@@ -20,7 +20,8 @@ beforeEach(() => {
   dock = document.createElement('div'); dock.className = 'ws-perf-dock';
   pill = document.createElement('button'); pill.className = 'ws-perf';
   pill.innerHTML = '<b>120</b><span class="ws-perf-ms">max 9 ms</span><span class="ws-perf-long">8.3 / 9.3 ms · max 9 ms · 118 calls · 541k tris · desktop · bench</span>';
-  card = document.createElement('div'); card.className = 'ws-grid-budget'; card.innerHTML = '<i class="ws-grid-budget-label">mem</i><b class="ws-grid-budget-gb">1.16</b>';
+  card = document.createElement('div'); card.className = 'ws-grid-budget';
+  card.innerHTML = '<button class="ws-grid-budget-chip"><span class="ws-grid-budget-icon"></span><b class="ws-grid-budget-gb">1.16</b></button>';
   dock.append(pill, card); document.body.append(dock);
 });
 afterEach(() => { document.head.innerHTML = ''; document.body.replaceChildren(); view(1024, 768); });

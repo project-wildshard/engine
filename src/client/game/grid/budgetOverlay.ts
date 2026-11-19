@@ -1,11 +1,8 @@
 /**
- * The memory card (SHARD-PLATFORM SF38 / G30, rebuilt by G628's memory-strip rows M1 / M3 / M5 / M7): Developer mode only,
- * grid pages only. A14 (Jake, 2026-11-10: "MEM becomes a really small card at the top, labelled mem, right next to the FPS
- * chip"): a chip on the Developer dock (`perfDock.ts`) reading "mem 1.46" (GB), toned by its band, with a red "!" while a
- * shard is over its limit. The chip shows EM11's playing estimate and the largest sampled EM11 estimate
- * through boot. The panel adds the playing upper bound, device crash line, world limits, entry trend,
- * and observed allocations. Claims and observations can supply the labelled fallback before the ledger
- * is available. The panel reads once a second.
+ * The Developer memory button shows the EM11 playing estimate (GB) in its danger band. The panel
+ * adds the source, the peak across boot checkpoints and displayed readings, the playing upper
+ * bound, device crash line, world limits, entry trend, and observed allocations. Claims and
+ * observations supply the fallback while the ledger is unavailable. The panel reads once a second.
  *
  * Costs nothing when off: no element and no timer exist until the Developer switch is on; switching it off stops the
  * timer and hides the strip (the trend still records each entry: one allocator read). Text is authored with
@@ -73,7 +70,7 @@ export interface BudgetOverlay {
   readonly crossed: () => void;
 }
 
-/** Playing estimate with its source and the peak sampled during loading. */
+/** Playing estimate with its source and the high-water readings for this overlay. */
 export interface MemoryHeadline {
   readonly bytes: number; readonly tone: PointsTone;
   /** the cost model's playing bytes */
@@ -83,13 +80,14 @@ export interface MemoryHeadline {
   /** which of the two the headline is */
   readonly source: 'model' | 'native' | 'observed' | 'predicted';
   readonly loadingPeak: number | null;
+  readonly peak: number;
 }
 export function memoryTone(bytes: number): PointsTone { return bytes >= MEMORY_RED ? 'red' : bytes >= MEMORY_AMBER ? 'amber' : 'green'; }
 export function memoryHeadline(model: number, snapshot: MemorySnapshot | null, engineBase: number): MemoryHeadline {
   const native = snapshot?.measured ?? null, observed = snapshot === null ? 0 : snapshot.totals.gpu + snapshot.totals.ram;
   const measured = native !== null ? native.webContentBytes + native.labelledGpuBytes : observed > 0 ? engineBase + observed : null;
   const bytes = Math.max(model, measured ?? 0);
-  return { bytes, tone: memoryTone(bytes), model, measured, loadingPeak: null,
+  return { bytes, tone: memoryTone(bytes), model, measured, loadingPeak: null, peak: bytes,
     source: measured === null || measured <= model ? 'model' : native !== null ? 'native' : 'observed' };
 }
 
@@ -115,7 +113,8 @@ function section(title: string, ...rows: HTMLElement[]): HTMLElement {
 /** Install the strip on a grid page; everything leaves with the scope. */
 export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   const { scope } = host;
-  let root: HTMLElement | null = null, gb: HTMLElement | null = null, badge: HTMLElement | null = null, alert: HTMLElement | null = null, bar: HTMLElement | null = null, detail: HTMLElement | null = null, more: HTMLElement | null = null;
+  let root: HTMLElement | null = null, chip: HTMLButtonElement | null = null, gb: HTMLElement | null = null;
+  let bar: HTMLElement | null = null, detail: HTMLElement | null = null, more: HTMLElement | null = null;
   let crash: ReturnType<typeof phoneCrashLine> | null = null;
   let timer: ReturnType<typeof setInterval> | 0 = 0, expanded = false, last: BudgetPoints | null = null, head: MemoryHeadline | null = null, signature = '';
   let group: MemoryGrouping = 'owner', sort: MemorySort = 'total';
@@ -143,10 +142,10 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   }
   const paint = (points: BudgetPoints, headline: MemoryHeadline, parts: ReturnType<typeof budgetBreakdown>, memory: MemorySnapshot | null,
     over: readonly { readonly owner: string; readonly overBytes: number }[], prediction: PhoneBudgetReading | null): void => {
-    if (root === null || gb === null || badge === null || alert === null || bar === null || more === null || crash === null) return;
+    if (root === null || chip === null || gb === null || bar === null || more === null || crash === null) return;
     const worlds = parts.worlds.length, start = prediction === null ? trend[0] : undefined;
     const since = start === undefined ? '' : ` · ${headline.bytes >= start ? '+' : '−'}${Math.round(Math.abs(headline.bytes - start) / 1e6)} MB SINCE START`;
-    const source = SOURCE[headline.source], peak = headline.loadingPeak === null ? '—' : GB(headline.loadingPeak);
+    const source = SOURCE[headline.source], peak = GB(headline.peak);
     const crashLine = crash.bytes === null ? 'UNMEASURED' : `${GB(crash.bytes)} GB`;
     const line = el('span', 'ws-grid-budget-x', `${source} ≈${GB(headline.bytes)} GB PLAYING · ${worlds} ${worlds === 1 ? 'WORLD' : 'WORLDS'}${since}`);
     data(line, 'tone', headline.tone); data(line, 'bytes', headline.bytes); data(line, 'source', headline.source);
@@ -156,17 +155,17 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
     });
     bar.replaceChildren(line, ...lines);
     gb.textContent = GB(headline.bytes); data(gb, 'tone', headline.tone);
-    badge.textContent = `${source} · peak ${peak}`;
-    data(root, 'source', headline.source); data(root, 'playing-bytes', headline.bytes);
+    data(chip, 'tone', headline.tone);
+    chip.toggleAttribute('data-over-limit', over.length > 0);
+    data(root, 'source', headline.source); data(root, 'playing-bytes', headline.bytes); data(root, 'peak-bytes', headline.peak);
     if (headline.loadingPeak === null) delete root.dataset['loadingPeakBytes'];
     else data(root, 'loading-peak-bytes', headline.loadingPeak);
-    alert.hidden = over.length === 0; alert.textContent = over.length > 1 ? `!${String(over.length)}` : '!';
-    root.setAttribute('aria-label', `${line.textContent ?? ''} · LOADING PEAK ${peak}${headline.loadingPeak === null ? '' : ' GB'}`);
+    chip.setAttribute('aria-label', `Memory ${gb.textContent} GB`);
     if (!expanded) { allocationScope?.dispose(); allocationScope = null; more.replaceChildren(); return; }
     if (prediction !== null) line.title = `Predicted phone range ${GB(prediction.range.low)}–${GB(prediction.range.high)} GB`;
     const total = section('MEMORY ESTIMATES',
       ...(prediction === null ? [] : [row('EM11 PLAYING UPPER', `${GB(prediction.range.high)} GB`)]),
-      row('LOADING PEAK · EM11 CHECKPOINTS', headline.loadingPeak === null ? 'NOT SAMPLED' : `${peak} GB`),
+      row('PEAK SINCE LOAD', `${peak} GB`),
       row(`CRASH LINE · ${crash.label}`, crashLine),
       row('MODEL (CLAIMS)', MB(headline.model), headline.source === 'model' ? headline.tone : null),
       ...(prediction === null ? [] : [row('PHONE PREDICTION RANGE', `${GB(prediction.range.low)}–${GB(prediction.range.high)} GB`)]),
@@ -200,14 +199,15 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
     if (next === signature && last !== null) return;
     signature = next;
     last = readBudgetPoints({ entries: () => entries, cost: () => cost }, { name: label, ...(host.shard === undefined ? {} : { shard: host.shard }) });
-    head = read(cost, memory);
-    if (prediction !== null) head = { ...head, bytes: prediction.range.central, tone: memoryTone(prediction.range.central), source: 'predicted' };
-    head = { ...head, loadingPeak };
+    const fallback = read(cost, memory);
+    const playing: MemoryHeadline = prediction === null ? fallback
+      : { ...fallback, bytes: prediction.range.central, tone: memoryTone(prediction.range.central), source: 'predicted' };
+    head = { ...playing, loadingPeak, peak: Math.max(head?.peak ?? 0, playing.bytes, loadingPeak ?? 0) };
     paint(last, head, budgetBreakdown(entries, cost), expanded ? memory : null, over, prediction);
   }
   const toggle = (): void => {
-    if (root === null || detail === null) return;
-    expanded = !expanded; root.setAttribute('aria-expanded', String(expanded)); detail.hidden = !expanded;
+    if (chip === null || detail === null) return;
+    expanded = !expanded; chip.setAttribute('aria-expanded', String(expanded)); detail.hidden = !expanded;
     refresh();
   };
   const crossed = (): void => {
@@ -225,15 +225,18 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
   };
   const build = (): void => {
     crash = phoneCrashLine(navigator.userAgent, screen.width, screen.height, devicePixelRatio);
-    root = el('div', 'ws-grid-budget'); root.setAttribute('role', 'button'); root.setAttribute('aria-expanded', 'false'); root.tabIndex = -1;
-    gb = el('b', 'ws-grid-budget-gb', '—'); badge = el('span', 'ws-grid-budget-label'); alert = el('i', 'ws-grid-budget-alert', '!'); alert.hidden = true;
+    root = el('div', 'ws-grid-budget');
+    chip = document.createElement('button'); chip.type = 'button'; chip.className = 'ws-grid-budget-chip'; chip.setAttribute('aria-expanded', 'false');
+    const icon = el('span', 'ws-grid-budget-icon'); icon.setAttribute('aria-hidden', 'true');
+    gb = el('b', 'ws-grid-budget-gb', '—');
+    chip.append(icon, gb);
     // the panel: the headline and the over-limit lines, then (expanded) the breakdown
     bar = el('div', 'ws-grid-budget-bar'); more = el('div', 'ws-grid-budget-more'); detail = el('div', 'ws-grid-budget-detail'); detail.hidden = true;
     detail.append(bar, more);
-    root.append(el('i', 'ws-grid-budget-label', 'mem'), gb, badge, alert, detail);
+    root.append(chip, detail);
     // the card takes its own taps; the touch controls under it never see them
     scope.listen(root, 'pointerdown', (event: Event) => { event.stopPropagation(); });
-    scope.listen(root, 'click', (event: Event) => { event.stopPropagation(); toggle(); });
+    scope.listen(chip, 'click', (event: Event) => { event.stopPropagation(); toggle(); });
     perfDockChip(root, scope, 10);
   };
   const sync = (on: boolean): void => {

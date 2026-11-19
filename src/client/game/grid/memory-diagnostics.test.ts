@@ -24,21 +24,24 @@ test('G628 M1/M3: one line, the page headline in its danger band; the shard limi
   setDev(true);
   const scope = owner(), hud = document.body, bytes = 321_621_621;
   const input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: bytes, commons: 0, overlap: 80_000_000 };
-  const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Driftwood Isle', memory: () => observed(0, 0),
+  withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Driftwood Isle', memory: () => observed(0, 0),
     allocator: { entries: () => [sim('dw', bytes)], cost: () => ({ ...contentCost(input), input }) } }));
   const line = hud.querySelector<HTMLElement>('.ws-grid-budget-x');
   expect(line?.textContent).toBe(`CLAIMS ≈${(contentCost(input).playing / 1e9).toFixed(2)} GB PLAYING · 1 WORLD`);
   expect(line?.dataset['tone']).toBe('green');
-  // A14: the card on the Developer dock reads "mem 0.70", toned; the headline above waits in its panel
+  // The dock button has one visible number. The headline above waits in its panel.
   const card = document.querySelector<HTMLElement>('.ws-perf-dock .ws-grid-budget');
-  expect(card?.querySelector('.ws-grid-budget-label')?.textContent).toBe('mem');
-  expect(card?.querySelector<HTMLElement>('.ws-grid-budget-gb')?.textContent).toBe((contentCost(input).playing / 1e9).toFixed(2));
+  const chip = card?.querySelector<HTMLButtonElement>('button.ws-grid-budget-chip');
+  expect(chip?.querySelector('.ws-grid-budget-icon')?.getAttribute('aria-hidden')).toBe('true');
+  expect(chip?.textContent).toBe((contentCost(input).playing / 1e9).toFixed(2));
+  expect(chip?.getAttribute('aria-label')).toBe(`Memory ${chip?.textContent} GB`);
   expect(card?.querySelector<HTMLElement>('.ws-grid-budget-gb')?.dataset['tone']).toBe('green');
-  expect(card?.querySelector<HTMLElement>('.ws-grid-budget-alert')?.hidden).toBe(true);
+  expect(chip?.dataset['overLimit']).toBeUndefined();
   expect(card?.querySelector<HTMLElement>('.ws-grid-budget-detail')?.hidden).toBe(true);
   for (const gone of ['SHARDS OK', 'SHARED', 'OF BUDGET', 'NO OWNER']) expect(hud.textContent).not.toContain(gone);
   expect(hud.querySelector('[data-owner="dw"]')).toBeNull();
-  overlay.toggle();
+  chip?.click();
+  expect(chip?.getAttribute('aria-expanded')).toBe('true');
   // d2ef0c0848 calibrates the base to 250 MiB: 262144000 + ceil(bytes * 1.11) + 80000000 = 699144000.
   expect(hud.querySelector('[data-owner="dw"]')?.textContent).toBe('DRIFTWOOD ISLE58% · 699 / 1200 MB');
   expect(hud.querySelector('.ws-grid-budget-gauge')).toBeNull();
@@ -103,7 +106,7 @@ test('collapsed strip reads current totals and expands with full allocation deta
   } finally { vi.useRealTimers(); }
 });
 
-test('the chip shows EM11 central and boot peak, while the panel shows the playing upper and subsystem budgets', async () => {
+test('the chip shows EM11 central, while the panel shows the peak, upper and subsystem budgets', async () => {
   const playing = { gpu: { buffer: 300e6, texture: 10e6 }, workers: { 'decoder/wasm': 2e6 } };
   const loading = { ...playing, ram: { decode: 150e6 } };
   let ledger = loading;
@@ -120,17 +123,18 @@ test('the chip shows EM11 central and boot peak, while the panel shows the playi
     document.dispatchEvent(new Event('ws:control-ready'));
     const scope = owner(), input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: 0, commons: 0, overlap: 0 };
     const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: id => id,
-      memory: () => observed(2e9, 3e9),
+      memory: () => observed(100e6, 0),
       allocator: { entries: () => [], cost: () => ({ ...contentCost(input), input }) } }));
     await vi.dynamicImportSettled();
     const range = phoneFromLedger(playing, phoneModel), peak = phoneFromLedger(loading, phoneModel).central;
     const chip = document.querySelector<HTMLElement>('.ws-grid-budget');
-    expect(chip?.dataset).toMatchObject({ source: 'predicted', playingBytes: String(range.central), loadingPeakBytes: String(peak) });
-    expect(chip?.textContent).toContain(`EM11 · peak ${(peak / 1e9).toFixed(2)}`);
-    expect(overlay.headline()).toMatchObject({ source: 'predicted', bytes: range.central, loadingPeak: peak });
+    expect(chip?.dataset).toMatchObject({ source: 'predicted', playingBytes: String(range.central), loadingPeakBytes: String(peak), peakBytes: String(peak) });
+    expect(chip?.querySelector('button')?.textContent).toBe((range.central / 1e9).toFixed(2));
+    expect(overlay.headline()).toMatchObject({ source: 'predicted', bytes: range.central, loadingPeak: peak, peak });
     overlay.toggle();
     expect(document.querySelector('.ws-grid-budget-x')?.textContent).toContain('EM11');
     expect(chip?.textContent).toContain(`EM11 PLAYING UPPER${(range.high / 1e9).toFixed(2)} GB`);
+    expect(chip?.textContent).toContain(`PEAK SINCE LOAD${(peak / 1e9).toFixed(2)} GB`);
     expect(chip?.textContent).toContain('CRASH LINE · IPHONE 13-CLASSUNMEASURED');
     const geometry = document.querySelector<HTMLElement>('[data-subsystem="geometry"]');
     expect(geometry?.dataset).toMatchObject({ liveBytes: '300000000', budgetBytes: '150000000', tone: 'red' });
@@ -138,6 +142,37 @@ test('the chip shows EM11 central and boot peak, while the panel shows the playi
     expect(document.querySelector<HTMLElement>('[data-subsystem="workers"]')?.dataset['liveBytes']).toBe('2000000');
   } finally {
     setDev(false);
+    startBoot({ id: 'nine', name: 'Nine' }, false);
+    vi.unstubAllGlobals();
+  }
+});
+
+test('the peak includes a higher playing reading and holds it after memory falls', async () => {
+  const low = { gpu: { buffer: 300e6 } }, high = { gpu: { buffer: 550e6 } };
+  let playing = low;
+  vi.stubGlobal('__wildshardMemory', { counters: () => playing });
+  provideBootLedger(() => low);
+  try {
+    setDev(true);
+    startBoot({ id: 'nine', name: 'Nine' }, false);
+    recordBootCheckpoint('decode:peak');
+    document.dispatchEvent(new Event('ws:control-ready'));
+    const scope = owner(), input: ContentCostInput = { l0: 0, l1: 0, far: 0, libraries: 0, sims: 0, commons: 0, overlap: 0 };
+    const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: id => id, memory: () => observed(0, 0),
+      allocator: { entries: () => [], cost: () => ({ ...contentCost(input), input }) } }));
+    await vi.dynamicImportSettled();
+    const lowBytes = phoneFromLedger(low, phoneModel).central, highBytes = phoneFromLedger(high, phoneModel).central;
+    expect(highBytes).toBeGreaterThan(lowBytes);
+    expect(overlay.headline()).toMatchObject({ bytes: lowBytes, loadingPeak: lowBytes, peak: lowBytes });
+    playing = high;
+    overlay.refresh();
+    expect(overlay.headline()).toMatchObject({ bytes: highBytes, loadingPeak: lowBytes, peak: highBytes });
+    playing = low;
+    overlay.refresh();
+    document.querySelector<HTMLButtonElement>('.ws-grid-budget-chip')?.click();
+    expect(overlay.headline()).toMatchObject({ bytes: lowBytes, loadingPeak: lowBytes, peak: highBytes });
+    expect(document.querySelector('.ws-grid-budget-detail')?.textContent).toContain(`PEAK SINCE LOAD${(highBytes / 1e9).toFixed(2)} GB`);
+  } finally {
     startBoot({ id: 'nine', name: 'Nine' }, false);
     vi.unstubAllGlobals();
   }
@@ -158,7 +193,7 @@ test('G628 M4/M7: a red line per shard over its limit; the trend keeps the first
   const overlay = withOwner(scope, () => installBudgetOverlay({ scope, name: () => 'Nine', memory: () => observed(0, 0),
     overLimit: () => [{ owner: 'nine', overBytes: 50_000_000 }], allocator: { entries: () => [sim('nine', sims)], cost } }));
   expect(hud.querySelector('.ws-grid-budget-over')?.textContent).toBe('NINE OVER ITS LIMIT · +50.0 MB');
-  expect(hud.querySelector<HTMLElement>('.ws-grid-budget-alert')?.hidden).toBe(false);
+  expect(hud.querySelector<HTMLElement>('.ws-grid-budget-chip')?.dataset['overLimit']).toBeDefined();
   const start = cost().playing;
   for (let i = 0; i < 9; i++) { overlay.crossed(); sims += 10_000_000; }
   await new Promise(resolve => { setTimeout(resolve, 0); }); // each entry's line follows it by a task

@@ -13,7 +13,7 @@ import { saveStorage } from '../saves/slots';
  *
  * Phones (E47, Jake: "a compact FPS counter next to the pause button … '59 fps 17 ms' … when you tap it it can expand to
  * show calls and tris … on top of the mini map"): perf.css turns the meter into a small glass pill on PAUSE's row showing
- * only fps + worst ms; it is a button, and a tap opens `.ws-perf-panel` over the minimap (p50 / p95, draw calls, triangles,
+ * only fps; it is a button, and a tap opens `.ws-perf-panel` over the minimap (worst ms, p50 / p95, draw calls, triangles,
  * tier · DPR, GL losses). It stays up until the pill is tapped again (a toggle — E142). The pill cancels its own touch events (no
  * double-tap zoom, no callout / selection on iOS) and toggles on pointerup, so it never starts a look drag. Desktop keeps
  * the one-line readout, click-through as before.
