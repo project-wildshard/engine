@@ -13,6 +13,7 @@
  * know (a deprecated name) stays an include line for three to resolve or refuse.
  */
 import * as THREE from 'three';
+import { recordSource, replaySource, shaderSourceCacheActive, sourceKey } from './shaderSourceCache';
 
 type ShaderText = Pick<THREE.WebGLProgramParametersWithUniforms, 'vertexShader' | 'fragmentShader' | 'numSunLights' | 'numDirLights'
   | 'numSpotLights' | 'numSpotLightMaps' | 'numRectAreaLights' | 'numPointLights' | 'numHemiLights' | 'numSunLightShadows'
@@ -80,11 +81,21 @@ export function finishShaderText(shader: ShaderText): void {
     shader.vertexShader = known.vertex; shader.fragmentShader = known.fragment; return;
   }
   const vertexRaw = shader.vertexShader, fragmentRaw = shader.fragmentShader, read = new Map<string, string>();
+  const cacheKey = shaderSourceCacheActive() ? `${sourceKey(vertexRaw)}/${sourceKey(fragmentRaw)}/${counts}` : undefined;
+  interface FinishedSource { vertex: string; fragment: string; chunks: [string, string][] }
+  const saved = cacheKey === undefined ? undefined : replaySource('finish', cacheKey) as FinishedSource | undefined;
+  if (saved !== undefined && saved.chunks.every(([name, key]) => sourceKey(chunkText[name] ?? '') === key)) {
+    shader.vertexShader = saved.vertex;
+    shader.fragmentShader = saved.fragment;
+    return;
+  }
   reads = read;
   try {
     shader.vertexShader = fillCounts(resolveIncludes(vertexRaw), shader);
     shader.fragmentShader = fillCounts(resolveIncludes(fragmentRaw), shader);
   } finally { reads = undefined; }
+  if (cacheKey !== undefined) recordSource('finish', cacheKey, { vertex: shader.vertexShader, fragment: shader.fragmentShader,
+    chunks: [...read].map(([name, text]) => [name, sourceKey(text)]) });
   if (entries >= FINISHED_BOUND) { finished.clear(); entries = 0; }
   let fragments = finished.get(vertexRaw);
   if (fragments === undefined) { fragments = new Map(); finished.set(vertexRaw, fragments); }

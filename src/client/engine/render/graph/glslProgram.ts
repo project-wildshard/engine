@@ -20,6 +20,7 @@
 import * as THREE from 'three';
 import { parseFamilyMaterial } from '@wildshard/format/materialFamilies';
 import type { GraphLiteral } from '@wildshard/format/materialGraph';
+import { recordSource, replaySource, shaderSourceCacheActive, sourceKey } from '../shaderSourceCache';
 import { emitGraphGlsl, graphGlslLibraries, type EmitGraphGlslOptions, type GraphGlsl, type GraphGlslProgram, type GraphGlslUniform } from './glsl';
 import { toonGraph } from './presets';
 import type { ToonLook } from '../families/toon';
@@ -662,6 +663,10 @@ export function graphShaders(glsl: GraphGlsl, opts: GraphShaderOptions = {}): Gr
     if (lent === undefined && from.get(u.name) === 'graph') shared?.set(u.name, value);
     uniforms[u.name] = value;
   }
+  const cacheKey = shaderSourceCacheActive() ? sourceKey(JSON.stringify([program, glsl.attributes, own, glsl.libraries, glsl.ir.kind, glsl.ir.model,
+    glsl.ir.effectState, glsl.ir.stages.surface?.alphaCutoff, fog?.glsl.fog, fog?.glsl.fogSample, fog?.glsl.libraries, opts.outline, opts.depth, opts.weighted])) : undefined;
+  type Text = Pick<GraphShaders, 'vertexShader' | 'fragmentShader'>;
+  const savedText = cacheKey === undefined ? undefined : replaySource('wrap', cacheKey) as Text | undefined;
   const libraries = graphGlslLibraries([...glsl.libraries, ...(fog?.glsl.libraries ?? [])]);
   const text = [...own.filter(u => u.name !== 'wsCodecStep').map(decl), libraries].join('\n'), ir = glsl.ir;
   if (ir.kind === 'post') {
@@ -672,7 +677,9 @@ export function graphShaders(glsl: GraphGlsl, opts: GraphShaderOptions = {}): Gr
       if (seen.has(name)) continue;
       uniforms[name] = { value }; postText += `\nuniform ${type} ${name};`;
     }
-    return { ...postShaders(program, postText, sample, opts.weighted === true), uniforms, lights: false, fog: false };
+    const shaders = savedText ?? postShaders(program, postText, sample, opts.weighted === true);
+    if (cacheKey !== undefined && savedText === undefined) recordSource('wrap', cacheKey, shaders);
+    return { ...shaders, uniforms, lights: false, fog: false };
   }
   const outline = opts.outline === true, depth = opts.depth === true, lit = !outline && !depth && ir.model !== 'unlit';
   const fogged = !depth && (outline || ir.effectState?.fog !== false);
@@ -689,10 +696,11 @@ export function graphShaders(glsl: GraphGlsl, opts: GraphShaderOptions = {}): Gr
     THREE.UniformsLib.roughnessmap, THREE.UniformsLib.aomap]), { envMapIntensity: { value: 1 } }, { ...uniforms });
   // three refreshes fogColor only for a fogged material: one that reads it unfogged keeps the uniforms (fog_fragment stays out)
   if (fogged || program.fragment.body.includes('wsFogColour()') || program.vertex.body.includes('wsFogColour()')) Object.assign(uniforms, THREE.UniformsUtils.clone(THREE.UniformsLib.fog), { ...uniforms });
-  return {
+  const shaders = savedText ?? {
     vertexShader: vertexShader(glsl, program, text, lit, declaredFog !== undefined, outline),
     fragmentShader: lit ? litFragment(glsl, program, skyLightFromLights(fragmentText), fogged, declaredFog, glsl.ir.model === 'toon')
       : unlitFragment(glsl, program, fragmentText, fogged, declaredFog, depth),
-    uniforms, lights: lit, fog: fogged || program.fragment.body.includes('wsFogColour()') || program.vertex.body.includes('wsFogColour()'),
   };
+  if (cacheKey !== undefined && savedText === undefined) recordSource('wrap', cacheKey, shaders);
+  return { ...shaders, uniforms, lights: lit, fog: fogged || program.fragment.body.includes('wsFogColour()') || program.vertex.body.includes('wsFogColour()') };
 }

@@ -33,6 +33,7 @@ import {
   GRAPH_OPS, MAX_GRAPH_BUDGET, SUN_OPS, validateGraph, type GraphCost, type GraphIr, type GraphLiteral, type GraphNode, type GraphRef, type GraphValidation,
   type GraphValidationOptions, type GraphValueType, type GraphBinding,
 } from '@wildshard/format/materialGraph';
+import { recordSource, replaySource, shaderSourceCacheActive, sourceKey } from '../shaderSourceCache';
 import { FRONT_LEN, FRONT_SPEED, FRONT2_LEN, WIND_DIR } from '../../world/wind';
 import { sampleWindField, type WindFieldMath } from '../../../../shared/engine/world/windField';
 import { GERSTNER_TERMS } from '../../../../shared/engine/world/waves';
@@ -225,6 +226,8 @@ const windGlsl: WindFieldMath<string> = {
  * Lower a graph to GLSL. Throws (with every reason) when validation refuses it, and on a graph the classic back-end
  * cannot carry (a varying inside a loop body).
  */
+type RecordedLowering = Omit<GraphGlsl, 'ir' | 'cost' | 'postFog'>;
+
 export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): GraphGlsl {
   if (opts.validated !== undefined && opts.validated.graph !== input) throw new Error('material graph: a validation of another graph');
   const checked = opts.validated ?? validateGraph(input, opts);
@@ -234,6 +237,11 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
   const postFog = ir.postFog === undefined ? undefined : emitGraphGlsl(ir.postFog.graph, dependencyOpts);
   if (postFog !== undefined && postFog.fogSample === undefined) throw new Error('material graph: post fog needs explicit transmission');
   if (ir.model === 'toon' && opts.toon === undefined) throw new Error('material graph: a toon graph needs the family preset ({ toon })');
+  const cacheKey = shaderSourceCacheActive() ? sourceKey(JSON.stringify([ir, opts.toon, opts.replaceEnvironmentDiffuse, opts.reportExecutionCost])) : undefined;
+  if (cacheKey !== undefined) {
+    const source = replaySource('lower', cacheKey) as RecordedLowering | undefined;
+    if (source !== undefined) return { ...source, ir, cost, ...(postFog === undefined ? {} : { postFog }) };
+  }
   const uniforms = new Map<string, GraphGlslUniform>();
   const uniform = (u: GraphGlslUniform): string => { if (!uniforms.has(u.name)) uniforms.set(u.name, u); return u.name; };
   const host = (h: GraphGlslHostUniform, type: Extract<GraphGlslUniform, { from: 'host' }>['type']): string => uniform({ name: `ws${h[0]?.toUpperCase() ?? ''}${h.slice(1)}`, type, from: 'host', host: h });
@@ -1098,13 +1106,18 @@ export function emitGraphGlsl(input: unknown, opts: EmitGraphGlslOptions = {}): 
   const outlined = ir.kind === 'material' && ir.stages.outline !== undefined ? emitProgram('outline') : null;
   const fogged = ir.kind === 'fog' ? emitProgram('fog') : null;
   const sampledFog = ir.kind === 'fog' && ir.stages.fog?.transmission !== undefined ? emitProgram('fogSample') : null;
-  return {
+  const emitted: GraphGlsl = {
     ir, cost, bindings, ...(postFog === undefined ? {} : { postFog }), program: main?.program ?? null, outline: outlined?.program ?? null, fog: fogged?.fogFunction ?? null,
     ...(sampledFog?.fogSample === null || sampledFog?.fogSample === undefined ? {} : { fogSample: sampledFog.fogSample }),
     ...(opts.reportExecutionCost === true ? { executionCost: { main: main?.execution ?? null, outline: outlined?.execution ?? null, fog: fogged?.execution ?? null, ...(sampledFog?.execution === null || sampledFog?.execution === undefined ? {} : { fogSample: sampledFog.execution }) } } : {}),
     libraries: (['hash', 'noise'] as const).filter(name => libraries.has(name)),
     uniforms: [...uniforms.values()], attributes: [...attributes.values()],
   };
+  if (cacheKey !== undefined) {
+    const { ir: _ir, cost: _cost, postFog: _postFog, ...text } = emitted;
+    recordSource('lower', cacheKey, text);
+  }
+  return emitted;
 }
 
 /** the code of the libraries lowered graphs call (`GraphGlsl.libraries`), each once, in a fixed order */
