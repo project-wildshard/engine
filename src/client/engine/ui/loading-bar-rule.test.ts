@@ -85,10 +85,12 @@ it('freezes ready accounting and headings at one rounding-boundary instant throu
     const done=loading.done(),times=loading.phaseTimes();void done.catch(()=>undefined);
     expect(times.total).toBeCloseTo(1049.99);expect(times.download).toBe(0);expect(times.load).toBeCloseTo(times.total);
     expect(loading.root.querySelector('[data-el="clock"]')?.textContent).toBe('00:01.0');
-    expect(loading.root.querySelector('[data-el="suFact"]')?.textContent).toBe('Held by the Developer switch · tap PLAY');
-    expect(loading.diagnosticsText()).toContain('load 1.0 s');
+    const held = 'Held by the Developer switch · tap PLAY';
+    expect(loading.root.querySelector('[data-el="suFact"]')?.textContent).toBe(held);
+    expect(loading.diagnosticsText()).toContain('total 1.0 s · start 0.0 s · download 0.0 s · load 1.0 s');
     readyClock.mockReturnValue(9100);await vi.advanceTimersByTimeAsync(1000);
     expect(loading.phaseTimes()).toEqual(times);expect(loading.root.querySelector('[data-el="clock"]')?.textContent).toBe('00:01.0');
+    expect(loading.root.querySelector('[data-el="suFact"]')?.textContent).toBe(held);
     loading.root.querySelector<HTMLButtonElement>('.ws-load-play')?.click();await vi.advanceTimersByTimeAsync(317);await done;
   }finally{loading.scope.dispose();setSetting('holdLoading',false);setDev(false);}
 });
