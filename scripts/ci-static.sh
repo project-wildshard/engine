@@ -30,7 +30,7 @@ if [ "$mode" = code ]; then
   check native-loadout proof sim-node-loader.mjs test/ci/native-loadout.proof.mjs
   check keyed-sky-clock proof sim-node-loader.mjs test/ci/keyed-sky-clock.proof.mjs
   check interaction-placement proof sim-node-loader.mjs test/ci/interaction-placement.proof.mjs
-  check declared-journeys bash -c 'node scripts/pins.ts install template && node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/declared-journeys.proof.mjs'
+  check declared-journeys bash -c 'node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/declared-journeys.proof.mjs'
   check weather bash -c 'node scripts/pins.ts install pine-hollow nalati-grasslands && node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs'
   check hybrid-render-preparation proof bake-loader.mjs test/ci/hybrid-render-preparation.proof.mjs
   check net-climate proof bake-loader.mjs test/ci/net-climate.proof.mjs
