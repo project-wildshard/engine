@@ -755,7 +755,7 @@ export class ShardfileClient {
       spent: spentUses(source, { read, taken: item => takenHere(item) }) });
     // meta MOSSGATE-ZONE MZ34: a look lamp naming a panel lights while that panel shows (a brazier's fire with its flames)
     const shownPanels: ReadonlyMap<string, { readonly visible: boolean }> = tiles.props?.panels ?? new Map();
-    ctx.scope.onDispose(setLampPanels(scene, panel => shownPanels.get(panel)?.visible ?? false));
+    ctx.scope.onDispose(setLampPanels(world.game.rootScene, panel => shownPanels.get(panel)?.visible ?? false));
     // SS-GP7: the one install list (races, talks, rides, a held tool's lines), on this page's wire; a grid stay walks the same list
     if (hasTalks(source) && presentation === null) throw new Error('Missing talk presentation module');
     installPlay(source, { ...playWire(), scope: ctx.scope, system: ctx.system, flags, prompts: runtime.interactables, root: ctx.root,
