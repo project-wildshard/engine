@@ -212,6 +212,13 @@ async function attach(socketUrl, { overrides = [] }) {
       await send('Network.setInterceptionEnabled', { enabled: false }, 15_000).catch(() => undefined);
       await send('Network.disable', {}, 15_000).catch(() => undefined);
     },
+    // meta IPHONE13-DRIFTWOOD DW6: a cold link run boots with Safari's resource cache off for this page (Web Inspector's
+    // "Disable Caches"), the nearest thing to an empty HTTP cache with no finger on the glass; a warm run turns it back on.
+    /** @param {boolean} off */
+    cacheOff: async (off) => {
+      if (off) await send('Network.enable', {}, 15_000).catch(() => undefined);
+      await send('Network.setResourceCachingDisabled', { disabled: off }, 15_000);
+    },
     /** @param {string} script @param {unknown[]} [args] */
     evaluate: (script, args = []) => run(syncExpression(script, args), false, 60_000),
     /** @param {string} script @param {unknown[]} args @param {number} timeoutMs */

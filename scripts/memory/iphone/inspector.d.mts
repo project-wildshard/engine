@@ -11,6 +11,8 @@ export interface InspectedSafari {
   freshTab: () => Promise<void>;
   /** turns the Network agent off once the page has control (overrides are for the boot) */
   quiet: () => Promise<void>;
+  /** Web Inspector's Disable Caches for this page (DW6 cold runs) */
+  cacheOff: (off: boolean) => Promise<void>;
   evaluate: (script: string, args?: unknown[]) => Promise<unknown>;
   evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<unknown>;
   click: (element: { __wsElement: number }) => Promise<unknown>;
