@@ -13,7 +13,8 @@ import { createHash } from 'node:crypto';
 import * as v from 'valibot';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import { proveAuthoredGrid, createShardfileSim, bindShardfileSim, type ShardfileSimulation } from '@wildshard/engine/game/plugin/simulation';
-import { installDeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
+import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
+import { tapeKitCommand } from '../tapeKitCommand';
 import { createSimSnapshotSerializer, snapshotSimHostBytes, decodeSimSnapshot, checkSimSnapshotWire } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 
@@ -25,6 +26,8 @@ import { headlessSections } from '@wildshard/format/headlessSections';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
 import { offlineMemoryAdmission, prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
+
+const PLAYER = 'actor.player';
 
 await runTickWorker(async raw => {
   const payload = v.parse(v.strictObject({ shard: v.unknown(), assets: v.map(v.string(), v.instance(Uint8Array)), binary: v.string(), snapshot: v.optional(v.string()), sections: v.exactOptional(v.map(v.string(), v.unknown())), product: v.exactOptional(v.string()) }), raw);
@@ -48,10 +51,13 @@ await runTickWorker(async raw => {
     coins: (amount: number, actorId: string) => { effects.push({ kind: 'coins', amount, actorId }); },
   } };
   let sim = createShardfileSim(shard, payload.assets, ports);
+  // ONE-FORMAT OF42b: the shard's declared kit, as cellWorld installs it with the simulation, so a tape's attack swings a
+  // sword the shard declares and its E takes a rack; a restore finds the kit's seats where the save put them.
+  let kit: DeclaredKitItems | null = installDeclaredKitItems(sim.host, shard, sim.itemHooks);
   if (payload.snapshot !== undefined) {
     const level = sim.host.level; sim.dispose();
     let installed: ShardfileSimulation | undefined;
-    const host = restoreSimHost(level, { rapier }, decodeSimSnapshot(payload.snapshot), fresh => { installed = bindShardfileSim(fresh, shard, payload.assets, { ...ports, restoring: true }); });
+    const host = restoreSimHost(level, { rapier }, decodeSimSnapshot(payload.snapshot), fresh => { installed = bindShardfileSim(fresh, shard, payload.assets, { ...ports, restoring: true }); kit = installDeclaredKitItems(fresh, shard, installed.itemHooks); });
     if (installed === undefined) { host.dispose(); throw new Error('Missing restored headless adapters'); }
     sim = installed;
   }
@@ -78,14 +84,18 @@ await runTickWorker(async raw => {
   const step=(input:readonly HeadlessCommand[]):void => {
       scriptMicros = 0; decisionFuel = 0; effects = []; const numeric = new Map<string, number>(); let player: SimCommand | undefined;
       for (const command of input) {
-        if (command.kind === 'player') player = simPlayerCommand(command);
+        if (command.kind === 'player') {
+          player = simPlayerCommand(command);
+          // the command a cell's client sends, its seq the tick's own, so a restored worker presses the same
+          kit?.command(PLAYER, tapeKitCommand(sim.host, PLAYER, command, sim.host.state.tick + 1));
+        }
         else if(command.kind==='launcher')throw new Error('Launcher input requires a native bolt owner');
-        else if (command.kind === 'interact') sim.interact(command.id);
+        else if (command.kind === 'interact') { if (kit?.scene(PLAYER, command.id) !== true) sim.interact(command.id); }
         else if (command.kind === 'script') {
           if (!sim.actors.has(command.actorId)) throw new Error('Unknown command actor'); numeric.set(command.actorId, command.value);
         } else { if (sim.lane === undefined) throw new Error('Event requires a script lane'); sim.lane.enqueue({ type: command.type, target: command.target, value: command.value }); }
       }
-      commands = numeric; sim.host.step(player === undefined ? undefined : new Map([['actor.player', player]]));
+      commands = numeric; sim.host.step(player === undefined ? undefined : new Map([[PLAYER, player]]));
       for (const body of sim.host.players.values()) if (!Number.isFinite(body.position.x) || !Number.isFinite(body.position.y) || !Number.isFinite(body.position.z)) throw new Error('Nonfinite headless simulation state');
       for (const body of sim.host.entities.values()) if (!Number.isFinite(body.position.x) || !Number.isFinite(body.position.y) || !Number.isFinite(body.position.z)) throw new Error('Nonfinite headless simulation state');
       const script=sim.lane?.host.checkpoint();

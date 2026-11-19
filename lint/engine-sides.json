@@ -1491,6 +1491,7 @@
     "src/server/host/standalone/serverRuntime.ts": "server",
     "src/server/host/standalone/serverFolder.ts": "server",
     "src/server/host/standalone/serverWorker.ts": "server",
+    "src/server/host/tapeKitCommand.ts": "server",
     "src/server/host/tickWorkerHost.ts": "server",
     "src/server/host/tickWorkerLoop.ts": "server",
     "src/shared/engine/ai/ambientFlight.ts": "shared",
