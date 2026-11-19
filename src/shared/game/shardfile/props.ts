@@ -5,7 +5,9 @@ import type { ColliderDesc } from '@wildshard/engine/world/registry';
 /** Remove absent optional fields before handing admitted shapes to the engine's exact collider descriptor port. */
 export function propColliderDescriptors(props: ShardProps): { id: string; initialActive: boolean; shapes: ColliderDesc[] }[] {
   return props.colliders.map((row) => ({ id: row.id, initialActive: row.initialActive, shapes: row.shapes.map((shape): ColliderDesc => {
-    const material = shape.surface === undefined ? {} : { surface: shape.surface };
+    // OF22a3: a baked solid's own contact rides with it
+    const material = { ...(shape.surface === undefined ? {} : { surface: shape.surface }), ...(shape.friction === undefined ? {} : { friction: shape.friction }),
+      ...(shape.groups === undefined ? {} : { groups: shape.groups }) };
     if (shape.kind === 'treads') return { kind: 'treads', from: { ...shape.from }, to: { ...shape.to }, width: shape.width, count: shape.count, ...material };
     const pose = { x: shape.x, y: shape.y, z: shape.z,
       ...(shape.yaw === undefined ? {} : { yaw: shape.yaw }), ...(shape.rot === undefined ? {} : { rot: { ...shape.rot } }) };
@@ -14,6 +16,7 @@ export function propColliderDescriptors(props: ShardProps): { id: string; initia
       points.set(shape.points);
       return { kind: 'hull', ...pose, points, ...material };
     }
+    if (shape.kind === 'capsule') return { kind: 'capsule', ...pose, halfHeight: shape.halfHeight, radius: shape.radius, ...material };
     return { kind: 'box', ...pose, hx: shape.hx, hy: shape.hy, hz: shape.hz, ...material };
   }) }));
 }

@@ -1426,6 +1426,7 @@
     "src/server/game/shardfile/groupRuntime.ts": "server",
     "src/server/game/shardfile/homeKeeper.ts": "server",
     "src/server/game/shardfile/installedSides.ts": "server",
+    "src/server/game/shardfile/assemblySolids.ts": "server",
     "src/server/game/shardfile/nativeAssembly.ts": "server",
     "src/server/game/shardfile/nativeAssemblyHosts.ts": "server",
     "src/server/game/shardfile/nativeAssemblyInput.ts": "server",

@@ -19,7 +19,8 @@ export function treadBoxes(d: Extract<ColliderDesc, { kind: 'treads' }>): Extrac
   const out: Extract<ColliderDesc, { kind: 'box' }>[] = [];
   for (let i = 0; i < d.count; i++) {
     const f = (i + 0.5) / d.count, top = d.from.y + rise * (i + 1), hy = Math.max(0.01, (top - d.from.y) / 2);
-    out.push({ kind: 'box', x: d.from.x + dx * f, y: d.from.y + hy, z: d.from.z + dz * f, hx: d.width / 2, hy, hz: run / 2, yaw, ...(d.surface === undefined ? {} : { surface: d.surface }) });
+    out.push({ kind: 'box', x: d.from.x + dx * f, y: d.from.y + hy, z: d.from.z + dz * f, hx: d.width / 2, hy, hz: run / 2, yaw, ...(d.surface === undefined ? {} : { surface: d.surface }),
+      ...(d.friction === undefined ? {} : { friction: d.friction }), ...(d.groups === undefined ? {} : { groups: d.groups }) });
   }
   return out;
 }
@@ -28,6 +29,8 @@ export function treadBoxes(d: Extract<ColliderDesc, { kind: 'treads' }>): Extrac
 // template per world; never retain native handles or skip a collider creation.
 const lastBox = new WeakMap<Physics, { hx: number; hy: number; hz: number; desc: RapierDesc }>();
 const IDENTITY_ROTATION = { x: 0, y: 0, z: 0, w: 1 } as const;
+/** Rapier's own default friction: a reused box descriptor must not carry the preceding solid's (OF22a3). */
+const DEFAULT_FRICTION = 0.5;
 function rapierDesc(physics: Physics, d: Exclude<ColliderDesc, { kind: 'treads' }>): RapierDesc | null {
   const { R } = physics;
   switch (d.kind) {
@@ -89,7 +92,7 @@ export function addPiece(physics: Physics, piece: Piece, frame?: Object3D): Adde
     const made = (target: Physics, d: Exclude<ColliderDesc, { kind: 'treads' }>, raw: ColliderDesc): Collider | null => {
       const desc = rapierDesc(target, d);
       if (desc === null) return null; // a degenerate hull: nothing to collide with
-      desc.setTranslation(d.x, d.y, d.z).setCollisionGroups(collisionGroups);
+      desc.setTranslation(d.x, d.y, d.z).setCollisionGroups(d.groups ?? collisionGroups).setFriction(d.friction ?? DEFAULT_FRICTION);
       if (d.rot) desc.setRotation(d.rot);
       else if (d.yaw !== undefined && d.yaw !== 0) desc.setRotation({ x: 0, y: Math.sin(d.yaw / 2), z: 0, w: Math.cos(d.yaw / 2) });
       else desc.setRotation(IDENTITY_ROTATION); // a reused box must not carry the preceding piece's rotation

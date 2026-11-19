@@ -12,6 +12,7 @@ import { createNativeBakeReader, installNativeCollision, nativeBakeGround, type 
 import { NativePopulationField } from '../population/environment';
 import { need, readAssemblyInput, type AssemblyGround, type AssemblyPrepared, type NativeAssemblyContext, type NativeAssemblyPorts } from './nativeAssemblyInput';
 import { prepareAssemblyFeature, type AssemblyRun } from './nativeAssemblyHosts';
+import { installAssemblySolids, standsOwnSolids } from './assemblySolids';
 import { readPatrolIntake } from '../boss/patrolNative';
 import { readSlotIntake } from '../boss/slotsNative';
 import { readWindIntake } from '../boss/windEliteNative';
@@ -133,6 +134,9 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   const declaredLevel: SimLevel = { ...level, entities: declaredSpawnEntities(counted) };
   const world = sectionWorld(product, plan);
+  // OF22a3: with no collision host the bake lends its ground alone and the shard's prop solids stand beside it
+  const ownSolids = standsOwnSolids(plan.features.map(row => row.host));
+  const ownGround = ownSolids && plan.bake !== undefined && plan.collision !== undefined ? { bake, resolution: plan.collision.resolution } : null;
   const levelPorts = { ground: false as const, heightAt };
   const walk = (host: SimHost): ReturnType<typeof proveTerrainEntries> => proveTerrainEntries(host.physics, shard.entryways, heightAt, plan.entries.walk as Parameters<typeof proveTerrainEntries>[3]);
   return { level: declaredLevel, ports: levelPorts, proveEntries: host => {
@@ -145,6 +149,8 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     lendReturns(host);
     recordPrimitives(host, shard, plan.features.map(row => row.host)); // OF17b1: native features name their families until M8
     const run: AssemblyRun<C> = { host, context, input: null, day: world(host) };
+    // OF22a3: the ground and prop solids stand first, where a plan's `collision` host stood, before any host reads them
+    if (ownSolids) installAssemblySolids(host, shard, assets, ownGround, context.restoring);
     for (const step of steps) step(run);
     installRuntimeCreatures(host, counted, assets, sections, { restoring: context.restoring, keeper, summoned,
       fact: (name, actor) => { need(run.input, 'A declared decision grant needs the commands host').ledger.fact(name, actor); } });

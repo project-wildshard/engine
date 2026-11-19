@@ -25,8 +25,9 @@ import { labelObjectTree } from '../render/gpuLabels';
 interface Vec3 { x: number; y: number; z: number }
 interface Quat { x: number; y: number; z: number; w: number }
 
-/** How a collider is placed: a centre, and either a turn about +Y (three's convention) or a full rotation. */
-interface Placed { x: number; y: number; z: number; yaw?: number; rot?: Quat; surface?: Material }
+/** How a collider is placed: a centre, and either a turn about +Y (three's convention) or a full rotation. A baked solid may
+ * name its own friction and packed Rapier groups (ONE-FORMAT OF22a3); absent, a piece is the world's (`groups('WORLD')`, 0.5). */
+interface Placed { x: number; y: number; z: number; yaw?: number; rot?: Quat; surface?: Material; friction?: number; groups?: number }
 
 export type ColliderDesc =
   /** a box: half-extents along its own axes */
@@ -42,7 +43,7 @@ export type ColliderDesc =
    * a stair: `count` boxes rising `rise` each from `from` (the foot of the first tread) toward `to` (the top edge,
    * at from.y + count × rise), `width` across — built as treads, never as a ramp (PHYSICS.md: autostep climbs them).
    */
-  | { kind: 'treads'; from: Vec3; to: Vec3; width: number; count: number; surface?: Material };
+  | { kind: 'treads'; from: Vec3; to: Vec3; width: number; count: number; surface?: Material; friction?: number; groups?: number };
 
 export type PieceCategory = 'buildings' | 'nature' | 'props' | 'creatures' | 'people' | 'gear' | 'ground';
 
