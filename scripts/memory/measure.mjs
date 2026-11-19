@@ -33,7 +33,8 @@
 // origin, the order flipped each round. Every run names its boot; an online run that starts the in-page server worker
 // (`standalone-server`) is refused, as is a standalone run that starts none. `--round=k` starts the round count at k, so a
 // shell loop can take one pair per command, each inside the measure lock, with the order still flipping. `--online --arm2=<query>`
-// pairs the online boot with itself under a probe's URL switch (STR12's `trisprobe=half`): same build, same world. ratchet.mjs and phone-fit.mjs refuse runs that mix boots, as they do instruments.
+// pairs the online boot with itself under a probe's URL switch (STR12's `trisprobe=half`): same build, same world. `--arm2-pin=<slot>=<json>`
+// does the same under a device slot (STR16's `debug.vertexPack=false`), since the game reads no URL switch. ratchet.mjs and phone-fit.mjs refuse runs that mix boots, as they do instruments.
 // The online page enters a `?chunk=` shard only where its build's catalogue gives the shard a grid cell (OF3): a shard off the
 // grid (Thin Ice and Desert Ruin, J305) lands on the title, so `--online` refuses it at once. `--place=<slug,...> --out=<file>`
 // writes the pinned catalogue with those shards on ring 3's first free cells (J314's order, from (0,3), where staging puts
@@ -266,6 +267,15 @@ export async function openOnlineBoot({ dist, chunk, scratch }) {
     }
     throw new Error(`the ${chunk} world server did not become healthy`);
   } catch (error) { await close(); throw error; }
+}
+
+/** STR16: `key=json` (a device slot and its value; a bare word is a string) as a save fixture's fields. @param {string} text */
+export function devicePin(text) {
+  const at = text.indexOf('=');
+  if (at <= 0) throw new Error(`--arm2-pin takes <device slot>=<json>, not ${text}`);
+  const raw = text.slice(at + 1);
+  let data; try { data = JSON.parse(raw); } catch { data = raw; }
+  return { key: text.slice(0, at), data };
 }
 
 const CATALOGUE_ELEMENT = /<script type="application\/json" id="ws-catalogue">([^<]*)<\/script>/u;
@@ -872,12 +882,14 @@ async function main(argv) {
   // STR1: the online boot's world, on loopback for this build (closed when the runs end)
   const world = online === null || runs === 0 ? null : await openOnlineBoot({ dist: args.dist, chunk: args.chunk, scratch: resolvePath(args.scratch ?? 'tmp/measure-online') });
   if (world !== null) args.url = world.url;
-  /** Each arm a round boots: two builds (--url2), online and standalone (--online=pair), or one. @type {{url: string, world: {release: string, key: string} | null, name: string}[]} */
+  /** Each arm a round boots: two builds (--url2), online and standalone (--online=pair), or one. @type {{url: string, world: {release: string, key: string} | null, name: string, pin?: {key: string, data: unknown}}[]} */
   const arms = args.url2 ? [{ url: args.url, world: null, name: args.url }, { url: args.url2, world: null, name: args.url2 }]
     : world === null ? [{ url: args.url, world: null, name: args.url }]
       : online === 'pair' ? [{ url: world.url, world: world.stamp, name: 'online' }, { url: world.url, world: null, name: 'standalone' }]
         // MEMORY-STRUCTURE STR12: `--arm2=<k=v&...>` pairs the online boot with the same online boot under a probe switch
         : args.arm2 ? [{ url: world.url, world: world.stamp, name: 'online' }, { url: `${world.url}?${args.arm2}`, world: world.stamp, name: `online ${args.arm2}` }]
+          // STR16: `--arm2-pin=<device slot>=<json>` pairs the online boot with the same online boot under a device slot
+          : args['arm2-pin'] ? [{ url: world.url, world: world.stamp, name: 'online' }, { url: world.url, world: world.stamp, name: `online ${args['arm2-pin']}`, pin: devicePin(args['arm2-pin']) }]
           : [{ url: world.url, world: world.stamp, name: 'online' }];
   /** @type {Awaited<ReturnType<typeof webkitBoot>>[]} */
   const webkit = [];
@@ -889,7 +901,9 @@ async function main(argv) {
     for (let i = first; i < first + runs; i++) {
       // two arms alternate inside each round, and the order flips each round, so drift lands on both
       for (const arm of i % 2 === 0 ? arms : [...arms].reverse()) {
-        const run = await webkitBoot({ url: arm.url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure), instrument, world: arm.world, walk });
+        const pin = arm.pin, prepare = pin === undefined ? undefined : async (/** @type {any} */ context) => { const { saveFixture } = await import('../debug-settings.mjs'); await saveFixture(context, { scope: 'device', ...pin }); };
+        const run = await webkitBoot({ url: arm.url, chunk: args.chunk, settleMs, timeoutMs, gcs, reads, closure: Boolean(args.closure), instrument, world: arm.world, walk, prepare });
+        run.arm = arm.name;
         webkit.push(run);
         for (const line of webkitLines(run)) console.log(line);
         if (args.closure) for (const line of closureLines(run, webkitCalibration())) console.log(line);
@@ -903,7 +917,7 @@ async function main(argv) {
       }
     }
   } finally { await world?.close(); }
-  const armOf = (/** @type {Awaited<ReturnType<typeof webkitBoot>>} */ r) => arms.find((arm) => arm.url === r.url && (arm.world === null) === (r.boot === 'standalone'));
+  const armOf = (/** @type {Awaited<ReturnType<typeof webkitBoot>> & {arm?: string}} */ r) => arms.find((arm) => (r.arm === undefined || arm.name === r.arm) && arm.url === r.url && (arm.world === null) === (r.boot === 'standalone'));
   if (arms.length > 1) {
     for (const arm of arms) {
       const good = webkit.filter((r) => armOf(r) === arm && r.settled && !r.refused);

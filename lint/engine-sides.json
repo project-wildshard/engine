@@ -408,6 +408,7 @@
     "src/client/engine/render/parkedDraws.ts": "client",
     "src/client/engine/render/passSplit.ts": "client",
     "src/client/engine/render/byteTriples.ts": "client",
+    "src/client/engine/render/vertexPack.ts": "client",
     "src/client/engine/render/pmremSize.ts": "client",
     "src/client/engine/render/postPreparation.ts": "client",
     "src/client/engine/render/precompile.ts": "client",

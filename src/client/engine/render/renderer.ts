@@ -22,6 +22,9 @@ import { installShadowMaterialOwnership } from './shadowMaterialOwnership';
 import { installProvokingVertex } from './drawHooks';
 import { installPassSplit, passSplitLimit, PASS_SPLIT_VERTICES } from './passSplit';
 import { installByteTriples } from './byteTriples';
+import { installVertexPack, VERTEX_PACK_SLOT, vertexPackWanted } from './vertexPack';
+import { jsonSlot } from '../saves/slots';
+import { TIER } from '../core/tier';
 import { gltfOpaqueSort } from './gltfMaterialOrder';
 import type { AssetService } from '../app/assets';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -59,6 +62,9 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   installPassSplit(context, undefined, passSplitLimit(), PASS_SPLIT_VERTICES);
   // MG10: tight three-byte vertex channels upload at stride 4 (byteTriples.ts); before the Memory saver's upload watch
   installByteTriples(context);
+  // STR16: the phone's static Float32 vertex channels go up packed (vertexPack.ts); outside byteTriples, inside the Memory saver
+  const packSlot = jsonSlot(VERTEX_PACK_SLOT, 'device').read();
+  installVertexPack(context, () => vertexPackWanted(TIER === 'phone', packSlot));
   const stopLabels = installDeveloperLabels(renderer);
   const dispose = renderer.dispose.bind(renderer);
   renderer.dispose = () => { try { dispose(); } finally { stopLabels(); stopJournal(); stopCounters(); } };
