@@ -85,6 +85,24 @@ test('wildshard-config writes one setting, keeps the others and never touches th
   expect(shown.out).not.toContain('planted');
 });
 
+test('MMO-SERVER E7.8a.b1: PLAYTEST is 0 or 1 on staging, and never a production setting', () => {
+  const root = etc();
+  for (const value of ['1', '0']) {
+    const run = config(root, 'set', 'staging', 'PLAYTEST', value);
+    expect(run.status, run.out).toBe(0);
+    expect(read(root, 'staging.settings')).toContain(`PLAYTEST=${value}`);
+  }
+  for (const value of ['2', 'yes', '', '1\nSEAT_SECRET=x']) {
+    const run = config(root, 'set', 'staging', 'PLAYTEST', value);
+    expect(run.status, value).toBe(1);
+    expect(run.out).toContain('PLAYTEST must be 0 or 1, on staging only');
+  }
+  const production = config(root, 'set', 'production', 'PLAYTEST', '1', '--production');
+  expect(production.status, production.out).toBe(1);
+  expect(production.out).toContain('PLAYTEST must be 0 or 1, on staging only');
+  expect(existsSync(join(root, 'etc/wildshard/production.settings'))).toBe(false);
+});
+
 test('wildshard-config narrows ALLOWED_ORIGINS to the game hosts, keeping the channel its own (MS3.4)', () => {
   const root = etc();
   const hosts = 'https://play.wildshard.io,https://staging.wildshard.io,https://preview.wildshard.io';

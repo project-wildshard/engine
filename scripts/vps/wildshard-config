@@ -55,6 +55,9 @@ SETTINGS = {
     'PLACEMENT_PUBLIC_KEY': lambda value, channel: value in ('', PLACEMENT_PUBLIC_KEY),
     # SC2: the channel's own port, which the box's Prometheus scrapes, or blank (off). The server binds it on 127.0.0.1 only.
     'METRICS_PORT': lambda value, channel: value in ('', str(CHANNELS[channel]['metrics'])),
+    # MMO-SERVER E7.8a.b1: the measured playtest file (PlaytestFile, PLAYTEST_DIR from the unit), staging only. Production
+    # never writes one: an agent proof runs on staging (J205), and a sitting there is the E7 table's input.
+    'PLAYTEST': lambda value, channel: channel == 'staging' and value in ('0', '1'),
 }
 RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), none twice",
          'WORLD_WORKERS': 'a whole number from 1 to the channel\'s pinned CPUs (production 9, staging 4)',
@@ -63,7 +66,8 @@ RULES = {'WORLD_CELLS': "'grid' or comma-separated cell names (a-z, 0-9, -), non
                             "https://preview.wildshard.io, keeping the channel's own (production play, staging staging)",
          'PLACEMENT_URL': "https://packs.wildshard.io/releases/<channel>-placements.json for this channel, or blank",
          'PLACEMENT_PUBLIC_KEY': f'the API placement key {PLACEMENT_PUBLIC_KEY}, or blank',
-         'METRICS_PORT': "the channel's own metrics port (production 9790, staging 9791), or blank (off)"}
+         'METRICS_PORT': "the channel's own metrics port (production 9790, staging 9791), or blank (off)",
+         'PLAYTEST': '0 or 1, on staging only (production never records a playtest file)'}
 
 # The engine's tests hand it a made-up /etc and no systemctl; never as root, so sudo (which drops the environment anyway) cannot.
 TEST = os.geteuid() != 0 and os.environ.get('WILDSHARD_CONFIG_TEST_ROOT')
