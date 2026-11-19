@@ -263,14 +263,17 @@ try {
   await until(phone, '(window.__workerClient?.().frames ?? 0) > 30', 120_000, 'thirty frames');
   if (await phone.evaluate('window.__wildshard?.world?.game.app.clock.paused === true') === true) await phone.evaluate("(() => { const button = [...document.querySelectorAll('button')].find(each => /^resume$/iu.test(each.textContent?.trim() ?? '')); button?.click(); return button !== undefined; })()");
   await until(phone, 'window.__wildshard?.world?.game.app.clock.paused === false', 30_000, 'an unpaused clock');
-  const seat = await phone.evaluate('({ build: globalThis.__WS_BUILD_ID__, own: window.__workerClient().own, frames: window.__workerClient().frames, closed: window.__workerClient().closed })');
-  note(row, 'title to play: in Driftwood on the staging build, holding a seat', v.parse(v.looseObject({ build: v.unknown() }), seat).build === version.build, seat);
   note(row, 'the phone\'s browser and GPU', true, await phone.evaluate(GPU));
   await phone.evaluate(CANVAS);
   await until(phone, 'window.__xrCanvas !== null', 20_000, 'the canvas read');
   const drawn = v.parse(v.looseObject({ pixels: v.array(v.array(v.number())) }), await phone.evaluate('window.__xrCanvas'));
   note(row, 'the canvas holds a world, not black', drawn.pixels.some(([red = 0, green = 0, blue = 0]) => red + green + blue > 30), drawn);
   await phone.shot('2-in-play');
+
+  // A lit solo world has frames but no server actor. Wait for ownership before taking either position.
+  await until(phone, '(() => { const room = window.__workerClient?.(); return typeof room?.own === "string" && room.own.length > 0 && room.closed === null; })()', 30_000, 'an owned actor in the signed room');
+  const seat = v.parse(v.object({ build: v.string(), own: v.string(), frames: v.number() }), await phone.evaluate('({ build: globalThis.__WS_BUILD_ID__, own: window.__workerClient().own, frames: window.__workerClient().frames })'));
+  note(row, 'title to play: exact build and an owned actor in the signed room', seat.build === version.build, seat);
 
   // The touch walk: the stick reads the thumb, and the server moves the body.
   await until(phone, "document.querySelector('.ws-touch-stick')?.getBoundingClientRect().width > 0", 30_000, 'the move stick');

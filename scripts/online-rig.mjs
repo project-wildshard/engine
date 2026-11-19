@@ -154,9 +154,22 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   }
 
   const DATABASE = memory ? 'memory:' : database('saves_online', pgPort);
+  const worldEnv = { ...process.env };
+  delete worldEnv.PULL_SCRIPT;
+  const waitForWorld = isolated || ephemeral;
+  const readyWorld = async (/** @type {import('node:child_process').ChildProcess} */ child) => {
+    if (!waitForWorld) return;
+    try {
+      const listening = await childListener(child, 'world-ready');
+      if (worldFront !== undefined) worldFront.point(listening);
+      else if (listening !== worldPort) throw new Error('The world bound an unexpected port');
+    } catch (error) {
+      throw new Error(`The signed rig rooms did not start. See ${join(work, 'server.log')}`, { cause: error });
+    }
+  };
   const world = (running = build) => {
-    const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', ephemeral ? 'ipc' : 'ignore'],
-      env: { ...process.env, RELEASE_URL: `http://127.0.0.1:${String(releasePort)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(ephemeral ? 0 : worldPort), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(pagePort)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
+    const room = spawn(process.execPath, [join(server, 'main.mjs')], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe', waitForWorld ? 'ipc' : 'ignore'],
+      env: { ...worldEnv, RELEASE_CHANNEL: channel, RELEASE_URL: `http://127.0.0.1:${String(releasePort)}/release.json`, RELEASE_PUBLIC_KEY: key.public, PACK_ORIGIN: `file://${origin}/`, PACK_CACHE: join(work, 'packs'), DATABASE_URL: DATABASE, SEAT_SECRET: 'online-proof', HOST: '127.0.0.1', PORT: String(ephemeral ? 0 : worldPort), ALLOWED_ORIGINS: [`http://127.0.0.1:${String(pagePort)}`, ...origins].join(','), WILDSHARD_BUILD: running, WORLD_CELLS: cells, RELEASE_POLL_MS: '500', GRACE_MS: '6000', ...seats === undefined ? {} : { WORLD_SEATS: String(seats) }, ...workers === undefined ? {} : { WORLD_WORKERS: String(workers) } } });
     room.once('exit', () => { worldFront?.clear(); });
     room.stdout?.pipe(log, { end: false }); room.stderr?.pipe(log, { end: false });
     return room;
@@ -208,12 +221,12 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   pages = await serve(dist);
   let main = world();
   resources.push(() => stopped(main));
-  if (worldFront !== undefined) worldFront.point(await childListener(main, 'world-ready'));
+  await readyWorld(main);
   /** @param {string} [running] */
   const start = async running => {
     if (main.exitCode === null && main.signalCode === null) throw new Error('Stop the current rig world before starting another');
     main = world(running);
-    try { if (worldFront !== undefined) worldFront.point(await childListener(main, 'world-ready')); }
+    try { await readyWorld(main); }
     catch (error) { await stopped(main); throw error; }
   };
   // FM5b4: the signed retention file, written into every build folder the page origin can serve, and removed at close
