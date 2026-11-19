@@ -76,6 +76,12 @@
    "toBytes": 26340742,
    "decision": "J338",
    "why": "GC30b (J338, Jake 2026-11-13: \"let's have it look GREAT FIRST ; then optimize megabytes later\", up to 50 MB a shard, 100 MB the hard ceiling): Sky Reach rev 3 (cdbb400c) gives Far Reach its entry docks and ships its phone tier as copies of the desktop GLBs, +0.36 MB over the 25.98 MB latch. The look stays; megabytes are optimised later. Raised by opus-farreach."
+  },
+  {
+   "shard": "driftwood-isle",
+   "toBytes": 27218404,
+   "decision": "J437",
+   "why": "Driftwood rev 5 adds revised piano, sound effects and shard assets. The staging phone pack measures 22,218,404 B. Raise the soft ceiling from 21,082,585 B to that measurement plus J431's 5,000,000 B margin."
   }
  ],
  "shards": {
@@ -163,7 +169,8 @@
   "driftwood-isle": {
    "baselinePhoneBytes": 23757802,
    "recordedPhoneBytes": 26278506,
-   "ceilingPhoneBytes": 21082585,
+   "ceilingPhoneBytes": 27218404,
+   "marginPhoneBytes": 5000000,
    "shrinkOnly": true,
    "baseline": {
     "phone": {
@@ -239,7 +246,7 @@
     "bytes": 94310912,
     "mountsAssetsBytes": 12076637
    },
-   "latchedPhoneBytes": 21082585
+   "latchedPhoneBytes": 22218404
   },
   "far-reach": {
    "baselinePhoneBytes": 49888072,
