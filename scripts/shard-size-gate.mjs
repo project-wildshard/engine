@@ -53,7 +53,7 @@ function legalCeiling(slug, row, raises) {
  * with no row is refused too (a shard that left the build must arrive through the cook, or nothing measures it), unless
  * `cooksAfter` says a later step adds rows and the gate runs again on its output.
  * @param {{ limits: { newShardHardCapBytes: number, toleranceBytes: number, ratchetSlackBytes: number },
- *   shards: Record<string, { baselinePhoneBytes: number, recordedPhoneBytes: number, ceilingPhoneBytes: number, shrinkOnly: boolean }>,
+ *   shards: Record<string, { baselinePhoneBytes: number, recordedPhoneBytes: number, ceilingPhoneBytes: number, marginPhoneBytes?: number, shrinkOnly: boolean }>,
  *   raises: readonly { shard: string, toBytes: number, decision: string, why: string }[] }} baseline
  * @param {Record<string, number>} downloads
  * @param {{ cooksAfter?: boolean }} [options]
@@ -73,8 +73,9 @@ export function checkShardSizes(baseline, downloads, { cooksAfter = false } = {}
       if (!cooksAfter) errors.push(`shard size: ${slug} has a baseline and no row in the book, so nothing measures it. A shard leaves the build only through the cook, with this gate run on the cooked output.`);
       continue;
     }
-    if (bytes > row.ceilingPhoneBytes + limits.toleranceBytes) errors.push(`shard size: ${slug} downloads ${MB(bytes)} on a phone, past its ${MB(row.ceilingPhoneBytes)} ceiling (baseline ${MB(row.baselinePhoneBytes)}${row.shrinkOnly ? ', shrink-only' : ''}). Shrink it, or get Jake's decision and add a row to "raises" in ${BASELINE_FILE}.`);
-    else if (bytes < row.ceilingPhoneBytes - limits.ratchetSlackBytes && row.shrinkOnly) errors.push(`shard size: ${slug} shrank to ${MB(bytes)}; latch it in this change: node scripts/shard-size-gate.mjs dist --ratchet`);
+    const measured = row.ceilingPhoneBytes - (row.marginPhoneBytes ?? 0);
+    if (bytes > row.ceilingPhoneBytes + limits.toleranceBytes) errors.push(`shard size: ${slug} downloads ${MB(bytes)} on a phone, past its ${MB(row.ceilingPhoneBytes)} ceiling (baseline ${MB(row.baselinePhoneBytes)}${row.shrinkOnly ? ', shrink-only' : ''}). For added content, record the new soft ceiling and the content in "raises" in ${BASELINE_FILE} (J438/J439). Investigate growth without added content.`);
+    else if (bytes < measured - limits.ratchetSlackBytes && row.shrinkOnly) errors.push(`shard size: ${slug} shrank to ${MB(bytes)}; latch it in this change: node scripts/shard-size-gate.mjs dist --ratchet`);
     if (row.shrinkOnly) notes.push(`shard size: ${slug} ${MB(bytes)} shrink-only, ${MB(bytes - row.baselinePhoneBytes)} over its baseline`);
   }
   for (const [slug, bytes] of Object.entries(downloads)) {
@@ -85,14 +86,15 @@ export function checkShardSizes(baseline, downloads, { cooksAfter = false } = {}
 
 /** The baseline with each shrink-only ceiling lowered to what the shard downloads now, past its baseline if it got there:
  * a shard that reached 58 can't regrow to a 78 baseline unrefused. A shard held at its baseline stays there, and so does one
- * inside the slack: build noise is no shrink, and latching it would leave no room for the next build's.
- * @template {{ limits: { ratchetSlackBytes: number }, shards: Record<string, { ceilingPhoneBytes: number, latchedPhoneBytes?: number, shrinkOnly: boolean }> }} T
+ * inside the slack. A declared content margin stays above the measured download when it shrinks.
+ * @template {{ limits: { ratchetSlackBytes: number }, shards: Record<string, { ceilingPhoneBytes: number, latchedPhoneBytes?: number, marginPhoneBytes?: number, shrinkOnly: boolean }> }} T
  * @param {T} baseline @param {Record<string, number>} downloads @returns {T} */
 export function ratchetShardSizes(baseline, downloads) {
   const shards = Object.fromEntries(Object.entries(baseline.shards).map(([slug, row]) => {
     const bytes = downloads[slug];
-    if (bytes === undefined || bytes >= row.ceilingPhoneBytes - baseline.limits.ratchetSlackBytes || !row.shrinkOnly) return [slug, row];
-    return [slug, { ...row, ceilingPhoneBytes: bytes, latchedPhoneBytes: bytes }];
+    const margin = row.marginPhoneBytes ?? 0;
+    if (bytes === undefined || bytes >= row.ceilingPhoneBytes - margin - baseline.limits.ratchetSlackBytes || !row.shrinkOnly) return [slug, row];
+    return [slug, { ...row, ceilingPhoneBytes: bytes + margin, latchedPhoneBytes: bytes }];
   }));
   return { ...baseline, shards };
 }
