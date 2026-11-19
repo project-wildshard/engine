@@ -31,6 +31,8 @@ const NAME_IN = 12;
 const NAME_RANGE = 101;
 /** A neighbour's baked map is kept at this many px a side (0.8 px per metre, 0.64 MB): the minimap shows it ~110 m across */
 export const CELL_PX = 400;
+/** J455: an empty cell of the 7 by 7 on the full map */
+const EMPTY = '#2c3029';
 const STRIP = '#3b4038', ROAD = '#2a2e35', LINE = '#c9a640', VOID = '#0b1016', NAME = '#eaf6ff';
 /** Each cell whose name spot is in the disc from the feet (home-frame metres), with an arrow toward it. */
 function roadNames(host: MinimapBlendHost, feet: { readonly x: number; readonly z: number }): MapExtraLabel[] {
@@ -224,6 +226,12 @@ export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
   const grid = fullMapGrid(assembly, home), side = grid === undefined ? 0 : grid.cells * grid.pitch;
   // the 7 by 7's empty cells past the placed rectangle show as the strips' ground, as the empty cells inside it do
   const ground: MapExtraRect[] = grid === undefined ? [] : [{ x: grid.x0 + side / 2, z: grid.z0 + side / 2, hx: side / 2, hz: side / 2, color: STRIP }];
+  // and each empty cell as a darker square, so a clamped view's corner cell reads as a cell (J455), not as more strip
+  if (grid !== undefined) {
+    const taken = new Set(assembly.cells.map((c) => c.cell.join(',')));
+    for (let i = -DRAWN_GRID_RADIUS; i <= DRAWN_GRID_RADIUS; i++) for (let j = -DRAWN_GRID_RADIUS; j <= DRAWN_GRID_RADIUS; j++)
+      if (!taken.has(`${String(i)},${String(j)}`)) ground.push({ x: i * grid.pitch - ox, z: j * grid.pitch - oz, hx: CHUNK_HALF, hz: CHUNK_HALF, color: EMPTY });
+  }
   return { outside: VOID, baseAlpha: atlas === undefined && homeImage === null ? 1 : 0, rects: [...ground, ...rects, ...plots], images, labels, ...(grid === undefined ? {} : { grid }) };
 }
 
