@@ -28,7 +28,9 @@ function scenario(rosterStep = 'pine.roster', program: unknown = night, raw = fa
   const sample = SIM_LEVEL.entities[0]; if (sample === undefined) throw new Error('Missing fixture recipe');
   const native = PINE_SPECIES_PROGRAMS.native[0]; if (native === undefined) throw new Error('Missing species row');
   const population = readSpeciesPrograms({ page: [], hunt: PINE_SPECIES_PROGRAMS.hunt, native: [...PINE_SPECIES_PROGRAMS.native,
-    { ...native, id: 'marsh.heron', kind: 'heron', variants: [{ id: 'reed', label: 'Heron', weight: 1, rarity: 'common' as const, scale: [1, 1] }] }] });
+    // This synthetic species has its own variants and no deer harvest.
+    { ...native, id: 'marsh.heron', kind: 'heron', harvest: [],
+      variants: [{ id: 'reed', label: 'Heron', weight: 1, rarity: 'common' as const, scale: [1, 1] }] }] });
   const parked = [['elk', 'thrall'], ['boar', 'thrall'], ['heron', 'reed']].map(([kind, variant], i) => {
     if (kind === undefined || variant === undefined) throw new Error('Missing species recipe');
     return Object.assign(structuredClone(sample), { id: `recipe.${String(i)}`, kind, variant, spec: { ...sample.spec, kind, variant } });
