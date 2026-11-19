@@ -1,6 +1,7 @@
 /**
  * A data cell's scene life on a grid page (meta SHARD-SOURCE SS-SHIPb): its look's detail layers (AP32d1: grass, ferns), its
- * hung lanterns and signs (SS8c: `look.light.swings`), its pools' splash (SS6) and the wind clock they sway on (SS8a).
+ * hung lanterns and signs (SS8c: `look.light.swings`), its declared water's surfaces (MOSSGATE-ZONE MZ6), its pools' splash
+ * (SS6) and the wind clock they sway on (SS8a).
  *
  * A standalone page installs these in `ShardfileClient.world()` (`shardfile/client.ts`). A grid cell never runs that: the
  * session draws a data cell through its tile admission (`session.ts`), which compiles the look's materials, and so their
@@ -12,8 +13,13 @@
  * then. A product's copies share one compiled material set and so one set of swing uniforms (world-space pivots), so a
  * slug placed more than once keeps its swings still rather than turn one copy's lanterns round another's pivots.
  * Hung look lamps (`setLampSwings`) are not driven here: a grid cell draws no look lamp lights of its own.
+ *
+ * The water surfaces are drawn on admission, as the cell's tiles are, so a neighbour's pond shows from the road; a planar
+ * mirror (one extra scene draw per frame in view) shows only while its cell is entered, and its ripples step only then. On
+ * staging rev 6 Mossgate's pond drew splash and rings over a bare pit: the grid drew `source.water`'s splash, never its
+ * surface (QA 11-19 row 27).
  */
-import { Group, Vector3, type Material } from 'three';
+import { Group, Vector3, type Material, type Mesh } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { windClockFallback } from '@wildshard/engine/world/wind';
 import { SwingField, type SwingMover, type SwingUniforms } from '@wildshard/engine/world/swings';
@@ -21,6 +27,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { detailLayerFiles, installClientDetails } from '../shardfile/clientDetails';
 import { installClientSplash } from '../shardfile/clientSplash';
+import { installClientWater } from '../shardfile/clientWater';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 
 /** What a cell's scene life reads from the session. */
@@ -42,7 +49,7 @@ export interface CellScenePresentation {
 }
 
 /** One cell's readout. */
-export interface CellSceneLifeCell { readonly instance: string; readonly layers: number; readonly swings: number; readonly splash: boolean; readonly live: boolean }
+export interface CellSceneLifeCell { readonly instance: string; readonly layers: number; readonly swings: number; readonly water: number; readonly splash: boolean; readonly live: boolean }
 
 interface CellScene {
   readonly cell: GridCell;
@@ -55,14 +62,19 @@ interface CellScene {
   swings: SwingField | null;
   /** per-frame runs (the layers' ring, the splash), stepped only while entered */
   readonly frames: ((dt: number) => void)[];
+  /** its declared water's surfaces (MZ6) */
+  readonly water: readonly Mesh[];
+  /** the planar mirrors among them, shown only while entered */
+  readonly mirrors: readonly Mesh[];
   readonly splash: boolean;
   live: boolean;
 }
 
-/** A cell carries scene life when it is a data cell (a runtime or declared page installs its own) with any of these rows. */
+/** A cell carries scene life when it is a data cell (a runtime or declared page installs its own) with any of these rows:
+ *  any declared water body draws a surface, as a standalone page's `ShardfileClient.world()` draws it. */
 export function hasCellSceneLife(source: Shardfile): boolean {
   if (source.runtime !== null || hasDeclaredClientPage(source)) return false;
-  return (source.look.details?.length ?? 0) > 0 || (source.look.light?.swings?.length ?? 0) > 0 || source.water.some(body => body.kind === 'pool' && body.surface !== undefined);
+  return (source.look.details?.length ?? 0) > 0 || (source.look.light?.swings?.length ?? 0) > 0 || source.water.length > 0;
 }
 
 /** The data cells' scene life on this page: admitted with each cell's tiles, stepped in the page's late phase. */
@@ -102,11 +114,17 @@ export class CellSceneLife {
       const swingRows = source.look.light?.swings ?? [];
       const swings = copies > 1 || swingRows.length === 0 || presentation.swings === undefined ? null : new SwingField(swingRows, presentation.swings, root);
       if (swings !== null) scope.onDispose(() => { swings.dispose(); });
+      // MZ6: the declared water's surfaces, in the look's `water` material when it has one (as the standalone page)
+      const ripples: ((dt: number) => void)[] = [];
+      const water = installClientWater(source.water, { root, scope, materials: presentation.materials, frame: (run) => { ripples.push(run); } }, this.ports.phone ? 'phone' : 'desktop');
+      const mirrors = water.filter((mesh) => (mesh as Mesh & { isReflector?: boolean }).isReflector === true);
+      for (const mirror of mirrors) mirror.visible = false;
+      frames.push(...ripples);
       const splashFeet = { id: 'player', x: 0, y: 0, z: 0 };
       const splash = installClientSplash(source.water, { root, scope, phone: this.ports.phone,
         movers: () => { this.local(root, splashFeet); return [splashFeet]; },
         frame: (run) => { frames.push(run); } }) !== null;
-      const scene: CellScene = { cell, details, install, installed: install === null, layers: 0, swings, frames, splash, live: false };
+      const scene: CellScene = { cell, details, install, installed: install === null, layers: 0, swings, frames, water, mirrors, splash, live: false };
       this.products.set(cell.slug, [...siblings, scene]);
       this.cells.set(cell.instance, scene);
     } catch (error) { scope.dispose(); throw error; }
@@ -126,12 +144,13 @@ export class CellSceneLife {
     for (const scene of this.cells.values()) {
       const live = this.ports.active(scene.cell.instance);
       // leaving the cell stills its swings: the shared uniforms never keep a lean, and re-entry starts from rest
-      if (!live) { scene.details.visible = false; if (scene.live) scene.swings?.dispose(); scene.live = false; continue; }
+      if (!live) { scene.details.visible = false; for (const mirror of scene.mirrors) mirror.visible = false; if (scene.live) scene.swings?.dispose(); scene.live = false; continue; }
       if (!scene.installed) {
         scene.installed = true;
         try { scene.layers = scene.install?.() ?? 0; } catch (error) { console.warn(`[grid] ${scene.cell.instance} draws no detail layers:`, error); }
       }
       scene.details.visible = true; scene.live = true;
+      for (const mirror of scene.mirrors) mirror.visible = true;
       if (!stepped) { this.clock(dt); stepped = true; }
       for (const run of scene.frames) run(dt);
       if (scene.swings !== null) {
@@ -143,6 +162,6 @@ export class CellSceneLife {
   }
 
   state(): CellSceneLifeCell[] {
-    return [...this.cells.values()].map((scene) => ({ instance: scene.cell.instance, layers: scene.layers, swings: scene.swings?.count ?? 0, splash: scene.splash, live: scene.live }));
+    return [...this.cells.values()].map((scene) => ({ instance: scene.cell.instance, layers: scene.layers, swings: scene.swings?.count ?? 0, water: scene.water.length, splash: scene.splash, live: scene.live }));
   }
 }
