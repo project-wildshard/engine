@@ -22,13 +22,36 @@ async function expectOpenGate(page: Page): Promise<void> {
     .toBe(true)
 }
 
+// The HUD's use prompt, as the player reads it: `play.ts` presses E on the nearest interactable it last drew.
+async function gatePromptShown(page: Page): Promise<void> {
+  await page.waitForFunction(
+    (): boolean => {
+      const hud: unknown = Reflect.get(
+        globalThis.__wildshard?.world ?? {},
+        'hud',
+      )
+      const text: unknown =
+        typeof hud === 'object' && hud !== null
+          ? Reflect.get(hud, 'promptText')
+          : ''
+      return typeof text === 'string' && text.includes('canyon gate')
+    },
+    undefined,
+    { timeout: 20_000 },
+  )
+}
+
 async function openGate(page: Page): Promise<void> {
-  // A pose alone shows no prompt: walk the last 2 m in, as a player does.
+  // A pose alone shows no prompt: walk in until the gate's prompt shows, then press E, as a player does. A fixed
+  // 500 ms walk tied the press to the frame rate: on hosted software GL the gate stayed shut (TR-4b, run 44527365455).
   await poseAt(page, 'gate', { z: 3, yaw: 0 })
   expect(await gateIsOpen(page)).toBe(false)
   await page.keyboard.down('KeyW')
-  await page.waitForTimeout(500)
-  await page.keyboard.up('KeyW')
+  try {
+    await gatePromptShown(page)
+  } finally {
+    await page.keyboard.up('KeyW')
+  }
   await page.keyboard.press('KeyE', { delay: 100 })
   await expectOpenGate(page)
 }

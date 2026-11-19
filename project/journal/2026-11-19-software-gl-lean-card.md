@@ -15,3 +15,14 @@ Locally on SwiftShader K passes in 45 to 60 s. Each Brasscap entry now
 prints a `[t1-boot]` line (time to play plus the level.world, assembly,
 home, shaders and firstFrame steps) so the next hosted run says which
 step eats the budget instead of only "killed".
+
+## B's gate walk and the full boot line (opus-tr4b2)
+
+Hosted B (run 44527365455) went red with the canyon gate still shut 5 s
+after its fixed 500 ms walk and E press: on software GL the walk and the
+press were tied to a slow frame rate. `openGate` now holds W until the
+HUD shows the gate's prompt, then presses E, as a player does. The
+`[t1-boot]` line now lists every loader stage of 0.5 s or more with its
+start: locally on SwiftShader `firstFrame` is 12.6 to 13.5 s of a 24 to
+28 s boot, while hosted boots run 35 to 76 s (run 44529532710), so two
+boots plus their waits overrun B's and H's 120 s.
