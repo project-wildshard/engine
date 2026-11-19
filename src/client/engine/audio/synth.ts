@@ -79,7 +79,11 @@ export abstract class Synth {
       const lfo = ownAudioSource(c.createOscillator()); lfo.frequency.value = opts.vibrato.rate;
       const lg = c.createGain(); lg.gain.value = opts.vibrato.depth;
       lfo.connect(lg).connect(o.frequency); lfo.start(t);
-      lfo.stop(t + (opts.attack ?? 0.002) + (opts.hold ?? 0) + opts.decay + 0.1);
+      // QA 11-19-mini row 27: an LFO reaches the output only through its tone's frequency, and WebKit renders it only
+      // while that tone renders. Stopped after the tone (it was +0.1 s against the tone's +0.05 s), it never reached its
+      // stop, never fired `ended`, and its owner kept it: 15 a 40 s on Driftwood's dock (iPhone 13, main ac5044019).
+      // It stops as the envelope reaches silence, while the tone still renders.
+      lfo.stop(t + (opts.attack ?? 0.002) + (opts.hold ?? 0) + opts.decay);
     }
     const g = c.createGain(); this.env(g, t, opts.gain, opts.attack ?? 0.002, opts.decay, opts.hold);
     let node: AudioNode = o;

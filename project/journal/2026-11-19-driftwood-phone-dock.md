@@ -24,3 +24,11 @@ MessageChannel ping loop showed 190 to 540 ms main-thread tasks between frames, 
 named them: half the main thread in `new WebAssembly.Memory`, the grid page's script memory top-up after control
 (scriptMemoryPlan.ts, SB47). The slot `debug.scriptMemoryTopUp` (default on) can skip it; the phone pairs decide.
 The bench gained `--ab <slot>` (ABBA pairs in one process), `--cool-to`, `--legs`, `--profile <s>` and a per-second busy gap.
+
+## Later: the audio sources that never end (QA 27, mini-driftwood13b)
+
+Under the inspector the page's AudioContext stays suspended, so every source looks live for good; the bench now sends one
+touchend as a gesture to unlock it. With the context running, Driftwood's dock went from 8 to 56 live sources in 40 s. The
+biggest site that never ended was `Synth.tone`'s vibrato LFO: it reaches the output only through its tone's frequency, WebKit
+renders it only while the tone renders, and it was stopped after the tone. It now stops as the envelope reaches silence. Music
+pad oscillators (12 live, 0 ended in 40 s) are the next site to read.
