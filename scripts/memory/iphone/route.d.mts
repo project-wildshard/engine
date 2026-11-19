@@ -14,7 +14,7 @@ export interface LegSummary { seconds: number | null; fps: number | null; p50Ms:
 export interface LegResult { name: string; kind?: string; cap: number | null; error: string | null; nav: unknown; summary: LegSummary | null; samples?: LegSample[]; rec?: string | null }
 export const ROUTES: Readonly<Record<string, readonly RouteLeg[]>>;
 export function routeFor(slug: string): readonly RouteLeg[];
-export function routeLegOnPage(leg: RouteLeg & { cap: 30 | 60 | null }): Promise<unknown>;
+export function routeLegOnPage(leg: RouteLeg & { cap: 0 | 30 | 60 | null }): Promise<unknown>;
 export function legSummary(samples: LegSample[]): LegSummary;
 export function playRoute(driver: { evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<unknown> },
   options: { slug: string; cap: 30 | 60 | null; rec?: string[]; log?: (line: string) => void }): Promise<LegResult[]>;

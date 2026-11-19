@@ -51,7 +51,7 @@ export function routeFor(slug) {
 }
 
 /** In the page: play one leg and keep its frames per second. Must not close over anything outside itself.
- * @param {RouteLeg & { cap: 30 | 60 | null }} leg */
+ * @param {RouteLeg & { cap: 0 | 30 | 60 | null }} leg */
 export function routeLegOnPage(leg) {
   const api = /** @type {any} */ (window).__wildshard, w = api?.world;
   if (!w || !w.hud.entered || w.hud.paused || !w.game.frameGate()) return Promise.resolve({ error: 'cannot run a route leg before control' });
@@ -63,7 +63,7 @@ export function routeLegOnPage(leg) {
     cell.cell[1] * state.pitch - (state.feet.z - p.position.z)] : [0, 0];
   if (leg.grid && leg.kind === 'stand' && Math.hypot(p.position.x - originX, p.position.z - originZ + 194) > 8)
     return Promise.resolve({ error: 'the route starts at the Driftwood dock' });
-  const inside = () => typeof grid.travelState === 'function' ? grid.travelState().inside : grid.state().inside;
+  const travel = () => typeof grid.travelState === 'function' ? grid.travelState() : grid.state();
   // the cap: Game re-reads qualityCap every 2 s from the preset and Low Power; held here for the whole leg
   if (leg.cap !== null) {
     try { Object.defineProperty(game, 'qualityCap', { get: () => leg.cap, set: () => { /* held */ }, configurable: true }); } catch { /* read-only */ }
@@ -71,7 +71,7 @@ export function routeLegOnPage(leg) {
   const clock = p.link?.client?.clock ?? null;
   // GPU traffic per second (DW1, for opus-fps: does the Memory saver purge and re-upload?): texture uploads, buffer uploads
   // and buffer read-backs (a released array read again, memorySaver.ts restore), counted on the context's prototype once
-  const counts = /** @type {any} */ (window).__wsRouteGl ??= (() => {
+  const counts = leg.fixed ? null : (/** @type {any} */ (window).__wsRouteGl ??= (() => {
     const tally = { tex: 0, buf: 0, read: 0, audioStarts: 0, audioEnds: 0 };
     const proto = /** @type {any} */ (globalThis).WebGL2RenderingContext?.prototype;
     const wrap = (/** @type {string} */ name, /** @type {'tex'|'buf'|'read'} */ key) => {
@@ -95,7 +95,7 @@ export function routeLegOnPage(leg) {
       };
     }
     return tally;
-  })();
+  })());
   let seenGl = { ...counts };
   const memChip = () => {
     for (const el of document.querySelectorAll('.ws-perf-dock *')) {
@@ -109,7 +109,7 @@ export function routeLegOnPage(leg) {
   let detours = 0, detourUntil = 0, detourYaw = 0, pressedLock = 0, checkX = prevX, checkZ = prevZ, still = 0, swings = 0, target = /** @type {any} */ (null), engaged = false;
   /** @type {any[]} */ const samples = [];
   const nav = { reached: 0, stuck: /** @type {number[][]} */ ([]), skipped: 0, metres: 0, path: /** @type {number[][]} */ ([]),
-    expected: leg.points?.length ?? 0, road: false, returned: false, dwellMs: 0, lostFrames: 0,
+    expected: leg.points?.length ?? 0, road: false, returned: false, dwellMs: 0, admissionMs: 0, lostFrames: 0,
     target: /** @type {unknown} */ (null), engagedAt: /** @type {number|null} */ (null) };
   const points = leg.points ?? [], reach = leg.reach ?? 3;
   let dwellStart = 0, dwelled = false, navAt = t0;
@@ -143,9 +143,11 @@ export function routeLegOnPage(leg) {
     samples.push({ tMs: now - t0, seconds: (now - previous) / 1000, frames, frameMs, updateMs, renderMs, gpuApproxMs,
       draws: game.lastFrame.calls, triangles: game.lastFrame.triangles, programs: renderer.info?.programs?.length ?? null,
       delayMs: clock?.delayMs ?? null, jitterMs: clock?.jitterMs ?? null,
-      texUploads: counts.tex - seenGl.tex, bufUploads: counts.buf - seenGl.buf, readBacks: counts.read - seenGl.read,
-      audioStarts: counts.audioStarts - seenGl.audioStarts, audioLive: counts.audioStarts - counts.audioEnds,
-      textures: renderer.info?.memory?.textures ?? null, geometries: renderer.info?.memory?.geometries ?? null, mem: memChip(),
+      ...(counts === null ? {} : {
+        texUploads: counts.tex - seenGl.tex, bufUploads: counts.buf - seenGl.buf, readBacks: counts.read - seenGl.read,
+        audioStarts: counts.audioStarts - seenGl.audioStarts, audioLive: counts.audioStarts - counts.audioEnds,
+        textures: renderer.info?.memory?.textures ?? null, geometries: renderer.info?.memory?.geometries ?? null, mem: memChip(),
+      }),
       at: [Math.round((p.position.x - originX) * 10) / 10, Math.round((p.position.z - originZ) * 10) / 10] });
     previous = now; seenGl = { ...counts };
   };
@@ -162,7 +164,7 @@ export function routeLegOnPage(leg) {
   };
   const step = () => {
     if (ended) return;
-    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000), s = (now - t0) / 1000;
+    const now = performance.now(), elapsed = now - last, dt = Math.min(0.1, elapsed / 1000), s = (now - t0) / 1000;
     last = now;
     if (w !== /** @type {any} */ (window).__wildshard?.world || document.visibilityState !== 'visible') { end('the page lost the controlled world during the leg'); return; }
     const x = p.position.x - originX, z = p.position.z - originZ;
@@ -170,12 +172,20 @@ export function routeLegOnPage(leg) {
     if (leg.fixed && movedSinceFrame > 18) { end('position jumped during the route'); return; }
     metres += movedSinceFrame; prevX = p.position.x; prevZ = p.position.z;
     if (now - previous >= (leg.fixed ? 150 : 1000)) sample(now);
+    const returning = leg.dwell?.road === true && nav.road && !nav.returned;
+    const road = returning ? travel() : undefined, crossing = road?.live?.crossing;
+    const held = crossing?.current === null && crossing.target === state.home &&
+      (crossing.phase === 'preparing' || crossing.phase === 'ready');
+    if (held) nav.admissionMs += elapsed;
+    const returnedNow = returning && road?.inside === state.home;
+    if (returnedNow) nav.returned = true;
     if (now - navAt >= 1000) {
       navAt = now;
       nav.path.push([Math.round(s), Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
       const moved = Math.hypot(p.position.x - checkX, p.position.z - checkZ);
       checkX = p.position.x; checkZ = p.position.z;
-      if (leg.kind !== 'stand' && !engaged && at < points.length && moved < 1 && (dwellStart === 0 || dwelled)) {
+      if (leg.kind !== 'stand' && !engaged && at < points.length && moved < 1 && (dwellStart === 0 || dwelled) &&
+        !held && !returnedNow) {
         still++;
         nav.stuck.push([Math.round(s), Math.round(x * 10) / 10, Math.round(z * 10) / 10]);
         input.setHeld('jump', true); setTimeout(() => { input.setHeld('jump', false); }, 150);
@@ -186,7 +196,6 @@ export function routeLegOnPage(leg) {
     }
     const over = s >= leg.seconds;
     if (leg.fixed && leg.kind === 'walk') {
-      if (nav.road && !nav.returned && inside() === state.home) nav.returned = true;
       const point = points[at];
       const dwelling = leg.dwell !== undefined && at === leg.dwell.point + 1 && !dwelled;
       if (dwelling) {
@@ -195,7 +204,7 @@ export function routeLegOnPage(leg) {
         const look = leg.dwell?.face ?? leg.face;
         if (look !== undefined) steer(look[0] - x, look[1] - z, dt);
         else if (leg.turn !== undefined) p.yaw += leg.turn * dt;
-        if (leg.dwell?.road && !nav.road && z < -250 && inside() === null) nav.road = true;
+        if (leg.dwell?.road && !nav.road && z < -250 && travel().inside === null) nav.road = true;
         if (nav.dwellMs >= (leg.dwell?.seconds ?? 0) * 1000) {
           dwelled = true;
           navAt = now;
