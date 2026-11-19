@@ -442,8 +442,9 @@
      "emits": "app.events.emit('player.died'"
     }
    ],
-   "proof": "flow:data-shard",
-   "why": "C10: Big Blob's declared panel retries off its row."
+   "proof": "flow:data",
+   "why": "C10: Big Blob's declared panel retries off its row.",
+   "debt": "TEMPLATE-E2E TR-5 retired flow:data-shard with the Template (its Big Blob page); flow:data boots a data page, but no flow kills on one yet: a Brasscap death flow is owed"
   },
   {
    "id": "player.respawned",
@@ -825,8 +826,9 @@
      "emits": "this.events.emit('actor.died'"
     }
    ],
-   "proof": "flow:data-shard",
-   "why": "Server code in shared: the host's own combat settles the death that a declared quest trigger counts."
+   "proof": "flow:data",
+   "why": "Server code in shared: the host's own combat settles the death that a declared quest trigger counts.",
+   "debt": "TEMPLATE-E2E TR-5 retired flow:data-shard with the Template; test/ci/declared-journeys.proof.mjs still kills the slice's blob for its declared quest headless, but no browser flow does: a Brasscap death flow is owed"
   },
   {
    "id": "host.actor.died.props",
