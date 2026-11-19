@@ -30,6 +30,11 @@ export const GROUND_Y_SLACK = 0.05;
  * feet are grounded and kept under this share of the asked move, a gap within STALL_SLACK is the same pocket, not a miss.
  */
 export const STALL_FREEDOM = 0.35, STALL_SLACK = 0.05;
+/**
+ * NET-LAG NL12 (h): a match farther apart than this (m), or with speeds this far apart (m/s), takes the room's state quietly.
+ * Under it is rounding: a speed of 1e-16 where the other side has 3e-16, which no step grows (`test/net-player.test.ts`).
+ */
+export const RESYNC_GAP = 1e-5, RESYNC_SPEED = 1e-3;
 /** A correction this far is a teleport: it snaps rather than glides. */
 export const PREDICTION_SNAP = 3;
 /** Room for a ride's words and its capsule's in a saved move. */
@@ -89,20 +94,22 @@ const OWNER_FLAGS: Readonly<Record<string, (s: PlayerMotionState, value: boolean
 };
 
 /** The owner block's columns as the predictor reads them, resolved once. */
-interface OwnerTable { readonly x: number; readonly y: number; readonly z: number; readonly grounded: number; readonly board: number; readonly swim: number; readonly led: number; readonly resets: number; readonly freedom: number; readonly shove: number }
+interface OwnerTable { readonly x: number; readonly y: number; readonly z: number; readonly vx: number; readonly vy: number; readonly vz: number; readonly grounded: number; readonly board: number; readonly swim: number; readonly led: number; readonly resets: number; readonly freedom: number; readonly shove: number }
 function ownerTable(columns: readonly NetColumn<never>[]): OwnerTable {
   const at = (name: string): number => {
     const index = columns.findIndex(column => column.name === name);
     if (index === -1) throw new Error(`Owner block has no ${name}`);
     return index;
   };
-  return { x: at('px'), y: at('py'), z: at('pz'), grounded: at('grounded'), board: at('board'), swim: at('swim'), led: at('led'), resets: at('resets'), freedom: at('freedom'), shove: at('shoveT') };
+  return { x: at('px'), y: at('py'), z: at('pz'), vx: at('vx'), vy: at('vy'), vz: at('vz'), grounded: at('grounded'), board: at('board'), swim: at('swim'), led: at('led'), resets: at('resets'), freedom: at('freedom'), shove: at('shoveT') };
 }
 
 /** One player's prediction. */
 export class Predictor {
   /** Corrections taken, and steps replayed for them: what a proof page reports. */
   corrections = 0; replays = 0;
+  /** Matches within tolerance that were not exact, so took the room's state and replayed quietly (NL12 h). */
+  resyncs = 0;
   /** Server-owned transitions, kept separate from a failed local prediction in proof output. */
   readonly authoritative = { leadEnds: 0, resets: 0, shoves: 0 };
   /** The render offset gliding now came from a server-owned take (a lead's end, a reset, a knock), not a wrong guess (NL12 f). */
@@ -181,7 +188,12 @@ export class Predictor {
     // NET-LAG NL12 (f): a creature's blow knocks the body back in the room at the tick it lands, which the page hears only
     // a round trip later; the room's shove clock running where this step had none is the server's word, not a wrong guess.
     const shoved = saved && !forced && this.value(table.shove, owner) > 0 && (this.states[at + CAPTURED.shove] ?? 0) === 0;
-    if (!forced && !shoved && (!saved || this.matches(slot, owner, ridden))) return false;
+    if (!forced && !shoved && !saved) return false;
+    // NET-LAG NL12 (h): a match that is not exact takes the room's state quietly. The page and the room step alike from the
+    // same state; a gap kept because it was within tolerance (one from the first frame, a creature's push) was never closed,
+    // and on a steep bank a key change grew 0.4 mm to 12 mm and a climb two ticks apart. `test/net-predict-resync.test.ts`
+    const matched = !forced && !shoved && this.matches(slot, owner, ridden);
+    if (matched && !this.drifted(slot, owner, ridden)) return false;
     // NL12 (c): the write below can take feet under a deck only if the server's world lacks the deck; NL5 gave the room the same
     // rope planks (`server/host/ropeDecks.ts`), and `test/net-predict-deck.test.ts` replays a correction 0.3 to 1 m low back onto them
     const s = body.motionState, { ride } = body, feet = ride?.feet ?? s.position, x = feet.x + body.renderOffset.x, y = feet.y + body.renderOffset.y, z = feet.z + body.renderOffset.z, { yaw } = s;
@@ -201,11 +213,12 @@ export class Predictor {
     if (leadEnded) this.authoritative.leadEnds++;
     if (reset) this.authoritative.resets++;
     if (shoved) this.authoritative.shoves++;
-    const corrected = !forced && !led && !boarded && !shoved;
+    const corrected = !forced && !led && !boarded && !shoved && !matched;
     if (corrected) this.corrections++;
+    if (matched) this.resyncs++;
     const offsetX = x - feet.x, offsetY = y - feet.y, offsetZ = z - feet.z, far = offsetX * offsetX + offsetY * offsetY + offsetZ * offsetZ > PREDICTION_SNAP * PREDICTION_SNAP;
     body.renderOffset.set(far ? 0 : offsetX, far ? 0 : offsetY, far ? 0 : offsetZ);
-    this.authoritativeGlide = !corrected;
+    if (!matched) this.authoritativeGlide = !corrected; // a resync's hair joins whatever glide is running
     this.glide = glidePace(body.renderOffset.length());
     if(corrected)this.corrected?.({tick:tick??s.tick,mode:ride!==null?'ride':s.board.on?'board':s.swim.on?'swim':'foot',offset:Math.hypot(offsetX,offsetY,offsetZ),snapped:far});
     return corrected;
@@ -262,6 +275,14 @@ export class Predictor {
     if (this.flag(table.board, owner) !== states[at + CAPTURED.board]) { missed.board++; return false; }
     if (this.flag(table.swim, owner) !== states[at + CAPTURED.swim]) { missed.swim++; return false; }
     return true;
+  }
+  /** A match the page did not hit bit for bit: its feet or speed differ from the room's. A deck's phase and a ride keep theirs. */
+  private drifted(slot: number, owner: ArrayLike<number>, ridden: ArrayLike<number> | null): boolean {
+    const { states, table } = this, at = slot * SAVED_WORDS;
+    if (ridden !== null || this.rode[slot] === 1 || (states[at + CAPTURED.carried] ?? 0) !== 0) return false;
+    const x = this.value(table.x, owner) - (states[at + CAPTURED.x] ?? 0), y = this.value(table.y, owner) - (states[at + CAPTURED.y] ?? 0), z = this.value(table.z, owner) - (states[at + CAPTURED.z] ?? 0);
+    const vx = this.value(table.vx, owner) - (states[at + CAPTURED.x + 3] ?? 0), vy = this.value(table.vy, owner) - (states[at + CAPTURED.y + 3] ?? 0), vz = this.value(table.vz, owner) - (states[at + CAPTURED.z + 3] ?? 0);
+    return x * x + y * y + z * z > RESYNC_GAP * RESYNC_GAP || vx * vx + vy * vy + vz * vz > RESYNC_SPEED * RESYNC_SPEED;
   }
   /** The first misses, side by side: server x y z grounded, then this client's. */
   private keepMiss(slot: number, owner: ArrayLike<number>): void {

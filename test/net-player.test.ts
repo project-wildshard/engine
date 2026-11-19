@@ -20,7 +20,7 @@ const scenario: MotionScenario = { id: 'net-player', start: { x: -10, z: 0, yaw:
 /** mulberry32. */
 const seeded = (seed: number): (() => number) => { let a = seed; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t ^= t + Math.imul(t ^ (t >>> 7), 61 | t); return ((t ^ (t >>> 14)) >>> 0) / 2 ** 32; }; };
 
-interface Run { readonly commands: number; readonly steps: number; readonly corrections: number; readonly replays: number; readonly offset: number; readonly feetGap: number; readonly delayMs: number; readonly drawn: readonly number[]; readonly rowSpeed: number; readonly x: number }
+interface Run { readonly commands: number; readonly steps: number; readonly corrections: number; readonly replays: number; readonly resyncs: number; readonly offset: number; readonly feetGap: number; readonly delayMs: number; readonly drawn: readonly number[]; readonly rowSpeed: number; readonly x: number }
 
 /** Play `seconds` at a frame time, with the server ticking on its own clock in batches of two. */
 function play(seconds: number, frameMs: (frame: number) => number, press: (frame: number, page: PageSide) => void = () => undefined, pacing?: (seconds: number) => 'live' | 'paused' | 'frame'): Run {
@@ -63,7 +63,7 @@ function play(seconds: number, frameMs: (frame: number) => number, press: (frame
   if (pacing !== undefined) net.driveDevice(() => 'paused', () => player.sampleHeldCommand());
   for (let settle = 0; settle < 6; settle++) { for (let run = 0; run < 2; run++) room.tick(); link.pump(); }
   net.reconcile();
-  const report = { commands, steps: room.lastSeq(seat), corrections: net.predictor.corrections, replays: net.predictor.replays, offset: net.worstOffset, feetGap: player.position.distanceTo(host.player.position), delayMs: client.clock.delayMs, drawn, rowSpeed: speed, x: host.player.position.x };
+  const report = { commands, steps: room.lastSeq(seat), corrections: net.predictor.corrections, replays: net.predictor.replays, resyncs: net.predictor.resyncs, offset: net.worstOffset, feetGap: player.position.distanceTo(host.player.position), delayMs: client.clock.delayMs, drawn, rowSpeed: speed, x: host.player.position.x };
   net.dispose(); room.dispose(); page.dispose(); host.dispose();
   return report;
 }
@@ -74,8 +74,11 @@ test.each([['Low Power Mode', lowPower()], ['60 frames/s', () => 1000 / 60]] as 
   expect(run.commands).toBeGreaterThan(300);
   expect(run.steps).toBe(run.commands); // the server reached the last one, and a step is a command (J125)
   expect(run.corrections).toBe(0);
-  expect(run.replays).toBe(0);
-  expect(run.offset).toBe(0);
+  // NET-LAG NL12 (h): the page's world and the room's are built apart, so a sideways step on flat ground can part them by a
+  // tenth of a millimetre; a match that far off takes the room's state quietly and replays what is in flight. Now and then,
+  // and a hair to glide, never a correction (measured: 36 to 39 in 480 commands, a 1.5 mm glide at worst).
+  expect(run.resyncs).toBeLessThan(run.commands / 10);
+  expect(run.offset).toBeLessThan(0.005);
   expect(run.feetGap).toBeLessThan(0.02);
 });
 
