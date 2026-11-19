@@ -19,12 +19,11 @@ function glArgs(): readonly string[] {
     ? ['--use-angle=metal', '--ignore-gpu-blocklist']
     : []
 }
-const suites =
-  process.env['WS_T1_EXPLORE'] === '1'
-    ? { Explore: /explore\.spec\.ts$/u }
-    : T1_SHARDS
+const explore = process.env['WS_T1_EXPLORE'] === '1'
+const suites = explore ? { Explore: /explore\.spec\.ts$/u } : T1_SHARDS
 export default defineConfig({
-  testDir: '.',
+  // Explore builds its own viewer client. The root specs use the shared Template build.
+  testDir: explore ? 'explore' : '.',
   outputDir: path.resolve(
     'tmp',
     process.env['WS_LANE_NAME'] ?? 't1-e2e',

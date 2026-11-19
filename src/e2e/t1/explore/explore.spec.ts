@@ -1,4 +1,4 @@
-import { expect, test } from '../../../scripts/browser-test.mjs'
+import { expect, test } from '../../../../scripts/browser-test.mjs'
 
 import type { Page } from '@playwright/test'
 
@@ -43,12 +43,16 @@ test('Explore browses, flies and inspects without a socket or durable saves', as
   const [x, z] = await cameraXZ(page)
   await page.keyboard.down('KeyW')
   try {
+    // This proves movement. Software rendering advances only a few frames per second.
     await expect
-      .poll(async (): Promise<number> => {
-        const [nextX, nextZ] = await cameraXZ(page)
-        return Math.hypot(nextX - x, nextZ - z)
-      })
-      .toBeGreaterThan(1)
+      .poll(
+        async (): Promise<number> => {
+          const [nextX, nextZ] = await cameraXZ(page)
+          return Math.hypot(nextX - x, nextZ - z)
+        },
+        { timeout: 15_000 },
+      )
+      .toBeGreaterThan(0.5)
   } finally {
     await page.keyboard.up('KeyW')
   }
