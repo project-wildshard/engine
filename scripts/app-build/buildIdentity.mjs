@@ -67,7 +67,11 @@ export function lateBootTags(html) {
   rest += html.slice(from);
   const start = '<script data-boot-late-start>(()=>{const late=document.querySelector(\'template[data-boot-late]\');'
     + 'if(!(navigator.standalone||matchMedia(\'(display-mode: standalone)\').matches)){document.write(late.innerHTML);return;}'
-    + 'addEventListener(\'load\',()=>{document.head.append(document.importNode(late.content,true));},{once:true});})();</script>';
+    // QA-FEEDBACK 11-19 row 18: iOS takes its still image down at `load`, but code run in the load event holds the next frame
+    // until it is done, so a cached boot showed the menu as its first frame. The code waits for one painted frame of the
+    // moving shell (a frame, then the next one's start; 250 ms at most when frames are throttled).
+    + 'addEventListener(\'load\',()=>{let added=false;const add=()=>{if(added)return;added=true;document.head.append(document.importNode(late.content,true));};'
+    + 'requestAnimationFrame(()=>{requestAnimationFrame(add);});setTimeout(add,250);},{once:true});})();</script>';
   return `${rest.slice(0, first)}<template data-boot-late>${tags.map(tag => tag[0]).join('\n')}</template>${start}${rest.slice(first)}`;
 }
 

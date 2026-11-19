@@ -14,7 +14,7 @@ const built = (shell = true): string => '<!doctype html><html><head><meta charse
   + `${shell ? '<div class="ws-launch" data-title-shell></div>' : ''}<script data-loading-first-paint></script></body></html>`;
 
 /** Run the late start script against a stand-in page: a tab (document.write) or a Home Screen launch (load). */
-function launch(html: string, standalone: boolean): {written: string[]; appended: unknown[]; load: (() => void) | undefined} {
+function launch(html: string, standalone: boolean): {written: string[]; appended: unknown[]; load: (() => void) | undefined; frame: () => void; timers: () => void} {
   const start = /<script data-boot-late-start>([\s\S]*?)<\/script>/u.exec(html)?.[1] ?? '';
   const template = /<template data-boot-late>([\s\S]*?)<\/template>/u.exec(html)?.[1] ?? '';
   const written: string[] = [], appended: unknown[] = [], content = {fragment: template};
@@ -27,9 +27,15 @@ function launch(html: string, standalone: boolean): {written: string[]; appended
   };
   const addEventListener = (name: string, listener: () => void, options: {once?: boolean}) => { if (name === 'load' && options.once === true) load = listener; };
   const matchMedia = (query: string) => ({matches: standalone && query === '(display-mode: standalone)'});
+  let frames: (() => void)[] = [], timeouts: {run: () => void; ms: number}[] = [];
+  const requestAnimationFrame = (run: () => void) => { frames.push(run); };
+  const setTimeout = (run: () => void, ms: number) => { timeouts.push({run, ms}); };
+  /** one painted frame: the callbacks queued before it run, and those they queue wait for the next */
+  const frame = (): void => { const now = frames; frames = []; for (const run of now) run(); };
+  const timers = (): void => { const now = timeouts; timeouts = []; for (const {run} of now) run(); };
   // eslint-disable-next-line @typescript-eslint/no-implied-eval -- the generated inline script, run against stand-ins
-  new Function('document', 'navigator', 'matchMedia', 'addEventListener', start)(document, {}, matchMedia, addEventListener);
-  return {written, appended, load};
+  new Function('document', 'navigator', 'matchMedia', 'addEventListener', 'requestAnimationFrame', 'setTimeout', start)(document, {}, matchMedia, addEventListener, requestAnimationFrame, setTimeout);
+  return {written, appended, load, frame, timers};
 }
 
 test('the title document keeps its bundle tags, in order, in one inert template right where they were', () => {
@@ -54,7 +60,25 @@ test('a browser tab writes the tags back while it parses; a Home Screen launch a
   expect(home.written).toEqual([]);
   expect(home.appended).toEqual([]);
   home.load?.();
+  // QA-FEEDBACK 11-19 row 18: not in the load event itself. The bundles' code would hold the frame iOS shows when its still
+  // image goes, so a cached boot's first frame was the menu. One frame of the moving shell is painted first.
+  expect(home.appended).toEqual([]);
+  home.frame();
+  expect(home.appended).toEqual([]);
+  home.frame();
   expect(home.appended).toEqual([{clone: {fragment: [MODULE, ...PRELOADS, SHEET].join('\n')}}]);
+  home.timers();
+  expect(home.appended).toHaveLength(1);
+});
+
+test('a Home Screen launch whose frames are throttled still adds the tags, once, 250 ms after load', () => {
+  const home = launch(lateBootTags(built()), true);
+  home.load?.();
+  home.timers();
+  expect(home.appended).toEqual([{clone: {fragment: [MODULE, ...PRELOADS, SHEET].join('\n')}}]);
+  home.frame(); home.frame();
+  expect(home.appended).toHaveLength(1);
+  expect(/<script data-boot-late-start>([\s\S]*?)<\/script>/u.exec(lateBootTags(built()))?.[1]).toContain('setTimeout(add,250)');
 });
 
 test('a page with no title shell, or a source page with no bundle tags, is unchanged', () => {

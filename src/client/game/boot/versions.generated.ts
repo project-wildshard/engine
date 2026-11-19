@@ -827,7 +827,7 @@ export const ASSET_VERSIONS: Readonly<Record<string, string>> = {
   "/assets/tex/wood_trunk_wall/nor_gl_1k.jpg": 'fc6aab0a',
   "/assets/tex/wood_trunk_wall/nor_gl_1k.phone.webp": 'a70475f6',
   "/assets/title/driftwood-isle-portrait.jpg": 'e9d5c9ae',
-  "/assets/title/launch-1206x2622-6afc7dd7eee8.png": '6afc7dd7',
+  "/assets/title/launch-1206x2622-aa16bc3256f3.png": 'aa16bc32',
   "/assets/title/main-crossroads-landscape-first.jpg": 'f3f19648',
   "/assets/title/main-crossroads-landscape.jpg": '9437ac10',
   "/assets/title/main-crossroads-square-first.jpg": '98ef65b2',

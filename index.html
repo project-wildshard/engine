@@ -222,13 +222,13 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/icons/preview/apple-touch-icon.png" />
     <!-- iPhone 16/17 Pro: iOS paints this before a standalone document exists.
          Rendered from this same shell by scripts/generate-title-launch.mjs. -->
-    <link rel="apple-touch-startup-image" href="/assets/title/launch-1206x2622-6afc7dd7eee8.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
+    <link rel="apple-touch-startup-image" href="/assets/title/launch-1206x2622-aa16bc3256f3.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" />
     <link rel="icon" type="image/png" sizes="64x64" href="/icons/preview/favicon-64.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <script>
       // Plain launch: the shard selector is the first screen, with no world or loading panel underneath it.
       // BEGIN TITLE URLS
-      const titleAssetURLs = {"/assets/title/driftwood-isle-portrait.jpg":"/assets/title/driftwood-isle-portrait-e9d5c9aedd5c5920.jpg","/assets/title/launch-1206x2622-6afc7dd7eee8.png":"/assets/title/launch-1206x2622-6afc7dd7eee8.png","/assets/title/main-crossroads-landscape-first.jpg":"/assets/title/main-crossroads-landscape-first-f3f196486b3476a0.jpg","/assets/title/main-crossroads-landscape.jpg":"/assets/title/main-crossroads-landscape-9437ac10c599548a.jpg","/assets/title/main-crossroads-square-first.jpg":"/assets/title/main-crossroads-square-first-98ef65b2b3433656.jpg","/assets/title/main-crossroads-square.jpg":"/assets/title/main-crossroads-square-24abf23d2606ae3f.jpg","/assets/title/nalati-grasslands-portrait.jpg":"/assets/title/nalati-grasslands-portrait-5ac0c2e430a5a22b.jpg","/assets/title/nine-dragon-stack-portrait.jpg":"/assets/title/nine-dragon-stack-portrait-d92d65e333c1ccba.jpg","/assets/title/pine-hollow-portrait.jpg":"/assets/title/pine-hollow-portrait-30a60f74489265a0.jpg"};
+      const titleAssetURLs = {"/assets/title/driftwood-isle-portrait.jpg":"/assets/title/driftwood-isle-portrait-e9d5c9aedd5c5920.jpg","/assets/title/launch-1206x2622-aa16bc3256f3.png":"/assets/title/launch-1206x2622-aa16bc3256f3.png","/assets/title/main-crossroads-landscape-first.jpg":"/assets/title/main-crossroads-landscape-first-f3f196486b3476a0.jpg","/assets/title/main-crossroads-landscape.jpg":"/assets/title/main-crossroads-landscape-9437ac10c599548a.jpg","/assets/title/main-crossroads-square-first.jpg":"/assets/title/main-crossroads-square-first-98ef65b2b3433656.jpg","/assets/title/main-crossroads-square.jpg":"/assets/title/main-crossroads-square-24abf23d2606ae3f.jpg","/assets/title/nalati-grasslands-portrait.jpg":"/assets/title/nalati-grasslands-portrait-5ac0c2e430a5a22b.jpg","/assets/title/nine-dragon-stack-portrait.jpg":"/assets/title/nine-dragon-stack-portrait-d92d65e333c1ccba.jpg","/assets/title/pine-hollow-portrait.jpg":"/assets/title/pine-hollow-portrait-30a60f74489265a0.jpg"};
       // END TITLE URLS
       const homeParams = new URLSearchParams(location.search);
       // The environment flags select no level (src/client/app/bootRoute.ts keeps the same list): a launch with only them is the title.
@@ -555,9 +555,13 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       .ws-launch-bar i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--ws-cyan); box-shadow: 0 0 10px rgba(143, 227, 255, .6); transition: width .25s ease-out; }
       .ws-launch-shard { display: flex; flex-direction: column; gap: 4px; min-height: 44px; padding: 12px 16px; border: 1px solid #8fe3ff66; background: #091624ee; color: #eaf8ff; text-decoration: none; font: 18px Rajdhani, system-ui, sans-serif; }
       .ws-launch-shard span { color: #bdced7; font-size: 14px; }
-      .ws-launch-bar::after { content: ''; position: absolute; top: 0; bottom: 0; left: -30%; width: 30%; background: linear-gradient(90deg, transparent, rgba(143, 227, 255, .6), transparent); animation: ws-launch-sweep 1.2s linear infinite; }
-      @keyframes ws-launch-sweep { to { left: 100%; } }
-      @media (prefers-reduced-motion: reduce) { .ws-launch-bar::after { animation: none; } }
+      /* QA-FEEDBACK 11-19 row 18 (Jake: "Something should move on this page"): the sweep moves from the first frame iOS shows
+         after its still launch image. It is a transform, so the compositor keeps it moving while the bundles' code runs on
+         the main thread, and its negative delay starts it mid-bar, never off screen. Reduced motion pulses; it never stops. */
+      .ws-launch-bar::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 30%; background: linear-gradient(90deg, transparent, rgba(143, 227, 255, .85), transparent); transform: translateX(-100%); will-change: transform; animation: ws-launch-sweep 1.2s linear -.5s infinite; }
+      @keyframes ws-launch-sweep { from { transform: translateX(-100%); } to { transform: translateX(334%); } }
+      @media (prefers-reduced-motion: reduce) { .ws-launch-bar::after { width: 100%; transform: none; background: rgba(143, 227, 255, .5); animation: ws-launch-pulse 1.6s ease-in-out infinite alternate; } }
+      @keyframes ws-launch-pulse { from { opacity: .15; } to { opacity: .8; } }
       @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/jetbrains-mono-cyrillic-ext.woff2) format('woff2');unicode-range:U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F}
       @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/jetbrains-mono-cyrillic.woff2) format('woff2');unicode-range:U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116}
       @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400;font-display:swap;src:url(/fonts/jetbrains-mono-greek.woff2) format('woff2');unicode-range:U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF}
