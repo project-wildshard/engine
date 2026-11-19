@@ -2,11 +2,12 @@ import { afterAll, expect, test } from 'vitest';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real git repositories and a Vitest JSON report on disk.
 import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real git repositories and a Vitest JSON report on disk.
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Real git repositories and a Vitest JSON report on disk.
 import { join } from 'node:path';
 import { failingIds, mainReds, newReds, writeCache, cacheFile } from '../../scripts/push-known-red.mjs';
 import { markGated, pregated } from '../../scripts/main-push-gated.mjs';
+import { pregate } from '../../scripts/main-push.mjs';
 
 // Mini coordinator, 2026-11-16 ~17:50 Cancún: a push is never refused for a red main already has, and main-push gates
 // before its lock. Real git: a bare remote, a clone, replayed commits keeping their patch ids.
@@ -78,4 +79,20 @@ test('a main-push gated commit stays gated after a replay onto a newer main; an 
   writeFileSync(join(a, 'carried.txt'), 'c\n'); git(a, 'add', 'carried.txt'); git(a, 'commit', '--quiet', '-m', 'carried');
   expect(pregated(a, `refs/heads/main ${git(a, 'rev-parse', 'HEAD')} refs/heads/main ${upstream}`)).toBeNull();
   expect(pregated(a, `refs/heads/plan/x ${replayed} refs/heads/plan/x ${upstream}`)).toBeNull();
+});
+
+// 2026-11-19: opus-of19b0's Brasscap ring re-record (d2cef3cd8) needed ALLOW_PIN_PUSH=1 from engine-quickfix: main-push's
+// early gate ran the pre-push without FS18's marker, so pin provenance refused the route its own message recommends.
+test('the gate before the lock carries main-push\'s own marker for its HEAD', async () => {
+  const remote = join(work, 'marked.git'), clone = join(work, 'marked');
+  git(work, 'init', '--quiet', '--bare', '--initial-branch=main', remote);
+  git(work, 'clone', '--quiet', remote, clone);
+  writeFileSync(join(clone, 'seed.txt'), 'seed\n'); git(clone, 'add', 'seed.txt'); git(clone, 'commit', '--quiet', '-m', 'seed'); git(clone, 'push', '--quiet', 'origin', 'main');
+  writeFileSync(join(clone, 'pin.txt'), 'pin\n'); git(clone, 'add', 'pin.txt'); git(clone, 'commit', '--quiet', '-m', 'pin');
+  const seen = join(work, 'marked-env.txt');
+  mkdirSync(join(clone, '.githooks'), { recursive: true });
+  writeFileSync(join(clone, '.githooks/pre-push'), `#!/usr/bin/env bash\ncat >/dev/null\nprintf '%s' "$WS_LAND_MAIN_PUSH" > '${seen}'\n`);
+  chmodSync(join(clone, '.githooks/pre-push'), 0o755);
+  expect(await pregate(clone, () => undefined)).toMatch(/gate green before the lock/u);
+  expect(readFileSync(seen, 'utf8')).toBe(`main-push:${git(clone, 'rev-parse', 'HEAD')}`);
 });

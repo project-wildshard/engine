@@ -450,7 +450,9 @@ export async function pregate(cwd, log, remote = 'origin') {
   const began = Date.now();
   let gated;
   try {
-    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_MAIN_WATCH: '0' };
+    // FS18: the same marker the push under the lock carries (`pushMain`), so pin provenance passes main-push's own
+    // test/pins change here too; without it the early gate refused every pin re-record (opus-of19b0, 2026-11-19).
+    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_MAIN_WATCH: '0', WS_LAND_MAIN_PUSH: `main-push:${head}` };
     gated = spawnSync('bash', [hook, remote, url], { cwd, env, input: `refs/heads/main ${head} refs/heads/main ${base}\n`, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['pipe', fd, fd] });
   } finally {
     closeSync(fd);
