@@ -104,6 +104,7 @@ async function bench() {
         await coldOrigin(driver, base, {});
         if (typeof driver.cacheOff === 'function') await driver.cacheOff(true);
       } else if (typeof driver.cacheOff === 'function') await driver.cacheOff(false);
+      /** @type {any} */
       let row;
       try { row = { kind, ...await linkRun(driver) }; } catch (error) { row = { kind, at: {}, error: error instanceof Error ? error.message : String(error) }; }
       console.log(`${kind} ${String(i + 1)}: ${row.error ?? `control ${String(row.at.control)} s`} ${JSON.stringify(row.at)}`);

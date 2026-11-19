@@ -37,7 +37,7 @@ export async function startWebKit({ headless = true } = {}) {
     },
     /** @param {{__wsElement: number}} element */
     async click(element) {
-      const box = await page.evaluate((index) => {
+      const box = await page.evaluate((/** @type {number} */ index) => {
         const el = /** @type {any} */ (window).__wsInspectorElements?.[index];
         if (!el?.isConnected) return null;
         const rect = el.getBoundingClientRect();
