@@ -29,6 +29,7 @@ export function connect(socket:string,device:string,name:string):NativeObserverB
     coins:frame===null?null:coins,checkpoint,closed:bot.closed,closedAt};
   },
   move:()=>{bot.thumb=tick=>({viewTick:0,steer:{keyX:0,keyY:1,stickX:0,stickY:0},yaw:tick/90,pitch:0,buttons:0});},
+  quit:()=>bot.quit(),
   close:()=>{control();off();owned.set=write;owned.delete=remove;owned.clear=clear;bot.drop();},
  };
 }

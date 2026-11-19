@@ -14,6 +14,38 @@ import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { watchFaults } from './proof-faults.mjs';
 
+/** The release's read-only phone load. It reaches the real loading card with every socket and write blocked.
+ * @param {string} base @param {string} build */
+export async function readOnlyPhoneLoad(base, build) {
+  const { webkit } = await import('./browser-playwright.mjs');
+  const url = new URL('/', base);
+  url.search = new URLSearchParams({ chunk: 'driftwood-isle', mute: '1', nolock: '1' }).toString();
+  const browser = await webkit.launch({ headless: true });
+  try {
+    const context = await browser.newContext({ ...PHONE, deviceScaleFactor: 1, serviceWorkers: 'block' });
+    await context.route('**/*', route => route.request().method() === 'GET' ? route.continue() : route.abort());
+    await context.routeWebSocket(/.*/u, socket => socket.close({ code: 4000, reason: 'Read-only phone proof' }));
+    const page = await context.newPage();
+    const response = await page.goto(url.href, { waitUntil: 'commit' });
+    if (response?.status() !== 200) throw new Error('The phone entry did not load');
+    const version = await fetch(new URL('/version.json', base), { cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+    if (!version.ok || (await version.json()).build !== build) throw new Error('The phone entry served another build');
+    const deadline = Date.now() + 45_000;
+    let entered = false;
+    while (Date.now() < deadline) {
+      const view = await page.evaluate(screenNow).catch(() => null);
+      if (view?.errorCard === true) throw new Error('The phone entry opened an error card');
+      if (view?.loading === true) return;
+      const skip = page.locator('#ws-name-box [data-name=skip]');
+      if (await skip.isVisible()) await skip.tap({ timeout: 3000 });
+      const enter = page.locator('.ws-menu-play');
+      if (!entered && await enter.isVisible()) { await enter.tap({ timeout: 3000 }); entered = true; }
+      await page.waitForTimeout(150);
+    }
+    throw new Error('The phone entry never reached its loader');
+  } finally { await browser.close(); }
+}
+
 /** @typedef {import('playwright').Page} Page */
 /** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, errorCard?: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string }} Screen */
 /** @typedef {'select' | 'mmo' | 'deeplink'} JourneyPath */

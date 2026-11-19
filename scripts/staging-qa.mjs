@@ -13,18 +13,20 @@ import { bugbashRows } from './staging-smoke/bugbash.mjs';
 import { writeBoard } from './staging-smoke/board.mjs';
 import { holds, worstFirst } from './staging-smoke/checks.mjs';
 import { newestProfiles, STORE } from './staging-smoke/store.mjs';
-import { CHANNELS, SMOKE_SCENARIOS } from './page-release/flow.mjs';
+import { CHANNELS, RELEASE_PUBLIC_KEY, SMOKE_SCENARIOS } from './page-release/flow.mjs';
 import { checkLocalSource, openQaRig } from './staging-qa-local.mjs';
 import { bindCandidateBrowser } from './staging-qa-browser.mjs';
 import { openQaCandidate } from './staging-qa-candidate.mjs';
 import { budgetFinding, budgetLines, LEGS } from './staging-qa-budget.mjs';
 import { iosSafari } from './staging-qa-sim.mjs';
+import { readOnlyPhoneLoad } from './journey-proof.mjs';
 
 /** @typedef {import('./staging-smoke/checks.mjs').Finding} Finding */
 /** @typedef {{ id: string, browser: string, pass: boolean, seconds: number, playedMs: number, reason?: string, log: string }} Proof */
 /** @typedef {{build?: string, findings: readonly Finding[], scenarios: readonly { id: string, status: string, legs: readonly {playedMs?: number}[] }[] }} SmokeEvidence */
-const JOURNEYS = Object.freeze(['gate-chromium', 'journey-webkit', 'ios-safari']);
+const JOURNEYS = Object.freeze(['gate-chromium', 'journey-webkit', 'ios-safari', 'doctor', 'read-only-webkit']);
 const DEPLOY_SCENARIOS = Object.freeze([...SMOKE_SCENARIOS, 'K6']);
+const DEPLOY_CHECKS = Object.freeze([...DEPLOY_SCENARIOS, 'gate-chromium', 'doctor', 'read-only-webkit']);
 const STAGING = CHANNELS.staging.origin;
 
 /** @param {string} scenario @param {string} key @param {Finding['severity']} severity @param {string} text @returns {Finding} */
@@ -66,16 +68,28 @@ function readResult(file) { return existsSync(file) ? JSON.parse(readFileSync(fi
 
 /** @param {{ id: string, root: string, url: string, out: string, build: string, candidate?: Candidate }} options @returns {Promise<Proof>} */
 async function journey({ id, root, url, out, build, candidate }) {
-  const gate = id === 'gate-chromium';
-  const browser = gate ? 'chromium' : 'webkit';
+  const gate = id === 'gate-chromium', doctor = id === 'doctor';
+  const browser = gate || doctor ? 'chromium' : 'webkit';
   const dir = join(out, id);
   mkdirSync(dir, { recursive: true });
   const log = join(dir, 'run.log');
+  const started = Date.now();
+  if (id === 'read-only-webkit') {
+    try {
+      await readOnlyPhoneLoad(url, build);
+      writeFileSync(log, 'PASS exact-build WebKit phone loader with writes and sockets blocked\n');
+      return { id, browser, pass: true, seconds: (Date.now() - started) / 1000, playedMs: 0, log };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'The phone entry failed';
+      writeFileSync(log, `${reason}\n`);
+      return { id, browser, pass: false, seconds: (Date.now() - started) / 1000, playedMs: 0, reason, log };
+    }
+  }
   const args = gate
     ? [join(import.meta.dirname, 'zone-gate-proof.mjs'), `--base=${url}`, `--out=${dir}`, '--engine=chromium', '--viewport=1280x800@1', '--target=far-reach', '--deploy', '--online']
+    : doctor ? ['--import', join(import.meta.dirname, 'bake-loader.mjs'), join(import.meta.dirname, 'e7-doctor-proof.mjs'), url, build, RELEASE_PUBLIC_KEY, '--engine=chromium']
     : [join(import.meta.dirname, 'journey-proof.mjs'), '--url', url, '--out', dir, '--browsers', browser, '--card', 'driftwood-isle', '--paths', 'mmo', '--runs', 'cold', '--deploy'];
   console.log(`staging-qa starting ${id}`);
-  const started = Date.now();
   const fd = openSync(log, 'w', 0o600);
   let status;
   try {
@@ -86,6 +100,8 @@ async function journey({ id, root, url, out, build, candidate }) {
     const child = spawn(process.execPath, [...binding, ...args], { cwd: root, env, stdio: ['ignore', fd, fd] });
     status = await new Promise((_resolve, reject) => { child.once('close', _resolve); child.once('error', reject); });
   } finally { closeSync(fd); }
+  if (doctor) return { id, browser, pass: status === 0, seconds: (Date.now() - started) / 1000, playedMs: 0, log,
+    ...(status === 0 ? {} : { reason: 'Doctor did not pass for this build' }) };
   const report = readResult(join(dir, gate ? 'chromium-far-reach-zone-gate.json' : 'report.json'));
   const pass = status === 0 && report?.build === build &&
     (gate ? report?.fired?.ready === true : report?.report?.length === 1 && report?.report[0]?.ok === true);
@@ -112,11 +128,9 @@ async function cli() {
       `Run local QA on the green source (${LEGS.local.join(', ')})`,
       `Prepare ${release} from that source and start exact release CI`,
       'Build the staging page from the release commit',
-      'Upload the unaliased Worker and its packs',
-      'Wait for exact release CI and signed staging rooms, then run staging check',
-      `Run QA on the unaliased candidate (${LEGS.candidate.join(', ')})`,
-      'Run staging go-live with the local and candidate verdicts',
-      `Run live QA within ten minutes (${LEGS.staging.join(', ')})`,
+      'Run staging go-live with the local verdict. It arms the MMO observer, uploads and checks the unaliased candidate',
+      `Go-live runs ${DEPLOY_CHECKS.join(', ')} and requires a passing MMO continuity witness before moving the alias`,
+      `Go-live reruns live QA (${LEGS.staging.join(', ')}) and writes the build-bound verdict`,
     ];
     steps.forEach((step, index) => { console.log(`${index + 1}. ${step}`); });
     return;
@@ -131,12 +145,16 @@ async function cli() {
   const url = new URL(args.get('url') ?? STAGING).origin;
   if (url !== STAGING && !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/u.test(url)) throw new Error('Staging QA requires staging or a loopback server');
   const requested = args.get('only')?.split(',');
+  const deployChecks = args.has('deploy-checks');
+  if (deployChecks && (local || requested !== undefined || url !== STAGING || source === undefined)) {
+    throw new Error('Deploy checks require the full, exact candidate or staging build');
+  }
   const known = new Set(/** @type {string[]} */ ([...DEPLOY_SCENARIOS, ...JOURNEYS]));
   if (requested?.some(id => !known.has(id))) throw new Error('Unknown staging QA step');
   // SQ16 (J427): each leg runs its budgeted steps; --only picks steps by hand
   const kind = local ? 'local' : candidateUrl === undefined ? 'staging' : 'candidate';
   /** @type {readonly string[]} */
-  const leg = requested ?? LEGS[kind];
+  const leg = deployChecks ? DEPLOY_CHECKS : requested ?? LEGS[kind];
   const selected = DEPLOY_SCENARIOS.filter(id => leg.includes(id));
   const expected = JOURNEYS.filter(id => leg.includes(id));
   // SQ14: the Simulator's Safari uses the Mac's own network, which no route can point at the unaliased candidate

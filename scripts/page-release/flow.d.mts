@@ -58,6 +58,7 @@ export const SMOKE_SCENARIOS: readonly string[];
 export interface QaVerdict { qa?: boolean; kind?: string; full?: boolean; build?: string; release?: string; url?: string; deploymentId?: string; roomsSerial?: number; proofs?: readonly { id?: string; pass?: boolean }[]; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string }
 export const QA_LEGS: Readonly<{ candidate: readonly string[]; staging: readonly string[] }>;
 export function qaGap(qa: QaVerdict | undefined, build: string): string | undefined;
+export function localQaGap(qa: QaVerdict | undefined, source: string | undefined, release: string): string | undefined;
 export const PACKS_ORIGIN: string;
 export const API_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;

@@ -150,15 +150,17 @@ Keep its verdict with the release. From main, run
 `../repo-kit/release.sh vX.Y.Z --prepare --from <source-sha> --notes <file>`.
 The helper writes the version, changelog and stamps on the release branch.
 
-Use a clean staging clone at the release head. Run `staging build` and
-`staging upload` so the packs are available before signing (J234).
-When exact branch CI and the signed staging rooms are ready, run
-`staging check` and give its Worker version URL to
-`staging-qa.mjs --candidate <worker-url> --release vX.Y.Z --build <release-sha>`.
-Run `staging go-live --local-qa=<local-verdict> --qa=<candidate-verdict>`
-after both legs pass. The local verdict must name the release commit's
-parent. The candidate verdict must match the release, Worker version and
-signed rooms serial. A serial change requires another candidate run.
+Use a clean staging clone at the release head. Run `staging build`, then
+`staging go-live --local-qa=<local-verdict> --qa-out=<evidence-dir>`.
+Go-live arms the MMO observer before rooms move, uploads the page and
+packs, and checks the exact signed rooms and Worker version. It runs
+K1–K6, the zone-gate play leg, Doctor and a read-only WebKit phone load.
+The smoke checks world draw and continues through Play anyway if shown.
+Go-live requires a clean verdict and the MS9 continuity witness. After
+the alias move it reruns live M3 and writes the final `verdict.json`.
+The local verdict must name the release commit's parent. Use the final
+verdict as production's `--qa` input. For an already live release,
+`--observer-proof=<file>` supplies its saved MS9 witness for verification.
 Print the train order with
 `node scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z`.
 

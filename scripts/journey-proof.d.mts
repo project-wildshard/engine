@@ -20,6 +20,7 @@ export const PHONE: {
 /** Runs in the page: requestAnimationFrame capped at 60 fps. */
 export function capFrames(): void;
 export function screenNow(): Screen;
+export function readOnlyPhoneLoad(base: string, build: string): Promise<void>;
 export function label(s: Screen | null): string;
 export function judge(samples: readonly Sample[], options?: { blankMs?: number; budgetMs?: number }): Problem[];
 export function judgeDeploy(samples: readonly Sample[], budgetMs?: number): Problem[];

@@ -9,7 +9,7 @@ export interface NativeReading {
  readonly checkpoint?:DurableCheckpoint|null;
  readonly closed:string|null;readonly closedAt:number|null;
 }
-export interface NativeObserverBot {read:()=>NativeReading;move:()=>void;close:()=>void}
+export interface NativeObserverBot {read:()=>NativeReading;move:()=>void;quit?:()=>void;close:()=>void}
 export interface ObservationSnapshot {
  readonly release:ReleaseFile;readonly ready:boolean;readonly reason:string|null;
  readonly health:{readonly build:string;readonly serial:number;readonly players:number};
@@ -26,6 +26,7 @@ export interface ObserverOptions {
  readonly devices:readonly [string,string];
  readonly labels?:readonly [string,string];
  readonly durationMs:number;readonly pollMs?:number;readonly signal?:AbortSignal;
+ readonly requireDurableBaseline?:boolean;
  readonly event?:(phase:string)=>void;
 }
 type Status='observed'|'failed'|'inconclusive'|'refused'|'cancelled';
@@ -127,10 +128,23 @@ export async function observeRelease(options:ObserverOptions){
    sessions.push({label,device,bot,generation:baseline.release.serial,attempts:1,first:null,latest:null,moved:false,
     before:null,closeAt:null,closeReason:null,backMs:null});bot.move();
   }
+  const priming=new Set<Session>();
   while(!signal.aborted){
-   for(const session of sessions)sample(session);
-   if(sessions.some(session=>session.latest?.closed!==null&&session.latest?.closed!==undefined))return report('inconclusive','baseline-link-ended');
-   if(sessions.every(session=>session.moved))break;
+   for(const session of sessions){
+    sample(session);
+    if(session.latest?.closed!==null&&session.latest?.closed!==undefined){
+     if(!priming.delete(session))return report('inconclusive','baseline-link-ended');
+     const current=await read();
+     if(current===null||!current.ready||identity(current.release)!==identity(baseline.release))return report('inconclusive','baseline-moved-before-join');
+     connect(session,current);
+    }
+    if(options.requireDurableBaseline===true&&session.moved&&!priming.has(session)&&!session.latest?.checkpoint){
+     if(session.attempts!==1||session.bot.quit===undefined)return report('inconclusive','missing-durable-baseline');
+     priming.add(session);
+     session.bot.quit();
+    }
+   }
+   if(sessions.every(session=>session.moved&&(options.requireDurableBaseline!==true||session.latest?.checkpoint)))break;
    await pause(Math.min(pollMs,100),undefined,{signal});
   }
   if(signal.aborted)throw signal.reason;

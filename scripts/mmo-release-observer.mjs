@@ -5,9 +5,11 @@ import {existsSync,lstatSync,mkdirSync,readFileSync,realpathSync,writeFileSync} 
 import {dirname,resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
+import NodeWebSocket from 'ws';
 import {observationInputs,ObservationRefusedError} from './mmo-release-observer-inputs.mjs';
 import {prepareObserverClient} from './mmo-observer-client.mjs';
 import {observeRelease} from '../test/fixtures/dedicated/releaseObserver.ts';
+import {CHANNELS} from './page-release/flow.mjs';
 
 const ROOT=resolve(import.meta.dirname,'..');
 /** @param {string[]} args @param {string} [root] */
@@ -61,12 +63,23 @@ export async function runObserver(args,root=ROOT){
    prepare:async(snapshot,signal)=>{try{return await prepareObserverClient(snapshot,signal,{root,work});}
     catch(error){if(signal.aborted)throw signal.reason;throw new ObservationRefusedError('client-prepare',error);}},
    devices:observerIdentities(realBase),
-   labels:[`E7-${id.slice(0,6)}-0`,`E7-${id.slice(0,6)}-1`],durationMs:seconds*1000,signal:cancel.signal,
+   labels:[`E7-${id.slice(0,6)}-0`,`E7-${id.slice(0,6)}-1`],durationMs:seconds*1000,signal:cancel.signal,requireDurableBaseline:true,
    event:phase=>{console.log(JSON.stringify({at:'release-observer',phase}));}});
   writeFileSync(join(work,'report.json'),`${JSON.stringify(report,null,2)}\n`,{mode:0o600});
   console.log(JSON.stringify({status:report.status,reason:report.reason,from:report.from,to:report.to,continuity:report.continuity,report:join(work,'report.json')}));
   return report.status==='observed'?0:report.status==='refused'||report.status==='failed'?1:report.status==='cancelled'?130:75;
  }finally{process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);}
 }
-if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)
- process.exitCode=await runObserver(process.argv.slice(2));
+if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
+ // The staging door requires its page Origin. Node's global WebSocket does not supply it.
+ const native=globalThis.WebSocket;
+ class StagingSocket extends NodeWebSocket {
+  /** @param {string} url @param {string[]} protocols */
+  constructor(url,protocols){
+   if(new URL(url).href!==new URL(CHANNELS.staging.socket).href)throw new Error('Observer socket must be the public staging door');
+   super(url,protocols,{origin:CHANNELS.staging.origin});
+  }
+ }
+ globalThis.WebSocket=/** @type {typeof native} */ (/** @type {unknown} */ (StagingSocket));
+ try{process.exitCode=await runObserver(process.argv.slice(2));}finally{globalThis.WebSocket=native;}
+}

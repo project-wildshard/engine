@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash, X509Certificate } from 'node:crypto';
 import { chromium, webkit } from './browser-playwright.mjs';
 
-const VERSION = 'https://staging.wildshard.io/version.json';
+const STAGING = 'https://staging.wildshard.io';
 
 /** @param {Buffer|string} certificate */
 export function certificateSpki(certificate) {
@@ -39,8 +39,11 @@ export function bindCandidateBrowser({ server, preview, chromiumSPKI }) {
   chromiumCandidateArgs([], chromiumSPKI);
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (input, options) => {
-    const url = input instanceof Request ? input.url : String(input);
-    return originalFetch(url === VERSION ? `${preview}/version.json` : input, options);
+    const url = new URL(input instanceof Request ? input.url : String(input));
+    const method = options?.method ?? (input instanceof Request ? input.method : 'GET');
+    if (url.origin !== STAGING || (method !== 'GET' && method !== 'HEAD')) return originalFetch(input, options);
+    const target = `${preview}${url.pathname}${url.search}`;
+    return originalFetch(input instanceof Request ? new Request(target, input) : target, options);
   };
   const undo = [chromium, webkit].map(engine => {
     const originalPersistent = engine.launchPersistentContext.bind(engine);

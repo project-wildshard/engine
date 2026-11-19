@@ -391,7 +391,7 @@ export const SMOKE_SCENARIOS = Object.freeze(['K1', 'K2', 'K3', 'K4', 'K5']);
 export const QA_LEGS = Object.freeze({candidate: LEGS.candidate, staging: LEGS.staging});
 
 /** @param {QaVerdict | undefined} qa @param {string | undefined} source @param {string} release */
-function localQaGap(qa, source, release) {
+export function localQaGap(qa, source, release) {
   if (qa === undefined) return 'no local verdict';
   if (qa.problem !== undefined) return qa.problem;
   if (qa.qa !== true || qa.kind !== 'local' || qa.full !== true) return 'a full local staging-qa.mjs verdict is required';

@@ -10,9 +10,9 @@
 //   --dry-run                print every step and read the live gate; build, upload and alias nothing
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
 //   --local-qa=<verdict.json> staging go-live (SQ7): the local QA verdict on the parent of the release commit.
-//   --qa=<verdict.json>      staging go-live needs the candidate QA verdict. Production (SQ15) needs one verdict, the
-//                            candidate's or live staging's full leg; go-live refuses without one, for another build, or when
-//                            it holds (a P0 or P1). It replaced --after-staging-proofs, --journeys and --smoke.
+//   --qa-out=<dir>           staging go-live writes one verdict.json here (J434). It runs the candidate and live QA itself.
+//   --observer-proof=<file>  reuse an exact MS9 transition witness when verifying a staging build already live.
+//   --qa=<verdict.json>      production needs the clean candidate or live staging verdict for its exact build (SQ15).
 //   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
 //                            dist-content/ to packs.wildshard.io first (PAGE-SIZE PZ2,
 //                            page-release/content.mjs); preview.yml passes it (PZ6), staging and production with PZ8
@@ -34,6 +34,7 @@ import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, runPhase} from './pa
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
+import {deployStaging} from './page-release/staging-deploy.mjs';
 
 /** SQ15: the staging-qa verdict.json, or why it could not be read. @param {string} file */
 function readQa(file) {
@@ -92,9 +93,18 @@ const contentCopies = flag('content') === undefined ? undefined : r2Copies(proce
 if (contentCopies !== undefined) secrets.push(...contentCopies.secrets);
 
 let phase = '';
-try {
-  for (phase of phaseList.split(',')) {
-    const {refusals} = await runPhase(/** @type {any} */ (phase), {
+const phases = phaseList.split(',');
+const bundled = channel === 'staging' && !flag('dry-run') && phases.includes('go-live');
+const localQa = value('local-qa') === undefined ? undefined : readQa(resolve(value('local-qa') ?? ''));
+const localQaSource = channel === 'staging' && phases.includes('go-live') ? git(['rev-parse', `${build}^`], root) : undefined;
+const manifest = {
+  version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version,
+  saveEpoch: JSON.parse(readFileSync(join(root, 'save-epoch.json'), 'utf8')).saveEpoch,
+};
+/** @param {import('./page-release/flow.mjs').Phase} name @param {import('./page-release/flow.mjs').QaVerdict} [generatedQa] */
+async function run(name, generatedQa) {
+    const qa = generatedQa ?? (value('qa') === undefined ? undefined : readQa(resolve(value('qa') ?? '')));
+    const {refusals} = await runPhase(name, {
       root, channel: /** @type {any} */ (channel), build, host, releaseKey, codeRetention: true,
       packs: r2Packs({log}),
       ...(flag('content') === undefined ? {} : {content: {
@@ -122,22 +132,28 @@ try {
         remoteTag: tag => git(['ls-remote', '--tags', 'origin', `refs/tags/${tag}^{}`, `refs/tags/${tag}`], root)
           .split('\n').map(line => line.split('\t')).sort(([, a], [, b]) => (b ?? '').length - (a ?? '').length)[0]?.[0] || undefined,
       },
-      manifest: {
-        version: JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version,
-        saveEpoch: JSON.parse(readFileSync(join(root, 'save-epoch.json'), 'utf8')).saveEpoch,
-      },
+      manifest,
       log, now: () => Date.now(), sleep: delay,
       dryRun: flag('dry-run') !== undefined,
       waitMs: Number(value('wait') ?? 45) * 60_000,
-      ...(value('qa') === undefined ? {} : {qa: readQa(resolve(value('qa') ?? ''))}),
-      ...(channel !== 'staging' || phase !== 'go-live' ? {} : {
-        localQaSource: git(['rev-parse', `${build}^`], root),
-        ...(value('local-qa') === undefined ? {} : {localQa: readQa(resolve(value('local-qa') ?? ''))}),
-      }),
+      ...(qa === undefined ? {} : {qa}),
+      ...(localQaSource === undefined ? {} : {localQaSource}),
+      ...(localQa === undefined ? {} : {localQa}),
       // the build runs in `root`, so a relative path is the caller's
       ...(value('catalogue') === undefined ? {} : {catalogue: resolve(value('catalogue') ?? '')}),
     });
-    if (refusals.length > 0) log(`DRY-RUN ${channel} ${phase}: ${refusals.length} gate(s) would refuse today`);
+    if (refusals.length > 0) log(`DRY-RUN ${channel} ${name}: ${refusals.length} gate(s) would refuse today`);
+}
+try {
+  for (phase of phases) {
+    if (bundled && (phase === 'upload' || phase === 'check')) continue;
+    if (bundled && phase === 'go-live' && localQaSource !== undefined) {
+      const proof = value('observer-proof');
+      await deployStaging({ root, build, release: `v${manifest.version}`, source: localQaSource,
+        out: resolve(value('qa-out') ?? join(root, 'tmp', 'staging-deploy', build, String(Date.now()))),
+        ...(localQa === undefined ? {} : { localQa }), ...(proof === undefined ? {} : { observerProof: resolve(proof) }),
+        readState, get: async url => (await fetch200(url)).json(), phase: run, log });
+    } else await run(/** @type {import('./page-release/flow.mjs').Phase} */ (phase));
   }
 } catch (error) {
   // CLI and fetch errors can carry argv or headers: only redacted text leaves this process.

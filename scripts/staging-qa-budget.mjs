@@ -23,6 +23,8 @@ export const STEPS = Object.freeze({
   K5: { seconds: 30, catches: 'the Infinite Wildshard grid entry does not arrive in play' },
   K6: { seconds: 210, catches: 'one Shard Select card draws a black world or never plays on WebKit iPhone at phone Low' },
   'gate-chromium': { seconds: 90, catches: 'walking through a cell gate does not arrive in the next cell' },
+  doctor: { seconds: 45, catches: 'the signed build connection Doctor cannot reach staging rooms' },
+  'read-only-webkit': { seconds: 30, catches: 'a fresh WebKit phone cannot reach the deep-link loader without writes' },
   // measured 55 s on staging v0.1.44 with the Simulator's boot; J428 keeps it to the obvious checks, so it uses ~2 of J427's ~5 minutes
   'ios-safari': { seconds: 120, catches: 'real iOS Safari (Simulator, real touch) does not reach a drawn world or move' },
 });
