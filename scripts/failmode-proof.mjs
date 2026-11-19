@@ -178,7 +178,9 @@ try {
     '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] });
   browserVersion = launched.version();
   const { defaultBrowserType: _engine, ...device } = devices['iPhone 16 Pro'];
-  const phone = { ...device, viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 } };
+  // FM11: a hosted runner draws with SwiftShader; at the phone's 3x a Driftwood frame (and so a screenshot) outlasts 30 s, so off macOS
+  // the phone draws at 1x. Layout, touch and the mobile frame cap are the phone's either way.
+  const phone = { ...device, ...(process.platform === 'darwin' ? {} : { deviceScaleFactor: 1 }), viewport: { width: 402, height: 874 }, screen: { width: 402, height: 874 } };
   const allowedOrigins = fixtureRequestOrigins(PAGE_ORIGIN, SOCKET);
   /** WebSocket dials the pages made, by origin (FM4b modes 6 and 7 count their negative target's) */
   const socketDials = /** @type {Map<string, number>} */ (new Map());
@@ -272,7 +274,7 @@ try {
   }).catch(() => '') ?? '').replaceAll(/\s+/gu, ' ').slice(0, process.env.FM_TRACE === '1' ? 3000 : 300),
     ...process.env.FM_TRACE === '1' ? { marks: await page.evaluate(() => Object.fromEntries(Object.entries(document.documentElement.dataset))).catch(() => null) } : {} });
   /** A shot named for the case. @param {import('playwright').Page} page @param {string} id @param {string} what */
-  const shoot = async (page, id, what) => { const file = `${id.replace('/', '-')}-${what}.png`; await page.screenshot({ path: join(shots, file) }); return file; };
+  const shoot = async (page, id, what) => { const file = `${id.replace('/', '-')}-${what}.png`; await page.screenshot({ path: join(shots, file), scale: 'css', timeout: 60_000 }); return file; };
   /** Back in play: frames move on and no card or page is up (a notice may be). @param {import('playwright').Page} page @param {number} timeout */
   const recovered = async (page, timeout) => {
     const until = Date.now() + timeout, start = await frames(page);

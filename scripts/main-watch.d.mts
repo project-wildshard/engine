@@ -14,6 +14,7 @@ export interface Io {
   receipts:()=>string;receipt:(line:string)=>void;panes:()=>Pane[];send:(pane:string,text:string)=>boolean;prompt:(agent:string,text:string)=>boolean;fixers:()=>string[];dispatch:()=>void;
   nativeRuns?:()=>Run[];
   budgetRuns?:()=>Run[];
+  failmodeRuns?:()=>Run[];
   budgetAnnotations?:(id:number)=>string;
   memoryQa?:(rows:MemoryQa[])=>void;
   quotaReset?:()=>number;

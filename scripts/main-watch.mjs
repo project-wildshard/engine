@@ -73,6 +73,8 @@ export function failedNames(jobs){
 
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
 const finished=(/** @type {Run} */run)=>run.status==='completed';
+/** FM11: a failure-mode run older than a nightly's day is history when the watcher first meets it, not today's fix row. */
+const FAILMODE_WINDOW_MS=26*60*60_000;
 /** Superseded, never red: a cancel that hid no blocking failure. Main pushes never cancel a started run (ci.yml's
  * cancel-in-progress is false for main) unless it is red already (ci-early-red.yml, FS24), so a started run whose
  * blocking job failed, timed out or was cancelled (a job over its timeout-minutes concludes `cancelled`:
@@ -270,6 +272,9 @@ export function liveIo(env=process.env){
     budgetAnnotations:(/** @type {number} */id)=>/** @type {{id:number,name:string}[]} */(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs)
       .filter(job=>job.name==='budgets')
       .map(job=>read(['api','--paginate',`repos/${repo}/check-runs/${job.id}/annotations?per_page=100`,'--jq','.[].message'])).join('\n'),
+    // FM11 (meta MMO-FAILURE-MODES, J229): the failure-mode browser proof (nightly, related pushes) reports beside ci.
+    failmodeRuns:()=>sharedRuns(`${runsCache}.failmodes`,()=>/** @type {Run[]} */(
+      JSON.parse(read(['api',`repos/${repo}/actions/workflows/failmodes.yml/runs?branch=main&per_page=15`])).workflow_runs)),
     runSha:(/** @type {number} */id)=>String(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}`])).head_sha),
     nativeRuns:()=>sharedRuns(`${runsCache}.memory-footprint`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/memory-footprint.yml/runs?branch=main&per_page=15`])).workflow_runs)),
@@ -440,6 +445,17 @@ export function sweep(io,hint={}){
       if(report.qa!==null)state.memoryQa.push(report.qa);
       state.judged.push(run.id);writeState(io.state,state);
       for(const line of report.lines)io.receipt(line);
+    }
+    // FM11 (J229): a red failure-mode proof (the nightly all-46 or a related push) is a fix row for today, never main's verdict.
+    let failmodeRuns=/** @type {Run[]} */([]);
+    try{failmodeRuns=io.failmodeRuns?.()??[];}catch(error){
+      io.receipt(`failure-mode proof status unavailable: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
+    }
+    const dayAgo=(io.now?.()??Date.now())-FAILMODE_WINDOW_MS;
+    for(const run of failmodeRuns.filter(row=>finished(row)&&!state.judged.includes(row.id))){
+      state.judged.push(run.id);writeState(io.state,state);
+      if(run.conclusion==='success'||run.conclusion==='cancelled'||run.conclusion==='skipped'||Date.parse(run.created_at)<dayAgo)continue;
+      io.receipt(`main FAILMODES ${short(run.head_sha)} run ${run.id} (${run.event}) ${run.conclusion??'unknown'}: a fix row today, never main red (FM11, J229); receipt artifact failmodes-${run.head_sha}`);
     }
     if(state.memoryQa.length>0&&io.memoryQa!==undefined){
       try{io.memoryQa(state.memoryQa);state.memoryQa=[];writeState(io.state,state);}catch(error){

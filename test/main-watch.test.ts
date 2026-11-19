@@ -458,3 +458,16 @@ test('FS22: a red whose pusher has no pane reaches the keeper at once, and not a
   clock += 25 * 60_000;sweep(io);
   expect(w.prompted).toHaveLength(1);
 });
+
+test('FM11: a red failure-mode proof is one fix-row receipt, never main red; green, cancelled and old runs are quiet', () => {
+  const w = world(replay), io = { ...fake('failmodes', w), now: () => Date.parse('2026-11-11T06:00:00Z') };
+  const nightly = { ...run(42970000031, '652afa6c', 'failure', 40), event: 'schedule' };
+  const old = { ...run(42970000032, '652afa6c', 'failure', 40), created_at: '2026-11-09T05:00:00Z' };
+  const failmodes = [nightly, old, run(42970000033, '652afa6c', 'success', 41), run(42970000034, '652afa6c', 'cancelled', 42), run(42970000035, '652afa6c', null, 43, 'in_progress')];
+  const watched = { ...io, failmodeRuns: () => failmodes };
+  expect(sweep(watched).map(row => row.kind)).not.toContain('red');
+  sweep(watched);
+  const lines = w.receipts.filter(line => line.includes('FAILMODES'));
+  expect(lines).toEqual([`main FAILMODES 652afa6c00 run 42970000031 (schedule) failure: a fix row today, never main red (FM11, J229); receipt artifact failmodes-${sha('652afa6c')}`]);
+  expect(w.sent).toEqual([]);
+});
