@@ -223,6 +223,9 @@ export class GameMenu {
     this.exitBtn.hidden = !pause;
     // E176: the build pill shows over the PAUSE menu (not the BAG), so the root says which one is up
     this.root.classList.toggle('pause', pause);
+    // MAP-NEXT MN15 (QA 11-19 row 59): the play group's A sheet (short header, full-width tabs, the bottom band) is its own
+    // class, so neither PAUSE nor the title's Settings (BootSettings, the same .ws-gmenu sheet) takes it
+    this.root.classList.toggle('play', !pause);
     this.root.classList.toggle('ws-gmenu-svmenu', pause); // J245: SETTINGS is wider than PAUSED was
     window.dispatchEvent(new Event('ws-menu'));
   }

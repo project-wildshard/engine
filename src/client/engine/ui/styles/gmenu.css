@@ -65,6 +65,9 @@
 .ws-gmenu .ws-gmenu-body { position: relative; flex: 1; min-height: 0; }
 .ws-gmenu .ws-gmenu-panel { position: absolute; inset: 0; display: none; padding: 14px 16px 10px; }
 .ws-gmenu .ws-gmenu-panel.active { display: flex; flex-direction: column; }
+/* MAP-NEXT MN15/MN16 (QA 11-19 row 59): every BAG tab's content spans the sheet (386 pt inside a 402 pt phone's 1 px border,
+   the map's width); the map's own rule below keeps its tighter top */
+.ws-gmenu.play .ws-gmenu-panel { padding: 12px 7px 10px; }
 .ws-gmenu .ws-gmenu-panel.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; }
 .ws-gmenu .ws-gmenu-hint { padding: 10px 0 12px; text-align: center; font-size: 9px; letter-spacing: 0.26em; text-transform: uppercase; color: rgba(196, 220, 232, 0.45); }
 .ws-gmenu .ws-gmenu-label { flex: none; margin: 10px 0 6px; font-size: 9.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-text-dim); }
@@ -94,21 +97,22 @@
 .ws-gmenu .ws-gmenu-legend i.poi { color: var(--ws-cyan); }
 .ws-gmenu .ws-gmenu-legend i.you { color: #fff; }
 .ws-gmenu .ws-gmenu-legend[hidden] { display: none; }
-/* QA 11-19 row 58, Jake's A-1.4 (17:20, board 9TGmo1PWB5zAEd4GaPSdHL): the BAG (not PAUSE) gets a shorter CLOSE · BAG
+/* QA 11-19 row 58, Jake's A-1.4 (17:20, board 9TGmo1PWB5zAEd4GaPSdHL): the BAG (`.play`, MN15: never PAUSE, never the
+   title's Settings, which shares this sheet) gets a shorter CLOSE · BAG
    header, the map at the sheet's full width and 1.4 times as tall, the zoom row (0.25x 0.5x 1x 2x) and the key under it,
    and nothing below: no hint line (the web app's bottom bar sits there). The 44 px tap height stays, past the button. */
-.ws-gmenu:not(.pause) .ws-gmenu-bar { padding: 2px 10px; }
-.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-close { position: relative; min-height: 32px; padding: 4px 14px; font-size: 12px; letter-spacing: 0.2em; }
-.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-close::before { content: ''; position: absolute; inset: -6px -4px; }
+.ws-gmenu.play .ws-gmenu-bar { padding: 2px 10px; }
+.ws-gmenu.play .ws-gmenu-bar .ws-gmenu-close { position: relative; min-height: 32px; padding: 4px 14px; font-size: 12px; letter-spacing: 0.2em; }
+.ws-gmenu.play .ws-gmenu-bar .ws-gmenu-close::before { content: ''; position: absolute; inset: -6px -4px; }
 /* MAP-NEXT MN11: with the icon tabs' padding (the BAG rule below) the header and the tab row are 88 pt or less together */
 /* MN12: in a home-screen app iOS reports no bottom inset (E58); --ws-home stands in, so the sheet ends above the home bar */
-.ws-gmenu:not(.pause) { padding-bottom: calc(10px + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px))); }
+.ws-gmenu.play { padding-bottom: calc(10px + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px))); }
 /* MN10: on a wider screen the frame keeps its 1.4, capped by the height the sheet leaves it */
 @media (min-width: 561px) { .ws-gmenu .ws-gmenu-mapframe { width: auto; max-width: 100%; aspect-ratio: 5 / 7; align-self: center; } }
-.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-title { font-size: 17px; letter-spacing: 0.3em; }
-.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-sub { margin-top: 2px; font-size: 8.5px; letter-spacing: 0.24em; }
+.ws-gmenu.play .ws-gmenu-bar .ws-gmenu-title { font-size: 17px; letter-spacing: 0.3em; }
+.ws-gmenu.play .ws-gmenu-bar .ws-gmenu-sub { margin-top: 2px; font-size: 8.5px; letter-spacing: 0.24em; }
 .ws-gmenu .ws-gmenu-hint:empty { display: none; }
-@media (max-width: 560px) { .ws-gmenu:not(.pause) { padding-left: 0; padding-right: 0; } } /* the sheet at the phone's full width */
+@media (max-width: 560px) { .ws-gmenu.play { padding-left: 0; padding-right: 0; } } /* the sheet at the phone's full width */
 
 /* INVENTORY: equipped weapon cards + the 3-column pack grid */
 .ws-gmenu .ws-gmenu-weapon { flex: none; display: flex; align-items: center; gap: 14px; width: 100%; margin-bottom: 8px; padding: 10px 12px; appearance: none; -webkit-appearance: none; text-align: left; background: rgba(143, 227, 255, 0.04); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text); font-family: var(--ws-mono); cursor: pointer; }
