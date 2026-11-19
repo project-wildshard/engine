@@ -25,6 +25,7 @@ import { fetchReleaseFile, readPulledReleaseCells, servingRelease, ReleaseWatch 
 import { savesUrl } from './saves/pgDatabase';
 import { within } from './saves/saveStore';
 import { ZoneEntries, ZONE_ENTRY_MINUTE_MS } from './zoneEntries';
+import { readZoneUploads, zoneSelectRoute } from './zoneSelect';
 import { ServerReports } from './serverReports';
 import { ServerMetrics, metricsPort } from './serverMetrics';
 import { sendSentryTest, serverSentry } from './serverSentry';
@@ -139,7 +140,16 @@ let activationReceiver: ReturnType<typeof uploadActivationReceiver> | undefined;
 // MMO-PLAN MP2.5a: a signed-in page's export and delete, with its join ticket as the proof. Memory saves have none.
 const { exportAccount: exporting, deleteAccount: deleting } = saves;
 const accounts = exporting === undefined || deleting === undefined ? undefined : accountRoutes({ ticketKey: ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, allowedOrigins: trust.allowedOrigins, hold: seat => world.holdForDelete(seat), exportAccount: exporting, deleteAccount: deleting, deleted: account => { world.forgetAccount(account); }, log });
+const catalogueAt = new URL('/api/catalogue', placementAt !== undefined && /^https?:/u.test(placementAt) ? placementAt : 'https://api.wildshard.io');
+const zoneSelect = zoneSelectRoute({
+  channel: release.channel, allowedOrigins: trust.allowedOrigins,
+  world: () => ({ serial: release.serial, slugs: world.openShards() }),
+  uploads: () => readZoneUploads(catalogueAt),
+  totals: () => arrivals?.totals() ?? Promise.resolve([]),
+  log,
+});
 const server = createServer((request, response) => {
+  if (zoneSelect(request, response)) return;
   if (activationReceiver?.(request, response)) return;
   if (accounts?.(request, response) === true) return;
   // MEMORY-STRUCTURE STR4: a dev server's control channel (`build-server.mjs --dev`); the box's bundle folds this away

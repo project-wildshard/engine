@@ -869,6 +869,11 @@ export class World {
     const cell = last === null ? null : cellName(last);
     return cell !== null && this.links.has(cell) ? cell : first;
   }
+  /** The catalogue the room door can seat now, including successful live placements. */
+  openShards(): readonly string[] {
+    return [...new Set([...this.links].filter(([cell, link]) => roadHome(cell) === null && this.up.has(link)).map(([cell]) => cellShard(cell)))];
+  }
+
   private discovery():Pick<WorldWord,'cells'|'shards'>{return {cells:this.links.size,shards:[...new Set([...this.links.keys()].map(cellShard))]};}
   private seat(slug: string, end: SocketTransport, entry: SeatEntry, hello: ArrayBuffer, entering = false): void {
     if (!end.isOpen || this.draining) return;
