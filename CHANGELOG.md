@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.49 (2026-11-19)
+
+- Native runtime plans now run the creatures declared by ordinary shard uploads.
+- Pine phone textures use both cook encoder lanes and have time to finish a cold cook.
+- Declared creatures can hold their spawn, using shard format 0.47.0.
+
 ## v0.1.48 (2026-11-19)
 
 - Staging shard uploads cook in minutes again.
