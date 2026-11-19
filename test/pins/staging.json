@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "bfe1afc70e74d197ed662611e26aa6a068f9f16f735b7c6ae92be51384f6a8fb",
+  "catalogueHash": "5cc494bd018e33ff29d10a0a8da4e3f9de4aa4b2b74e07db4441c03c08d555c6",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -696,8 +696,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 10,
-        "hash": "6fd1d8de0cc063330dc2d6902c437849de53c93a801d5a006b96cced6cba9f2e"
+        "revision": 11,
+        "hash": "1214e5e2930ffa6b65243dce75401ecb8b5fde01a8cd86df6f17722451faff23"
       },
       {
         "slug": "cinder-orchard",
@@ -891,9 +891,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 10,
-      "hash": "6fd1d8de0cc063330dc2d6902c437849de53c93a801d5a006b96cced6cba9f2e",
-      "bytes": 21988864
+      "revision": 11,
+      "hash": "1214e5e2930ffa6b65243dce75401ecb8b5fde01a8cd86df6f17722451faff23",
+      "bytes": 22113792
     },
     {
       "slug": "cinder-orchard",
