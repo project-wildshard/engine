@@ -129,8 +129,8 @@ const CLEAN = { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.U
 function stop(message) { console.error(`stop    ${message}`); process.exit(1); }
 /** One line on stderr, so stdout carries only the server's own lines. @param {string} what @param {string} message */
 function say(what, message) { try { console.error(`${what.padEnd(7)} ${message}`); } catch { /* the caller went away */ } }
-/** @param {string} command @param {string[]} args */
-function exec(command, args, inherit = false, /** @type {string | undefined} */ input = undefined) {
+/** @param {string} command @param {string[]} args @param {boolean} [inherit] @param {string} [input] */
+function exec(command, args, inherit = false, input) {
   const stand = test !== undefined ? process.env[`WILDSHARD_REPLICA_TEST_${command.split('/').pop()?.replaceAll('-', '_').toUpperCase() ?? ''}`] : undefined;
   return spawnSync(stand ?? command, args, { encoding: 'utf8', cwd: '/', env: test !== undefined ? { ...process.env, ...CLEAN, PATH: process.env.PATH ?? CLEAN.PATH } : CLEAN,
     ...(input === undefined ? {} : { input }), stdio: [input === undefined ? 'ignore' : 'pipe', inherit ? 'inherit' : 'pipe', inherit ? 'inherit' : 'pipe'] });
