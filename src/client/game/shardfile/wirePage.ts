@@ -26,6 +26,7 @@ import { netLootFeed, type LootFeed } from '../loot/feed';
 import { netCreatureCount } from '../population/netCounts';
 import type { MoverView } from '../../../server/game/plugin/mover';
 import type { MoverPose } from '@wildshard/format/moverPose';
+import type { PageAbility } from './clientRecipes';
 
 type Live = (client: NetClient) => (() => void) | undefined;
 /** A mover's look in one grid cell, as `WirePage.moverLooks` keys it. */
@@ -128,6 +129,13 @@ export class WirePage {
   declareSpecies(kinds: ReadonlyMap<string, string>, scope: Scope): void {
     this.speciesKinds = kinds; scope.onDispose(() => { if (this.speciesKinds === kinds) this.speciesKinds = new Map(); });
   }
+  /** CC11a2c: each declared species' abilities in row order (`abilityRows`), until `scope` ends. */
+  private speciesAbilities: ReadonlyMap<string, readonly PageAbility[]> = new Map();
+  declareAbilities(abilities: ReadonlyMap<string, readonly PageAbility[]>, scope: Scope): void {
+    this.speciesAbilities = abilities; scope.onDispose(() => { if (this.speciesAbilities === abilities) this.speciesAbilities = new Map(); });
+  }
+  /** The ability a row's `ability` names (1-based in its species' abilities); none for 0, an unknown one or no species. */
+  abilityOf(species: string, index: number): PageAbility | undefined { return index > 0 ? this.speciesAbilities.get(species)?.[index - 1] : undefined; }
   /** The kind a row spawns as here: its declared species' page kind, else the wire's `kind` (a native body, an older server). */
   /** CC28c: each page kind's look swap (its body's second look), by the page kind it swaps from. */
   private swaps: ReadonlyMap<string, { readonly kind: string; readonly index: number; readonly at: number }> = new Map();

@@ -66,7 +66,7 @@ import type { GraphSources } from './clientGraphs';
 import { clientPostStack, type ClientPost } from './clientPost';
 import { loadScenePostGraphCompiler } from '@wildshard/engine/render/graphBackend';
 import { frameLookOf } from '../grid/frameLook';
-import { clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ShardViewRecipe } from './clientRecipes';
+import { abilityRows, clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ShardViewRecipe } from './clientRecipes';
 import { loadItemModels, loadStaticModels } from './itemModels';
 import { attachmentRefs, withAttachments } from './clientAttachments';
 import { loadClientSkins, type ClientSkin } from './clientSkins';
@@ -446,6 +446,7 @@ export class ShardfileClient {
     // TE-ENG7: two declared species on one native kind each register under a page kind of their own; rows find it by species id
     const kinds = speciesViewKinds(source.rows), pageKind = (species: string, kind: string): string => kinds.get(species) ?? kind;
     wirePage.declareSpecies(kinds, ctx.scope);
+    wirePage.declareAbilities(abilityRows(source.rows), ctx.scope);
     const pageRows = source.rows.species.map((row) => ({ ...row, harvest: row.harvest ?? [], variants: row.variants.map((variant) => ({ ...variant, scale: [variant.scale[0], variant.scale[1]] as [number, number] })) }));
     ctx.rows.species(pageSpecies(pageRows, kinds));
     // CC28c: a body's swap look registers under its own page kind, with a copy of its species row, never its species' kind

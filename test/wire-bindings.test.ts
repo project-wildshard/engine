@@ -22,7 +22,7 @@ const columns = (list: NetClass<never>['row']): FrozenColumn[] => list.map(({ na
 
 test('the bound classes hash to the descriptors, which are engine main\'s v0 wire', () => {
   expect(NET_SCHEMA_HASH).toBe(v0SchemaHash(WIRE_CLASSES));
-  expect(NET_SCHEMA_HASH).toBe(1_375_460_222); // with animal.species (TE-ENG7), player swing, heavy, air (RP6), the animal's channels and lock (CC28), player roadX, roadZ (MP1.5) and animal roadX, roadZ (MP5.2b)
+  expect(NET_SCHEMA_HASH).toBe(35_583_310); // with animal.species (TE-ENG7), player swing, heavy, air (RP6), the animal's channels and lock (CC28), player roadX, roadZ (MP1.5), animal roadX, roadZ (MP5.2b) and animal ability, abilityT (CC11a2c)
 });
 
 /** REMOTE-PLAYERS RP6: the player row others get, after `held`: a swing count, its weight and the airborne bit. */
@@ -32,10 +32,10 @@ const CC28 = ['channel1', 'channel2', 'channel3', 'channel4', 'lockable'];
 /** MMO-PLAN MP1.5 (wire 1.2): a road body's place for others, after RP6's three. */
 const MP15 = ['roadX', 'roadZ'];
 const PLAYER_ADDED = [...RP6, ...MP15];
-/** MMO-PLAN MP5.2b (wire 1.3): a creature's road place, after CC28's five. */
-const ANIMAL_ADDED = [...CC28, ...MP15];
+/** MMO-PLAN MP5.2b (wire 1.3): a creature's road place, after CC28's five; then ONE-FORMAT CC11a2c's running ability (wire 1.4). */
+const ANIMAL_ADDED = [...CC28, ...MP15, 'ability', 'abilityT'];
 
-test('every compiled column is cfd6681\'s; the player gains its spawn name, RP6\'s and MP1.5\'s row fields, the animal its species, CC28\'s and MP5.2b\'s row fields', () => {
+test('every compiled column is cfd6681\'s; the player gains its spawn name, RP6\'s and MP1.5\'s row fields, the animal its species, CC28\'s, MP5.2b\'s and CC11a2c\'s row fields', () => {
   expect(NET_CLASSES.map(entry => entry.cls)).toEqual(FROZEN.map(entry => entry.cls));
   for (const [index, entry] of NET_CLASSES.entries()) {
     const frozen = FROZEN[index];

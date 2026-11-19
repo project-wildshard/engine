@@ -70,7 +70,7 @@ function prepareAbilities(host: SimHost, actor: AnimalSim, abilities: ResolvedCr
   });
   return {
     install: () => {
-      const removePlayback = actor.bindAbilityPlayback(() => host.strikes.get(actor.entityId)?.ability);
+      const removePlayback = actor.bindAbilityPlayback(() => host.strikes.get(actor.entityId)?.ability, options.map(row => row.spec.id));
       try {
         const removeCatalogue = host.bindStrikeCatalogue(actor.entityId, options.map(row => row.spec));
         return () => { removePlayback(); removeCatalogue(); };

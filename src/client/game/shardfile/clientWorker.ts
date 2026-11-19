@@ -1,5 +1,6 @@
 // P1-E5.3 I6 (J126), E6: every page runs the real Game and Player against the real server in its worker: the Player predicts and
 // reconciles, and every creature is an interpolated row drawn by the real views.
+import type { CreatureSkinClipName } from '@wildshard/format/skinData';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { DevBox, DevGround } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
@@ -193,6 +194,8 @@ const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), ST
 const CHANNELS = [column('channel1'), column('channel2'), column('channel3'), column('channel4')], LOCKABLE = column('lockable');
 /** MP5.2b: a road row's place (wire 1.3); a build without the columns reads none. */
 const ROAD_X = column('roadX'), ROAD_Z = column('roadZ');
+/** CC11a2c: the declared ability a row runs and how far through (wire 1.4); an older room reads 0, the attack fallback. */
+const ABILITY = column('ability'), ABILITY_T = column('abilityT');
 /** Where `row` stands in the manager it is drawn in (`drawnPlace`), into `out`; false when this page doesn't draw it. */
 const placeInto = (row: Float64Array, home: Readonly<Place> | null, out: Place): boolean => {
   const at = drawnPlace({ x: row[X] ?? 0, z: row[Z] ?? 0, ...(ROAD_X < 0 || ROAD_Z < 0 ? {} : { roadX: row[ROAD_X] ?? 0, roadZ: row[ROAD_Z] ?? 0 }) }, home);
@@ -256,7 +259,8 @@ function poseActs(names: ReadonlySet<string>): readonly string[] {
   return line === '' ? acts : [...acts, line];
 }
 /** A creature on screen, and the world's manager that holds it: a crossing leaves it behind. */
-interface RowBody { readonly body: Animal; readonly manager: Creatures; windup?: number; /** its page kind before a look swap (CC28c) */ readonly home: string }
+interface RowBody { readonly body: Animal; readonly manager: Creatures; windup?: number; /** its page kind before a look swap (CC28c) */ readonly home: string;
+  /** CC11a2c: its species id, and the running ability its row names, refilled in place */ readonly species: string; readonly ability: { id: string; clip?: CreatureSkinClipName; progress: number } }
 /** Every creature on this page is a row: a new one spawns through the real manager, one the server dropped retires. */
 function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map<number, RowBody>, retired: Map<string, number>, spawnMs: Map<string, number>, poses: ReadonlyMap<string, Record<string, number>>, edgeHome: Readonly<Place> | null = null): void {
   if (animals === null) return;
@@ -274,7 +278,7 @@ function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map
     spawnMs.set(kind, Math.max(spawnMs.get(kind) ?? 0, diagnosticNow() - at));
     body.rowDriven = true;
     wirePage.dress(animals, body);
-    bodies.set(handle, { body, manager: animals, home });
+    bodies.set(handle, { body, manager: animals, home, species: typeof info.initial['species'] === 'string' ? info.initial['species'] : '', ability: { id: '', progress: 0 } });
     Object.assign(body.mem, poses.get(info.id));
   }
   // STR20: run every frame; the page's own population is retired once, so the common frame finds none and copies nothing
@@ -297,7 +301,15 @@ function headOf(body: Animal | undefined, to: Vector3): boolean {
 
 type ShownRow = { -readonly [K in keyof Parameters<Animal['showRow']>[0]]-?: Parameters<Animal['showRow']>[0][K] };
 const SHOWN_ROW: ShownRow = { x: 0, y: 0, z: 0, yaw: 0, state: 'idle', attack: 0, attackDuration: 1, winding: false, flinch: 0, strafe: 0, brace: 0,
-  hp: 0, alive: true, rise: 0, act: 0, channels: [], lock: 'row' };
+  hp: 0, alive: true, rise: 0, act: 0, channels: [], lock: 'row', ability: undefined };
+/** CC11a2c: the declared ability row `index` names for this body, in its reused holder; none for 0 (an older room). */
+function rowAbility(entry: RowBody, index: number, progress: number): RowBody['ability'] | undefined {
+  const named = wirePage.abilityOf(entry.species, index);
+  if (named === undefined) return undefined;
+  const held = entry.ability; held.id = named.id; held.progress = progress;
+  if (named.clip === undefined) delete held.clip; else held.clip = named.clip;
+  return held;
+}
 /** STR20: the animal rows the client holds, counted without copying the entity map each frame */
 function animalRows(client: NetClient): number {
   let rows = 0;
@@ -323,6 +335,7 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<numbe
     drawn.attack = attack; drawn.attackDuration = duration; drawn.winding = winding; drawn.flinch = row[FLINCH] ?? 0; drawn.strafe = row[STRAFE] ?? 0;
     drawn.brace = row[BRACE] ?? 0; drawn.hp = row[HP] ?? 0; drawn.alive = row[ALIVE] === 1; drawn.rise = row[RISE] ?? 0; drawn.act = row[ACT] ?? 0;
     drawn.channels = channelsOf(row, ROW_CHANNELS); drawn.lock = LOCKS[row[LOCKABLE] ?? 0] ?? 'row';
+    drawn.ability = rowAbility(entry, ABILITY < 0 ? 0 : row[ABILITY] ?? 0, ABILITY_T < 0 ? 0 : row[ABILITY_T] ?? 0);
     body.showRow(drawn, dt);
     if (started) { entry.windup = stamp; if (body.alive) manager.onWindup?.(body, duration); }
     shown++;

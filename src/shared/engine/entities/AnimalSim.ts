@@ -138,11 +138,20 @@ export class AnimalSim {
   }
   private strikePoints: CreatureLockPoints | undefined;
   private readAbility: (() => RunningAbility | undefined) | undefined;
-  get runningAbility(): RunningAbility | undefined { return this.readAbility?.(); }
-  bindAbilityPlayback(read: () => RunningAbility | undefined): () => void {
+  /** CC11a2c: the strike ids of the species' declared abilities, in row order: the wire names one by its 1-based place. */
+  private abilityIds: readonly string[] = [];
+  /** CC11a2c: on a page, the ability a row says this body runs (wire 1.4); none from an older room. */
+  private shownAbility: RunningAbility | undefined;
+  get runningAbility(): RunningAbility | undefined { return this.readAbility?.() ?? this.shownAbility; }
+  /** The running ability's 1-based place in the species' abilities, 0 for none: what the animal row's `ability` says. */
+  get abilityIndex(): number {
+    const running = this.readAbility?.();
+    return running === undefined ? 0 : this.abilityIds.indexOf(running.id) + 1;
+  }
+  bindAbilityPlayback(read: () => RunningAbility | undefined, ids: readonly string[] = []): () => void {
     if (this.readAbility !== undefined) throw new Error('Creature ability playback is already bound');
-    this.readAbility = read;
-    return () => { if (this.readAbility === read) this.readAbility = undefined; };
+    this.readAbility = read; this.abilityIds = ids;
+    return () => { if (this.readAbility === read) { this.readAbility = undefined; this.abilityIds = []; } };
   }
   bindStrikePoints(points: CreatureLockPoints): void {
     if (this.strikePoints !== undefined || points.names.length === 0) throw new Error('Incompatible creature strike points');
@@ -175,7 +184,7 @@ export class AnimalSim {
     out.flinchRoll = this.flinchRoll; out.flinchPitch = this.flinchPitch; out.brace = this.brace; out.deathSide = this.deathSide;
   }
   /** Stand as a wire row says (P1-E5.3 I6): a view of a body a server elsewhere runs. Nothing here decides or steps. */
-  showRow(row: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly state: AnimalState; readonly attack: number; readonly attackDuration?: number; readonly winding?: boolean; readonly flinch: number; readonly strafe: number; readonly brace: number; readonly hp: number; readonly alive: boolean; readonly rise: number; readonly act: number; readonly channels?: readonly number[]; readonly lock?: 'row' | 'on' | 'off' }, dt: number): void {
+  showRow(row: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number; readonly state: AnimalState; readonly attack: number; readonly attackDuration?: number; readonly winding?: boolean; readonly flinch: number; readonly strafe: number; readonly brace: number; readonly hp: number; readonly alive: boolean; readonly rise: number; readonly act: number; readonly channels?: readonly number[]; readonly lock?: 'row' | 'on' | 'off'; readonly ability?: RunningAbility | undefined }, dt: number): void {
     const moved = Math.hypot(row.x - this.position.x, row.z - this.position.z);
     if (dt > 0) this.speed += (Math.min(moved / dt, 20) - this.speed) * Math.min(1, dt * 10);
     this.position.set(row.x, row.y, row.z); this.yaw = row.yaw; this.groundY = row.y; this.hp = row.hp; this.alive = row.alive;
@@ -188,6 +197,8 @@ export class AnimalSim {
     // CC28: the server's channels and lock answer, so a page's look and its lock and Tab agree with the room
     if (row.channels !== undefined) for (let i = 0; i < 4; i++) this.channels[i] = row.channels[i] ?? 0;
     if (row.lock !== undefined) this.lockOverride = row.lock === 'row' ? null : row.lock === 'on';
+    // CC11a2c: the declared ability the server runs, so this page picks its clip as every other page does
+    this.shownAbility = row.ability;
   }
   /** Full motor/contact continuation; authored ports and rig state remain with the fresh instance. */
   snapshot(): AnimalSnapshot {

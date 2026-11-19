@@ -51,4 +51,7 @@ export const ANIMAL_NET: NetSchema<AnimalNetView> = bindClass<AnimalNetView, typ
   // MMO-PLAN MP5.2b: on a road (frame 0, the world's) `x`/`z` clamp at ±260 m, so a creature shown there says its place here. Zero in a cell.
   roadX: view => view.road === true ? view.sim.position.x : 0,
   roadZ: view => view.road === true ? view.sim.position.z : 0,
+  // ONE-FORMAT CC11a2c: the declared ability it runs (1-based in its species' abilities, 0 none) and how far through.
+  ability: view => view.sim.abilityIndex,
+  abilityT: view => view.sim.abilityIndex === 0 ? 0 : view.sim.runningAbility?.progress ?? 0,
 });

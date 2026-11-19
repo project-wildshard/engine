@@ -3,6 +3,7 @@ import { NO_FUR } from '@wildshard/engine/entities/species/rigs';
 import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
 import { channelLookOf } from '@wildshard/engine/entities/channelLook';
 import type { ShardRows } from '@wildshard/format/rows';
+import type { CreatureSkinClipName } from '@wildshard/format/skinData';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import { skinSpeciesLook, type ClientSkin } from './clientSkins';
 
@@ -64,6 +65,16 @@ export function speciesViewKinds(rows: Pick<ShardRows, 'species' | 'looks'>): Re
   const counts = new Map<string, number>();
   for (const row of rows.species) counts.set(row.kind, (counts.get(row.kind) ?? 0) + 1);
   return new Map(rows.species.map((row) => [row.id, (counts.get(row.kind) ?? 0) > 1 && rows.looks.some((look) => look.species === row.id) ? row.id : row.kind]));
+}
+
+/** A declared ability as a page names it: its strike id and its own clip. */
+export interface PageAbility { readonly id: string; readonly clip?: CreatureSkinClipName }
+/**
+ * ONE-FORMAT CC11a2c: each species' declared abilities in its row's order, by species id. An animal row's `ability` names
+ * one by its 1-based place, so a page knows which ability, and so which clip, the server runs.
+ */
+export function abilityRows(rows: Pick<ShardRows, 'species'>): ReadonlyMap<string, readonly PageAbility[]> {
+  return new Map(rows.species.map((row) => [row.id, (row.abilities ?? []).map((ability): PageAbility => (ability.clip === undefined ? { id: ability.use } : { id: ability.use, clip: ability.clip }))]));
 }
 
 /**
