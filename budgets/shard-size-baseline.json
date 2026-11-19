@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "about": "The measured history of each shard's phone download: what it downloaded at the baseline and recorded commits, and how that was measured. It judges nothing since BUDGET-CAPS BC4 (J444): scripts/shard-size-gate.mjs reads the hard cap from budgets/caps.json and each shard's baseline from budgets/baselines.json. The old latch, raises and the 60 MB cap are in git at 161063f3. Plan: docs/plans/multi-repo/SHARD-SIZE-PLAN.md in project-wildshard-meta.",
+ "about": "The measured history of each shard's phone download: what it downloaded at the baseline and recorded commits, and how that was measured. It judges nothing since BUDGET-CAPS BC4 (J444): scripts/shard-size-gate.mjs reads the hard cap from budgets/caps.json and each shard's baseline from budgets/baselines.json. The old latch, raises and the 60 MB cap are in git at 161063f3. Plan: project/archive/SHARD-SIZE-PLAN.md in project-wildshard-meta.",
  "baseline": {
   "commit": "1474f7deb9cb190cab32bc8a3388c2adefc119ef",
   "committed": "2026-10-29T14:41:01-05:00",

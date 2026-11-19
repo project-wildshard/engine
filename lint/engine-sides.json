@@ -1,5 +1,5 @@
 {
-  "about": "P1-E2 engine ownership map (tag first, move later): every non-test source under src/engine and src/game names its side, \"shared\", \"server\", \"client\" or \"cook\", or { \"side\", \"mixed\": true } for a sim/view mix that E4 splits. wildshard/engine-sides enforces client \u219b server, server \u219b client, shared \u219b client|server, cook \u219b client and no DOM or renderer in shared, server or cook; lint/engine-side-edges.json holds the counts that may only fall. Seeded from measure-cut (project-wildshard-meta docs/plans/multi-repo/tools) on 2026-11-05; a new file is tagged by its author.",
+  "about": "P1-E2 engine ownership map (tag first, move later): every non-test source under src/engine and src/game names its side, \"shared\", \"server\", \"client\" or \"cook\", or { \"side\", \"mixed\": true } for a sim/view mix that E4 splits. wildshard/engine-sides enforces client \u219b server, server \u219b client, shared \u219b client|server, cook \u219b client and no DOM or renderer in shared, server or cook; lint/engine-side-edges.json holds the counts that may only fall. Seeded from measure-cut (project-wildshard-meta docs/plans/MULTI-REPO-SAGA/tools) on 2026-11-05; a new file is tagged by its author.",
   "files": {
     "src/client/engine/ai/view/eliteController.ts": "client",
     "src/client/engine/ai/view/eliteEntry.ts": "client",

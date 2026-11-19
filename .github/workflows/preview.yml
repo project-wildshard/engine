@@ -1,4 +1,4 @@
-# SHELL-CUTOVER SC1 (meta docs/plans/multi-repo/SHELL-CUTOVER-PLAN.md; J172, J209, J210): preview.wildshard.io is the
+# SHELL-CUTOVER SC1 (meta project/archive/SHELL-CUTOVER-PLAN.md; J172, J209, J210): preview.wildshard.io is the
 # solo build of engine's newest green main, with no world stamp (the solo preview: no __WS_WORLD__, so the in-page server runs).
 # OFF-VERCEL OV6 (meta docs/plans/OFF-VERCEL-PLAN.md; J272, J274): the page is the Cloudflare Worker wildshard-play-preview
 # (pages/wrangler.jsonc --env preview), released by scripts/page-release.mjs in its four phases: build, upload (a

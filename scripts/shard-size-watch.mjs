@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SHARD-SIZE row 8 (docs/plans/multi-repo/SHARD-SIZE-PLAN.md in project-wildshard-meta): what the build's gate can't see. The gate
+// SHARD-SIZE row 8 (project/archive/SHARD-SIZE-PLAN.md in project-wildshard-meta): what the build's gate can't see. The gate
 // reads the packs book, so it is blind to the title stage, the desktop and the grid flow, and to a book that stopped
 // telling the truth. This runs scripts/shard-wire-meter.mjs against a served build and reports any title over 3 MB or
 // any flow over its book by 10 %. It only reports: it holds no deploy step and refuses nothing.

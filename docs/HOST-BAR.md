@@ -8,7 +8,7 @@ The scoring matrix for every platform host and every proposed one. A host is sha
 `src/<side>/engine`, `src/<side>/game` or the `@wildshard/format` package that shards drive. Jake set the bar in G454
 (2026-10-16) and asked for it to be written down as permanent design (G481, 2026-10-17): *"the engine is supposed to be
 very flexible and not have all kinds of random Sky specific and Dune specific if statements in them."* G decisions are
-singleplayer's `docs/plans/decisions.md`; J decisions are meta's `docs/plans/multi-repo/MULTI-REPO-PLAN.md` section 2.
+singleplayer's `docs/plans/decisions.md`; J decisions are meta's `docs/plans/MULTI-REPO-SAGA/decisions/`.
 
 ## Where code belongs
 
