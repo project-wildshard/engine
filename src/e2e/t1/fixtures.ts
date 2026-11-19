@@ -35,6 +35,53 @@ interface Workers {
 
 const dropHandled = new WeakSet<Page>()
 
+const REPORTED_STEPS: readonly string[] = [
+  'level.world',
+  'assembly',
+  'home',
+  'shaders',
+  'firstFrame',
+]
+
+/** TR-4b: one stdout line per Brasscap entry with its boot steps, so a hosted suite killed at its budget still says
+ *  where its time went. */
+async function reportBoot(page: Page, startedAt: number): Promise<void> {
+  const steps = await page
+    .evaluate((keys: readonly string[]): string => {
+      const timing: unknown = Reflect.get(globalThis, '__bootTiming')
+      const entries: unknown =
+        typeof timing === 'object' && timing !== null && 'entries' in timing
+          ? timing.entries
+          : []
+      const rows = Array.isArray(entries) ? (entries as unknown[]) : []
+      return keys
+        .map((key: string): string => {
+          const row: unknown = rows.find(
+            (entry: unknown): boolean =>
+              typeof entry === 'object' &&
+              entry !== null &&
+              'operation' in entry &&
+              entry.operation === `stage:${key}`,
+          )
+          const ms =
+            typeof row === 'object' &&
+            row !== null &&
+            'start' in row &&
+            'end' in row &&
+            typeof row.start === 'number' &&
+            typeof row.end === 'number'
+              ? row.end - row.start
+              : Number.NaN
+          return `${key} ${(ms / 1000).toFixed(1)}`
+        })
+        .join(', ')
+    }, REPORTED_STEPS)
+    .catch((): string => 'steps unread')
+  process.stdout.write(
+    `[t1-boot] Brasscap in play after ${((Date.now() - startedAt) / 1000).toFixed(1)} s (${steps})\n`,
+  )
+}
+
 /** Enter the installed Brasscap through the same controls as a player. */
 async function enterBrasscap(page: Page, name?: string): Promise<void> {
   // The title's drop modal ("Unexpectedly back at the title": a reload after a page went hidden, as `hideAndSave` fakes)
@@ -91,8 +138,10 @@ async function enterBrasscap(page: Page, name?: string): Promise<void> {
   await page
     .locator(`.ws-menu-card.selected[data-i="${String(index)}"]`)
     .waitFor()
+  const startedAt = Date.now()
   await page.locator('.ws-menu-play').click()
   await inPlay(page)
+  await reportBoot(page, startedAt)
 }
 
 async function seat(page: Page): Promise<void> {
