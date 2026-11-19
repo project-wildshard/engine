@@ -40,7 +40,7 @@ from pathlib import Path
 assert all(str(path) in registry for path in Path('test/scripts').glob('*.test.ts'))
 `], { encoding: 'utf8' });
   expect(JSON.parse(result)).toEqual([
-    ['_template', 'brasscap-mesa'], ['far-reach'],
+    ['brasscap-mesa'], ['far-reach'],
     ['_template', 'driftwood-isle', 'far-reach', 'nalati-grasslands', 'nine-dragon-stack', 'pastel-plain', 'pine-hollow', 'sunscar-dunes'],
     [], [], [], [], ['driftwood-isle', 'pine-hollow'], [], ['pine-hollow'],
   ]);
