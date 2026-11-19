@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { nextFailmodeDeploy } from '../../scripts/failmode-deploy-fixture.mjs';
 import { fixtureScratch } from './owned-scratch.mjs';
 

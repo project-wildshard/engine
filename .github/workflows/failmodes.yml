@@ -50,8 +50,7 @@ jobs:
           pins-cache-scope: full
       - run: bash scripts/ci-playwright-install.sh chromium
       - run: pnpm pins
-      - run: node --test test/tooling/failmode-deploy-fixture.test.mjs
-      - run: pnpm exec vitest run test/tooling/failmode-results.test.mjs test/failmode-cases.test.ts
+      - run: pnpm exec vitest run test/tooling/failmode-deploy-fixture.test.mjs test/tooling/failmode-results.test.mjs test/failmode-cases.test.ts
       - name: Prepare one exact build
         run: |
           node scripts/scratch-dir.mjs fm11 'Ring 2 browser failure proof'
