@@ -7,7 +7,7 @@ import { serverBootProgress } from '../../../shared/engine/boot/serverProgress';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import {app} from '../app/runtime';
 import { engineString } from '../../../shared/engine/strings';
-import { saveStorage } from '../saves/slots';
+import { jsonSlot, saveStorage } from '../saves/slots';
 import { formatMB, type ProgressView } from '../boot/plan';
 import { bootWaits, loadingStepWaits, STAGE_READS } from '../../../shared/engine/boot/waits';
 import { TIER } from '../core/tier';
@@ -31,6 +31,7 @@ import { leftByPlayer } from '../boot/dropNotice';
 import { showFailure, clearFailure } from '../telemetry/runtime';
 import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import { holdLoadingPassSplit } from '../render/passSplit';
+import { graphicsMode } from '../core/graphicsMode';
 import './loading.css';
 
 const savedStorage = saveStorage('session');
@@ -114,6 +115,31 @@ export interface LoadingDownloadSource {
 /** Facts repaint at 5 Hz; the clock samples at 10 Hz. Done and errors paint at once. */
 const PAINT_MS = 200;
 const CLOCK_MS = 100;
+/**
+ * meta IPHONE13-REAL-TEST IP33 (lane mini-loadcard): the lean card. WebKit composited the full-screen card and its blurred
+ * glass panel as their own layers and repainted them about 30 times a second through the boot (the 100 ms clock, the 200 ms
+ * facts and each bar's 0.1 s width transition between them), so the GPU process held front and back buffers of all of them:
+ * ~100 MB of IOSurface on Nine's phone boot (IP32). Lean, the clock and the facts paint together at most 4 times a second, a
+ * download event waits for that tick, the bars step without a transition and the panel's glass has no backdrop blur (no layer
+ * of its own). Same art, text and bars; the clock and bars move in steps. The device slot `debug.leanCard` (true or false)
+ * picks it; with none, phone Low gets LEAN_CARD_DEFAULT.
+ */
+export const LEAN_CARD_SLOT = 'debug.leanCard';
+/** IP33's pairs met the go line stacked with IP30 and IP31 but not alone (2 of 3 pairs lower, twice), so phone Low starts off. */
+export const LEAN_CARD_DEFAULT = false;
+/** the lean tick; facts repaint on every tick, as PAINT_MS is shorter */
+const LEAN_MS = 250;
+let leanOn: boolean | undefined;
+/** Whether this page's full-screen loading cards are lean; read once per page. */
+export function leanLoadingCard(): boolean {
+  if (leanOn !== undefined) return leanOn;
+  let saved: unknown = null;
+  try { saved = jsonSlot(LEAN_CARD_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
+  leanOn = typeof saved === 'boolean' ? saved : LEAN_CARD_DEFAULT && TIER === 'phone' && graphicsMode() === 'low';
+  return leanOn;
+}
+/** Tests only: read the switch again. */
+export function resetLeanLoadingCard(): void { leanOn = undefined; }
 let currentLoading: { id: string; loading: Loading } | null = null;
 /** STAGING-BUGBASH SB5: past the card's end the world can still be hidden: grid/reveal.ts keeps the canvas and the HUD out of
  *  sight until its first gated frame (0.4 s in WebKit, up to 1.6 s in Chromium), and the page showed black. While a part holds
@@ -206,6 +232,8 @@ export class Loading {
   private readonly timeLeft = new TimeLeftClock();
   private slowGpu = false;
   private timeLeftShown = false;
+  /** IP33: one 4 Hz paint for the clock and the facts (leanLoadingCard) */
+  private readonly lean: boolean;
 
   /** QA 2026-11-13 (Jake: "make it look the same as the one for Shard Select"): `inset`, a scoped card drawn over the live
    *  world (a grid cell's preparation): the same panel, no backdrop, head or foot; it never covers the world or takes input. */
@@ -213,6 +241,7 @@ export class Loading {
     bootMark('app:loading-adopt', {scoped: mode.scoped === true || mode.inset === true, chunk: chunk.id});
     if (mode.inset !== true) { app.ui.bindPresentation(this.scope); app.ui.holdCovered(this.scope); }
     this.scoped = mode.scoped === true || mode.inset === true;
+    this.lean = mode.inset !== true && leanLoadingCard();
     // MG9 (passSplit.ts): the card's frames draw in split Metal passes; an inset card sits over live play and leaves it
     if (mode.inset !== true) this.scope.onDispose(holdLoadingPassSplit());
     if (!this.scoped && document.documentElement.classList.contains('boot-menu')) {
@@ -231,6 +260,7 @@ export class Loading {
       this.root.innerHTML = loadShellTemplate();
       mountUi(this.root, this.scope, document.body);
     }
+    if (this.lean) this.root.dataset['lean'] = '';
     // RL3: index.html's card has no inline clock any more; an adopted first-document card started with the document
     const startedAt = Number(this.root.dataset['startedAt'] ?? (shell !== null ? 0 : Number.NaN));
     if (Number.isFinite(startedAt) && startedAt >= 0 && startedAt <= this.t0) this.t0 = startedAt;
@@ -294,7 +324,7 @@ export class Loading {
     set(this.els.suFact, engineString('s_loading_waiting'));
     this.paintPhases();
     this.tickClock();
-    this.clockScope.interval(CLOCK_MS, () => { this.tickClock(); });
+    this.clockScope.interval(this.lean ? LEAN_MS : CLOCK_MS, () => { this.tickClock(); });
     const unsubscribe = bootTiming()?.subscribe?.(() => { this.readServerProgress(); });
     if (unsubscribe !== undefined) this.clockScope.onDispose(unsubscribe);
   }
@@ -336,6 +366,8 @@ export class Loading {
     if(!this.scoped&&timing!==undefined)(timing.work??={}).download=source.snapshot;
     this.scope.onDispose(()=>{if(timing?.work?.download===source.snapshot)delete timing.work.download;});
     this.stopDownloadSource = source.subscribe(() => {
+      // IP33: a lean card paints the download with its next tick
+      if (this.lean) { this.paintDownloadCounters(this.downloadProgress()); this.dirty = true; return; }
       const fraction = this.paintDownloads();
       set(this.els.dlPct, this.downloadPct(fraction)); setBar(this.els.dlBar, fraction);
       this.dirty = true;

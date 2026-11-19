@@ -510,6 +510,12 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
 @media (max-height: 500px) { .ws-load[data-inset] .ws-load-body { padding-top: 12px; } }
 
 /* G846: everyone sees the detailed progress; only the hold control is Developer-only. */
+
+/* meta IPHONE13-REAL-TEST IP33: the lean card (Loading.ts leanLoadingCard). The bars step without a transition (each 0.1 s
+   width transition was six more paints of the full-screen card), and the panel's glass has no backdrop blur, so it is painted
+   into the card's one layer instead of a layer of its own (its navy glass and border stay). */
+.ws-load[data-lean] .ws-load-fill { transition: none; }
+.ws-load[data-lean] .ws-load-panel { -webkit-backdrop-filter: none; backdrop-filter: none; }
 /* </inline-shell-css> */
       html, body { margin: 0; width: 100%; height: 100%; background: #0b1622; }
       /* First document pixels need neither the extracted stylesheet nor a module: the card above is Loading's own CSS (DL21). */
