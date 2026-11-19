@@ -199,10 +199,13 @@ def acquire_cpu(root, entry, capacity, deadline):
             entry['ticket'] = state.setdefault('cpuNext', 0)
             state['cpuNext'] += 1
             pending.append(entry)
-        # J402: a browser waiting for its two-owner resource must not hold up
-        # ordinary CPU work behind it. Eligible requests retain FIFO order.
-        browser_full = sum(row.get('browser') is True for row in active) >= 2
-        eligible = [row for row in pending if not browser_full or row.get('browser') is not True]
+        # J402: a browser waiting for room must not hold up ordinary CPU work
+        # behind it. Eligible requests retain FIFO order. DS20c (FS17): a
+        # browser fits while four cores are free, not under a fixed two.
+        # A browser borrowing an ancestor's grant spends that grant's cores.
+        browser_full = capacity - reserved_slots(active) < 4
+        eligible = [row for row in pending if not browser_full or row.get('browser') is not True
+                    or row.get('borrowedFrom') is not None]
         if not eligible:
             return False
         # A browser spending an already-held ancestor budget cannot wait

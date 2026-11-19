@@ -1,16 +1,51 @@
 // Read-only machine usage; CPU ledger writes are atomic renames.
+// DS20c (meta FLOW-SIMPLE FS17, J443): browser slots are free cores / 4, recomputed on every read, in place of J402's
+// fixed two. Each browser reserves four cores in the CPU ledger; one open outside the ledger is charged four too.
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {availableParallelism} from 'node:os';
 import {resolve} from 'node:path';
 import {cpuRoot} from './cpu-admission.mjs';
 
+/** Cores one headless browser reserves (J402). */
+export const BROWSER_CORES=4;
+
+/** @typedef {{token?:string,slots?:number,borrowedFrom?:string|null,browser?:boolean,browserWeight?:number,holder?:number}} LedgerRow */
+
+/** Cores the ledger holds: cpu-admission.py's reserved_slots. A borrowed grant is covered by its root's slots; a
+ * root's browsers count when they weigh more. @param {readonly LedgerRow[]} active @returns {number} */
+export function reservedSlots(active){
+ const tokens=new Map(active.map(row=>[row.token,row]));
+ /** @type {Map<string|undefined,number>} */const roots=new Map(),weights=new Map();
+ for(const row of active){
+  let cursor=row;const seen=new Set();
+  while(cursor.borrowedFrom!=null&&tokens.has(cursor.borrowedFrom)&&!seen.has(cursor.token)){seen.add(cursor.token);cursor=/** @type {LedgerRow} */(tokens.get(cursor.borrowedFrom));}
+  roots.set(cursor.token,cursor.slots??0);
+  if(row.browser===true)weights.set(cursor.token,(weights.get(cursor.token)??0)+(row.browserWeight??BROWSER_CORES));
+ }
+ let sum=0;for(const [token,slots] of roots)sum+=Math.max(slots,weights.get(token)??0);
+ return sum;
+}
+
+/** How many browsers may be open at once now: those open plus one per four free cores.
+ * @param {{capacity:number,active:readonly LedgerRow[],outside:number}} ledger @returns {number} */
+export function browserSlots({capacity,active,outside}){
+ const open=active.filter(row=>row.browser===true).length+outside;
+ const free=capacity-reservedSlots(active)-outside*BROWSER_CORES;
+ return open+Math.max(0,Math.floor(free/BROWSER_CORES));
+}
+
 export function browserStatus(){
- /** @type {{browser?:boolean,holder?:number}[]} */let rows=[];
+ /** @type {LedgerRow[]} */let active=[];
+ // cpu-admission.py's machine budget when no ledger exists yet: every core but two.
+ let capacity=Math.max(1,availableParallelism()-2);
  try{
-  /** @type {{cpuActive?:{browser?:boolean,holder?:number}[]}} */const state=JSON.parse(readFileSync(resolve(cpuRoot(),'queue.json'),'utf8'));
+  /** @type {{cpuActive?:LedgerRow[],cpuCapacity?:number}} */const state=JSON.parse(readFileSync(resolve(cpuRoot(),'queue.json'),'utf8'));
   if(state.cpuActive!==undefined&&!Array.isArray(state.cpuActive))throw new Error('Invalid CPU ledger');
-  rows=(state.cpuActive??[]).filter(row=>row.browser===true);
+  active=state.cpuActive??[];
+  if(Number.isSafeInteger(state.cpuCapacity)&&/** @type {number} */(state.cpuCapacity)>0)capacity=/** @type {number} */(state.cpuCapacity);
  }catch(error){if(!(error instanceof Error&&'code'in error&&error.code==='ENOENT'))throw error;}
+ const rows=active.filter(row=>row.browser===true);
  // Snapshots are atomically renamed. Include physical roots outside this
  // ledger without exposing command lines or counting admitted roots twice.
  const processes=execFileSync('ps',['-axo','pid=,ppid=,command='],{encoding:'utf8',timeout:5000}).trim().split('\n').map(line=>{
@@ -29,7 +64,7 @@ export function browserStatus(){
   }
   if(!owned)outside.push(row.pid);
  }
- return{total:rows.length+outside.length,holders:rows.flatMap(row=>typeof row.holder==='number'?[row.holder]:[]),outside};
+ return{total:rows.length+outside.length,slots:browserSlots({capacity,active,outside:outside.length}),holders:rows.flatMap(row=>typeof row.holder==='number'?[row.holder]:[]),outside};
 }
 
 export function browserUsage(){return browserStatus().total;}

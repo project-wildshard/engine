@@ -1,4 +1,5 @@
 // J402 native admission control: real broker connections, private ledger, no browser.
+// DS20c (FS17): a browser is admitted while four cores are free (free cores / 4), not under a fixed two.
 import assert from 'node:assert/strict';
 import {availableParallelism} from 'node:os';
 import {mkdirSync,readFileSync} from 'node:fs';
@@ -19,14 +20,18 @@ const deadline=setTimeout(()=>{for(const child of children)child.kill('SIGKILL')
 try{
  const first=await holdBrokerCpu(broker.environment,4,process.cwd(),{browser:true});held.push(first);
  const second=await holdBrokerCpu(broker.environment,4,process.cwd(),{browser:true});held.push(second);
+ // DS20c: with two browsers open, the four free cores of twelve admit a third at once (J402's fixed two made it wait).
+ const extra=await holdBrokerCpu(broker.environment,4,process.cwd(),{browser:true});
+ await extra.release();
+ const filler=await holdBrokerCpu(broker.environment,1,process.cwd());held.push(filler);
  let admitted=false;
  third=holdBrokerCpu(broker.environment,4,process.cwd(),{browser:true}).then(lease=>{admitted=true;held.push(lease);return lease;});
  await queuedBrowser(root);
- assert.equal(admitted,false,'a third browser must wait even when four CPU cores remain');
+ assert.equal(admitted,false,'a third browser must wait while fewer than four cores are free (3 free: 0 slots)');
  const ordinary=await holdBrokerCpu(broker.environment,1,process.cwd());held.push(ordinary);
  /** @type {{cpuActive:{browser?:boolean,slots:number}[]}} */const state=JSON.parse(readFileSync(resolve(root,'queue.json'),'utf8'));
  assert.equal(state.cpuActive.filter(row=>row.browser===true).length,2);
- assert.equal(state.cpuActive.reduce((sum,row)=>sum+row.slots,0),9);
+ assert.equal(state.cpuActive.reduce((sum,row)=>sum+row.slots,0),10);
  await first.release();
  await third;
  assert.equal(admitted,true);
@@ -67,9 +72,10 @@ console.log('READY');process.stdin.resume();process.stdin.on('end',async()=>{awa
  const ended=new Promise(_resolve=>{child.once('close',_resolve);});
  await new Promise((_resolve,_reject)=>{child.stdout.once('data',_resolve);child.once('error',_reject);child.once('exit',()=>{_reject(new Error('Browser owner ended before admission'));});});
  const survivor=await holdBrokerCpu(broker.environment,4,process.cwd(),{browser:true});held.push(survivor);
+ const busy=await holdBrokerCpu(broker.environment,1,process.cwd());held.push(busy);
  third=holdBrokerCpu(broker.environment,4,process.cwd(),{browser:true}).then(lease=>{held.push(lease);return lease;});
  child.kill('SIGKILL');await ended;await third;
- console.log(JSON.stringify({twoOwners:true,thirdWaits:true,ordinaryWorkContinues:true,weightedCpu:9,releaseAdmitsNext:true,cancellation:true,exclusiveParentLent:true,ancestorBrowserReleased:true,crashedOwnerReclaimed:true}));
+ console.log(JSON.stringify({freeCoreSlots:true,thirdWaits:true,ordinaryWorkContinues:true,weightedCpu:10,releaseAdmitsNext:true,cancellation:true,exclusiveParentLent:true,ancestorBrowserReleased:true,crashedOwnerReclaimed:true}));
 }finally{
  clearTimeout(deadline);
  await broker.close();

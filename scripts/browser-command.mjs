@@ -1,20 +1,20 @@
 #!/usr/bin/env node
-// J402 compatibility wrapper. Actual launch adapters own the two slots; this
+// J402 compatibility wrapper. Actual launch adapters own the slots (free cores / 4, DS20c); this
 // wrapper adds no second lease and excludes their queue waits from its clock.
 import {setTimeout as delay} from 'node:timers/promises';
 import * as playwright from './browser-playwright.mjs';
 import {installMachineBrowserAdmission} from './browser-machine-loader.mjs';
-import {browserUsage as owners,browserStatus} from './browser-usage.mjs';
+import {browserStatus} from './browser-usage.mjs';
 import {runT1Child} from './t1-runner.mjs';
 
 await installMachineBrowserAdmission(playwright);
 const args=process.argv.slice(2),mode=args[0];
-if(mode==='status'){const status=browserStatus();console.log(`browser broker: ${status.total} / 2; holders ${status.holders.join(', ')}; outside roots ${status.outside.join(', ')}; four cores per reservation`);}
-else if(mode==='capacity')console.log(`2 ${Math.max(0,2-owners())}`);
-else if(mode==='free')process.exitCode=owners()<2?0:1;
+if(mode==='status'){const status=browserStatus();console.log(`browser broker: ${status.total} / ${status.slots}; holders ${status.holders.join(', ')}; outside roots ${status.outside.join(', ')}; four cores per reservation`);}
+else if(mode==='capacity'){const status=browserStatus();console.log(`${status.slots} ${Math.max(0,status.slots-status.total)}`);}
+else if(mode==='free'){const status=browserStatus();process.exitCode=status.total<status.slots?0:1;}
 else if(mode==='wait'){
  const began=Date.now();
- while(owners()>=2){if(Date.now()-began>=300000)throw new Error('Browser broker wait exceeded five minutes');await delay(1000);}
+ for(let status=browserStatus();status.total>=status.slots;status=browserStatus()){if(Date.now()-began>=300000)throw new Error('Browser broker wait exceeded five minutes');await delay(1000);}
 }else if(mode==='reap')throw new Error('Run the browser-lane.sh machine reaper');
 else{
  let minutes=60;

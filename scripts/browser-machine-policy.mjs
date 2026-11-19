@@ -1,5 +1,5 @@
 // J402 machine policy: every physical launch spends one of the CPU ledger's
-// two four-core browser slots. Author tools discover this provider locally.
+// four-core browser slots, free cores / 4 (DS20c, FS17). Author tools discover this provider locally.
 import process from 'node:process';
 import {setTimeout as delay} from 'node:timers/promises';
 import {browserStatus} from './browser-usage.mjs';
@@ -13,7 +13,7 @@ const owner=process;
 const admissions=owner.__wildshardBrowserAdmissions??=createBrowserAdmissions(()=>browserQueue(async()=>{
  const deadline=Date.now()+300000;
  let status=browserStatus();
- while(status.total>=2){
+ while(status.total>=status.slots){
   if(Date.now()>=deadline)throw new Error(`Browser admission exceeded five minutes; holders: ${[...status.holders,...status.outside].join(', ')}`);
   await delay(1000);status=browserStatus();
  }
