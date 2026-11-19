@@ -5,7 +5,7 @@
 //      title-drop report;
 //   3. the engine's chunk recovery (a stale `main` chunk, a newer /version.json) reloads by itself and resumes the shard.
 // Headless Chromium at 402×874 (Jake's iPhone 17 Pro), GPU flags kept. It stops the server and the browser it starts.
-//   node scripts/reload-title-proof.mjs --dist=<built app> --out=<captures dir> [--shard=_template] [--port=18931]
+//   node scripts/reload-title-proof.mjs --dist=<built app> --out=<captures dir> [--shard=brasscap-mesa] [--port=18931]
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
@@ -14,7 +14,7 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 /** @param {string} name */
 const option = name => process.argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3);
-const dist = absolute(option('dist') ?? 'dist'), out = absolute(option('out') ?? 'tmp/reloadtitle/shots'), shard = option('shard') ?? '_template';
+const dist = absolute(option('dist') ?? 'dist'), out = absolute(option('out') ?? 'tmp/reloadtitle/shots'), shard = option('shard') ?? 'brasscap-mesa';
 const port = Number(option('port') ?? '18931'), base = `http://127.0.0.1:${String(port)}`;
 mkdirSync(out, { recursive: true });
 /** @param {number} ms */

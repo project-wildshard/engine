@@ -3,7 +3,7 @@
 // portrait (390×844 @3, iPhone UA, touch=1&tier=phone), so every target starts from the same empty GPU process.
 //
 //   scripts/browser-lane.sh node scripts/crossroads-rig/desktop-probe.mjs --base=http://127.0.0.1:4400 \
-//     --shard=_template --shard=driftwood-isle … [--rig=<query>=<label> …] [--blank] [--settle=15] [--out=<file.json>]
+//     --shard=brasscap-mesa --shard=driftwood-isle … [--rig=<query>=<label> …] [--blank] [--settle=15] [--out=<file.json>]
 //   --setting=k=v seeds and verifies the same global Settings pick as sim-memory.mjs (the textures are a harness pin since G386).
 //
 // A shard target loads `/?chunk=<slug>&skipintro=1&nolock=1&mute=1&touch=1&tier=phone`, waits for the world (no loading

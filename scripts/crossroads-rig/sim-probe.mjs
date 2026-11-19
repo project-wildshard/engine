@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // sim-probe.mjs: SF22a's iOS Simulator memory reading (iPhone 17 Pro, Safari), each target on a cold Safari.
 //
-//   node scripts/crossroads-rig/sim-probe.mjs --base=http://127.0.0.1:4400/ --shard=_template … [--rig=<query>=<label> …]
+//   node scripts/crossroads-rig/sim-probe.mjs --base=http://127.0.0.1:4400/ --shard=brasscap-mesa … [--rig=<query>=<label> …]
 //        [--settle=15] [--measure=15] --out=<dir>
 // It runs itself inside scripts/sim-lane.sh run (one booted Simulator machine-wide; shut down after). Per target: Safari
 // terminated and relaunched on /version.json, Web Inspector attached (ios_webkit_debug_proxy, as scripts/nine-sim-memory.mjs),

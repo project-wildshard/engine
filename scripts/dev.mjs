@@ -5,7 +5,7 @@
 // server and restarts the world (the open page redials and stays in play); a client edit rebuilds the client and the open
 // page opens the new build.
 //
-//   pnpm dev [--shard _template] [--port 4402] [--dist <built client folder>] [--saves disk|memory] [--no-watch]
+//   pnpm dev [--shard brasscap-mesa] [--port 4402] [--dist <built client folder>] [--saves disk|memory] [--no-watch]
 //
 // Its files live in ./tmp/dev-world/ (key, saves, client builds, server log); delete the folder, with dev stopped, for a
 // fresh world.
@@ -18,14 +18,14 @@ import { shardfileValidationRevision } from './shardfile-validation-revision.mjs
 
 const ROOT = resolve(import.meta.dirname, '..');
 const { values } = parseArgs({ options: {
-  shard: { type: 'string', default: '_template' }, port: { type: 'string', default: String(DEV_PORT) }, dist: { type: 'string' },
+  shard: { type: 'string', default: 'brasscap-mesa' }, port: { type: 'string', default: String(DEV_PORT) }, dist: { type: 'string' },
   saves: { type: 'string', default: 'disk' }, 'no-watch': { type: 'boolean', default: false }, work: { type: 'string', default: 'tmp/dev-world' },
 } });
 if (values.saves !== 'disk' && values.saves !== 'memory') throw new Error('--saves is disk or memory');
 const work = resolve(ROOT, values.work), port = Number(values.port);
 mkdirSync(work, { recursive: true });
-// Ring 1 is Template's slice; any other shard installs every pin.
-const ring = values.shard === '_template';
+// Ring 1 holds Brasscap (J434); any other shard installs every pin.
+const ring = values.shard === 'brasscap-mesa';
 const catalogue = ring ? resolve(ROOT, 'out/.ring-catalogue.json') : resolve(ROOT, 'test/pins/catalogue.json');
 
 /** @param {string} command @param {string[]} args */

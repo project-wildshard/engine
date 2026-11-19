@@ -44,7 +44,7 @@ const catalogueText = (() => {
 })();
 const catalogue = /** @type {{ grid: { cells: { instance: string, slug: string, cell: [number, number] }[] } }} */ (JSON.parse(catalogueText));
 const CARD = /** @type {Record<string, string>} */ ({ 'driftwood-isle': 'Driftwood Isle', 'pine-hollow': 'Pine Hollow', 'nalati-grasslands': 'Nalati Grasslands', 'nine-dragon-stack': 'Nine Dragon Stack',
-  'sunscar-dunes': 'Signal Dunes', 'far-reach': 'Sky Reach', _template: 'Template shard', 'open-plot-thin-ice': 'Thin Ice' });
+  'sunscar-dunes': 'Signal Dunes', 'far-reach': 'Sky Reach', 'open-plot-thin-ice': 'Thin Ice' });
 const cells = catalogue.grid.cells.filter(cell => only.length === 0 || only.includes(cell.instance)).sort((a, b) => b.cell[1] - a.cell[1] || a.cell[0] - b.cell[0]);
 
 /** @typedef {{ instance: string, slug: string, cell: [number, number] }} Cell */
@@ -185,7 +185,7 @@ async function runOne(browser, cell, layout, path) {
 }
 
 /** A cell whose card the Developer deck shows (the template). @param {Cell} cell */
-const developerCard = cell => cell.slug === '_template';
+const developerCard = cell => cell.slug === 'brasscap-mesa';
 const runsFile = join(out, 'runs.json');
 /** @type {{ runs: Run[], staging: Record<string, unknown> }} */
 const state = existsSync(runsFile) ? JSON.parse(readFileSync(runsFile, 'utf8')) : { runs: [], staging: {} };

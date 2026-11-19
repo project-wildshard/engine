@@ -35,7 +35,7 @@ const option = name =>
     .find(value => value.startsWith(`--${name}=`))
     ?.slice(name.length + 3)
 const root = resolvePath(option('root') ?? '.'),
-  shard = option('shard') ?? '_template'
+  shard = option('shard') ?? 'brasscap-mesa'
 const out = resolvePath(option('out') ?? 'tmp/loading-card'),
   throttle = process.argv.includes('--throttle'),
   gpu = process.argv.includes('--gpu')

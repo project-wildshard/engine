@@ -20,7 +20,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** The pinned shards SS1 compares: the six that ship a native or runtime-plan world, plus the data-cell template. */
-export const SIDE_PARITY_SHARDS = ['driftwood-isle', 'far-reach', 'nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'sunscar-dunes', '_template'];
+export const SIDE_PARITY_SHARDS = ['driftwood-isle', 'far-reach', 'nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'sunscar-dunes'];
 
 /**
  * Every collider in a physics world as { owner, material, sensor, dynamic, box }. Self-contained: it is serialized into

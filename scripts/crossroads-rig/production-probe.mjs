@@ -73,11 +73,11 @@ async function safari() {
     sim(['openurl', udid, `${base}version.json`]); await connect(`${base}version.json`);
     await evaluate(`(()=>{${saveFixtureCode({ scope: 'device', key: 'devMode', data: true })}; return true;})()`, `${base}version.json`);
     connection.close(); connection = undefined;
-    const game = `${base}?chunk=_template&mute=1&skipintro=1&sw=0`;
+    const game = `${base}?chunk=brasscap-mesa&mute=1&skipintro=1&sw=0`;
     sim(['openurl', udid, game]); await connect(game);
     const start = Date.now();
     while (!(await evaluate('Boolean(document.querySelector(".ws-touch-pause") && !document.querySelector(".ws-load"))'))) {
-      if (Date.now() - start > 90000) throw new Error('Template boot timed out'); await sleep(250);
+      if (Date.now() - start > 90000) throw new Error('Brasscap boot timed out'); await sleep(250);
     }
     await evaluate('document.querySelector(".ws-touch-pause").click(); true'); await sleep(500);
     await evaluate('document.querySelector(".ws-gmenu-card.debug.fold.folded .ws-gmenu-cardtitle")?.click(); true');

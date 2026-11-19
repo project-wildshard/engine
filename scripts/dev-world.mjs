@@ -67,7 +67,7 @@ const stopChild = (child, graceMs = 15_000) => new Promise(resolve => {
  * `product` is the shard's built product folder (STR5: `wildshard dev` names the author's build); by default the one this
  * checkout's pins installed (`built-folder.mjs` `readBuiltShardfile`).
  * @param {{ dist: string, work: string, shard?: string, product?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string, log?: (line: string) => void }} options */
-export async function openDevWorld({ dist, work: requestedWork, shard = '_template', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, log = line => { console.log(line); } }) {
+export async function openDevWorld({ dist, work: requestedWork, shard = 'brasscap-mesa', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, log = line => { console.log(line); } }) {
   if (!/^[a-z0-9_-]+$/u.test(shard)) throw new Error('A dev world shard must be a slug');
   const work = absolute(requestedWork); mkdirSync(work, { recursive: true });
   const key = devKey(work);

@@ -7,3 +7,6 @@
 - Tests that only needed a product or a slug boot Brasscap: the saved-door reload (its canyon gate), lone restore, session
   exit, core heap, look-loop, boot route, the exported harness, cook preparation, the online rig's second build, and Ring
   1's pin grid journey (now walks north out of Brasscap's (0, 1) filler cell: the old east route was the Template's).
+- Scripts: the Template-only browser proofs go (quest-complete, split-repair data-shard, sky-trails' blob particles);
+  dev, dev-world, loading-card, reload-title and the crossroads probes default to Brasscap; side parity and the offline
+  deck drop the Template (Brasscap's side-parity page half still needs a `--record`).

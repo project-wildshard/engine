@@ -25,8 +25,8 @@ const greenLog = [
 const base = { shard: 'nalati-grasslands', channel: 'staging' as const, mode: 'offline', entry: 'deck' };
 
 describe('offline proof rules (OF1)', () => {
-  it('covers the ten catalogue shards and three Open Plots', () => {
-    expect(ALL_SHARDS).toHaveLength(13);
+  it('covers the nine catalogue shards and three Open Plots', () => {
+    expect(ALL_SHARDS).toHaveLength(12);
     expect(ALL_SHARDS).toContain('open-plot-night-market');
   });
   it('passes a load from the cache whose only failures are telemetry, version.json and the release read', () => {
