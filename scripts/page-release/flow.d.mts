@@ -1,8 +1,8 @@
 export type WorldChannel = 'staging' | 'production';
-export type Channel = WorldChannel | 'preview';
+export type Channel = WorldChannel | 'preview' | 'explore';
 export type Phase = 'build' | 'upload' | 'check' | 'go-live';
 export interface WorldChannelConfig { channel: WorldChannel; solo: false; other: WorldChannel; origin: string; release: string; socket: string; health: string }
-export interface SoloChannelConfig { channel: 'preview'; solo: true; origin: string; release: string }
+export interface SoloChannelConfig { channel: 'preview' | 'explore'; solo: true; origin: string; release: string }
 export type ChannelConfig = WorldChannelConfig | SoloChannelConfig;
 export interface Deployment { id: string; url: string }
 export interface HostContext { root: string; channel: ChannelConfig; build: string; saveEpoch: number; version: string; deployment?: Deployment }
@@ -67,7 +67,7 @@ export const RELEASE_PUBLIC_KEY: string;
 export function pinnedReleaseKey(configured?: string): string;
 export const PHASES: readonly Phase[];
 export const CHECKED_DOCUMENTS: readonly ['version.json', 'index.html', 'sw.js', 'deploy-chunks.json'];
-export const CHANNELS: { staging: WorldChannelConfig; production: WorldChannelConfig; preview: SoloChannelConfig };
+export const CHANNELS: { staging: WorldChannelConfig; production: WorldChannelConfig; preview: SoloChannelConfig; explore: SoloChannelConfig };
 export class RefusedError extends Error { constructor(message: string) }
 export function runPhase(phase: Phase, deps: Deps): Promise<{ refusals: string[] }>;
 export function buildEnv(channel: ChannelConfig, deps: Deps): Record<string, string>;

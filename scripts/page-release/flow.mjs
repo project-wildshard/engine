@@ -28,15 +28,16 @@ export const PHASES = /** @type {const} */ (['build', 'upload', 'check', 'go-liv
 export const CHECKED_DOCUMENTS = /** @type {const} */ (['version.json', 'index.html', 'sw.js', 'deploy-chunks.json']);
 
 /** @typedef {'staging'|'production'} WorldChannel */
-/** @typedef {WorldChannel|'preview'} Channel */
+/** @typedef {WorldChannel|'preview'|'explore'} Channel */
 /** @typedef {typeof PHASES[number]} Phase */
 /** @typedef {{channel: WorldChannel, solo: false, other: WorldChannel, origin: string, release: string, socket: string, health: string}} WorldChannelConfig */
-/** @typedef {{channel: 'preview', solo: true, origin: string, release: string}} SoloChannelConfig */
+/** @typedef {{channel: 'preview'|'explore', solo: true, origin: string, release: string}} SoloChannelConfig */
 /** @typedef {WorldChannelConfig|SoloChannelConfig} ChannelConfig */
 
-/** @type {{staging: WorldChannelConfig, production: WorldChannelConfig, preview: SoloChannelConfig}} */
+/** @type {{staging: WorldChannelConfig, production: WorldChannelConfig, preview: SoloChannelConfig, explore: SoloChannelConfig}} */
 export const CHANNELS = {
   // SHELL-CUTOVER SC1: the solo build of the newest green main, no world stamp, so the in-page server runs.
+  explore: {channel: 'explore', solo: true, origin: 'https://explore.wildshard.io', release: `${PACKS_ORIGIN}/releases/staging.json`},
   preview: {channel: 'preview', solo: true, origin: 'https://preview.wildshard.io', release: `${PACKS_ORIGIN}/releases/preview.json`},
   staging: {
     channel: 'staging', solo: false, other: 'production', origin: 'https://staging.wildshard.io',
@@ -134,7 +135,7 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
 export async function runPhase(phase, deps) {
   /** @type {ChannelConfig|undefined} */
   const channel = Object.hasOwn(CHANNELS, deps.channel) ? CHANNELS[deps.channel] : undefined;
-  if (channel === undefined) throw new RefusedError(`unknown channel ${deps.channel}: preview, staging or production`);
+  if (channel === undefined) throw new RefusedError(`unknown channel ${deps.channel}: preview, staging, production or explore`);
   if (!PHASES.includes(phase)) throw new RefusedError(`unknown phase ${phase}: ${PHASES.join(', ')}`);
   /** @type {string[]} */
   const refusals = [];
@@ -156,6 +157,13 @@ export async function runPhase(phase, deps) {
   deps.log(`${channel.channel} ${phase} ${deps.build} v${deps.manifest.version} epoch ${deps.manifest.saveEpoch} on ${deps.host.name}${dry ? ' (dry run)' : ''}`);
 
   if (phase === 'build') {
+    if (channel.channel === 'explore') {
+      if (deps.catalogue === undefined) refuse('Explore requires --catalogue pointing to the matching staging build');
+      else if (!dry) {
+        const expected = await deps.fetchText(`${CHANNELS.staging.origin}/catalogue.json`).catch(() => '');
+        if (expected === '' || sha256(deps.readFile(deps.catalogue)) !== sha256(Buffer.from(expected))) refuse('Explore catalogue differs from the live staging build');
+      }
+    }
     const env = buildEnv(channel, deps);
     for (const line of deps.host.describe('prepare', context)) plan(line);
     if (!dry) await deps.host.prepare(context);
@@ -242,10 +250,10 @@ export async function runPhase(phase, deps) {
     }
     for (const line of deps.host.describe('deployedDigests', deployed)) plan(line);
     if (!dry) await checkDeployed(deps, deployed, refuse);
-    if (channel.solo) {
+    if (channel.channel === 'preview') {
       plan(`sign ${channel.release} after the page and its content are uploaded (no socket or server bundle)`);
       if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/page-release/preview.mjs', `--build=${deps.build}`], {});
-    } else {
+    } else if (!channel.solo) {
       plan(`verify the server book and parts on ${PACKS_ORIGIN} answer with CORS ${channel.origin}`);
       if (!dry) await deps.packs.verify({root: deps.root, build: deps.build, cors: channel.origin});
     }
@@ -341,7 +349,8 @@ function checkOutput(channel, deps, context, refuse) {
   if (!html.includes(`globalThis.__WS_BUILD_ID__=${JSON.stringify(deps.build)};`)) refuse('index.html is not stamped with this build');
   const stamp = /globalThis\.__WS_WORLD__=(\{[^;]+\});/u.exec(html)?.[1];
   if (channel.solo) {
-    if (stamp !== undefined || html.includes('/releases/')) refuse('index.html names a world, but preview is the solo game');
+    if (stamp !== undefined || html.includes('/releases/')) refuse(`index.html names a world, but ${channel.channel} is the solo game`);
+    if (channel.channel === 'explore' && !html.includes('globalThis.__WS_EXPLORE__=true;')) refuse('index.html has no Explore stamp');
     return files;
   }
   const world = stamp === undefined ? undefined : JSON.parse(stamp);
@@ -486,9 +495,18 @@ export async function readGate(channel, deps) {
   let release;
   try { release = JSON.parse(signed.body); } catch { return {problem: `${channel.release} body is not JSON`}; }
   if (release === null || typeof release !== 'object' || !Number.isSafeInteger(release.serial) || release.serial < 1) return {problem: `${channel.release} has an invalid serial`};
-  if (release.channel !== channel.channel) return {problem: `${channel.release} is channel ${release.channel}`};
+  const expectedChannel = channel.channel === 'explore' ? 'staging' : channel.channel;
+  if (release.channel !== expectedChannel) return {problem: `${channel.release} is channel ${release.channel}`};
   if (release.engineBuild !== deps.build) return {problem: `${channel.release} serial ${release.serial} signs ${release.engineBuild}, not ${deps.build}`};
   if (release.saveEpoch !== deps.manifest.saveEpoch) return {problem: `${channel.release} save epoch ${release.saveEpoch} is not ${deps.manifest.saveEpoch}`};
+  if (channel.channel === 'explore') {
+    const versionURL = `${CHANNELS.staging.origin}/version.json`;
+    try {
+      const page = await deps.fetchJSON(versionURL);
+      if (page?.build !== deps.build) return {problem: `${versionURL} names ${page?.build}, not ${deps.build}`};
+    } catch { return {problem: `${versionURL} unreadable`}; }
+    return {serial: release.serial};
+  }
   if (channel.solo) return release.socket === undefined && release.bundle === undefined
     ? {serial: release.serial} : {problem: `${channel.release} must be solo (no socket or server bundle)`};
   if (String(release.socket).replace(/\/$/u, '') !== channel.socket) return {problem: `${channel.release} socket ${release.socket} is not ${channel.socket}`};

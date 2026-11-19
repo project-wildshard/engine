@@ -19,6 +19,7 @@ const CHANNELS: Readonly<Record<string, 'production' | 'staging'>> = {
   'play.wildshard.io': 'production',
   'staging.wildshard.io': 'staging',
   'preview.wildshard.io': 'staging',
+  'explore.wildshard.io': 'staging',
 }
 const EDGE_SECONDS = 60
 const HEX_PAIR = /../gu

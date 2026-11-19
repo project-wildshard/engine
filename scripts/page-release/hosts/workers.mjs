@@ -20,8 +20,9 @@ import {CLOUDFLARE_ACCOUNT} from '../packs.mjs';
 import {runRedacted} from '../redact.mjs';
 
 export const CONFIG = 'pages/wrangler.jsonc';
-/** @type {Record<'preview'|'staging'|'production', {env: string, worker: string}>} */
+/** @type {Record<'preview'|'staging'|'production'|'explore', {env: string, worker: string}>} */
 export const WORKERS = {
+  explore: {env: 'explore', worker: 'wildshard-explore'},
   preview: {env: 'preview', worker: 'wildshard-play-preview'},
   staging: {env: 'staging', worker: 'wildshard-play-staging'},
   production: {env: '', worker: 'wildshard-play'},

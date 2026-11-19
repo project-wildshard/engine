@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The preview, staging and production page release (meta OFF-VERCEL OV4). Runbook: docs/server-release.md "Page release".
 //
-//   node scripts/page-release.mjs <preview|staging|production> <phase>[,<phase>...] [options]
+//   node scripts/page-release.mjs <preview|staging|production|explore> <phase>[,<phase>...] [options]
 //
 //   phases: build, upload, check, go-live, in that order; a comma list runs them one after another and stops at the first
 //   failure (preview.yml: `preview build,upload,check,go-live`)
@@ -20,7 +20,7 @@
 //   --catalogue=<file>       preview build: bake this catalogue, the grid borrowed from staging (SHARD-AUTHORING SA35,
 //                            scripts/preview-grid.ts); default test/pins/catalogue.json. Refused on staging and production
 //
-//   node scripts/page-release.mjs --print-env <preview|staging|production> [--root=<dir>] [--catalogue=<file>]
+//   node scripts/page-release.mjs --print-env <preview|staging|production|explore> [--root=<dir>] [--catalogue=<file>]
 //                            print the channel's build environment for the root's HEAD (--catalogue on preview only),
 //                            one sorted KEY=value a line, and run nothing (PAGE-SIZE PZ6: the three channels' builds
 //                            differ only in named keys)
@@ -56,7 +56,7 @@ if (flag('print-env') !== undefined) {
   const config = channel !== undefined && Object.hasOwn(CHANNELS, channel) ? Reflect.get(CHANNELS, channel) : undefined;
   const catalogue = value('catalogue');
   if (config === undefined || phaseList !== undefined || (catalogue !== undefined && !config.solo)) {
-    console.error('usage: node scripts/page-release.mjs --print-env <preview|staging|production> [--root=<dir>] [--catalogue=<file>, preview only]');
+    console.error('usage: node scripts/page-release.mjs --print-env <preview|staging|production|explore> [--root=<dir>] [--catalogue=<file>, preview only]');
     process.exit(2);
   }
   const cwd = resolve(value('root') ?? '.');
@@ -66,7 +66,7 @@ if (flag('print-env') !== undefined) {
   process.exit(0);
 }
 if (channel === undefined || phaseList === undefined || hostName !== 'workers') {
-  console.error('usage: node scripts/page-release.mjs <preview|staging|production> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--local-qa=<verdict.json>] [--qa=<verdict.json>] [--content] [--catalogue=<file>]');
+  console.error('usage: node scripts/page-release.mjs <preview|staging|production|explore> <build|upload|check|go-live>[,...] [--host=workers] [--root=<dir>] [--dry-run] [--wait=<minutes>] [--local-qa=<verdict.json>] [--qa=<verdict.json>] [--content] [--catalogue=<file>]');
   process.exit(2);
 }
 const git = (/** @type {string[]} */ argv, /** @type {string} */ cwd) => execFileSync('git', argv, {cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe']}).trim();
@@ -106,7 +106,7 @@ const manifest = {
 async function run(step, generatedQa) {
     const qa = generatedQa ?? (value('qa') === undefined ? undefined : readQa(resolve(value('qa') ?? '')));
     const {refusals} = await runPhase(step, {
-      root, channel: /** @type {any} */ (channel), build, host, releaseKey, codeRetention: true,
+      root, channel: /** @type {any} */ (channel), build, host, releaseKey, codeRetention: channel !== 'explore',
       packs: r2Packs({log}),
       ...(flag('content') === undefined ? {} : {content: {
         publish: ({dir, cors, dryRun}) => publishContent({dir, origin: cors, dryRun, log,

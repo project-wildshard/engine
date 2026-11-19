@@ -20,7 +20,7 @@ import { PLACEMENT_PUBLIC_KEY } from '../src/shared/game/grid/placementRows';
 // OFF-VERCEL OV1 (J272): one wrangler.jsonc, three Workers. Production is the top level; staging and preview are envs.
 // Production is always named with `--env ''`: without it wrangler warns that more than one environment is defined.
 const CONFIG = resolve('pages/wrangler.jsonc');
-const WORKERS = { production: 'wildshard-play', staging: 'wildshard-play-staging', preview: 'wildshard-play-preview' } as const;
+const WORKERS = { production: 'wildshard-play', staging: 'wildshard-play-staging', preview: 'wildshard-play-preview', explore: 'wildshard-explore' } as const;
 // The account's other Workers (PACKS-CDN, voice ICE, API-CF, WWW-CF): a channel must never deploy over one of them.
 const TAKEN = ['wildshard-packs', 'wildshard-voice-ice', 'wildshard-api', 'wildshard-www'];
 const ENVS = Object.keys(WORKERS) as (keyof typeof WORKERS)[];
@@ -29,26 +29,26 @@ function read(channel: keyof typeof WORKERS): ReturnType<typeof unstable_readCon
   return unstable_readConfig({ config: CONFIG, ...(channel === 'production' ? {} : { env: channel }) });
 }
 
-test('three channel Workers, none named like another Worker on the account', () => {
+test('four channel Workers, none named like another Worker on the account', () => {
   const names = ENVS.map(channel => read(channel).name);
   expect(names).toEqual(ENVS.map(channel => WORKERS[channel]));
-  expect(new Set(names).size).toBe(3);
+  expect(new Set(names).size).toBe(4);
   for (const name of names) expect(TAKEN).not.toContain(name);
 });
 
-test('every channel serves dist with 404s, version URLs and no workers.dev or custom domain', () => {
+test('every channel serves dist with 404s, version URLs and only Explore declares a custom domain', () => {
   for (const channel of ENVS) {
     const config = read(channel);
     expect(config.main).toBe(resolve('pages/worker.ts'));
     expect(config.assets).toMatchObject({ directory: '../dist', binding: 'ASSETS', not_found_handling: 'none', run_worker_first: ['/', '/index.html', '/slug/*', '/assets/spawn/parts/*', '/assets/spawn/server/*'] });
     expect(config.workers_dev).toBe(false);
     expect(config.preview_urls).toBe(true);
-    expect(config.routes ?? []).toEqual([]);
+    expect(config.routes ?? []).toEqual(channel === 'explore' ? [{pattern: 'explore.wildshard.io', custom_domain: true}] : []);
     expect(config.route).toBeUndefined();
   }
 });
 
-test('wrangler deploy --dry-run passes for all three channels', async () => {
+test('wrangler deploy --dry-run passes for all four channels', async () => {
   mkdirSync(resolve('tmp'), { recursive: true });
   const root = mkdtempSync(resolve('tmp/page-workers-'));
   try {

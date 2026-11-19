@@ -1,4 +1,4 @@
-// The game's pages on Cloudflare Workers static assets (meta OFF-VERCEL-PLAN OV1, J272): three Workers, one config.
+// The game's pages on Cloudflare Workers static assets (J272, J468): four Workers, one config.
 // Production is the top level (`--env ''`, said out loud), `--env staging` and `--env preview` are the other two.
 // Each has its own versions and domain, so preview's hourly deploys never touch production.
 // No custom domains yet: OV6 to OV8 attach them.
@@ -23,6 +23,12 @@
   },
   "observability": { "enabled": true },
   "env": {
+    "explore": {
+      "name": "wildshard-explore",
+      "workers_dev": false,
+      "preview_urls": true,
+      "routes": [{"pattern": "explore.wildshard.io", "custom_domain": true}]
+    },
     "staging": {
       "name": "wildshard-play-staging",
       "workers_dev": false,

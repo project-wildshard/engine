@@ -31,12 +31,13 @@ const {publicKey, privateKey} = generateKeyPairSync('ed25519');
 const key = publicKey.export({format: 'der', type: 'spki'}).toString('hex');
 const token = ['host', 'credential', 'marker'].join('-');
 
-function signed(channel: Channel, serial: number, engineBuild = build) {
+function signed(channel: Exclude<Channel, 'explore'>, serial: number, engineBuild = build) {
   const body = JSON.stringify({channel, serial, engineBuild, saveEpoch: 1, ...(channel === 'preview' ? {} : {socket: CHANNELS[channel].socket})});
   return {body, signature: sign(null, Buffer.from(body), privateKey).toString('hex')};
 }
 
 function page(channel: Channel) {
+  if (channel === 'explore') return Buffer.from(`<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};globalThis.__WS_EXPLORE__=true;</script>`);
   if (channel === 'preview') return Buffer.from(`<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};</script>`);
   const world = JSON.stringify({release: CHANNELS[channel].release, key});
   return Buffer.from(`<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};globalThis.__WS_WORLD__=${world};</script>`);
@@ -54,7 +55,7 @@ function rig(channel: Channel = 'staging') {
   ]);
   const deployedFiles = new Map(files);
   const live = {
-    release: signed(channel, 7) as unknown,
+    release: signed(channel === 'explore' ? 'staging' : channel, 7) as unknown,
     health: {build, serial: 7} as unknown,
     stagingVersion: {build, saveEpoch: 1},
     domain: {build: 'old', saveEpoch: 1},
@@ -87,7 +88,7 @@ function rig(channel: Channel = 'staging') {
       const config = CHANNELS[channel];
       if (url === config.release) return Promise.resolve(live.release);
       if (!config.solo && url === config.health) return Promise.resolve(live.health);
-      if (url === `${CHANNELS.staging.origin}/version.json` && channel === 'production') return Promise.resolve(live.stagingVersion);
+      if (url === `${CHANNELS.staging.origin}/version.json` && (channel === 'production' || channel === 'explore')) return Promise.resolve(live.stagingVersion);
       if (url === `${CHANNELS[channel].origin}/version.json`) return Promise.resolve(live.domain);
       return Promise.reject(new Error(`unexpected ${url}`));
     },
@@ -671,4 +672,26 @@ test('staging cannot move the alias while the cook still runs the previous build
   }};
   await expect(runPhase('go-live', guarded)).rejects.toThrow('cook is not staging');
   expect(rig_.calls).not.toContain('goLive');
+});
+
+test('Explore deploys the live staging SHA without publishing a new world release or packs', async () => {
+  const {deps, calls, files, live} = rig('explore');
+  const catalogue = '/staging/catalogue.json', body = '{"placements":[]}';
+  files.set(catalogue, Buffer.from(body));
+  const explore = {...deps, catalogue, fetchText: () => Promise.resolve(body)};
+  for (const step of PHASES) await runPhase(step, explore);
+  expect(calls).toContain('goLive');
+  expect(calls).toContain('fetch https://packs.wildshard.io/releases/staging.json');
+  expect(calls).toContain('fetch https://staging.wildshard.io/version.json');
+  expect(calls.some(line => line.startsWith('packs.') || line.includes('page-release/preview.mjs'))).toBe(false);
+  live.stagingVersion = {...live.stagingVersion, build: source};
+  await expect(runPhase('check', explore)).rejects.toThrow('version.json names');
+});
+
+test('an Explore build refuses a catalogue other than the live staging bytes', async () => {
+  const {deps, files} = rig('explore');
+  const catalogue = '/staging/catalogue.json';
+  files.set(catalogue, Buffer.from('old'));
+  await expect(runPhase('build', deps)).rejects.toThrow('Explore requires --catalogue');
+  await expect(runPhase('build', {...deps, catalogue, fetchText: () => Promise.resolve('current')})).rejects.toThrow('Explore catalogue differs');
 });

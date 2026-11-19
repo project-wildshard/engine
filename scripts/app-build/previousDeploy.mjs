@@ -145,7 +145,7 @@ export function liveDeployBuilds(get = fetch, origins = CHANNEL_ORIGINS) {
  * Workers release replaced a paused host that answered 503, and a missed hour costs an open preview tab a reload.
  * @param {Readonly<Record<string, string | undefined>>} env @returns {boolean} */
 export function previousDeployOptional(env) {
-  return (env.WS_PREVIOUS_DEPLOY_OPTIONAL === '1' && env.WS_RELEASE !== '1') || env.WS_CHANNEL === 'preview';
+  return (env.WS_PREVIOUS_DEPLOY_OPTIONAL === '1' && env.WS_RELEASE !== '1') || env.WS_CHANNEL === 'preview' || env.WS_CHANNEL === 'explore';
 }
 
 /** OFF-VERCEL OV3: a release carries the kept builds from its own channel's domain, never a vercel.app address. A main
@@ -153,6 +153,7 @@ export function previousDeployOptional(env) {
  * @param {string | undefined} channel  WS_CHANNEL
  * @returns {string} */
 export function channelOrigin(channel) {
+  if (channel === 'explore') return 'https://explore.wildshard.io';
   const name = channel === undefined || channel === '' ? 'production' : channel;
   const origin = Object.hasOwn(CHANNEL_ORIGINS, name) ? CHANNEL_ORIGINS[name] : undefined;
   if (origin === undefined) throw new Error(`WS_CHANNEL must be ${Object.keys(CHANNEL_ORIGINS).join(' or ')}, not ${name}`);
