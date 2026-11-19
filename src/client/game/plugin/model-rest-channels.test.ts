@@ -190,3 +190,11 @@ it('takes a packed static vertex (STR16) as plain Float32 rest channels in ident
     expect([...attribute.array]).toEqual([...plain.getAttribute(name).array]);
   }
 });
+
+it('IP30: keeps the pool failure that left a part missing', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  const cause = new RangeError('Out of memory');
+  const library = createModelLibrary<never, never>({ ...empty, geometryPools: [{ url: 'pool', parts: ['a'] }] }, 'test', {}, () => Promise.reject(cause));
+  await library.preload();
+  expect(library.geometry('a')).toBeNull(); expect(library.fault?.('a')).toBe(cause); expect(library.fault?.('b')).toBeUndefined();
+});

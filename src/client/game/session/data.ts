@@ -24,6 +24,7 @@ import { bootFetches, prefetch, prefetchAfter, whenPrefetched } from '@wildshard
 import { useShardSteps } from '@wildshard/engine/boot/steps';
 import { startViewmodelTextures } from '@wildshard/engine/combat/view/ranged';
 import { TIER } from '@wildshard/engine/core/tier';
+import { phoneBudget } from '@wildshard/engine/boot/loadWindow';
 import { beginLoading, type Loading } from '@wildshard/engine/ui/Loading';
 import { currentPageMode } from '../../../shared/game/grid/pageMode';
 import { NO_AUDIO, type LevelAudioProfile } from '@wildshard/engine/audio/levelAudio';
@@ -92,7 +93,8 @@ async function buildData(ctx: SessionContext) : Promise<{ loading: Loading; audi
   useDownloadAudio({ listed: spawnListed, read: url => spawnHeldBytes(url, false) });
   prefetchAfter(extraFetches(files), extrasBarrier);
   // High-peak builds may defer extras decoding until their later loading steps.
-  const deferExtras = manifest.boot?.phone?.deferExtras === true && TIER === 'phone';
+  // IP30: the phone byte budget decodes optional audio after control on every shard, as Nine's manifest asks
+  const deferExtras = (manifest.boot?.phone?.deferExtras === true || phoneBudget()) && TIER === 'phone';
   // The grid never shows the title deck: its cards keep their URLs (decoded if a menu ever opens) and the Explore
   // controls load when opened, so a grid entry does not decode every card's art (round 40: the phone froze 10-14 s)
   const menuLoad = deferExtras || currentPageMode() === 'grid' ? null : startMenuPreload(files, manifest);

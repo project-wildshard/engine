@@ -1,4 +1,5 @@
 import { sceneWeldBytes } from '@wildshard/format/worldScenePages';
+import { budgetCollection } from '@wildshard/engine/render/memorySaver';
 import { TileDriver, tileRing } from './tileDriver';
 import { StreamingCamera } from './streamingView';
 import { ring, ringRadius, type TileContent } from './tileContent';
@@ -510,12 +511,15 @@ async function buildPrepared(ctx: ShardContext, section: WorldScenesSection, res
             await models.preload(() => constructionCheckpoint(owner) ?? Promise.resolve());
             requireSceneOwner(owner);
             if (row.publish !== undefined) for (const part of row.files.flatMap(file => file.parts)) {
-              const geometry = models.geometry(part); if (geometry === null) throw new Error(`Missing scene pool part: ${part}`);
+              const geometry = models.geometry(part);
+              // IP30: name the pool's own failure (an allocation, read or parse error), never only the empty lookup
+              if (geometry === null) { const cause = models.fault?.(part); throw new Error(`Missing scene pool part: ${part}${cause === undefined ? '' : ` (${cause instanceof Error ? cause.message : 'a non-Error throw'})`}`, { cause }); }
               owner.onDispose(() => { geometry.dispose(); }); handles.publish(`${row.publish}.${part}`, geometry);
             }
             libraries.set(row.id, { geometry: id => models.geometry(id), draw: id => models.draw?.(id), models });
           }
           libraryProgress(libraryIndex + 1, row.id);
+          budgetCollection(); // IP30: each library's decode garbage goes before the next decodes
           const pause = constructionCheckpoint(owner); if (pause !== undefined) await pause;
         });
       }

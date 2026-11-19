@@ -28,6 +28,8 @@ import { renderCount } from './frameCounter';
 import { presenting } from '../../../shared/engine/core/framePacing';
 import { COLLECTION_HINT_BYTES, hintCollection } from '../../../shared/engine/core/ownedBuffer';
 import { jsonSlot } from '../saves/slots';
+import { phoneBudget } from '../boot/loadWindow';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 
 const LABEL = 'engine/memorySaver';
 const isTarget = (value: unknown): value is THREE.WebGLRenderTarget => value instanceof THREE.WebGLRenderTarget;
@@ -252,6 +254,14 @@ export function collectBeforeShaders(userAgent: string = typeof navigator === 'u
   if (!webKitEngine(userAgent)) return 0;
   const bytes = collectionHintBytes();
   return bytes > 0 ? hintCollection(bytes) : 0;
+}
+
+/** IP30: under the phone byte budget, WebKit's collection hint between upload batches, at most every 200 ms (0 when off). */
+let budgetCollected = -Infinity;
+export function budgetCollection(): number {
+  if (!phoneBudget() || diagnosticNow() - budgetCollected < 200) return 0;
+  budgetCollected = diagnosticNow();
+  return collectBeforeShaders();
 }
 
 /** remember which GL buffer each attribute array went into (three's WebGLAttributes.createBuffer / a full re-upload) */

@@ -18,6 +18,7 @@
  * array buffers. A measurement reads it as `__wsLoadWindow()`.
  */
 import { TIER } from '../core/tier';
+import { jsonSlot } from '../saves/slots';
 
 /** The phone tier's starting window (EM23). */
 export const PHONE_LOAD_WINDOW_BYTES: number = 64 * 1024 * 1024;
@@ -122,3 +123,18 @@ export class LoadWindow {
 export const loadWindow: LoadWindow = new LoadWindow(() => (TIER === 'phone' ? PHONE_LOAD_WINDOW_BYTES : Number.POSITIVE_INFINITY));
 export function loadWindowStats(): LoadWindowStats { return loadWindow.stats(); }
 if (typeof globalThis !== 'undefined') (globalThis as { __wsLoadWindow?: () => LoadWindowStats }).__wsLoadWindow = loadWindowStats;
+
+/**
+ * meta IPHONE13-REAL-TEST IP30: the phone's one decode and upload byte budget. On, the phone tier (Low by default) keeps
+ * collision and the drawable spawn cover as before, and the work that piled onto the loading peak waits its turn:
+ * optional audio decodes after control, and each upload batch frees its staging arrays and its garbage (WebKit's collection
+ * hint, `budgetCollection`) before the next decodes. The device slot `debug.phoneBudget` (true or false) picks it; a
+ * harness sets it before the boot.
+ */
+let budgetOn: boolean | undefined;
+export function phoneBudget(): boolean {
+  if (TIER !== 'phone') return false;
+  // read once: each slot read parses the device save document, and the budget's own garbage must not grow with its calls
+  try { budgetOn ??= jsonSlot('debug.phoneBudget', 'device').read() === true; } catch { return false; }
+  return budgetOn;
+}

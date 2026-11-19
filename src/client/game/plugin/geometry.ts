@@ -128,6 +128,8 @@ export interface ModelLibrary<M extends string, H extends string> {
   readonly bindLooks: (scope: ResourceScope, ports: { readonly materials: ReadonlyMap<string, Material>; readonly bindMeshMap: (id: string, map: Texture | Material) => Material }) => void;
   readonly look: (id: string) => Material | undefined;
   readonly material: (id: string) => Material;
+  /** IP30: why a pool part did not load (the pool's caught read, parse or allocation failure), else undefined. */
+  readonly fault?: (name: string) => unknown;
   readonly mappedLook: (id: string, map: Texture | Material) => Material;
   /** Load every listed model once (a failed one is skipped and faulted). */
   preload: (pause?: () => Promise<void>) => Promise<void>;
@@ -256,7 +258,7 @@ export function createModelLibrary<M extends string, H extends string>(rows: Mod
   if (fallback !== undefined && [fallback.roughness, fallback.metalness].some(value => !Number.isFinite(value) || value < 0 || value > 1)) throw new Error('Invalid mapped look fallback');
   const ready = new Map<M, BufferGeometry>(), hd = new Map<H, Object3D>();
   const painted = new Map<string, PaintedModel>(), paintedRows = rows.paintedModels ?? [];
-  const rest = new Map<string, BufferGeometry>(), atlases = new Map<string, ModelPbrAtlas>();
+  const rest = new Map<string, BufferGeometry>(), atlases = new Map<string, ModelPbrAtlas>(), faults = new Map<string, unknown>();
   const borrowedRest = new WeakMap<BufferGeometry, BufferGeometry>();
   const rigs = rows.rigs === undefined ? null : rigLibrary(rows.rigs);
   const state: ModelLoadState = { loading: null };
@@ -438,7 +440,7 @@ export function createModelLibrary<M extends string, H extends string>(rows: Mod
       for (const [name, geometry] of prepared) {
         cacheModelEntry(rest, name, geometry, state);
       }
-    } catch (error: unknown) { console.error(`${fault} the rest geometry pool did not load:`, error); }
+    } catch (error: unknown) { for (const name of pool.parts) faults.set(name, error); console.error(`${fault} the rest geometry pool did not load:`, error); }
   }
 
   async function load(name: M): Promise<void> {
@@ -494,6 +496,7 @@ export function createModelLibrary<M extends string, H extends string>(rows: Mod
       lookPorts = ports; scope.onDispose(() => { if (lookPorts === ports) lookPorts = null; });
     },
     look: id => lookPorts?.materials.get(id),
+    fault: name => faults.get(name),
     material: id => { const material = lookPorts?.materials.get(id); if (material === undefined) throw new Error(`Missing borrowed model material ${id}`); return material; },
     mappedLook: (id, map) => {
       if (lookPorts?.materials.has(id) === true) return lookPorts.bindMeshMap(id, map);

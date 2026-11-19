@@ -6,6 +6,7 @@ import { beginLoadingWait, finishLoadingWait, reportLoadingWait } from '@wildsha
 import { currentLoadingTimeline } from '@wildshard/engine/boot/timeline';
 import { observeReads } from '@wildshard/engine/boot/waits';
 import { bootTask } from '@wildshard/engine/boot/timing';
+import { budgetCollection } from '@wildshard/engine/render/memorySaver';
 import { streamingDistance, streamingVisible, type StreamingPoint, type StreamingView } from './streamingView';
 
 type Point = StreamingPoint;
@@ -212,6 +213,7 @@ export class ControlRefinement {
           job.reject(refusal);
         });
         if (this.owner.disposed || this.owner.disposing) break;
+        if (fence) budgetCollection(); // IP30: a fence batch's garbage goes before the next batch decodes
         if (refusal !== undefined) {
           this.failure = refusal;
           for (const queued of this.waiting.values()) queued.reject(refusal);

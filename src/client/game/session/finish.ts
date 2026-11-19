@@ -29,7 +29,7 @@ import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
 import { textureBytes } from '@wildshard/engine/render/textureBytes';
-import { collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
+import { budgetCollection, collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { shardArea } from '../grid/area';
@@ -156,6 +156,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // for this first fence; the final readyFrame fence uses the posed camera.
   // PINE-FLASH (grid/spawnGround.ts): first the entered cell's own ground where its ring tiles are that ground (Pine), so
   // control never arrives over its far proxy; bounded, and nothing for a cell that draws its own ground (Nalati)
+  budgetCollection();
   await loadingStage('spawnDetail', async () => { await holdSpawnGround(ctx.grid); await prepareSpawnView(undefined, undefined, 'player'); });
   // mini QA 2026-11-17 row 19: the shaders step and the first frames are the boot's memory peak (every texture, buffer and
   // pipeline reaches the GPU, which iOS charges to the page). The parts the store already holds leave memory first (Nine:
@@ -163,7 +164,12 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   bootMark('download:members-dropped', { count: dropStoredSpawnMembers(), held: heldSpawnMembers() });
   // and every geometry drawn so far lets its CPU copy go after each drawing step (play waits 240 renders, which the boot
   // never reaches: Nine's phone held 88-147 MB of attribute arrays beside their GPU copies through its peak)
-  const releaseDrawn = (after: string): void => { bootMark('memory:geometry-released', { after, bytes: releaseDrawnGeometry(game.renderer) }); };
+  // IP30: under the phone byte budget each step's uploaded batch frees its staging arrays and then its garbage, before the
+  // next step decodes on top of it
+  const releaseDrawn = (after: string): void => {
+    bootMark('memory:geometry-released', { after, bytes: releaseDrawnGeometry(game.renderer) });
+    const hinted = budgetCollection(); if (hinted > 0) bootMark('memory:budget-collection', { after, bytes: hinted });
+  };
   try {
     // LS8 (J204): the shaders step's measured cost per program decides how the first frame slices its draws
     const shadersAt = diagnosticNow(), programsBefore = game.renderer.info.programs?.length ?? 0;
@@ -308,7 +314,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     const counted = <T>(job: Promise<T>): Promise<T> => job.then(value => { readyUnits(++readyDone); return value; });
     // QA row 27: Jake's Nine paste had 4.6 s of readyFrame with no entry before 'wait:Minimap': the spawn view's fence and
     // its tile settle, which the card names but the boot timeline did not; it is a named wait there too now
-    await spawnViewThenNamed(counted(bootTask('wait:Spawn view', () => prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); releaseDrawnGeometry(game.renderer); }), 'camera', settlingTiles))),
+    await spawnViewThenNamed(counted(bootTask('wait:Spawn view', () => prepareSpawnView(wholeLevel ? Infinity : undefined, () => settleTileDrivers(() => { game.hiddenFrame(); releaseDrawnGeometry(game.renderer); budgetCollection(); }), 'camera', settlingTiles))),
       // NB3: their own spans from their start too (the card names them only once the spawn view ends)
       [['Minimap', counted(bootTask('app:ready-minimap', () => waitEntryWork(game.levelScope, () => ctx.minimap.prepare())))],
         ['Horizon paintings', counted(bootTask('app:ready-horizon', () => edgeDressing.horizonReady))]]);
@@ -368,6 +374,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // QA row 29: the canvas still held readyFrame's view from the authored spawn; draw it again from the place the server's
   // first owner block put the player (clientWorker.ts), so the first revealed frame is already there
   game.hiddenFrame();
+  budgetCollection();
   if (audioAfterWorld) await prepareBootAudio();
   // Let first-row activation finish before the recovery menu parks the page.
   // Its captured resume state is play, after the loader's app transition above.
@@ -428,6 +435,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   const decodeAfterBoot = async (): Promise<void> => {
     try {
       if (deferredAudio) useBanks(await deferredAudio.decode());
+      budgetCollection(); // IP30: the decode's garbage goes before play piles onto it
       const late = startLateAudio(files);
       if (late) useBanks(await late);
     } catch (error) {
