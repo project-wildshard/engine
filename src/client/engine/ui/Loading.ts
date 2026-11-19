@@ -336,7 +336,8 @@ export class Loading {
   }
 
   /** QA 30 (Jake, 2026-11-10: "You can't like regret loading the wrong shard and bail out and go to the other shard"): the
-   *  loading card's own SETTINGS and EXIT TO TITLE. Exit leaves the way pause ▸ Exit to main menu does: a fresh title page
+   *  loading card's own EXIT TO TITLE. Its SETTINGS went (QA 11-19 row 51, Jake 16:09: "Get rid of the settings button on the
+   *  loading screen"); Exit keeps its half width at the right (Jake 16:10: "leave it at the half width"). Exit leaves the way pause ▸ Exit to main menu does: a fresh title page
    *  (src/client/game/session/exitToTitle.ts), so the in-flight load's workers, reads and server link end with this
    *  document and nothing of it can land on the title. */
   private menuRow(): HTMLElement {
@@ -349,7 +350,6 @@ export class Loading {
       row.append(b);
       return b;
     };
-    button('settings', engineString('s_loading_settings'), () => { void import('./BootSettings').then(m => { m.openBootSettings(); return undefined; }); });
     const exit = button('exit', engineString('s_loading_exit'), () => {
       exit.disabled = true;
       leaveSaved(() => { leftByPlayer(); markUnload('exit to title from the loading card'); location.replace(exitTitleUrl(location.href)); });

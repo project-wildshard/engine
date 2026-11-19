@@ -4,7 +4,8 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import { exitTitleUrl, Loading } from './Loading';
 
 // QA 30 (Jake, 2026-11-10: "You can't like regret loading the wrong shard and bail out and go to the other shard"): a shard's
-// loading card carries SETTINGS and EXIT TO TITLE; Exit replaces the page with the title, ending the in-flight load with it.
+// loading card carries EXIT TO TITLE; Exit replaces the page with the title, ending the in-flight load with it. QA 11-19 row 51
+// (Jake 16:09: "Get rid of the settings button on the loading screen"): no SETTINGS beside it.
 const owners: Scope[] = [];
 beforeEach(() => {
   vi.stubGlobal('PerformanceObserver', class {
@@ -24,9 +25,9 @@ function card(scoped = false): Loading {
   return loading;
 }
 
-it('a shard load offers Settings and Exit to title', () => {
+it('a shard load offers Exit to title alone, no Settings', () => {
   const buttons = [...card().root.querySelectorAll<HTMLButtonElement>('.ws-load-menu button')];
-  expect(buttons.map(b => [b.dataset['loadMenu'], b.textContent])).toEqual([['settings', 'Settings'], ['exit', 'Exit to title']]);
+  expect(buttons.map(b => [b.dataset['loadMenu'], b.textContent])).toEqual([['exit', 'Exit to title']]);
 });
 
 it('a mid-play cell load keeps its own exits: no menu row', () => {

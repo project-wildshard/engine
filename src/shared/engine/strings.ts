@@ -359,7 +359,6 @@ export const ENGINE_STRINGS = {
   "s_loading_start_files": "⟦0⟧ · ⟦1⟧ over the network",
   "s_loading_files_of": "⟦0⟧ of ⟦1⟧",
   "s_loading_copy": "Copy diagnostics",
-  "s_loading_settings": "Settings",
   "s_loading_exit": "Exit to title",
   "s_loading_slow_head": "Taking longer than it should",
   "s_loading_slow_sent": "A report was sent. You can retry, or wait: it may still finish.",
