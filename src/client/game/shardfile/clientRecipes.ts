@@ -67,14 +67,33 @@ export function speciesViewKinds(rows: Pick<ShardRows, 'species' | 'looks'>): Re
   return new Map(rows.species.map((row) => [row.id, (counts.get(row.kind) ?? 0) > 1 && rows.looks.some((look) => look.species === row.id) ? row.id : row.kind]));
 }
 
-/** A declared ability as a page names it: its strike id and its own clip. */
-export interface PageAbility { readonly id: string; readonly clip?: CreatureSkinClipName }
+/** A declared ability as a page names it: its strike id and its own clip; since CC11b3 its ground tell, its timing as the
+ *  server's runner counts it (the ability's own windup and duration over its strike's), and the reach and width a tell draws. */
+export interface PageAbility {
+  readonly id: string; readonly clip?: CreatureSkinClipName; readonly tell?: 'lane' | 'ring';
+  readonly windup: number; readonly active: number; readonly recover: number; readonly reach: number; readonly width: number;
+}
+type StrikeShape = ShardRows['strikes'][number]['shape'];
+/** How far a strike shape reaches from the body, and how wide a lane is: what its tell draws. */
+const shapeReach = (shape: StrikeShape | undefined): { reach: number; width: number } =>
+  shape === undefined ? { reach: 0, width: 0 }
+    : shape.kind === 'lane' ? { reach: shape.length, width: shape.width }
+      : shape.kind === 'wedge' ? { reach: shape.length, width: 0 }
+        : shape.kind === 'ring' ? { reach: shape.outer, width: 0 } : { reach: shape.radius, width: 0 };
 /**
  * ONE-FORMAT CC11a2c: each species' declared abilities in its row's order, by species id. An animal row's `ability` names
  * one by its 1-based place, so a page knows which ability, and so which clip, the server runs.
  */
-export function abilityRows(rows: Pick<ShardRows, 'species'>): ReadonlyMap<string, readonly PageAbility[]> {
-  return new Map(rows.species.map((row) => [row.id, (row.abilities ?? []).map((ability): PageAbility => (ability.clip === undefined ? { id: ability.use } : { id: ability.use, clip: ability.clip }))]));
+export function abilityRows(rows: Pick<ShardRows, 'species' | 'strikes'>): ReadonlyMap<string, readonly PageAbility[]> {
+  const strikes = new Map(rows.strikes.map((strike) => [strike.id, strike]));
+  return new Map(rows.species.map((row) => [row.id, (row.abilities ?? []).map((ability): PageAbility => {
+    const strike = strikes.get(ability.use), { reach, width } = shapeReach(strike?.shape);
+    const page: { -readonly [K in keyof PageAbility]: PageAbility[K] } = { id: ability.use,
+      windup: ability.windup ?? strike?.windup ?? 0, active: ability.duration ?? strike?.active ?? 0, recover: strike?.recover ?? 0, reach, width };
+    if (ability.clip !== undefined) page.clip = ability.clip;
+    if (ability.tell !== undefined) page.tell = ability.tell;
+    return page;
+  })]));
 }
 
 /**

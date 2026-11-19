@@ -59,7 +59,7 @@ test('a late-joining page and a continuing page read the same running ability un
     }
     // both pages resolve it to the same id and clip, which the skin picks over the attack fallback
     const [shown] = abilityRows(source.rows).get(body.id)?.slice(1) ?? [];
-    expect(shown).toEqual({ id: strike.id, clip: 'swing' });
+    expect(shown).toEqual({ id: strike.id, clip: 'swing', windup: strike.windup, active: strike.active, recover: strike.recover, reach: expect.any(Number), width: expect.any(Number) });
     for (let at = 0; at < 240 && actor.runningAbility !== undefined; at++) tick(pages);
     expect(actor.runningAbility).toBeUndefined();
     tick(pages);

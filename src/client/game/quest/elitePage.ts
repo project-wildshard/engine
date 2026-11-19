@@ -7,6 +7,7 @@ import type { HUD } from '@wildshard/engine/ui/HUD';
 import { CameraFX } from '@wildshard/engine/player/CameraFX';
 import { Impacts } from '@wildshard/engine/fx/Impacts';
 import { GroundTell } from '@wildshard/engine/fx/groundTell';
+import { drawTell, type TellDraw } from '../shardfile/abilityTell';
 import { rowEliteScript, type Elites } from '../Elite';
 import { DomePuffs } from '@wildshard/engine/fx/groundFx';
 import { wirePage } from '../shardfile/wirePage';
@@ -24,16 +25,7 @@ export async function readPageEliteRows(product: ShardFolder, name: string): Pro
  * content contributes only rows and prepared models, with no shard callback, override or reflected path. */
 /** How long a tell the server said stands without being said again. */
 const HEARD_FOR = 0.2;
-interface TellDraw { readonly tell?: string | undefined; readonly phase: string; readonly time: number; readonly windup: number; readonly x0: number; readonly z0: number; readonly x1: number; readonly z1: number; readonly width: number; readonly radius: number }
 type HeardTell = TellDraw & { readonly tell: 'lane' | 'ring'; readonly bodyX: number; readonly bodyZ: number; at: number };
-/** A strike's ground tell, as its windup and active time have it. */
-function drawTell(tell: GroundTell, strike: TellDraw, t: number, bodyX: number, bodyZ: number): void {
-  if (strike.tell === 'lane' && strike.phase === 'windup') {
-    const k = Math.min(1, strike.time / Math.max(0.001, strike.windup)); tell.lane(strike.x0, strike.z0, strike.x1, strike.z1, strike.width, 0.35 + 0.55 * k * (0.75 + 0.25 * Math.sin(t * 22)));
-  } else if (strike.tell === 'lane' && strike.phase === 'active') tell.lane(strike.x0, strike.z0, strike.x1, strike.z1, strike.width, Math.max(0, 0.6 - strike.time * 1.2));
-  else if (strike.tell === 'ring' && strike.phase === 'windup') { const k = Math.min(1, strike.time / Math.max(0.001, strike.windup)); tell.ring(bodyX, bodyZ, strike.radius * (0.7 + 0.3 * k), 0.35 + 0.6 * k * (0.7 + 0.3 * Math.sin(t * 20))); }
-  else tell.hide();
-}
 /** An elite's tell off the wire: `eliteTellArgs`'s numbers back into a strike. */
 function heardTell(name: string, args: readonly number[]): HeardTell | null {
   const tell = name === ELITE_TELL.lane ? 'lane' : name === ELITE_TELL.ring ? 'ring' : null, [, phase = 0, time = 0, windup = 0, x0 = 0, z0 = 0, x1 = 0, z1 = 0, width = 0, radius = 0, bodyX = 0, bodyZ = 0] = args;

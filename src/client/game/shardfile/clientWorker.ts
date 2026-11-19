@@ -1,6 +1,7 @@
 // P1-E5.3 I6 (J126), E6: every page runs the real Game and Player against the real server in its worker: the Player predicts and
 // reconciles, and every creature is an interpolated row drawn by the real views.
 import type { CreatureSkinClipName } from '@wildshard/format/skinData';
+import { AbilityTells } from './abilityTell';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { DevBox, DevGround } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
@@ -310,6 +311,13 @@ function rowAbility(entry: RowBody, index: number, progress: number): RowBody['a
   if (named.clip === undefined) delete held.clip; else held.clip = named.clip;
   return held;
 }
+/** CC11b3: each scene's running-ability ground tells (`AbilityTells`), made on first use. */
+const TELLS = new WeakMap<Object3D, AbilityTells>();
+function tellsOf(scene: Object3D): AbilityTells {
+  let tells = TELLS.get(scene);
+  if (tells === undefined) { tells = new AbilityTells(scene as Scene); TELLS.set(scene, tells); }
+  return tells;
+}
 /** STR20: the animal rows the client holds, counted without copying the entity map each frame */
 function animalRows(client: NetClient): number {
   let rows = 0;
@@ -321,6 +329,7 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<numbe
   const { interpolator } = client, own = client.welcome?.handle ?? 0, under = client.riders.get(own);
   let shown = 0;
   near.length = 0;
+  const tells = tellsOf(ports.scene); tells.begin();
   for (const [handle, entry] of bodies) {
     const { body, manager } = entry;
     if (handle === under || !interpolator.sample(handle, renderTick, row)) continue; // the body under this player is its own prediction (J48)
@@ -337,6 +346,8 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<numbe
     drawn.channels = channelsOf(row, ROW_CHANNELS); drawn.lock = LOCKS[row[LOCKABLE] ?? 0] ?? 'row';
     drawn.ability = rowAbility(entry, ABILITY < 0 ? 0 : row[ABILITY] ?? 0, ABILITY_T < 0 ? 0 : row[ABILITY_T] ?? 0);
     body.showRow(drawn, dt);
+    // CC11b3: a running ability's ground tell (a marked slam's ring, a lane), from its row and the server's progress
+    if (drawn.ability !== undefined) tells.show(wirePage.abilityOf(entry.species, row[ABILITY] ?? 0), drawn.ability.progress, PLACE.x, PLACE.z, drawn.yaw, renderTick / 60);
     if (started) { entry.windup = stamp; if (body.alive) manager.onWindup?.(body, duration); }
     shown++;
     if (row[RIDEABLE] === 1) rideable.add(handle);
