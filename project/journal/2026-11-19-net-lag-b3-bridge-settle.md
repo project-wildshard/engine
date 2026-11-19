@@ -9,3 +9,8 @@ frames 120 to 134 ms late and the delay climbs to 175 ms. It is back at 70 ms 11
 proof's own stall, not the link, so `b3Verdict` (scripts/net-lag-verdict.mjs) gives the forced frames the same 10 s
 to settle that entry gets. The bar (120 ms, held 0) is unchanged. NL4's Driftwood command with no bridge, same
 release: B3 80 ms, B2 0 a minute.
+
+The same holds for B2 on the phone: B4's injected 1 m sink settled into the walk's first seconds, 3 corrections a phone
+run at 30 fps on v0.1.49 and v0.1.50, none with no bridge. B2's window now opens once the correction count has held still
+for 2 s after the bridge (at most 10 s). Staging v0.1.50, Driftwood phone Chromium with the bridge, two rounds: B2 0 a
+minute, B3 82 and 83 ms.

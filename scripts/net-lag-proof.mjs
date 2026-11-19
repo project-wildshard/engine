@@ -157,7 +157,15 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
       // B4 first, from the spawn on the pier, where its route starts
       // NL17: B3 is judged from 10 s after B4's forced frames as well as after entry (`b3Verdict`)
       let forcedEnd = 0;
-      if (bridge && slug === 'driftwood-isle') { stage = 'bridge'; row.bridge = await crossBridge(page); forcedEnd = Date.now() - entered; }
+      if (bridge && slug === 'driftwood-isle') {
+        stage = 'bridge'; row.bridge = await crossBridge(page); forcedEnd = Date.now() - entered;
+        // NL17: B4's injected 1 m sink settles over the next frames (3 corrections a phone run, at 30 fps, both v0.1.49 and
+        // v0.1.50; none with no bridge). B2's window opens once the count has held still for 2 s, at most 10 s.
+        for (let last = -1, still = 0, ends = Date.now() + 10_000; still < 4 && Date.now() < ends; await sleep(500)) {
+          const now = (await report())?.corrections ?? -1;
+          still = now === last ? still + 1 : 0; last = now;
+        }
+      }
       await page.evaluate(() => { /** @type {any} */ (window).__netLag.worst = 0; });
       const before = await report();
       /** @param {string} name @param {string[]} keys @param {{ at: number, from: string, to: string }} [turn] the boost's turn back */
