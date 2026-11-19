@@ -2,27 +2,12 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "2055a4a64e5fcd34907543b3c05efd8b6653c9ffefcc0997b5fbd0f32a0a5e1d",
+  "catalogueHash": "6df2edeefc171e099d82060695e5b30de98d703a685763c1ff8d10736bdedd38",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
     "stage": "live",
     "placements": [
-      {
-        "instance": "template-solo",
-        "slug": "_template",
-        "cell": [
-          0,
-          0
-        ],
-        "size": [
-          500,
-          500,
-          500
-        ],
-        "order": 1000,
-        "status": "live"
-      },
       {
         "instance": "driftwood-isle",
         "slug": "driftwood-isle",
@@ -425,101 +410,6 @@
             0,
             1
           ]
-        },
-        {
-          "instance": "template-2",
-          "slug": "_template",
-          "cell": [
-            1,
-            1
-          ],
-          "identity": {
-            "accent": "lime",
-            "marks": [
-              {
-                "x": -88,
-                "y": 28.3,
-                "z": -85,
-                "yaw": 0,
-                "size": 4
-              },
-              {
-                "x": -88,
-                "y": 28.3,
-                "z": -91,
-                "yaw": 3.14159265,
-                "size": 4
-              },
-              {
-                "x": -85,
-                "y": 28.3,
-                "z": -88,
-                "yaw": 1.570796325,
-                "size": 4
-              },
-              {
-                "x": -91,
-                "y": 28.3,
-                "z": -88,
-                "yaw": -1.570796325,
-                "size": 4
-              },
-              {
-                "x": 0,
-                "y": 13.25,
-                "z": 229.8,
-                "yaw": 0,
-                "size": 1.5
-              },
-              {
-                "x": 0,
-                "y": 10.75,
-                "z": -219.55,
-                "yaw": 3.14159265,
-                "size": 2.2
-              },
-              {
-                "x": 221.05,
-                "y": 2.5,
-                "z": 14,
-                "yaw": 1.570796325,
-                "size": 3
-              },
-              {
-                "x": -234.2,
-                "y": 5.6,
-                "z": 0,
-                "yaw": -1.570796325,
-                "size": 1.8
-              }
-            ],
-            "layout": {
-              "seed": 7,
-              "plots": [
-                {
-                  "x": 66,
-                  "z": 162,
-                  "half": 20
-                },
-                {
-                  "x": -162,
-                  "z": 66,
-                  "half": 20
-                },
-                {
-                  "x": -66,
-                  "z": -162,
-                  "half": 20
-                },
-                {
-                  "x": 162,
-                  "z": -66,
-                  "half": 20
-                }
-              ]
-            }
-          },
-          "speedClass": "road"
         },
         {
           "instance": "sunscar-dunes",
@@ -994,12 +884,6 @@
         "name": "Signal Dunes",
         "revision": 3,
         "hash": "f5fd3db978dac4a3590c1d67dc39bdc0c98fb776e52aa25fabfe004e0552a78e"
-      },
-      {
-        "slug": "template",
-        "name": "Template shard",
-        "revision": 10,
-        "hash": "cc1fcd3131c2e97376ea42fda46ce187301941c81066c3b552429d671799a747"
       }
     ],
     "missing": []
@@ -1196,12 +1080,6 @@
       "revision": 3,
       "hash": "f5fd3db978dac4a3590c1d67dc39bdc0c98fb776e52aa25fabfe004e0552a78e",
       "bytes": 11386368
-    },
-    {
-      "slug": "template",
-      "revision": 10,
-      "hash": "cc1fcd3131c2e97376ea42fda46ce187301941c81066c3b552429d671799a747",
-      "bytes": 11968000
     }
   ]
 }
