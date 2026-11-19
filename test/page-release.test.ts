@@ -14,10 +14,14 @@ import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/w
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
 
 const build = 'a'.repeat(40);
+const zoneEntry = (on = build) => ({build:on, engine:'webkit', profile:'phone', pass:true, expected:2, arrivals:[
+  {from:'driftwood-isle', to:'far-reach'}, {from:'far-reach', to:'driftwood-isle'},
+]});
 /** STAGING-QA SQ15: one staging-qa verdict for `on`, the candidate's full leg, clean unless `hold`. */
 const qaOn = (on: string = build, hold = false) => ({qa: true, kind: 'candidate', full: true, build: on, url: CHANNELS.staging.origin,
   scenarios: QA_LEGS.candidate.map(id => ({id, status: id === 'K1' ? 'skip' : 'ran'})), hold,
-  findings: hold ? [{scenario: 'K6', key: 'black-world', severity: 'P0', text: 'the world is black or empty'}] : []});
+  findings: hold ? [{scenario: 'K6', key: 'black-world', severity: 'P0', text: 'the world is black or empty'}] : [],
+  deploy:{zoneEntry:zoneEntry(on)}});
 const source = 'b'.repeat(40);
 const localQa = {qa: true, kind: 'local', full: true, build: source, release: 'v0.1.10', url: 'http://127.0.0.1:4400', hold: false,
   scenarios: ['K3', 'K4', 'K5'].map(id => ({id, status: 'ran'})),
@@ -291,8 +295,7 @@ test('production needs its tag, staging live on the build and the strict staging
   expect(fetched(calls).at(-2)).toBe('goLive');
 });
 
-// STAGING-QA SQ15 (J426-J428): production go-live reads one staging-qa verdict, the candidate's or live staging's full leg, in
-// place of --after-staging-proofs, verify-staging.sh's journeys and sweeps, and --smoke. A P0 or P1 holds it (J398).
+// Production go-live reads one staging deploy verdict with J451's full phone walk. A P0 or P1 holds it.
 test('production go-live needs one clean staging QA verdict for this build', async () => {
   const {deps, calls} = rig('production');
   await through(deps, 'check');
@@ -313,6 +316,13 @@ test('production go-live needs one clean staging QA verdict for this build', asy
   await expect(runPhase('go-live', deps)).rejects.toThrow(/K2 missing, K5 missing, K6 crashed/u);
   deps.qa = {problem: 'tmp/qa/verdict.json: ENOENT'};
   await expect(runPhase('go-live', deps)).rejects.toThrow(/ENOENT/u);
+  deps.qa = {...qaOn(), deploy: {}};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/no J451 zone-entry smoke/u);
+  deps.qa = {...qaOn(), deploy:{zoneEntry: {...zoneEntry(), arrivals: zoneEntry().arrivals.slice(0, 1)}}};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/did not complete every live neighbour pair/u);
+  deps.qa = {...qaOn(), deploy:{zoneEntry: {...zoneEntry(), pass:false,
+    failure:{from:'driftwood-isle', to:'far-reach', reason:'world is black'}}}};
+  await expect(runPhase('go-live', deps)).rejects.toThrow(/driftwood-isle -> far-reach: world is black/u);
   expect(calls).not.toContain('goLive');
   expect(qaGap({...qaOn(), kind: 'staging', scenarios: QA_LEGS.staging.map(id => ({id, status: 'ran'}))}, build)).toBeUndefined();
   deps.qa = qaOn();

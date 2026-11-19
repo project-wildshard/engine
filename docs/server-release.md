@@ -118,10 +118,9 @@ Each phase refuses until the one before it has run for the same SHA
 (results in `<clone>/tmp/page-release/<channel>-<sha>.json`). Production
 `check` and `go-live` also need the `v<version>` tag on origin at this
 SHA and `staging.wildshard.io` already serving it; `go-live` needs
-`--qa=<verdict.json>` (meta STAGING-QA SQ15, J426 to J428): one
-`staging-qa.mjs` verdict for this exact build, the candidate's full leg
-(K1, K2, K5, K6) or live staging's (K3, K5), on the staging origin, not
-held. It replaced `--after-staging-proofs` (Doctor and the live
+`--qa=<verdict.json>` from `staging go-live` for the exact build,
+including the full J451 zone-entry result on the staging origin.
+The staging verdict replaced `--after-staging-proofs` (Doctor and the live
 two-player proof), `verify-staging.sh`'s eight journeys and two zone
 sweeps, and `--smoke`: about 42 minutes a release (J427). Go-live
 refuses without a verdict, for another build, a local or partial leg,
@@ -160,7 +159,11 @@ client and redials with the same identities. Go-live holds on a failed
 redial or lost durable progress. A changed hash with both bots playing
 from later checkpoints, with their coins and ledger retained, is an
 inconclusive progress comparison reported as P2. After the alias move
-the command reruns live M3 and writes the final `verdict.json`.
+the command reruns live M3. J451 then walks from Driftwood into Sky
+Reach on phone-profile WebKit and crosses each live shared edge in
+both directions in that session. Every arrival needs drawn play and
+working movement within 90 seconds. A failure names the pair in
+`verdict.json` and holds the release.
 The local verdict must name the release commit's parent. Use the final
 verdict as production's `--qa` input. For an already live release,
 `--observer-proof=<file>` supplies its saved MS9 witness for verification.
@@ -186,7 +189,7 @@ staging QA. The live page stays in place (J426).
 starts npm OIDC publishing. `--published` waits for npm's listing;
 never rerun the publish job while npm processes it. Production build
 and upload may run once the build is green. Run `production check`,
-then `production go-live --qa=<the candidate's staging-qa verdict.json>`,
+then `production go-live --qa=<the staging go-live verdict.json>`,
 then the static Doctor with `--human-static` (J205).
 
 The cook follows production: `node scripts/release-cook.mjs vX.Y.Z`

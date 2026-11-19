@@ -131,7 +131,7 @@ async function cli() {
       'Build the staging page from the release commit',
       'Run staging go-live with the local verdict. It arms the MMO observer, uploads and checks the unaliased candidate',
       `Go-live runs ${DEPLOY_CHECKS.join(', ')} and requires a passing MMO continuity witness before moving the alias`,
-      `Go-live reruns live QA (${LEGS.staging.join(', ')}) and writes the build-bound verdict`,
+      `Go-live reruns live QA (${LEGS.staging.join(', ')}), walks the live zone edges in phone WebKit (J451) and writes the build-bound verdict`,
     ];
     steps.forEach((step, index) => { console.log(`${index + 1}. ${step}`); });
     return;

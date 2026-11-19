@@ -12,7 +12,7 @@
 //   --local-qa=<verdict.json> staging go-live (SQ7): the local QA verdict on the parent of the release commit.
 //   --qa-out=<dir>           staging go-live writes one verdict.json here (J434). It runs the candidate and live QA itself.
 //   --observer-proof=<file>  reuse an exact MS9 transition witness when verifying a staging build already live.
-//   --qa=<verdict.json>      production needs the clean candidate or live staging verdict for its exact build (SQ15).
+//   --qa=<verdict.json>      production needs staging go-live's verdict with the J451 phone tour for its exact build.
 //   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
 //                            dist-content/ to packs.wildshard.io first (PAGE-SIZE PZ2,
 //                            page-release/content.mjs); preview.yml passes it (PZ6), staging and production with PZ8

@@ -373,16 +373,43 @@ async function productionGates(phase, deps, refuse) {
   if (tagged !== deps.build) refuse(`origin tag ${tag} is ${tagged ?? 'missing'}, not ${deps.build} (release.sh ${tag} --finish first)`);
   const staging = /** @type {{build?: string}} */ (await deps.fetchJSON(`${CHANNELS.staging.origin}/version.json`).catch(() => ({})));
   if (staging.build !== deps.build) refuse(`staging serves ${staging.build ?? 'nothing'}, not ${deps.build}: staging goes live first`);
-  const qa = phase === 'go-live' ? qaGap(deps.qa, deps.build) : undefined;
-  if (qa !== undefined) refuse(`production go-live needs a clean staging QA verdict on this build (node scripts/staging-qa.mjs --candidate <url> or --release ${tag} on staging, then --qa=<its verdict.json>): ${qa}`);
+  const qa = phase === 'go-live' ? qaGap(deps.qa, deps.build) ?? zoneEntryGap(deps.qa?.deploy?.zoneEntry, deps.build) : undefined;
+  if (qa !== undefined) refuse(`production go-live needs the staging QA verdict from staging go-live for this build: ${qa}`);
 }
 
 /**
  * @typedef {{ qa?: boolean, kind?: string, full?: boolean, build?: string, release?: string, url?: string, hold?: boolean,
  *   roomsSerial?: number, deploymentId?: string, proofs?: readonly { id?: string, pass?: boolean }[],
  *   scenarios?: readonly { id?: string, status?: string }[],
- *   findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string }} QaVerdict
+ *   findings?: readonly { scenario?: string, severity?: string, text?: string }[], problem?: string,
+ *   deploy?: {zoneEntry?: ZoneEntryProof} }} QaVerdict
  */
+
+/** @typedef {{build?:string,engine?:string,profile?:string,pass?:boolean,expected?:number,arrivals?:readonly {from:string,to:string}[],
+ *   failure?:{from:string,to:string,reason:string}}} ZoneEntryProof */
+
+/** J451 binds the complete post-deploy WebKit tour to the staging build.
+ * @param {ZoneEntryProof | undefined} proof @param {string} build */
+export function zoneEntryGap(proof, build) {
+  if (proof === undefined || proof.build !== build) return 'no J451 zone-entry smoke for this build';
+  if (proof.failure !== undefined) return `${proof.failure.from} -> ${proof.failure.to}: ${proof.failure.reason}`;
+  if (proof.engine !== 'webkit' || proof.profile !== 'phone') return 'J451 zone-entry smoke needs phone-profile WebKit';
+  const {arrivals, expected} = proof, first = arrivals?.[0];
+  if (proof.pass !== true || !Array.isArray(arrivals) || !Number.isSafeInteger(expected) ||
+      expected !== arrivals.length || first?.from !== 'driftwood-isle' || first.to !== 'far-reach') {
+    return 'J451 zone-entry smoke did not complete every live neighbour pair';
+  }
+  const seen = new Set();
+  for (const [index, pair] of arrivals.entries()) {
+    const id = `${pair.from}/${pair.to}`;
+    if (seen.has(id) || (index > 0 && arrivals[index-1]?.to !== pair.from)) return 'J451 zone-entry smoke did not follow one continuous tour';
+    seen.add(id);
+  }
+  if (arrivals.at(-1)?.to !== first.from || arrivals.some(pair => !seen.has(`${pair.to}/${pair.from}`))) {
+    return 'J451 zone-entry smoke is missing a return crossing';
+  }
+  return undefined;
+}
 
 /** The staging smoke's five kept scenarios (meta STAGING-SMOKE SM0); staging-qa.mjs adds K6. */
 export const SMOKE_SCENARIOS = Object.freeze(['K1', 'K2', 'K3', 'K4', 'K5']);

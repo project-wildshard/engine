@@ -7,7 +7,7 @@ import { createInterface } from 'node:readline';
 import { setTimeout as delay } from 'node:timers/promises';
 import { readPublication } from '../server-release/sign.mjs';
 import { worstFirst } from '../staging-smoke/checks.mjs';
-import { CHANNELS, RELEASE_PUBLIC_KEY, RefusedError, localQaGap, qaGap } from './flow.mjs';
+import { CHANNELS, RELEASE_PUBLIC_KEY, RefusedError, localQaGap, qaGap, zoneEntryGap } from './flow.mjs';
 
 const stage = CHANNELS.staging;
 const scripts = absolute(import.meta.dirname, '..');
@@ -93,6 +93,19 @@ async function runQa({ root, out, build, release, name, candidate, deploy }) {
   return result;
 }
 
+/** @param {string} out @param {string} build @returns {Promise<import('./flow.mjs').ZoneEntryProof | undefined>} */
+async function runZoneEntry(out, build) {
+  const dir = join(out, 'zone-entry');
+  const job = start({file:'bash', args:[join(scripts, 'browser-lane.sh'), '--max', '120', process.execPath,
+    join(scripts, 'zone-gate-proof.mjs'), `--base=${stage.origin}`, `--out=${dir}`, '--engine=webkit',
+    '--target=far-reach', '--deploy', '--walk-all', `--expected-build=${build}`], cwd:toolsRoot, out, name:'zone-entry'});
+  const code = await job.done, proof = read(join(dir, 'zone-entry.json'));
+  if (code !== 0 && proof?.failure === undefined) {
+    return {build, pass:false, failure:{from:'driftwood-isle', to:'far-reach', reason:'The browser did not complete the zone-entry smoke'}};
+  }
+  return proof;
+}
+
 /** @param {{ root:string, build:string, release:string, source:string, out:string, observerProof?:string,
  * localQa?:import('./flow.mjs').QaVerdict, readState:() => any, get:(url:string) => Promise<any>,
  * phase:(name:import('./flow.mjs').Phase, qa?:import('./flow.mjs').QaVerdict) => Promise<unknown>, log:(line:string)=>void }} opts */
@@ -105,6 +118,7 @@ export async function deployStaging({ root, build, release, source, out, observe
   /** @type {ReturnType<typeof observeMove>|undefined} */ let running;
   /** @type {DeploymentQa|undefined} */ let qa;
   /** @type {DeploymentQa|undefined} */ let live;
+  /** @type {import('./flow.mjs').ZoneEntryProof|undefined} */ let zoneEntry;
   /** @type {Observation|undefined} */ let observation;
   let aliasMoved = false;
   let step = 'local QA';
@@ -117,7 +131,7 @@ export async function deployStaging({ root, build, release, source, out, observe
     findings.sort(worstFirst);
     const hold = findings.some(row => row.severity === 'P0' || row.severity === 'P1');
     write(reportPath, { ...(live ?? qa), build, release, status: hold ? 'hold' : 'pass', hold, worst: findings[0]?.severity ?? 'none', findings,
-      aliasMoved, deploy: { local: localQa?.build, qualification: qa, live, observation } });
+      aliasMoved, deploy: { local: localQa?.build, qualification: qa, live, observation, zoneEntry } });
   };
   try {
     const gap = localQaGap(localQa, source, release);
@@ -169,15 +183,24 @@ export async function deployStaging({ root, build, release, source, out, observe
     }
     if (changed) observerNote = {scenario: 'MMO observer', key: 'checkpoint-progress-changed', severity: 'P2', source: 'check',
       text: 'Both observers returned with newer saves and retained coins and ledger. A progress hash changed between the captures.'};
+    /** @type {string|undefined} */ let liveProblem;
     if (!alreadyLive) {
       step = 'alias';
       await phase('go-live', qa);
       aliasMoved = true;
       step = 'live smoke';
-      live = await runQa({ root, build, release, out, name: 'live', deploy: false });
-      const missed = qaGap(live, build);
-      if (missed !== undefined) throw new RefusedError(missed);
+      try {
+        live = await runQa({ root, build, release, out, name: 'live', deploy: false });
+        liveProblem = qaGap(live, build);
+      } catch (error) {
+        liveProblem = error instanceof RefusedError ? error.message : 'Live M3 did not complete';
+      }
     }
+    step = 'zone entry';
+    zoneEntry = await runZoneEntry(out, build);
+    const entryGap = zoneEntryGap(zoneEntry, build);
+    if (entryGap !== undefined) throw new RefusedError(entryGap);
+    if (liveProblem !== undefined) { step = 'live smoke'; throw new RefusedError(liveProblem); }
     record(undefined);
     log(`staging go-live PASS ${release} ${build.slice(0,8)} rooms/${serial} (${reportPath})`);
   } catch (error) {

@@ -20,15 +20,20 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { watchFaults } from './proof-faults.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
-import { deployFrameProblem } from './journey-proof.mjs';
+import { deployFrameProblem, PHONE } from './journey-proof.mjs';
+import { FIRST_ZONE_PAIR, walkZoneEntryTour } from './zone-entry-tour.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire');
 const deploy = process.argv.includes('--deploy');
+const liveTour = process.argv.includes('--walk-all'), expectedBuild = flag('expected-build', '');
 if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: zone-gate-proof.mjs --base=<staging, preview or loopback url> --out=<dir>');
 // ZE15/ZE22: staging is a world build like the rig's (J205: a guest seat, the socket guarded to the staging door; never production)
 const staging = base === 'https://staging.wildshard.io', online = staging || process.argv.includes('--online');
+if (liveTour && (!staging || engineName !== 'webkit' || !/^[0-9a-f]{40}$/u.test(expectedBuild))) {
+  throw new Error('--walk-all requires staging, WebKit and --expected-build');
+}
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ?? [0, '2992', '1434', '2']).slice(1).map(Number);
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 const HALF = 250;
@@ -79,14 +84,22 @@ async function bootCard(context, card, pose, errors) {
 }
 const tag = `${engineName}${device === '' ? '' : '-phone'}${targetSlug === 'nalati-grasslands' ? '' : `-${targetSlug}`}`;
 const result = { base, engine: engineName, viewport: '', at: new Date().toISOString(), build: '', shots: /** @type {Record<string, unknown>[]} */ ([]), fired: /** @type {unknown} */ (null), errors: /** @type {string[]} */ ([]), note: '' };
+/** @type {import('./zone-entry-tour.mjs').Tour} */
+const tour = {expected:0, arrivals:[], pass:false, failure:{...FIRST_ZONE_PAIR, reason:'The runner did not reach the first crossing'}};
+const saveTour = () => writeFileSync(join(out, 'zone-entry.json'), `${JSON.stringify({build:result.build, engine:engineName, profile:'phone', ...tour}, null, 2)}\n`);
+const servedBuild = async () => {
+  const response = await fetch(`${base}/version.json`, {cache:'no-store', signal:AbortSignal.timeout(15_000)});
+  return response.ok ? String((await response.json()).build) : '';
+};
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
 let code = 1;
 try {
-  result.build = await fetch(`${base}/version.json`).then(async found => String((await found.json()).build)).catch(() => '');
+  result.build = await servedBuild().catch(() => '');
+  if (liveTour && result.build !== expectedBuild) throw new Error('Staging serves a different build from the zone-entry request');
   const phone = device === '' ? undefined : devices[device];
   if (device !== '' && phone === undefined) throw new Error(`No Playwright device ${device}`);
-  result.viewport = phone === undefined ? `${String(desk[0])}x${String(desk[1])}@${String(desk[2])}` : `${device} ${String(phone.viewport.width)}x${String(phone.viewport.height)}@${String(phone.deviceScaleFactor)}`;
-  const context = await browser.newContext(phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 }), page = await context.newPage();
+  result.viewport = liveTour ? 'iPhone 17 Pro 402x874@3' : phone === undefined ? `${String(desk[0])}x${String(desk[1])}@${String(desk[2])}` : `${device} ${String(phone.viewport.width)}x${String(phone.viewport.height)}@${String(phone.deviceScaleFactor)}`;
+  const context = await browser.newContext(liveTour ? {...PHONE, isMobile:true} : phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 }), page = await context.newPage();
   // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
   const faults = await watchFaults(page, result.errors);
   if (staging) await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
@@ -113,6 +126,12 @@ try {
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
   const state = () => page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard.shard.grid.state(), wf = st.live?.live?.worldFeet ?? W.__wildshard.world.player.position; return { x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), gate: st.gate ?? null, walls: st.softWalls ?? null, inside: st.inside, cur: st.live?.live?.current ?? null }; });
   const origin = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
+  if (liveTour) {
+    await walkZoneEntryTour(page, origin, tour, saveTour);
+    if (tour.pass && await servedBuild() !== expectedBuild) throw new Error('The staging build changed during the zone-entry smoke');
+    code = tour.pass ? 0 : 1;
+    if (tour.failure !== undefined) console.log(`FAIL ${tour.failure.from} -> ${tour.failure.to}: ${tour.failure.reason}`);
+  } else {
   const pitch = 562.5, nalatiEdge = origin[ax] + dir * (pitch - HALF);
   const face = (/** @type {number} */ yaw) => page.evaluate(wanted => { /** @type {any} */ (window).__wildshard.world.player.yaw = wanted; }, yaw);
   /** Walk with W held toward `v` on the gate's axis (along the line through Driftwood's origin) until within 0.4 m. */
@@ -286,8 +305,17 @@ try {
   const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && (fired.residency.script?.readsBefore ?? 0) === 0 && (staging || (typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50));
   code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false && (!online || fired.oneSocket === true))) ? 0 : 1;
   }
-} catch (error) { result.note = String(error).slice(0, 400); console.log(`FAIL ${result.note}`); }
+  }
+} catch (error) {
+  result.note = String(error).slice(0, 400);
+  if (liveTour) {
+    tour.pass = false;
+    tour.failure = {...tour.failure ?? FIRST_ZONE_PAIR, reason:result.note};
+  }
+  console.log(`FAIL ${result.note}`);
+}
 finally {
+  if (liveTour) saveTour();
   writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
   await browser.close();
 }
