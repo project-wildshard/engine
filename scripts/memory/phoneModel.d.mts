@@ -2,10 +2,16 @@ export interface Range {low:number;central:number;high:number}
 export interface TraceWindow {step:string;peak:{webcontent:number;gpu:number}}
 export interface ChainModel {gpuFloorMB:number;alpha:{low:number;high:number};scale:{low:number;high:number}}
 export interface LedgerFit {webcontent:{floorMB:number;perMB:number};gpu:{floorMB:number;perMB:number};missPct:number}
+export interface UnmeasuredPhoneFit {
+  name:string;status:'unmeasured';reportOnly:true;alpha:null;scale:null;limitMB:null;limitHighMB:null;
+  fitInputs:{killLineFromIP7:null;pairedFootprintsFromIP9:null};
+}
 export interface PhoneModel extends ChainModel {
   limitMB:number;limitHighMB:number;ledger:LedgerFit;peakOverSettled:Range;chromium:{loadingPerRenderer:Range};
   anchor?:unknown;instrument?:string;zones?:Record<string,{phonePlayingMB:Range;phoneLoadingMB:Range}>;
+  devices?:Readonly<Record<string, UnmeasuredPhoneFit>>;
 }
+export const IPHONE_13_MODEL:'iPhone14,5';
 export function loadPhoneModel():PhoneModel;
 export function anchorBounds(windows:readonly TraceWindow[],lastOperation:string,options:{limitMB:number;limitHighMB:number;gpuFloorMB:number}):{
   alpha:{low:number;high:number};scale:{low:number;high:number};died:{step:string;webcontentMB:number;gpuMB:number};lived:{step:string;webcontentMB:number;gpuMB:number};consistent:boolean};

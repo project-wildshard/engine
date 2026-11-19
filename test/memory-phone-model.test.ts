@@ -2,12 +2,14 @@
 // with Nine rev 2, which Jake's iPhone 17 Pro killed right after the boot trace's last `compile:after` (mini QA 19).
 // EM11b: the anchor and the zones are read with measure.mjs's instrument minimal (no Web Inspector Network retention);
 // the first anchor reading (instrument full) is kept beside it to pin what that changed.
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { CRASH_LINE } from '../src/client/game/grid/budgetOverlay';
-import { anchorBounds, ledgerSplit, loadPhoneModel, phoneFromChromium, phoneFromLedger, phoneFromWebKit, phonePeakFromWebKit, rangeText, t90, upperOverRuns, zoneOverRuns } from '../scripts/memory/phoneModel.mjs';
+import { IPHONE_13_MODEL, anchorBounds, ledgerSplit, loadPhoneModel, phoneFromChromium, phoneFromLedger, phoneFromWebKit, phonePeakFromWebKit, rangeText, t90, upperOverRuns, zoneOverRuns } from '../scripts/memory/phoneModel.mjs';
 import { ANCHOR_RENDERER_MB, fitPhoneModel, lineFit } from '../scripts/memory/phone-fit.mjs';
-import { traceToControl } from '../scripts/memory/measure.mjs';
+import { phoneLine, summaryMarkdown, traceToControl } from '../scripts/memory/measure.mjs';
 
 const MB = 1e6;
 interface Window { step: string; peak: { webcontent: number; gpu: number } }
@@ -20,6 +22,42 @@ test('the chip and the calibration use the one device limit, ActiveHard 2048 MiB
   expect(CRASH_LINE).toBe(2048 * 1024 ** 2);
   expect(model.limitMB).toBe(Math.round(CRASH_LINE / MB));
   expect(model.limitHighMB).toBe(model.limitMB);
+});
+
+test('IP11 names the unmeasured inputs and keeps the 17 Pro reading in the report', () => {
+  const device = loadPhoneModel().devices?.[IPHONE_13_MODEL];
+  expect(device).toEqual({ name: 'iPhone 13', status: 'unmeasured', reportOnly: true,
+    alpha: null, scale: null, limitMB: null, limitHighMB: null, fitInputs: { killLineFromIP7: null, pairedFootprintsFromIP9: null } });
+  const out = execFileSync(process.execPath, ['scripts/memory/phone-fit.mjs', `--device=${IPHONE_13_MODEL}`], { encoding: 'utf8' });
+  expect(JSON.parse(out)).toEqual(device);
+  const run = { instrument: 'minimal', build: 'test', settled: { webcontent: 500 * MB, gpu: 300 * MB },
+    checkpoints: [{ peak: { webcontent: 600 * MB, gpu: 400 * MB } }] };
+  const { devices: _devices, ...pro } = loadPhoneModel();
+  expect(phoneLine(run)).toBe(phoneLine(run, pro));
+  const report = summaryMarkdown('brasscap-mesa', [run], null, null);
+  expect(report).toContain(rangeText(phoneFromWebKit(run.settled, pro)));
+  expect(report).toContain("iPhone 13, iPhone14,5, report only]: unmeasured. Awaiting IP7's kill line and IP9's paired footprints.");
+});
+
+test('a 17 Pro CLI refit keeps the separate iPhone 13 entry', () => {
+  mkdirSync('tmp', { recursive: true });
+  const scratch = mkdtempSync('tmp/ip11-fit-');
+  try {
+    const anchorPath = join(scratch, 'anchor.json'), zones = [join(scratch, 'a.json'), join(scratch, 'b.json')];
+    writeFileSync(anchorPath, JSON.stringify({ webkit: anchor.runs.map(traceCheckpoints => ({ traceCheckpoints, instrument: anchor.instrument })) }));
+    for (const [index, path] of zones.entries()) {
+      const ram = (50 + 100 * index) * MB, gpu = (300 + 600 * index) * MB;
+      const settled = { webcontent: (500 + 400 * index) * MB, gpu };
+      writeFileSync(path, JSON.stringify({ webkit: [{ chunk: `test-${index}`, build: 'fixture', ready: true, instrument: anchor.instrument,
+        settled, counters: { ram: { bytes: ram }, gpu: { bytes: gpu } }, checkpoints: [{ peak: settled }] }] }));
+    }
+    const out = join(scratch, 'fit.json');
+    execFileSync(process.execPath, ['scripts/memory/phone-fit.mjs', `--anchor=${anchorPath}`, `--zones=${zones.join(',')}`, `--out=${out}`]);
+    expect(JSON.parse(readFileSync(out, 'utf8'))).toMatchObject({ alpha: model.alpha, scale: model.scale, limitMB: model.limitMB,
+      devices: loadPhoneModel().devices });
+  } finally {
+    rmSync(scratch, { recursive: true, force: true });
+  }
 });
 
 test('v0.1.36 Nine, the boot the phone died in: the chain puts its last compile:after window at or over the line, and every window before it under the higher line', () => {

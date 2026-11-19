@@ -64,7 +64,7 @@ import { dirname, join, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { bootTimelineEntries } from '../loading-flow/stalls.mjs';
 import { listProcesses, readFootprints, startSampler, webkitProcesses } from './footprint.mjs';
-import { ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText, zoneOverRuns } from './phoneModel.mjs';
+import { IPHONE_13_MODEL, ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit, rangeText, zoneOverRuns } from './phoneModel.mjs';
 import { allocationSites, CULLER, symbolizer, walkPeak, walkRoute } from './walk.mjs';
 
 export const PROTOCOL = 'memory-run/1';
@@ -541,6 +541,13 @@ export function phoneLine(run, model = loadPhoneModel()) {
   return `  phone [EM11 chain, iPhone 17 Pro]: playing ${rangeText(playing)}, loading peak ${rangeText(loading)}; crash line ${(model.limitMB / 1000).toFixed(2)} GB, envelope 1.00 GB${warn}`;
 }
 
+/** @param {import('./phoneModel.mjs').PhoneModel} model */
+function iphone13Line(model) {
+  const entry = model.devices?.[IPHONE_13_MODEL];
+  if (entry === undefined) return null;
+  return `phone [${entry.name}, ${IPHONE_13_MODEL}, report only]: ${entry.status}. Awaiting IP7's kill line and IP9's paired footprints.`;
+}
+
 /** EM1's native-WebKit calibration. */
 export function webkitCalibration() { return JSON.parse(readFileSync(new URL('calibration.json', import.meta.url), 'utf8')).hosts.webkit; }
 
@@ -951,6 +958,8 @@ async function main(argv) {
     const z = zoneOverRuns(/** @type {any} */ (good), loadPhoneModel()), gb = (/** @type {number} */ b) => (b / 1e9).toFixed(2);
     console.log(`phone over ${z.runs} runs [EM11, iPhone 17 Pro]: playing ${gb(z.playing.central)} GB (upper ${gb(z.playing.upper)}), loading ${gb(z.loading.central)} GB (upper ${gb(z.loading.upper)}); upper = 90% prediction bound on one more cold boot`);
   }
+  const phone13 = webkit.length === 0 ? null : iphone13Line(loadPhoneModel());
+  if (phone13 !== null) console.log(`  ${phone13}`);
   const walked = walk > 0 ? walkSummary(webkit, walks) : null;
   if (walked) for (const line of walkSummaryLines(walked)) console.log(line);
   const microscope = args.microscope || args['ledger-only'] ? await chromiumMicroscope({
@@ -1037,6 +1046,8 @@ export function summaryMarkdown(chunk, webkit, summary, ledger) {
       lines.push(`| ${i + 1} | ${String(r.build).slice(0, 8)} | ${ok ? m(r.settled.webcontent) : r.refused ?? '-'} | ${ok ? m(r.settled.gpu) : '-'} | ${m(Math.max(0, ...r.checkpoints.map((/** @type {any} */ c) => c.peak.webcontent)))} | ${m(l.ram)} / ${m(l.gpu)} | ${playing} | ${loading} |`);
     });
     if (summary) lines.push('', `Settled WebContent median ${m(summary.settledWebContent.median)} MB, spread ${summary.settledWebContent.spreadPct}% (n ${summary.settledWebContent.n}); GPU process ${m(summary.settledGpu.median)} MB, spread ${summary.settledGpu.spreadPct}%. MB decimal; native Playwright WebKit, phone view, Low, instrument ${summary.instrument ?? 'full'}.`);
+    const phone13 = model === null ? null : iphone13Line(model);
+    if (phone13 !== null) lines.push('', phone13);
   }
   if (ledger) lines.push(...(webkit.length > 0 ? [''] : []), `Ledger [L] in Chromium: control ${m(ledger.control.ram)} ram + ${m(ledger.control.gpu)} gpu MB; peak ${m(ledger.peak.ram + ledger.peak.gpu)} MB at ${ledger.peak.step}.`);
   return `${lines.join('\n')}\n\n`;

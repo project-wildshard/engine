@@ -3,12 +3,13 @@
 //
 //   node scripts/memory/phone-fit.mjs --anchor=<measure.mjs JSON of the build the phone died on> --last=compile:after
 //        --zones=<measure.mjs JSON>,... --chromium=<boot-memory-peak.mjs JSON>,... [--out=scripts/memory/phone-model.json]
+//   node scripts/memory/phone-fit.mjs --device=iPhone14,5   show report-only fit inputs and status (IP11)
 //
 // The anchor run must carry the boot trace's windows (measure.mjs records them as `traceCheckpoints`). Each zone needs
 // three or more native WebKit runs with the ledger counters at control, and one or more Chromium probe runs of the same
 // build. What each number means: scripts/memory/phoneModel.mjs.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { anchorBounds, ledgerSplit, phoneFromWebKit, phonePeakFromWebKit } from './phoneModel.mjs';
+import { anchorBounds, ledgerSplit, loadPhoneModel, phoneFromWebKit, phonePeakFromWebKit } from './phoneModel.mjs';
 import { stats } from './measure.mjs';
 
 const MB = 1e6;
@@ -91,6 +92,13 @@ function chromiumBar(rows, floor, round) {
 /** @param {string[]} argv */
 function main(argv) {
   const args = Object.fromEntries(argv.map((a) => /^--([^=]+)=(.*)$/u.exec(a)).filter((m) => m !== null).map((m) => [m[1], m[2]]));
+  const devices = loadPhoneModel().devices;
+  if (args.device !== undefined) {
+    const entry = Object.hasOwn(devices ?? {}, args.device) ? devices[args.device] : undefined;
+    if (entry === undefined) throw new Error(`No report-only phone fit entry for ${args.device}`);
+    console.log(JSON.stringify(entry, null, 1));
+    return 0;
+  }
   const read = (/** @type {string} */ f) => JSON.parse(readFileSync(f, 'utf8'));
   const chromium = /** @type {Record<string, number[]>} */ ({});
   for (const f of (args.chromium ?? '').split(',').filter(Boolean)) { const run = read(f); const r = run.verdict?.rendererPeak?.bytes; if (typeof r === 'number') (chromium[run.chunk] ??= []).push(r); }
@@ -99,7 +107,8 @@ function main(argv) {
     limitMB: Number(args.limit ?? 2147), limitHighMB: Number(args['limit-high'] ?? args.limit ?? 2147), gpuFloorMB: calibration.baselineMB.gpu });
   const out = args.out ?? new URL('phone-model.json', import.meta.url).pathname;
   const previous = (() => { try { return read(out); } catch { return {}; } })();
-  writeFileSync(out, `${JSON.stringify({ version: 1, note: previous.note ?? '', measured: args.measured ?? new Date().toISOString().slice(0, 10), host: previous.host ?? '', ...fitted }, null, 1)}\n`);
+  writeFileSync(out, `${JSON.stringify({ version: 1, note: previous.note ?? '', measured: args.measured ?? new Date().toISOString().slice(0, 10), host: previous.host ?? '',
+    ...fitted, devices: { ...devices, ...previous.devices } }, null, 1)}\n`);
   console.log(JSON.stringify(fitted, null, 1));
   return 0;
 }

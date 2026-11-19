@@ -249,5 +249,20 @@
    },
    "chromiumLoadingRendererMB": 518
   }
+ },
+ "devices": {
+  "iPhone14,5": {
+   "name": "iPhone 13",
+   "status": "unmeasured",
+   "reportOnly": true,
+   "alpha": null,
+   "scale": null,
+   "limitMB": null,
+   "limitHighMB": null,
+   "fitInputs": {
+    "killLineFromIP7": null,
+    "pairedFootprintsFromIP9": null
+   }
+  }
  }
 }

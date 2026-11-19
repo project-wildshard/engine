@@ -28,6 +28,7 @@ import { phoneFromWebKit } from '../../src/shared/engine/core/phoneMemoryModel.t
 export { phoneFromWebKit, ledgerSplit, phoneFromLedger } from '../../src/shared/engine/core/phoneMemoryModel.ts';
 
 const MB = 1e6;
+export const IPHONE_13_MODEL = 'iPhone14,5';
 
 /** @typedef {{low:number, central:number, high:number}} Range */
 /** @typedef {{step:string, peak:{webcontent:number, gpu:number}}} TraceWindow */
