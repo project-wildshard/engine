@@ -15,6 +15,11 @@
  *    frame back by its excess (at most MAX_GAP_MS), so the worker messages and input it held up drain before the next.
  *    A steady frame holds nothing back: a skipped animation frame costs more than its own wait (same rig: 18 drawn frames
  *    a second unspaced, 4 when every frame left a third of the main thread free), and its read-back is short by then.
+ * TR-4b (opus-tr4b4): a frame's GPU work counts as its cost too. Where the page is not read back on the main thread (Linux
+ * headless Chromium, the hosted T1 runners), the main thread's part of a frame is 4-6 ms while SwiftShader takes 80-100 ms
+ * (a Mac) to 330 ms (a hosted runner, 3 fps) to raster it, and the next animation frame waits for it. So the gap from a
+ * drawn frame's animation frame to the next one (`presented`) joins the window as that frame's cost; the spacing still
+ * reads the main thread's cost alone, since a GPU behind already holds the next animation frame back by itself.
  * Only a software rasterizer is ever paced (`softwareRasterizer`, by the unmasked renderer name): "Render scale stays 2x
  * on the phone (no dynamic resolution)" (Jake, 2026-10-20, wildshard-singleplayer AGENTS.md), so no real GPU, phone or
  * desktop, leaves its tier's scale, however slow its shaders step measured. A software rasterizer is no player's phone:
@@ -54,6 +59,9 @@ export const HITCH_MS: number = 2 * FRAME_COST_TARGET_MS;
 export const RAISE_WINDOWS = 4;
 /** The longest a frame's spacing holds the next one (ms), however long that frame was. */
 export const MAX_GAP_MS = 1000;
+/** The longest gap after a drawn frame that counts as its GPU cost (ms): a longer one is the page held by something else
+ *  (a hidden tab, a long task), not by its own frames. */
+export const MAX_PRESENT_GAP_MS: number = 2 * MAX_GAP_MS;
 /** Pixel ratios snap to eighths, so a resize is never a rounding change. */
 const SNAP = 8;
 
@@ -67,6 +75,8 @@ export class SlowGpuPacing {
   private due = Number.NEGATIVE_INFINITY;
   private calm = 0;
   private pending: number | null = null;
+  /** The longest gap after a drawn frame not yet counted (`presented`). */
+  private presentedGap = 0;
   constructor(maxRatio: number) { this.maxRatio = maxRatio; this.ratio = maxRatio; }
 
   /** The pixel ratio to set right before the next frame actually draws, once. A resize clears the canvas, so it waits for
@@ -74,7 +84,11 @@ export class SlowGpuPacing {
   takeRatio(): number | null { const next = this.pending; this.pending = null; return next; }
 
   /** Back to the tier's own scale (a capture): from the next drawn frame. */
-  restore(): void { if (this.ratio !== this.maxRatio) { this.ratio = this.maxRatio; this.pending = this.maxRatio; } this.calm = 0; this.costs.length = 0; }
+  restore(): void { if (this.ratio !== this.maxRatio) { this.ratio = this.maxRatio; this.pending = this.maxRatio; } this.calm = 0; this.costs.length = 0; this.presentedGap = 0; }
+
+  /** The gap from a drawn frame's animation frame to the next animation frame (ms): a software GPU process still
+   *  rastering the frame holds that next one back while the main thread sits idle. The next `measured` frame counts it. */
+  presented(gap: number): void { if (gap > 0 && gap <= MAX_PRESENT_GAP_MS) this.presentedGap = Math.max(this.presentedGap, gap); }
 
   /** Whether a frame may draw at `now` (the last frame's spacing has run out). */
   ready(now: number): boolean { return now >= this.due; }
@@ -83,7 +97,7 @@ export class SlowGpuPacing {
    *  takes (`takeRatio`), or null for no change. */
   measured(start: number, cost: number): number | null {
     this.due = start + cost + Math.min(MAX_GAP_MS, Math.max(0, cost - HITCH_MS));
-    this.costs.push(cost);
+    this.costs.push(Math.max(cost, this.presentedGap)); this.presentedGap = 0;
     if (this.costs.length < PACING_WINDOW) return null;
     const median = [...this.costs].sort((a, b) => a - b)[Math.floor(PACING_WINDOW / 2)] ?? 0;
     this.costs.length = 0;

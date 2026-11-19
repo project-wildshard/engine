@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { TIER, initializeTier, frameCapFps, practiceFps, frameProbe } from './tier';
 import { frameBudgetSpent, heldDrawDeferred, noteFrameDrawn, setBuildHeld } from '../../../shared/engine/core/framePacing';
-import { FRAME_COST_TARGET_MS, HITCH_MS, MAX_GAP_MS, MIN_PIXEL_RATIO, PACING_WINDOW, RAISE_BELOW_MS, RAISE_WINDOWS, SlowGpuPacing, pacedSkip, slowGpuPacingFor, softwareRasterizer, webglRendererName } from './slowGpuPacing';
+import { FRAME_COST_TARGET_MS, HITCH_MS, MAX_GAP_MS, MAX_PRESENT_GAP_MS, MIN_PIXEL_RATIO, PACING_WINDOW, RAISE_BELOW_MS, RAISE_WINDOWS, SlowGpuPacing, pacedSkip, slowGpuPacingFor, softwareRasterizer, webglRendererName } from './slowGpuPacing';
 
 const initialTier = TIER, initialLocation = globalThis.location;
 
@@ -73,6 +73,22 @@ test('RT3: windows steadily under the target raise the scale back to the tier, n
   for (let i = 0; i < 4 * RAISE_WINDOWS; i++) window(5);
   expect(pacing.ratio).toBe(1.5);
   expect(window(5)).toBeNull();
+});
+
+test('TR-4b: a GPU still rastering (the next animation frame held back) counts as the frame cost; the spacing does not', () => {
+  const pacing = new SlowGpuPacing(1);
+  const window = (cost: number, gap: number): number | null => {
+    let last: number | null = null;
+    for (let i = 0; i < PACING_WINDOW; i++) { pacing.presented(gap); last = pacing.measured(i * 1000, cost); }
+    return last;
+  };
+  expect(window(5, 17)).toBeNull(); // a 60 Hz display, a fast GPU
+  expect(window(5, 330)).toBe(MIN_PIXEL_RATIO); // a hosted runner's SwiftShader: 3 fps on a 5 ms main thread
+  pacing.measured(10_000, 5);
+  expect(pacing.ready(10_005)).toBe(true); // nothing held back for the GPU's part
+  const fresh = new SlowGpuPacing(1);
+  for (let i = 0; i < PACING_WINDOW; i++) { fresh.presented(MAX_PRESENT_GAP_MS + 1); fresh.measured(i * 1000, 5); }
+  expect(fresh.ratio).toBe(1); // a hidden tab's or long task's gap is not the frame's
 });
 
 test('RT3: a new scale waits for the next drawn frame, once; a capture restores the tier scale the same way', () => {

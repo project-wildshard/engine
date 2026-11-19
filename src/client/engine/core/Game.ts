@@ -1737,6 +1737,8 @@ export class Game {
   /** The pending cost probe of the last drawn frame: its start, or null when none is in flight. */
   private pacedStart: number | null = null;
   private pacedProbe: MessageChannel | null = null;
+  /** TR-4b: the animation frame of the last paced frame drawn, until the next animation frame reads its gap (`presented`). */
+  private pacedDrawnAt: number | null = null;
   /** The pacing state on a slow software rasterizer, for proofs; null on any other GPU. */
   get pacing(): Readonly<SlowGpuPacing> | null { return this.slowPacing; }
   /** RT3: pace this page's frames to a slow software rasterizer (finish.ts, after its shaders step measured the GPU slow).
@@ -1821,6 +1823,9 @@ export class Game {
       if (now !== undefined) { if (now === lastNow) return; lastNow = now; }
       if (this.dead) return; // a core system died (faults.ts): the fatal modal is up, nothing more to draw
       lastRun = diagnosticNow();
+      // TR-4b: the first animation frame after a paced draw waited for the GPU to raster it (slowGpuPacing.ts `presented`)
+      if (this.pacedDrawnAt !== null && now !== undefined) this.slowPacing?.presented(now - this.pacedDrawnAt);
+      this.pacedDrawnAt = null;
       // RT3: on a GPU the shaders step measured slow, the last frame's spacing (slowGpuPacing.ts) leaves the main thread to
       // worker messages and input; like a capped vsync, a skipped one does nothing. A capture draws at the tier's own
       // scale on its own clock: no spacing, and any lowered scale restored
@@ -1909,7 +1914,7 @@ export class Game {
       const done = diagnosticNow(), work = done - lastRun;
       noteFrameDrawn(done, now, cap, cap > 0 && Number.isFinite(lastDrawn) ? lastDrawn : undefined); // Builds share the cap recovery deadline; actual rAF still measures display cadence.
       this.app.cpu.end();
-      if (pacing !== null) this.measurePacedFrame(lastRun);
+      if (pacing !== null) { this.measurePacedFrame(lastRun); this.pacedDrawnAt = now ?? null; }
       // NB5: dynamic resolution reads the drawn frame's interval (uncapped play only: a cap or a capture sets its own pace)
       else if (this.budget !== null && !capture && cap === 0 && !forceFrame && !this.app.clock.paused && !this.budgetSkip) this.budget.measured(liveDt * 1000);
       this.budgetSkip = false;
@@ -1927,7 +1932,7 @@ export class Game {
       this.stats.frames++; this.stats.acc += realDt;
       if (this.stats.acc >= 0.5) { this.stats.fps = Math.round(this.stats.frames / this.stats.acc); this.stats.frames = 0; this.stats.acc = 0; }
     };
-    this.frame = { draw: loop, parked: () => { this.clock.getDelta(); lastDrawn = -Infinity; } };
+    this.frame = { draw: loop, parked: () => { this.clock.getDelta(); lastDrawn = -Infinity; this.pacedDrawnAt = null; } };
     return this.frame;
   }
 

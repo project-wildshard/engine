@@ -51,3 +51,17 @@ stalled at `home` first. The boot's data step now begins the same read
 The 503 load still boots the grid (no word: J300) and reshards to the
 one-shard page once the healed read lets the server step hear the
 world, so K is still two boots.
+
+## The GPU's part of a frame paces software GL (opus-tr4b4)
+
+After control every hosted boot still spent 16 to 26 s: five game
+frames, then 30 worker frames, at about 3 fps (run 44542508555's D:
+2.8 and 3.0 fps with a p95 main-thread frame of 5 to 6 ms). A rAF
+trace on local SwiftShader showed why: the main thread's part of a
+frame is 4 ms, and the next animation frame comes 83 to 100 ms after
+a drawn one, held back by the GPU process rastering it. RT3's pacing
+measured only the main thread, so its render scale never left 1.
+The gap after a drawn frame now counts as that frame's cost, and the
+scale settles at 0.5 (local fps 10 to 14.5; 0.5 alone measured 18.5
+against 8 to 12 at 1). Seen once beside a load of 32: A's boot sat in
+`home` for 112 s with no network after 6 s, the K stall's shape.
