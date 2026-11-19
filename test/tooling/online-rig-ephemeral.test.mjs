@@ -10,6 +10,7 @@ import { openT1OnlineRig } from '../../scripts/t1-online-rig.mjs';
 import { openRig } from '../../scripts/online-rig.mjs';
 
 const root = resolve('tmp/codex-pagesize');
+const fixtureBuild = 'd520000-fixture';
 
 test('memory/T1 rigs own actual HTTP/WS endpoints across replacement and cleanup', async () => {
   const { work, dist, keyFile, pair } = fixture(), rigs = [];
@@ -21,7 +22,7 @@ test('memory/T1 rigs own actual HTTP/WS endpoints across replacement and cleanup
     expect(ports.every(port => Number.isInteger(port) && port > 0)).toBe(true);
     expect(new Set(ports).size).toBe(ports.length);
     for (const rig of rigs) {
-      expect((await fetch(`${rig.base}/version.json`).then(response => response.json())).build).toBe('ds20-memory-zero');
+      expect((await fetch(`${rig.base}/version.json`).then(response => response.json())).build).toBe(fixtureBuild);
       expect((await fetch(`${rig.worldOrigin}/health`)).ok).toBe(true);
       const signed = await fetch(`${rig.releaseOrigin}/release.json`).then(response => response.json());
       expect(verify(null, Buffer.from(signed.body), pair.publicKey, Buffer.from(signed.signature, 'hex'))).toBe(true);
@@ -79,7 +80,7 @@ function fixture() {
   const work = mkdtempSync(join(root, 'rig-zero-'));
   const pair = generateKeyPairSync('ed25519'), dist = join(work, 'dist'), keyFile = join(work, 'key.json');
   mkdirSync(dist);
-  writeFileSync(join(dist, 'version.json'), JSON.stringify({ build: 'ds20-memory-zero' }));
+  writeFileSync(join(dist, 'version.json'), JSON.stringify({ build: fixtureBuild }));
   writeFileSync(join(dist, 'index.html'), 'owned preview');
   writeFileSync(keyFile, JSON.stringify({ public: pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex'), private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }) }), { mode: 0o600 });
   writeGridCollision(work, 'transport-fixture', [{ id: 'transport-road', mesh: { origin: { x: 0, z: 0 }, positions: new Float32Array([0, 0, 0, 1, 0, 0, 0, 0, 1]), indices: new Uint32Array([0, 1, 2]), colours: new Float32Array(9) }, duplicates: [], features: [] }]);
