@@ -1,5 +1,6 @@
 import * as v from 'valibot';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import { creatureRank } from '@wildshard/format/creatureRanks';
 import { Rng, fnv1a32 } from '@wildshard/engine/core/rng';
 import { WeightedTable, type TableDrop } from '@wildshard/engine/ai/weighted';
 import type { SimHost } from '@wildshard/engine/sim';
@@ -67,8 +68,12 @@ export function installPersonalLoot(host: SimHost, ports: PersonalLootPorts): vo
       const times = ledgerDedupe.filter(row => row === paid).length;
       if (times >= cap) continue;
       const draw = ports.draws?.(`${paid}#${String(times)}`) ?? next;
-      const coins = ports.coins?.(body.kind, draw) ?? 0;
-      const items = ports.items?.({ kind: body.kind, variant: body.variant, owned: item => ledgerDedupe.includes(itemKey(player, item)) }, draw) ?? [];
+      // ONE-FORMAT OF33b: a ranked body rolls its rank's count of times, paid as one bounty; once-only items fall once
+      let coins = 0; const items: TableDrop<string>[] = [];
+      for (let roll = 0; roll < creatureRank(body.rank).loot; roll++) {
+        coins += ports.coins?.(body.kind, draw) ?? 0;
+        items.push(...ports.items?.({ kind: body.kind, variant: body.variant, owned: item => ledgerDedupe.includes(itemKey(player, item)) || items.some(row => row.item === item) }, draw) ?? []);
+      }
       if (coins <= 0 && items.length === 0) continue;
       ledgerDedupe.push(paid);
       if (coins > 0) { ports.grant(player, coins); host.events.emit('reward.granted', { player, coins, body: actor.id }); }

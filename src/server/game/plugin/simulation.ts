@@ -111,6 +111,7 @@ import { countedShard, countSlots } from '../shardfile/declaredSpawnCount';
 import type { PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { installDeclaredAttackable } from '../shardfile/declaredAttackable';
 import { installDeclaredPatrols } from '../shardfile/declaredPatrols';
+import { installDeclaredRanks, rankCreatureSpawns } from '../shardfile/declaredRanks';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
 
 type Physics = SimHost['physics'];
@@ -438,7 +439,7 @@ function shardfileSimInput(source: Shardfile, assets: ReadonlyMap<string, Uint8A
   const weapon = ports.weapon ?? HOST_PROBE;
   return {level: { version: SIM_API_VERSION, id: shard.identity.slug, seed: shard.identity.seed,
     ground: { size: 500, height: 0 }, player: { at: { x: shard.spawn.x, y: shard.spawn.y, z: shard.spawn.z }, yaw: shard.spawn.yaw, speed: Math.min(5, shard.authorCaps.speed) },
-    entities: sizeCreatureSpawns(buildPlatformSpawns(shard.creatures.spawns, speciesResolver(shard.rows, shard.creatures.brains), simStrikes(shard.rows)), shard.rows, shard.creatures.spawns), weapon, quests: [],
+    entities: rankCreatureSpawns(sizeCreatureSpawns(buildPlatformSpawns(shard.creatures.spawns, speciesResolver(shard.rows, shard.creatures.brains), simStrikes(shard.rows)), shard.rows, shard.creatures.spawns), shard.creatures.spawns), weapon, quests: [],
   }, ports: { ...ports, ground: ports.ground !== false && terrain === undefined && shard.meshCollision === null && shard.entryways.some(entry => (entry.kind ?? 'ground') === 'ground'), heightAt }};
 }
 /** Install the ordinary native simulation once. */
@@ -473,6 +474,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
       body.species = spawn.species;
       body.harvest = species?.harvest ?? [];
       body.capExempt = species?.capExempt;
+      body.rank = spawn.rank; // OF33b: its loot rolls and blows read it
     }
   }
   if (shard.nativeGround !== null) throw new Error('Native ground retains its native runtime simulation; a flat declared proxy is forbidden');
@@ -773,6 +775,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     installDeclaredHostPortalRide(host, shard, portalRide, ports.quest?.fact ?? (() => undefined)); // OF41b: the `portal` primitive
     installDeclaredAttackable(host, shard); // OF38b: each creature's own `attackable` row, never a weapon's target list
     installDeclaredPatrols(host, creatures.patrols ?? [], ports.restoring === true); // OF37b: the patrol primitive
+    installDeclaredRanks(host, shard.creatures.spawns); // OF33b: the elites primitive, a ranked body's blows
     recordPrimitives(host, shard); // OF17b1: the list comes from the sections, never a host list
     return { riding, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
   } catch (error) { host.dispose(); throw error; }

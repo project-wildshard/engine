@@ -1,4 +1,5 @@
 import type { HarvestDrop } from '@wildshard/format/harvestRows';
+import type { CreatureRank } from '@wildshard/format/creatureRanks';
 import { Vector3, MathUtils } from 'three';
 import type { AnimalPoseLaw } from './animalPose';
 import { FlightMotion, type SpeciesFlight } from '../ai/flight';
@@ -85,6 +86,8 @@ export class AnimalSim {
   harnessHold = false;
   kind: string; variant: string; rarity: Rarity; label: string; aggressive: boolean;
   capExempt: boolean | undefined;
+  /** ONE-FORMAT OF33b: the declared spawn's rank (absent: unranked), set with `species` on create and restore; never saved. */
+  rank: CreatureRank | undefined;
   mods: VariantMods;
   alive = true;
   hp: number; maxHp: number;
