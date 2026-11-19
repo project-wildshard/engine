@@ -8,9 +8,9 @@ import { textureLibrarySource } from '@wildshard/format/deviceMemoryCost';
 import { nearbyContentCost } from '@wildshard/format/budget';
 import { builtFolder } from '../src/test/game/builtFolder';
 
-/** D122: Nine Dragon's spawn, phone tier, read on HEAD preview a423f4d305 (Chromium, 2026-10-27): labelled GPU 245.6 MB +
- *  labelled RAM 287.1 MB. The admission's estimate there may shed what is never resident, never fall below this. */
-const MEASURED_SPAWN_RESIDENT = 245_600_000 + 287_100_000;
+/** D122: settled Nine Dragon revision 3 (afd68ee2) at spawn on the phone tier, with KTX2 and ASTC enabled
+ *  (Chromium, 2026-11-18). The two terms are the GPU and RAM byte totals from the engine memory ledger. */
+const MEASURED_SPAWN_RESIDENT = 166_081_624 + 34_719_433;
 
 test('Nine\'s play estimate at spawn never falls below its measured resident memory', async () => {
   const folder = builtFolder('nine-dragon-stack'), product = await loadHeadlessFolder(folder), source = product.shardfile;
