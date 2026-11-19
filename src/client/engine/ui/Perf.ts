@@ -148,7 +148,7 @@ export class Perf {
       if (!this.active) return;
       // QA8: a closed frame gate (the held loading card, a gated reveal) draws nothing on purpose, like a menu: its time is
       // not a stall. Counted, Jake's 8 s on the hold card read "0 fps · max 8954 ms" for 3 s after PLAY
-      if (!game.frameGate()) this.frameWindow.reset(performance.now(), game.frameCount);
+      if (!game.frameGate() || document.visibilityState === 'hidden') this.frameWindow.reset(performance.now(), game.frameCount);
       else this.frameWindow.observe(game.frameCount, game.frameRafTime);
       this.paint(performance.now());
     });
@@ -156,6 +156,11 @@ export class Perf {
     // one read as one 10.4 s frame (Nine on 69fa647: '5 fps · max 10395 ms' 0.5 s after control) while the card had kept
     // moving all along
     this.scope.listen(document, 'ws:control-ready', () => { this.frameWindow.reset(performance.now(), game.frameCount); });
+    // QA-FEEDBACK 11-19 row 56 (Jake 16:17, "max 17190 ms" after an app switch): a page in the background draws nothing on
+    // purpose, like a menu; the suspended time is not a stall, so the window starts again when the page comes back
+    const back = (): void => { if (document.visibilityState === 'visible') this.frameWindow.reset(performance.now(), game.frameCount); };
+    this.scope.listen(document, 'visibilitychange', back);
+    this.scope.listen(window, 'pageshow', back);
   }
 
   /** Hidden while the menu is up (the world is not rendering, so there is nothing to measure). */

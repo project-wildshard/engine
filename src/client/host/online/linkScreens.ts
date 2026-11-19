@@ -31,6 +31,12 @@ const NOTICE_MS = 2500;
 /** QA-FEEDBACK 11-19 row 14, J449: a link dropped behind the background (cause `hidden`) reconnects quietly: no banner for
  *  this long, and no Reconnected notice unless the player saw the outage (a banner or a card) because it stalled play. */
 const RETURN_QUIET_MS = 5_000;
+/** QA-FEEDBACK 11-19 row 56 (Jake 16:17: "When we tap back into the game, I have a 5-second grace period where you don't show
+ *  me this shit"): for this long after the page comes back to the front (visibilitychange to visible, pageshow), the socket
+ *  redials quietly whatever the cause: no Reconnecting banner, no Unstable or Slow chip, and so no Reconnected notice. An iOS
+ *  app switch suspends the page, so the drop is only noticed on return and its `downMs` already holds the suspended time;
+ *  J449's `hidden` quiet alone missed it. An outage that outlasts the grace shows its banner then. */
+const RESUME_GRACE_MS = 5_000;
 /** FM4b modes 21 and 22, sampled once a second while live: a pong RTT over this is slow; five in a row spanning this much are unstable. */
 const SLOW_RTT_MS = 250, UNSTABLE_SPAN_MS = 250;
 /** Mode 22: the share of frames the server says it skipped for this client (`lossPct`), not measured TCP loss. */
@@ -204,8 +210,13 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   let open: { scope: Scope; root: HTMLElement; kind: 'hold' | 'stop' | 'offline' | 'away' | 'reach' | 'auth'; paint: () => void; what?: string; chat?: boolean; key?: string } | null = null;
   const held: { text: string; send: (text: string) => void; drop: () => void }[] = [];
   const down = (): boolean => state === 'reconnecting' || state === 'resuming';
-  /** J449: back from the background, the socket's own redial, not yet long enough to stall play */
-  const quietBack = (): boolean => down() && hooks.why() === 'hidden' && hooks.progress().downMs < RETURN_QUIET_MS;
+  /** row 56: when the page last came back to the front (Date.now), and whether it is within RESUME_GRACE_MS of it */
+  let resumedAt = -Infinity;
+  const inGrace = (): boolean => Date.now() - resumedAt < RESUME_GRACE_MS;
+  /** J449 and row 56: back from the background, the socket's own redial, not yet long enough to stall play */
+  const quietBack = (): boolean => down() && (inGrace() || (hooks.why() === 'hidden' && hooks.progress().downMs < RETURN_QUIET_MS));
+  /** a banner quietBack kept down: the once-a-second check shows it when the quiet ends with the link still down */
+  let quietHeld = false;
   /** FM4b modes 5 to 8: down, online, and no dial on this page ever reached the world, for 10 s. A restart or an old server's cut
    *  (`updating`) is the world's own word, and a link that was ever live stays FM4's banner (15, 19, then 20's card). */
   const unreachable = (): boolean => {
@@ -223,7 +234,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const freePointer = (): void => { if ('exitPointerLock' in document && document.pointerLockElement instanceof Element) document.exitPointerLock(); };
   const paintBanner = (): void => {
     // offline (FM4b mode 2) or back from away (modes 4 and 45), the card is the screen: no banner under it
-    const shown = down() && hooks.why() !== 'offline' && hooks.progress().away === undefined && !unreachable() && !quietBack();
+    const quiet = quietBack(), shown = down() && hooks.why() !== 'offline' && hooks.progress().away === undefined && !unreachable() && !quiet;
+    quietHeld = down() && quiet;
     if (shown) seen = true;
     banner.hidden = !shown;
     // a link that is down takes the top band from the deploy countdown; the countdown comes back with the link
@@ -442,7 +454,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   const sampleQuality = (): void => {
     sinceChip++;
     const stats = hooks.stats?.();
-    if (stats === undefined || state !== 'live') { hideQuality('replaced'); slowRun = unstableRun = goodRun = 0; rtts.length = 0; return; }
+    // row 56: the first seconds back from the background measure the wake-up, not the line: they start the count again
+    if (stats === undefined || state !== 'live' || inGrace()) { hideQuality('replaced'); slowRun = unstableRun = goodRun = 0; rtts.length = 0; return; }
     const rtt = stats.rttMs;
     if (Number.isFinite(rtt) && rtt > 0) { rtts.push(rtt); if (rtts.length > 5) rtts.shift(); }
     const slow = Number.isFinite(rtt) && rtt > SLOW_RTT_MS;
@@ -453,8 +466,17 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
     if (due !== null && sinceChip >= QUALITY_GAP_S) showQuality(due, rtt);
   };
   scope.interval(1000, sampleQuality);
-  // J449: a quiet return that outlasts RETURN_QUIET_MS has stalled play: its banner shows then
-  scope.interval(1000, () => { if (banner.hidden === true && down() && hooks.why() === 'hidden' && !quietBack() && open?.kind !== 'auth') paintBanner(); });
+  // J449 and row 56: a quiet return that outlasts its quiet has stalled play: its banner shows then
+  scope.interval(1000, () => { if (quietHeld && banner.hidden === true && down() && !quietBack() && open?.kind !== 'auth') paintBanner(); });
+  const resumed = (): void => {
+    if (document.visibilityState !== 'visible') return;
+    resumedAt = Date.now();
+    // a chip from before the switch is no word on the line now
+    hideQuality('replaced'); slowRun = unstableRun = goodRun = 0; rtts.length = 0;
+    if (banner.hidden !== true && open?.kind !== 'auth') paintBanner();
+  };
+  scope.listen(document, 'visibilitychange', resumed);
+  scope.listen(window, 'pageshow', resumed);
   const link = (next: LinkState, why?: string): void => {
     state = next; reason = why;
     if (state !== 'live') hideQuality('replaced');

@@ -616,3 +616,41 @@ test('a quiet background drop still gives a tap its hold card, and the offline c
   expect(shown('offline-play')).not.toBeNull();
   scope.dispose();
 });
+
+test('QA 11-19 row 56: for 5 s after the page comes back, the redial is quiet whatever the cause; a longer outage still shows', () => {
+  vi.useFakeTimers();
+  try {
+    const stats = { rttMs: 80, lossPct: 0, sentBytes: 0, recvBytes: 0 };
+    let downMs = 17_190, why: LinkCause = 'closed';
+    const scope = new Scope('test.resume');
+    const screens = linkScreens(scope, { retry: () => undefined, dialNow: () => undefined, reload: () => undefined, progress: () => ({ dials: 1, nextDialMs: 1800, downMs }), why: () => why, stats: () => stats });
+    const banner = (): HTMLElement | null => document.querySelector<HTMLElement>('#ws-reconnect-strip:not([hidden])');
+    const chip = (kind: string): HTMLElement | null => document.querySelector<HTMLElement>(`.ws-link-notice[data-failmode="${kind}"]`);
+    const back = (): void => { document.dispatchEvent(new Event('visibilitychange')); };
+    // an iOS app switch: the socket died while suspended, so the drop is seen on return with the suspended time in downMs
+    back(); vi.advanceTimersByTime(300);
+    screens.link('reconnecting', 'closed');
+    expect(banner(), 'no Reconnecting banner in the grace').toBeNull();
+    vi.advanceTimersByTime(1200); screens.link('live');
+    expect(chip('reconnected'), 'a quiet redial says nothing when it is back').toBeNull();
+    // a page shown from the bfcache gets the same grace; the wake-up's RTT spike makes no Unstable or Slow chip
+    window.dispatchEvent(new Event('pageshow'));
+    stats.rttMs = 900; vi.advanceTimersByTime(4900);
+    expect(chip('slow')).toBeNull(); expect(chip('lossy')).toBeNull();
+    stats.rttMs = 80; vi.advanceTimersByTime(10_000);
+    // an outage that outlasts the grace shows its banner once the grace ends
+    back(); why = 'silent'; downMs = 0;
+    screens.link('reconnecting', 'silent');
+    vi.advanceTimersByTime(4000);
+    expect(banner()).toBeNull();
+    vi.advanceTimersByTime(2000);
+    expect(banner()?.dataset['failmode']).toBe('half-open');
+    screens.link('live');
+    expect(chip('reconnected'), 'a seen outage says Reconnected').not.toBeNull();
+    // and with no return in the last 5 s, a drop shows at once, as before
+    vi.advanceTimersByTime(10_000); why = 'closed';
+    screens.link('reconnecting', 'closed');
+    expect(banner()).not.toBeNull();
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
+});

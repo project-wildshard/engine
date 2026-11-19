@@ -111,3 +111,29 @@ test('retirement during the real import prevents late performance controls from 
   expect(Reflect.has(window,'__perfHud')).toBe(false);
   expect(document.querySelector('.ws-perf-panel')).toBeNull();
 });
+
+test('QA 11-19 row 56: an iOS app switch is no 17 s frame: the meter starts again when the page comes back', () => {
+  vi.useFakeTimers();
+  let now = 0, update = (): void => undefined;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const scope = new Scope('frame-pill-resume');
+  const game = legacyDouble<Game>({ app,
+    level: legacyDouble<Game['level']>({ id: 'frame-pill-resume', budgets: {} }),
+    renderer: legacyDouble<Game['renderer']>({ getPixelRatio: () => 2 }),
+    gl: legacyDouble<Game['gl']>({ events: 0, restoredAt: 0, lostAt: 0 }),
+    frameMs: new Float32Array(120).fill(1000 / 30), frameCount: 0, frameRafTime: null, frameGate: () => true,
+    lastFrame: { calls: 1, triangles: 1 },
+    onUpdate: tick => { update = () => { tick(0, 0); }; },
+  });
+  const max = (meter: Perf): number => Number(/^max (\d+) ms$/u.exec(meter.root.querySelector('.ws-perf-ms')?.textContent ?? '')?.[1]);
+  try {
+    const meter = withOwner(scope, () => new Perf(game));
+    for (let frame = 1; frame <= 30; frame++) { now += 33; game.frameCount++; game.frameRafTime = now; update(); vi.advanceTimersByTime(33); }
+    // suspended: no timer and no frame runs for 17.19 s (Jake's "max 17190 ms"); the first frame back can beat the event
+    now += 17_190; game.frameCount++; game.frameRafTime = now; update();
+    window.dispatchEvent(new Event('pageshow'));
+    document.dispatchEvent(new Event('visibilitychange'));
+    for (let frame = 1; frame <= 30; frame++) { now += 33; game.frameCount++; game.frameRafTime = now; update(); vi.advanceTimersByTime(33); }
+    expect(max(meter)).toBeLessThan(100);
+  } finally { scope.dispose(); }
+});
