@@ -18,6 +18,7 @@ import { HeldInHand, heldOnOthers } from './heldOnOthers';
 import type { NetClient, NetEntityInfo } from './client';
 import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
+import { SoftCollide, type SoftBody, type SoftSelf } from './softCollide';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp'), SWIM = column('swim');
@@ -43,6 +44,9 @@ const SADDLE_LIFT = 0.85;
 /** A rider's knees, in radians. The row it rides moves the body. */
 const SEAT = 1.2;
 const AXIS = new THREE.Vector3(1, 0, 0), turn = new THREE.Quaternion();
+/** Row 54: s another body is drawn behind this page's present past the interpolation delay (its own commands' trip to the
+ *  server); the soft collision leads it by both. */
+const LINK_LEAD = 0.05;
 
 /** A Name as a sprite: it reads the same on any shard, and it needs no DOM over the canvas. RP12: sharp on a phone, sized by
  *  distance within its clamps, clear of the head, gone past 60 m (nameTag.ts). */
@@ -263,6 +267,23 @@ export class OtherPlayers {
       if (nearest === null || metres < nearest) nearest = metres;
     }
     return nearest;
+  }
+  /** QA-FEEDBACK-2026-11-19 row 54: this page's player doesn't walk through these bodies (softCollide.ts). The page asks it to
+   *  bend each step's move (`soft.bend`) and calls `collide` once a frame, after `frame`. */
+  readonly soft: SoftCollide = new SoftCollide();
+  private readonly solid: SoftBody[] = [];
+  /** Once a frame, after `frame`: the soft collision reads every body where it is drawn now (its interpolated row, never a raw
+   *  snapshot), placed, alive and not in a saddle. `active` false (this player on a board, in water, in a saddle) lets go. */
+  collide(self: SoftSelf, dt: number, active: boolean): void {
+    const { solid } = this;
+    let count = 0;
+    if (active) for (const [key, { placed, shown }] of this.bodies) {
+      if (!placed || shown.mounted || shown.death !== '' || shown.hp <= 0) continue;
+      const at = solid[count] ??= { key: 0, x: 0, y: 0, z: 0 };
+      at.key = key; at.x = shown.x; at.y = shown.y; at.z = shown.z; count++;
+    }
+    solid.length = count;
+    this.soft.frame(self, solid, dt, active, this.client.clock.delayMs / 1000 + LINK_LEAD);
   }
   /** What a proof reads. */
   get shown(): readonly (OtherShown & { readonly tag: NameTagShown; readonly hurt: HurtShown })[] {

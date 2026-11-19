@@ -253,7 +253,7 @@ function inScene(object: Object3D): boolean {
   for (let at: Object3D | null = object; at !== null; at = at.parent) { if (!at.visible) return false; if (at instanceof Scene) return true; }
   return false;
 }
-declare global { interface Window { __workerClientNet?: () => { readonly client: NetClient; readonly predictor: NetPlayer['predictor'] }; __onlinePlayers?: () => OtherPlayers['shown']; __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientStill?: () => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientDevColliders?: (name: string, boxes: readonly DevBox[]) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
+declare global { interface Window { __workerClientNet?: () => { readonly client: NetClient; readonly predictor: NetPlayer['predictor'] }; __onlinePlayers?: () => OtherPlayers['shown']; __softCollide?: () => OtherPlayers['soft']['report'] | null; __workerClientFights?: () => readonly WorkerClientFight[]; __workerClientHits?: (by: number) => void; __workerClientStill?: () => void; __workerClientTravel?: (to: ShardSlug) => void;__workerClientSky?: (name: string) => void; __workerClientTime?: (pick: OptionValue<'time'>) => void; __workerClientRow?: (name: string) => number | undefined; __workerClientFlag?: (flag: string) => void; __workerClientDevColliders?: (name: string, boxes: readonly DevBox[]) => void; __workerClientRows?: (kind: string) => readonly { readonly x: number; readonly y: number; readonly z: number }[]; __workerClientGate?: (flag: string) => boolean; __workerClientBot?: (id: string, x: number, y: number, z: number) => { readonly move: (x: number, y: number, z: number) => void; readonly press: (id: string) => void; readonly end: () => void }; __workerClient?: () => WorkerClientReport; __workerClientSave?: () => Promise<void> } }
 
 /** The page's pose inputs, as acts short enough to go. */
 function poseActs(names: ReadonlySet<string>): readonly string[] {
@@ -723,6 +723,10 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   // E7.6: only a world has anyone else in it.
   let others: OtherPlayers | null = null;
   if (shell.redials === true) others = new (await import('@wildshard/engine/net/otherPlayers')).OtherPlayers(client, ports.scene, scope, player.position, ports.warmRoad);
+  // QA-FEEDBACK-2026-11-19 row 54: players don't walk through each other. Each step's move is bent round the bodies drawn here,
+  // so the server steps the same move (softCollide.ts); a crossing, a board, water or a saddle lets go.
+  const soft = others?.soft ?? null, self = { x: 0, y: 0, z: 0, vx: 0, vz: 0, deep: (x: number, z: number): boolean => player.deepAt(x, z) };
+  if (soft !== null) { player.bendMove = (str, fwd, yaw) => soft.bend(str, fwd, yaw); scope.onDispose(() => { player.bendMove = null; }); }
   if (new URLSearchParams(location.search).has('bossGod')) shell.bossGod();
   bootMark('server:ready-send'); shell.ready();
   const heard: Record<string, number> = {};
@@ -821,6 +825,11 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     bindMount(); offerMounts(); seatMount(); bindClaw();
     const shown = showRows(client, ports, bodies, renderTick, dt, row, near, rideable, home);
     others?.frame(renderTick, dt); flights.show(renderTick);
+    if (others !== null) {
+      const feet = player.position, free = here && player.link !== null && !player.hover && !player.swimming && player.ride === null && !player.carried && player.mountedOn === null;
+      self.x = feet.x; self.y = feet.y; self.z = feet.z; self.vx = player.velocity.x; self.vz = player.velocity.z;
+      others.collide(self, dt, free);
+    }
     wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day()); decks.frame(renderTick);
     report.rows = animals === null ? animalRows(client) : shown; // a data cell's life draws them
     if (!quiet()) net.present(dt);
@@ -858,6 +867,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     scope.onDispose(() => { if (window.__workerClientNet === observed) delete window.__workerClientNet; });
   }
   window.__onlinePlayers = () => others?.shown ?? [];
+  window.__softCollide = () => soft?.report ?? null;
   window.__workerClientHits = by => { shell.hardHits(by); };
   window.__workerClientStill = () => { shell.still(); };
   window.__workerClientFlag = flag => { shell.raise(flag); };

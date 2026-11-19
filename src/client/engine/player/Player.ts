@@ -3,7 +3,7 @@ import { isDev } from '../core/devMode';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { hoverTaps, pressHover } from '../ui/hoverBoost';
 import { walkingSpeed } from '../../../shared/engine/player/walk';
-import { pondBob } from '../../../shared/engine/player/swim';
+import { deepWater, pondBob } from '../../../shared/engine/player/swim';
 import { FIXED_STEP } from '../../../shared/engine/core/fixedStep';
 import { waveClock } from '../../../shared/engine/world/waves';
 import { combatSpeedFactor } from '../../../shared/engine/player/combatMotion';
@@ -491,7 +491,7 @@ export class Player {
   sampleCommand(): PlayerWireInput {
     const input = this.inputService, k = this.keys, ride = this.link === null ? undefined : this.ride?.sampleCommand?.();
     const raw = ride?.steer ?? this.sampleSteer(), clamp = (value: number): number => Math.max(-1, Math.min(1, value));
-    const steer = ride !== undefined ? { ...raw } : clamp(raw.keyX + raw.stickX) === this.inStr && clamp(raw.keyY + raw.stickY) === this.inFwd ? raw : { keyX: 0, keyY: 0, stickX: this.inStr, stickY: this.inFwd };
+    let steer = ride !== undefined ? { ...raw } : clamp(raw.keyX + raw.stickX) === this.inStr && clamp(raw.keyY + raw.stickY) === this.inFwd ? raw : { keyX: 0, keyY: 0, stickX: this.inStr, stickY: this.inFwd };
     const sprint = ride?.sprint ?? ((input?.held('sprint') ?? k.has('ShiftLeft')) || this.touchSprint), jump = ride?.jump ?? (input?.pressed('jump') ?? this.jumpQueued);
     const dodge = (input?.pressed('dodge') ?? false) || this.dodgeQueued, dive = (input?.held('dive') ?? k.has('Space')) || this.touchDive;
     const surface = (input?.held('surface') ?? (k.has('ShiftLeft') || k.has('ShiftRight'))) || this.touchSurface, board = this.boardPressed;
@@ -499,7 +499,22 @@ export class Player {
     const buttons = (jump ? NET_BUTTONS.jump : 0) | (dodge ? NET_BUTTONS.dodge : 0) | (sprint ? NET_BUTTONS.sprint : 0) | (this.crouchWanted ? NET_BUTTONS.crouch : 0)
       | (dive ? NET_BUTTONS.dive : 0) | (surface ? NET_BUTTONS.surface : 0) | (board ? NET_BUTTONS.hover : 0) | (input?.held('skip') === true ? NET_BUTTONS.skip : 0)
       | (this.hoverBoost && isDev() ? NET_BUTTONS.boost : 0);
+    if (ride === undefined) steer = this.bent(steer, buttons);
     return { steer, yaw: this.yaw, pitch: this.pitch, buttons };
+  }
+  /** QA-FEEDBACK-2026-11-19 row 54: soft collision bends the move a step sends (client/engine/net/softCollide.ts), so the server
+   *  steps the same bent move; null (or a null answer) leaves it as asked. A dodge is never bent: it goes where it was aimed. */
+  bendMove: ((str: number, fwd: number, yaw: number) => { readonly str: number; readonly fwd: number } | null) | null = null;
+  private bent(steer: NetCommand['steer'], buttons: number): NetCommand['steer'] {
+    if (this.bendMove === null || (buttons & NET_BUTTONS.dodge) !== 0) return steer;
+    const clamp = (value: number): number => Math.max(-1, Math.min(1, value));
+    const move = this.bendMove(clamp(steer.keyX + steer.stickX), clamp(steer.keyY + steer.stickY), this.yaw);
+    return move === null ? steer : { keyX: 0, keyY: 0, stickX: move.str, stickY: move.fwd };
+  }
+  /** Deep water at (x, z) with no deck over it: the dodge's pier-edge test (player/swim.ts `deepWater`), at these feet. */
+  deepAt(x: number, z: number): boolean {
+    const w = this.motionWorld;
+    return w.hasWater && deepWater(x, z, this.position.y, w.water(x, z), w.heightAt(x, z), w.platforms, w.floor);
   }
 
   /** Read sustained movement without advancing aim, rides or consuming presses.
@@ -511,7 +526,7 @@ export class Player {
       | (((input?.held('dive') ?? k.has('Space')) || this.touchDive) ? NET_BUTTONS.dive : 0)
       | (((input?.held('surface') ?? (k.has('ShiftLeft') || k.has('ShiftRight'))) || this.touchSurface) ? NET_BUTTONS.surface : 0)
       | (this.hoverBoost && isDev() ? NET_BUTTONS.boost : 0);
-    return { steer: { keyX: 0, keyY: 0, stickX: move.x, stickY: move.y }, yaw: this.yaw, pitch: this.pitch, buttons };
+    return { steer: this.bent({ keyX: 0, keyY: 0, stickX: move.x, stickY: move.y }, buttons), yaw: this.yaw, pitch: this.pitch, buttons };
   }
 
   /**

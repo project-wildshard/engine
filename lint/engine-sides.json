@@ -281,6 +281,7 @@
     "src/client/engine/net/netPlayer.ts": "client",
     "src/client/engine/net/onRep.ts": "client",
     "src/client/engine/net/otherPlayers.ts": "client",
+    "src/client/engine/net/softCollide.ts": "client",
     "src/client/engine/net/othersOnMap.ts": "client",
     "src/client/engine/net/voiceNear.ts": "client",
     "src/client/engine/net/predictionWorld.ts": "client",
