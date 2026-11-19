@@ -49,26 +49,41 @@ test('routes: Nine walks its streets, every other zone spins; a missing reading 
   expect(walkSummary([run(100),{refused:'no control'}],[sampled(10)]).complete).toBe(false);
 });
 
-test('the walk ratchet: a completed worse median fails, noise inside the allowance passes, a re-pin only tightens',async()=>{
-  const {compareWalk,parseWalkBaseline,repinWalk}=await import('../scripts/memory/walkRatchet.mjs');
-  const baseline=parseWalkBaseline({version:1,mode:'walk',boot:'online',zone:'nine-dragon-stack',seconds:60,runs:3,source:'abc',
-    rate:{value:2e6,spread:0.3e6,allowance:0.5e6},peak:{value:200e6,spread:150e6,allowance:250e6}});
+test('the walk ratchet (J431): the rate fails past max(2%, 5 MB over the walk) only when a re-measure agrees; the bimodal peak is reported',async()=>{
+  const {bimodal,compareWalk,parseWalkBaseline,rateLine,repinWalk,reportedLines,walkVerdict}=await import('../scripts/memory/walkRatchet.mjs');
+  const baseline=parseWalkBaseline({version:2,mode:'walk',boot:'online',zone:'nine-dragon-stack',seconds:60,runs:3,source:'abc',
+    rate:{value:7e6,spread:0.1e6,judged:true},peak:{value:200e6,spread:300e6,judged:false,why:'bimodal'}});
   const read=(rate:number,peak:number)=>({complete:true,bytesPerSecond:{median:rate,min:rate-1e5,max:rate+1e5,n:3},peakAboveSettled:{median:peak,min:peak-5e7,max:peak+5e7,n:3}});
-  expect(compareWalk(baseline,read(2.4e6,420e6))).toBeNull();
-  expect(compareWalk(baseline,read(2.6e6,200e6))).toMatch(/allocation 2\.60 MB\/s > 2\.50 MB\/s/u);
-  expect(compareWalk(baseline,read(2e6,460e6))).toMatch(/peak above settled 460 MB > 450 MB/u);
+  // 2% of 7 MB/s over 60 s is 8.4 MB, more than 5 MB: the line is 7.14 MB/s
+  expect(rateLine(baseline)).toBeCloseTo(7.14e6,-2);
+  expect(compareWalk(baseline,read(7.13e6,900e6))).toBeNull();
+  expect(compareWalk(baseline,read(7.2e6,200e6))).toMatch(/allocation 7\.20 MB\/s > 7\.14 MB\/s/u);
+  // a slow walk's 5 MB floor: 1 MB/s pinned has 5 MB / 60 s, not 2%
+  expect(rateLine(parseWalkBaseline({...baseline,rate:{value:1e6,spread:0,judged:true}}))).toBeCloseTo(1e6+5e6/60,-1);
+  expect(walkVerdict(baseline,read(7e6,1),null).state).toBe('pass');
+  expect(walkVerdict(baseline,read(7.3e6,1),read(7.1e6,1)).state).toBe('spike');
+  expect(walkVerdict(baseline,read(7.3e6,1),null).state).toBe('spike');
+  expect(walkVerdict(baseline,read(7.3e6,1),read(7.2e6,1))).toMatchObject({state:'fail',failure:expect.stringMatching(/7\.20 MB\/s/u)});
+  // a judged peak fails past max(2%, 5 MB)
+  const judged=parseWalkBaseline({...baseline,peak:{value:200e6,spread:10e6,judged:true}});
+  expect(compareWalk(judged,read(7e6,205e6))).toBeNull();
+  expect(compareWalk(judged,read(7e6,206e6))).toMatch(/peak above settled 206 MB > 205 MB/u);
   expect(()=>compareWalk(baseline,{...read(1,1),complete:false})).toThrow(/completed/u);
-  const next=repinWalk(baseline,read(1.5e6,300e6),'def');
-  expect(next.rate).toEqual({value:1.5e6,spread:2e5,allowance:0.5e6});
-  expect(next.peak.value).toBe(200e6);
-  // an allowance no wider than its spread is refused
-  expect(()=>parseWalkBaseline({...baseline,peak:{value:1,spread:5,allowance:5}})).toThrow(/allowance must exceed its spread/u);
+  expect(bimodal([21e6,294e6,335e6])).toBe(true); expect(bimodal([150e6,160e6,170e6])).toBe(false);
+  expect(reportedLines(baseline,read(7e6,294e6),[21e6,294e6,335e6])[0]).toMatch(/not judged: bimodal.*21, 294, 335 MB \(two modes\)/u);
+  expect(reportedLines(judged,read(7e6,1),[1])).toEqual([]);
+  const next=repinWalk(baseline,read(6.5e6,300e6),'def');
+  expect(next.rate).toEqual({value:6.5e6,spread:2e5,judged:true});
+  expect(next.peak).toMatchObject({value:200e6,judged:false,why:'bimodal'});
+  // a reading not judged says why; the rate is always judged
+  expect(()=>parseWalkBaseline({...baseline,peak:{value:1,spread:5,judged:false}})).toThrow(/says why/u);
+  expect(()=>parseWalkBaseline({...baseline,rate:{value:1,spread:0,judged:false,why:'x'}})).toThrow(/always judged/u);
 });
 
-test('the committed walk baseline parses: Nine, online, each allowance wider than its spread',async()=>{
+test('the committed walk baseline parses: Nine, online, the rate judged',async()=>{
   const {walkBaseline}=await import('../scripts/memory/walkRatchet.mjs');
   const baseline=walkBaseline();
   expect(baseline.zone).toBe('nine-dragon-stack');
-  expect(baseline.rate.allowance).toBeGreaterThan(baseline.rate.spread);
-  expect(baseline.peak.allowance).toBeGreaterThan(baseline.peak.spread);
+  expect(baseline.rate.judged).toBe(true);
+  expect(baseline.runs).toBeGreaterThanOrEqual(3);
 });
