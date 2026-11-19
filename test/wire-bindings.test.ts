@@ -22,7 +22,7 @@ const columns = (list: NetClass<never>['row']): FrozenColumn[] => list.map(({ na
 
 test('the bound classes hash to the descriptors, which are engine main\'s v0 wire', () => {
   expect(NET_SCHEMA_HASH).toBe(v0SchemaHash(WIRE_CLASSES));
-  expect(NET_SCHEMA_HASH).toBe(2_811_545_480); // with animal.species (TE-ENG7), player swing, heavy, air (RP6), the animal's channels and lock (CC28) and player roadX, roadZ (MP1.5)
+  expect(NET_SCHEMA_HASH).toBe(1_375_460_222); // with animal.species (TE-ENG7), player swing, heavy, air (RP6), the animal's channels and lock (CC28), player roadX, roadZ (MP1.5) and animal roadX, roadZ (MP5.2b)
 });
 
 /** REMOTE-PLAYERS RP6: the player row others get, after `held`: a swing count, its weight and the airborne bit. */
@@ -32,22 +32,24 @@ const CC28 = ['channel1', 'channel2', 'channel3', 'channel4', 'lockable'];
 /** MMO-PLAN MP1.5 (wire 1.2): a road body's place for others, after RP6's three. */
 const MP15 = ['roadX', 'roadZ'];
 const PLAYER_ADDED = [...RP6, ...MP15];
+/** MMO-PLAN MP5.2b (wire 1.3): a creature's road place, after CC28's five. */
+const ANIMAL_ADDED = [...CC28, ...MP15];
 
-test('every compiled column is cfd6681\'s; the player gains its spawn name, RP6\'s and MP1.5\'s row fields, the animal its species and CC28\'s row fields', () => {
+test('every compiled column is cfd6681\'s; the player gains its spawn name, RP6\'s and MP1.5\'s row fields, the animal its species, CC28\'s and MP5.2b\'s row fields', () => {
   expect(NET_CLASSES.map(entry => entry.cls)).toEqual(FROZEN.map(entry => entry.cls));
   for (const [index, entry] of NET_CLASSES.entries()) {
     const frozen = FROZEN[index];
     expect(entry.id).toBe(frozen?.id);
-    expect(columns(entry.row).filter(column => (entry.cls !== 'player' || !PLAYER_ADDED.includes(column.name)) && (entry.cls !== 'animal' || !CC28.includes(column.name)))).toEqual(frozen?.row);
+    expect(columns(entry.row).filter(column => (entry.cls !== 'player' || !PLAYER_ADDED.includes(column.name)) && (entry.cls !== 'animal' || !ANIMAL_ADDED.includes(column.name)))).toEqual(frozen?.row);
     if (entry.cls === 'animal') {
-      expect(entry.row.slice(-CC28.length).map(column => column.name)).toEqual(CC28);
+      expect(entry.row.slice(-ANIMAL_ADDED.length).map(column => column.name)).toEqual(ANIMAL_ADDED);
     }
     if (entry.cls === 'player') {
       const names = entry.row.map(column => column.name), held = names.indexOf('held');
       expect(names.slice(held + 1, held + 6)).toEqual(PLAYER_ADDED);
       expect(columns(entry.row).slice(held + 1, held + 6).map(({ kind, bits }) => [kind, bits])).toEqual([['u8', 8], ['bool', 1], ['bool', 1], ['f32q', 16], ['f32q', 16]]);
     }
-    expect(columns(entry.owner).filter(column => entry.cls !== 'animal' || !CC28.includes(column.name))).toEqual(frozen?.owner);
+    expect(columns(entry.owner).filter(column => entry.cls !== 'animal' || !ANIMAL_ADDED.includes(column.name))).toEqual(frozen?.owner);
     expect(columns(entry.initial)).toEqual(frozen?.initial);
     expect(entry.radius).toBe(frozen?.radius);
     expect(entry.position).toEqual(frozen?.position);

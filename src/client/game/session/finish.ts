@@ -52,7 +52,7 @@ const gridPrefetch = () => import('../grid/prefetch');
 
 /** What a grid page lends the worker client (J130). */
 function workerGrid({ grid, gridLive }: Pick<Awaited<ReturnType<typeof playStage>>, 'grid' | 'gridLive'>): WorkerClientGrid | null {
-  return grid === null || gridLive === null ? null : { cells: grid.assembly.cells, bindWire: wire => { gridLive.bindWire(wire); }, frame: () => gridLive.frame(), animals: () => gridLive.enteredAnimals(), items: () => gridLive.enteredItems(), saveLocation: () => { gridLive.saveLocation(); },
+  return grid === null || gridLive === null ? null : { cells: grid.assembly.cells, bindWire: wire => { gridLive.bindWire(wire); }, frame: () => gridLive.frame(), animals: () => gridLive.enteredAnimals(), roadAnimals: () => gridLive.roadAnimals(), items: () => gridLive.enteredItems(), saveLocation: () => { gridLive.saveLocation(); },
     // GO5: the server's place is the save; the hint and the loading card follow it.
     serverPlace: (instance, at) => { gridLive.serverPlace(instance, at); const cell = grid.assembly.cells.find(row => row.instance === instance); if (cell !== undefined) showGridDestination(cell.slug); },
     reenter: instance => { reenterGrid(instance); }, reenterInPage: (instance, handOver) => reenterGridInPage(instance, handOver), reshard: instance => { reenterShard(instance); }, booted: gridLive.booted };

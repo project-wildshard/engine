@@ -154,9 +154,28 @@ interface RoomClient {
 }
 
 
+/** A road place's node floor: a room older than its wire minor sends none, and a page reads this, outside the grid. */
+const ROAD_FLOOR = -2048;
+const roadColumns = new WeakMap<NetClass<never>, readonly [number, number] | null>();
+/** A class's `roadX` and `roadZ` row columns, or null for a class without them. */
+function roadColumnsOf(cls: NetClass<never>): readonly [number, number] | null {
+  let held = roadColumns.get(cls);
+  if (held === undefined) {
+    const x = cls.row.findIndex(column => column.name === 'roadX'), z = cls.row.findIndex(column => column.name === 'roadZ');
+    held = x === -1 || z === -1 ? null : [x, z];
+    roadColumns.set(cls, held);
+  }
+  return held;
+}
 function rowPosition(frame: WorldFrame, at: number, cls: NetClass<never>): { x: number; y: number; z: number } | null {
   if (cls.position === null) return null;
   const read = (index: number): number => { const column = cls.row[index], value = column?.value(frame.data[at + index] ?? 0); return typeof value === 'number' ? value : 0; };
+  // MMO-PLAN MP5.2b: a row on a road says its place in `roadX`/`roadZ`, where `x`/`z` clamp at ±260 m: relevance and nearness read it there
+  const road = roadColumnsOf(cls);
+  if (road !== null) {
+    const x = read(road[0]), z = read(road[1]);
+    if ((x !== 0 || z !== 0) && x > ROAD_FLOOR && z > ROAD_FLOOR) return { x, y: read(cls.position[1]), z };
+  }
   return { x: read(cls.position[0]), y: read(cls.position[1]), z: read(cls.position[2]) };
 }
 

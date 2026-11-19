@@ -504,6 +504,14 @@ export class LiveGridSession {
     return instance === null ? null : this.runtimeRegions.get(instance)?.animals() ?? null;
   }
 
+  /** MMO-PLAN MP5.2b: on the road, the home region's creature manager and the home's origin in the world's frame, where the road's rows
+   *  of the home's creatures near its edge are drawn (in the home's own metres); null in a cell or with no home world. */
+  roadAnimals(): { readonly animals: NonNullable<ReturnType<PreparedRegionalRuntime['animals']>>; readonly origin: { readonly x: number; readonly z: number } } | null {
+    if (this.live.current() !== null) return null;
+    const animals = this.runtimeRegions.get(this.ports.home.instance)?.animals() ?? null;
+    return animals === null ? null : { animals, origin: this.ports.home.origin };
+  }
+
   /** The entered cell's item rows, for the slots the server knows its held items by; none on the road. */
   enteredItems(): Shardfile['items']['rows'] | null {
     const current = this.live.current();

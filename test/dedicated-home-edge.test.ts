@@ -5,7 +5,9 @@ import { afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { CHUNK_HALF } from '../src/shared/engine/core/config';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { placeOf } from '../src/client/engine/net/otherPlayers';
-import { PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
+import { ANIMAL_CLASS, PLAYER_CLASS } from '../src/shared/engine/net/netSchemas';
+import { roadPlaceOf } from '../src/client/game/grid/edgeCreatures';
+import { SIM_LEVEL } from './fixtures/sim-level/level';
 import type { NetClass } from '../src/shared/engine/net/schema';
 import { createSimHost } from '../src/server/engine/sim';
 import { ROAD } from '../src/server/host/standalone/roadWorld';
@@ -29,6 +31,14 @@ function rowOf(view: unknown): { x: number; z: number; place: { x: number; z: nu
   const values = cls.row.map((column, index) => { const value = column.value(out[index] ?? 0); return typeof value === 'number' ? value : Number(value); });
   return { x: Number(values[cls.row.findIndex(column => column.name === 'x')]), z: Number(values[cls.row.findIndex(column => column.name === 'z')]), place: placeOf(values) };
 }
+/** MP5.2b: where a creature row of `view` stands: its road place (wire 1.3), else its clamped `x`/`z`. */
+function animalAt(view: unknown): { x: number; z: number; road: boolean } {
+  const cls = ANIMAL_CLASS as NetClass<unknown>, out = new Float64Array(cls.row.length), refs = (): number => 0;
+  cls.row.forEach((column, index) => { out[index] = column.sample(view, refs); });
+  const read = (name: string): number => { const index = cls.row.findIndex(column => column.name === name), value = cls.row[index]?.value(out[index] ?? 0); return typeof value === 'number' ? value : Number(value); };
+  const road = roadPlaceOf(read('roadX'), read('roadZ'));
+  return road === null ? { x: read('x'), z: read('z'), road: false } : { ...road, road: true };
+}
 /** Every row `list` shows, by id. */
 function shownBy(list: EdgeList): Map<string, unknown> { const rows = new Map<string, unknown>(); list.visit({ entity: (id, _cls, view) => { rows.set(id, view); } }); return rows; }
 
@@ -46,13 +56,21 @@ test('off Driftwood\'s origin (Sunscar, 562.5 m west): each side reads the other
     const origin = { x: -562.5, z: 0 }, slug = 'sunscar-dunes';
     // inside Sunscar 5 m short of its east edge (its own frame), and out on the road 20 m past it (the world's)
     const inside = cell.addPlayer('seat:in', { x: CHUNK_HALF - 5, y: 1, z: 40 }, 0), deep = cell.addPlayer('seat:deep', { x: CHUNK_HALF - EDGE_REACH - 20, y: 1, z: 0 }, 0);
+    const recipe = SIM_LEVEL.entities[0];
+    if (recipe === undefined) throw new Error('Missing creature');
+    const near = cell.spawn({ ...recipe, id: 'edge.near', at: { x: CHUNK_HALF - 20, y: 1, z: -10 } }), deepBeast = cell.spawn({ ...recipe, id: 'edge.deep', at: { x: 0, y: 1, z: 0 } });
     const out = road.addPlayer('seat:out', { x: origin.x + CHUNK_HALF + 20, y: 1, z: -30 }, 0), far = road.addPlayer('seat:far', { x: origin.x + CHUNK_HALF + EDGE_REACH + 20, y: 1, z: 0 }, 0);
     out.roadPlace = true; far.roadPlace = true;
     const rows = new EdgeRows(), origins = new Map([[slug, origin]]), roadList = new EdgeList(), cellList = new EdgeList();
     const homes = new Map<string, string | null>([['seat:out', slug], ['seat:far', 'driftwood-isle']]);
     rows.refresh({ host: road, list: roadList, taken: 2, homes: () => homes }, [{ slug, host: cell, list: cellList, taken: 2 }], origins);
     const onRoad = shownBy(roadList), inCell = shownBy(cellList);
-    expect([...onRoad.keys()], 'the road shows Sunscar\'s body near its edge, not the deep one').toEqual([`${EDGE_PREFIX}${slug}:seat:in`]);
+    expect([...onRoad.keys()], 'the road shows Sunscar\'s body and creature near its edge, not the deep ones').toEqual([`${EDGE_PREFIX}${slug}:seat:in`, `${EDGE_PREFIX}${slug}:animal:edge.near`]);
+    // MP5.2b: the creature 20 m inside says its place in the world's frame, as a road place, past x's ±260 m clamp
+    const beast = animalAt(onRoad.get(`${EDGE_PREFIX}${slug}:animal:edge.near`));
+    expect(beast.road, 'a road place').toBe(true);
+    expect(Math.abs(beast.x - (origin.x + near.position.x)) + Math.abs(beast.z - near.position.z), 'the creature on the road, in the world\'s frame').toBeLessThan(0.1);
+    expect(deepBeast.position.x).toBeLessThan(CHUNK_HALF - EDGE_REACH);
     expect([...inCell.keys()], 'Sunscar shows the road body within 60 m, not the far one').toEqual([`${EDGE_PREFIX}road:seat:out`]);
     const seenOnRoad = rowOf(onRoad.get(`${EDGE_PREFIX}${slug}:seat:in`)), seenInCell = rowOf(inCell.get(`${EDGE_PREFIX}road:seat:out`));
     expect(Math.abs(seenOnRoad.place.x - (origin.x + inside.position.x)) + Math.abs(seenOnRoad.place.z - inside.position.z), 'on the road, in the world\'s frame').toBeLessThan(0.1);
@@ -66,7 +84,7 @@ test('off Driftwood\'s origin (Sunscar, 562.5 m west): each side reads the other
     inside.position.z += 3;
     expect(rowOf(onRoad.get(`${EDGE_PREFIX}${slug}:seat:in`)).place.z).toBeCloseTo(inside.position.z, 1);
     // a body that left its host shows no more, before the next refresh; an empty cell is shown nothing and shows nothing
-    cell.removePlayer('seat:in');
+    cell.removePlayer('seat:in'); cell.entities.delete('edge.near');
     expect(shownBy(roadList).size).toBe(0);
     rows.refresh({ host: road, list: roadList, taken: 2, homes: () => homes }, [{ slug, host: cell, list: cellList, taken: 0 }], origins);
     expect(cellList.size).toBe(0);
@@ -125,4 +143,19 @@ test('across Driftwood\'s west edge: the bot inside and the bot on the road each
   // A walks 80 m in: past 60 m, B reads it no more
   inside.resetPose({ x: -(CHUNK_HALF - 80), y: inside.position.y + 0.5, z: 40 }, 0);
   await vi.waitFor(() => { expect(placeIn(b, aRow), 'A 80 m in is not shown on the road').toBeNull(); }, { timeout: 5_000, interval: 50 });
+  // MP5.2b: one of Driftwood's creatures 20 m inside the edge: B on the road reads it at its world place, and nothing on the road can hit it
+  const [beastId, beast] = [...home.host.entities][0] ?? [];
+  if (beastId === undefined || beast === undefined) throw new Error('Driftwood has creatures');
+  const beastRow = `${EDGE_PREFIX}${HOME}:animal:${beastId}`;
+  await vi.waitFor(() => {
+    beast.position.set(-(CHUNK_HALF - 20), beast.position.y, 40);
+    const handle = b.client.handle(beastRow), frame = b.client.latest, row = handle === undefined ? undefined : frame?.rows.get(handle);
+    expect(row, 'B reads the creature').toBeDefined();
+    const read = (name: string): number => { const index = ANIMAL_CLASS.row.findIndex(column => column.name === name), value = ANIMAL_CLASS.row[index]?.value(row?.[index] ?? 0); return typeof value === 'number' ? value : Number(value); };
+    const place = roadPlaceOf(read('roadX'), read('roadZ'));
+    expect(place, 'as a road place').not.toBeNull();
+    expect(Math.abs((place?.x ?? Infinity) - beast.position.x) + Math.abs((place?.z ?? Infinity) - beast.position.z), 'where B stands it').toBeLessThan(0.1);
+  }, { timeout: 5_000, interval: 50 });
+  expect(road.host.entities.get(beastRow), 'no body for it on the road').toBeUndefined();
+  expect(road.host.combat.hit({ source: onRoad.health, target: beast.combatActor(), sourceTags: ['dmg.melee', 'cover.checked'], amount: 1, point: new Vector3(), dir: new Vector3(), throughWalls: true }), 'B hits it from the road').toBeNull();
 });

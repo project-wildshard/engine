@@ -3,7 +3,9 @@ import { ANIMAL } from '@wildshard/wire/classes';
 import { bindClass, type NetSchema } from './schema';
 
 /** One creature's per-tick read: the sim, its sampled pose and its strike target. A reused buffer, never kept. */
-export interface AnimalNetView { sim: AnimalSim; readonly pose: AnimalPoseSample; target: string | null; rideable: boolean }
+export interface AnimalNetView { sim: AnimalSim; readonly pose: AnimalPoseSample; target: string | null; rideable: boolean;
+  /** MMO-PLAN MP5.2b: a home cell's creature shown on its road, whose place goes as a road place (`roadX`/`roadZ`). */
+  readonly road?: boolean }
 
 // P1-E5.2 (E5-REPLICATION §3.2): the fields a creature view needs, declared in `@wildshard/wire` (WR2). Positions are
 // cell-local over ±260 m in 16 bits, an 8 mm step (§3.5). Everything else on AnimalSim (AI memory, strike runners, RNG)
@@ -46,4 +48,7 @@ export const ANIMAL_NET: NetSchema<AnimalNetView> = bindClass<AnimalNetView, typ
   channel3: view => view.sim.channels[2],
   channel4: view => view.sim.channels[3],
   lockable: view => view.sim.lockOverride === null ? 'row' : view.sim.lockOverride ? 'on' : 'off',
+  // MMO-PLAN MP5.2b: on a road (frame 0, the world's) `x`/`z` clamp at ±260 m, so a creature shown there says its place here. Zero in a cell.
+  roadX: view => view.road === true ? view.sim.position.x : 0,
+  roadZ: view => view.road === true ? view.sim.position.z : 0,
 });

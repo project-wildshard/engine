@@ -62,6 +62,7 @@ import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
 import { earlyStandalone, serverRoute, serverStepLabel } from './serverRoute';
 import { worldHosted } from '../grid/oneWayIn';
+import { drawnPlace, roadPlaceOf } from '../grid/edgeCreatures';
 import { setLampFollow } from '@wildshard/engine/render/lookLight';
 import { pageLogin, refreshTicket, signedIn, ticketBeforeJoin, ticketed, TICKET_REFRESH_MS } from '@wildshard/engine/net/playerLogin';
 
@@ -72,6 +73,9 @@ export interface WorkerClientGrid {
   readonly bindWire: (wire: LiveGridWire) => void;
   readonly frame: () => string | null;
   readonly animals: () => Creatures | null;
+  /** MMO-PLAN MP5.2b: on the road, the home's creature manager and the home's origin in the world's frame, where the road's rows of the
+   *  home's creatures near its edge are drawn; null in a cell, or with no home world on the page. */
+  readonly roadAnimals?: () => { readonly animals: Creatures; readonly origin: { readonly x: number; readonly z: number } } | null;
   /** The entered cell's item rows; none on the road, which keeps the last cell's. */
   readonly items: () => readonly WorkerItemRow[] | null;
   /** Say where the page stands: a reload boots the cell it names, and has to open where the server's save stands. */
@@ -187,6 +191,16 @@ const column = (name: string): number => ANIMAL_CLASS.row.findIndex(entry => ent
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), STATE = column('state'), ATTACK = column('attackT'), ATTACK_DUR = column('attackDur'), ATTACK_STAMP = column('attackStamp'), WINDING = column('winding'), TARGET = column('target'), FLINCH = column('flinch'), HP = column('hp'), ALIVE = column('alive'), RIDEABLE = column('rideable'), STRAFE = column('strafe'), BRACE = column('brace'), RISE = column('rise'), ACT = column('act');
 // CC28: the actor channels and lock answer (wire 1.1); an older room reads each at its default (0, `row`).
 const CHANNELS = [column('channel1'), column('channel2'), column('channel3'), column('channel4')], LOCKABLE = column('lockable');
+/** MP5.2b: a road row's place (wire 1.3); a build without the columns reads none. */
+const ROAD_X = column('roadX'), ROAD_Z = column('roadZ');
+/** Where `row` stands in the manager it is drawn in (`drawnPlace`), into `out`; false when this page doesn't draw it. */
+const placeInto = (row: Float64Array, home: Readonly<Place> | null, out: Place): boolean => {
+  const at = drawnPlace({ x: row[X] ?? 0, z: row[Z] ?? 0, ...(ROAD_X < 0 || ROAD_Z < 0 ? {} : { roadX: row[ROAD_X] ?? 0, roadZ: row[ROAD_Z] ?? 0 }) }, home);
+  if (at === null) return false;
+  out.x = at.x; out.z = at.z; return true;
+};
+interface Place { x: number; z: number }
+const PLACE: Place = { x: 0, z: 0 };
 const LOCKS = ['row', 'on', 'off'] as const;
 const channelsOf = (row: Float64Array, out: number[]): number[] => { for (let i = 0; i < 4; i++) out[i] = row[CHANNELS[i] ?? -1] ?? 0; return out; };
 const ROW_CHANNELS = [0, 0, 0, 0], SYNC_CHANNELS = [0, 0, 0, 0], SYNC_ROW = ownedArray(Float64Array, ANIMAL_CLASS.row.length, { owner: 'game/creatures', asset: 'row-swap' });
@@ -244,12 +258,16 @@ function poseActs(names: ReadonlySet<string>): readonly string[] {
 /** A creature on screen, and the world's manager that holds it: a crossing leaves it behind. */
 interface RowBody { readonly body: Animal; readonly manager: Creatures; windup?: number; /** its page kind before a look swap (CC28c) */ readonly home: string }
 /** Every creature on this page is a row: a new one spawns through the real manager, one the server dropped retires. */
-function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map<number, RowBody>, retired: Map<string, number>, spawnMs: Map<string, number>, poses: ReadonlyMap<string, Record<string, number>>): void {
+function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map<number, RowBody>, retired: Map<string, number>, spawnMs: Map<string, number>, poses: ReadonlyMap<string, Record<string, number>>, edgeHome: Readonly<Place> | null = null): void {
   if (animals === null) return;
   for (const [handle, info] of client.entities) {
     if (info.cls.cls !== ANIMAL_CLASS.cls || bodies.has(handle)) continue; // the shell's bundle has its own copy of the class
-    const { x = 0, y = 0, z = 0, yaw = 0 } = client.interpolator.fields(handle, Number.MAX_SAFE_INTEGER) ?? {};
-    if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number' || typeof yaw !== 'number') continue;
+    const { x: rowX = 0, y = 0, z: rowZ = 0, yaw = 0, roadX, roadZ } = client.interpolator.fields(handle, Number.MAX_SAFE_INTEGER) ?? {};
+    if (typeof rowX !== 'number' || typeof y !== 'number' || typeof rowZ !== 'number' || typeof yaw !== 'number') continue;
+    // MP5.2b: on the road only the home's creatures near its edge are drawn, in the home's metres
+    const place = drawnPlace({ x: rowX, z: rowZ, ...(typeof roadX === 'number' && typeof roadZ === 'number' ? { roadX, roadZ } : {}) }, edgeHome);
+    if (place === null) continue;
+    const { x, z } = place;
     const home = wirePage.rowKind(info.initial['species'], String(info.initial['kind'])), at = diagnosticNow();
     const kind = wirePage.lookKind(home, channelsOf(client.interpolator.sample(handle, Number.MAX_SAFE_INTEGER, SYNC_ROW) ? SYNC_ROW : SYNC_ROW.fill(0), SYNC_CHANNELS));
     const body = animals.spawn(kind, x, z, yaw, String(info.initial['variant']), { y, body: { seed: Number(info.initial['seed']), scale: Number(info.initial['scale']) } });
@@ -287,7 +305,7 @@ function animalRows(client: NetClient): number {
   return rows;
 }
 /** Rows onto the bodies, and the near ones into the predicted world as capsules. */
-function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>): number {
+function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<number, RowBody>, renderTick: number, dt: number, row: Float64Array, near: CreaturePredictionRow[], rideable: Set<number>, home: Readonly<Place> | null = null): number {
   const { interpolator } = client, own = client.welcome?.handle ?? 0, under = client.riders.get(own);
   let shown = 0;
   near.length = 0;
@@ -300,7 +318,8 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<numbe
     const stamp = row[ATTACK_STAMP] ?? 0, started = winding && row[TARGET] === own && entry.windup !== stamp;
     // STR20: one row object refilled per body (showRow copies its fields; the literal was one object per creature a frame)
     const drawn = SHOWN_ROW;
-    drawn.x = row[X] ?? 0; drawn.y = row[Y] ?? 0; drawn.z = row[Z] ?? 0; drawn.yaw = row[YAW] ?? 0; drawn.state = ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle';
+    if (!placeInto(row, home, PLACE)) continue;
+    drawn.x = PLACE.x; drawn.y = row[Y] ?? 0; drawn.z = PLACE.z; drawn.yaw = row[YAW] ?? 0; drawn.state = ANIMAL_STATES[row[STATE] ?? 0] ?? 'idle';
     drawn.attack = attack; drawn.attackDuration = duration; drawn.winding = winding; drawn.flinch = row[FLINCH] ?? 0; drawn.strafe = row[STRAFE] ?? 0;
     drawn.brace = row[BRACE] ?? 0; drawn.hp = row[HP] ?? 0; drawn.alive = row[ALIVE] === 1; drawn.rise = row[RISE] ?? 0; drawn.act = row[ACT] ?? 0;
     drawn.channels = channelsOf(row, ROW_CHANNELS); drawn.lock = LOCKS[row[LOCKABLE] ?? 0] ?? 'row';
@@ -308,12 +327,14 @@ function showRows(client: NetClient, ports: WorkerClientPorts, bodies: Map<numbe
     if (started) { entry.windup = stamp; if (body.alive) manager.onWindup?.(body, duration); }
     shown++;
     if (row[RIDEABLE] === 1) rideable.add(handle);
+    if (home !== null) continue; // MP5.2b: a road row has no body in the road's world to walk into
     const { radius, height } = creatureBodyShape(body.dims, body.scale);
     near.push({ handle, x: row[X] ?? 0, y: row[Y] ?? 0, z: row[Z] ?? 0, alive: row[ALIVE] === 1, driven: false, radius, height });
   }
   // A data cell's life draws its own bodies, and a crossing has none yet: the rows still stand in the predicted world, or walking into one corrects.
   for (const [handle, info] of client.entities) {
     if (info.cls.cls !== ANIMAL_CLASS.cls || bodies.has(handle) || handle === under || !interpolator.sample(handle, renderTick, row)) continue;
+    if (ROAD_X >= 0 && ROAD_Z >= 0 && roadPlaceOf(row[ROAD_X], row[ROAD_Z]) !== null) continue; // MP5.2b: read-only across the home edge
     const kind = String(info.initial['kind']), dims = KIND_DIMS.get(kind) ?? ports.dims(kind) ?? SOME_CREATURE;
     KIND_DIMS.set(kind, dims);
     const { radius, height } = creatureBodyShape(dims, Number(info.initial['scale'] ?? 1));
@@ -696,11 +717,13 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   system({ id: 'proof.worker.reconcile', phase: 'input', run: () => { const at = diagnosticNow(); net.reconcile(); cost = diagnosticNow() - at; } });
   system({ id: 'proof.worker.present', phase: 'update', run: dt => {
     // A page still crossing stands in another world than the frames: those rows aren't its manager's to spawn.
-    const at = diagnosticNow(), here = client.latest === null || net.inCell(client.latest.cell), animals = !here ? null : grid === null ? ports.animals : grid.animals();
+    const at = diagnosticNow(), here = client.latest === null || net.inCell(client.latest.cell), cellAnimals = !here ? null : grid === null ? ports.animals : grid.animals();
+    // MP5.2b: on the road the home's manager draws the road's rows of the home's creatures near its edge
+    const road = here && cellAnimals === null && grid !== null ? grid.roadAnimals?.() ?? null : null, animals = road?.animals ?? cellAnimals, home = road?.origin ?? null;
     renderTick = client.present();
     const entered = grid?.items() ?? items;
     if (entered !== items) { items = entered; net.bindSlots(slotsOf(items)); }
-    sayPoseInputs(); syncCreatures(client, animals, bodies, retired, spawnMs, poses);
+    sayPoseInputs(); syncCreatures(client, animals, bodies, retired, spawnMs, poses, home);
     if (here && contacts.length > 0) for (const event of contacts.splice(0)) {
       const entry = bodies.get(event.kind === 'hit' ? event.target : event.kind === 'died' ? event.id : event.body);
       if (entry === undefined) continue;
@@ -714,7 +737,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const arrows = client.owned.get(OWNED_ROW.arrows); // plus one, so an empty quiver is a line too
     if (arrows !== undefined && arrows !== arrowsSaid) { arrowsSaid = arrows; ports.weapons.mirrorArrows(arrows - 1); }
     bindMount(); offerMounts(); seatMount(); bindClaw();
-    const shown = showRows(client, ports, bodies, renderTick, dt, row, near, rideable);
+    const shown = showRows(client, ports, bodies, renderTick, dt, row, near, rideable, home);
     others?.frame(renderTick, dt);
     wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day()); decks.frame(renderTick);
     report.rows = animals === null ? animalRows(client) : shown; // a data cell's life draws them

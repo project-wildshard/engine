@@ -36,8 +36,8 @@ importers:
         specifier: npm:@wildshard/shard-format@0.44.0
         version: '@wildshard/shard-format@0.44.0(typescript@6.0.3)'
       '@wildshard/wire':
-        specifier: ^1.2.0
-        version: 1.2.0(typescript@6.0.3)
+        specifier: ^1.3.0
+        version: 1.3.0(typescript@6.0.3)
       ajv:
         specifier: 6.15.0
         version: 6.15.0
@@ -133,8 +133,8 @@ importers:
         specifier: npm:@wildshard/shard-format@0.38.1
         version: '@wildshard/shard-format@0.38.1(typescript@6.0.3)'
       '@wildshard/wire-released':
-        specifier: npm:@wildshard/wire@1.1.0
-        version: '@wildshard/wire@1.1.0(typescript@6.0.3)'
+        specifier: npm:@wildshard/wire@1.2.0
+        version: '@wildshard/wire@1.2.0(typescript@6.0.3)'
       assemblyscript:
         specifier: 0.28.20
         version: 0.28.20
@@ -805,12 +805,12 @@ packages:
     engines: {node: '>=24.18.0'}
     hasBin: true
 
-  '@wildshard/wire@1.1.0':
-    resolution: {integrity: sha512-lsPGYPBMSDYl+219BXAon8izJwBoJ8tWlMfLdpok3ILBIcxjyXjDH7gav5vZSn0hTDitX3fh0MkqBm08OvwcMw==}
-    hasBin: true
-
   '@wildshard/wire@1.2.0':
     resolution: {integrity: sha512-knJg+cSiiguoFESbxJy0yMAlrVeoMz2t391mXh07bVCjgX7t08SJa3re0fxsWl2qleC6/dXgguUcDxsZP9CfBQ==}
+    hasBin: true
+
+  '@wildshard/wire@1.3.0':
+    resolution: {integrity: sha512-CYm/kHVf11uFI6rz3a4Idt5MHzl8MK0JG7V02vE2t65OU3WqSjywqIg3XHa7zSyFK2+UGGPgctLBxYjyOjgf2Q==}
     hasBin: true
 
   ajv@6.15.0:
@@ -2065,13 +2065,13 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@wildshard/wire@1.1.0(typescript@6.0.3)':
+  '@wildshard/wire@1.2.0(typescript@6.0.3)':
     dependencies:
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
       - typescript
 
-  '@wildshard/wire@1.2.0(typescript@6.0.3)':
+  '@wildshard/wire@1.3.0(typescript@6.0.3)':
     dependencies:
       valibot: 1.5.0(typescript@6.0.3)
     transitivePeerDependencies:
