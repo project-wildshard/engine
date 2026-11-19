@@ -57,9 +57,10 @@ mkdirSync(out, { recursive: true });
 const RAPIER_STUB = 'const stub = new Proxy(function () {}, { get: (_, key) => key === "then" ? undefined : stub, apply: () => stub, construct: () => stub }); export default stub; export const RawVector = stub;';
 /** @type {import('vite').Plugin} */
 const chatOnly = { name: 'hud-worst-chat-only', enforce: 'pre',
-  resolveId: id => id.startsWith('@dimforge/rapier3d') ? '\0hud-worst-no-rapier' : null,
-  load: id => id === '\0hud-worst-no-rapier' ? RAPIER_STUB : null,
-  resolveDynamicImport: () => ({ id: 'data:text/javascript,export{}', external: true }) };
+  /** @param {string} id @param {string | undefined} _from @param {{ kind?: string }} [how] */
+  resolveId: (id, _from, how) => how?.kind === 'dynamic-import' ? { id: 'data:text/javascript,export{}', external: true }
+    : id.startsWith('@dimforge/rapier3d') ? '\0hud-worst-no-rapier' : null,
+  load: id => id === '\0hud-worst-no-rapier' ? RAPIER_STUB : null };
 
 /** The chat row's real modules over a stub link, as one script for the page (from `rev`'s modules when given).
  * @param {string} rev @returns {Promise<string>} */
