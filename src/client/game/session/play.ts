@@ -665,7 +665,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   }
   // ?explore=hub|world|model|sets[&cam=x,y,z,yaw,pitch][&model=id] — straight into the viewer (a shard with ShardManifest.explore — D4, E66; a note's "go there")
   let startExplore: (() => void) | undefined;
-  if (exploreParam !== null && (exploreApp || chunk.explore !== undefined)) {
+  // Authored folders declare the viewer capability. The hub can use the zone's card when it has no custom Explore art.
+  if (exploreParam !== null && (exploreApp || chunk.uses?.includes('explore') === true || chunk.explore !== undefined)) {
     const cam = (params.get('cam') ?? '').split(',').filter((v) => v !== '').map(Number);
     const model = params.get('model');
     hud.onExplore = () => { hud.onExplore = () => { void openExplore('hub'); }; void openExplore(exploreMode, { ...(cam.length >= 3 ? { cam } : {}), ...(model !== null ? { model } : {}) }); };
