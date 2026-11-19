@@ -20,3 +20,5 @@ pattern and belongs to the shard.
 
 `src/e2e/t1/layers.spec.ts` counts Chromium's full-screen composited layers in play and allows only the root and the
 canvas.
+
+The switch is a device slot, so `src/shared/engine/saves/saves.lock.json` records `IDLE_HUD_SLOT` (check:saves).
