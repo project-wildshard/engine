@@ -15,3 +15,19 @@ export function qualifyResult(item, result, elapsed) {
   ].filter(value => value !== null);
   return failures.length === 0 ? result : { ...result, outcome: 'harness-fail', reason: failures.join('; ') };
 }
+/** QA-FEEDBACK 2026-11-19 row 8: how long a boot case waits for its screen. A page reads its release file again only when it dials,
+ *  after the world has loaded, and hosted SwiftShader takes past 30 s to get there; the world's own entry gets 150 s (`intoWorld`). */
+export const BOOT_SCREEN_MS = 150_000;
+/** A boot case's screen, polled until it shows, the page is in the world without it (a real miss, called at once), or the deadline.
+ *  `screen` waits a beat itself and does any per-beat step (the Name box) first.
+ *  @template T @param {{ screen: () => Promise<T | null>, inWorld: () => Promise<boolean>, now?: () => number }} probe @param {number} deadlineMs
+ *  @returns {Promise<{ seen: T } | { seen: null, why: 'in the world' | 'deadline' }>} */
+export async function bootScreenWait(probe, deadlineMs) {
+  const now = probe.now ?? Date.now, until = now() + deadlineMs;
+  while (now() < until) {
+    const seen = await probe.screen();
+    if (seen !== null) return { seen };
+    if (await probe.inWorld()) return { seen: null, why: 'in the world' };
+  }
+  return { seen: null, why: 'deadline' };
+}

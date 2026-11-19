@@ -38,7 +38,7 @@ import { openApiFixture } from './failmode-api-fixture.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
-import { qualifyResult } from './failmode-results.mjs';
+import { BOOT_SCREEN_MS, bootScreenWait, qualifyResult } from './failmode-results.mjs';
 import { nextFailmodeDeploy } from './failmode-deploy-fixture.mjs';
 import { claimFixture, fixtureKey, fixtureRequestOrigins } from './online-rig-owned.mjs';
 import { rawLeak, selectCases, verdict } from './failmode-cases.mjs';
@@ -1158,12 +1158,16 @@ try {
         const before = await control(); await arm(item.id, [rule]);
         const started = Date.now(); await page.goto(URL_PLAY);
         // the Name box comes before the read on a page with no seat yet
-        const seen = await (async () => { const until = Date.now() + 30_000; while (Date.now() < until) { if (await page.locator('#ws-name-box input').isVisible().catch(() => false)) { await page.locator('#ws-name-box input').fill('fmboot'); await page.locator('#ws-name-box button[type=submit]').click(); } const found = await screen(page, item.screen, 500, started); if (found !== null) return found; } return null; })();
+        // QA 2026-11-19 row 8: the page reads the file again when it dials, after the world loads (past 30 s on SwiftShader)
+        const waited = await bootScreenWait({ inWorld: async () => await frames(page) > 0, screen: async () => {
+          if (await page.locator('#ws-name-box input').isVisible().catch(() => false)) { await page.locator('#ws-name-box input').fill('fmboot'); await page.locator('#ws-name-box button[type=submit]').click(); }
+          return screen(page, item.screen, 500, started);
+        } }, BOOT_SCREEN_MS), { seen } = waited;
         const shot = await shoot(page, item.id, seen === null ? 'missing' : 'page');
         const injection = { releaseMatches: await matchedSince(before, 'release'), upgrades: (await control()).counters.upgrades - before.counters.upgrades };
         if (injection.releaseMatches === 0) return { outcome: 'harness-fail', reason: 'the release fault matched nothing', injection, notes: await onScreen(page) };
         if (item.id === 'release-unsigned' && injection.upgrades > 0) return { outcome: 'ui-fail', reason: 'the page dialled on a release it could not verify', seen, injection, shot };
-        const result = await judged(seen, item, page);
+        const result = 'why' in waited && waited.why === 'in the world' ? { outcome: /** @type {const} */ ('ui-fail'), reason: `the page dialled with no ${item.screen} screen`, seen: null, notes: await onScreen(page) } : await judged(seen, item, page);
         await heal();
         if (result.outcome !== 'pass') return { ...result, injection, shot };
         await press(page, item.screen, 'Try').catch(() => undefined);
