@@ -74,7 +74,8 @@ export class CellMinimaps {
     /** J450: the cook's map, drawn instead when the author's own map is flat (`flatMap`) */
     readonly fallback?: string;
   } | undefined>, private readonly fullSize: (slug: string) => boolean = () => false,
-  private readonly retry?: { revision: () => number; deferred: (error: unknown) => boolean }) {
+  private readonly retry?: { revision: () => number; deferred: (error: unknown) => boolean },
+  private readonly flat: (image: CanvasImageSource) => boolean = flatMap) {
     scope.onDispose(() => { this.disposed = true; for (const m of this.maps.values()) if (m.image !== null) {
       if ('close' in m.image) m.image.close(); else m.image.width = m.image.height = 0;
     } this.maps.clear(); });
@@ -92,6 +93,8 @@ export class CellMinimaps {
     if (typeof document !== 'undefined') void this.load(slug, entry);
     return null;
   }
+  /** MAP-NEXT MN14: the shard's map if it is already loaded, without starting a load (the Bag map's cells past the atlas) */
+  peek(slug: string): HTMLCanvasElement | ImageBitmap | null { return this.disposed ? null : this.maps.get(slug)?.image ?? null; }
   /** whether `slug`'s map is kept at full size (the home's), else at CELL_PX */
   fullSized(slug: string): boolean { return this.fullSize(slug); }
   /** bytes held now (RGBA), for the memory readouts */
@@ -111,9 +114,14 @@ export class CellMinimaps {
         return createImageBitmap(await res.blob());
       };
       let full = await decode(url);
-      // J450: an author's map that is one flat colour (Saltwind's, Cinder Orchard's) counts as no map: the cook's is drawn
+      // J450: an author's map that is one flat colour (Saltwind's, Cinder Orchard's) counts as no map: the cook's is drawn.
+      // MN14: with no cook's map (a build-pinned slug) it is none at all, so the cell's atlas tile draws, not a flat disc
       const fallback = typeof leased === 'string' ? undefined : leased.fallback;
-      if (fallback !== undefined && !this.isDisposed() && flatMap(full)) { full.close(); full = await decode(fallback); }
+      if (!this.isDisposed() && this.flat(full)) {
+        full.close();
+        if (fallback === undefined) return;
+        full = await decode(fallback);
+      }
       try {
         if (this.disposed) return;
         if (this.fullSize(slug)) { entry.image = full; return; }
@@ -163,39 +171,49 @@ export interface MinimapBlendHost {
   readonly assembly: GridAssembly; readonly home: GridCell; readonly cells: GridCellEvents;
   readonly worldFeet: () => { readonly x: number; readonly z: number };
   readonly image: (instance: string) => CanvasImageSource | null;
+  /** MN14: a cell's map if already loaded, without starting a load (unset: none is) */
+  readonly peek?: (instance: string) => CanvasImageSource | null;
   readonly name: (cell: GridCell) => string;
+}
+type AtlasTile = (slug: string) => Pick<MapExtraImage, 'image' | 'crop'> | null;
+/** MAP-NEXT MN14: a cell's map, the one choice the HUD minimap and the Bag map both draw. Its own map (the author's look/map
+ *  unless flat, else the cook's: CellMinimaps) once loaded, else the build's atlas tile (a pinned slug's cooked render), else,
+ *  for a cell the atlas lacks (a placed upload), its own map loaded now. `load` loads the cell's own map first (the cell you
+ *  stand in, the home); otherwise the atlas stands in, so the overview never reads every cell's product (ZONE-ENTRY ZE14). */
+export function cellMap(host: MinimapBlendHost, cell: GridCell, atlas: AtlasTile | undefined, load: boolean): Pick<MapExtraImage, 'image' | 'crop'> | null {
+  const own = load ? host.image(cell.instance) : host.peek?.(cell.instance) ?? null;
+  if (own !== null) return { image: own };
+  const tile = atlas?.(cell.slug) ?? null;
+  if (tile !== null || load) return tile;
+  const image = host.image(cell.instance);
+  return image === null ? null : { image };
 }
 /** The overlay for the feet now (pure but for the rasters; the home frame's metres). */
 export function minimapOverlay(host: MinimapBlendHost, rects: readonly MapExtraRect[], atlas?: AtlasTile): MapExtras {
   const { assembly, home } = host, feet = host.worldFeet(), ox = home.origin.x, oz = home.origin.z;
   const inside = host.cells.cell === null ? undefined : assembly.at(feet.x, feet.z);
-  const homeImage = host.image(home.instance);
+  // MN14: every cell's ground is cellMap's choice, the home's too (its atlas tile before painted ground: Mossgate's green disc)
+  const homeMap = cellMap(host, home, atlas, true);
   const images: MapExtraImage[] = [];
   if (inside === undefined) {
-    // G107 on the road: every cell in view faded, the home's own layer too. ZONE-ENTRY ZE14: another cell is its world map
-    // atlas tile; its own map read admits its whole product (24 cells' worth on the first road step, failing offline)
+    // G107 on the road: every cell in view faded, the home too. ZONE-ENTRY ZE14: another cell is its world map atlas tile
+    // until its own map is loaded; its own map read admits its whole product (24 cells' worth on the first road step)
     for (const cell of assembly.cells) {
-      if (cell.instance === home.instance && homeImage === null) continue;
-      const at = { x: cell.origin.x - ox, z: cell.origin.z - oz, size: 2 * CHUNK_HALF, alpha: ROAD_TERRAIN_ALPHA };
-      const tile = cell.instance === home.instance ? null : atlas?.(cell.slug) ?? null;
-      if (tile !== null) { images.push({ ...tile, ...at }); continue; }
-      const image = host.image(cell.instance);
-      if (image !== null) images.push({ image, ...at });
+      const map = cell.instance === home.instance ? homeMap : cellMap(host, cell, atlas, false);
+      if (map !== null) images.push({ ...map, x: cell.origin.x - ox, z: cell.origin.z - oz, size: 2 * CHUNK_HALF, alpha: ROAD_TERRAIN_ALPHA });
     }
-    return { outside: VOID, baseAlpha: homeImage === null ? ROAD_TERRAIN_ALPHA : 0, rects, images, labels: roadNames(host, feet) };
+    return { outside: VOID, baseAlpha: homeMap === null ? ROAD_TERRAIN_ALPHA : 0, rects, images, labels: roadNames(host, feet) };
   }
-  // inside a cell: that shard at full strength and the road; no shard's name (SB32c: names are the road's)
-  if (inside.instance !== home.instance || homeImage !== null) {
-    const image = host.image(inside.instance);
-    if (image !== null) images.push({ image, x: inside.origin.x - ox, z: inside.origin.z - oz, size: 2 * CHUNK_HALF, alpha: 1 });
-  }
-  return { outside: VOID, baseAlpha: inside.instance === home.instance && homeImage === null ? 1 : 0, rects, images, labels: [] };
+  // inside a cell: that shard at full strength and the road; no shard's name (SB32c: names are the road's). Painted ground
+  // only for a home with neither its own map nor an atlas tile
+  const map = inside.instance === home.instance ? homeMap : cellMap(host, inside, atlas, true);
+  if (map !== null) images.push({ ...map, x: inside.origin.x - ox, z: inside.origin.z - oz, size: 2 * CHUNK_HALF, alpha: 1 });
+  return { outside: VOID, baseAlpha: inside.instance === home.instance && map === null ? 1 : 0, rects, images, labels: [] };
 }
 
 /** The grid's full map (SF66): every cell's baked map at its cell, the road network, each shard's name near its cell's north
  *  edge; the home's own ground is the map's base layer. Home-frame metres. A cell the atlas has no tile for (a placed cell,
  *  QA-FEEDBACK 2026-11-13 row 44) draws its own baked map once that loads, and a plain-plot square until then. */
-type AtlasTile = (slug: string) => Pick<MapExtraImage, 'image' | 'crop'> | null;
 /** J455: the whole drawn 7 by 7 in the home frame, so the full map spans it, opens on you inside it and clamps its pan to it.
  *  Spanning only the placed cells' rectangle cut staging's map to 6 by 6 (QA 2026-11-19 row 31: x -2..3, z -2..3 placed).
  *  A lone shard (one cell) keeps its own map. */
@@ -205,24 +223,19 @@ export function fullMapGrid(assembly: GridAssembly, home: GridCell): MapGrid | u
   return { x0: edge - home.origin.x, z0: edge - home.origin.z, pitch: p, cells: 2 * DRAWN_GRID_RADIUS + 1 };
 }
 export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraRect[], atlas?: AtlasTile): MapExtras {
-  const { assembly, home } = host, ox = home.origin.x, oz = home.origin.z, homeImage = atlas === undefined ? host.image(home.instance) : null;
+  const { assembly, home } = host, ox = home.origin.x, oz = home.origin.z;
   const images: MapExtraImage[] = [], labels: MapExtraLabel[] = [], plots: MapExtraRect[] = [];
+  let bareHome = false;
   for (const cell of assembly.cells) {
     const x = cell.origin.x - ox, z = cell.origin.z - oz;
     const text = host.name(cell);
     labels.push({ x, z: z + CHUNK_HALF - 90, text, short: text.split(' · ').at(-1) ?? text, color: NAME, width: CHUNK_HALF * 2 - 32, height: 160,
       fill: { x, z, width: assembly.pitch - 24, height: CHUNK_HALF * 2 - 32 } }); // MAP-NEXT MN9: the whole cell and its roads, at the overview
-    if (atlas !== undefined) {
-      const tile = atlas(cell.slug);
-      if (tile !== null) { images.push({ ...tile, x, z, size: 2 * CHUNK_HALF, alpha: 1 }); continue; }
-      const image = host.image(cell.instance);
-      if (image !== null) images.push({ image, x, z, size: 2 * CHUNK_HALF, alpha: 1 });
-      else plots.push({ x, z, hx: CHUNK_HALF, hz: CHUNK_HALF, color: PLOT });
-      continue;
-    }
-    if (cell.instance === home.instance && homeImage === null) continue;
-    const image = host.image(cell.instance);
-    if (image !== null) images.push({ image, x, z, size: 2 * CHUNK_HALF, alpha: 1 });
+    // MN14: the same choice as the HUD minimap (cellMap); with an atlas a cell that has nothing yet is a plain plot
+    const map = cellMap(host, cell, atlas, false);
+    if (map !== null) images.push({ ...map, x, z, size: 2 * CHUNK_HALF, alpha: 1 });
+    else if (atlas !== undefined) plots.push({ x, z, hx: CHUNK_HALF, hz: CHUNK_HALF, color: PLOT });
+    else if (cell.instance === home.instance) bareHome = true;
   }
   const grid = fullMapGrid(assembly, home), side = grid === undefined ? 0 : grid.cells * grid.pitch;
   // the 7 by 7's empty cells past the placed rectangle show as the strips' ground, as the empty cells inside it do
@@ -233,7 +246,7 @@ export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
     for (let i = -DRAWN_GRID_RADIUS; i <= DRAWN_GRID_RADIUS; i++) for (let j = -DRAWN_GRID_RADIUS; j <= DRAWN_GRID_RADIUS; j++)
       if (!taken.has(`${String(i)},${String(j)}`)) ground.push({ x: i * grid.pitch - ox, z: j * grid.pitch - oz, hx: CHUNK_HALF, hz: CHUNK_HALF, color: EMPTY });
   }
-  return { outside: VOID, baseAlpha: atlas === undefined && homeImage === null ? 1 : 0, rects: [...ground, ...rects, ...plots], images, labels, ...(grid === undefined ? {} : { grid }) };
+  return { outside: VOID, baseAlpha: bareHome ? 1 : 0, rects: [...ground, ...rects, ...plots], images, labels, ...(grid === undefined ? {} : { grid }) };
 }
 
 interface ExtrasSink { setExtras: (source: (() => MapExtras | null) | null) => void }

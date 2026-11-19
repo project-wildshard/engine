@@ -647,7 +647,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
       onInput: (fn) => { game.onInput(fn, 'game.grid.hud.fov'); }, onLate: (fn) => { game.onLate(fn, 'game.grid.hud'); } });
     // G107: the minimap blends at the road boundary (the shard + the road + the neighbours' names inside; faded terrain on the road)
     const atlas = await loadGridMapAtlas(game.levelScope, grid.allocator, __GRID_MAP_ATLAS__);
-    const blend = installMinimapBlend(minimap, { assembly: grid.assembly, home: grid.home, cells: gridCells, worldFeet: () => grid.worldFeet(), image: (id) => grid.mapImage(id),
+    const blend = installMinimapBlend(minimap, { assembly: grid.assembly, home: grid.home, cells: gridCells, worldFeet: () => grid.worldFeet(), image: (id) => grid.mapImage(id), peek: (id) => grid.mapPeek(id),
       name: (cell) => findShard(cell.slug)?.name ?? cell.slug }, game.levelScope, fullMap, atlas); // Full map is complete before the first Bag open.
     // playtest round 3: the menu names the shard whose cell you are in (the full map's arrow reads mapAt's home frame too)
     game.levelScope.onDispose(gridCells.onEnter((cell) => { menu.setLevelName(findShard(cell.slug)?.name ?? cell.slug); }));

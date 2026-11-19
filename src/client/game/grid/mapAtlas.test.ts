@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { loadGridMapAtlas } from './mapAtlas';
 import { GridAssembly } from '../../../shared/game/grid/assembly';
-import { fullMapOverlay, minimapOverlay } from './minimapBlend';
+import { CellMinimaps, fullMapOverlay, minimapOverlay } from './minimapBlend';
 import { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 
@@ -89,7 +89,8 @@ test('the road minimap draws the atlas, not each cell\'s product (ZONE-ENTRY ZE1
   const road = minimapOverlay(host, [], tile);
   // only the home's own layer and the one cell the atlas lacks are asked for; every other cell is its atlas tile, faded
   expect(asked.filter(instance => instance !== home.instance)).toEqual([placed.instance]);
-  expect(road.images.filter(row => row.image === atlasImage)).toHaveLength(assembly.cells.length - 2);
+  // MAP-NEXT MN14: the home with no map of its own is its atlas tile too, not painted ground
+  expect(road.images.filter(row => row.image === atlasImage)).toHaveLength(assembly.cells.length - 1); expect(road.baseAlpha).toBe(0);
   expect(road.images.every(row => row.alpha < 1)).toBe(true);
 });
 
@@ -105,4 +106,47 @@ test('MAP-NEXT MN9: with every zone\'s map the 7 by 7 is 49 cells, no plain plot
   for (const [i, cell] of assembly.cells.entries()) {
     expect(overlay.labels[i]?.fill).toEqual({ x: cell.origin.x - home.origin.x, z: cell.origin.z - home.origin.z, width: assembly.pitch - 24, height: 2 * CHUNK_HALF - 32 });
   }
+});
+
+test('MAP-NEXT MN14 (a): a flat author map with no cook\'s map is no map, and the home draws its atlas tile, not painted ground', async () => {
+  // a build-pinned slug (Mossgate) has no placed cooked map to fall back to: its flat look/map counts as none
+  const bitmap = { width: 4, height: 4, close: vi.fn() };
+  vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, blob: () => Promise.resolve(new Blob()) })));
+  vi.stubGlobal('createImageBitmap', vi.fn(() => Promise.resolve(bitmap)));
+  const scope = new Scope('flat-map');
+  try {
+    let maps: CellMinimaps | undefined;
+    const retained = await new Promise<unknown>(resolve => {
+      maps = new CellMinimaps(scope, () => Promise.resolve({ url: '/map.webp', retained: resolve }), () => true, undefined, () => true);
+      expect(maps.image('mossgate')).toBeNull();
+    });
+    expect(retained).toBeNull(); expect(bitmap.close).toHaveBeenCalledOnce();
+    expect(maps?.image('mossgate')).toBeNull(); expect(maps?.peek('mossgate')).toBeNull();
+  } finally { scope.dispose(); vi.unstubAllGlobals(); }
+  // standing in the home with no map of its own: its atlas tile at full strength, no painted ground under it
+  const assembly = new GridAssembly({ developer: true, devserver: true }), home = assembly.cells[0];
+  if (home === undefined) throw new Error('Missing home');
+  const atlasImage = document.createElement('canvas'), cells = new GridCellEvents();
+  cells.enter(home);
+  const host = { assembly, home, cells, worldFeet: () => home.origin, name: (cell: { slug: string }) => cell.slug, image: () => null };
+  const inside = minimapOverlay(host, [], () => ({ image: atlasImage, crop: [0, 0, 256, 256] }));
+  expect(inside.baseAlpha).toBe(0);
+  expect(inside.images).toEqual([{ image: atlasImage, crop: [0, 0, 256, 256], x: 0, z: 0, size: 2 * CHUNK_HALF, alpha: 1 }]);
+});
+
+test('MAP-NEXT MN14 (b): the HUD minimap and the Bag map choose the same source for every cell', () => {
+  const assembly = new GridAssembly({ developer: true, devserver: true }), [home, loaded, upload] = assembly.cells;
+  if (home === undefined || loaded === undefined || upload === undefined) throw new Error('Missing cells');
+  // the home and one neighbour have their own maps loaded; one placed upload has no atlas tile; the rest are atlas only
+  const own = new Map([[home.instance, document.createElement('canvas')], [loaded.instance, document.createElement('canvas')], [upload.instance, document.createElement('canvas')]]);
+  const atlasImage = document.createElement('canvas');
+  const host = { assembly, home, cells: new GridCellEvents(), worldFeet: () => ({ x: home.origin.x + CHUNK_HALF + 20, z: home.origin.z }), name: (cell: { slug: string }) => cell.slug,
+    image: (instance: string) => own.get(instance) ?? null, peek: (instance: string) => instance === upload.instance ? null : own.get(instance) ?? null };
+  const tile = (slug: string) => slug === upload.slug ? null : { image: atlasImage, crop: [0, 0, 256, 256] as [number, number, number, number] };
+  const source = (row: { image: unknown; crop?: unknown; x: number; z: number }) => [`${row.x},${row.z}`, [row.image, row.crop]] as const;
+  const road = new Map(minimapOverlay(host, [], tile).images.map(source)), bag = new Map(fullMapOverlay(host, [], tile).images.map(source));
+  expect(road.size).toBe(assembly.cells.length); expect(road).toEqual(bag);
+  expect(bag.get('0,0')?.[0]).toBe(own.get(home.instance));
+  expect(bag.get(`${loaded.origin.x - home.origin.x},${loaded.origin.z - home.origin.z}`)?.[0]).toBe(own.get(loaded.instance));
+  expect(bag.get(`${upload.origin.x - home.origin.x},${upload.origin.z - home.origin.z}`)?.[0]).toBe(own.get(upload.instance));
 });

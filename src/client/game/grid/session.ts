@@ -1107,6 +1107,8 @@ export class GridSession {
   }
   /** G107 / SF66: a cell's admitted baked map once loaded, retaining the home's full raster size. */
   mapImage(instance: string): HTMLCanvasElement | ImageBitmap | null { return this.mapImages.image(this.assembly.cell(instance).slug); }
+  /** MAP-NEXT MN14: a cell's map if already loaded, without starting a load */
+  mapPeek(instance: string): HTMLCanvasElement | ImageBitmap | null { return this.mapImages.peek(this.assembly.cell(instance).slug); }
   /** the neighbours' baked maps held now (bytes), for the memory readouts */
   get mapImageBytes(): number { return this.mapImages.bytes; }
   /** The traveller's feet in grid metres, whatever frame it is in. */
