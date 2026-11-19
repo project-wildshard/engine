@@ -97,9 +97,9 @@ export function gridFloorPlans(state, scenario, options = {}) {
   const origin = cell => ({ x: cell.cell[0] * pitch, z: cell.cell[1] * pitch });
   const h = origin(home), plans = [];
   if (scenario === 'milestone') {
-    // Each road entry is an independent approach after the continuous template out/back drive.
+    // Each road entry is an independent approach after the continuous Brasscap out/back drive.
     // Seed its road, let the real source checkpoint/leave settle, then measure held input through the border.
-    plans.push(...gridFloorPlans(state, 'template'));
+    plans.push(...gridFloorPlans(state, 'brasscap'));
     for (const slug of ['nine-dragon-stack', 'far-reach', 'nalati-grasslands', 'pine-hollow', 'sunscar-dunes', 'driftwood-isle']) {
       const target = state.cells.find(cell => cell.slug === slug);
       if (!target) throw new Error(`Milestone floor requires ${slug} (Nine requires --devserver)`);
@@ -165,8 +165,8 @@ export function gridFloorPlans(state, scenario, options = {}) {
     if (!target) throw new Error(`Grid floor has no ${String(options.cell)} cell (a DEVSERVER-only cell needs --devserver)`);
     if (target.instance === home.instance) {
       if (options.roadApproach !== true) throw new Error('Grid floor home cell needs a cold road return');
-      const [out, back] = gridFloorPlans(state, 'template');
-      if (out === undefined || back === undefined) throw new Error('Grid floor home return requires a template');
+      const [out, back] = gridFloorPlans(state, 'brasscap');
+      if (out === undefined || back === undefined) throw new Error('Grid floor home return requires a Brasscap cell');
       // Retire the owned home through actual travel before measuring its return. Reusing the boot
       // resident would hide preparation; this leg has no second pose seed or warm home allocation.
       return [{ ...out, movement: 'road-hover', hoverMaxSpeed: 30, retiredResidents: [home.instance] },
@@ -203,10 +203,13 @@ export function gridFloorPlans(state, scenario, options = {}) {
     { name: 'sun-reentry', from: null, to: sun.instance, movement: 'road-hover',
       waypoints: [entry], requiredResidents: [sun.instance] });
   }
-  if (scenario === 'template' || scenario === 'all') {
-    const peer = state.cells.filter(cell => cell.slug === '_template' && cell.instance !== home.instance)
+  // J434: the peer is Brasscap's road cell (the legacy Template's corner cell is retired); the public grid, which holds no
+  // Developer cell, names its own peer (options.peer)
+  if (scenario === 'brasscap' || scenario === 'all') {
+    const peerSlug = options.peer ?? 'brasscap-mesa';
+    const peer = state.cells.filter(cell => cell.slug === peerSlug && cell.instance !== home.instance)
       .sort((a, b) => a.instance.localeCompare(b.instance))[0];
-    if (!peer) throw new Error('Grid floor has no template');
+    if (!peer) throw new Error(`Grid floor has no ${peerSlug} cell`);
     const p = origin(peer), dx = Math.sign(p.x - h.x), dz = Math.sign(p.z - h.z);
     // leave from home's exit socket (its floor is the highway level): Driftwood's sea bed just inside its north socket lies
     // 0.8 m under the socket's edge, so a start at 230 m hovered into that ledge and the route timed out at waypoint 0
@@ -215,8 +218,8 @@ export function gridFloorPlans(state, scenario, options = {}) {
     // Corners have no diagonal entrance: use the two midpoint turn-ins and their crossroads.
     const road = dx !== 0 && dz !== 0 ? [{ x: h.x, z: (h.z + p.z) / 2 },
       { x: (h.x + p.x) / 2, z: (h.z + p.z) / 2 }, { x: (h.x + p.x) / 2, z: p.z }] : [];
-    plans.push({ name: 'template-interior', from: home.instance, to: peer.instance, start, waypoints: [...road, end], requiredResidents: [peer.instance] },
-      { name: 'template-return', from: peer.instance, to: home.instance, waypoints: [...road].reverse().concat(start), requiredResidents: [] });
+    plans.push({ name: 'brasscap-interior', from: home.instance, to: peer.instance, start, waypoints: [...road, end], requiredResidents: [peer.instance] },
+      { name: 'brasscap-return', from: peer.instance, to: home.instance, waypoints: [...road].reverse().concat(start), requiredResidents: [] });
   }
   if (scenario === 'runtime-travel' || scenario === 'all') {
     const pine = state.cells.find(cell => cell.slug === 'pine-hollow'), nalati = state.cells.find(cell => cell.slug === 'nalati-grasslands');

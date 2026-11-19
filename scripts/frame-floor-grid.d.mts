@@ -45,7 +45,7 @@ export interface FloorGridFailure { kind: string; stop: FloorGridProgress['stop'
 export function installFloorGridProgress(): void;
 export function gridFloorRuntimeFailure(last: FloorGridProgress | null, diagnostic: { documentOrigin: number; lastEnd?: { reason: string; at: number }; lastUnload?: { reason: string; t: number } } | null): FloorGridFailure | null;
 /** 'cell' enters the cell whose instance or slug is `options.cell` from the road at its home-side edge (op-frame22). */
-export function gridFloorPlans(state: Pick<FloorGridState, 'home' | 'cells' | 'pitch'>, scenario: 'baseline' | 'template' | 'runtime-travel' | 'sun-entry' | 'cell' | 'all' | 'milestone' | 'reentry' | 'sky-cycle', options?: { cell?: string; roadApproach?: boolean; entrySocket?: boolean; risingIslet?: 'north' | 'east' | 'south' | 'west' }): FloorGridPlan[];
+export function gridFloorPlans(state: Pick<FloorGridState, 'home' | 'cells' | 'pitch'>, scenario: 'baseline' | 'brasscap' | 'runtime-travel' | 'sun-entry' | 'cell' | 'all' | 'milestone' | 'reentry' | 'sky-cycle', options?: { cell?: string; peer?: string; roadApproach?: boolean; entrySocket?: boolean; risingIslet?: 'north' | 'east' | 'south' | 'west' }): FloorGridPlan[];
 /** Original standing poses translated only by the served lattice's half-pitch delta. */
 export function gridFloorPoses(pitch?: number): { name: string; x: number; y: number; z: number; yaw: number; pitch: number }[];
 /** Resolve declared portal nodes or the socket-lift approach from the pinned shardfile. */

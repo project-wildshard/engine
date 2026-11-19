@@ -3,7 +3,7 @@ import { floorGridPortalPlan, gridFloorPlans, gridFloorPoses, gridFloorWitnessFa
 
 const state = { home: 'home', cells: [
   { instance: 'home', slug: 'driftwood-isle', cell: [0, 0] as const },
-  { instance: 'template', slug: '_template', cell: [-1, -1] as const },
+  { instance: 'brasscap', slug: 'brasscap-mesa', cell: [-1, -1] as const },
   { instance: 'pine', slug: 'pine-hollow', cell: [0, 1] as const },
   { instance: 'nalati', slug: 'nalati-grasslands', cell: [1, 0] as const },
 ] };
@@ -20,7 +20,7 @@ test('the default pitch plans and poses equal the 555 m ones', () => {
 
 test('562.5 m routes follow observed cell origins and midpoint turn-ins', () => {
   const plans = gridFloorPlans({ ...state, pitch: 562.5 }, 'all');
-  expect(plans.map(plan => plan.name)).toEqual(['template-interior', 'template-return', 'pine-interior', 'nalati-interior']);
+  expect(plans.map(plan => plan.name)).toEqual(['brasscap-interior', 'brasscap-return', 'pine-interior', 'nalati-interior']);
   expect(plans[0]?.waypoints).toEqual([
     { x: 0, z: -281.25 }, { x: -281.25, z: -281.25 },
     { x: -281.25, z: -562.5 }, { x: -332.5, z: -562.5 },

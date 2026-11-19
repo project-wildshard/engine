@@ -7,22 +7,23 @@ export function publicGridIntentCode(home) {
   return `(() => {const target={...${JSON.stringify(home)},at:Date.now()};const write=${writeSaveFixture.toString()};write({scope:'session',key:'gridIntent',data:target});write({scope:'device',key:'gridIntent.once',data:target});})()`;
 }
 
-/** A single initial home approach, followed by real-input road and template-centre legs.
+/** The public cell the public walk enters: Brasscap is Developer-only, so Sunscar Dunes beside home (J434). */
+export const PUBLIC_PEER = 'sunscar-dunes';
+
+/** A single initial home approach, followed by real-input road and peer-centre legs.
  * @param {Pick<import('./frame-floor-grid.mjs').FloorGridState,'home'|'cells'|'pitch'>} state */
 export function publicGridPlans(state) {
-  const entry = gridFloorPlans(state, 'template').at(0);
+  const entry = gridFloorPlans(state, 'brasscap', { peer: PUBLIC_PEER }).at(0);
   if (!entry?.start) throw new Error('Public grid needs its home approach');
   const cell = state.cells.find(row => row.instance === entry.to), end = entry.waypoints.at(-1);
-  if (!cell || !end) throw new Error('Public grid needs a template destination');
+  if (!cell || !end) throw new Error(`Public grid needs a ${PUBLIC_PEER} destination`);
   const road = entry.waypoints.length > 2 ? entry.waypoints.slice(0, 2)
     : [{x:(entry.start.x+end.x)/2,z:(entry.start.z+end.z)/2}];
   const centre = {x:cell.cell[0]*(state.pitch ?? 555),z:cell.cell[1]*(state.pitch ?? 555)};
-  // The southern approach to the template centre meets the grey hut's back wall
-  // at local z=-15. Walk around its west side; keep every segment real input.
-  const interior = end.x === centre.x && end.z < centre.z
-    ? [{x:centre.x-8,z:centre.z-25},{x:centre.x-8,z:centre.z},centre] : [centre];
+  // The legacy Template's grey hut needed a detour round its back wall; the peer's centre is walked to directly.
+  const interior = [centre];
   return [{name:'public-road',from:entry.from,to:null,borrowedHome:state.home,start:entry.start,waypoints:road,requiredResidents:[]},
-    {name:'public-template',from:null,to:entry.to,waypoints:[...entry.waypoints.slice(entry.waypoints.length > 2 ? 2 : 0),
+    {name:'public-peer',from:null,to:entry.to,waypoints:[...entry.waypoints.slice(entry.waypoints.length > 2 ? 2 : 0),
       ...interior],requiredResidents:[cell.instance]}];
 }
 
@@ -50,7 +51,7 @@ export function publicGridWitnessFailures(witness, requireTemplate) {
   if (witness.homeResidency?.instance !== state.home || !Number.isSafeInteger(witness.homeResidency.bytes) || witness.homeResidency.bytes <= 0) failures.push('Grid home has no positive admitted residency claim');
   if (state.cells.some(row => !PUBLIC_SLUGS.has(row.slug))) failures.push('Developer-only region is present in the public catalogue');
   if (state.live.live.residents.some(id => !state.cells.some(row => row.instance === id && PUBLIC_SLUGS.has(row.slug)))) failures.push('An unlisted region became a runtime resident');
-  if (requireTemplate && !state.cells.some(row => row.slug === '_template' && row.instance === state.inside
-    && row.instance === state.live.live.current && state.live.live.residents.includes(row.instance))) failures.push('Public template entry and residency were not witnessed');
+  if (requireTemplate && !state.cells.some(row => row.slug === PUBLIC_PEER && row.instance === state.inside
+    && row.instance === state.live.live.current && state.live.live.residents.includes(row.instance))) failures.push(`Public ${PUBLIC_PEER} entry and residency were not witnessed`);
   return failures;
 }

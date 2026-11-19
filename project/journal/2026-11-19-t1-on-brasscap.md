@@ -43,3 +43,5 @@ found three real bugs, each fixed in its own commit:
   `footprint/brasscap-mesa/settled` has no baseline until a record run
   (verdict "raised", not red). The ladder's `_template` rung is left for
   TR-8 (its "engine fixed" part needs the simplest shard, not Brasscap).
+- Frame floor: the peer route is 'brasscap' (Brasscap's road cell at
+  (-1,-1)); the public walk enters Sunscar Dunes (Brasscap is Developer).
