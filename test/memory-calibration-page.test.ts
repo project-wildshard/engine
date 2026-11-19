@@ -63,7 +63,11 @@ test.skipIf(noBrowser)(`the staircase writes every step and a reload reads the l
   const page = await browser!.newPage();
   await page.goto(`${base}?kind=arraybuffer&stair=1&stepmb=8&every=10&max=32&beacon=/beacon`);
   await until(page, (c) => c.done);
-  await expect.poll(() => beacons.filter((b) => b.kind === 'arraybuffer').map((b) => b.got / MB)).toEqual([8, 16, 24, 32]);
+  // The browser queues each beacon independently, so the server can receive steps out of order.
+  await expect.poll(() => beacons
+    .filter((beacon) => beacon.kind === 'arraybuffer')
+    .map((beacon) => beacon.got / MB)
+    .sort((a, b) => a - b)).toEqual([8, 16, 24, 32]);
   expect(await page.evaluate(() => localStorage.getItem('calib:arraybuffer'))).toBe(String(32 * MB));
   await page.goto(`${base}?kind=arraybuffer`);
   await until(page, (c) => c.done);
