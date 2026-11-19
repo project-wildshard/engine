@@ -1,14 +1,15 @@
 // @vitest-environment happy-dom
 // J455 (QA 2026-11-19 rows 31 and 57): the Bag map opens on you with your zone filling 72% of the short side and a rim of
 // every neighbour around it, zoom 1 shows the whole 7 by 7, and the
-// pan is clamped so a whole grid cell always stays in view.
+// pan is clamped so a whole grid cell always stays in view. Row 58 (Jake's A-1.4): the chips are 0.25x (the whole 7 by 7),
+// 0.5x, 1x (the opening view) and 2x, and a pinch settles on the nearest one.
 import { afterEach, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { withOwner } from '../../../shared/engine/app/ownership';
 import { legacyDouble } from '../../../test/engine/FakeGame';
 import { FullMap } from './Map';
 import type { MapExtras, Minimap } from './Minimap';
-import { GRID_ZOOMS, OPEN_ZONE_FILL, cellAt, clampView, gridPpm, openZoom, wholeCellsIn, type MapGrid } from './mapView';
+import { OPEN_ZONE_FILL, SHARD_STOPS, cellAt, clampView, gridPpm, gridStops, nearestStop, openZoom, wholeCellsIn, type MapGrid } from './mapView';
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -21,7 +22,6 @@ const ZONE = 500;
 
 test('the map opens with the zone at 72% of the short side and a rim of road and next zone around it', () => {
   expect(OPEN_ZONE_FILL).toBe(0.72);
-  expect(GRID_ZOOMS).toEqual([1, 2, 4]); // the chips stay until Jake picks their labels
   const short = 1000, across = short / gridPpm(GRID, short, openZoom(GRID));
   expect(ZONE / across).toBeCloseTo(0.72);
   // each side shows the zone's whole road (its half and the neighbour's) and a slice of the next zone past it
@@ -29,6 +29,21 @@ test('the map opens with the zone at 72% of the short side and a rim of road and
   expect(rim).toBeGreaterThan(road + 20);
   expect(rim).toBeLessThan(road + ZONE / 4);
   expect(short / gridPpm(GRID, short, 1) / PITCH).toBeCloseTo(7);
+});
+
+test('row 58: 1x opens on you, 0.5x and 2x halve and double it, 0.25x is the whole 7 by 7', () => {
+  const stops = gridStops(GRID), open = openZoom(GRID);
+  expect(stops.map(s => s.label)).toEqual([0.25, 0.5, 1, 2]);
+  expect(stops.map(s => s.zoom)).toEqual([1, open / 2, open, 2 * open]);
+  // 0.25x: the 7 by 7 exactly across the short side (zoom 1), not a quarter of 1x (which leaves a cell and a half out)
+  expect(1000 / gridPpm(GRID, 1000, stops[0]?.zoom ?? 0) / PITCH).toBeCloseTo(7);
+  expect(open / 4).toBeGreaterThan(1.3);
+  expect(nearestStop(stops, open * 1.3).label).toBe(1);
+  expect(nearestStop(stops, open * 1.5).label).toBe(2);
+  expect(nearestStop(stops, 1.6).label).toBe(0.25);
+  expect(nearestStop(stops, 2.2).label).toBe(0.5);
+  expect(nearestStop(stops, 100).label).toBe(2);
+  expect(SHARD_STOPS.map(s => s.label)).toEqual([1, 2, 4]);
 });
 
 test('panning away leaves exactly one whole corner cell in view, at every zoom', () => {
@@ -141,5 +156,42 @@ test('a one-shard map keeps its old fit: the chunk, centred, at 1x', () => {
     expect(map.zoom).toBe(1);
     const box = map.viewBox();
     expect((box.x0 + box.x1) / 2).toBeCloseTo(0);
+  } finally { scope.dispose(); }
+});
+
+test('row 58: the grid map\'s chips are its stops, and a pinch settles on the nearest one about the fingers', () => {
+  const { map, scope, frames } = fixture(gridExtras);
+  try {
+    map.update({ x: 0, z: 0 }, 0); map.show();
+    expect(map.stops).toEqual(gridStops(GRID));
+    const open = openZoom(GRID), canvas = map.root.querySelector('canvas');
+    if (canvas === null) throw new Error('no canvas');
+    const at = (id: number, x: number, y: number, type = 'pointermove'): void => { canvas.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: y })); };
+    // pinch out 1.3 times from 1x: under the halfway (1.41x) to 2x, so it settles back on 1x
+    at(1, 400, 300, 'pointerdown'); at(2, 600, 300, 'pointerdown');
+    at(1, 370, 300); at(2, 630, 300);
+    expect(map.zoom).toBeCloseTo(open * 1.3);
+    at(2, 630, 300, 'pointerup');
+    for (let t = 0; frames.length > 0 && t < 40; t++) for (const frame of frames.splice(0)) frame(1000 + t * 16);
+    expect(map.zoom).toBeCloseTo(open);
+    // pinch out 1.6 times: past the halfway, so it settles on 2x
+    at(2, 600, 300, 'pointerdown'); at(1, 370, 300); at(2, 370 + 1.6 * 230, 300);
+    at(1, 370, 300, 'pointerup');
+    for (let t = 0; frames.length > 0 && t < 40; t++) for (const frame of frames.splice(0)) frame(5000 + t * 16);
+    expect(map.zoom).toBeCloseTo(2 * open);
+    at(2, 0, 0, 'pointerup');
+  } finally { scope.dispose(); }
+});
+
+test('a one-shard map keeps its 1x 2x 4x chips and its free pinch', () => {
+  const { map, scope } = fixture(null);
+  try {
+    map.update({ x: 0, z: 0 }, 0); map.show();
+    expect(map.stops).toBe(SHARD_STOPS);
+    const canvas = map.root.querySelector('canvas');
+    if (canvas === null) throw new Error('no canvas');
+    const at = (id: number, x: number, type = 'pointermove'): void => { canvas.dispatchEvent(new PointerEvent(type, { pointerId: id, clientX: x, clientY: 300 })); };
+    at(1, 400, 'pointerdown'); at(2, 600, 'pointerdown'); at(1, 370); at(2, 630); at(2, 630, 'pointerup');
+    expect(map.zoom).toBeCloseTo(1.3);
   } finally { scope.dispose(); }
 });

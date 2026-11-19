@@ -38,7 +38,8 @@ const TITLE: Record<MenuGroup, string> = { pause: engineString('s_74a883a037bc')
 /** the menu's keys (Esc is handled apart: it pauses, and closes whatever tab is open) */
 
 /** what a Settings row's "applies when" reads: the weapons you hold now and the shard */
-const HINTS: Record<BuiltInTab, string> & Partial<Record<string, string>> = { map: engineString('s_90238ffb7476'), gear: engineString('s_d6a37d4c0ef4'), finds: engineString('s_77fb830f183c'), inventory: engineString('s_f60c27a1ad27'), achievements: engineString('s_b86de6f1d8e0'), settings: engineString('s_de1b7705e971'), feedback: engineString('s_1806a5739ce4') };
+/** row 58 (Jake's A-1.4): nothing under the map's zoom row, so the MAP tab has no hint (it was "Drag to pan · pinch to zoom") */
+const HINTS: Record<BuiltInTab, string> & Partial<Record<string, string>> = { map: '', gear: engineString('s_d6a37d4c0ef4'), finds: engineString('s_77fb830f183c'), inventory: engineString('s_f60c27a1ad27'), achievements: engineString('s_b86de6f1d8e0'), settings: engineString('s_de1b7705e971'), feedback: engineString('s_1806a5739ce4') };
 
 /** the weapons as the GEAR tab shows them — read live from Weapons (src/engine/player/Weapons.ts) */
 export interface KitEntry { id: string; name: string; ammoLabel: string; ammo: number; magazine: number; reserve: number; equipped: boolean; icon: IconId; melee: boolean; tracers: boolean; huntersEye: boolean }
@@ -85,6 +86,10 @@ export class GameMenu {
   /** the map's POI · You key: hidden over a practice room's own map (its names are on it, it has no POIs; E353) */
   private mapLegend: HTMLElement;
   private zoomChips: HTMLButtonElement[] = [];
+  private zooms: HTMLElement;
+  /** the labels the chips show now ("0.25,0.5,1,2"): rebuilt when the map's stops change (the grid's, a one-shard map's) */
+  private zoomKey = '';
+  private zoomScope: Scope | null = null;
   private _tab: MenuTab = 'settings';
   private layer: UiHandle | null = null;
   private openScope: Scope | null = null;
@@ -141,19 +146,16 @@ export class GameMenu {
     mountUi(this.root, this.scope, document.body);
 
     // ── MAP: the FullMap canvas lives inside this panel (Map.ts embedded mode) ──
+    // row 58 (Jake's A-1.4): the map is the panel's full width and 1.4 times as tall, the zoom row and the key under it and
+    // nothing below. The shard's name line is hidden on a phone (the header's subtitle already names it)
     this.mapMeta = el('ws-gmenu-mapmeta'); this.mapMeta.textContent = levelName; // E318: the shard's name, no chunk size
     this.mapQuest = el('ws-gmenu-mapquest');
     const frame = el('ws-gmenu-mapframe');
     opts.fullMap.mount(frame);
     const foot = el('ws-gmenu-mapfoot');
-    const zooms = el('ws-gmenu-zooms');
-    for (const z of [1, 2, 4]) {
-      const b = el('ws-gmenu-zoom', engineString('s_03a5f0ef36b4', [z]), 'button') as HTMLButtonElement; b.type = 'button'; b.dataset['z'] = String(z);
-      listenTap(this.scope, b, () => { opts.fullMap.setZoom(z); this.syncZoom(); });
-      zooms.append(b); this.zoomChips.push(b);
-  }
+    this.zooms = el('ws-gmenu-zooms');
     this.mapLegend = el('ws-gmenu-legend', engineString('s_dd35e28aa4b1', [icon('poi'), icon('you')]));
-    foot.append(zooms, this.mapLegend);
+    foot.append(this.zooms, this.mapLegend);
     this.panels.map.append(this.mapMeta, this.mapQuest, frame, foot);
     opts.fullMap.onZoom = () => this.syncZoom();
 
@@ -371,9 +373,23 @@ export class GameMenu {
   }
 
   private syncZoom() {
-    const z = this.opts.fullMap.zoom;
-    this.mapLegend.hidden = this.opts.fullMap.hasRoom;
-    for (const b of this.zoomChips) b.classList.toggle('active', Math.abs(Number(b.dataset['z']) - z) < 0.01);
+    const map = this.opts.fullMap, z = map.zoom;
+    this.mapLegend.hidden = map.hasRoom;
+    const stops = map.stops, key = stops.map((stop) => stop.label).join(',');
+    if (key !== this.zoomKey) {
+      this.zoomKey = key;
+      this.zoomScope?.dispose();
+      const scope = this.zoomScope = this.scope.child('zooms');
+      this.zoomChips = stops.map((stop) => {
+        const b = el('ws-gmenu-zoom', engineString('s_03a5f0ef36b4', [stop.label]), 'button') as HTMLButtonElement;
+        b.type = 'button'; b.dataset['z'] = String(stop.label);
+        listenTap(scope, b, () => { map.setZoom(stop.zoom); this.syncZoom(); });
+        return b;
+      });
+      this.zooms.replaceChildren(...this.zoomChips);
+    }
+    // a chip lights at its stop (a pinch settles there; the wheel may sit between two, and then none is lit)
+    for (const [i, b] of this.zoomChips.entries()) { const stop = stops[i]; b.classList.toggle('active', stop !== undefined && Math.abs(Math.log(stop.zoom / z)) < 0.01); }
   }
 
   // ── SETTINGS ──

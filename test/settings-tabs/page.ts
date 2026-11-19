@@ -22,7 +22,7 @@ import { reviewUnlocked } from '../../src/client/engine/ui/review';
 installAssetTables({ bytes: {}, versions: {}, music: {}, sfx: {}, packs: {} });
 const owner = new Scope('settings-proof');
 owner.onDispose(bindFlatTerrain());
-const map = legacyDouble<FullMap>({ mount: () => undefined, setZoom: () => undefined, fit: () => undefined, show: () => undefined, hide: () => undefined, hasRoom: false, zoom: 1, quest: null });
+const map = legacyDouble<FullMap>({ mount: () => undefined, setZoom: () => undefined, fit: () => undefined, show: () => undefined, hide: () => undefined, hasRoom: false, zoom: 1, stops: [{ label: 1, zoom: 1 }], quest: null });
 const held = { weapons: new Set<string>(), melee: false, tracers: false, huntersEye: false };
 const menu = withOwner(owner, () => new GameMenu({ levelName: 'Driftwood Isle', fullMap: map, settings: () => held }));
 // the game's own section (its shard save cards, G83), as savesSettings.ts adds it

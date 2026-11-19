@@ -17,14 +17,15 @@ import { engineString } from '../../../shared/engine/strings';
  * Around the chunk, `setExtras` lays out more ground as data (the grid: every cell's baked map at its cell, the road network
  * and each shard's name; SF66), and the view then spans all of it.
  * On the grid (the extras carry a `grid`, J455) the map opens centred on you with your zone filling 72% of the frame (QA 11-19
- * row 57), 1× fits the whole
- * 7 by 7, and the pan is clamped so a whole grid cell always stays in view (mapView.ts).
+ * row 57), its chips are 0.25× (the whole 7 by 7) · 0.5× · 1× (that opening view) · 2× and a pinch settles on the nearest
+ * of them (row 58, Jake's A-1.4), and the pan is clamped so a whole grid cell always stays in view (mapView.ts).
  * Drag to pan, pinch or wheel to zoom (1× = the chunk fitted to the frame, up to 6×). The world
  * keeps running underneath; the canvas swallows touch so the pads don't move you.
  *
  *   const fullMap = new FullMap(minimap);   // builds the canvas only
  *   fullMap.mount(frame)                    // the menu puts it in its map frame (Menu.ts); show()/hide() are the menu's
  *   fullMap.setZoom(2) / fullMap.zoom / fullMap.onZoom / fullMap.fit()
+ *   fullMap.stops                          // the zoom chips: { label, zoom }[] (gridStops on the grid, else SHARD_STOPS)
  *   fullMap.setPois(() => MapPoi[])        // a shard's own points of interest (Driftwood: its places with discovery + the
  *                                          // quest's markers, src/shards/driftwood-isle/quest/Places.ts); unset = the cabins / pond as before
  *   fullMap.setPois(src, { tally: true })  // + "PLACES n / N" (found / all places) in the frame's bottom-left corner (E309 A)
@@ -44,7 +45,7 @@ import { CABIN_SITES, POND, hasPond } from '../../../shared/engine/world/Heightf
 import { activeLevel } from '../../../shared/engine/level/selection';
 import type { MapExtras, MapFeatures, Minimap } from './Minimap';
 import { MapPainter } from './mapPainter';
-import { clampView, gridPpm, gridSide, openZoom, type MapGrid } from './mapView';
+import { SHARD_STOPS, clampView, gridPpm, gridSide, gridStops, nearestStop, openZoom, type MapGrid, type ZoomStop } from './mapView';
 
 /** a point on the full map: a discovered place (named), an undiscovered one ("?"), or a live quest marker (pulsing diamond);
  *  `short` = a quest marker's short name ("SEA CAVE" for "SEA CAVE SHARD") — the map labels it with that */
@@ -56,6 +57,8 @@ export interface MapZone { x: number; z: number; label: string }
 
 /** 1× fits everything the map spans; the closest zoom shows as much ground as 6× of one chunk */
 const ZOOM_MIN = 1, ZOOM_CHUNK_MAX = 6;
+/** row 58: how long a pinch takes to settle on its stop */
+const SETTLE_MS = 160;
 const CYAN = '#8fe3ff';
 const noMapHold = (): void => undefined;
 const ctx2d = (c: HTMLCanvasElement): CanvasRenderingContext2D => { const ctx = c.getContext('2d'); if (!ctx) throw new Error('FullMap: no 2d context'); return ctx; };
@@ -72,6 +75,9 @@ export class FullMap {
   private cx = 0; private cz = 0; private _zoom = 1;
   private pointers = new Map<number, { x: number; y: number }>();
   private pinchDist = 0; private pinchZoom = 1;
+  /** the pinch's last midpoint (client px): a settle zooms about it; `settling` stamps the settle running now (a new touch,
+   *  chip or wheel stops it) */
+  private pinchMid = { x: 0, y: 0 }; private settling = 0;
   onToggle?: (open: boolean) => void;
   private poiSource: (() => MapPoi[]) | null = null;
   private questSource: (() => MapQuest | null) | null = null;
@@ -91,16 +97,22 @@ export class FullMap {
     this.root.append(this.canvas);
 
     // pan / pinch
-    this.scope.listen(this.canvas, 'pointerdown', (e) => { capturePointer(this.canvas, e.pointerId); this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (this.pointers.size === 2) { this.pinchDist = this.dist(); this.pinchZoom = this.zoom; } });
+    this.scope.listen(this.canvas, 'pointerdown', (e) => { this.settling++; capturePointer(this.canvas, e.pointerId); this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (this.pointers.size === 2) { this.pinchDist = this.dist(); this.pinchZoom = this.zoom; } });
     this.scope.listen(this.canvas, 'pointermove', (e) => {
       const p = this.pointers.get(e.pointerId); if (!p) return;
       if (this.pointers.size === 1) { this.panBy(e.clientX - p.x, e.clientY - p.y); }
       p.x = e.clientX; p.y = e.clientY;
-      if (this.pointers.size === 2 && this.pinchDist > 0) { const d = this.dist(); this.zoomTo(this.pinchZoom * (d / this.pinchDist), this.mid()); }
+      if (this.pointers.size === 2 && this.pinchDist > 0) { const d = this.dist(); this.pinchMid = this.mid(); this.zoomTo(this.pinchZoom * (d / this.pinchDist), this.pinchMid); }
     });
-    const end = (e: PointerEvent) => { this.pointers.delete(e.pointerId); if (this.pointers.size < 2) this.pinchDist = 0; };
+    const end = (e: PointerEvent) => {
+      this.pointers.delete(e.pointerId);
+      if (this.pointers.size >= 2 || this.pinchDist === 0) return;
+      this.pinchDist = 0;
+      // row 58 (Jake's A-1.4): on the grid a pinch settles on the nearest chip, so the map always sits on one of them
+      if (this.grid() !== null) this.settle(nearestStop(this.stops, this._zoom).zoom, this.pinchMid);
+    };
     this.scope.listen(this.canvas, 'pointerup', end); this.scope.listen(this.canvas, 'pointercancel', end);
-    this.scope.listen(this.canvas, 'wheel', (e) => { e.preventDefault(); this.zoomTo(this._zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), { x: e.clientX, y: e.clientY }); }, { passive: false });
+    this.scope.listen(this.canvas, 'wheel', (e) => { e.preventDefault(); this.settling++; this.zoomTo(this._zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15), { x: e.clientX, y: e.clientY }); }, { passive: false });
   }
 
   /** put the map in its frame (the menu's MAP tab); the frame is the map's viewport */
@@ -169,8 +181,10 @@ export class FullMap {
   /** a practice room's own map is up (the minimap's, E321): the MAP tab shows it — in the arena / a playground too */
   get hasRoom(): boolean { return this.minimap.room !== null; }
   get zoom(): number { return this._zoom; }
-  /** zoom about the frame centre (the menu's 1× / 2× / 4× chips) */
-  setZoom(z: number): void { const r = this.canvas.getBoundingClientRect(); this.zoomTo(z, { x: r.left + r.width / 2, y: r.top + r.height / 2 }); }
+  /** the zoom chips, widest first: on the grid 0.25× · 0.5× · 1× · 2× (row 58), else the chunk's 1× · 2× · 4× */
+  get stops(): readonly ZoomStop[] { const grid = this.grid(); return grid !== null ? gridStops(grid) : SHARD_STOPS; }
+  /** zoom about the frame centre (the menu's zoom chips: a stop's `zoom`) */
+  setZoom(z: number): void { this.settling++; const r = this.canvas.getBoundingClientRect(); this.zoomTo(z, { x: r.left + r.width / 2, y: r.top + r.height / 2 }); }
   show(): void {
     if (this.open) return;
     this.openScope = this.scope.child('open');
@@ -245,6 +259,20 @@ export class FullMap {
     this.cx += before.x - after.x; this.cz += before.z - after.z;
     this.clamp();
     this.onZoom?.(nz);
+  }
+  /** ease from the current zoom to `to` about `around` (client px) over SETTLE_MS, on the open map's frames */
+  private settle(to: number, around: { x: number; y: number }): void {
+    const from = this._zoom, scope = this.openScope, run = ++this.settling;
+    if (scope === null || Math.abs(Math.log(to / from)) < 1e-3) { this.zoomTo(to, around); return; }
+    let t0 = -1;
+    const step = (now: number): void => {
+      if (run !== this.settling || !this.open) return;
+      if (t0 < 0) t0 = now;
+      const k = Math.min(1, (now - t0) / SETTLE_MS), eased = 1 - (1 - k) ** 3;
+      this.zoomTo(k === 1 ? to : from * (to / from) ** eased, around);
+      if (k < 1) scope.raf(step);
+    };
+    scope.raf(step);
   }
   /** client (viewport) CSS px → world; the canvas may sit anywhere in the page */
   private toWorld(client: { x: number; y: number }) {

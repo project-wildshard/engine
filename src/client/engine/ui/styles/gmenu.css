@@ -77,8 +77,8 @@
 .ws-gmenu .ws-gmenu-empty { padding: 20px 0; text-align: center; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); }
 .ws-gmenu svg { width: 100%; height: 100%; display: block; }
 
-/* MAP: label row, a square frame the FullMap canvas fills, zoom chips + legend */
-.ws-gmenu .ws-gmenu-panel.map { touch-action: none; padding-bottom: 8px; }
+/* MAP: label row, a frame the FullMap canvas fills (1.4 times as tall as wide, row 58), zoom chips + legend */
+.ws-gmenu .ws-gmenu-panel.map { touch-action: none; padding: 8px; }
 .ws-gmenu .ws-gmenu-mapmeta { flex: none; margin-bottom: 8px; font-size: 9.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-text-dim); }
 /* the quest card (E51): the chapter title, the full objective and its sub-steps — the HUD carries only the short chip */
 .ws-gmenu .ws-gmenu-mapquest { flex: none; margin-bottom: 10px; padding: 8px 10px 8px 12px; border: 1px solid rgba(143, 227, 255, 0.22); border-left: 2px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.05); }
@@ -87,10 +87,10 @@
 .ws-gmenu .ws-gmenu-mapquest-obj { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-family: var(--ws-display); font-weight: 600; font-size: 15px; letter-spacing: 0.03em; color: var(--ws-text); }
 .ws-gmenu .ws-gmenu-mapquest-obj i { flex: none; width: 7px; height: 7px; transform: rotate(45deg); background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.8); }
 .ws-gmenu .ws-gmenu-mapquest-hint { margin-top: 3px; padding-left: 15px; font-size: 9.5px; letter-spacing: 0.06em; color: var(--ws-text-dim); }
-.ws-gmenu .ws-gmenu-mapframe { position: relative; flex: 0 1 auto; width: 100%; aspect-ratio: 1; min-height: 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(4, 7, 12, 0.9); overflow: hidden; }
+.ws-gmenu .ws-gmenu-mapframe { position: relative; flex: 0 1 auto; width: 100%; aspect-ratio: 5 / 7; min-height: 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(4, 7, 12, 0.9); overflow: hidden; }
 .ws-gmenu .ws-gmenu-mapfoot { flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
 .ws-gmenu .ws-gmenu-zooms { display: flex; gap: 6px; }
-.ws-gmenu .ws-gmenu-zoom { min-width: 46px; padding: 8px 10px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.05); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.14em; cursor: pointer; }
+.ws-gmenu .ws-gmenu-zoom { min-width: 42px; min-height: 36px; padding: 6px 8px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.05); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.04em; cursor: pointer; }
 .ws-gmenu .ws-gmenu-zoom.active { border-color: var(--ws-cyan); color: #fff; background: rgba(143, 227, 255, 0.16); }
 .ws-gmenu .ws-gmenu-legend { display: flex; gap: 14px; font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); }
 .ws-gmenu .ws-gmenu-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -98,6 +98,19 @@
 .ws-gmenu .ws-gmenu-legend i.poi { color: var(--ws-cyan); }
 .ws-gmenu .ws-gmenu-legend i.you { color: #fff; }
 .ws-gmenu .ws-gmenu-legend[hidden] { display: none; }
+/* QA 11-19 row 58, Jake's A-1.4 (17:20, board 9TGmo1PWB5zAEd4GaPSdHL): the BAG (not PAUSE) gets a shorter CLOSE · BAG
+   header, the map at the sheet's full width and 1.4 times as tall, the zoom row (0.25x 0.5x 1x 2x) and the key under it,
+   and nothing below: no hint line (the web app's bottom bar sits there). The 44 px tap height stays, past the button. */
+.ws-gmenu:not(.pause) .ws-gmenu-bar { padding: 3px 10px; }
+.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-close { position: relative; min-height: 34px; padding: 4px 14px; font-size: 12px; letter-spacing: 0.2em; }
+.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-close::before { content: ''; position: absolute; inset: -5px -4px; }
+.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-title { font-size: 17px; letter-spacing: 0.3em; }
+.ws-gmenu:not(.pause) .ws-gmenu-bar .ws-gmenu-sub { margin-top: 2px; font-size: 8.5px; letter-spacing: 0.24em; }
+.ws-gmenu .ws-gmenu-hint:empty { display: none; }
+@media (max-width: 560px) {
+  .ws-gmenu:not(.pause) { padding-left: 0; padding-right: 0; }
+  .ws-gmenu .ws-gmenu-panel.map .ws-gmenu-mapmeta { display: none; } /* the header's subtitle names the zone */
+}
 
 /* INVENTORY: equipped weapon cards + the 3-column pack grid */
 .ws-gmenu .ws-gmenu-weapon { flex: none; display: flex; align-items: center; gap: 14px; width: 100%; margin-bottom: 8px; padding: 10px 12px; appearance: none; -webkit-appearance: none; text-align: left; background: rgba(143, 227, 255, 0.04); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text); font-family: var(--ws-mono); cursor: pointer; }
