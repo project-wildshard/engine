@@ -193,6 +193,14 @@ history. Release cadence is daily plus on demand (J362).
 
 Pack writes use `wrangler r2 object put` with wrangler's login.
 
+The `server-release.yml` author-client job builds
+`devserver-client.tar.gz` and `preparation-client.tar.gz` from the
+release SHA and checks each archive's `version.json` before upload.
+Check the preparation archive on the immutable release tag before
+handing the build to a shard lane for `wildshard prepare`. If its build
+fails, the author-client job reports the failure and still uploads a
+valid devserver archive.
+
 The host is `scripts/page-release/hosts/workers.mjs` (OFF-VERCEL OV4), the
 Cloudflare host: three Workers from `pages/wrangler.jsonc` (production
 is `--env ''`, then `--env staging` and `--env preview`). `package`

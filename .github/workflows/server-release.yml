@@ -173,6 +173,7 @@ jobs:
       contents: write
     env:
       SOURCE_SHA: ${{ needs.source.outputs.sha }}
+      WS_BUILD_ID: ${{ needs.source.outputs.sha }}
       RELEASE_TAG: ${{ needs.source.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -196,20 +197,31 @@ jobs:
           python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --out "$RUNNER_TEMP/devserver-client.tar.gz"
       - name: Build the preparation client
         if: steps.has.outputs.preparation == 'true'
-        # a failed preparation build never holds back the devserver client: the upload skips a missing asset
-        continue-on-error: true
         run: python3 scripts/heavy-lane.py build -- node scripts/devserver-client.mjs --kind preparation --out "$RUNNER_TEMP/preparation-client.tar.gz"
       - name: Upload it to the release, once
-        if: steps.has.outputs.build == 'true'
+        if: ${{ !cancelled() && steps.has.outputs.build == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          PREPARATION_REQUIRED: ${{ steps.has.outputs.preparation }}
         run: |
+          set -o pipefail
           if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' > "$RUNNER_TEMP/assets.txt" 2> "$RUNNER_TEMP/view.err"; then
             if grep -qi 'release not found' "$RUNNER_TEMP/view.err"; then echo "::warning::no release $RELEASE_TAG for $SOURCE_SHA: publish made none"; exit 0; fi
             cat "$RUNNER_TEMP/view.err"; exit 1
           fi
+          version=$(node -p 'require("./package.json").version')
           for asset in devserver-client.tar.gz preparation-client.tar.gz; do
             [ -f "$RUNNER_TEMP/$asset" ] || continue
-            if grep -qx "$asset" "$RUNNER_TEMP/assets.txt"; then echo "::notice::$RELEASE_TAG already has $asset"; continue; fi
+            if grep -Fxq "$asset" "$RUNNER_TEMP/assets.txt"; then echo "::notice::$RELEASE_TAG already has $asset"; continue; fi
+            tar -xOzf "$RUNNER_TEMP/$asset" ./version.json |
+              jq -e --arg sha "$SOURCE_SHA" --arg version "$version" --arg asset "$asset" '
+                .build == $sha and .clientVersion == $version and
+                ((.preparationOnly // false) == ($asset == "preparation-client.tar.gz"))
+              ' >/dev/null
             gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/$asset" --repo "$GITHUB_REPOSITORY"
           done
+          if [ "$PREPARATION_REQUIRED" = true ] && [ ! -f "$RUNNER_TEMP/preparation-client.tar.gz" ] &&
+            ! grep -Fxq preparation-client.tar.gz "$RUNNER_TEMP/assets.txt"; then
+            echo "::error::Missing preparation-client.tar.gz for $SOURCE_SHA"
+            exit 1
+          fi
