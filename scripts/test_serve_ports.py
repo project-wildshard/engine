@@ -680,5 +680,5 @@ class SharedReleaseTests(unittest.TestCase):
 if __name__ == '__main__':
     if len(sys.argv) == 3 and sys.argv[1] == '--partition':
         from test_partition import run_partition
-        run_partition(sys.modules[__name__], sys.argv[2])
+        run_partition(sys.modules[__name__], sys.argv[2], verbosity=2)
     unittest.main()

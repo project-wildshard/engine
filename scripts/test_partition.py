@@ -2,7 +2,7 @@
 import unittest
 
 
-def run_partition(module, specification):
+def run_partition(module, specification, *, verbosity=1):
     index, count = map(int, specification.split('/'))
     if not 1 <= index <= count:
         raise ValueError('Invalid test partition')
@@ -19,5 +19,5 @@ def run_partition(module, specification):
     selected = list(cases(suite))[index - 1::count]
     if not selected:
         raise ValueError('Empty test partition')
-    result = unittest.TextTestRunner().run(unittest.TestSuite(selected))
+    result = unittest.TextTestRunner(verbosity=verbosity).run(unittest.TestSuite(selected))
     raise SystemExit(not result.wasSuccessful())

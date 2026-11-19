@@ -10,3 +10,15 @@ ownership and answer HTTP. A 21-second delay before the readiness probe
 reproduces the report on the Mac mini. Allow the launcher to finish its
 readiness check and report its own error. If the outer fixture still
 times out, include the launcher's partial stderr.
+
+The later full local gate stopped all three partition processes at their
+45-second aggregate cap. The launcher and Python fixture were unchanged
+since the first fix. Each partition can run four sequential 35-second
+launcher checks plus shorter admission and teardown checks. The outer
+runner now allows that envelope, observes cancellation, and includes the
+named Python fixture and its output when something fails. Production
+readiness and every existing fixture assertion retain their deadlines.
+
+All 36 Python cases and three normal Vitest partitions passed. A scratch
+launcher with 14 seconds of delay at each startup passed partition one
+in 63.14 seconds. Every individual launch still used its original limit.

@@ -1,8 +1,5 @@
-import { expect, test } from 'vitest';
-// oxlint-disable-next-line import/no-nodejs-modules -- Exercise original real lease controls in isolated fixture roots.
-import { spawnSync } from 'node:child_process';
+import { test } from 'vitest';
+import { checkPreviewLeasePartition, PREVIEW_LEASE_TEST_TIMEOUT } from './previewLeaseProof';
 
-test('preview leases, sharing and release retain all behavior (partition 2/3)', () => {
-  const result = spawnSync('python3', ['scripts/test_serve_ports.py', '--partition', '2/3'], { encoding: 'utf8', timeout: 45000 });
-  expect(result.status, result.stderr).toBe(0);
-}, 50000);
+test('preview leases, sharing and release retain all behavior (partition 2/3)',
+  ({ signal }) => checkPreviewLeasePartition(2, signal), PREVIEW_LEASE_TEST_TIMEOUT);
