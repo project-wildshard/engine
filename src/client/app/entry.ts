@@ -42,7 +42,7 @@ import { lastEnd, markUnload, settleLastEnd } from '@wildshard/engine/boot/lastE
 import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
-import { currentSlug, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
+import { currentSlug, exploreSlugOfPath, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
 
 
 import { installForceUpdate } from '@wildshard/engine/boot/forceUpdate';
@@ -96,11 +96,9 @@ persistHomeScreen();
 definePageSaveKeys(saves);
 /** the page's address as the boot reads it; a same-page entry (ZE10a3) reads it again for its next session */
 let search = new URLSearchParams(location.search);
-const exploreIndex = exploreChannel() && location.pathname === '/' && !search.has('chunk');
-if (exploreChannel() && !exploreIndex) {
-  search = exploreBootParams(search);
-  history.replaceState(history.state, '', `${location.pathname}?${search.toString()}${location.hash}`);
-}
+const exploreSlug = exploreChannel() ? exploreSlugOfPath(location.pathname) : null;
+const exploreIndex = exploreChannel() && exploreSlug === null && !search.has('chunk');
+if (exploreChannel() && !exploreIndex) search = exploreBootParams(search, exploreSlug ?? undefined);
 // Jake (11-10): Low Power Mode for Copy diagnostics, from this document's first visible second of rAF (a busy boot can
 // only rule it out); the title's own idle reading starts once the title shows (boot/lowPower.ts)
 startLowPowerProbe();
@@ -161,7 +159,7 @@ async function enterPage(): Promise<unknown> {
   }
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
   // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)
-  const slugged = slugOfPath(location.pathname);
+  const slugged = exploreChannel() ? null : slugOfPath(location.pathname);
   const plainTitle = requested === null && slugged === null && document.getElementById('ws-shardfile') === null
     && bootRoute(search, { line: previousBootLine(), level: previousBootLevel() }).titleOnly;
   // The live menu's code can arrive while styles and the previous-end query settle.
@@ -568,7 +566,7 @@ async function prepareShaderSourceCache(zone: string): Promise<void> {
 
 async function startSelected(): Promise<void> {
   const selected = bootAwait('app:selected-discovery', import('./shardSelection').then(async selection => {
-    await selection.prepareSelectedShard();
+    await selection.prepareSelectedShard(search.get('chunk'));
     return selection;
   }));
   const [{ preparePageCatalogue, completePageCatalogue }, { game }, { beginLoading }, { TIER }] = await Promise.all([

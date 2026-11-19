@@ -13,6 +13,12 @@ export function slugOfPath(pathname: string): string | null {
   return name === undefined ? null : API[name] ?? name;
 }
 
+/** The standalone Explore app uses a single public path segment. */
+export function exploreSlugOfPath(pathname: string): string | null {
+  const name = /^\/([a-z0-9-]{1,80})\/?$/u.exec(pathname)?.[1];
+  return name === undefined ? null : currentSlug(name);
+}
+
 /** Each retired slug and the slug that replaced it, for the save namespaces a rename carries (TC-SHIP-a). */
 export function retiredSlugs(): readonly (readonly [string, string])[] { return retired(); }
 

@@ -19,7 +19,7 @@ export function showExploreIndex(owner: Scope, notice?: string): void {
     const focused = list.contains(document.activeElement) ? document.activeElement?.getAttribute('href') : null;
     list.replaceChildren(...zones.map(zone => {
       const row = document.createElement('li'), link = document.createElement('a');
-      link.href = `/?chunk=${encodeURIComponent(zone.slug)}`;
+      link.href = `/${encodeURIComponent(zone.slug)}`;
       if (zone.image) {
         const image = document.createElement('img');
         image.src = zone.image; image.alt = ''; image.loading = 'lazy'; link.append(image);

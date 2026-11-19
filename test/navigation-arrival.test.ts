@@ -1,6 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { freshPageArrival, setTitleArrival, consumeTitleArrival, dropTabArrival, pendingTitleArrival } from '../src/client/engine/boot/titleArrival';
 import { saveStorage } from '../src/client/engine/saves/slots';
+import { exploreSlugOfPath } from '../src/client/app/slugPath';
 import { bootRoute, exploreBootParams, onlineTitleFirst } from '../src/client/app/bootRoute';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { gridIntents } from '../src/client/game/grid/intent';
@@ -130,8 +131,19 @@ test('a page reloading itself hands the tap to its own tab only (QA row 16)', ()
   expect(pendingTitleArrival('driftwood-isle')).toBeNull();
 });
 
-test('Explore opens Driftwood in the hub by default and retains an explicit view', () => {
-  expect(Object.fromEntries(exploreBootParams(new URLSearchParams()))).toEqual({ chunk: 'driftwood-isle', explore: 'hub' });
+test('Explore opens a selected zone in the hub by default and retains an explicit view', () => {
+  expect(Object.fromEntries(exploreBootParams(new URLSearchParams('chunk=driftwood-isle')))).toEqual({ chunk: 'driftwood-isle', explore: 'hub' });
   const link = new URLSearchParams('chunk=mossgate&explore=model&model=oak&tier=phone');
   expect(exploreBootParams(link).toString()).toBe(link.toString());
+});
+
+test('the Explore path chooses the shard and retains the view coordinates and model', () => {
+  const slug = exploreSlugOfPath('/driftwood-isle/');
+  expect(slug).toBe('driftwood-isle');
+  expect(exploreSlugOfPath('/blender-template')).toBe('brasscap-mesa');
+  for (const path of ['/', '/b/c', '/version.json', '/%2f']) expect(exploreSlugOfPath(path)).toBeNull();
+  const query = new URLSearchParams('explore=world&cam=16,32,64,0.5,0.1&model=tree&chunk=wrong');
+  expect(Object.fromEntries(exploreBootParams(query, slug ?? undefined))).toEqual({
+    explore: 'world', cam: '16,32,64,0.5,0.1', model: 'tree', chunk: 'driftwood-isle',
+  });
 });

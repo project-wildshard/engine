@@ -7,9 +7,9 @@
  * A URL with only version or environment harness settings is the title too; those settings do not select a level.
  */
 /** Explore's standalone entry opens a shard into its hub unless a view was requested. */
-export function exploreBootParams(search: URLSearchParams): URLSearchParams {
+export function exploreBootParams(search: URLSearchParams, zone?: string): URLSearchParams {
   const route = new URLSearchParams(search);
-  if (!route.has('chunk')) route.set('chunk', 'driftwood-isle');
+  if (zone !== undefined) route.set('chunk', zone);
   if (!route.has('explore')) route.set('explore', 'hub');
   return route;
 }

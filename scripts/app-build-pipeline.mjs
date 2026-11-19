@@ -208,7 +208,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   const preview = mode === "preview" || process.env.WS_CHANNEL === "preview";
   const explore = mode === "explore" || process.env.WS_CHANNEL === "explore";
   const solo = preview || explore;
-  if (solo && (preview && explore || worldFile !== undefined || worldKey !== undefined || mode === "devserver" ||
+  if (solo && (preview && explore || worldFile !== undefined || mode === "devserver" ||
     (process.env.WS_CHANNEL !== undefined && process.env.WS_CHANNEL !== (explore ? "explore" : "preview"))))
     throw new Error("A solo build requires one solo channel and cannot name a world or run as devserver");
   const verdicts = /** @type {unknown} */ (JSON.parse(execFileSync(process.execPath, [

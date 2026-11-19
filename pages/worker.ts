@@ -36,6 +36,9 @@ function doctor(search: string): string {
 }
 const PAGE = new Set(['/', '/index.html'])
 // SA36: the one-shard page a sharddev author shares (src/client/app/slugPath.ts reads the same paths)
+const EXPLORE_HOST = 'explore.wildshard.io'
+const EXPLORE_SLUG = /^\/(?<slug>[a-z0-9-]{1,80})\/?$/u
+const MMO_ORIGINS = new Set(['https://play.wildshard.io', 'https://staging.wildshard.io'])
 const SLUG = /^\/slug\/(?<slug>[\w-]+)\/?$/u
 const NOT_FOUND = 404
 const PLAIN = { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' }
@@ -126,7 +129,7 @@ async function slugPage({ request, url, slug }: SlugRequest, env: Env): Promise<
     return new Response(head ? undefined : `No shard is named ${slug}.\n`, { status: NOT_FOUND, headers: PLAIN })
   }
   // TC-B12: og:url reads the public name
-  const shared = { ...meta, url: new URL(`/slug/${publicNameOf(slug)}`, url.origin).href }
+  const shared = { ...meta, url: new URL(`${url.hostname === EXPLORE_HOST ? '/' : '/slug/'}${publicNameOf(slug)}`, url.origin).href }
   return new Response(head ? undefined : withSlugMeta(html, shared), { status: OK, headers: pageHeaders(asset) })
 }
 
@@ -140,10 +143,31 @@ async function namedSlug({ request, url, slug }: SlugRequest, env: Env): Promise
   return await slugPage({ request, url, slug: apiSlugOf(slug) }, env)
 }
 
+function redirectToExplore(url: Readonly<URL>, slug: string): Response {
+  const destination = new URL(`/${publicNameOf(slug)}`, `https://${EXPLORE_HOST}`)
+  for (const key of ['explore', 'cam', 'model']) {
+    for (const value of url.searchParams.getAll(key)) {
+      destination.searchParams.append(key, value)
+    }
+  }
+  return new Response(undefined, { status: FOUND, headers: { location: destination.href, 'cache-control': 'no-store' } })
+}
+
 // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
-async function handle(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url)
-  const slug = SLUG.exec(url.pathname)?.groups?.['slug']
+function exploreRequest(request: Request, { url, slug }: SlugAddress, env: Env): Response | Promise<Response> | undefined {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return undefined
+  }
+  if (url.hostname === EXPLORE_HOST) {
+    const name = EXPLORE_SLUG.exec(url.pathname)?.groups?.['slug']
+    return name === undefined ? undefined : slugPage({ request, url, slug: apiSlugOf(name) }, env)
+  }
+  return slug !== undefined && url.searchParams.has('explore') && MMO_ORIGINS.has(url.origin)
+    ? redirectToExplore(url, slug) : undefined
+}
+
+// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
+async function normalPage(request: Request, { url, slug }: SlugAddress, env: Env): Promise<Response> {
   // A slug link's `?doctor` goes to the doctor as the page's does
   if (PAGE.has(url.pathname) || (slug !== undefined && url.searchParams.has('doctor'))) {
     return await page(request, url, env)
@@ -155,6 +179,18 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return await part(request, env)
   }
   return uncachedMiss(await env.ASSETS.fetch(request))
+}
+
+interface SlugAddress {
+  readonly url: URL
+  readonly slug: string | undefined
+}
+
+// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
+async function handle(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url)
+  const address = { url, slug: SLUG.exec(url.pathname)?.groups?.['slug'] }
+  return await (exploreRequest(request, address, env) ?? normalPage(request, address, env))
 }
 
 const worker = { fetch: handle }

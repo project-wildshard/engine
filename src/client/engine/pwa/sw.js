@@ -535,7 +535,9 @@ workerScope.listen(self, 'fetch', event => {
   // A diagnostic document must reach its own host route, not the cached game
   // shell. It owns no game loader and must not pause the game's precache.
   const doctor = request.mode === 'navigate' && isDoctorDocument(url);
-  if (doctor) return;
+  // A warm MMO tab still takes the host's Explore redirect.
+  const explore = WORLD && request.mode === 'navigate' && /^\/slug\/[\w-]+\/?$/u.test(url.pathname) && url.searchParams.has('explore');
+  if (doctor || explore) return;
   // A loading page (a navigation, or a client that has not reported control) gets the link: the precache waits.
   if (request.mode === 'navigate') pausePrecache(event.resultingClientId);
   else if (!controlled.has(event.clientId)) event.waitUntil(pauseForClient(event.clientId));

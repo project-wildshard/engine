@@ -292,3 +292,23 @@ test('a slug serves its page, and a retired slug\'s old link goes to the new one
   expect([old.status, old.headers.get('location')]).toEqual([302, 'https://staging.wildshard.io/slug/brasscap-mesa?x=1'])
   expect(SLUG_NAMES).toEqual(pageSlugNames.names)
 })
+
+test('MMO Explore links redirect before reading the shell and keep view parameters', async () => {
+  for (const host of ['play.wildshard.io', 'staging.wildshard.io']) {
+    const seen: string[] = []
+    const response = await worker.fetch(new Request(`https://${host}/slug/driftwood-isle?explore=world&cam=1,2,3,0,0&model=oak&private=test`), { ASSETS: site(seen) })
+    expect([response.status, response.headers.get('cache-control'), seen]).toEqual([302, 'no-store', []])
+    const target = new URL(response.headers.get('location') ?? '')
+    expect(target.origin + target.pathname).toBe('https://explore.wildshard.io/driftwood-isle')
+    expect(Object.fromEntries(target.searchParams)).toEqual({ explore: 'world', cam: '1,2,3,0,0', model: 'oak' })
+  }
+})
+
+test('Explore serves its shell at a zone path and gives unknown paths a clean miss', async () => {
+  const seen: string[] = []
+  const response = await worker.fetch(new Request('https://explore.wildshard.io/driftwood-isle?explore=model&model=oak'), { ASSETS: site(seen) })
+  expect([response.status, seen]).toEqual([200, ['/']])
+  expect(og(await response.text())['url']).toBe('https://explore.wildshard.io/driftwood-isle')
+  const miss = await worker.fetch(new Request('https://explore.wildshard.io/unknown-isle'), { ASSETS: site([]) })
+  expect(miss.status).toBe(404)
+})
