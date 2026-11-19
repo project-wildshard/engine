@@ -15,7 +15,7 @@ const fixtureBuild = 'd520000-fixture';
 test('memory/T1 rigs own actual HTTP/WS endpoints across replacement and cleanup', async () => {
   const { work, dist, keyFile, pair } = fixture(), rigs = [];
   try {
-    const starts = await Promise.allSettled([0, 1].map(index => openRig({ port: 0, gridRoot: work, dist, work: join(work, `rig-${index}`), keyFile, saves: 'memory', shard: '_template', workers: 1 })));
+    const starts = await Promise.allSettled([0, 1].map(index => openRig({ port: 0, gridRoot: work, dist, work: join(work, `rig-${index}`), keyFile, saves: 'memory', shard: 'brasscap-mesa', workers: 1 })));
     for (const started of starts) if (started.status === 'fulfilled') rigs.push(started.value);
     expect(starts.filter(started => started.status === 'rejected').map(started => started.reason.message)).toEqual([]);
     const ports = rigs.flatMap(rig => Object.values(rig.ports));
@@ -93,7 +93,7 @@ test.runIf(bin !== undefined || process.env.CI !== undefined || process.env.FAIL
   const { work, dist, keyFile } = fixture();
   let native;
   try {
-    native = await openRig({ port: 0, gridRoot: work, dist, work: join(work, 'native-rig'), keyFile, pgBin: bin, pgData: join(work, 'native-data'), shard: '_template', workers: 1 });
+    native = await openRig({ port: 0, gridRoot: work, dist, work: join(work, 'native-rig'), keyFile, pgBin: bin, pgData: join(work, 'native-data'), shard: 'brasscap-mesa', workers: 1 });
     expect(new Set(Object.values(native.ports)).size).toBe(4);
     const client = new native.Client({ connectionString: native.DATABASE });
     try {

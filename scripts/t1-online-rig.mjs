@@ -32,7 +32,8 @@ export async function openT1OnlineRig(dist, scratch, { gridRoot } = {}) {
     rig = await openRig({ port: 0, socket: `ws://127.0.0.1:${String(world.port)}/`, dist, work: join(work, 'rig'), keyFile, saves: 'memory', shard: 'brasscap-mesa', workers: 1, gridRoot, origins: [pageOrigin] });
     // A deployed page carries its signed /code-retention.json (page-release signs it); without one the page's read is a
     // console 404, which every T1 online test counts as an error. Serve the deploy's file: the current build kept.
-    rig.retain({ keptBuilds: [rig.build] });
+    // Only a build named by its source commit has a retention list to sign; a named fixture build (the rig tests') has none.
+    if (/^[0-9a-f]{7,40}(?:-[a-z0-9]+)?$/u.test(rig.build)) rig.retain({ keptBuilds: [rig.build] });
     proxy = await openChaosProxy({ work: join(work, 'proxy'), pageUpstream: rig.base, releaseUpstream: rig.releaseOrigin, worldUpstream: rig.worldOrigin, pagePort: 0, worldPort: 0 });
     page.point(Number(new URL(proxy.ready.pageOrigin).port));
     world.point(Number(new URL(proxy.ready.worldOrigin).port));
