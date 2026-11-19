@@ -467,11 +467,11 @@ function ringCatalogue(pins: readonly Pin[]): void {
   writeFileSync(RING_CATALOGUE, json({ ...catalogue, shards, placements: catalogue.placements.filter(row => kept.has(row.slug)), grid: { ...catalogue.grid, cells } }));
 }
 
-async function installRing(name: string): Promise<void> {
+async function installRing(name: string, extra: readonly string[]): Promise<void> {
   const { readTar } = await import('@wildshard/format/tar');
   const { checkSlice } = await import('./slice-inputs.ts');
   const ring = ringOf(name), started = performance.now();
-  const pins = await install(ring.products, 'ring');
+  const pins = await install([...new Set([...ring.products, ...extra])], 'ring');
   // A tree that held every head keeps none of the others: their mounts just left public/.
   const wanted = new Set(pins.map(row => row.hash));
   for (const folder of readdirSync('out')) {
@@ -532,7 +532,7 @@ if (command === 'refresh') {
   await refresh(rest.flatMap((arg, at) => rest[at - 1] === '--drop' ? arg.split(',') : []));
   }
 }
-else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1');
+else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1', rest.slice(2));
 else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), 'format');
 else if (command === 'install' && rest[0] === '--from-dir') {
   if (rest.length !== 2 || !rest[1]) throw new Error('usage: pins.ts install --from-dir <built out/slug directory>');
@@ -544,4 +544,4 @@ else if (command === 'verify-slices') await slice(true);
 else if (command === 'install-saves') await installSaves(rest);
 else if (command === 'keep') await keep(rest[0] ?? 'tmp/pins-release');
 else if (command === 'status') status();
-else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --ring 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');
+else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --ring 1 [extra slug...] | install-saves [slug...] | slice | verify-slices | keep <dir> | status');

@@ -73,12 +73,12 @@ if (args[0] === '--prepare') {
   const environment = { ...process.env, SERVE_OWNER: owner, WILDSHARD_RELEASE_URL: RELEASE_URL, WILDSHARD_RELEASE_KEY: key.public, VITE_API_ORIGIN: PAGE_ORIGIN };
   const folder = join(work, 'dist');
   if (process.env.GITHUB_ACTIONS === 'true') {
-    // This isolated runner can build directly from the admitted Ring 1 inputs.
+    // Build once with the pinned Driftwood client product admitted.
     // The fixture is baked from this source and carries no live deployment.
     const output = join(ROOT, 'dist');
     if (existsSync(output)) throw new Error('The hosted fixture needs a fresh build directory');
     const built = spawnSync('pnpm', ['build:ring'], { cwd: ROOT,
-      env: { ...environment, GITHUB_EVENT_NAME: undefined, WS_RELEASE: '0' }, stdio: 'inherit' });
+      env: { ...environment, GITHUB_EVENT_NAME: undefined, WS_RELEASE: '0', WS_RING_EXTRA_PRODUCTS: SHARD }, stdio: 'inherit' });
     if (built.status !== 0) throw new Error('The hosted fixture build failed');
     renameSync(output, folder);
   } else {
