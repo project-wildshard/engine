@@ -1,6 +1,13 @@
 // DS20c (meta FLOW-SIMPLE FS17, J443): browser slots are free cores / 4, recomputed per read, in place of J402's two.
-import { expect, test } from 'vitest';
-import { browserSlots, reservedSlots } from '../scripts/browser-usage.mjs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Replace the process table with a fixed browser listing.
+import { execFileSync } from 'node:child_process';
+import { expect, test, vi } from 'vitest';
+import { browserSlots, browserStatus, reservedSlots } from '../scripts/browser-usage.mjs';
+
+vi.mock('node:child_process', async importOriginal => ({
+  ...await importOriginal<typeof import('node:child_process')>(),
+  execFileSync: vi.fn(),
+}));
 
 const lease = (token: string, slots: number, extra: Record<string, unknown> = {}) => ({ token, slots, ...extra });
 
@@ -18,4 +25,15 @@ test('reserved cores follow the ledger: a borrowed grant is covered by its root,
   expect(reservedSlots([lease('root', 6), lease('kid', 2, { borrowedFrom: 'root' })])).toBe(6);
   expect(reservedSlots([lease('root', 2), lease('b1', 4, { borrowedFrom: 'root', browser: true, browserWeight: 4 })])).toBe(4);
   expect(reservedSlots([lease('a', 4, { browser: true, browserWeight: 4 }), lease('orphan', 3, { borrowedFrom: 'gone' })])).toBe(7);
+});
+
+test('counts Chrome for Testing without charging its Crashpad helper as another browser', () => {
+  const chrome = '/Users/example/.agent-browser/browsers/chrome-157/Google Chrome for Testing.app/Contents';
+  vi.mocked(execFileSync).mockReturnValueOnce([
+    `5100001 1 ${chrome}/MacOS/Google Chrome for Testing --headless --mute-audio`,
+    `5100002 1 ${chrome}/Frameworks/Google Chrome for Testing Framework.framework/Versions/157/Helpers/chrome_crashpad_handler --monitor-self`,
+    '5100003 1 /Users/example/Library/Caches/ms-playwright/chromium-157/chrome-headless-shell --mute-audio',
+    '5100004 5100003 /Users/example/Library/Caches/ms-playwright/chromium-157/chrome-headless-shell --type=renderer',
+  ].join('\n'));
+  expect(browserStatus().outside).toEqual([5100001, 5100003]);
 });

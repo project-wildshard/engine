@@ -54,9 +54,11 @@ export function browserStatus(){
  });
  const parents=new Map(processes.map(row=>[row.pid,row.parent]));
  const admitted=new Set(rows.map(row=>row.holder));
+ // Chrome's Mac executable uses Contents/MacOS. Crashpad runs inside Contents/Frameworks.
+ const browserRoot=/^\/[^ ]*\/(?:ms-playwright|\.agent-browser\/browsers)\/(?:[^/\s]+\/)*(?:Google Chrome for Testing\.app\/Contents\/MacOS\/Google Chrome for Testing|chrome-headless-shell|Chromium|chrome)(?:\s|$)/u;
  /** @type {number[]} */const outside=[];
  for(const row of processes){
-  if(!/^\/[^ ]*\/(?:ms-playwright|\.agent-browser\/browsers)\/.*\/(?:chrome-headless-shell|Chromium|chrome|Google Chrome for Testing)(?:\s|$)/u.test(row.command)||row.command.includes('--type='))continue;
+  if(!browserRoot.test(row.command)||row.command.includes('--type='))continue;
   let pid=row.pid,owned=false;
   for(let depth=0;pid>1&&depth<64;depth++){
    if(admitted.has(pid)){owned=true;break;}
