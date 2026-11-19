@@ -379,6 +379,9 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
 .ws-load.hide { opacity: 0; pointer-events: none; }
 .ws-load .ws-load-play { display: block; width: 100%; min-height: 48px; margin-top: 18px; border: 1px solid var(--ws-cyan); background: rgba(9, 22, 36, 0.88); color: var(--ws-cyan); font: 700 18px var(--ws-display); letter-spacing: 0.18em; cursor: pointer; touch-action: manipulation; }
 .ws-load .ws-load-play:focus-visible { outline: 2px solid var(--ws-cyan); outline-offset: 3px; }
+.ws-load .ws-load-memory-warning { box-sizing: border-box; width: min(calc(100% - 32px), 420px); padding: 24px; border: 1px solid var(--ws-cyan-line); background: #0d1b26; color: var(--ws-text); }
+.ws-load .ws-load-memory-warning::backdrop { background: rgb(3 8 15 / 75%); }
+.ws-load .ws-load-memory-warning h1 { margin: 0; font: 700 26px/1.2 var(--ws-display); color: #ffb86b; }
 .ws-load[data-hold] .ws-load-head, .ws-load[data-hold] .ws-load-foot { flex-shrink: 0; }
 .ws-load[data-hold] .ws-load-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
 .ws-load[data-hold] .ws-load-panel { flex-shrink: 0; }
