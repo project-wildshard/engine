@@ -35,3 +35,7 @@
 - BC5: `check-chunks.mjs` judges `js/<label>/{raw,gzip}` against baselines.json;
   only `js/title/raw` keeps a hard cap (J324). The build writes
   `.vite/budget-measures.json` for the check that follows ci.
+- BC6/BC7: `scripts/memory/ledgerVerdict.mjs` judges each zone's two ledger
+  totals against its baseline + 10%, re-reading three times only when the first
+  read is over; `compareLedger` no longer lowers a baseline. One table, no
+  `::warning`.

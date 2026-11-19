@@ -7,6 +7,9 @@ import { armedMemory, comparePhoneFootprint, footprintBaseline, footprintBootFor
 import { checkMemory, memoryWarningLine } from './gate.mjs';
 import { loadPhoneModel } from './phoneModel.mjs';
 import { compareLedger, compareFootprint, footprintBoot, footprintBudget, footprintInstrument, ledgerBudget } from './ratchet.mjs';
+import { checkLedger, ledgerFailure, reportLedger, zoneContentKey } from './ledgerVerdict.mjs';
+import { readBaselines, readCaps } from '../budgets/files.mjs';
+import { pinnedContentKeys } from '../shard-size-gate.mjs';
 
 const [mode, root, output, recordFlag, ...extra] = process.argv.slice(2);
 if (!['ledger', 'webkit-ledger', 'footprint'].includes(mode) || !root || !output || extra.length > 0
@@ -54,6 +57,13 @@ if (baseline.version !== 1 || baseline.mode !== mode) throw new Error('Incompati
 const preview = await serve(absolute(root), '', true, { telemetryDir: join(directory, 'telemetry') });
 /** @type {Record<string, any>} */
 const recorded = {};
+// BUDGET-CAPS BC6: the ledger modes judge two totals a zone through the budget verdict; every judged row goes in one
+// table and in budget-measures.json (scripts/budgets/cli.mjs record --run reads it from the run's artifact).
+const budgets = { caps: readCaps(), baselines: readBaselines() }, pins = pinnedContentKeys();
+/** @type {any[]} */
+const budgetRows = [];
+/** @type {string[]} */
+const ledgerFailures = [];
 try {
   const built = readdirSync(join(root, 'dist', 'shardfiles'), { withFileTypes: true })
     .filter(entry => entry.isDirectory()).map(entry => entry.name).sort();
@@ -118,8 +128,8 @@ try {
     /** @param {import('./gate.mjs').Warning} warning */
     function warn(warning) {
       if (!policy.zones.has(chunk)) return;
-      const line = memoryWarningLine(mode, chunk, warning);
-      console.log(process.env.GITHUB_ACTIONS === 'true' ? `::warning title=Memory gate::${line}` : line);
+      // BUDGET-CAPS BC7: a plain log line, never a GitHub warning annotation; the job summary carries the budget table.
+      console.log(memoryWarningLine(mode, chunk, warning));
     }
 
     if (mode === 'footprint') {
@@ -144,10 +154,8 @@ try {
       return;
     }
 
-    if (!baseline.zones?.[chunk]) throw new Error('Missing committed subsystem ceilings');
-    const pinned = baseline.zones[chunk];
-    const metrics = Object.fromEntries(Object.entries(flatLedger(pinned)).map(([metric, bytes]) =>
-      [metric, { baseline: bytes, previousMargin: Math.floor(bytes * 0.02) }]));
+    if (!baseline.zones?.[chunk]) throw new Error('Missing committed subsystem ledger');
+    const pinnedLedger = baseline.zones[chunk];
     /** @param {number} count */
     async function probe(count) {
       if (mode === 'webkit-ledger') {
@@ -165,10 +173,20 @@ try {
       return values;
     }
     const [first] = await probe(1);
-    const next = await checkMemory({ zone: chunk, metrics, first, remeasure: probe, warn, record });
-    recorded[chunk] = Object.fromEntries(Object.entries(pinned).map(([phase, bytes]) =>
-      [phase, Object.fromEntries(Object.keys(bytes).map(kind => [kind, next[`${phase}.${kind}`]]))]));
+    const { rows, reads } = await checkLedger({ mode, zone: chunk, first, remeasure: probe, contentKey: zoneContentKey(chunk, pins), budgets, record });
+    budgetRows.push(...rows);
+    const median = (/** @type {string} */ metric) => reads.map(read => read[metric]).sort((a, b) => a - b)[Math.floor(reads.length / 2)];
+    recorded[chunk] = Object.fromEntries(Object.entries(pinnedLedger).map(([phase, bytes]) =>
+      [phase, Object.fromEntries(Object.keys(bytes).map(kind => [kind, median(`${phase}.${kind}`)]))]));
+    // Every zone is read and tabled before the run decides: a regression is reported once at the end (BC9).
+    const failure = ledgerFailure(rows);
+    if (failure !== null) ledgerFailures.push(failure);
   }, console.log);
+  reportLedger({ rows: budgetRows, mode, directory, commit: process.env.GITHUB_SHA, summaryFile: process.env.GITHUB_STEP_SUMMARY });
+  if (ledgerFailures.length > 0) {
+    console.log(ledgerFailures.join('\n'));
+    process.exitCode = 1;
+  }
   if (record) {
     const outputFile = join(directory, `${mode}-ratchet.json`);
     const { anchor = baseline.anchor, ...zones } = recorded;

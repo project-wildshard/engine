@@ -63,14 +63,13 @@ test('a retained allocation that every reading shows still fails the zone', () =
     .toThrow(/2 of 2 readings over the line\n[^]*template control loading: 50000000 B > 30600000 B/u);
 });
 
-test('clean observations ratchet down and the tolerance never raises the baseline', () => {
+test('nothing lowers itself and the tolerance never raises the baseline (BUDGET-CAPS BC6)', () => {
   const baseline = boot(0), reduced = structuredClone(baseline);
   reduced.peak.loading -= MB;
   reduced.control.geometry += 1000;
   expect(compareLedger(baseline, [reduced], 'template')).toEqual(baseline);
   const outlier = structuredClone(reduced); outlier.peak.loading = 42 * MB;
-  expect(compareLedger(baseline, [outlier, reduced, baseline], 'template'))
-    .toMatchObject({ control: { geometry: 18 * MB }, peak: { loading: 69 * MB } });
+  expect(compareLedger(baseline, [outlier, reduced, baseline], 'template')).toEqual(baseline);
 });
 
 test('native footprint compares the median with the stored upper spread', () => {

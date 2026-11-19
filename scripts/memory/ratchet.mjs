@@ -2,7 +2,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { isDeepStrictEqual, parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
-import { medianOfThree } from './gate.mjs';
 import { memorySubsystems, PHONE_MEMORY_BUDGETS } from '../../src/shared/engine/core/memoryBudget.ts';
 
 const SUBSYSTEMS = Object.keys(PHONE_MEMORY_BUDGETS);
@@ -38,8 +37,8 @@ export function ledgerBudget(checkpoints) {
 }
 
 /**
- * Replay a historical comparison. A clean three-boot cohort can lower
- * the stored baseline to its median.
+ * Replay a historical comparison against a subsystem ledger. It never lowers the stored ledger (BUDGET-CAPS BC6:
+ * nothing lowers itself; the CI gate judges the two totals through scripts/memory/ledgerVerdict.mjs).
  * @param {LedgerBudget} baseline @param {readonly LedgerBudget[]} runs
  * @param {string} zone @returns {LedgerBudget}
  */
@@ -53,8 +52,7 @@ export function compareLedger(baseline, runs, zone) {
     const observed = Math.max(...runs.map(run => byteCount(run[phase]?.[kind])));
     const limit = previous + Math.floor(previous * 0.02);
     if (observed > limit) failures.push(`${zone} ${phase} ${kind}: ${observed} B > ${limit} B (baseline ${previous} B)`);
-    next[phase][kind] = runs.length === 3
-      ? Math.min(previous, medianOfThree(runs.map(run => byteCount(run[phase]?.[kind])))) : previous;
+    next[phase][kind] = previous;
   }
   if (failures.length > 0) throw new Error(failures.join('\n'));
   return next;
