@@ -1449,6 +1449,7 @@
     "src/server/game/weather/continuation.ts": "server",
     "src/server/game/weather/reactions.ts": "server",
     "src/server/game/weather/wire.ts": "server",
+    "src/server/game/zoneSelect/featured.ts": "server",
     "src/server/host/bake/headlessWorker.ts": "server",
     "src/server/host/dedicated/gridCells.ts": "server",
     "src/client/game/shardfile/serverRoute.ts": "client",
