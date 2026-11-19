@@ -14,6 +14,7 @@ import { runtimePacksOn } from '@wildshard/engine/boot/loadingPacks';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { preloadModuleFiles, readModuleFiles } from '@wildshard/engine/boot/download';
 import { prepareBootImports, startTitleWarmup } from './bootDownloads';
+import { MISSING_SERVER, pageServerRoute } from '@wildshard/engine/game/shardfile/serverRoute';
 /**
  * The page's module entry. Everything the game imports statically is evaluated in ONE task when a module graph
  * runs: three.js plus the ~150 game modules at once was a 115–157 ms long task at 4× CPU before the first boot step
@@ -133,6 +134,11 @@ function learnPlacedCellsOnce(): Promise<void> {
   return Promise.race([read, deadline]);
 }
 async function enterPage(): Promise<unknown> {
+  if (pageServerRoute() === 'missing') {
+    const { showError } = await import('@wildshard/engine/ui/ErrorModal');
+    showError(MISSING_SERVER);
+    return undefined;
+  }
   // S20: a crash read off another tab's live beat is no crash; asked now, answered (at most 500 ms) before the title reads it
   const settled = settleLastEnd();
   // TC-SHIP-a: progress saved under a retired slug (Brasscap Mesa's blender-template: its pack, owned items, coins and

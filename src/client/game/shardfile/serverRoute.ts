@@ -1,17 +1,15 @@
-// GO4 (MMO-ZONE-SELECT, QA row 13: "let's make it all the same"): which server a page plays on. A build stamped with a world (play,
-// staging) puts every page in it, the grid's as well as a one-shard page; only a build with no world (preview, sharddev) runs the
-// in-page standalone server (J209). Kept apart from `clientWorker.ts` so a test can read the rule without a renderer.
+/** A world stamp always wins. Only a preview-stamped page can boot a worker. */
+export type ServerRoute = 'online' | 'standalone' | 'missing';
+export const MISSING_SERVER = 'No game server is configured. Run pnpm dev for the engine or wildshard dev for a shard.';
 
-/** Where a page's server is. */
-export type ServerRoute = 'online' | 'standalone';
+export function serverRoute(world: unknown, preview: unknown): ServerRoute {
+  if (world !== undefined) return 'online';
+  return preview === true ? 'standalone' : 'missing';
+}
 
-/** The route for a page. `world` is the build's stamp (`__WS_WORLD__`). OFFLINE OF2 (J298, Jake 2026-11-12: "staging and prod should
- *  never try to play offline versions"): a build with a world sends every page online, whatever its world says or doesn't say. No
- *  answer (unreachable, offline), a world that hosts one cell, a shard the grid doesn't place: the page still joins, and a failing link
- *  shows the connection screens in the world, never the in-page server. The world's word picks only which page boots (Shard select's
- *  one way in, `oneWayIn.ts`), never the server. */
-export function serverRoute(world: unknown): ServerRoute {
-  return world === undefined ? 'standalone' : 'online';
+export function pageServerRoute(): ServerRoute {
+  const stamps = globalThis as { __WS_WORLD__?: unknown; __WS_PREVIEW__?: unknown };
+  return serverRoute(stamps.__WS_WORLD__, stamps.__WS_PREVIEW__);
 }
 
 /** Whether the door's `world` word (`socketFrames.ts` `WorldWord`, sent on every socket before hello) says it hosts the grid: more
@@ -21,12 +19,8 @@ export function hostsGrid(world: unknown): boolean {
   return typeof cells === 'number' && cells > 1;
 }
 
-/** Whether a page may start the in-page server before its server step: only on a build with no world (OF2: a world build's pages
- *  all join the world). */
-export function earlyStandalone(world: unknown): boolean { return serverRoute(world) === 'standalone'; }
-
-/** STAGING-BUGBASH SB48 (Jake 2026-11-18): the Load step a player read as "Worker boot" is, on staging and prod, the page joining
- *  the world; only the preview's in-page standalone server boots a server of its own, and only it says so. */
-export function serverStepLabel(world: unknown = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__): string {
-  return serverRoute(world) === 'online' ? 'Joining the world' : 'Starting the in-page server';
+export function serverStepLabel(): string {
+  const route = pageServerRoute();
+  if (route === 'online') return 'Joining the world';
+  return route === 'standalone' ? 'Starting the in-page server' : 'Game server';
 }

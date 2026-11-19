@@ -1038,7 +1038,7 @@ function exportTree(ref) {
     linkNodeModules(dirname(nm), dir); // E432: @wildshard/* → this export
     console.error('> vite build');
     // the export's own app build script (D24), else a bare vite build for a ref that predates it
-    const app = existsSync(join(dir, 'scripts/build-app.mjs')) ? 'node scripts/build-app.mjs' : `node "${join(dir, 'node_modules/vite/bin/vite.js')}" build`;
+    const app = existsSync(join(dir, 'scripts/build-app.mjs')) ? 'node scripts/build-app.mjs --mode preview' : `node "${join(dir, 'node_modules/vite/bin/vite.js')}" build`;
     execSync(app, { cwd: dir, stdio: ['ignore', 'ignore', 'inherit'] });
   } else console.error(`> reusing ${dir}/dist`);
   return dir;

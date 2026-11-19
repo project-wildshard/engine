@@ -78,7 +78,7 @@ case "${1:-}" in
     exit 0;;
 esac
 
-MODE=production; HEAD_ONLY=0; REV=HEAD; PORT=""; HOURS=4; NAME="build"; FULL=0; SHARDS=""
+MODE=preview; HEAD_ONLY=0; REV=HEAD; PORT=""; HOURS=4; NAME="build"; FULL=0; SHARDS=""
 ARGS=("$@")
 while [ $# -gt 0 ]; do
   case "$1" in

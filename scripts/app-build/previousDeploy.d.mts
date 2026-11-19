@@ -12,6 +12,7 @@ export function carryPreviousDeploy(directory: string, options?: {
   readonly optional?: boolean;
   /** PZ5: this build reads its content from a content base: its graph names code only, marked, so it is carried as code only */
   readonly contentBase?: boolean;
+  readonly keepFile?: (path: string) => boolean;
   /** PAGE-SIZE D1: what the kept builds may add to the page; a kept build past it is dropped whole, newest first */
   readonly budget?: {readonly files: number; readonly bytes: number};
 }): Promise<{current: number; builds: number; carried: number; bytes: number}>;

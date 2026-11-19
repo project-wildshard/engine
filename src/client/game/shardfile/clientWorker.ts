@@ -63,7 +63,7 @@ import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
-import { earlyStandalone, serverRoute, serverStepLabel } from './serverRoute';
+import { MISSING_SERVER, pageServerRoute, serverStepLabel } from './serverRoute';
 import { worldHosted } from '../grid/oneWayIn';
 import { drawnPlace } from '../grid/edgeCreatures';
 import { setLampFollow } from '@wildshard/engine/render/lookLight';
@@ -447,7 +447,7 @@ async function leaveEarly(shell: Promise<Shell>): Promise<void> {
 /** MG10 (J410): the standalone server's worker, started at the boot's data step to load and warm physics while the page
  *  holds little (shell.ts `prespawnStandalone`); the server's boot adopts it. Only a build with an in-page server. */
 export function prespawnWorkerServer(): void {
-  if (!earlyStandalone((globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__)) return;
+  if (pageServerRoute() !== 'standalone') return;
   void (async () => {
     try { (await loadServerModules()).prespawnStandalone?.(url => spawnHeldBytes(url)); } catch { /* the server's boot loads them again */ }
   })();
@@ -456,7 +456,7 @@ export function prespawnWorkerServer(): void {
  *  that step instead, as before. A level left before adoption saves and stops this server as an adopted one would. */
 export function startWorkerServerEarly(options: { readonly slug: string; readonly lone: boolean; readonly scope: Scope }): void {
   // GO4: a build with a world puts every page in it, a grid page too: no in-page server to start early.
-  if (!earlyStandalone((globalThis as { __WS_WORLD__?: BuildWorld }).__WS_WORLD__)) return;
+  if (pageServerRoute() !== 'standalone') return;
   if (early !== null && !early.adopted) return;
   const reads: EarlyServer['reads'] = { count: 0, card: null };
   const shell = bootStandalone(options.slug, options.lone, () => { if (reads.card === null) reads.count++; else reads.card.add(); });
@@ -485,6 +485,8 @@ function pageOnlyStorage(): SaveStorage {
     setItem: (key, value) => { items.set(key, value); }, removeItem: key => { items.delete(key); } };
 }
 async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<typeof countedWait>): Promise<void> {
+  const route = pageServerRoute();
+  if (route === 'missing') throw new Error(MISSING_SERVER);
   const { slug, player, physics, scope, system } = ports, { savePrefix } = appIdentity(), page = saveEnvironment().storage('shard');
   const { root, build } = buildRoot();
   const adopted = early !== null && !early.adopted && early.key === serverKey(slug, ports.grid === null) ? early : null;
@@ -559,7 +561,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     await new Promise<never>(() => { /* settles never: the page unloads */ });
   }
   // A page that can keep nothing still joins, with a device id for this page only.
-  const shell = await (world !== undefined && serverRoute(world) === 'online' ? online(world, page ?? pageOnlyStorage()) : standalone()), { client } = shell;
+  const shell = await (world !== undefined && route === 'online' ? online(world, page ?? pageOnlyStorage()) : standalone()), { client } = shell;
   // ZE10d2: a handed-over link no session took (this one is not online) goes; the door's hold keeps the seat for a later dial
   if (handedOver !== null) { handedOver.shell.dispose(); handedOver = null; }
   void shell.booted.catch(() => undefined);

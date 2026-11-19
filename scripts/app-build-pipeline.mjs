@@ -190,7 +190,7 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
   // HTML owns the deploy identity; hashed runtime code stays reusable across builds.
   // Calibration documents need it too. The worker must see these final bytes.
   const validator = shardfileValidationRevision();
-  // E7.2d: a build with a release file is a build of the one world. Every other build stays standalone.
+  // STR7: the preview channel and local preview proofs opt in explicitly.
   const {
     WILDSHARD_RELEASE_URL: worldFile,
     WILDSHARD_RELEASE_KEY: worldKey,
@@ -206,10 +206,14 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
           key: worldKey,
           ...(recordTag === undefined ? {} : { recordTag }),
         };
+  const preview = mode === "preview" || process.env.WS_CHANNEL === "preview";
+  if (preview && (world !== undefined || mode === "devserver" || (process.env.WS_CHANNEL !== undefined && process.env.WS_CHANNEL !== "preview")))
+    throw new Error("A preview build cannot be a devserver or name a world");
   stampBuildDocuments(outDir, {
     validator,
     verdicts: buildValidationReceipts(validator),
     ...(world === undefined ? {} : { world }),
+    ...(preview ? { preview: true } : {}),
     // QA 11-13: the static title's build pill, before any bundle (index.html data-launch-progress)
     label: buildLabelOf(buildId, engineRelease(process.cwd())),
   });
@@ -218,10 +222,9 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
 
   writeTitleAssets(process.cwd(), outDir);
 
-  // the standalone shell and its server worker under the build's folder, before the service worker, which precaches them (J130)
-  await (
-    await import("./app-build/standaloneOutput.mjs")
-  ).writeStandaloneOutput(outDir, buildId, process.cwd(), { devserver: mode === "devserver" });
+  // Preview adds its worker beside the common server, storage and identity modules.
+  const { checkServerOutput, standaloneServerFile, writeStandaloneOutput } = await import("./app-build/standaloneOutput.mjs");
+  await writeStandaloneOutput(outDir, buildId, process.cwd(), { preview, devserver: mode === "devserver" });
 
   // the crossroads phone rig beside the bundle (was vite/crossroadsRig.ts); before the worker, which counts its files
   step([
@@ -301,9 +304,12 @@ export async function finishAppBuild({ outDir, buildId, mode, deferPublic }) {
       ...(previousOrigin === undefined ? {} : { previousOrigin }),
       optional,
       contentBase,
+      ...(preview ? {} : { keepFile: path => !standaloneServerFile(path) }),
       ...(budget === undefined ? {} : { budget }),
     }),
   );
+
+  checkServerOutput(outDir, preview);
 
   // OFF-VERCEL OV3: dist/ is the Workers asset directory. Refuse what Workers static assets would refuse.
   if (outDir === resolve("dist")) console.log(`Asset limits: ${describeAssetLimits(assertAssetLimits(outDir))}`);

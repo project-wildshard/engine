@@ -6,6 +6,7 @@ import {join, resolve as resolvePath} from 'node:path';
 import {createServer} from 'node:http';
 import {expect, test, vi} from 'vitest';
 import {CHUNK, KEEP_PROMOTED, carryPreviousDeploy, channelOrigin, liveDeployBuilds, previousDeployOptional} from '../scripts/app-build/previousDeploy.mjs';
+import {checkServerOutput, standaloneServerFile} from '../scripts/app-build/standaloneOutput.mjs';
 
 test('a deploy carries the kept builds unchanged, but never one past the prune, nor a map', async () => {
   mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-'));
@@ -76,6 +77,28 @@ test('PZ5: a carried build carries its code only, never assets/spawn/, a grid fi
     // A marked graph that names content anyway (an older writer) still carries its code only, and is written back as code.
     writeFileSync(join(old, 'deploy-chunks.json'), JSON.stringify({format: 2, builds: [{build: 'old', content: true, files: [...code, ...content].map(path => ({path, bytes: path.length}))}]}));
     expect((await carriedOnce('again'))[1]?.files.map(row => row.path).sort()).toEqual([...code].sort());
+  } finally {rmSync(root, {recursive: true, force: true});}
+});
+
+test('STR7 retains online code while excluding an old preview worker', async () => {
+  mkdirSync('tmp', {recursive: true}); const root = mkdtempSync(resolvePath('tmp/previous-deploy-preview-'));
+  const dir = 'b/old/standalone';
+  const online = `${dir}/online.js`;
+  const server = [`${dir}/shell.js`, `${dir}/serverWorker-aaaaaaaa.js`, `${dir}/serverRuntime-bbbbbbbb.js`];
+  try {
+    const old = join(root, 'old'); mkdirSync(join(old, dir), {recursive: true});
+    writeFileSync(join(old, 'version.json'), '{"build":"old"}');
+    for (const path of [online, ...server]) writeFileSync(join(old, path), path);
+    checkServerOutput(old, true);
+    expect(() => checkServerOutput(old, false)).toThrow('Unexpected in-page server output');
+    await carryPreviousDeploy(old);
+    const next = join(root, 'next'); mkdirSync(next);
+    writeFileSync(join(next, 'version.json'), '{"build":"next"}');
+    await carryPreviousDeploy(next, {previousDirectory: old, keepFile: path => !standaloneServerFile(path)});
+    expect(readFileSync(join(next, online), 'utf8')).toBe(online);
+    for (const path of server) expect(existsSync(join(next, path))).toBe(false);
+    checkServerOutput(next, false);
+    expect(() => checkServerOutput(next, true)).toThrow('Preview build has no server worker');
   } finally {rmSync(root, {recursive: true, force: true});}
 });
 

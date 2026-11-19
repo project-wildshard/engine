@@ -866,7 +866,7 @@ async function main(argv) {
   if (online !== null && (!args.dist || !args.chunk || args.url2 || args.ladder || args.microscope || args['ledger-only'])) { console.error(`--online takes --dist and --chunk, and no --url2, --ladder, --microscope or --ledger-only\n${usage}`); return 64; }
   if (online !== null && builtGridCell(readFileSync(join(args.dist, 'index.html'), 'utf8'), args.chunk) === null) {
     console.error(`--online: ${args.chunk} has no grid cell in ${args.dist}'s catalogue (off the grid, J305), so the online page lands on the title (OF3).\n`
-      + `Place it and build a client for it: node scripts/memory/measure.mjs --place=${args.chunk} --out=tmp/<lane>/catalogue.json, then WILDSHARD_CATALOGUE=tmp/<lane>/catalogue.json node scripts/build-app.mjs --outDir <dist>`);
+      + `Place it and build a client for it: node scripts/memory/measure.mjs --place=${args.chunk} --out=tmp/<lane>/catalogue.json, then WILDSHARD_CATALOGUE=tmp/<lane>/catalogue.json node scripts/build-app.mjs --mode preview --outDir <dist>`);
     return 64;
   }
   if ((online === null && !args.url) || (args.chunk === undefined && !args.ladder)) { console.error(usage); return 64; }

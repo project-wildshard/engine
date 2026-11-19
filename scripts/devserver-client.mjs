@@ -100,7 +100,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   const client = resolve(option('keep') ?? join(ROOT, 'tmp', 'devserver-client', 'client'));
   if (relative(ROOT, client).startsWith('..')) throw new Error('devserver-client: the build folder must be inside this checkout (build-app defers its public copy there)');
   rmSync(client, { recursive: true, force: true });
-  const built = spawnSync(process.execPath, ['scripts/build-app.mjs', '--mode', kind === 'devserver' ? 'devserver' : 'production', '--outDir', client], {
+  const built = spawnSync(process.execPath, ['scripts/build-app.mjs', '--mode', kind === 'devserver' ? 'devserver' : 'preview', '--outDir', client], {
     cwd: ROOT, stdio: 'inherit', env: { ...process.env, WILDSHARD_CATALOGUE: process.env.WILDSHARD_CATALOGUE ?? 'test/pins/catalogue.json',
       ...(kind === 'preparation' ? { WILDSHARD_PREPARATION_ONLY: '1' } : {}) } });
   if (built.status !== 0) throw new Error(`devserver-client: build-app exited ${String(built.status)}`);

@@ -47,7 +47,7 @@ try {
   // build HEAD's own file list instead (source-input-proof.mjs's inventory), as build-mirror.mjs does (main ci 43064007268)
   const files=join(work,'tree-files.json');
   writeFileSync(files,JSON.stringify({root:realpathSync(tree),files:execFileSync('git',['ls-tree','-r','--name-only','-z','HEAD'],{encoding:'utf8',maxBuffer:16*1024*1024}).split('\0').filter(file=>file!=='')}));
-  execFileSync('python3',['scripts/heavy-lane.py','build','--',process.execPath,'scripts/build-app.mjs'],{
+  execFileSync('python3',['scripts/heavy-lane.py','build','--',process.execPath,'scripts/build-app.mjs','--mode','preview'],{
     cwd:tree,env:{...process.env,WS_BUILD_ID:sourceBuildId(sha),WILDSHARD_CATALOGUE:catalogue,WS_GENERATION_TREE_FILES:files,WS_GENERATION_TREE_ROOT:realpathSync(tree)},stdio:'inherit',timeout:300000});
   const dist=join(tree,'dist'),{build}=JSON.parse(readFileSync(join(dist,'version.json'),'utf8'));
   const cooked=join(work,'cooked');

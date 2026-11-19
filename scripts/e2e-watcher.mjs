@@ -99,7 +99,7 @@ async function finish(bundle) {
     cpSync(bundleDir, generation, { recursive: true });
     // A newer bundle began while this one was copied: its own finish follows.
     if (bundle !== status.started) { rmSync(generation, { recursive: true, force: true }); return; }
-    await finishAppBuild({ outDir: generation, buildId: BUILD_ID, mode: 'production', deferPublic: true });
+    await finishAppBuild({ outDir: generation, buildId: BUILD_ID, mode: 'preview', deferPublic: true });
     if (bundle === status.started) {
       // Served atomically: the link moves to the finished generation in one rename, then older ones go.
       const link = `${client}.next`;

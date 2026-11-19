@@ -12,7 +12,7 @@ assert.ok(output, 'Pass a disposable --output=<owned scratch parent>');
 await mkdir(output, { recursive: true });
 const directory = await mkdtemp(join(resolvePath(output), 'bootstrap-'));
 try {
-  await writeStandaloneOutput(directory, 'bootstrap-proof', process.cwd());
+  await writeStandaloneOutput(directory, 'bootstrap-proof', process.cwd(), { preview: true });
   const paths = await readdir(join(directory, 'b/bootstrap-proof/standalone'));
   const workerFile = paths.find(path => /^serverWorker.*\.js$/u.test(path));
   assert.ok(workerFile, 'Build emitted no actual worker');

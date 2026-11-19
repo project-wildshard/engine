@@ -173,7 +173,7 @@ export function channelOrigin(channel) {
  * kept build that would take the page past it is dropped whole, as a pruned build is: chunk recovery moves its tabs on. Without
  * it, the first build that splits its content off carried four builds that hold theirs (preview, 2026-11-13: 178 MB) and the
  * gate refused every build, so those never aged out.
- * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean, optional?: boolean, contentBase?: boolean, budget?: {files: number, bytes: number}}} [options]
+ * @param {{previousDirectory?: string, previousOrigin?: string, live?: readonly string[], ours?: (build: string) => boolean, optional?: boolean, contentBase?: boolean, keepFile?: (path: string) => boolean, budget?: {files: number, bytes: number}}} [options]
  */
 export async function carryPreviousDeploy(directory, options = {}) {
   const current = currentManifest(directory, options.contentBase === true);
@@ -207,7 +207,7 @@ export async function carryPreviousDeploy(directory, options = {}) {
   const held = new Map(current.files.map(row => [row.path, row.bytes])), kept = [current];
   let carried = 0, bytes = 0;
   for (const whole of previous.filter(row => row.build !== current.build).slice(0, KEEP_PROMOTED - 1)) {
-    const carry = carryOf(whole.content), graph = {...whole, files: whole.files.filter(row => carry.test(row.path))};
+    const carry = carryOf(whole.content), graph = {...whole, files: whole.files.filter(row => carry.test(row.path) && (options.keepFile?.(row.path) ?? true))};
     const fresh = [];
     // A path this build writes with other bytes than a kept build's: a chunk hash that doesn't cover what Vite adds after
     // hashing (`__vite__mapDeps`), seen across checkouts (main ci 43064007268). This build's bytes win and that kept build

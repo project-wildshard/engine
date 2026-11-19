@@ -16,7 +16,7 @@ const browserTemp = resolvePath(scratch,'t1/browser-tmp',suite);
 mkdirSync(browserTemp, { recursive: true });
 const env = { ...process.env, TMPDIR: browserTemp, WS_T1_BUILD_DIR: out, WILDSHARD_CATALOGUE: resolvePath('out/.ring-catalogue.json') };
 const commands = process.env.WS_T1_BUILD_DIR === undefined ? [
-  ['node', 'scripts/pins.ts', 'install', '--ring', '1'], ['pnpm', 'gen:inputs'], ['python3', 'scripts/heavy-lane.py', 'build', '--', 'node', 'scripts/build-app.mjs', '--outDir', out],
+  ['node', 'scripts/pins.ts', 'install', '--ring', '1'], ['pnpm', 'gen:inputs'], ['python3', 'scripts/heavy-lane.py', 'build', '--', 'node', 'scripts/build-app.mjs', '--mode', 'preview', '--outDir', out],
 ] : [];
 for (const [command, ...args] of commands) {
   const run = spawnSync(command, args, { stdio: 'inherit', env });

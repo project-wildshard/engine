@@ -74,7 +74,7 @@ export function lateBootTags(html) {
 /** Stamp before executable module scripts, without changing the bundle's URLs. `label` (QA 11-13) is the build pill's
  * words, which index.html's static title shows before any bundle runs.
  * @param {string} html @param {string} build
- * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}, label?: string, builtAt?: number}} [facts] */
+ * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}, preview?: true, label?: string, builtAt?: number}} [facts] */
 export function stampBuildHtml(html, build, facts) {
   if (build.length === 0 || !/^[\w.-]+$/u.test(build)) throw new Error('Invalid document build identity');
   if (html.includes('globalThis.__WS_BUILD_ID__=')) throw new Error('Duplicate document build identity');
@@ -88,20 +88,22 @@ export function stampBuildHtml(html, build, facts) {
   if (facts !== undefined && (!/^[a-f0-9]{64}$/u.test(facts.validator) || !Array.isArray(facts.verdicts))) throw new Error('Invalid document admission facts');
   const admission = facts === undefined ? '' : `globalThis.__WS_SHARDFILE_VALIDATOR__=${JSON.stringify(facts.validator)};globalThis.__WS_SHARDFILE_VERDICTS__=${JSON.stringify(facts.verdicts).replaceAll('<', String.raw`\u003c`)};`;
   const world = facts?.world === undefined ? '' : `globalThis.__WS_WORLD__=${JSON.stringify(facts.world).replaceAll('<', String.raw`\u003c`)};`;
+  if (facts?.preview === true && facts.world !== undefined) throw new Error('A preview document cannot name a world');
+  const preview = facts?.preview === true ? 'globalThis.__WS_PREVIEW__=true;' : '';
   if (facts?.label !== undefined && !/^[\w .·+-]{1,80}$/u.test(facts.label)) throw new Error('Invalid document build label');
   const label = facts?.label === undefined ? '' : `globalThis.__WS_BUILD_LABEL__=${JSON.stringify(facts.label)};`;
   // STALE-BUILD SB1 (J321): the build time, as a meta a person can read and a number index.html's data-stale-build reads
   const at = facts?.builtAt;
   if (at !== undefined && !(Number.isSafeInteger(at) && at > 0)) throw new Error('Invalid document build time');
   const built = at === undefined ? ['', ''] : [`<meta name="ws-built-at" content="${new Date(at).toISOString()}">`, `globalThis.__WS_BUILT_AT__=${at};`];
-  return `${source.slice(0, end)}${built[0]}<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};${built[1]}${admission}${world}${label}</script>${source.slice(end)}`;
+  return `${source.slice(0, end)}${built[0]}<script>globalThis.__WS_BUILD_ID__=${JSON.stringify(build)};${built[1]}${admission}${world}${preview}${label}</script>${source.slice(end)}`;
 }
 
 /** Plain post-bundle step, before the service worker hashes the final HTML.
  * Every document entry gets the same version.json identity, including native
  * index.html and the calibration entry. No new Vite plugin or fetched module.
  * @param {string} directory
- * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}, label?: string}} [facts] */
+ * @param {{validator: string, verdicts: readonly unknown[], world?: {release: string, key: string,recordTag?:string}, preview?: true, label?: string}} [facts] */
 export function stampBuildDocuments(directory, facts) {
   /** @type {unknown} */
   const version = JSON.parse(readFileSync(resolve(directory, 'version.json'), 'utf8'));

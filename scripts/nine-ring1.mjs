@@ -29,7 +29,7 @@ if (phase === 'build' || phase === 'all') {
   catalogue.grid.cells = catalogue.grid.cells.map((/** @type {{slug:string}} */ row) => kept.has(row.slug) ? row : {...row,slug:'brasscap-mesa',speedClass:'road'});
   const file = resolvePath(out,'catalogue.json'); writeFileSync(file,JSON.stringify(catalogue));
   await run([process.execPath,'scripts/gen.mjs','--inputs-only'], {...process.env,WILDSHARD_CATALOGUE:file});
-  await run(['python3','scripts/heavy-lane.py','build','--',process.execPath,'scripts/build-app.mjs','--outDir',resolvePath(previewRoot,'dist')],
+  await run(['python3','scripts/heavy-lane.py','build','--',process.execPath,'scripts/build-app.mjs','--mode','preview','--outDir',resolvePath(previewRoot,'dist')],
     {...process.env,WILDSHARD_CATALOGUE:file});
 }
 if (phase !== 'build') {

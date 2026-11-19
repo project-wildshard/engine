@@ -54,11 +54,11 @@
     "gen:inputs": "node scripts/gen.mjs --inputs-only",
     "gen:source": "node --import ./scripts/bake-loader.mjs scripts/gen-source.mjs",
     "pins": "node scripts/pins.ts install",
-    "build:ring": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install --ring 1 ${WS_RING_EXTRA_PRODUCTS:-} && node scripts/gen.mjs --inputs-only && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs && node scripts/check-devserver.mjs dist'",
+    "build:ring": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install --ring 1 ${WS_RING_EXTRA_PRODUCTS:-} && node scripts/gen.mjs --inputs-only && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs --mode preview && node scripts/check-devserver.mjs dist'",
     "ring:1": "bash scripts/ring1.sh all",
     "lint:typed": "node scripts/lint-all.mjs",
     "test:checks": "pnpm gen && node scripts/check-graph.mjs --source-only && node scripts/check-engine-sides.mjs && node scripts/check-sim-players.mjs",
-    "build:game": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install && node scripts/gen.mjs --inputs-only && npr tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=\"${WILDSHARD_CATALOGUE:-test/pins/catalogue.json}\" node scripts/build-app.mjs && node scripts/check-devserver.mjs dist && node scripts/app-build/splitOutput.mjs dist && node scripts/page-size.mjs dist --gate'",
+    "build:game": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install && node scripts/gen.mjs --inputs-only && npr tsc -b tsconfig.layers.json --builders 1 && WILDSHARD_CATALOGUE=\"${WILDSHARD_CATALOGUE:-test/pins/catalogue.json}\" node scripts/build-app.mjs --mode \"${WS_CHANNEL:-preview}\" && node scripts/check-devserver.mjs dist && node scripts/app-build/splitOutput.mjs dist && node scripts/page-size.mjs dist --gate'",
     "tools:install": "npr install --frozen"
   },
   "dependencies": {
@@ -1064,6 +1064,7 @@
     "./game/shardfile/homeKeeper": "./src/server/game/shardfile/homeKeeper.ts",
     "./game/shardfile/runtimeFolder": "./src/client/game/shardfile/runtimeFolder.ts",
     "./game/shardfile/clientSource": "./src/client/game/shardfile/clientSource.ts",
+    "./game/shardfile/serverRoute": "./src/client/game/shardfile/serverRoute.ts",
     "./game/shardfile/shardFolder": "./src/shared/game/shardfile/shardFolder.ts",
     "./game/shardfile/playArea": "./src/shared/game/shardfile/playArea.ts",
     "./game/shardfile/props": "./src/shared/game/shardfile/props.ts",

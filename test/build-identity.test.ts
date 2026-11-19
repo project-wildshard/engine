@@ -19,6 +19,17 @@ test('deploy identities change the document while its module URLs and runtime ex
   expect(() => stampBuildHtml('<head></head><head></head>', 'valid')).toThrow('Missing or ambiguous document head');
 });
 
+test('a preview document opts in before the module starts', () => {
+  const html = '<html><head><script type="module" src="/main.js"></script></head></html>';
+  const facts = { validator: 'a'.repeat(64), verdicts: [] };
+  const preview = stampBuildHtml(html, 'preview', { ...facts, preview: true });
+  expect(preview.indexOf('globalThis.__WS_PREVIEW__=true;')).toBeGreaterThan(0);
+  expect(preview.indexOf('globalThis.__WS_PREVIEW__=true;')).toBeLessThan(preview.indexOf('src="/main.js"'));
+  const world = { release: 'https://example.invalid/packs', key: 'a' };
+  expect(stampBuildHtml(html, 'staging', { ...facts, world })).not.toContain('__WS_PREVIEW__');
+  expect(() => stampBuildHtml(html, 'invalid', { ...facts, world, preview: true })).toThrow('A preview document cannot name a world');
+});
+
 test('the post-bundle stamp covers web and native document entries without modifying code', () => {
   mkdirSync('tmp', { recursive: true });
   const root = mkdtempSync(resolve('tmp/build-identity-'));

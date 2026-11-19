@@ -154,5 +154,5 @@ function buildTree(tree,sha) {
   // Use this harness's lane even when the historical oracle predates it. One lease owns the whole build pipeline.
   const lane=fileURLToPath(new URL('../heavy-lane.py',import.meta.url));
   execFileSync('python3',[lane,'build','--','bash','-c',
-    'if [ -f scripts/gen.mjs ]; then node scripts/gen.mjs --inputs-only || exit; fi; if [ -f scripts/build-shardfiles.mjs ]; then node scripts/build-shardfiles.mjs || exit; fi; if [ -f scripts/build-app.mjs ]; then node scripts/build-app.mjs; else pnpm exec vite build; fi'],options);
+    'if [ -f scripts/gen.mjs ]; then node scripts/gen.mjs --inputs-only || exit; fi; if [ -f scripts/build-shardfiles.mjs ]; then node scripts/build-shardfiles.mjs || exit; fi; if [ -f scripts/build-app.mjs ]; then node scripts/build-app.mjs --mode preview; else pnpm exec vite build; fi'],options);
 }
