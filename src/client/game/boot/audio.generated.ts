@@ -4715,7 +4715,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   "licence": "Per file (see provenance.source): MOSS-SoundEffect v2.0 is Apache-2.0; Stable Audio 3 Medium is the Stability AI Community License (free below USD 1M revenue, register with Stability AI for commercial use, show 'Powered by Stability AI').",
   "beds": {
    "island": {
-    "file": "bed-island-1-e4bcf390.m4a",
+    "file": "bed-island-1-4611714d.m4a",
     "loopStart": 2.25,
     "loopEnd": 15.25,
     "duration": 16.256,
@@ -4724,7 +4724,7 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   },
   "hums": {
    "shrine": {
-    "file": "hum-shrine-2-387fcd89.m4a",
+    "file": "hum-shrine-2-d89ed03a.m4a",
     "loopStart": 2.75,
     "loopEnd": 8.75,
     "duration": 9.7707,
@@ -4734,60 +4734,60 @@ export const SFX_MANIFESTS: Readonly<Record<string, unknown>> = {
   "oneshots": {
    "gull": {
     "files": [
-     "gull-1-13bd74e8.m4a"
+     "gull-1-5fa9130b.m4a"
     ],
     "gain": 1
    },
    "crab_click": {
     "files": [
-     "crab_click-2-6d9c72fc.m4a",
-     "crab_click-3-257be7cc.m4a"
+     "crab_click-2-aefbc41d.m4a",
+     "crab_click-3-f47e95a3.m4a"
     ],
     "gain": 1
    },
    "crab_snap": {
     "files": [
-     "crab_snap-2-e667a59e.m4a",
-     "crab_snap-3-382299ce.m4a"
+     "crab_snap-2-bff601ad.m4a",
+     "crab_snap-3-69ea11c0.m4a"
     ],
     "gain": 1
    },
    "monkey_chatter": {
     "files": [
-     "monkey_chatter-3-e93276a6.m4a"
+     "monkey_chatter-3-1c7d7e2d.m4a"
     ],
     "gain": 1
    },
    "monkey_shriek": {
     "files": [
-     "monkey_shriek-2-1e59ae1d.m4a",
-     "monkey_shriek-1-a876746e.m4a"
+     "monkey_shriek-2-54acd647.m4a",
+     "monkey_shriek-1-1a358b4e.m4a"
     ],
     "gain": 1
    },
    "sailor_groan": {
     "files": [
-     "sailor_groan-2-8c1f159c.m4a"
+     "sailor_groan-2-43e2a981.m4a"
     ],
     "gain": 1
    },
    "sailor_slash": {
     "files": [
-     "sailor_slash-3-cefa074c.m4a",
-     "sailor_slash-1-3d63c124.m4a"
+     "sailor_slash-3-5a10eada.m4a",
+     "sailor_slash-1-611ba654.m4a"
     ],
     "gain": 1
    },
    "coconut_hit": {
     "files": [
-     "coconut_hit-3-fc3b4fa6.m4a",
-     "coconut_hit-2-e3427546.m4a"
+     "coconut_hit-3-9c8e8fd7.m4a",
+     "coconut_hit-2-83ed831d.m4a"
     ],
     "gain": 1
    },
    "coconut_land": {
     "files": [
-     "coconut_land-1-bd89bee9.m4a"
+     "coconut_land-1-42389b0a.m4a"
     ],
     "gain": 1
    }
