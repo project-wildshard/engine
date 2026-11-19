@@ -3,9 +3,10 @@
  "about": "BUDGET-CAPS: each budget's recorded baseline, written by node scripts/budgets/cli.mjs record (never by hand). contentKey is what the value was measured on: a shard's pinned revision (<slug>@<revision>) for its numbers, engine for the app's own. declared: an engine feature that raised this budget in the commit that wrote it (cli.mjs declare); record clears it. The soft line is value plus 10% (J444).",
  "baselines": {
   "download/phone/pine-hollow": {
-   "value": 40965253,
-   "contentKey": "pine-hollow@5",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 45600182,
+   "contentKey": "pine-hollow@6",
+   "commit": "cf8078d96172764541d8c08565573b1b8ac15d55",
+   "why": "Pine r6 engine-cooked phone layers and full-size hero art"
   },
   "download/phone/driftwood-isle": {
    "value": 22227966,
@@ -801,34 +802,36 @@
    }
   },
   "ledger/pine-hollow/control": {
-   "value": 335072063,
-   "contentKey": "pine-hollow@5",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 179123887,
+   "contentKey": "pine-hollow@6",
+   "commit": "cf8078d96172764541d8c08565573b1b8ac15d55",
+   "why": "Pine r6 engine-cooked phone layers and full-size hero art",
    "detail": {
     "browser": 2810784,
     "engine": 524288,
     "workers": 8300285,
-    "geometry": 46564857,
-    "textures": 127285900,
+    "geometry": 36629165,
+    "textures": 66096724,
     "scene": 158244,
-    "audio": 22253277,
-    "loading": 127174428,
+    "audio": 0,
+    "loading": 64604397,
     "margin": 0
    }
   },
   "ledger/pine-hollow/peak": {
-   "value": 387638428,
-   "contentKey": "pine-hollow@5",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 252857523,
+   "contentKey": "pine-hollow@6",
+   "commit": "cf8078d96172764541d8c08565573b1b8ac15d55",
+   "why": "Pine r6 engine-cooked phone layers and full-size hero art",
    "detail": {
     "browser": 2810784,
     "engine": 524288,
-    "workers": 10412040,
-    "geometry": 46564857,
-    "textures": 127285900,
-    "scene": 324624,
-    "audio": 46651101,
-    "loading": 153064834,
+    "workers": 10477576,
+    "geometry": 36629165,
+    "textures": 66096724,
+    "scene": 329280,
+    "audio": 0,
+    "loading": 135989706,
     "margin": 0
    }
   },
