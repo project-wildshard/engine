@@ -29,7 +29,7 @@ describe('START: the first document\'s painter', () => {
   const windows: Window[] = [];
   afterEach(async () => { for (const window of windows.splice(0)) await window.happyDOM.close(); });
   /** The real index.html's Start painter after `steps` LS1 boundaries and these code rows of the resource timeline. */
-  async function startRow(steps: number, rows: { url: string; decodedBodySize: number; responseStatus?: number | null }[]): Promise<{ fact: string; pct: string; bar: string }> {
+  async function startRow(steps: number, rows: { url: string; decodedBodySize: number; responseStatus?: number | null }[]): Promise<{ fact: string; pct: string; bar: string; step: string | undefined }> {
     const html = readFileSync('index.html', 'utf8').replace('<script data-loading-clock>',
       `<script type="application/json" id="boot-module-files">${JSON.stringify({ common: codeFiles })}</script><script data-loading-clock>`);
     const window = new Window({ url: 'https://launch.test/?chunk=brasscap-mesa&tier=phone', width: 402, height: 874, settings: {
@@ -42,11 +42,14 @@ describe('START: the first document\'s painter', () => {
     for (const row of rows) timing.resources.push({ realm: 'page', url: `https://launch.test${row.url}`, decodedBodySize: row.decodedBodySize, transferSize: 0, responseEnd: 5, responseStatus: row.responseStatus ?? null });
     await new Promise(resolve => { setTimeout(resolve, 250); });
     const read = (name: string): string => window.document.querySelector(`[data-el="${name}"]`)?.textContent ?? '';
-    return { fact: read('stFact'), pct: read('stPct'), bar: window.document.querySelector('[data-el="stBar"]')?.getAttribute('style') ?? '' };
+    // QA 11-19 row 19: the fact ends with the step it is on ('2.5 of 3.1 MB · game code')
+    const [fact = '', step] = read('stFact').split(' · ');
+    return { fact, step, pct: read('stPct'), bar: window.document.querySelector('[data-el="stBar"]')?.getAttribute('style') ?? '' };
   }
   it('prints code bytes and its percent is those bytes (Jake\'s shot: "2 / 31 code files" beside 80 %)', async () => {
-    const { fact, pct, bar } = await startRow(5, codeFiles.slice(0, 2).map(([url, bytes]) => ({ url, decodedBodySize: bytes })));
+    const { fact, pct, bar, step } = await startRow(5, codeFiles.slice(0, 2).map(([url, bytes]) => ({ url, decodedBodySize: bytes })));
     expect(fact).toBe('2.5 of 3.1 MB');
+    expect(step).toBe('game code');
     expect(pct).toBe('80');
     expect(bar).toContain('width: 80%');
     expectRowAgrees(fact, pct);
@@ -57,6 +60,7 @@ describe('START: the first document\'s painter', () => {
     for (const steps of [2, 6]) {
       const { fact, pct, bar } = await startRow(steps, []);
       expect({ steps, fact, pct }).toEqual({ steps, fact: '0.0 of 3.1 MB', pct: '0' });
+      expect(fact).not.toContain('·');
       expect(bar).toContain('width: 0%');
     }
   });

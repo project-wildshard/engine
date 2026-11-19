@@ -8,7 +8,6 @@ import { bootTierFolderTotals } from './bootFolderTiers';
 import { homeExtraFiles } from './bootExtras';
 import { createHash } from 'node:crypto';
 import { writtenBundle } from './writtenBundle';
-import { afterFirstPaint } from './buildIdentity.mjs';
 
 /** Only imports actually scheduled by startSelected; title, recovery and error
  * branches elsewhere in the entry module are not home requirements. */
@@ -268,6 +267,9 @@ export function writeBootModules(outDir: string, root: string): void {
   featureRoots['boot.common']=[...ids];
   const rows = { common: bootModuleFiles(bundle, ids), client: bootModuleFiles(bundle, [client.id]), grid: bootModuleFiles(bundle, gridRoots), optional: bootModuleGroups(bundle, featureRoots), products, extras };
   const json = JSON.stringify(rows).replaceAll('<', String.raw`\u003c`);
-  const at = afterFirstPaint(html, html.indexOf('<head>') + '<head>'.length);
-  writeFileSync(htmlFile, `${html.slice(0, at)}<script type="application/json" id="boot-module-files">${json}</script>${html.slice(at)}`);
+  // QA 11-19 rows 19 and 46: the bank sits below the shell, right ahead of the first inline script that reads it (the
+  // loading clock), never in the head: there it held the body's first paint behind its whole length on a slow line.
+  const reader = '<script data-loading-clock>';
+  if (!html.includes(reader)) throw new Error('Missing the loading clock that reads the boot module bank');
+  writeFileSync(htmlFile, html.replace(reader, () => `<script type="application/json" id="boot-module-files">${json}</script>${reader}`));
 }

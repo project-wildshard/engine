@@ -1,4 +1,5 @@
 import type {GridMode} from '../../../shared/game/grid/catalogue';
+import {unpackEntryDownloads} from '../../../shared/game/grid/entryDownloadsWire';
 
 export interface GridEntryDownload { readonly url: string; readonly bytes: number }
 /** The directory and at most 64 blocks' header and body: a home's ring reads 16 at most today. */
@@ -12,8 +13,7 @@ export function gridStripDownloadRows(mode: GridMode, home: string): readonly Gr
   try {
     const input: unknown = JSON.parse(text), key = `${Number(mode.developer)}${Number(mode.devserver)}${Number(mode.nineDragon)}`;
     const bank: unknown = typeof input === 'object' && input !== null ? Reflect.get(input, 'gridEntryDownloads') : undefined;
-    const modes: unknown = typeof bank === 'object' && bank !== null ? Reflect.get(bank, key) : undefined;
-    const rows: unknown = typeof modes === 'object' && modes !== null ? Reflect.get(modes, home) : undefined;
+    const rows = unpackEntryDownloads(bank, key, home); // QA 11-19 row 19: packed, each file once
     // ZE4: the directory, then each initial block's header and body (bodies shared by content are fetched once)
     if (!Array.isArray(rows) || rows.length < 3 || rows.length % 2 === 0 || rows.length > MAX_DOWNLOAD_ROWS) return [];
     const result: GridEntryDownload[] = [], seen = new Set<string>();

@@ -718,9 +718,10 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           if (shell.hasAttribute('data-stalled') !== stalled) { shell.toggleAttribute('data-stalled', stalled); version.textContent = name(stalled); }
           // STALESHELL: a stall names what it waits on, a file this document names (its hash dropped) or the code it starts
           const missing = started ? undefined : [...files].find(href => !(t?.resources || []).some(row => row.url === href && row.responseStatus !== 0));
+          // QA 11-19 row 19: the line names the file it waits on while it loads too, not only once it has stalled
           const waitingOn = opening ? 'the menu' : missing === undefined ? 'the game code' : (missing.split('/').pop() || '').replace(/-[A-Za-z0-9_-]{8}(?=\.\w+$)/u, '');
           step.textContent = (stalled ? 'Still waiting on ' + waitingOn + ' · tap reload' : opening ? 'Opening the menu' : started ? 'Starting'
-            : got > 0 ? 'Loading · ' + got + ' of ' + files.size + ' files' : 'Loading') + ' · ' + (now / 1000).toFixed(1) + ' s';
+            : got > 0 ? 'Loading ' + waitingOn + ' · ' + got + ' of ' + files.size + ' files' : 'Loading the page') + ' · ' + (now / 1000).toFixed(1) + ' s';
         };
         const timer = setInterval(tick, 100); tick();
       })();
@@ -763,16 +764,25 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
     <script data-loading-first-paint>
       // RL3 (Jake: "reload should just reload the page"): one self-reload. A page whose entry modules have not arrived 12 s
       // after it started (no data-booted: a hung module fetch) reloads once a session; a slow boot that runs is left alone.
-      setTimeout(() => {
-        const pending = document.getElementById('ws-loading-shell');
-        if (document.documentElement.hasAttribute('data-booted') || !document.querySelector('[data-title-shell]') || !(document.querySelector('.ws-load[data-shell]') || pending instanceof HTMLTemplateElement && pending.content.querySelector('.ws-load[data-shell]'))) return;
-        try { // the session save key boot.selfReload (src/client/engine/saves/slots.ts), shared with stuck.ts's one retry
-          const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') || '{"keys":{}}');
-          if (doc.keys?.['boot.selfReload']) return;
-          (doc.keys ??= {})['boot.selfReload'] = { v: 1, data: String(Date.now()) }; sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify(doc));
-        } catch { return; }
-        (globalThis.__wsShellReload || location.reload.bind(location))();
-      }, 12000);
+      // QA 11-19 row 19 (Jake's phone on 4G, the title at ~26 s): a slow line is not a hung fetch. While some response
+      // finished in the last 4 s the page is still arriving, so the check looks again a second later; only 4 s with nothing
+      // arriving reloads (a reload drops the worker and starts every fetch over: the slowest thing a slow line can do).
+      (() => {
+        let arrived = 0;
+        try { new PerformanceObserver(list => { for (const row of list.getEntries()) arrived = Math.max(arrived, row.responseEnd); }).observe({ type: 'resource', buffered: true }); } catch { /* no observer: the 12 s rule alone */ }
+        const check = () => {
+          const pending = document.getElementById('ws-loading-shell');
+          if (document.documentElement.hasAttribute('data-booted') || !document.querySelector('[data-title-shell]') || !(document.querySelector('.ws-load[data-shell]') || pending instanceof HTMLTemplateElement && pending.content.querySelector('.ws-load[data-shell]'))) return;
+          if (arrived > 0 && performance.now() - arrived < 4000) { setTimeout(check, 1000); return; }
+          try { // the session save key boot.selfReload (src/client/engine/saves/slots.ts), shared with stuck.ts's one retry
+            const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') || '{"keys":{}}');
+            if (doc.keys?.['boot.selfReload']) return;
+            (doc.keys ??= {})['boot.selfReload'] = { v: 1, data: String(Date.now()) }; sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify(doc));
+          } catch { return; }
+          (globalThis.__wsShellReload || location.reload.bind(location))();
+        };
+        setTimeout(check, 12000);
+      })();
     </script>
     <script data-loading-clock>
       // DL21 (E526): before any module arrives, a world page's card runs its clock from the title tap (the fresh arrival the
@@ -798,6 +808,8 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         // 100 until Loading adopts the card; with no inventory, the completed LS1 boundaries of START_STEPS (shell.ts).
         const steps = ['app:document-and-module-graph', 'app:page-entry-import', 'app:tables-import-and-prepare', 'app:tier-menu-download-imports', 'app:three-import', 'app:main-import', 'app:selected-discovery'];
         const startFact = field('stFact'), startPct = field('stPct'), startBar = field('stBar');
+        const stepNames = {'app:document-and-module-graph': 'page', 'app:page-entry-import': 'entry code', 'app:tables-import-and-prepare': 'tables',
+          'app:tier-menu-download-imports': 'menu code', 'app:three-import': '3D engine', 'app:main-import': 'game code', 'app:selected-discovery': 'shard list'};
         // Compiler-owned decoded body sizes, not transfer sizes or a timing estimate. WebKit gives decodedBodySize 0 (and no
         // responseStatus) for a cached or service-worker answer, the precached code of a repeat visit, so a row with no size
         // counts its compiler size; Chromium's row for a failed fetch says responseStatus 0 and counts nothing (v0.1.13,
@@ -816,7 +828,10 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           if (startPct.textContent !== pct) { startPct.textContent = pct; startBar.style.width = pct + '%'; }
           startFact.textContent = moduleTotal > 0 ? (moduleBytes / 1e6).toFixed(1) + ' of ' + (moduleTotal / 1e6).toFixed(1) + ' MB' : done.length + ' of ' + steps.length + ' steps';
           if (moduleTotal > 0) { card.dataset.startBytes = String(moduleBytes); card.dataset.startTotalBytes = String(moduleTotal); card.dataset.startFiles = String(received.size); }
-          card.dataset.step = 'start.' + (steps.find(op => !done.includes(op)) || 'hand-off');
+          const current = steps.find(op => !done.includes(op)) || 'hand-off';
+          card.dataset.step = 'start.' + current;
+          // QA 11-19 row 19: the start row names the step it is on (a slow line sat on a bare byte count)
+          startFact.textContent += ' · ' + (stepNames[current] || 'starting');
         };
         paint(); startPaint(); const tick = setInterval(() => { if (card.hasAttribute('data-shell')) { paint(); startPaint(); } else clearInterval(tick); }, 100);
       } catch { /* the module's clock (shell.ts startShellClock) still runs */ }

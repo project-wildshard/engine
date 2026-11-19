@@ -11,6 +11,7 @@ import {writeEntryBootstrap, writeSpawnManifests} from '../scripts/app-build/app
 import {readSpawnManifest} from '../src/shared/game/shardfile/spawnManifest';
 import {serverPackPart} from '../src/shared/game/shardfile/serverPack';
 import {gridEntryDownloads} from '../src/cook/game/gridEntryDownloads';
+import {packEntryDownloads, unpackEntryDownloads} from '../src/shared/game/grid/entryDownloadsWire';
 import {startGridStripDownload, gridStripDownloadRows} from '../src/client/game/grid/entryDownloads';
 import {entryReadSet} from '../src/cook/game/entryReadSet';
 import {wholeGeometryInputs} from '../src/shared/game/shardfile/wholeInputs';
@@ -130,7 +131,7 @@ test('grid tap selects only its mode/home initial blocks, never outer or another
     const rows=gridEntryDownloads(root);
     expect(rows['100']).toEqual({example:[directory,header,body]});expect(rows['000']).toEqual({});
     const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
-    vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:rows})})});
+    vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:packEntryDownloads(rows)})})});
     const read=vi.spyOn(globalThis,'fetch').mockImplementation(()=>Promise.resolve(new Response(new Uint8Array([1,2,3]))));
     try {
       expect(gridStripDownloadRows({developer:true,devserver:false,nineDragon:false},'example')).toEqual([directory,header,body].map(({url,bytes})=>({url,bytes})));
@@ -142,11 +143,11 @@ test('grid tap selects only its mode/home initial blocks, never outer or another
       startGridStripDownload({developer:true,devserver:false,nineDragon:false},'example:outer');expect(read).toHaveBeenCalledTimes(3);
       // ZE4 review: a home reads several blocks; a body two blocks share is fetched once
       const second={url:`/assets/grid-strip-page-${digest('header2').slice(0,8)}.json`,bytes:3};
-      vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:{'100':{example:[directory,header,body,second,body]}}})})});
+      vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:packEntryDownloads({'100':{example:[directory,header,body,second,body]}})})})});
       expect(gridStripDownloadRows({developer:true,devserver:false,nineDragon:false},'example')).toEqual([directory,header,body,second].map(({url,bytes})=>({url,bytes})));
-      vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:{'100':{example:[directory,header,body,second]}}})})});
+      vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:packEntryDownloads({'100':{example:[directory,header,body,second]}})})})});
       expect(gridStripDownloadRows({developer:true,devserver:false,nineDragon:false},'example')).toEqual([]);
-      vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:{'100':{example:[directory,header,{url:'/outside.bin',bytes:1}]}}})})});
+      vi.stubGlobal('document',{getElementById:()=>({textContent:JSON.stringify({gridEntryDownloads:packEntryDownloads({'100':{example:[directory,header,{url:'/outside.bin',bytes:1}]}})})})});
       expect(gridStripDownloadRows({developer:true,devserver:false,nineDragon:false},'example')).toEqual([]);
       startGridStripDownload({developer:true,devserver:false,nineDragon:false},'example');expect(read).toHaveBeenCalledTimes(3);
     }finally{
@@ -165,7 +166,7 @@ test('grid metadata can cross navigation while geometry waits for code and stays
   const body = {url: '/assets/grid-strip-mesh-cccccccc.bin', bytes: 3};
   const mode = {developer: true, devserver: false, nineDragon: false};
   const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
-  vi.stubGlobal('document', {getElementById: () => ({textContent: JSON.stringify({gridEntryDownloads: {'100': {example: [directory, header, body]}}})})});
+  vi.stubGlobal('document', {getElementById: () => ({textContent: JSON.stringify({gridEntryDownloads: packEntryDownloads({'100': {example: [directory, header, body]}})})})});
   const read = vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response(new Uint8Array([1, 2, 3]))));
   try {
     startGridStripDownload(mode, 'example', 'metadata');
@@ -180,4 +181,19 @@ test('grid metadata can cross navigation while geometry waits for code and stays
     else Object.defineProperty(globalThis, 'document', previousDocument);
     read.mockRestore();
   }
+});
+
+test('QA 11-19 row 19: the packed grid bank lists each file and each home table once', () => {
+  const a = {url: '/assets/grid-strip-book-aaaaaaaa.json', bytes: 3}, b = {url: '/assets/grid-strip-page-bbbbbbbb.json', bytes: 5};
+  const c = {url: '/assets/grid-strip-mesh-cccccccc.bin', bytes: 7};
+  const same = {home: [a, b, c], other: [a, b, c]};
+  const packed = packEntryDownloads({'000': same, '100': same, '010': {home: [a, c, b]}});
+  expect(packed.files).toEqual([[a.url, 3], [b.url, 5], [c.url, 7]]);
+  expect(packed.tables).toHaveLength(2);
+  expect(packed.modes).toEqual({'000': 0, '100': 0, '010': 1});
+  expect(unpackEntryDownloads(packed, '100', 'other')).toEqual([a, b, c]);
+  expect(unpackEntryDownloads(packed, '010', 'home')).toEqual([a, c, b]);
+  expect(unpackEntryDownloads(packed, '111', 'home')).toBeUndefined();
+  expect(unpackEntryDownloads({files: [], tables: [{home: [9]}], modes: {'000': 0}}, '000', 'home')).toEqual([null]);
+  expect(unpackEntryDownloads({'100': same}, '100', 'home')).toBeUndefined();
 });

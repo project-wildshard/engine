@@ -5,6 +5,7 @@ import {join} from 'node:path';
 import {engineHalfBookPath, writeEngineHalves} from './engineHalf';
 import {cookGridPack} from './gridCollision';
 import {gridEntryDownloads} from './gridEntryDownloads';
+import {packEntryDownloads} from '../../shared/game/grid/entryDownloadsWire';
 import {createPartEncoder} from './spawnParts';
 import {writeSpawnManifests, type BuildHalf} from './entryTotals';
 import {packsBookPath} from '../../shared/game/shardfile/spawnManifest';
@@ -31,6 +32,6 @@ export async function writeEntryBootstrap(outDir: string, root: string, build_: 
   await encoder.close();
   writeFileSync(join(outDir, serverPackBookPath(build)), JSON.stringify({book: 'server', build, shards: serverPacks, ...(gridPack === undefined ? {} : {grid: gridPack})}));
   writeFileSync(join(outDir, engineHalfBookPath(build)), JSON.stringify(writeEngineHalves(outDir, spawnManifests, build)));
-  const json = JSON.stringify({...bank, gridEntryDownloads: grid, spawnManifests}).replaceAll('<', String.raw`\u003c`);
+  const json = JSON.stringify({...bank, gridEntryDownloads: packEntryDownloads(grid), spawnManifests}).replaceAll('<', String.raw`\u003c`);
   writeFileSync(file, html.replace(expression, () => `<script type="application/json" id="boot-module-files">${json}</script>`));
 }

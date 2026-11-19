@@ -37,6 +37,25 @@ test('the real pre-module retry and runtime share one epoch guard', async () => 
   expect(await retry(session)).toBe(0);
   expect(session.getItem('wildshard.save.v2.session')).toBeNull();
 });
+test('QA 11-19 row 19: the self-reload waits while responses still arrive, and reloads after 4 s of none', async () => {
+  const session = storage(), window = new Window();
+  window.document.body.innerHTML = '<main data-title-shell></main><template id="ws-loading-shell"><div class="ws-load" data-shell></div></template>';
+  let timer, reloads = 0, now = 12_000, observed;
+  class PerformanceObserver { constructor(callback) { observed = callback; } observe() {} }
+  try {
+    runInNewContext(script('data-loading-first-paint'), {
+      document: window.document, HTMLTemplateElement: window.HTMLTemplateElement, PerformanceObserver,
+      performance: { now: () => now }, sessionStorage: session, location: { reload: () => { reloads++; } },
+      setTimeout: callback => { timer = callback; },
+    });
+    observed({ getEntries: () => [{ responseEnd: 10_500 }] });
+    timer(); expect(reloads).toBe(0); // a module landed 1.5 s ago: a slow line, still arriving
+    now = 14_000; observed({ getEntries: () => [{ responseEnd: 13_900 }] });
+    timer(); expect(reloads).toBe(0);
+    now = 17_850; timer(); expect(reloads).toBe(0);
+    now = 17_900; timer(); expect(reloads).toBe(1); // 4 s with nothing: a hung fetch
+  } finally { await window.happyDOM.close(); }
+});
 test('the pre-module clock consumes the current epoch title handoff', async () => {
   const dom = new Window();
   dom.document.body.innerHTML = '<template id="ws-loading-shell"><div class="ws-load" data-shell><b data-el="slug"></b><b data-el="tier"></b><b data-el="clock"></b></div></template>';
