@@ -30,7 +30,7 @@ import type {PlaytestHit} from './playtest';
 import { cellFrame, cellName, gridAssembly } from './gridCells';
 import { gridBoardLimitAt } from '@wildshard/engine/game/grid/rules';
 import {hitHistoryOf} from '@wildshard/engine/combat/rewind';
-import { entrywaysStand, floorBelow } from '@wildshard/engine/physics/query';
+import { clearStand, entrywaysStand, floorBelow } from '@wildshard/engine/physics/query';
 import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { buildStrips } from '../standalone/roadWorld';
@@ -230,7 +230,7 @@ export class DedicatedRoom implements CrossTarget {
     const away = this.departed.get(entry.body);
     if (lead) { this.departed.delete(entry.body); this.movePaid(entry.body, LEAD_SEAT); this.unparkLead(); }
     // Two who join together would otherwise stand inside each other.
-    const aside = SPAWN_ASIDE[(this.joined++) % SPAWN_ASIDE.length] ?? 0, stand = { ...spawn, x: spawn.x + aside };
+    const stand = this.aside(spawn);
     const player = lead ? this.lead : host.addPlayer(body, at ?? doc?.at ?? stand, at?.yaw ?? doc?.at.yaw ?? spawn.yaw);
     player.netName = entry.name;
     this.capBoard(player);
@@ -248,6 +248,20 @@ export class DedicatedRoom implements CrossTarget {
     const checkpoint=at===undefined?importedCheckpoint(entry.checkpoint,doc):undefined;
     if(checkpoint!==undefined)seat.checkpoint=checkpoint;
     return seat;
+  }
+  /**
+   * Where the next fresh seat stands: the spawn stepped aside in turn (`SPAWN_ASIDE`), to the first step from this seat's turn on
+   * that stands clear on a floor (`clearStand`). NL13b5: Nine's -1 m hung half the capsule off Lantern Square's west edge beside
+   * the Well's guard, and the page, resting on that edge a few centimetres higher than the room, corrected every walking frame. The
+   * spawn itself when no step stands clear.
+   */
+  private aside(spawn: ResumeAt): ResumeAt {
+    const turn = this.joined++, dimensions = this.lead.motor.opts;
+    for (let tried = 0; tried < SPAWN_ASIDE.length; tried++) {
+      const x = spawn.x + (SPAWN_ASIDE[(turn + tried) % SPAWN_ASIDE.length] ?? 0), y = clearStand(this.host.physics, x, spawn.z, spawn.y, dimensions);
+      if (y !== undefined) return { ...spawn, x, y };
+    }
+    return spawn;
   }
   /**
    * QA 11-15 row 8: a grid cell's board cap is the page's (`installGridHoverSpeed`): 14 m/s inside (G39), easing to the road's 30 over

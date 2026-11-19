@@ -137,6 +137,38 @@ export function canStandAt(physics: Physics, feet: Vec3, dimensions: { radius: n
   return admitted.clear && admitted.floor;
 }
 
+/** NL13b5: how far above a stand's height a floor may rise, how far below it may fall, and the skin feet keep above the highest. */
+export const CLEAR_STAND = { lift: 0.5, drop: 1.5, skin: 0.05 } as const;
+/**
+ * NET-LAG NL13b5: the feet height an upright capsule takes standing at `x`, `z` near `fromY`, or undefined when it can't stand
+ * there clear. Its footprint is its centre and eight points round its rim; each needs a world floor between `CLEAR_STAND.lift`
+ * above `fromY` and `CLEAR_STAND.drop` below, the floors may differ by at most `lift` (more is an edge), and nothing solid may be
+ * inside the capsule standing there. It stands at `fromY`, or `skin` above the highest floor when that rises over it. Collider
+ * poses are read directly, as `canStandAt` does: a room seats before its first step.
+ */
+export function clearStand(physics: Physics, x: number, z: number, fromY: number, dimensions: { readonly radius: number; readonly height: number }, exclude?: Collider): number | undefined {
+  const { radius, height } = dimensions, { lift, drop, skin } = CLEAR_STAND;
+  if (![x, z, fromY, radius, height].every(Number.isFinite) || radius <= 0 || height < radius * 2) return undefined;
+  const world: Collider[] = [];
+  physics.world.forEachCollider(collider => {
+    if (collider.isEnabled() && !collider.isSensor() && collider.handle !== exclude?.handle && ((collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0) world.push(collider);
+  });
+  const { R } = physics, ray = new R.Ray({ x, y: fromY + lift, z }, { x: 0, y: -1, z: 0 });
+  let low = Infinity, high = -Infinity;
+  for (let point = -1; point < 8; point++) {
+    const angle = point * Math.PI / 4;
+    ray.origin = point < 0 ? { x, y: fromY + lift, z } : { x: x + Math.cos(angle) * radius, y: fromY + lift, z: z + Math.sin(angle) * radius };
+    let near = Infinity;
+    for (const collider of world) { const t = collider.castRay(ray, lift + drop, true); if (t >= 0 && t < near) near = t; }
+    if (near === Infinity) return undefined;
+    const floor = fromY + lift - near;
+    low = Math.min(low, floor); high = Math.max(high, floor);
+  }
+  if (high - low > lift) return undefined;
+  const feet = high > fromY ? high + skin : fromY, shape = new R.Capsule(Math.max(0.01, height / 2 - radius), radius);
+  const centre = { x, y: feet + height / 2 + 0.03, z }, rotation = { x: 0, y: 0, z: 0, w: 1 };
+  return world.some(collider => collider.intersectsShape(shape, centre, rotation)) ? undefined : feet;
+}
 
 /** Rebind the original parentless baked box without allocating or changing its state.
  * The tolerance and first-match order retain the native continuation's lookup. */
