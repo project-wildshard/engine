@@ -13,6 +13,10 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.48 (2026-11-19)
+
+- Staging shard uploads cook in minutes again.
+
 ## v0.1.47 (2026-11-18)
 
 - Cook phone-ready textures for splat ground and skip redundant splat downloads during phone prefetch.
