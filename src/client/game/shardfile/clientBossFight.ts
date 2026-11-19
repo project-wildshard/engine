@@ -14,7 +14,7 @@ export function installClientBossFight(ctx: ShardContext, input: unknown): void 
   const row = parse(ClientBossFightSchema, input), book = clientNativeBook(ctx), source = ctx.product.shardfile;
   const quest = book.quest, world = ctx.game.runtime?.world, plan = ctx.product.section('sim/runtime-plan');
   const owner = plan.recipe.population.owner;
-  if (book.fight !== null || quest === null || world === undefined || world === null || owner.actor !== row.actor
+  if (book.fight !== null || quest === null || world === undefined || world === null || owner === undefined || owner.actor !== row.actor
     || (row.kind === 'boss.held') !== (owner.profile.pattern === 'held')) throw new Error('Encounter feature requires its actual saved page and native owner');
   if (typeof row.armed !== 'boolean' && !source.quests.flags.includes(row.armed.flag)) throw new Error('Encounter requires its declared armed flag');
   const common = { player: world.player.position, flags: quest.flags, facts: quest.facts,

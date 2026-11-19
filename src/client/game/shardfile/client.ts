@@ -473,10 +473,10 @@ export class ShardfileClient {
     if (this.nativeFeatures) {
       if (this.source.creatures.spawns.length === 0 || (this.plan?.features ?? []).some(row => row.kind === 'species.program')) return;
       this.declareCreatures(ctx);
-      // the plan's keeper keeps its boss (until OF19c): its fight's name, as the `species.program` feature registered it
+      // the plan's keeper boss, if it keeps one (OF19c0b): its fight's name, as the `species.program` feature registered it
       if (ctx.product.has('sim/runtime-plan')) {
         const owner = ctx.product.section('sim/runtime-plan').recipe.population.owner;
-        ctx.rows.encounter({ id: owner.actor, displayName: owner.definition.name });
+        if (owner !== undefined) ctx.rows.encounter({ id: owner.actor, displayName: owner.definition.name });
       }
       return;
     }

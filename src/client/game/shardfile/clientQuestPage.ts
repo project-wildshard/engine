@@ -67,11 +67,14 @@ export function finishClientQuestPage(ctx: ShardContext, input: unknown): void {
   if (quest === null || page === null || native === undefined || host === undefined || host === null || book.stages !== null)
     throw new Error('Page stages require their actual quest, interactions and native motion');
   const bindings = new Map<string, DirectorActionBinding[]>();
+  const owner = ctx.product.section('sim/runtime-plan').recipe.population.owner;
   for (const request of host.summons) {
-    const fight = book.fight;
-    if (fight === null || request.target !== ctx.product.section('sim/runtime-plan').recipe.population.owner.actor) throw new Error('Quest summon requires its actual encounter');
-    const actions = bindings.get(request.director) ?? [];
-    actions.push({ action: { spawn: request.target }, run: fight.summon }); bindings.set(request.director, actions);
+    const fight = book.fight, actions = bindings.get(request.director) ?? [];
+    // OF19c0: a summon of a declared encounter arms the server's fight; the page draws it from the wire
+    if (owner?.actor !== request.target && source.encounters.some(encounter => encounter.entity === request.target)) actions.push({ action: { spawn: request.target }, run: () => undefined });
+    else if (fight === null || request.target !== owner?.actor) throw new Error('Quest summon requires its actual encounter');
+    else actions.push({ action: { spawn: request.target }, run: fight.summon });
+    bindings.set(request.director, actions);
   }
   book.stages = bindPageQuestStages(ctx, source, { flags: quest.flags, actor: id => clientPopulationActor(ctx, id), bindings, motion: native });
   for (const endpoint of row.endpoints) {

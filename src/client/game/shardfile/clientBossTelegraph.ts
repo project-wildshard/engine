@@ -13,7 +13,7 @@ const HEARD_FOR = 0.25;
 export function installClientBossTelegraph(ctx: ShardContext, input: unknown): void {
   const row = parse(ClientBossTelegraphSchema, input), fight = clientNativeBook(ctx).fight, view = row.view;
   const world = ctx.game.runtime?.world;
-  if (fight === null || world === undefined || world === null || row.actor !== ctx.product.section('sim/runtime-plan').recipe.population.owner.actor)
+  if (fight === null || world === undefined || world === null || row.actor !== ctx.product.section('sim/runtime-plan').recipe.population.owner?.actor)
     throw new Error('Boss telegraph requires its actual encounter owner');
   if (view.kind === 'marked') return; // a row names no strike
   const strike = ctx.product.section('actors/strikes').find(entry => entry.id === view.strike);

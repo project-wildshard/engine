@@ -9,6 +9,8 @@ export function pagePopulationRows(plan: NativeRuntimePlanData): RuntimeSpawns {
     if (row.look === undefined) throw new Error(`Native page body needs its authored look: ${row.id}`);
     return { id: row.id, kind: row.kind, at: row.at, yaw: row.yaw, look: row.look };
   };
+  // OF19c0b: a plan with no owner row keeps no boss (its boss is a declared encounter): its keeper's homes alone
+  if (owner === undefined) return parseRuntimeSpawns({ homes: rows.homes.map(row => Object.assign(body(row), { respawn: row.respawn })), bosses: [] });
   if (owner.profile.pattern === 'held') {
     if (rows.boss !== undefined || rows.homes.some(row => row.respawn !== 0)) throw new Error('Held page requires its finite native roster');
     return parseRuntimeSpawns({ homes: [], bosses: rows.homes.filter(row => row.id === owner.actor).map(body),

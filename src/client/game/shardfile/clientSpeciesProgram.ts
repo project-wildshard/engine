@@ -40,6 +40,7 @@ export async function installClientSpeciesProgram(ctx: ShardContext, input: unkn
   if (ctx.scope.disposed) throw new Error('Species preparation left its entered owner');
   book.species = true;
   ctx.rows.species(rowSpecies(declared.page)); ctx.rows.speciesLook(library.looks);
+  // OF19c0b: a plan with no owner row has no keeper boss; a declared boss names its own fight
   const encounter = product.section('sim/runtime-plan').recipe.population.owner;
-  ctx.rows.encounter({ id: encounter.actor, displayName: encounter.definition.name });
+  if (encounter !== undefined) ctx.rows.encounter({ id: encounter.actor, displayName: encounter.definition.name });
 }
