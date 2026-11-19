@@ -302,7 +302,7 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  # Share nine reserves products; T1's four suites consume its build on their own runners.
+  # Share nine reserves products; the T1 suites consume its build on their own runners.
   # Anchors preserve the same static checks, packed inventory and artifact policy.
   products:
     name: tests (${{ matrix.job }})
@@ -321,6 +321,7 @@ jobs:
     # ran four software-GL browsers on its four cores and every suite missed
     # its 120 s budget; the suite budget itself is unchanged (J193). The
     # phone journey's four boots took 45 s of C's 84 s on a Mac: E and F.
+    # TR-4b: independent contexts, the dev world and entry faults run separately, G to L.
     needs: products
     if: ${{ !cancelled() && needs.products.outputs.code-run == 'true' && needs.products.result == 'success' }}
     continue-on-error: ${{ needs.products.outputs.t1-blocking != 'true' }}
@@ -329,7 +330,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [A, B, C, D, E, F]
+        suite: [A, B, C, D, E, F, G, H, I, J, K, L]
     env:
       WS_LANE_NAME: template-e2e-ci
       WS_T1_BUILD_DIR: dist
@@ -342,7 +343,7 @@ jobs:
       - name: Own the suite scratch folder
         run: node scripts/scratch-dir.mjs template-e2e-ci "Template suite shard"
       # TR-4b: run 44497363007's C sat 9 min in this 229 MB download until the job's 10 min ran out (a stalled blob
-      # read; the other five took seconds). Bound it and fetch once more.
+      # read; the other suites took seconds). Bound it and fetch once more.
       - id: products
         continue-on-error: true
         timeout-minutes: 2

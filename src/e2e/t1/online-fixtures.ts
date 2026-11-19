@@ -25,6 +25,8 @@ interface Workers {
 async function device(browser: Browser, rig: T1OnlineRig): Promise<Entered> {
   const context = await browser.newContext({
     ...devices['Desktop Chrome'],
+    // Keep the desktop controls while two software-rendered peers share a GPU.
+    viewport: { width: 800, height: 500 },
     baseURL: rig.base,
   })
   try {
@@ -55,20 +57,9 @@ async function device(browser: Browser, rig: T1OnlineRig): Promise<Entered> {
   }
 }
 
-async function enter(
-  browser: Browser,
-  rig: T1OnlineRig,
-  name: string,
-): Promise<Entered> {
-  const opened = await device(browser, rig)
-  try {
-    await opened.page.goto('/?mute=1&nolock=1&sw=0&fps=30')
-    await enterBrasscap(opened.page, name)
-    return opened
-  } catch (error) {
-    await opened.context.close()
-    throw error
-  }
+async function enter(opened: Entered, name: string): Promise<void> {
+  await opened.page.goto('/?mute=1&nolock=1&sw=0&fps=30')
+  await enterBrasscap(opened.page, name)
 }
 
 const test = base.extend<object, Workers>({
@@ -92,10 +83,12 @@ const test = base.extend<object, Workers>({
   ],
   peers: [
     async ({ browser, rig }, provide): Promise<void> => {
-      const first = await enter(browser, rig, 'T1 Alice')
+      const first = await device(browser, rig)
       try {
-        const second = await enter(browser, rig, 'T1 Bob')
+        const second = await device(browser, rig)
         try {
+          // Let both pages load before either starts a long-running render loop.
+          await Promise.all([enter(first, 'T1 Alice'), enter(second, 'T1 Bob')])
           await provide({ first, second })
         } finally {
           await second.context.close()

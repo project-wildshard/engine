@@ -22,6 +22,8 @@ test('a second test reuses that world; freshPage is isolated', async ({
       Reflect.get(globalThis, '__t1WorldMarker'),
     ),
   ).toBe('shared-world')
+  // Keep the worker page and its context open, but release its renderer before seating another world.
+  await page.goto('about:blank')
   const fresh = await freshPage()
   expect(fresh.context()).not.toBe(page.context())
   expect(

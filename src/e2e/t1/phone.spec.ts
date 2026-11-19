@@ -165,17 +165,9 @@ test('phone hover tab mounts the platform board and dismounts', async ({
   await expect
     .poll(async (): Promise<boolean> => await mounted(page))
     .toBe(true)
-  // Twenty drawn phone frames take at least 333 ms under its 60 fps
-  // ceiling, separating gestures beyond the 300 ms boost window.
-  const mountedFrame = await page.evaluate(
-    (): number => globalThis.__wildshard?.world?.game.frameCount ?? 0,
-  )
-  await page.waitForFunction(
-    (frame): boolean =>
-      (globalThis.__wildshard?.world?.game.frameCount ?? 0) >= frame + 20,
-    mountedFrame,
-    { timeout: 5000 },
-  )
+  // Boost pairs taps on a monotonic clock over 300 ms. Separate the gestures
+  // in wall time so slow software rendering cannot stretch the gap.
+  await page.waitForTimeout(350)
   await hover.tap()
   await page.waitForFunction(
     (): boolean => globalThis.__wildshard?.world?.player.hover === false,

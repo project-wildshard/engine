@@ -27,14 +27,12 @@ export default defineConfig({
     't1/results',
     process.env['WS_T1_SHARD'] ?? 'all',
   ),
-  projects: [
-    { name: 'A', testMatch: T1_SHARDS.A },
-    { name: 'B', testMatch: T1_SHARDS.B },
-    { name: 'C', testMatch: T1_SHARDS.C },
-    { name: 'D', testMatch: T1_SHARDS.D },
-    { name: 'E', testMatch: T1_SHARDS.E },
-    { name: 'F', testMatch: T1_SHARDS.F },
-  ],
+  projects: Object.entries(T1_SHARDS).map(
+    ([name, testMatch]: readonly [string, Readonly<RegExp>]): {
+      name: string
+      testMatch: RegExp
+    } => ({ name, testMatch }),
+  ),
   workers: 1,
   // Per-test lines and durations on CI too (its default dot reporter loses a killed suite's partial line).
   reporter: 'list',
