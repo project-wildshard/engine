@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "f4d8490168177eded5b6a2a53dc3954f3f4521da084ae2328520853956d88b01",
+  "catalogueHash": "752b1007c25a8425596de989006124fffb6ebdcc526403402e2f00083d15c983",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -820,8 +820,8 @@
       {
         "slug": "mirror-salt",
         "name": "Mirror Salt",
-        "revision": 2,
-        "hash": "991fb9f6705bf9ed0438b65f575ea9feeb6a6f27195b67f00203e72bd83a8bb8"
+        "revision": 3,
+        "hash": "e141c104dab0eba1907b163811cb5070855b3b60a7ef4dad227b6933cf2fb023"
       },
       {
         "slug": "mossgate",
@@ -844,8 +844,8 @@
       {
         "slug": "nine-dragon-stack",
         "name": "Nine Dragon Stack",
-        "revision": 2,
-        "hash": "0dd1fb1079166db5ef18420f3a3d18f18c0d4b38dcf540b1438b50f10adda6f5"
+        "revision": 3,
+        "hash": "afd68ee205f001779dcda7872cb8be483f723554c734d29b2356cca0d7acf9c3"
       },
       {
         "slug": "open-plot-alien-plain",
@@ -1009,8 +1009,8 @@
     },
     {
       "slug": "mirror-salt",
-      "revision": 2,
-      "hash": "991fb9f6705bf9ed0438b65f575ea9feeb6a6f27195b67f00203e72bd83a8bb8",
+      "revision": 3,
+      "hash": "e141c104dab0eba1907b163811cb5070855b3b60a7ef4dad227b6933cf2fb023",
       "bytes": 16299520
     },
     {
@@ -1033,9 +1033,9 @@
     },
     {
       "slug": "nine-dragon-stack",
-      "revision": 2,
-      "hash": "0dd1fb1079166db5ef18420f3a3d18f18c0d4b38dcf540b1438b50f10adda6f5",
-      "bytes": 116812288
+      "revision": 3,
+      "hash": "afd68ee205f001779dcda7872cb8be483f723554c734d29b2356cca0d7acf9c3",
+      "bytes": 119739392
     },
     {
       "slug": "open-plot-alien-plain",
