@@ -1345,6 +1345,7 @@
     "src/server/game/plugin/bossPhase.ts": "server",
     "src/server/game/plugin/brain.ts": "server",
     "src/server/game/plugin/mover.ts": "server",
+    "src/server/game/plugin/vehicleRuntime.ts": "server",
     "src/server/game/plugin/nativeItems.ts": "server",
     "src/server/game/plugin/nativeRewind.ts": "server",
     "src/server/game/plugin/nativeSwept.ts": "server",

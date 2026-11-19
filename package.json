@@ -268,6 +268,7 @@
     "./sim/moverLifecycle": "./src/shared/engine/sim/moverLifecycle.ts",
     "./sim/cableTraversal": "./src/shared/engine/sim/cableTraversal.ts",
     "./sim/moverMotion": "./src/shared/engine/sim/moverMotion.ts",
+    "./sim/vehicle": "./src/shared/engine/sim/vehicle.ts",
     "./ai/moves": "./src/server/engine/ai/moves.ts",
     "./script/decision": "./src/server/engine/script/decision.ts",
     "./script/decisionModule": "./src/shared/engine/script/decisionModule.ts",
