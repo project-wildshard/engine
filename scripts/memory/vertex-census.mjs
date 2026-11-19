@@ -11,6 +11,7 @@
 //   node scripts/memory/vertex-census.mjs --dist=<built client folder> --zones=a,b|all [--out=<dir>] [--settle=3]
 //        [--url=<served client> instead of --dist: a standalone boot] [--query=<k=v&...>: a probe switch, trisprobe=half]
 //        [--top=N: keep each frame's N heaviest passes, default 3; STR14 reads every pass with --top=99]
+//        [--pin=<device slot>=<json>: a device slot for every boot, STR16's debug.vertexPack=false]
 //
 // Writes <out>/<zone>.json (`vertex-census/1`) and prints one line per zone. Resident vertices count each vertex buffer
 // once (bytes / stride, a buffer with a position channel and no divisor); a buffer no draw has read yet has no layout and
@@ -18,7 +19,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { webkitBoot, openOnlineBoot } from './measure.mjs';
+import { webkitBoot, openOnlineBoot, devicePin } from './measure.mjs';
 import { resolveCameras, parseCameraFile, facing } from '../look-loop/cameras.mjs';
 
 export const PROTOCOL = 'vertex-census/1';
@@ -336,14 +337,16 @@ async function main(argv) {
   const zones = args.zones === 'all' ? [...new Set((catalogue?.grid?.cells ?? []).map((/** @type {any} */ c) => c.slug))].sort((a, b) => a.localeCompare(b)) : args.zones.split(',');
   const out = resolvePath(args.out ?? 'tmp/vertex-census'); mkdirSync(out, { recursive: true });
   const settleMs = Number(args.settle ?? 3) * 1000;
-  const { harnessPins } = await import('../debug-settings.mjs');
+  const { harnessPins, saveFixture } = await import('../debug-settings.mjs');
+  // STR16: `--pin=<device slot>=<json>` boots every zone under that device slot (debug.vertexPack=false: the unpacked census)
+  const pin = args.pin ? devicePin(args.pin) : null;
   let failed = 0;
   for (const zone of zones) {
     const world = args.dist ? await openOnlineBoot({ dist: args.dist, chunk: zone, scratch: join(out, 'online') }) : null;
     try {
       const base = world?.url ?? args.url, url = args.query ? `${base}${base.includes('?') ? '&' : '?'}${args.query}` : base;
       const run = await webkitBoot({ url, chunk: zone, world: world?.stamp ?? null, timeoutMs: 240_000,
-        prepare: async (/** @type {any} */ context) => { await harnessPins(context, { seed: 357 }); await context.addInitScript(SHIM); },
+        prepare: async (/** @type {any} */ context) => { await harnessPins(context, { seed: 357 }); await context.addInitScript(SHIM); if (pin) await saveFixture(context, { scope: 'device', ...pin }); },
         probe: (/** @type {any} */ page) => censusAtControl(page, { settleMs }) });
       const probed = /** @type {any} */ (run.probe);
       if (!run.ready || !probed) { failed++; console.log(`${zone}: no census (${run.failure ?? run.refused ?? 'no probe'})`); continue; }

@@ -27,6 +27,7 @@ export interface WorldStamp {release:string;key:string}
 export function isServerWorker(url:string):boolean;
 export function bootOf(runs:readonly {boot?:string}[]):string;
 export function builtGridCell(html:string,slug:string):readonly [number,number]|null;
+export function devicePin(text:string):{key:string;data:unknown};
 export function ringThree():[number,number][];
 export function placeOffGrid<C extends {grid:{cells:{instance:string;slug:string;cell:number[]}[]}}>(catalogue:C,slugs:readonly string[]):C;
 export function openOnlineBoot(options:{dist:string;chunk:string;scratch:string}):Promise<{url:string;stamp:WorldStamp;close:()=>Promise<void>}>;
