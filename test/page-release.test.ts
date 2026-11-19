@@ -10,7 +10,7 @@ import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
 import {CHANNELS, CHECKED_DOCUMENTS, PHASES, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
-import {CONFIG, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
+import {CONFIG, WORKERS, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
 
 const build = 'a'.repeat(40);
@@ -492,7 +492,7 @@ function workersRig(channel: Channel = 'staging') {
   writeFileSync(join(root, 'dist/assets/main.js'), 'export {};');
   writeFileSync(join(root, 'dist/assets/main.js.map'), '{}');
   const served = new Map(local);
-  const worker = {preview: 'wildshard-play-preview', staging: 'wildshard-play-staging', production: 'wildshard-play'}[channel];
+  const worker = WORKERS[channel].worker;
   const url = `https://${versionId.slice(0, 8)}-${worker}.raynos.workers.dev`;
   const wrangler: {args: string[], secrets: string[], env: NodeJS.ProcessEnv}[] = [];
   const uploadedMaps: number[] = [];
