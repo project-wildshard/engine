@@ -102,6 +102,26 @@ function nearSourceRay(o: THREE.Vector3, d: THREE.Vector3, range: number, tol: n
   return best;
 }
 
+/** QA42 (meta QA-FEEDBACK-2026-11-19): the session's live Combat, for a shot's own floats ("ARMOUR") and its body ray. */
+let liveCombat: Combat | null = null;
+function setLive(combat: Combat | null): void { liveCombat = combat; }
+/**
+ * The first body a round's ray (o, d unit) passes within `tol` m of (times its scale), up to `range` m out: a row body or a
+ * source body. Returns the point on the ray beside it (its tracer's end), or null. Cosmetic: the server settles the hit.
+ */
+export function bodyOnRay(o: THREE.Vector3, d: THREE.Vector3, range: number, out: THREE.Vector3, tol = 0.9): THREE.Vector3 | null {
+  const row = liveCombat?.rowBodyOnRay(o, d, range, tol) ?? null, source = nearSourceRay(o, d, range, tol);
+  let best = Infinity;
+  for (const body of [row, source]) {
+    if (body === null) continue;
+    body.headWorld(_t); const along = _t.sub(o).dot(d);
+    if (along > 0 && along < best) best = along;
+  }
+  return Number.isFinite(best) ? out.copy(o).addScaledVector(d, best) : null;
+}
+/** A float of the shot's own at a world point: a blocked round's "ARMOUR" (`cls` a combat.css float class). */
+export function combatFloat(point: THREE.Vector3, text: string, cls: string): void { liveCombat?.floatAt(point, text, cls); }
+
 interface BarSlot { el: HTMLElement; fill: HTMLElement; kind: HTMLElement; animal: CombatTarget | null; lastHp: number; shown: boolean; }
 interface FloatSlot { el: HTMLElement; num: HTMLElement; label: HTMLElement; x: number; y: number; t: number; active: boolean; }
 interface Pending { animal: Animal | null; t: number; deadline: number; active: boolean }
@@ -168,7 +188,13 @@ export class Combat {
     tap(animals, 'onDamage', (a, amount, point, headshot, died) => { this.damage(a as Animal, amount as number, point as THREE.Vector3, headshot as boolean, died as boolean); });
     tap(animals, 'onOthersHit', (a, amount, point, died) => { this.othersHit(a as Animal, amount as number, point as THREE.Vector3, died as boolean); });
     game.onUpdate((dt, t) => { this.update(dt, t); }, 'hud.combat');
+    setLive(this); this.scope.onDispose(() => { if (liveCombat === this) setLive(null); });
   }
+
+  /** QA42: the row body nearest along a round's ray, for `bodyOnRay`. */
+  rowBodyOnRay(o: THREE.Vector3, d: THREE.Vector3, range: number, tol: number): Animal | null { return this.animals.nearRay(o, d, range, tol); }
+  /** QA42: a float at a world point, when it is on screen. */
+  floatAt(point: THREE.Vector3, text: string, cls: string): void { if (this.project(point)) this.float(text, '', cls, false); }
 
   // ── events ──
 

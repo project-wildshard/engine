@@ -77,6 +77,7 @@ import { macrotask, type Plan, type StepRunner } from '@wildshard/engine/boot/pl
 import { waitFor } from '@wildshard/engine/boot/waits';
 import { loadExplore, loadFeedback as loadFeedbackModule, loadPlayground } from '@wildshard/engine/boot/runtime';
 import { CombatCues } from '@wildshard/engine/combat/cues';
+import { Gunfire } from '@wildshard/engine/fx/gunfire';
 import { EffectService } from '@wildshard/engine/combat/effects/EffectService';
 import { PlayerHealth } from '@wildshard/engine/combat/health';
 import { KeepAlive } from '@wildshard/engine/core/KeepAlive';
@@ -395,6 +396,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     ? installBodyShadow({ game, player, hidden: () => !hud.entered || practiceRoom.open || world.freeCamera || world.tour.active || explore?.active === true })
     : null;
   for (const { id: w } of weapons.list) { const s = skins.wearing(w); if (s) wearSkin(s); }
+  Gunfire.for(game); // QA42: tracers, flashes and dust for every shot, the player's and the creatures'
   new Combat(game, animals, weapons, game.camera); // health bars over animals + MMO-style damage / MISS floats (self-wiring); Combat only taps onFire / onImpact, which the manager forwards for every weapon
   // taking a hit (B3): the arc points at the attacker (src/client/engine/ui/HurtArc.ts), a hurt grunt panned toward it (Audio.hurt — it
   // used to be the landing thud), and the killer is remembered for the death toast (B2)

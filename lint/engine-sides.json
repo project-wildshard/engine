@@ -222,6 +222,7 @@
     "src/client/engine/explore/viewPoint.ts": "client",
     "src/client/engine/fx/effectField.ts": "client",
     "src/client/engine/fx/groundFx.ts": "client",
+    "src/client/engine/fx/gunfire.ts": "client",
     "src/client/engine/fx/groundTell.ts": "client",
     "src/client/engine/fx/Impacts.ts": "client",
     "src/client/engine/fx/lightEmitters.ts": "client",

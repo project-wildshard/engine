@@ -4,13 +4,17 @@ import { admitHeldRecipe } from './heldRecipe';
 import { createClientChannels, bindClientChannelInputs } from '../../../shared/game/plugin/channels';
 import { readBorrowedOwner, type BorrowedOwnerPath } from '../../../shared/game/plugin/borrowed';
 import { createClientScene, createHeldMeleeBinding, type ClientScene, type ClientScenePorts } from './scene';
-import { Object3D, BufferGeometry, Group, Mesh, BoxGeometry, ConeGeometry, CylinderGeometry, TorusGeometry, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, SphereGeometry, Vector2, Vector3, MathUtils } from "three";
+import { Object3D, BufferGeometry, Group, Mesh, BoxGeometry, ConeGeometry, CylinderGeometry, TorusGeometry, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera, PointLight, Vector2, Vector3, MathUtils, PlaneGeometry, AdditiveBlending, DoubleSide } from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { RangedAction, stepActionClock } from "@wildshard/engine/combat/Firearm";
 import { leverProfile, type LeverProfile } from "../../../shared/game/shardfile/items";
 import { blocks } from "@wildshard/engine/blocks";
 import type { WorldContactDispatcher } from "@wildshard/engine/combat/contactWeapon";
-import { Weapon, type WeaponState, type AimInfo } from "@wildshard/engine/combat/Weapon";
+import { Weapon, type WeaponState, type AimInfo, type OwnHit } from "@wildshard/engine/combat/Weapon";
+import { makeFlashTexture } from "@wildshard/engine/combat/view/firearmFx";
+import { worldHit } from "@wildshard/engine/combat/view/ranged";
+import { Gunfire } from "@wildshard/engine/fx/gunfire";
+import { bodyOnRay, combatFloat } from "@wildshard/engine/ui/Combat";
 import { Tool } from "@wildshard/engine/combat/Tool";
 import type { EquipmentRow, EquipContext } from "@wildshard/engine/combat/Equipment";
 import type { ItemFamily, ItemFamilyPorts } from "@wildshard/engine/combat/itemFamilies";
@@ -131,12 +135,42 @@ export interface DeclaredLeverHandle {
   readonly mirror: (rounds: number, reserve: number, reloading: boolean, taken: boolean) => void;
   readonly bindAimView: (camera: PerspectiveCamera, player: LeverAimPlayer, refit: () => void) => void;
 }
+/** QA42: a held round's way from the eye (the aim ray), its end and the body the cosmetic ray met. */
+const _origin = new Vector3(), _aim = new Vector3(), _end = new Vector3(), _muzzle = new Vector3(), _body = new Vector3();
+/** Seconds a round the page saw meet a body waits for the server's hit before it reads as blocked (armour, a shut guard). */
+/** The flash's roll and the kick's wander: a look only, so a local stream rather than the app's rng. */
+let rollSeed = 4243;
+const roll = (): number => { rollSeed = (rollSeed * 16807) % 2147483647; return (rollSeed - 1) / 2147483646; };
+const BLOCKED_AFTER = 0.6;
+/** A round in hand while reloading: where the hand goes for it (below the frame), in the model's metres from its grip. */
+const POUCH = new Vector3(0.06, -0.24, 0.16);
+const _handAt = new Vector3(), _gateAt = new Vector3(), _home = new Vector3();
+/** The held flash: three additive cards under the muzzle (one facing the eye, two along the bore), turned at random per shot. */
+function heldFlash(size: number): { readonly group: Group; readonly dispose: () => void } {
+  // a canvas only on a page: a headless view (the tests, a bot) draws the cards untextured
+  const group = new Group(), map = typeof document === 'undefined' ? null : makeFlashTexture(), material = new MeshBasicMaterial({ map, transparent: true, blending: AdditiveBlending, depthWrite: false, toneMapped: false, side: DoubleSide });
+  const face = new PlaneGeometry(size, size), side = new PlaneGeometry(size * 0.7, size * 1.9).rotateX(-Math.PI / 2).translate(0, 0, -size * 0.75);
+  const cross = side.clone().rotateZ(Math.PI / 2);
+  group.add(new Mesh(face, material), new Mesh(side, material), new Mesh(cross, material));
+  group.name = 'flash'; group.visible = false;
+  for (const child of group.children) child.renderOrder = 20;
+  return { group, dispose: () => { map?.dispose(); material.dispose(); face.dispose(); side.dispose(); cross.dispose(); } };
+}
 /**
  * A declared lever-action rifle (TE-ENG2, `kit.lever`): Pine's per-round cycle (`RangedAction.Cycle`) from the row's `firearm` profile,
  * with the shard's GLB in hand. On the wire the server fires every round (a hitscan at any body) and feeds every reload; this page
- * plays its own cycle for the feel (the hammer, the lever throw, the flash at the `muzzle` empty) and takes the server's count when
- * they differ at rest. Its weapon state fills the HUD's ammo strip: rounds in the gun over the tube, and the reserve. Until the player
- * takes it from its rack it is hidden and refuses every press.
+ * plays its own cycle for the feel and takes the server's count when they differ at rest. Its weapon state fills the HUD's ammo
+ * strip: rounds in the gun over the tube, and the reserve. Until the player takes it from its rack it is hidden and refuses every press.
+ *
+ * QA42 (Jake, 2026-11-19 on Brasscap: "The reloading animation's trash ... there's no particle effects ... There's no bullets"):
+ * - a shot kicks the gun up and back and the camera with it, shows a three-card flash at the `muzzle`, drops the `hammer`
+ *   and throws the `lever` (GLB nodes, each optional), and sends a tracer from the muzzle to where the round stops: a body
+ *   the aim ray passes (`bodyOnRay`), else the world, where a dust cloud rises (`Gunfire`);
+ * - the server's hit throws sparks there; a round the page saw meet a body with no hit from the server in BLOCKED_AFTER is
+ *   blocked (armour, a shut guard): sparks and a grey ARMOUR float;
+ * - a reload turns the gun's loading gate (the `gate` node) up toward the eye; the right hand (`handRight`, with the
+ *   `round` in its fingers) goes down for a round, brings it to the gate and thumbs it in as each round feeds, then
+ *   takes the wrist again. A GLB without those nodes keeps the turn alone.
  */
 class DeclaredLever extends Weapon implements DeclaredLeverHandle {
   readonly model: Group;
@@ -144,30 +178,43 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
   holster = 0; enabled = true; adsHeld = false; aimInfo: AimInfo | null = null;
   taken = false;
   private readonly ports: ItemFamilyPorts;
+  private readonly profile: LeverProfile;
   private readonly store: { reserve: number };
   private readonly act: InstanceType<typeof RangedAction.Cycle>;
-  private readonly flash: Mesh;
+  private readonly flash: Group;
+  private readonly muzzle: Object3D;
   private readonly lever: Object3D | null;
+  private readonly hammer: Object3D | null;
+  private readonly hand: { readonly node: Object3D; readonly rest: Vector3; readonly gate: Vector3; readonly round: Object3D | null } | null;
   private readonly sight: Vector3;
   private aimView: { camera: PerspectiveCamera; player: LeverAimPlayer; refit: () => void } | undefined;
   private hip: { fov: number; look: number } | undefined;
   private sightBlend = 0;
-  private flashT = 0; private kick = 0; private apart = 0;
+  private flashT = 0; private kick = 0; private apart = 0; private reloadBlend = 0; private hammerFall = 0;
+  /** A round the page saw meet a body: where, its way, and the seconds left for the server's hit. */
+  private readonly blocked = { at: new Vector3(), way: new Vector3(), left: 0 };
   constructor(row: EquipmentRow, spec: Extract<ItemSpec, { kind: 'weapon' }>, ports: ItemFamilyPorts) {
     const profile: LeverProfile = leverProfile({ id: spec.id, profile: ports.profile });
     super({ ...row, ui: { ...row.ui, touch: 'ranged', melee: false, lockOn: false, ammo: { label: 'Rounds', segments: profile.magazine, magazine: true } } });
-    this.ports = ports; this.store = { reserve: profile.reserve };
+    this.ports = ports; this.profile = profile; this.store = { reserve: profile.reserve };
     this.act = new RangedAction.Cycle(this.store, { magazine: profile.magazine, reload: profile.reload, ...profile.lever });
     this.model = itemMesh(ports); this.setAimSource(ports.aim);
     const muzzle = this.model.getObjectByName('muzzle') ?? this.model;
     const sight = this.model.getObjectByName('frontSight') ?? muzzle;
+    this.muzzle = muzzle;
     this.sight = this.model.worldToLocal(sight.getWorldPosition(new Vector3())).applyEuler(this.model.rotation);
     // Align just above the bore when the mesh has no sight locator.
     if (sight === muzzle) this.sight.y += 0.03;
-    const ball = new SphereGeometry(0.035, 6, 4), glow = new MeshBasicMaterial({ color: 0xffd27a });
-    this.flash = new Mesh(ball, glow); this.flash.visible = false; muzzle.add(this.flash);
+    // a wide bore (a scattergun's) flashes wider: the spread stands for it
+    const flash = heldFlash(0.16 + Math.min(0.12, profile.spreadHip * 0.06));
+    this.flash = flash.group; muzzle.add(this.flash);
     this.lever = this.model.getObjectByName('lever') ?? null;
-    ports.scope.onDispose(() => { ball.dispose(); glow.dispose(); });
+    this.hammer = this.model.getObjectByName('hammer') ?? null;
+    const hand = this.model.getObjectByName('handRight'), gate = this.model.getObjectByName('gate');
+    this.hand = hand === undefined || gate === undefined ? null
+      : { node: hand, rest: hand.position.clone(), gate: gate.position.clone(), round: hand.getObjectByName('round') ?? null };
+    if (this.hand !== null && this.hand.round !== null) this.hand.round.visible = false;
+    ports.scope.onDispose(flash.dispose);
     this.state.magazine = profile.magazine; this.sync();
   }
   override install(ctx: EquipContext): void {
@@ -217,8 +264,37 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
     if (act.phase === 'reload') { act.triggerWhileReloading(); this.wire?.press(false); return; }
     if (act.phase !== 'idle') return;
     if (!act.chambered) { this.onDry?.(); if (act.tube > 0) act.throwLever(); else this.reload(); this.wire?.press(false); return; }
-    act.dropHammer(); this.kick = 1; this.flashT = FLASH_SECONDS; this.onFire?.();
+    act.dropHammer(); this.kick = 1; this.flashT = FLASH_SECONDS; this.hammerFall = 1;
+    this.flash.rotation.z = roll() * Math.PI * 2; this.flash.scale.setScalar(0.85 + roll() * 0.35);
+    this.onFire?.();
+    this.shotEffects();
     this.wire?.press(false); // the server fires the round along this look; off the wire no round lands here
+  }
+  /** QA42: the round's tracer, the camera's kick, and the dust where it lands or the body it meets (the server settles the hit). */
+  private shotEffects(): void {
+    const fire = Gunfire.current(); if (fire === null) return;
+    this.aimRay(_origin, _aim); _aim.normalize();
+    const wall = worldHit(_origin, _end.copy(_origin).addScaledVector(_aim, this.profile.range), 0);
+    const reach = wall?.distance ?? this.profile.range, body = bodyOnRay(_origin, _aim, reach, _body);
+    if (body !== null) _end.copy(body); else _end.copy(_origin).addScaledVector(_aim, reach);
+    fire.shot(this.muzzle.getWorldPosition(_muzzle), _end, 'own');
+    fire.kick(1.6 + roll() * 0.8, (roll() - 0.5) * 1.2);
+    if (body !== null) { this.blocked.at.copy(body); this.blocked.way.copy(_aim); this.blocked.left = BLOCKED_AFTER; return; }
+    if (wall === null) return;
+    fire.impact(_end, _aim, 'dust');
+    this.onImpact?.('ground', _end.clone());
+  }
+  /** QA42: the server's word on a round: sparks (a weak spot's hotter spray) where it struck; a hit of nothing reads as blocked. */
+  override serverHit(hit: OwnHit): void {
+    this.blocked.left = 0;
+    if (hit.amount <= 0) { this.blockedAt(hit.at, this.blocked.way); return; }
+    super.serverHit(hit);
+    Gunfire.current()?.impact(hit.at, this.blocked.way, hit.head ? 'flesh' : 'sparks');
+  }
+  private blockedAt(at: Vector3, way: Vector3): void {
+    Gunfire.current()?.impact(at, way, 'armour');
+    combatFloat(at, 'ARMOUR', 'armour');
+    this.onImpact?.('wood', at.clone());
   }
   override reload(): void {
     if (!this.enabled || !this.taken || !this.act.beginReload()) return;
@@ -239,16 +315,48 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
     stepActionClock(dt, this.wire, seconds => { for (const event of this.act.events(seconds, false)) if (event === 'reloadEnd') this.onReloadEnd?.(); });
     this.sync();
     this.updateAim(dt);
+    if (this.blocked.left > 0 && (this.blocked.left -= dt) <= 0) this.blockedAt(this.blocked.at, this.blocked.way);
     const [x, y, z] = this.ports.view.position, [rx, ry, rz] = this.ports.view.rotation;
-    this.kick *= Math.exp(-dt * 14); this.flashT = Math.max(0, this.flashT - dt);
-    const throwing = Math.sin(this.act.cycleU * Math.PI), dip = this.act.phase === 'reload' ? 1 : 0;
+    this.kick *= Math.exp(-dt * 12); this.flashT = Math.max(0, this.flashT - dt); this.hammerFall *= Math.exp(-dt * 3);
+    const throwing = Math.sin(this.act.cycleU * Math.PI), reloading = this.act.phase === 'reload';
+    this.reloadBlend = MathUtils.damp(this.reloadBlend, Number(reloading), 9, dt);
+    const r = MathUtils.smoothstep(this.reloadBlend, 0, 1), kick = this.kick;
     this.model.visible = this.taken && (this.enabled || this.holster > 0);
     const sightX = MathUtils.lerp(x, -this.sight.x, this.sightBlend), sightY = MathUtils.lerp(y, -this.sight.y, this.sightBlend);
-    this.model.position.set(sightX, sightY - throwing * 0.03 - dip * 0.06, z + this.kick * 0.07);
-    this.model.rotation.set(rx + this.kick * 0.14, ry, rz + (this.lever === null ? throwing * 0.25 : 0) + dip * 0.45);
-    if (this.lever !== null) this.lever.rotation.x = throwing * 0.9;
+    // the reload: the gun comes in across the body toward the middle, its muzzle swung left, rolled onto its left side so the
+    // loading gate on its right faces up at the eye and the right hand can thumb rounds into it
+    this.model.position.set(sightX - r * 0.12, sightY - throwing * 0.03 + r * 0.05, z + kick * 0.09 + r * 0.14);
+    this.model.rotation.set(rx + kick * 0.2 + r * 0.1, ry + r * 0.5, rz + (this.lever === null ? throwing * 0.25 : throwing * 0.06) + r * 1.5 + kick * 0.03);
+    if (this.lever !== null) this.lever.rotation.x = throwing * 0.95;
+    if (this.hammer !== null) this.hammer.rotation.x = this.act.hammerCocked ? 0 : -0.75 * Math.max(0.6, this.hammerFall);
+    this.poseHand(throwing);
     this.flash.visible = this.flashT > 0;
     keepInFrame(this.model, [sightX, sightY, z]);
+  }
+  /** The right hand through a reload: down for a round, up to the gate, the thumb's push as it feeds; down with the lever as it throws. */
+  private poseHand(throwing: number): void {
+    const hand = this.hand; if (hand === null) return;
+    const { reloadIn } = this.profile.lever, reload = this.profile.reload;
+    let round = false;
+    _gateAt.copy(hand.gate).sub(hand.rest);
+    if (this.act.phase === 'reload') {
+      const inT = this.act.phaseT - reloadIn;
+      // before the first round: the hand drops from the wrist to the pouch; then one fetch-and-push cycle per round
+      if (inT < 0) _handAt.lerpVectors(_home.set(0, 0, 0), POUCH, MathUtils.smoothstep(1 + inT / Math.max(0.05, reloadIn), 0, 1));
+      else {
+        // a cycle runs from one round's feed (u 0) to the next's (u 1): back down for it, up to the gate, the thumb's push
+        const u = (inT % reload) / reload, first = inT < reload;
+        if (u < 0.15) { if (first) _handAt.copy(POUCH); else _handAt.lerpVectors(_gateAt, POUCH, MathUtils.smoothstep(u, 0, 0.15)); }
+        else if (u < 0.6) { _handAt.lerpVectors(POUCH, _gateAt, MathUtils.smoothstep(u, 0.15, 0.6)); _handAt.x += 0.03 * (1 - MathUtils.smoothstep(u, 0.4, 0.6)); round = true; }
+        else { const push = MathUtils.smoothstep(u, 0.6, 0.95); _handAt.copy(_gateAt); _handAt.z -= 0.035 * push; round = push < 0.95; }
+      }
+      hand.node.position.copy(hand.rest).add(_handAt);
+    } else {
+      // home on the wrist, eased back from wherever the reload left it; down with the lever as it throws
+      _home.copy(hand.rest); _home.y -= throwing * 0.04;
+      hand.node.position.lerp(_home, hand.node.position.distanceTo(_home) < 0.002 ? 1 : 0.3);
+    }
+    if (hand.round !== null) hand.round.visible = round;
   }
   private sync(): void {
     const s = this.state, { act } = this;

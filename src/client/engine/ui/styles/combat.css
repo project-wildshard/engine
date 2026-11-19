@@ -26,6 +26,7 @@
 /* REMOTE-PLAYERS RP10: another player's blow: smaller and paler than your own, no glow */
 .ws-combat-float.other b { font-size: 18px; font-weight: 600; color: rgba(214, 226, 234, 0.7); text-shadow: 0 0 2px rgba(0, 0, 0, 1), 0 1px 2px rgba(0, 0, 0, 0.85); }
 .ws-combat-float.miss b { font-size: 20px; font-weight: 600; letter-spacing: 0.18em; color: rgba(196, 220, 232, 0.75); text-shadow: 0 0 2px rgba(0, 0, 0, 1), 0 2px 3px rgba(0, 0, 0, 0.9); }
+.ws-combat-float.armour b { font-size: 16px; font-weight: 600; letter-spacing: 0.22em; color: #c9d2d8; text-shadow: 0 0 6px rgba(255, 220, 150, 0.45), 0 0 2px rgba(0, 0, 0, 1), 0 2px 3px rgba(0, 0, 0, 0.9); }
 
 @media (max-width: 720px) {
   .ws-combat-hp { left: -36px; width: 72px; top: -26px; }

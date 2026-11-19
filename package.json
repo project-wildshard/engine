@@ -467,6 +467,7 @@
     "./fx/ParticlePool": "./src/client/engine/fx/ParticlePool.ts",
     "./fx/SiteLights": "./src/client/engine/fx/SiteLights.ts",
     "./fx/groundFx": "./src/client/engine/fx/groundFx.ts",
+    "./fx/gunfire": "./src/client/engine/fx/gunfire.ts",
     "./input/InputService": "./src/client/engine/input/InputService.ts",
     "./input/dom": "./src/client/engine/input/dom.ts",
     "./input/gameplay": "./src/client/engine/input/gameplay.ts",
