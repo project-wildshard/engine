@@ -47,8 +47,8 @@
   "test/cook-worker-publish.test.ts": ["sunscar-dunes"],
   "test/cook-worker-limits.test.ts": ["sunscar-dunes"],
   "test/released-save-play.test.ts": ["_template", "brasscap-mesa", "sunscar-dunes", "far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"],
-  "test/cook-refusals.test.ts": ["_template"],
-  "test/cook-hostile-pins.test.ts": ["_template"],
+  "test/cook-refusals.test.ts": ["brasscap-mesa"],
+  "test/cook-hostile-pins.test.ts": ["brasscap-mesa"],
   "test/net-hostile-play.test.ts": ["sunscar-dunes", "pine-hollow"],
   "test/pinned-restore-play.test.ts": ["_template", "blender-template", "sunscar-dunes", "far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"],
   "test/shard-stands-alone.test.ts": ["_template","brasscap-mesa","driftwood-isle","far-reach","ink-cel-valley","nalati-grasslands","nine-dragon-stack","open-plot-alien-plain","open-plot-clockwork-canyon","open-plot-coral-drift","open-plot-desert-ruin","open-plot-ember-forge","open-plot-fossil-badlands","open-plot-frostline-peaks","open-plot-jungle-ziggurat","open-plot-lantern-bayou","open-plot-mosslight-ruins","open-plot-night-market","open-plot-patchwork-fairground","open-plot-saltwind-lighthouse","open-plot-sky-harbor","open-plot-sky-race","open-plot-starfall-observatory","open-plot-thin-ice","pastel-plain","pine-hollow","sunscar-dunes"],
@@ -220,7 +220,6 @@
     "far-reach"
   ],
   "test/template-strikes-hurt.test.ts": [
-    "_template",
     "brasscap-mesa"
   ],
   "test/scripts/far-reach-roc.test.ts": [
@@ -354,6 +353,6 @@
     "driftwood-isle",
     "pine-hollow"
   ],
-  "test/headless-byte-capture.test.ts": ["_template"],
+  "test/headless-byte-capture.test.ts": [],
   "test/script-seats.test.ts": ["pastel-plain"]
 }

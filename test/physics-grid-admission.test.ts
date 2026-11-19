@@ -7,7 +7,7 @@ afterEach(() => { vi.useRealTimers(); vi.stubGlobal('window', originalWindow); }
 test('approaches the readiness fence before owned peer admission', async () => {
   vi.useFakeTimers();
   const route = gridSeamRoute({ home: 'home', cells: [{ instance: 'home', slug: 'home', cell: [0, 0] },
-    { instance: 'peer', slug: '_template', cell: [1, 0] }] }, 15);
+    { instance: 'peer', slug: 'brasscap-mesa', cell: [1, 0] }] }, 15);
   let x = 0, held = false, current: string | null = 'home', fenceWaits = 0, fenceFrames = 0;
   const transitions: { from: string | null; to: string | null }[] = [];
   const residents = ['home'];
@@ -42,7 +42,7 @@ test('approaches the readiness fence before owned peer admission', async () => {
 
 test('diagonal peers use midpoint entries and stay on the road between cells', () => {
   const route = gridSeamRoute({ home: 'home', cells: [{ instance: 'home', slug: 'home', cell: [0, 0] },
-    { instance: 'peer', slug: '_template', cell: [1, 1] }] }, 15);
+    { instance: 'peer', slug: 'brasscap-mesa', cell: [1, 1] }] }, 15);
   expect(route.start).toEqual({ x: 0, z: 230 });
   expect(route.waypoints).toEqual([{ x: 0, z: 277.5 }, { x: 555, z: 277.5 }, { x: 555, z: 325 },
     { x: 555, z: 277.5 }, { x: 0, z: 277.5 }, { x: 0, z: 230 }]);
@@ -51,7 +51,7 @@ test('diagonal peers use midpoint entries and stay on the road between cells', (
 
 test('native seam routes follow the served one-tile gap at both speeds', () => {
   const state = { pitch: 562.5, home: 'home', cells: [{ instance: 'home', slug: 'home', cell: [0, 0] as const },
-    { instance: 'peer', slug: '_template', cell: [1, 1] as const }] };
+    { instance: 'peer', slug: 'brasscap-mesa', cell: [1, 1] as const }] };
   for (const speed of [15, 30] as const) {
     const route = gridSeamRoute(state, speed);
     expect(route.start).toEqual({ x: 0, z: 230 });

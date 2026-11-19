@@ -6,9 +6,9 @@ export function gridSeamRoute(state, speed) {
   const half = pitch / 2;
   const home = state.cells.find((cell) => cell.instance === state.home);
   if (home === undefined) throw new Error('Grid readout has no home cell');
-  const peer = state.cells.filter((cell) => cell.slug === '_template' && cell.instance !== home.instance && Math.abs(cell.cell[0] - home.cell[0]) <= 1 && Math.abs(cell.cell[1] - home.cell[1]) <= 1)
+  const peer = state.cells.filter((cell) => cell.slug === 'brasscap-mesa' && cell.instance !== home.instance && Math.abs(cell.cell[0] - home.cell[0]) <= 1 && Math.abs(cell.cell[1] - home.cell[1]) <= 1)
     .sort((a, b) => (a.cell[0] === home.cell[0] - 1 && a.cell[1] === home.cell[1] - 1 ? -1 : 0) - (b.cell[0] === home.cell[0] - 1 && b.cell[1] === home.cell[1] - 1 ? -1 : 0) || a.instance.localeCompare(b.instance))[0];
-  if (peer === undefined) throw new Error('Grid drive requires a neighbouring template cell');
+  if (peer === undefined) throw new Error('Grid drive requires a neighbouring Brasscap cell');
   const dx = peer.cell[0] - home.cell[0], dz = peer.cell[1] - home.cell[1];
   const hx = home.cell[0] * pitch, hz = home.cell[1] * pitch, px = peer.cell[0] * pitch, pz = peer.cell[1] * pitch;
   const start = dz !== 0 ? { x: hx, z: hz + dz * 230 } : { x: hx + dx * 230, z: hz };
