@@ -166,6 +166,8 @@ export class HUD {
   /** J473: a hit taken or landed in the last FIGHT_HOLD_MS (fightMark.ts) */
   private readonly fight = new FightMark(typeof document === 'undefined' ? null : document.documentElement);
   private struck = false;
+  /** J473 row 8: the touch HP strip follows the fight (FightMark.look), not the hurt clock */
+  private hpTouch: 'show' | 'fade' | 'gone' = 'gone';
   private hpFullAt: number | null = Number.NEGATIVE_INFINITY; private hpShown: 'show' | 'fade' | 'gone' = 'gone';
   private ammoCount!: HTMLElement; private ammoNum!: HTMLElement; private ammoStatus!: HTMLElement; private ammoStatusText!: HTMLElement; private reloadBar!: HTMLElement; private pips: HTMLElement[] = [];
   private cross!: HTMLElement; private killX!: HTMLElement; private hitRing!: HTMLElement; private aim!: HTMLElement; private aimText = '';
@@ -380,7 +382,8 @@ export class HUD {
     if (s.health < maxHp) this.hpFullAt = null; else this.hpFullAt ??= now;
     const fullFor = this.hpFullAt === null ? -1 : now - this.hpFullAt;
     const hp = fullFor < VITALS_HIDE_MS ? 'show' : fullFor < VITALS_HIDE_MS + VITALS_FADE_MS ? 'fade' : 'gone';
-    if (hp !== this.hpShown) { this.hpShown = hp; this.paintVitals(); }
+    const hpTouch = this.fight.look(now, VITALS_FADE_MS);
+    if (hp !== this.hpShown || hpTouch !== this.hpTouch) { this.hpShown = hp; this.hpTouch = hpTouch; this.paintVitals(); }
     const noAmmo = s.bolts === undefined;
     if (noAmmo !== L.noAmmo) { L.noAmmo = noAmmo; this.ammoPanel.style.display = noAmmo ? 'none' : ''; if (this.bar) this.bar.bolts.style.display = noAmmo ? 'none' : ''; }
     const bolts = s.bolts ?? 0;
@@ -475,9 +478,10 @@ export class HUD {
 
   /** E319: the desktop VITALS panel and the touch VITALS strip follow `hpShown` (fading out, then out of the layout) */
   private paintVitals(): void {
-    for (const e of [this.healthPanel, this.bar?.vitals]) {
+    // J473 row 8 (Jake, 2026-11-19: "HP only in combat"): the phone's strip shows through a fight; the desktop panel keeps E319
+    for (const [e, shown] of [[this.healthPanel, this.hpShown], [this.bar?.vitals, this.hpTouch]] as const) {
       if (e === undefined) continue;
-      e.classList.toggle('hp-fade', this.hpShown !== 'show'); e.classList.toggle('hp-gone', this.hpShown === 'gone');
+      e.classList.toggle('hp-fade', shown !== 'show'); e.classList.toggle('hp-gone', shown === 'gone');
     }
   }
   /** the touch strip's bars over the magazine: 4 for the crossbow, 6 for the rifle (rebuilt on a weapon change) */

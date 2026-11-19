@@ -26,6 +26,12 @@ export class FightMark {
     }
     return on;
   }
+  /** J473 row 8 ("HP only in combat"): how the phone's HP strip looks at `now`: up through the fight, fading for `fade` ms
+   *  after it, then out of the column. */
+  look(now: number, fade: number): 'show' | 'fade' | 'gone' {
+    const since = now - this.lastHit;
+    return since < FIGHT_HOLD_MS ? 'show' : since < FIGHT_HOLD_MS + fade ? 'fade' : 'gone';
+  }
   /** Take the marks off the page (the HUD is going). */
   clear(): void { this.on = false; if (this.root !== null) { delete this.root.dataset['wsFight']; delete this.root.dataset['wsHurt']; } }
 }

@@ -17,3 +17,12 @@ test('J473: a fight is a hit taken or landed in the last 8 s, marked on the page
   fight.clear();
   expect(root.dataset['wsFight']).toBeUndefined(); expect(root.dataset['wsHurt']).toBeUndefined();
 });
+
+test('J473 row 8 (Jake: "HP only in combat"): the phone HP strip shows through a fight, fades after it, then goes', () => {
+  const fight = new FightMark(null);
+  expect(fight.look(0, 400)).toBe('gone');
+  fight.hurt(1000);
+  expect(fight.look(1000 + FIGHT_HOLD_MS - 1, 400)).toBe('show');
+  expect(fight.look(1000 + FIGHT_HOLD_MS, 400)).toBe('fade');
+  expect(fight.look(1000 + FIGHT_HOLD_MS + 400, 400)).toBe('gone');
+});
