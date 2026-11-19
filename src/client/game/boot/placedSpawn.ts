@@ -30,6 +30,11 @@ const LOOSE_PATH = /^\/(?:shardfiles\/([a-z0-9_-]+)\/|programs\/([a-z0-9_-]+)\.j
 /** Where a placed slug's loose file is read, by its page path (`/shardfiles/<slug>/…`, `/programs/<slug>.json`): this upload's own copy.
  *  Undefined for every other path, and for every slug the build has. */
 export function placedLoose(pathname: string, search = ''): string | undefined {
-  const match = LOOSE_PATH.exec(pathname), named = match?.[1] ?? match?.[2], row = named === undefined ? undefined : placed.get(bare(named));
+  const owner = looseSlug(pathname), row = owner === undefined ? undefined : placed.get(owner);
   return row === undefined ? undefined : new URL(`.${pathname}${search}`, row.loose).href;
+}
+/** The bare slug a loose page path (`/shardfiles/<slug>/…`, `/programs/<slug>.json`) belongs to; undefined for any other path. */
+export function looseSlug(pathname: string): string | undefined {
+  const match = LOOSE_PATH.exec(pathname), named = match?.[1] ?? match?.[2];
+  return named === undefined ? undefined : bare(named);
 }
