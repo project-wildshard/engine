@@ -166,10 +166,32 @@ function slabTreeWorker(): Worker | null {
  *  one chunk at a time, so the worker holds one chunk's cluster tables, not every chunk's at once */
 function askFar(): void {
   if (!farQuiet || treeWorker === null || farAsked.size > 0) return;
-  for (const [id, chunk] of farHeld) {
+  try { askFarNext(); } catch (error) {
+    // the far levels are a saving, never worth the page: the held chunks keep drawing their own triangles
+    farHeld.clear();
+    console.warn('slab far levels dropped', error);
+  }
+}
+/**
+ * The first held chunk whose tree is in (its corners, positions and turn known), in the order they were held; undefined
+ * when none is. A `forEach` walk, not the Map's iterator: on staging v0.1.50 iOS 18.6 Safari threw "undefined is not a
+ * function" at `for (const [id, chunk] of farHeld)` in `askFar`, called from the slab tree worker's `onmessage`, on 2 of
+ * 4 Nine boots of the iPhone 13 (mini-phone-13b, 2026-11-19), and the error card paused the game.
+ */
+export function nextFarReady(held: ReadonlyMap<number, { readonly order?: unknown; readonly xyz?: unknown; readonly turned?: unknown; readonly sentTurned?: unknown }>): number | undefined {
+  let found: number | undefined;
+  held.forEach((chunk, id) => {
+    if (found === undefined && chunk.order !== undefined && chunk.xyz !== undefined && chunk.turned !== undefined && chunk.sentTurned !== undefined) found = id;
+  });
+  return found;
+}
+function askFarNext(): void {
+  for (let id = nextFarReady(farHeld); id !== undefined; id = nextFarReady(farHeld)) {
+    const chunk = farHeld.get(id);
+    farHeld.delete(id);
+    if (chunk === undefined) continue;
     const { geometry, order, xyz, turned, sentTurned } = chunk;
     if (order === undefined || xyz === undefined || turned === undefined || sentTurned === undefined) continue;
-    farHeld.delete(id);
     const ranges = RANGES.get(geometry);
     if (ranges === undefined) continue;
     const worker = slabTreeWorker();
