@@ -91,8 +91,7 @@ export interface CookIndex {
 export const indexKey: (build: string, hash: string) => string = cookIndexPath;
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const CONTENT_NAMED = /(?:^|\/)[a-f0-9]{16,64}\.[a-z0-9.]+$|-[a-f0-9]{16}\.json$/u;
-/** SA48: a cook's loose files (its header, its programs, its mounts' loose rows) again by upload, `loose/<hash>/<key>`: the slug's own
- *  keys are the last cook's, whichever upload that was, so a page that never baked the shard reads these (`CookIndex.loose`). */
+/** SA48: a cook's header, programs and other loose files live under its raw upload hash. Readers follow `CookIndex.loose`. */
 const LOOSE = 'loose/';
 export const looseFolder = (hash: string): string => `${LOOSE}${hash}/`;
 
@@ -388,10 +387,12 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);
-    // SA48: the loose files again under this upload's own folder (`looseFolder`)
-    const folder = looseFolder(hash), loose = keys.filter(key => key.startsWith('shardfiles/') || key.startsWith('programs/'));
+    // A recook can visit an older catalogue head after a staging upload. Only the upload owns these mutable names.
+    const folder = looseFolder(hash);
+    const byUpload = (key: string): boolean => key.startsWith('shardfiles/') || key.startsWith('programs/');
+    const loose = keys.filter(byUpload), shared = keys.filter(key => !byUpload(key));
     const measure = (rows: ReadonlyMap<string, StoredObject>): {readonly fresh: number; readonly used: number} => ({
-      fresh: keys.reduce((sum, key) => sum + (rows.has(key) ? 0 : statSync(join(client, key)).size), 0)
+      fresh: shared.reduce((sum, key) => sum + (rows.has(key) ? 0 : statSync(join(client, key)).size), 0)
         + loose.reduce((sum, key) => sum + (rows.has(folder + key) ? 0 : statSync(join(client, key)).size), 0),
       used: usageOf([...rows.values()], budget).bytes,
     });
@@ -404,14 +405,14 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     // is written again, which GC reads as new.
     const current = (key: string): boolean => clock() - (held.get(key)?.modified ?? 0) < GC_GRACE_MS / 2;
     const order = (key: string): number => (key.includes('/parts/') ? 0 : key.startsWith('assets/spawn/') ? 2 : 1);
-    for (const key of [...keys].sort((a, b) => order(a) - order(b))) {
+    for (const key of [...shared].sort((a, b) => order(a) - order(b))) {
       if (!CONTENT_NAMED.test(key) || !current(key)) await put(key, readFileSync(join(client, key)), objectHeaders(key));
     }
     for (const key of loose) if (!current(folder + key)) await put(folder + key, readFileSync(join(client, key)), {...objectHeaders(key), cache: IMMUTABLE});
     const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
-    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...keys, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
+    const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...shared, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
       ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
       ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}})};
     await put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});

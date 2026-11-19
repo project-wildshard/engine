@@ -14,6 +14,9 @@ describe('the cook worker', () => {
 
   it('cooks a real shard: parts and index in the store, a server pack for the room, no second cook', async () => {
     const hash = hashOf(h.real), cook = h.worker(new Map([[hash, h.real]]));
+    const sharedHeader = `shardfiles/${slug}/shard.json`;
+    const newerHeader = new TextEncoder().encode('the newer staged revision');
+    await h.store.put(sharedHeader, newerHeader, objectHeaders(sharedHeader));
     const row = await cook.cook({slug, hash});
     expect(row.state, row.detail).toBe('cooked');
     const index = JSON.parse(new TextDecoder().decode(await h.store.get(indexKey('b1', hash)))) as CookIndex;
@@ -23,10 +26,11 @@ describe('the cook worker', () => {
     expect(index.manifests).toHaveLength(4);
     for (const key of index.keys) expect(await h.store.has(key), key).toBe(true);
     expect(index.keys.filter(key => key.endsWith('.pack.br')).length).toBeGreaterThan(0);
-    // SA48: the loose files again under this upload, the header's bytes the slug's own key holds, and named by the index for GC
+    // An older recook must leave the shared alias alone and publish its own descriptor.
+    expect(await h.store.get(sharedHeader)).toEqual(newerHeader);
+    expect(index.keys).not.toContain(sharedHeader);
     expect(index.loose).toBe(`loose/${hash}/`);
-    const header = await h.store.get(`loose/${hash}/${index.header}`);
-    expect(header !== undefined && Buffer.from(header).equals(Buffer.from((await h.store.get(index.header)) ?? []))).toBe(true);
+    expect(await h.store.get(`loose/${hash}/${index.header}`)).toBeDefined();
     expect(index.keys).toContain(`loose/${hash}/${index.header}`);
     expect(objectHeaders(`loose/${hash}/${index.header}`).cache).toMatch(/immutable/u);
     const room = join(h.scratch, 'server', slug, hash), held = readdirSync(room, {recursive: true}).map(String);

@@ -22,7 +22,11 @@ import {servedDiscoveryPath} from '../../src/cook/game/entryTotals';
  * `/api/catalogue.json`; with none, the in-tree grid and this build's products say the same thing. */
 const ELEMENT = /<script type="application\/json" id="ws-catalogue">[^<]*<\/script>/u;
 /** J138: the shards cooked to R2 and its origin, for a page's spawn download. */
-export interface PackHome {readonly base: string; readonly shards: readonly string[]}
+export interface PackHome {
+  readonly base: string;
+  readonly shards: readonly string[];
+  readonly loose?: Readonly<Record<string, string>>;
+}
 const inline = (text: string): string => `<script type="application/json" id="ws-catalogue">${text.replaceAll('<', String.raw`\u003c`)}</script>`;
 
 const ROWS = /<script type="application\/json" id="ws-title-rows">[^<]*<\/script>/u;
@@ -219,7 +223,7 @@ export function catalogueWithAdded(built: StandaloneCatalogue, live: StandaloneC
  *  server's pack, which the server worker reads beside it. A shard this build shipped keeps its own copy: it leaves with
  *  `src/shards` (P5). `live` is the catalogue document the heads came from. */
 export async function addStoredShards(out: string, heads: readonly {readonly slug: string; readonly hash: string}[], store: Pick<PackStore, 'get'>, read: (hash: string) => Promise<Uint8Array>, home: PackHome, live: StandaloneCatalogue): Promise<readonly string[]> {
-  const {indexKey} = await import('../../src/cook/game/cookWorker');
+  const {indexKey, looseFolder} = await import('../../src/cook/game/cookWorker');
   const {build} = JSON.parse(readFileSync(join(out, 'version.json'), 'utf8')) as {build: string};
   const bank = /<script type="application\/json" id="boot-module-files">([^<]+)<\/script>/u.exec(readFileSync(join(out, 'index.html'), 'utf8'))?.[1];
   if (bank === undefined) throw new Error('Missing entry module bank');
@@ -229,7 +233,11 @@ export async function addStoredShards(out: string, heads: readonly {readonly slu
     if (body === undefined) throw new Error(`The store has no ${key}`);
     return body;
   };
-  const copy = async (key: string, root: string): Promise<void> => { mkdirSync(dirname(join(root, key)), {recursive: true}); writeFileSync(join(root, key), await need(key)); };
+  const loose = {...home.loose};
+  const copy = async (key: string, root: string, source = key): Promise<void> => {
+    mkdirSync(dirname(join(root, key)), {recursive: true});
+    writeFileSync(join(root, key), await need(source));
+  };
   try {
     for (const head of heads) {
       const body = Object.keys(client).some(slug => bareSlug(slug) === bareSlug(head.slug)) ? undefined : await store.get(indexKey(build, head.hash));
@@ -237,19 +245,23 @@ export async function addStoredShards(out: string, heads: readonly {readonly slu
       const index = JSON.parse(new TextDecoder().decode(body)) as CookIndex;
       // J262 (SP1a): the cook went by a preparation from another renderer; the bake says so beside its list.
       if (index.preparation === 'stale') console.warn(`stale preparation: ${index.slug}`);
+      if (index.loose !== undefined) {
+        if (index.loose !== looseFolder(head.hash)) throw new Error(`The stored cook for ${index.slug} names another upload`);
+        loose[bareSlug(index.slug)] = index.loose;
+      }
       for (const row of index.manifests) await copy(row.url.slice(1), scratch);
-      await copy(index.header, out);
+      await copy(index.header, out, `${index.loose ?? ''}${index.header}`);
       for (const key of index.keys) if (key.startsWith('assets/spawn/server/')) await copy(key, out);
       const proved = await folderVerdict(await read(head.hash), out);
       const server = index.serverPack?.index.slice(1);
       added.push({slug: index.slug, hash: head.hash, header: index.header, manifests: index.manifests,
-        entryPrograms: index.keys.includes(`programs/${index.slug}.json`), ...proved,
+        entryPrograms: index.keys.includes(`${index.loose ?? ''}programs/${index.slug}.json`), ...proved,
         ...(server === undefined ? {} : {server: JSON.parse(new TextDecoder().decode(await need(server))) as unknown})});
     }
     if (added.length > 0) {
       const slugs = added.map(row => row.slug);
       writeCatalogueDocument(out, catalogueWithAdded(v.parse(StandaloneCatalogueSchema, JSON.parse(readFileSync(join(out, 'catalogue.json'), 'utf8'))), live, slugs));
-      addCookedShards(out, added, scratch, {base: home.base, shards: [...home.shards, ...slugs]});
+      addCookedShards(out, added, scratch, {...home, shards: [...home.shards, ...slugs], ...(Object.keys(loose).length === 0 ? {} : {loose})});
     }
     return added.map(row => row.slug);
   } finally { rmSync(scratch, {recursive: true, force: true}); }

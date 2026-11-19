@@ -923,7 +923,9 @@ export function shardPackBase(slug: string): string | null {
   if (placed !== undefined) return placed.programs ? placed.loose : null;
   const bank: unknown = JSON.parse(text), recorded = get(bank, 'entryPrograms');
   if (get(recorded, slug) === false || get(recorded, bareSlug(slug)) === false) return null;
-  return packBase(get(get(bank, 'spawnManifests'), 'home'), slug);
+  const home = get(get(bank, 'spawnManifests'), 'home'), base = packBase(home, slug);
+  const loose = get(get(home, 'loose'), bareSlug(slug));
+  return typeof loose === 'string' && /^loose\/[a-f0-9]{64}\/$/u.test(loose) ? new URL(loose, base).href : base;
 }
 /** DL10: a shard's recorded entry programs, or null when its cook published none. The file carries the product slug: a
  *  placement's authored `_proto` reads `/programs/proto.json` (an authored-name read 404s, TEMPLATE-E2E TE13). */
