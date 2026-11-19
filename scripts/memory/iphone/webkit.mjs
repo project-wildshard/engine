@@ -3,7 +3,11 @@
 // `arguments` and `return`s, evaluateAsync with the done callback last, click an element an evaluate returned. Headless
 // Playwright WebKit with the iPhone 13's viewport, touch and user agent; the bench seeds phone Low as it does on the phone.
 // A DOM element in an evaluate's answer comes back as `{__el: n}` (kept in the page) and `click` taps its centre.
-import { webkit, devices } from 'playwright';
+import { createRequire } from 'node:module';
+import { admittedPlaywright } from '../../browser-machine-loader.mjs';
+
+const require = createRequire(import.meta.url);
+const { webkit, devices } = await admittedPlaywright(require('playwright'));
 
 /** The page-side runner: one function body, its arguments, and (async) a done callback appended last.
  * @param {[string, unknown[], boolean]} input */
