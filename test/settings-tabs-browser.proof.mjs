@@ -18,15 +18,15 @@ import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
 const OUT = resolve('tmp/settings-tabs'), SHOTS = process.env['WS_SETTINGS_SHOTS'] ?? resolve('tmp/settings-tabs-shots');
 /** @type {Readonly<Record<string, string>>} */
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png' };
-const TABS = ['graphics', 'sound', 'controls', 'saves', 'system'];
+const TABS = ['graphics', 'sound', 'controls', 'system']; // J458: Saves folds into System ▸ Progress file
 /** where each row must be: `data-setting` keys (switches, sliders, pickers) and `data-gfx` ids (Graphics), by tab */
 const EXPECT = {
-  graphics: { phone: ['gfx:mode', 'gfx:tier', 'gfx:aa', 'gfx:firstPlay'], desk: ['gfx:deskNote', 'gfx:tier', 'gfx:scale', 'gfx:aa'] },
+  graphics: { phone: ['gfx:mode', 'gfx:aa'], desk: ['gfx:deskNote', 'gfx:tier', 'gfx:scale', 'gfx:aa'] },
   sound: ['volume', 'music'],
   controls: ['look', 'lockCam', 'autoLock', 'aimAssist'],
 };
 
-test('Settings: five tabs (six in Developer mode), every row in its tab, every control works', { timeout: 240_000 }, async () => {
+test('Settings: four tabs (five in Developer mode), every row in its tab, every control works', { timeout: 240_000 }, async () => {
   mkdirSync(SHOTS, { recursive: true });
   await build({ configFile: false, root: resolve('test/settings-tabs'), logLevel: 'warn', publicDir: false,
     define: { __TITLE_ASSET_URLS__: '{}', __BUILD_ID__: '(globalThis.__WS_BUILD_ID__ ?? "")', __DEVSERVER__: 'false', __PREPARATION_ONLY__: 'false', __ENGINE_RELEASE__: '"v0.0.0"' },
@@ -71,7 +71,7 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       await page.evaluate(() => { /** @type {any} */ (window).__settings.menu.open('settings'); });
       await page.waitForTimeout(200);
       assert.equal(await page.locator('.ws-gmenu-title').textContent(), 'Settings', `${kind}: the menu is SETTINGS`);
-      assert.deepEqual(await shownTabs(), TABS, `${kind}: five tabs outside Developer mode`);
+      assert.deepEqual(await shownTabs(), TABS, `${kind}: four tabs outside Developer mode`);
       assert.equal(await page.$eval('.ws-gmenu-svtab.active', b => /** @type {HTMLElement} */ (b).dataset['svTab']), 'graphics', `${kind}: Settings opens on Graphics`);
 
       // every tab opens from its button, and shows its pane only
@@ -101,10 +101,13 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
         await tap('[data-gfx="scale"] .ws-gmenu-segbtn[data-v="auto"]');
       }
       await tap('[data-gfx="aa"] .ws-gmenu-segbtn[data-v="off"]'); assert.equal(await read('s.gfxPrefs.aa'), 'off', `${kind}: anti-aliasing saves`);
-      assert.equal(await page.locator('[data-gfx="reload"]').isVisible(), true, `${kind}: a pending boot pick shows Reload now`);
+      // J458: a phone's Quality and its Reload now are developer rows (DEV ▸ Graphics, proved below)
+      if (!phone) assert.equal(await page.locator('[data-gfx="reload"]').isVisible(), true, `${kind}: a pending boot pick shows Reload now`);
       await tap('[data-gfx="aa"] .ws-gmenu-segbtn[data-v="auto"]');
-      await tap('[data-gfx="tier"] .ws-gmenu-segbtn[data-v="desktop"]'); assert.equal(await read("s.savedSetting('tier')"), 'desktop', `${kind}: quality saves`);
-      await tap('[data-gfx="tier"] .ws-gmenu-segbtn[data-v="auto"]');
+      if (!phone) {
+        await tap('[data-gfx="tier"] .ws-gmenu-segbtn[data-v="desktop"]'); assert.equal(await read("s.savedSetting('tier')"), 'desktop', `${kind}: quality saves`);
+        await tap('[data-gfx="tier"] .ws-gmenu-segbtn[data-v="auto"]');
+      } else for (const id of ['tier', 'firstPlay']) assert.equal(await page.locator(`[data-gfx="${id}"]`).isVisible(), false, `${kind}: no ${id} in a player's Graphics`);
       assert.equal(await page.locator('[data-gfx="reload"]').isVisible(), false, `${kind}: nothing pending, no Reload now`);
       // the registry (graphicsControls.ts): a control the Low / High lane registers shows under Effects
       await page.evaluate(() => { const s = /** @type {any} */ (window).__settings; s.registerGraphicsControl({ id: 'proofShadows', section: 'effects', order: 10, build: () => { const b = document.createElement('button'); b.className = 'ws-gmenu-switch'; b.textContent = 'Shadows'; return b; } }); s.menu.close(); s.menu.open('settings'); });
@@ -146,10 +149,11 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       await tap('[data-setting="tracers"]'); assert.equal(await read("s.getSetting('tracers')"), false, `${kind}: tracers toggle`);
       await page.screenshot({ path: join(SHOTS, `${kind}-controls-armed.png`) });
 
-      // SAVES: the game's section first, then the progress file
-      await open('saves');
-      assert.equal(await page.locator('[data-proof="saveCards"]').isVisible(), true, `${kind}: the game's save cards`);
-      assert.ok(await page.locator('.ws-gmenu-svpane[data-sv-pane="saves"] .ws-gmenu-btn').count() >= 2, `${kind}: export and import`);
+      // SYSTEM ▸ PROGRESS FILE (J458): the game's section first, then the progress file
+      await open('system');
+      assert.equal(await page.locator('.ws-gmenu-svpane[data-sv-pane="system"] [data-proof="saveCards"]').isVisible(), true, `${kind}: the game's save cards`);
+      assert.ok(await page.locator('.ws-gmenu-svpane[data-sv-pane="system"] .ws-gmenu-svgroup[data-sv-group="saves.file"] .ws-gmenu-btn').count() >= 2, `${kind}: export and import`);
+      assert.ok((await page.locator('.ws-gmenu-svpane[data-sv-pane="system"]').textContent())?.includes('Progress file'), `${kind}: under Progress file`);
 
       // SYSTEM: the connection check, review, Developer mode → the DEV tab
       await open('system');
@@ -158,14 +162,21 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       await tap('.ws-gmenu-svpane[data-sv-pane="system"] .ws-gmenu-switch[role="switch"]');
       assert.equal(await read('s.isDev()'), true, `${kind}: Developer mode on`);
       await page.waitForTimeout(100);
-      assert.deepEqual(await shownTabs(), [...TABS, 'dev'], `${kind}: six tabs in Developer mode`);
+      assert.deepEqual(await shownTabs(), [...TABS, 'dev'], `${kind}: five tabs in Developer mode`);
       await open('dev');
       assert.equal(await page.locator('.ws-gmenu-svpane[data-sv-pane="dev"] .ws-gmenu-card.fold').first().isVisible(), true, `${kind}: Developer tools and Debug`);
+      if (phone) {
+        // J458: a phone's developer Graphics rows live here; Quality still saves and asks for a reload
+        for (const id of ['tier', 'firstPlay', 'reload']) assert.equal(await page.locator(`.ws-gmenu-svpane[data-sv-pane="dev"] [data-gfx="${id}"]`).count(), 1, `${kind}: ${id} in DEV`);
+        await tap('[data-gfx="tier"] .ws-gmenu-segbtn[data-v="desktop"]'); assert.equal(await read("s.savedSetting('tier')"), 'desktop', `${kind}: quality saves from DEV`);
+        assert.equal(await page.locator('[data-gfx="reload"]').isVisible(), true, `${kind}: DEV shows Reload now`);
+        await tap('[data-gfx="tier"] .ws-gmenu-segbtn[data-v="auto"]');
+      }
       await page.screenshot({ path: join(SHOTS, `${kind}-dev.png`) });
       await open('system');
       await tap('.ws-gmenu-svpane[data-sv-pane="system"] .ws-gmenu-switch[role="switch"]');
       await page.waitForTimeout(100);
-      assert.deepEqual(await shownTabs(), TABS, `${kind}: five tabs again with Developer mode off`);
+      assert.deepEqual(await shownTabs(), TABS, `${kind}: four tabs again with Developer mode off`);
 
       // SR13: unlock the review inbox (the inbox's check answered by a stub), then Feedback is a System row, not a tab bar
       await page.route('**/inbox**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
@@ -174,7 +185,7 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       await page.waitForFunction(() => /** @type {any} */ (window).__settings.reviewUnlocked() === true);
       await page.waitForTimeout(100);
       assert.equal(await page.locator('.ws-gmenu-tabs').isVisible(), false, `${kind}: no outer SETTINGS · FEEDBACK bar with review unlocked`);
-      assert.deepEqual(await shownTabs(), TABS, `${kind}: still the five tabs`);
+      assert.deepEqual(await shownTabs(), TABS, `${kind}: still the four tabs`);
       await page.screenshot({ path: join(SHOTS, `${kind}-system-feedback-row.png`) });
       await tap('.ws-gmenu-svpane[data-sv-pane="system"] [data-setting="feedback"] button');
       assert.equal(await page.locator('[data-proof="composer"]').isVisible(), true, `${kind}: System ▸ Feedback opens the composer`);
@@ -192,7 +203,7 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
       await page.waitForTimeout(200);
       const boot = '.ws-gmenu-boot';
       const bootTabs = () => page.$$eval(`${boot} .ws-gmenu-svtab`, bs => bs.filter(b => !b.hidden).map(b => /** @type {HTMLElement} */ (b).dataset['svTab']));
-      assert.deepEqual(await bootTabs(), TABS, `${kind}: the title has the same five tabs`);
+      assert.deepEqual(await bootTabs(), TABS, `${kind}: the title has the same four tabs`);
       for (const tab of TABS) {
         await page.locator(`${boot} .ws-gmenu-svtab[data-sv-tab="${tab}"]`).click(); await page.waitForTimeout(60);
         const active = await page.$$eval(`${boot} .ws-gmenu-svpane.active`, ps => ps.map(p => /** @type {HTMLElement} */ (p).dataset['svPane']));
@@ -203,7 +214,9 @@ test('Settings: five tabs (six in Developer mode), every row in its tab, every c
         els => els.map(e => { const d = /** @type {HTMLElement} */ (e).dataset; return d['gfx'] === undefined ? String(d['setting']) : `gfx:${d['gfx']}`; }));
       for (const key of ['volume', 'music']) assert.ok((await bootSeen('sound')).includes(key), `${kind}: the title's Sound has ${key}`);
       for (const key of ['look', 'lockCam', 'autoLock', 'aimAssist']) assert.ok((await bootSeen('controls')).includes(key), `${kind}: the title's Controls has ${key}`);
-      assert.ok((await bootSeen('graphics')).includes('gfx:tier'), `${kind}: the title's Graphics has Quality`);
+      // J458: a phone's Quality is a developer row (DEV ▸ Graphics, as in game); a desktop keeps it in Graphics
+      assert.ok((await bootSeen(phone ? 'dev' : 'graphics')).includes('gfx:tier'), `${kind}: the title's ${phone ? 'DEV' : 'Graphics'} has Quality`);
+      if (phone) for (const key of ['gfx:tier', 'gfx:gfxReadout', 'gfx:gfxDrawing', 'gfx:gfxWorld', 'gfx:firstPlay']) assert.ok(!(await bootSeen('graphics')).includes(key), `${kind}: no ${key} in the title's Graphics`);
       if (phone) assert.ok((await bootSeen('graphics')).includes('gfx:mode'), `${kind}: the title's Graphics has Low · High`);
       assert.equal(await page.locator(`${boot} .ws-gmenu-review`).count(), 0, `${kind}: no Review on the title`);
       assert.equal(await page.locator(`${boot} [data-proof="saveCards"]`).count(), 0, `${kind}: no shard save cards on the title`);

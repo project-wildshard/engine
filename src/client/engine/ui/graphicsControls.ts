@@ -9,7 +9,9 @@ import type { Scope } from '../../../shared/engine/app/scope';
  *   section   'main'      the top of the tab, no heading: Low / High (built in, `mode`), the frame-time readout, screen, scale
  *             'effects'   "Effects": shadows, bloom, sun rays, edge smoothing
  *             'advanced'  "Advanced": the boot-time picks (built in: quality, render scale, anti-aliasing, the reload row)
- *             'setup'     the foot: Replay first-time setup (built in, `firstPlay`)
+ *             'setup'     the foot of the tab
+ *             'dev'       not in Graphics: DEV ▸ Graphics, shown only in Developer mode (J458: on a phone the pixel count,
+ *                         the frame readout, Quality, Running now, the In-world toggle and Replay first-time setup)
  *   id        a registration with a built-in's id (`mode`, `tier`, `scale`, `aa`, `reload`, `firstPlay`) replaces that built-in
  *   build     makes the row once per menu, under the menu's scope (listeners on it go when the menu goes); use the
  *             gmenu.css rows: `.ws-gmenu-switch` (a toggle), `.ws-gmenu-row` + `.ws-gmenu-seg` (a picker)
@@ -19,8 +21,8 @@ import type { Scope } from '../../../shared/engine/app/scope';
  * Engine or game code may register (the game through `@wildshard/engine/ui/graphicsControls`); a registration made after
  * the menu was built appears on its next open.
  */
-export type GraphicsSection = 'main' | 'effects' | 'advanced' | 'setup';
-export const GRAPHICS_SECTIONS: readonly GraphicsSection[] = ['main', 'effects', 'advanced', 'setup'];
+export type GraphicsSection = 'main' | 'effects' | 'advanced' | 'setup' | 'dev';
+export const GRAPHICS_SECTIONS: readonly GraphicsSection[] = ['main', 'effects', 'advanced', 'setup', 'dev'];
 export interface GraphicsControl {
   readonly id: string;
   readonly section: GraphicsSection;

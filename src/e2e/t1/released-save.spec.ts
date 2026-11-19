@@ -112,7 +112,8 @@ test('released Brasscap world is refused while its progress carries', async ({
   const file = releasedFile(instance)
   await page.keyboard.press('Escape')
   const menu = page.locator('.ws-gmenu.show:not([inert])')
-  await menu.locator('[data-sv-tab="saves"]').click()
+  // J458: Saves is System ▸ Progress file
+  await menu.locator('[data-sv-tab="system"]').click()
   await menu.locator('input[type=file]').setInputFiles({
     name: 'released-brasscap.json',
     mimeType: 'application/json',

@@ -26,7 +26,7 @@ import { registerGraphicsControl, type GraphicsControl } from './graphicsControl
  * always shows a real value and applies at once (core/graphicsQuality.ts, Game.applyQuality); Low Power Mode refuses High (MG3).
  */
 
-type RowId = 'mode' | 'modeCards' | 'density' | 'shadows' | 'bloom' | 'rays' | 'aa' | 'readout' | 'world';
+type RowId = 'mode' | 'modeCards' | 'density' | 'drawing' | 'shadows' | 'bloom' | 'rays' | 'aa' | 'readout' | 'world';
 interface Row { readonly root: HTMLElement; readonly paint: () => void }
 
 const el = (cls: string, text = '', tag = 'div'): HTMLElement => { const e = document.createElement(tag); e.className = cls; if (text !== '') e.textContent = text; return e; };
@@ -75,23 +75,26 @@ export function graphicsRow(id: RowId, scope: Scope): Row {
           card.classList.toggle('active', on); card.setAttribute('aria-pressed', String(on)); card.classList.toggle('locked', locked && mode === 'high');
         }
       });
-      root = el('ws-gmenu-svmodewrap'); root.append(cards, refusal, el('ws-gmenu-note', s('s_gfx_block_note')));
+      // J458: the cards say what each preset is; no explainer under them, and Custom lights up by itself
+      root = el('ws-gmenu-svmodewrap'); root.append(cards, refusal);
     } else {
       root = el('ws-gmenu-gfxmode');
       root.append(seg(s('s_gfx_mode'), [{ v: 'low', text: s('s_gfx_low_start') }, { v: 'high', text: s('s_gfx_high_start') }, { v: 'custom', text: s('s_st_custom'), indicator: true }],
         () => presetLabel(), (v) => { if (v === 'low' || v === 'high') press(v); }), refusal, el('ws-gmenu-note', s('s_gfx_block_note')));
     }
     paints.push(() => { if (!lowPowerOn()) refused = false; refusal.textContent = lowPowerRefusal(); refusal.hidden = !refused && !lowPowerOn(); });
-  } else if (id === 'density') {
-    const drawing = el('ws-gmenu-note');
+  } else if (id === 'drawing') {
+    // J458: the pixel count is a developer row (DEV ▸ Graphics); Pixel density itself stays in Graphics
+    root = el('ws-gmenu-note');
     paints.push(() => {
       const ratio = drawingPixelRatio(window.devicePixelRatio, TIER_CONFIG.dpr, true);
       const buffer = drawingBuffer(window.innerWidth, window.innerHeight, ratio);
-      drawing.textContent = s('s_gfx_drawing', [buffer.width, buffer.height, Math.round(window.innerWidth * window.devicePixelRatio), Math.round(window.innerHeight * window.devicePixelRatio)]);
+      root.textContent = s('s_gfx_drawing', [buffer.width, buffer.height, Math.round(window.innerWidth * window.devicePixelRatio), Math.round(window.innerHeight * window.devicePixelRatio)]);
     });
+  } else if (id === 'density') {
     root = el('ws-gmenu-gfxdensity');
     root.append(seg(s('s_gfx_density'), DENSITIES.map((d) => ({ v: String(d), text: s(DENSITY_WORDS[String(d)] ?? 's_gfx_d2') })),
-      () => String(densityIn(graphicsMode())), (v) => { const d = DENSITIES.find((x) => String(x) === v); if (d !== undefined) saveDensity(d); }), drawing);
+      () => String(densityIn(graphicsMode())), (v) => { const d = DENSITIES.find((x) => String(x) === v); if (d !== undefined) saveDensity(d); }));
   } else if (id === 'readout') {
     root = el('ws-gmenu-note ws-gmenu-gfx-readout');
     paints.push(() => { const line = frameReadout(); root.textContent = line === '' ? s('s_gfx_readout_idle') : line; });
@@ -136,14 +139,16 @@ export function graphicsSettingsControls(): GraphicsControl[] {
   return [
     { id: 'mode', section: 'main', order: 0, when: phone, build: row('modeCards') },
     { id: 'gfxDensity', section: 'main', order: 10, when: phone, build: row('density') },
-    { id: 'gfxReadout', section: 'main', order: 20, when: phone, build: row('readout') },
+    // J458 (Jake, 2026-11-19, One Settings Menu A): the developer rows leave a phone's Graphics for DEV ▸ Graphics
+    { id: 'gfxDrawing', section: 'dev', order: 0, when: phone, build: row('drawing') },
+    { id: 'gfxReadout', section: 'dev', order: 5, when: phone, build: row('readout') },
     { id: 'gfxShadows', section: 'effects', order: 10, when: phone, build: row('shadows') },
     { id: 'gfxBloom', section: 'effects', order: 20, when: phone, build: row('bloom') },
     { id: 'gfxRays', section: 'effects', order: 30, when: phone, build: row('rays') },
     { id: 'gfxAa', section: 'effects', order: 40, when: phone, build: row('aa') },
-    { id: 'gfxWorld', section: 'setup', order: 10, when: phone, build: row('world') },
-    // "I don't like auto": Quality shows the tier this device runs
-    { id: 'tier', section: 'advanced', order: 10, build: (scope) => pick(scope, s('s_1b2c08a8733d'), [['phone', s('s_63dceb8800b2')], ['desktop', s('s_9bd88f2485ac')]],
+    { id: 'gfxWorld', section: 'dev', order: 70, when: phone, build: row('world') },
+    // "I don't like auto": Quality shows the tier this device runs (a phone's in DEV ▸ Graphics, J458)
+    { id: 'tier', section: TIER === 'phone' ? 'dev' : 'advanced', order: 10, build: (scope) => pick(scope, s('s_1b2c08a8733d'), [['phone', s('s_63dceb8800b2')], ['desktop', s('s_9bd88f2485ac')]],
       () => { const saved = savedSetting('tier'); return saved === 'auto' ? automaticTier : saved; }, (v) => { if (v === 'phone' || v === 'desktop') saveSetting('tier', v); }) },
     // a desktop's boot-time render scale and AA, as the built-ins had them; a phone has Pixel density and Anti-aliasing instead
     { id: 'scale', section: 'advanced', order: 20, when: () => !phone(), build: (scope) => pick(scope, s('s_2dee7435d0fe'),

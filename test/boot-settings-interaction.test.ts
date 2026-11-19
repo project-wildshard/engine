@@ -67,7 +67,7 @@ test('SR11: the title panel is the in-game tabs, and a quality pick reloads once
     const root = document.querySelector('.ws-gmenu');
     if (root === null) throw new Error('missing title Settings');
     const tabs = [...root.querySelectorAll<HTMLElement>('.ws-gmenu-svtab')].filter(b => b.hidden === false).map(b => b.dataset['svTab']);
-    expect(tabs).toEqual(['graphics', 'sound', 'controls', 'saves', 'system']);
+    expect(tabs).toEqual(['graphics', 'sound', 'controls', 'system']); // J458: Saves folds into System
     expect(root.querySelector('[data-setting="volume"]')).not.toBeNull(); // Sound is the in-game Sound
     expect(root.querySelector('[data-setting="musicStyle"]')).toBeNull(); // AUDIO AU16 (J304): one music style, no choice
     expect(root.querySelector('.ws-gmenu-review')).toBeNull(); // Review is in-game only

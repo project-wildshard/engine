@@ -87,8 +87,10 @@ function build(): HTMLElement {
   withOwner(scope, () => { buildMenuSettings({ scope, panel, hint, tab: () => 'settings', title: true, graphics: graphicsSettingsControls() }, state); });
   // which quality this page runs, and (the agents' screenshot URLs) a param that wins over the saved pick for this load
   const overridden = BOOT_OPTIONS.filter((k) => settingFromUrl(k));
-  state.tabs?.put('graphics.advanced', [words('ws-gmenu-note', engineString('s_a348737554c0', [TIER]))], true);
-  if (overridden.length > 0) state.tabs?.put('graphics.advanced', [words('ws-gmenu-note', engineString('s_7537bbaf9c47', [overridden.map((k) => `${k} (?${settingParams(k).join(' / ?')})`).join(', ')]))]);
+  // J458: on a phone these are developer rows (DEV ▸ Graphics, beside Quality); a desktop keeps them in Graphics ▸ Advanced
+  const advanced = TIER === 'phone' ? 'dev.graphics' : 'graphics.advanced';
+  state.tabs?.put(advanced, [words('ws-gmenu-note', engineString('s_a348737554c0', [TIER]))], true);
+  if (overridden.length > 0) state.tabs?.put(advanced, [words('ws-gmenu-note', engineString('s_7537bbaf9c47', [overridden.map((k) => `${k} (?${settingParams(k).join(' / ?')})`).join(', ')]))]);
 
   const closeBtn = sheet.querySelector<HTMLButtonElement>('.ws-gmenu-close');
   if (closeBtn) listenTap(scope, closeBtn, close);
