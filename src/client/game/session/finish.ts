@@ -25,7 +25,6 @@ import { installGpuRecovery } from '@wildshard/engine/core/GpuRecovery';
 import { installWorldWatch } from '@wildshard/engine/core/worldWatch';
 import { webglRendererName } from '@wildshard/engine/core/slowGpuPacing';
 import { TIER } from '@wildshard/engine/core/tier';
-import { installProbe } from '@wildshard/engine/debug/probe';
 import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
@@ -461,6 +460,10 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   game.captureLevelResources();
   game.levelScope.onDispose(() => { windupWarn?.dispose(); weapons.setEnabled(false); boot.runtime.hooks.dispose?.(); audio.unloadLevel(); });
   const grid = ctx.grid;
+  // The probe describes the built world. Load it here, before publishing
+  // control, so the session's initial graph does not carry its diagnostics.
+  const { installProbe } = await import('@wildshard/engine/debug/probe');
+  if (levelScope.disposed || levelScope.disposing) throw new Error('World disposed before probe installation');
   installProbe(handle, { leakPhysics, health: () => playerHealth.attributes.health, quest: () => ({ adventure: boot.runtime.hooks.adventureFlags?.() ?? [], quest: boot.runtime.hooks.questFlags?.() ?? [] }),
     // T2E-1b: a grid page's area is the cell the player is in, not the shell
     area: () => grid === null ? shardArea(slug, app.debug.snapshot()['shardfile'], boot.runtime.hooks.questFlags?.() ?? []) : grid.area() });

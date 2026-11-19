@@ -18,3 +18,9 @@ under the existing caps.
 
 The later shard-format 0.41.1 pin adds a separate bundle overage.
 This split compiles and passes the same 139 tests with that pin.
+
+The 0.41.1 pin takes the Template session to 4,409,052 raw bytes
+and 1,362,009 gzip. Import the world probe at the finish stage, when
+its world exists. Install its usual API before control and reject
+the installation if the level retired while loading the module.
+The Template build now reads 4,394,714 raw bytes and 1,356,820 gzip.
