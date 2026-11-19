@@ -503,6 +503,7 @@
     "src/client/engine/ui/layers.ts": "client",
     "src/client/engine/ui/leaveGuard.ts": "client",
     "src/client/engine/ui/Loading.ts": "client",
+    "src/client/engine/ui/slowLoad.ts": "client",
     "src/client/engine/ui/loadProgress.ts": "client",
     "src/client/engine/ui/LockOn.ts": "client",
     "src/client/engine/ui/Map.ts": "client",

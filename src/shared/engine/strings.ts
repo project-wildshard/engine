@@ -361,6 +361,8 @@ export const ENGINE_STRINGS = {
   "s_loading_copy": "Copy diagnostics",
   "s_loading_settings": "Settings",
   "s_loading_exit": "Exit to title",
+  "s_loading_slow_head": "Taking longer than it should",
+  "s_loading_slow_sent": "A report was sent. You can retry, or wait: it may still finish.",
   "s_loading_copied": "Copied",
   "s_loading_copy_failed": "Copy failed",
   "s_loading_memory_risk": "This world may crash this phone",

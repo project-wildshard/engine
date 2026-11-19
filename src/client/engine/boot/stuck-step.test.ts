@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { progressOfCard, stuckContext, stuckMessage, watchStuckStep, type StuckStepPorts } from './stuckStep';
+import { progressOfCard, slowStepMs, stuckContext, stuckMessage, watchStuckStep, type StuckStepPorts } from './stuckStep';
 
 /** A fake clock and timer: `tick(ms)` advances the clock and runs the repeating timer once a second. */
 function harness(progress: () => { step: string; signature: string }) {
@@ -147,4 +147,28 @@ test('seconds while the page is hidden never count toward the bound', () => {
   hidden = true; h.tick(600_000); expect(h.stalls).toEqual([]);
   hidden = false; h.tick(29_000); expect(h.stalls).toEqual([]);
   h.tick(1000); expect(h.stalls).toEqual([['home', 60_000]]);
+});
+
+// QA 11-19 row 17 (Jake: "There's no like error model of worst case here"): a step past its own deadline gets the slow card
+// (Retry, Exit, a connection check) and a non-fatal report long before the fatal bound, and it goes when loading moves again.
+test('a step past its own deadline is slow once, recovers when it moves, and the fatal bound still follows', () => {
+  let bytes = 0;
+  const h = harness(() => ({ step: 'modules', signature: `modules|${String(bytes)}` }));
+  const slow: [string, number][] = []; let recovered = 0;
+  watchStuckStep(never, { ...h.ports, slow: (step, ms) => { slow.push([step, ms]); }, recovered: () => { recovered++; } }, 60_000);
+  h.tick(19_000); expect(slow).toEqual([]);
+  h.tick(1000); expect(slow).toEqual([['modules', 20_000]]);
+  h.tick(10_000); expect(slow).toHaveLength(1);
+  bytes = 1; h.tick(1000); expect(recovered).toBe(1);
+  // a second stretch of no progress is slow again, then fatal at the bound
+  h.tick(20_000); expect(slow).toHaveLength(2);
+  h.tick(40_000); expect(h.stalls).toEqual([['modules', 60_000]]);
+  expect(recovered).toBe(2);
+});
+
+test('steps that may sit still on a slow phone get longer deadlines', () => {
+  expect(slowStepMs('modules')).toBe(20_000);
+  expect(slowStepMs('shaders')).toBe(30_000);
+  expect(slowStepMs('stage:firstFrame')).toBe(30_000);
+  expect(slowStepMs('admission.assets')).toBe(20_000);
 });

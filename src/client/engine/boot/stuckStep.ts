@@ -14,6 +14,20 @@ import { diagnosticNow } from '../../../shared/engine/core/clock';
  *  bytes counter well inside this, so only a hang trips it. */
 export const STUCK_STEP_MS = 60_000;
 
+/**
+ * QA 11-19 row 17 (Jake: "There's no like error model of worst case here"): each step's own deadline, well before the fatal
+ * bound. A step with no progress for its deadline gets the slow card (Retry, Exit to title, a connection check) and a
+ * non-fatal report, so a stuck entry is never silent; the fatal card still follows at `STUCK_STEP_MS`. Steps that may sit
+ * still for a while on a slow phone (a shader link, the first frame, a seat in the world) get longer.
+ */
+export const SLOW_STEP_MS = 20_000;
+const SLOW_STEPS: Readonly<Record<string, number>> = { shaders: 30_000, worldPrograms: 30_000, firstFrame: 30_000, worldFrame: 30_000, readyFrame: 30_000, server: 30_000 };
+/** The slow card's deadline for `step` (its `stage:` or `admission.` prefix dropped). */
+export function slowStepMs(step: string): number {
+  const bare = step.replace(/^(?:stage:|admission\.)/u, '');
+  return SLOW_STEPS[bare] ?? SLOW_STEPS[step] ?? SLOW_STEP_MS;
+}
+
 /** What the watch reads each second: the step, a signature of its progress, and whether the boot waits on the player
  *  (`player`: PLAY is up, so the next move is theirs and no stall can be the boot's). */
 export interface StuckProgress { readonly step: string; readonly signature: string; readonly player?: boolean }
@@ -27,12 +41,20 @@ export interface StuckStepPorts {
   readonly stalled: (step: string, stuckMs: number) => void;
   /** Whether the page is hidden now (default never): a hidden page's seconds never count (QA 11-19 row 17) */
   readonly hidden?: () => boolean;
+  /** QA 11-19 row 17: the step passed its own deadline (`slowStepMs`) with no progress; once per stretch of no progress */
+  readonly slow?: (step: string, stuckMs: number) => void;
+  /** progress came back after `slow`, or the start settled: the slow card goes */
+  readonly recovered?: () => void;
+  /** a step's slow deadline (default `slowStepMs`) */
+  readonly slowMs?: (step: string) => number;
 }
 
 /** Watch `started` until it settles; calls `stalled` at most once. Returns the stop. */
 export function watchStuckStep(started: Promise<unknown>, ports: StuckStepPorts, boundMs: number = STUCK_STEP_MS): () => void {
   const now = ports.now ?? diagnosticNow;
-  let last = ports.progress().signature, stuck = 0, looked = now(), live = true;
+  let last = ports.progress().signature, stuck = 0, looked = now(), live = true, slowShown = false;
+  const deadline = ports.slowMs ?? slowStepMs;
+  const recover = (): void => { if (slowShown) { slowShown = false; ports.recovered?.(); } };
   const tick = (): void => {
     if (!live) return;
     const { step, signature, player = false } = ports.progress(), at = now();
@@ -43,14 +65,15 @@ export function watchStuckStep(started: Promise<unknown>, ports: StuckStepPorts,
     // a backgrounded page (a phone's app switcher, a locked screen) is not a stopped boot: its seconds never count
     if (ports.hidden?.() === true) return;
     // a wait on the player holds the bound at zero; whatever follows it gets the whole bound again
-    if (player || signature !== last) { last = signature; stuck = 0; return; }
+    if (player || signature !== last) { last = signature; stuck = 0; recover(); return; }
     stuck += watched;
+    if (!slowShown && ports.slow !== undefined && stuck >= Math.min(deadline(step), boundMs - 1000)) { slowShown = true; ports.slow(step, stuck); }
     if (stuck < boundMs) return;
     stop();
     ports.stalled(step, stuck);
   };
   const cancel = ports.every(1000, tick);
-  function stop(): void { if (live) { live = false; cancel(); } }
+  function stop(): void { if (live) { live = false; cancel(); recover(); } }
   void started.then(stop, stop);
   return stop;
 }

@@ -439,11 +439,21 @@ async function startPage(): Promise<void> {
     } catch { return { unreadable: true }; }
   };
   const started = startSelected();
+  let slowShown = 0, removeSlow = (): void => undefined;
   watchStuckStep(started, {
     progress: () => progressOfCard(card(), document),
     hidden: () => document.visibilityState === 'hidden',
     every: (ms, run) => { const timer = entryScope.interval(ms, run); return () => { entryScope.cancelTimer(timer); }; },
     stalled: (step, stuckMs) => { const why = stall(); void (async () => { (await import('@wildshard/engine/ui/ErrorModal')).showError(stuckMessage(step, { stuckMs }), '', why); })(); },
+    // QA 11-19 row 17: a step past its own deadline gets the slow strip (Retry, Exit to title, a connection check) and a
+    // non-fatal report, so a stuck entry is never silent before the fatal card (src/client/engine/ui/slowLoad.ts)
+    slow: (step, stuckMs) => { const shown = ++slowShown, why = stall(); void (async () => {
+      const [modal, { emitFault }, { showSlowLoad }] = await Promise.all([import('@wildshard/engine/ui/ErrorModal'), import('@wildshard/engine/core/faults'), import('@wildshard/engine/ui/slowLoad')]);
+      modal.installErrorModal();
+      emitFault({ system: 'boot.slow', error: Object.assign(new Error(`Loading slow at step "${step}" (no progress for ${String(Math.round(stuckMs / 1000))} s)`), { detail: why }), verdict: 'retry' });
+      if (shown === slowShown) { removeSlow(); removeSlow = showSlowLoad(entryScope, step, stuckMs, card()); }
+    })(); },
+    recovered: () => { slowShown++; removeSlow(); removeSlow = (): void => undefined; },
   });
   try { await started; await installInPageEntry(); }
   catch (error) {
