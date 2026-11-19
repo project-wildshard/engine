@@ -15,3 +15,7 @@ its page. Two scratch history entries compare the same build and show
 unavailable readings. A dry replay leaves the history alone. A
 complete fixture exercises the three-sample median and the noise line.
 The live bench entry point and device proof depend on M1.
+
+The live suite owns a fresh capture directory, so a failed child cannot
+reuse a previous run's measurements. The same push carries IP30's
+regenerated save lock for the debug.phoneBudget device slot.

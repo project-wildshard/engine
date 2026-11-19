@@ -83,3 +83,13 @@ test('compares the second replay and keeps a dry replay out of history', async (
     } finally { print.mockRestore(); }
   });
 });
+
+test('a live capture never reuses an earlier capture directory', async () => {
+  await withRecording(async path => {
+    write(path, 'nine', [trial(500_000_000)]);
+    const lock = vi.fn(() => Promise.resolve(0));
+    await expect(releaseSuite(['--out', path, '--with-locks'], { script: 'unused.mjs', lock }))
+      .rejects.toMatchObject({ code: 'EEXIST' });
+    expect(lock).not.toHaveBeenCalled();
+  });
+});

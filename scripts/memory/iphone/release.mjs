@@ -45,7 +45,7 @@ function readTrials(directory) {
 
 /** @param {readonly (number | null | undefined)[]} values @param {number} runs */
 function completeMedian(values, runs) {
-  const samples = values.filter(value => typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  const samples = values.flatMap(value => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? [value] : []);
   return samples.length === runs && values.length === runs ? median(samples) : null;
 }
 
@@ -67,16 +67,18 @@ function stageOf(trials, task, build) {
   });
   const metrics = /** @type {Stage['metrics']} */ (Object.fromEntries(METRICS.map(([key]) =>
     [key, completeMedian(readings.map(row => row[key]), task.runs)])));
-  const complete = played.length === task.runs && trials.length === task.runs
-    && metrics.webPeak !== null && metrics.webSettled !== null && (task.mode !== 'walk' || metrics.fps !== null);
+  const complete = trials.length === task.runs && METRICS.every(([key]) =>
+    (key === 'fps' && task.mode !== 'walk') || metrics[key] !== null);
   return { status: complete ? 'complete' : 'incomplete', attempts: trials.length, control: played.length, metrics };
 }
 
 /** @param {string} directory @param {{date: string, source: HistoryRow['source'], base: string}} info */
 export function releaseReading(directory, info) {
   const results = TASKS.map(task => ({ task, trials: readTrials(join(directory, task.key)) }));
-  const builds = [...new Set(results.flatMap(({ trials }) => trials.map(pageBuild))
-    .filter(build => build !== null && build.trim() !== ''))];
+  const builds = [...new Set(results.flatMap(({ trials }) => trials.flatMap(row => {
+    const build = pageBuild(row);
+    return build !== null && build.trim() !== '' ? [build] : [];
+  })))];
   const build = builds.length === 1 ? builds[0] : null;
   const stages = /** @type {HistoryRow['stages']} */ (Object.fromEntries(results.map(({ task, trials }) =>
     [task.key, stageOf(trials, task, build)])));
@@ -180,6 +182,10 @@ export async function releaseSuite(args, bench) {
       // Carry the same output directory through the locked invocation.
       return bench.lock(bench.script, ['--suite', 'release', ...args, '--out', out, '--with-locks']);
     }
+    // Every live report owns a fresh directory. A refused or interrupted child
+    // cannot contribute a report left by a previous capture.
+    mkdirSync(dirname(out), { recursive: true });
+    mkdirSync(out);
     for (const command of commands) {
       const status = await runBench(bench.script, command);
       if (status !== 0) console.log(`Bench ended with ${String(status)} for ${command[3]} ${command[5]}. Keeping its available report.`);
