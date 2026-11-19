@@ -188,6 +188,8 @@ test('MMO-SERVER E7.4b.c: scratch saves only on the box replica, and one restart
     [['replica', '--box', '--box-saves', 'main'], '--box-saves is memory or postgres, with --box'],
     [['replica', '--box', '--pg-restart-at', '30'], '--pg-restart-at is a second inside the run'],
     [['replica', '--box', '--box-saves', 'postgres', '--seconds', '60', '--pg-restart-at', '60'], '--pg-restart-at is a second inside the run'],
+    [['replica', '--box', '--box-saves', 'postgres', '--pg-restart-checkpoint'], '--pg-restart-checkpoint needs --pg-restart-at'],
+    [['replica', '--box', '--box-saves', 'postgres', '--seconds', '120', '--pg-restart-at', '60', '--pg-restart-checkpoint'], 'more than 75 s of bot time'],
   ] as const) {
     const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', ...args], { encoding: 'utf8', timeout: 10_000 });
     expect(run.status, args.join(' ')).not.toBe(0);

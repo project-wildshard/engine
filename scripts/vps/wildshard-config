@@ -9,7 +9,7 @@
 #                                                                   the build a signed release names for it; roll back on failure
 #   wildshard-config show cook                                      print the cook worker's tag and build
 #   wildshard-config replica start [--seconds S] [--workers N] [--seats N] [--cells a,b] [--saves memory|postgres]
-#                                   | replica pg-restart | replica stop
+#                                   | replica pg-restart [--checkpoint] | replica stop
 #                                                                   MP1.2.d: the cap bench's replica on staging's CPUs, tailnet only;
 #                                                                   E7.4b.b: --saves postgres puts its saves on a scratch cluster that
 #                                                                   pg-restart restarts (never postgresql@16-main)
@@ -409,12 +409,12 @@ def write_secret_rows(path, rows):
 # /opt/wildshard-vps, from a signed tag) says how. Bounded here and there: 60 to 3,900 seconds, 1 to 4 workers, 1 to 64 seats,
 # at most 8 cells. It runs in the foreground and its server lines come back on stdout; `replica stop` ends it.
 REPLICA_USAGE = ('usage: wildshard-config replica start [--seconds 60-3900] [--workers 1-4] [--seats 1-64] [--cells a,b] '
-                 '[--saves memory|postgres] | replica pg-restart | replica stop')
+                 '[--saves memory|postgres] | replica pg-restart [--checkpoint] | replica stop')
 
 
 def replica(args):
-    if args[1:] in (['stop'], ['pg-restart']):
-        words = [args[1]]
+    if args[1:] in (['stop'], ['pg-restart'], ['pg-restart', '--checkpoint']):
+        words = args[1:]
     elif args[1:2] == ['start']:
         options = {'--seconds': '1800', '--workers': '4', '--seats': '32', '--cells': 'driftwood-isle', '--saves': 'memory'}
         rest = args[2:]

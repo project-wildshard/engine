@@ -248,6 +248,41 @@ test('E7.4b.b: pg-restart restarts only the scratch cluster, and only while a re
   expect(existsSync(join(root, 'etc/postgresql/16/wildshard_replica'))).toBe(false)
 })
 
+test.each([false, true])('E7.4b.c: checkpoint restart needs a blocked save witness (%s)', witnessed => {
+  const { root, env, calls } = box()
+  mkdirSync(join(root, 'etc/postgresql/16/wildshard_replica'), { recursive: true })
+  const psql = join(root, 'bin', 'checkpoint-psql')
+  writeFileSync(psql, `#!/bin/bash
+echo "runuser $*" >> "${root}/calls.log"
+while IFS= read -r sql; do
+  printf '%s\\n' "$sql" >> "${root}/seen-sql"
+  if [[ "$sql" == "SELECT 'checkpoint.waiting';" ]]; then
+    if [[ "$WITNESSED" == 1 ]]; then
+      echo checkpoint.waiting
+    else
+      exit 1
+    fi
+  fi
+done
+`, { mode: 0o755 })
+  const run = spawnSync('node', [REPLICA, 'pg-restart', '--checkpoint'], { encoding: 'utf8', timeout: 5000,
+    env: { ...env, ACTIVE: '0', WILDSHARD_REPLICA_TEST_RUNUSER: psql, WITNESSED: witnessed ? '1' : '0' } })
+  expect(run.status, run.stderr).toBe(witnessed ? 0 : 1)
+  expect(calls()).toContain('runuser -u postgres -- /usr/bin/psql')
+  expect(calls()).toContain('-p 5439 -d saves_replica')
+  expect(calls()).not.toContain('16-main')
+  const sql = readFileSync(join(root, 'seen-sql'), 'utf8')
+  expect(sql).toContain('LOCK TABLE public.player_save IN SHARE MODE')
+  expect(sql).toContain('pg_blocking_pids')
+  if (witnessed) {
+    expect(calls()).toContain('systemctl restart postgresql@16-wildshard_replica.service')
+    expect(JSON.parse(run.stdout)).toMatchObject({ at: 'scratch.restarted', checkpointInFlight: true })
+  } else {
+    expect(calls()).not.toContain('systemctl restart')
+    expect(run.stderr).toContain('no blocked checkpoint write')
+  }
+})
+
 test('E7.4b.b: wildshard-config passes --saves and pg-restart through, and nothing else', () => {
   const root = scratch(), seen = join(root, 'seen'), helper = join(root, 'replica.mjs')
   writeFileSync(helper, `import { writeFileSync } from 'node:fs'\nwriteFileSync(${JSON.stringify(seen)}, process.argv.slice(2).join(' '))\n`)
@@ -259,8 +294,10 @@ test('E7.4b.b: wildshard-config passes --saves and pg-restart through, and nothi
   expect(readFileSync(seen, 'utf8')).toBe('start 1800 4 32 driftwood-isle')
   expect(config('replica', 'pg-restart').status).toBe(0)
   expect(readFileSync(seen, 'utf8')).toBe('pg-restart')
+  expect(config('replica', 'pg-restart', '--checkpoint').status).toBe(0)
+  expect(readFileSync(seen, 'utf8')).toBe('pg-restart --checkpoint')
   rmSync(seen)
-  for (const bad of [['start', '--saves', 'main'], ['start', '--saves', 'postgres;id'], ['pg-restart', 'main']]) {
+  for (const bad of [['start', '--saves', 'main'], ['start', '--saves', 'postgres;id'], ['pg-restart', 'main'], ['pg-restart', '--checkpoint', 'main']]) {
     const run = config('replica', ...bad)
     expect(run.status, bad.join(' ')).toBe(1)
     expect(run.stderr).toContain('usage: wildshard-config replica start')

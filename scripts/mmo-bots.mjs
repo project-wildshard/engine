@@ -9,7 +9,7 @@
 //   node scripts/mmo-bots.mjs replica --box [--seconds 1800] ...   (MP1.2.d: the replica on the box's staging CPUs through the
 //     allowlisted `wildshard-config replica`, bots on this Mac over the tailnet; no other command reaches the box)
 //   node scripts/mmo-bots.mjs replica --box --box-saves postgres --pg-restart-at 120 ...   (MMO-SERVER E7.4b.c: the replica's
-//     saves on the box's scratch cluster, which the helper restarts once at that second; never a channel's Postgres)
+//     saves on the box's scratch cluster. Add --pg-restart-checkpoint to arm at that second and restart during a write.)
 //   node scripts/mmo-bots.mjs staging [--bots 2] [--seconds 60]   (at most 4: one address)
 //   node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60   (TC45: public Tunnel, no private health)
 //   node scripts/mmo-bots.mjs staging --tailnet ...   (NET-LAG NL3: the same, over staging's tailnet Serve address, no Cloudflare)
@@ -33,14 +33,15 @@
 // (`serverFrom`). Every value that reaches the host's shell is a checked slug, number, hex or fixed path.
 // Everything goes in tmp/mmo-bots/<stamp>/ by default, or in the bounded `--work-dir tmp/<lane>/...` path; the release tree is
 // removed after the run and the report stays.
-import { execFileSync, spawn } from 'node:child_process';
+import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseArgs } from 'node:util';
+import { parseArgs, promisify } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..');
+const runFile = promisify(execFile);
 const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
 // MS7.3: only rooms-staging is a live socket. D7 keeps the health read private on the tailnet.
 const STAGING_SOCKETS = ['wss://rooms-staging.wildshard.io'], STAGING_HEALTH = 'https://wildshard.tailb41b20.ts.net:8443/health';
@@ -55,7 +56,8 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
   'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false },
   'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false }, 'outside-proof': { type: 'boolean', default: false },
-  box: { type: 'boolean', default: false }, 'box-saves': { type: 'string', default: 'memory' }, 'pg-restart-at': { type: 'string' } } });
+  box: { type: 'boolean', default: false }, 'box-saves': { type: 'string', default: 'memory' }, 'pg-restart-at': { type: 'string' },
+  'pg-restart-checkpoint': { type: 'boolean', default: false } } });
 const outsideProof = values['outside-proof'];
 if (outsideProof && (mode !== 'staging' || values.tailnet || values.remote !== undefined || values['bots-on-host']))
   throw new Error('--outside-proof is one public staging client, without tailnet, SSH or a replica');
@@ -77,9 +79,12 @@ if (box && (mode !== 'replica' || remote !== undefined || values.database !== 'm
   throw new Error('--box is a replica on memory saves from the signed staging bundle: no --remote, --server-from or --spread, 4 workers, 64 seats, 3,480 s at most');
 // E7.4b.c: the scratch cluster is the box replica's only Postgres; its one restart is the helper's own verb.
 const boxSaves = values['box-saves'], pgRestartAt = values['pg-restart-at'] === undefined ? undefined : Number(values['pg-restart-at']);
+const pgRestartCheckpoint = values['pg-restart-checkpoint'];
 if ((boxSaves !== 'memory' && boxSaves !== 'postgres') || (boxSaves === 'postgres' && !box)) throw new Error('--box-saves is memory or postgres, with --box');
 if (pgRestartAt !== undefined && (boxSaves !== 'postgres' || !/^\d{1,4}$/u.test(values['pg-restart-at'] ?? '') || pgRestartAt < 10 || pgRestartAt >= Number(values.seconds ?? 120)))
   throw new Error('--pg-restart-at is a second inside the run, with --box-saves postgres');
+if (pgRestartCheckpoint && (pgRestartAt === undefined || pgRestartAt + 75 >= Number(values.seconds ?? 120)))
+  throw new Error('--pg-restart-checkpoint needs --pg-restart-at and more than 75 s of bot time after it');
 if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
 const bots = Number(values.bots ?? (outsideProof ? 1 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
@@ -272,18 +277,30 @@ if (botsOnHost && hostSsh !== null) {
   // The bots' one bundle (no wasm: their route cursor is plain math) goes to the run's host directory; nothing else of this Mac does.
   hostSsh(`mkdir -p ${away}/bots && cat > ${away}/bots/mmoBots.mjs`, readFileSync(join(out, 'mmoBots.mjs')));
 }
+/** @type {{startedAt: string, ms: number, checkpointInFlight: true} | null} */
+let checkpointRestart = null;
 const code = await new Promise(resolve => {
   const child = botsOnHost && remote !== undefined
     ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
     : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : '', values.tailnet ? 'tailnet' : 'public'], { stdio: ['ignore', 'pipe', 'inherit'] });
   botsChild = child;
-  // E7.4b.c: one restart of the box replica's scratch cluster, by the helper, at that second of the bots' run.
+  let restart = Promise.resolve();
+  // E7.4b.c: at this second, the helper either restarts the scratch cluster or arms a restart during a checkpoint.
   const pgRestart = pgRestartAt === undefined ? null : setTimeout(() => {
-    const asked = performance.now();
-    try {
-      const said = execFileSync('ssh', ['-o', 'BatchMode=yes', BOX, 'sudo -n /usr/local/sbin/wildshard-config replica pg-restart'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], timeout: 120_000 });
-      note({ step: 'pg-restart', at: pgRestartAt, ms: Math.round(performance.now() - asked), said: said.trim() });
-    } catch (error) { note({ step: 'pg-restart', at: pgRestartAt, error: error instanceof Error ? error.message : String(error) }); }
+    restart = (async () => {
+      const asked = performance.now();
+      try {
+        const command = 'sudo -n /usr/local/sbin/wildshard-config replica pg-restart' + (pgRestartCheckpoint ? ' --checkpoint' : '');
+        const { stdout } = await runFile('ssh', ['-o', 'BatchMode=yes', BOX, command], { encoding: 'utf8', timeout: 120_000 });
+        if (pgRestartCheckpoint) {
+          const row = JSON.parse(stdout);
+          if (row?.at !== 'scratch.restarted' || row.checkpointInFlight !== true || !Number.isFinite(row.ms)
+            || typeof row.startedAt !== 'string' || !Number.isFinite(Date.parse(row.startedAt))) throw new Error('The helper returned no checkpoint restart witness');
+          checkpointRestart = { startedAt: row.startedAt, ms: row.ms, checkpointInFlight: true };
+        }
+        note({ step: 'pg-restart', at: pgRestartAt, ms: Math.round(performance.now() - asked), said: stdout.trim() });
+      } catch (error) { note({ step: 'pg-restart', at: pgRestartAt, error: error instanceof Error ? error.message : String(error) }); }
+    })();
   }, pgRestartAt * 1000);
   child.once('exit', () => { if (pgRestart !== null) clearTimeout(pgRestart); });
   child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
@@ -291,9 +308,10 @@ const code = await new Promise(resolve => {
   const watchdog = outsideProof ? setTimeout(() => {
     child.kill('SIGTERM'); force = setTimeout(() => {child.kill('SIGKILL');}, 10_000);
   }, (seconds + 10) * 1000) : null;
-  child.once('exit', status => {if (watchdog !== null) clearTimeout(watchdog); if (force !== null) clearTimeout(force); resolve(status);});
+  child.once('exit', status => {if (watchdog !== null) clearTimeout(watchdog); if (force !== null) clearTimeout(force); void restart.then(() => resolve(status), () => resolve(1));});
 });
 let exit = typeof code === 'number' ? code : 1;
+if (pgRestartCheckpoint && checkpointRestart === null) exit = 1;
 if (botsOnHost && hostSsh !== null) writeFileSync(result, hostSsh(`cat ${away}/bots.json`));
 /** @type {{complete?:unknown,left?:unknown,signedReleaseBuild?:unknown,url?:unknown,error?:unknown,
  * seated?:unknown,steady?:unknown,walked?:unknown,sawEveryone?:unknown,interArrivalMs?:unknown}} */
@@ -317,6 +335,7 @@ const report = { ...observed, mode, exit, ...(outsideProof ? {outsideProof: true
   complete: exit === 0 && observed?.complete === true, left: observed?.left === true,
   ...(exit === 0 ? {} : {error: failure ?? (typeof observed.error === 'string' ? observed.error : 'Outside child did not exit successfully')})} : {}), ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
   ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}),
+  ...(pgRestartCheckpoint ? { checkpointRestart } : {}),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };

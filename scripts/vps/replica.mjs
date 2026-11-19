@@ -17,13 +17,14 @@
 //     (16 wildshard_replica, port 5439, socket only, peer for postgres and one per-run scram password for the replica's
 //     role), so a Postgres outage can be witnessed on apt Postgres without blipping a channel's saves. Only the constants
 //     below name a cluster: the channels' own cluster and databases are never touched.
-//   replica.mjs pg-restart  restarts only the scratch cluster, while a replica runs on it.
+//   replica.mjs pg-restart [--checkpoint]  restarts only the scratch cluster. With the flag, wait for a blocked save.
 //   replica.mjs stop      ends both units, drops the scratch cluster and removes the folder.
 // Nothing a channel's user can write is read (Codex J206): no bundle folder, no pulled release.json.
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
 // Public SPKI DER, equal to setup.sh's EXPECTED_RELEASE_PUBLIC_KEY and wildshard-apply.mjs's (the engine's test holds them equal).
@@ -127,6 +128,12 @@ const test = process.geteuid?.() !== 0 ? process.env.WILDSHARD_REPLICA_TEST : un
 const ETC = `${test ?? ''}/etc/wildshard`, PG_CONFIG = `${test ?? ''}/etc/postgresql/${PG_VERSION}`;
 const PG_ETC = join(PG_CONFIG, CLUSTER), FOLDER = test !== undefined ? join(test, 'replica') : `/var/lib/${UNIT}`;
 const CLEAN = { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.UTF-8' };
+const childEnv = test !== undefined ? { ...process.env, ...CLEAN, PATH: process.env.PATH ?? CLEAN.PATH } : CLEAN;
+
+/** @param {string} command */
+function executable(command) {
+  return (test === undefined ? undefined : process.env[`WILDSHARD_REPLICA_TEST_${command.split('/').pop()?.replaceAll('-', '_').toUpperCase() ?? ''}`]) ?? command;
+}
 
 /** @param {string} message @returns {never} */
 function stop(message) { console.error(`stop    ${message}`); process.exit(1); }
@@ -135,8 +142,7 @@ function say(what, message) { try { console.error(`${what.padEnd(7)} ${message}`
 /** @param {string} command @param {string[]} args @param {{ inherit?: boolean, input?: string }} [how] */
 function exec(command, args, how = {}) {
   const { inherit = false, input } = how;
-  const stand = test !== undefined ? process.env[`WILDSHARD_REPLICA_TEST_${command.split('/').pop()?.replaceAll('-', '_').toUpperCase() ?? ''}`] : undefined;
-  return spawnSync(stand ?? command, args, { encoding: 'utf8', cwd: '/', env: test !== undefined ? { ...process.env, ...CLEAN, PATH: process.env.PATH ?? CLEAN.PATH } : CLEAN,
+  return spawnSync(executable(command), args, { encoding: 'utf8', cwd: '/', env: childEnv,
     ...(input === undefined ? {} : { input }), stdio: [input === undefined ? 'ignore' : 'pipe', inherit ? 'inherit' : 'pipe', inherit ? 'inherit' : 'pipe'] });
 }
 /** E7.4b.b: drop the scratch cluster if it exists. It holds only a replica's throwaway saves. */
@@ -187,6 +193,67 @@ const UNITS = [`${UNIT}.service`, `${DOOR}.socket`, `${DOOR}.service`];
 const running = () => exec('/usr/bin/systemctl', ['is-active', '--quiet', `${UNIT}.service`]).status === 0;
 const end = () => { exec('/usr/bin/systemctl', ['stop', ...UNITS]); dropScratch(); rmSync(FOLDER, { recursive: true, force: true }); };
 
+// The scratch database alone holds this lock. Readers still run, and the proof catches the real replica role's
+// save INSERT waiting on this exact transaction. Keep the session open until systemd stops Postgres.
+const CHECKPOINT_SQL = `BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
+SET LOCAL idle_in_transaction_session_timeout = '15s';
+LOCK TABLE public.player_save IN SHARE MODE;
+DO $checkpoint$
+BEGIN
+  LOOP
+    PERFORM pg_stat_clear_snapshot();
+    EXIT WHEN EXISTS (
+      SELECT FROM pg_stat_activity
+      WHERE datname = current_database()
+        AND usename = '${PG_ROLE}'
+        AND wait_event_type = 'Lock'
+        AND query LIKE 'insert into player_save (%'
+        AND pg_backend_pid() = ANY(pg_blocking_pids(pid))
+    );
+    PERFORM pg_sleep(0.05);
+  END LOOP;
+END;
+$checkpoint$;
+SELECT 'checkpoint.waiting';
+`;
+
+/** @param {boolean} checkpointInFlight */
+function restartScratch(checkpointInFlight) {
+  const started = Date.now(), restarted = exec('/usr/bin/systemctl', ['restart', PG_UNIT]);
+  if (restarted.status !== 0) throw new Error(`${PG_UNIT} did not restart`);
+  console.info(JSON.stringify({ at: 'scratch.restarted', unit: PG_UNIT, ms: Date.now() - started,
+    ...(checkpointInFlight ? { checkpointInFlight, startedAt: new Date(started).toISOString() } : {}) }));
+}
+
+async function restartAtCheckpoint() {
+  const session = spawn(executable('/usr/sbin/runuser'), ['-u', 'postgres', '--', '/usr/bin/psql', '-XqAt',
+    '-v', 'ON_ERROR_STOP=1', '-h', PG_SOCKET, '-p', String(PG_PORT), '-d', PG_DATABASE],
+  { cwd: '/', env: childEnv, stdio: ['pipe', 'pipe', 'ignore'] });
+  const closed = new Promise(resolve => { session.once('close', resolve); });
+  const lines = createInterface({ input: session.stdout });
+  const limit = setTimeout(() => lines.close(), 70_000);
+  session.on('error', () => lines.close());
+  session.stdin.on('error', () => lines.close());
+  try {
+    session.stdin.write(CHECKPOINT_SQL);
+    for await (const line of lines) {
+      if (line !== 'checkpoint.waiting') continue;
+      restartScratch(true);
+      return;
+    }
+    throw new Error('no blocked checkpoint write on the scratch cluster');
+  } finally {
+    clearTimeout(limit);
+    lines.close();
+    session.stdin.end();
+    const kill = setTimeout(() => session.kill(), 1000);
+    await closed;
+    clearTimeout(kill);
+  }
+}
+
 async function main() {
   const [verb, ...args] = process.argv.slice(2);
   if (test === undefined) process.chdir('/');
@@ -195,15 +262,19 @@ async function main() {
     say('ok', `${UNIT} and ${DOOR} stopped; scratch cluster dropped; ${FOLDER} removed`);
     return 0;
   }
-  if (verb === 'pg-restart' && args.length === 0) {
+  const checkpoint = args.length === 1 && args[0] === '--checkpoint';
+  if (verb === 'pg-restart' && (args.length === 0 || checkpoint)) {
     if (!existsSync(PG_ETC) || !running()) stop('no replica runs on the scratch cluster (start one with --saves postgres)');
-    const started = Date.now(), restarted = exec('/usr/bin/systemctl', ['restart', PG_UNIT]);
-    if (restarted.status !== 0) stop(`${PG_UNIT} did not restart`);
-    console.info(JSON.stringify({ at: 'scratch.restarted', unit: PG_UNIT, ms: Date.now() - started }));
+    try {
+      if (checkpoint) await restartAtCheckpoint();
+      else restartScratch(false);
+    } catch (error) {
+      stop(error instanceof Error ? error.message : String(error));
+    }
     return 0;
   }
   const bounds = verb === 'start' ? limits(args) : null;
-  if (bounds === null) stop('usage: replica.mjs start <seconds 60-3900> <workers 1-4> <seats 1-64> <cells> [memory|postgres] | pg-restart | stop');
+  if (bounds === null) stop('usage: replica.mjs start <seconds 60-3900> <workers 1-4> <seats 1-64> <cells> [memory|postgres] | pg-restart [--checkpoint] | stop');
   // One start at a time, held for the whole run: a second waits for nothing and stops, so it never wipes the first's folder
   // or stops its units (flock -E 75 on a lock in /run, which a reboot clears).
   if (test === undefined && process.env.WILDSHARD_REPLICA_LOCKED !== '1') {
