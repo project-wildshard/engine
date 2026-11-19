@@ -194,7 +194,6 @@ export const PUBLIC_BYTES = {
   "/assets/gpu/models/dead_tree_trunk/dead_tree_trunk_lod-e185e9f6.glb": 2865440,
   "/assets/gpu/models/driftwood-blender/lm-ao-880aa796.ktx2": 2836494,
   "/assets/gpu/models/driftwood-blender/lm-ao.phone-9f6766dc.ktx2": 820186,
-  "/assets/gpu/models/driftwood-blender/lm-ao.phone-f988e321.ktx2": 223872,
   "/assets/gpu/models/driftwood-blender/lm-bounce-c187e3f8.ktx2": 271715,
   "/assets/gpu/models/driftwood-blender/lm-bounce.phone-582c92be.ktx2": 119188,
   "/assets/gpu/models/driftwood-hero/captain/captain-51fb1b40.glb": 1441356,

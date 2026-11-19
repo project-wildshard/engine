@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { applyDetail } from './detail';
 import { applyGround } from './ground';
 import { applyMeasure } from './measure';
+import { strandMaps } from './strands';
 import { bindFurRim } from '../furRim';
 import { patchShader, PATCH_ORDER } from '../shaderPatches';
 import type { PbrMaterialParams } from '@wildshard/format/materialFamilies';
@@ -48,15 +49,17 @@ export function compilePbr(params: PbrMaterialParams, textures: TextureResolver,
   const ormMap = orm === null ? white : textures(orm, 'data');
   // ONE-FORMAT OF27b: a fur (a hull book's coat drawn as a skin) is three's physical material for its velvet sheen
   const fur = params.sheen !== undefined || params.rim !== undefined;
+  // ONE-FORMAT OF3c2: the creature fur grain fills the maps the surface leaves empty, as the factory's fur draws it
+  const strands = params.strands === undefined ? undefined : strandMaps(params.strands);
   const m = new (fur ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial)({
     color: new THREE.Color().setRGB(...params.colour, THREE.SRGBColorSpace),
-    map: colour === null ? white : textures(colour, 'colour'),
-    normalMap: normal === null ? flatNormal : textures(normal, 'data'),
+    map: colour !== null ? textures(colour, 'colour') : strands?.map ?? white,
+    normalMap: normal !== null ? textures(normal, 'data') : strands?.normalMap ?? flatNormal,
     // glTF's UV convention (unflipped textures, as GLB and KTX2 load): three's tangent frame expects flipped ones, so the
     // normal map's green runs the other way, as GLTFLoader sets it
     // (SF50: the 8-bit filler's 128 / 255 is not zero, so a 0.3 degree tilt along the UVs moved a low key's light by ~1 %;
     // with no normal map the scale is zero and the geometry normal stands exactly)
-    normalScale: normal === null ? new THREE.Vector2(0, 0) : new THREE.Vector2(params.normalScale, -params.normalScale),
+    normalScale: normal !== null ? new THREE.Vector2(params.normalScale, -params.normalScale) : strands !== undefined ? new THREE.Vector2(1, 1) : new THREE.Vector2(0, 0),
     aoMap: ormMap, aoMapIntensity: orm === null ? 0 : params.occlusion,
     roughnessMap: ormMap, metalnessMap: ormMap,
     roughness: params.roughness, metalness: params.metalness,

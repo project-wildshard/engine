@@ -77,8 +77,9 @@ export function dataCreaturePorts(host: SimHost, rows: ShardRows, spawns: ShardC
   /** Every other player's pace: a body's reading is its own foe's, not the first player's. */
   const company = new Map<string, typeof motion>();
   const from = new Vector3(), to = new Vector3(), direction = new Vector3(), point = new Vector3();
-  const strikes = new Map<string, StrikeSpec>(rows.strikes.map(({ weight, speed, ...row }) =>
-    [row.id, { ...row, motion: { speed }, weight: () => weight }]));
+  // OF11b: a lane charge's overshoot rides the strike's motion, as the program's strike data carries it
+  const strikes = new Map<string, StrikeSpec>(rows.strikes.map(({ weight, speed, overshoot, ...row }) =>
+    [row.id, { ...row, motion: overshoot === undefined ? { speed } : { speed, overshoot }, weight: () => weight }]));
   const foe = (actor: AnimalSim): ReturnType<SimHost['nearestPlayer']> => host.nearestPlayer(actor.position);
   const speedOf = (actor: AnimalSim): number => company.get(foe(actor).id)?.speed ?? motion.speed;
   const calm = (actor: AnimalSim): boolean => !foe(actor).health.alive;

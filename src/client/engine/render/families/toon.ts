@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { patchShader, PATCH_ORDER } from '../shaderPatches';
 import { parseToonLook, type ToonLookParams, type ToonMaterialParams } from '@wildshard/format/materialFamilies';
+import { strandMaps } from './strands';
 
 /** the program-cache key every toon material shares (the source is the same for all of them) */
 export const TOON_PROGRAM_KEY = 'family.toon.v1';
@@ -185,6 +186,8 @@ export function compileToon(params: ToonMaterialParams, look: ToonLook): THREE.M
     side: params.doubleSided ? THREE.DoubleSide : THREE.FrontSide,
   });
   m.name = 'family:toon';
+  // ONE-FORMAT OF3c2: the creature fur grain (the factory's strand albedo and relief)
+  if (params.strands !== undefined) { const strands = strandMaps(params.strands); m.map = strands.map; m.normalMap = strands.normalMap; }
   patchShader(m, 'engine.family.toon', PATCH_ORDER.material, (shader) => {
     Object.assign(shader.uniforms, look.uniforms);
     shader.fragmentShader = injectToon(shader.fragmentShader);
