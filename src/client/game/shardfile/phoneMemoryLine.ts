@@ -5,7 +5,7 @@ import { TIER, type Tier } from '@wildshard/engine/core/tier';
 import { PHONE_MEMORY_LOADING_CAP_BYTES } from '@wildshard/engine/core/phoneMemoryCap';
 
 /** MG3 / J431: estimates over the phone line show a phone warning. Decimal bytes (BC12: budgets/caps.json). */
-export const PHONE_MEMORY_LINE_BYTES = PHONE_MEMORY_LOADING_CAP_BYTES;
+export const PHONE_MEMORY_LINE_BYTES: number = PHONE_MEMORY_LOADING_CAP_BYTES;
 
 interface PhoneMemoryEstimate { playing: number; loading: number }
 
