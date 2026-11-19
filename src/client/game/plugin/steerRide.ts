@@ -1,4 +1,7 @@
 import type { SystemSpec } from '@wildshard/engine/app/systems';
+import type { Scope } from '@wildshard/engine/app/scope';
+import { app } from '@wildshard/engine/app/runtime';
+import { playerModes, type ModePlayer } from '@wildshard/engine/player/modes';
 import type { MoverPose } from '@wildshard/format/moverPose';
 import { steerStick } from '@wildshard/engine/sim/moverMotion';
 import type { FollowedMovers } from './followedMovers';
@@ -83,6 +86,51 @@ export function installSteerRide(movers: FollowedMovers, page: {
     if (idle >= STEER_RECENTRE.idle && speed > RECENTRE_SPEED) p.yaw = angle(p.yaw + angle(heading - p.yaw) * (1 - Math.exp(-dt * STEER_RECENTRE.rate)));
     looked = p.yaw;
     const next = { speed: Math.max(0, Math.min(1, speed / riding.top)), boosting: page.boost() && speed > RECENTRE_SPEED };
+    if (shown === null || Math.abs(shown.speed - next.speed) > 0.01 || shown.boosting !== next.boosting) { shown = next; page.view.show(next); }
+  } });
+}
+
+/** MSZ9b: what a vehicle ride reads of the vehicles a page follows (`FollowedVehicles`). */
+export interface VehicleRidePort {
+  readonly seatOf: () => { readonly vehicle: string; readonly seat: number } | undefined;
+  readonly pose: (id: string) => MoverPose | undefined;
+  readonly kindOf: (id: string) => { readonly seats: readonly { readonly role: string }[]; readonly handling: { readonly speed: number; readonly boost: number } } | undefined;
+}
+
+/**
+ * MIRROR-SALT-ZONE MSZ9b: a seat in a `world/vehicles` vehicle on the page, as the server's `VehicleRuntime` leads it. While the
+ * wire's seat rows put this page's player in a seat, the player is in the reserved `drive` mode (a traversal of `modes.ts`: the
+ * walk stands down while the seat leads the body), boarding faces the heading, and a driver's view turns with the vehicle and
+ * swings back behind it as the steer ride's does (`STEER_RECENTRE`), with its speed and boost on the steer chip. `vehicles` is
+ * read each frame: the follower the page's wire holds now (a grid cell's changes with the feet).
+ */
+export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, page: {
+  readonly system: (spec: SystemSpec) => void; readonly scope: Scope; readonly player: SteerRider; readonly view: SteerRideView; readonly boost: () => boolean;
+}): void {
+  let seated: { readonly vehicle: string; readonly seat: number } | null = null, last: MoverPose | null = null, heading = 0, looked = 0, idle = 0, speed = 0;
+  let shown: { speed: number; boosting: boolean } | null = null;
+  // the reserved `drive` mode: the page's player's mode while a seat holds it (the server leads the body; the walk stands down)
+  playerModes(page.player as unknown as ModePlayer).register({ id: 'drive', hud: 'ride', traverse: () => seated !== null }, page.scope, { events: app.events });
+  page.system({ id: 'game.plugin.vehicle-ride', phase: 'update', run: (dt: number) => {
+    const port = vehicles(), held = port?.seatOf(), pose = held === undefined ? undefined : port?.pose(held.vehicle);
+    if (held === undefined || pose === undefined || port === undefined) {
+      seated = null; last = null;
+      if (shown !== null) { shown = null; page.view.show(null); }
+      return;
+    }
+    const p = page.player;
+    if (seated?.vehicle !== held.vehicle || seated.seat !== held.seat) { seated = held; last = null; speed = 0; p.yaw = angle(pose.euler.y); } // boarding faces the heading
+    if (last === null) { heading = pose.euler.y; looked = p.yaw; }
+    const moved = last === null || dt <= 0 ? 0 : Math.hypot(pose.position.x - last.position.x, pose.position.z - last.position.z) / dt;
+    if (last !== null && dt > 0) speed += (moved - speed) * Math.min(1, dt * SPEED_EASE);
+    last = pose;
+    if (Math.abs(angle(p.yaw - looked)) > 1e-4) idle = 0; else idle += dt;
+    const turned = angle(pose.euler.y - heading); heading = pose.euler.y; p.yaw = angle(p.yaw + turned);
+    if (idle >= STEER_RECENTRE.idle && speed > RECENTRE_SPEED) p.yaw = angle(p.yaw + angle(heading - p.yaw) * (1 - Math.exp(-dt * STEER_RECENTRE.rate)));
+    looked = p.yaw;
+    const kind = port.kindOf(held.vehicle), top = kind === undefined ? 1 : kind.handling.speed * kind.handling.boost;
+    const driving = kind?.seats[held.seat]?.role === 'driver';
+    const next = { speed: Math.max(0, Math.min(1, speed / top)), boosting: driving && page.boost() && speed > RECENTRE_SPEED };
     if (shown === null || Math.abs(shown.speed - next.speed) > 0.01 || shown.boosting !== next.boosting) { shown = next; page.view.show(next); }
   } });
 }

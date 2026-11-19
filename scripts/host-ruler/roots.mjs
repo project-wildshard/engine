@@ -38,8 +38,8 @@ export const SECTION_HOSTS = Object.freeze({
   'world/props': ['src/shared/game/shardfile/props.ts#propColliderDescriptors'],
   'world/water': ['src/client/game/shardfile/clientWater.ts#installClientWater', 'src/client/game/shardfile/water.ts#shardfileWater'],
   'world/movers': ['src/server/game/plugin/mover.ts#createComposedMoverHost', 'src/client/game/shardfile/clientMoverOwners.ts#installClientMoverOwners'],
-  // MIRROR-SALT-ZONE MSZ6: every install path docks its vehicles as steer carries, with their hulls, until MSZ8's runtime.
-  'world/vehicles': ['src/shared/game/shardfile/shardVehicles.ts#dockedShard', 'src/shared/game/shardfile/vehicleHulls.ts#vehicleHulls'],
+  // MIRROR-SALT-ZONE MSZ9b: the server runs its docks' vehicles and every page path follows them off the wire.
+  'world/vehicles': ['src/server/game/plugin/vehicleRuntime.ts#installVehicles', 'src/client/game/plugin/followedVehicles.ts#FollowedVehicles'],
   'world/traversal': ['src/shared/game/shardfile/portalTraversal.ts#createPortalTraversal'],
   'world/spawn': [], // Level admission metadata.
   'world/physics': [], // Handed to the runtime's explicitly imported native host.

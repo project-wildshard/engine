@@ -885,6 +885,7 @@
     "src/client/game/plugin/clientChannelView.ts": "client",
     "src/client/game/plugin/context.ts": "client",
     "src/client/game/plugin/followedMovers.ts": "client",
+    "src/client/game/plugin/followedVehicles.ts": "client",
     "src/client/game/plugin/geometry.ts": "client",
     "src/client/game/plugin/headless.ts": "client",
     "src/client/game/plugin/heldEquipment.ts": "client",

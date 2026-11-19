@@ -7,7 +7,8 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { riderStick } from '../src/server/game/plugin/mover';
-import { vehicleDockPrompt, vehicleSeatPrompt, VehicleRuntime } from '../src/server/game/plugin/vehicleRuntime';
+import { VehicleRuntime } from '../src/server/game/plugin/vehicleRuntime';
+import { playerVehicle, vehicleDockPrompt, vehicleSeatPrompt } from '../src/shared/game/shardfile/wirePrompts';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { VEHICLES_EXAMPLE } from './fixtures/vehiclesExample';
 
@@ -31,7 +32,7 @@ test('both seats board from their prompts and lead their bodies; each gets out o
   try {
     expect(runtime.prompts().map(row => [row.id, row.label])).toContainEqual([vehicleDockPrompt('yard.buggy'), 'Drive the buggy']);
     claim(vehicleDockPrompt('yard.buggy'), lead);
-    const buggy = `yard.buggy~${lead}`;
+    const buggy = playerVehicle('yard.buggy', lead);
     expect(runtime.riders(buggy)).toEqual([lead, null]);
     // the free passenger seat offers its ride; the driver's is taken, and the dock is no longer clear
     expect(runtime.prompts().filter(row => row.vehicle === buggy).map(row => [row.id, row.label])).toEqual([[vehicleSeatPrompt(buggy, 1), 'Ride in the buggy']]);
@@ -69,7 +70,7 @@ test('a disconnect or a move away (a teleport) empties the seat', async () => {
   const { host, runtime, lead, claim, tick } = await cell();
   try {
     claim(vehicleDockPrompt('yard.buggy'), lead);
-    const buggy = `yard.buggy~${lead}`;
+    const buggy = playerVehicle('yard.buggy', lead);
     claim(vehicleSeatPrompt(buggy, 1), 'p2'); tick();
     expect(runtime.riders(buggy)).toEqual([lead, 'p2']);
     host.removePlayer('p2'); tick();

@@ -85,7 +85,8 @@ import { prepareDeclaredGroupBrains, type DeclaredGroupPorts, type DeclaredGroup
 import { prepareDeclaredCrowds, type DeclaredCrowdPorts, type PreparedCrowds } from "../../../shared/game/shardfile/crowdRuntime";
 import { installLadders, type LadderClientPorts } from '../../../shared/game/shardfile/ladder';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
-import { dockedShard, shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
+import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
+import { installVehicles, type VehicleRuntime } from './vehicleRuntime';
 import { MoverScriptDriver, playerGrounds, verifiedMoverModules, proveTerrainEntries, type TerrainEntryWalk, type DeclaredMoverComposition, type MoverRuntime } from "./mover";
 import { socketLiftEntries } from "@wildshard/format/socketLiftAssets";
 import { createClientChannels } from "../../../shared/game/plugin/channels";
@@ -441,6 +442,8 @@ export interface ShardfileSimulation {
   groups: ReadonlyMap<string, DeclaredGroupPolicy>;
   crowds: PreparedCrowds['policies'];
   movers: MoverRuntime | undefined;
+  /** MIRROR-SALT-ZONE MSZ9b: its `world/vehicles` docks' vehicles, when it has any. */
+  vehicles: VehicleRuntime | null;
   /** CC40b1: the riding primitive, when a species declares a mount. */
   riding: DeclaredRiding | null;
   /** OF41c: the grapple primitive, when a `state/modes` grapple row carries its profile and hooks. */
@@ -448,8 +451,8 @@ export interface ShardfileSimulation {
 }
 /** One declared simulation core, used by the normal browser loader and the headless author validator. */
 function shardfileSimInput(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): {level: SimLevel; ports: SimHostPorts} {
-  // OF29b: a counted row runs as its row and its copies; MIRROR-SALT-ZONE MSZ6: a `world/vehicles` dock as a steer carry
-  const shard = countedShard(dockedShard(source, shardVehicles(source, ports.sections)));
+  // OF29b: a counted row runs as its row and its copies (MSZ9b: a `world/vehicles` dock runs in `VehicleRuntime`, not here)
+  const shard = countedShard(source);
   if (shard.nativeGround !== null) throw new Error('Native ground retains its native runtime simulation; a flat declared proxy is forbidden');
   preflightPlainPerches(shard, assets, ports);
   const portals = portalLinkEntries(shard.entryways), portalErrors = portalLinkRules(portals, shard);
@@ -490,7 +493,7 @@ function observationValue(entry: [string, unknown], value: boolean): asserts ent
 /** Reinstall matching adapters into a fresh standalone restore host; restoring skips collider allocation and stepping. */
 export function bindShardfileSim(host: SimHost, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, ports: ShardfileSimPorts): ShardfileSimulation {
   const vehicles = shardVehicles(source, ports.sections);
-  const shard = countedShard(dockedShard(source, vehicles)); // OF29b, MSZ6: the same expanded rows and docks the level was built from
+  const shard = countedShard(source); // OF29b: the same expanded rows the level was built from
   const seats = scriptSeats(host), { first } = seats;
   // TE-ENG7: each declared body names its species on the wire. Set here, on create and on restore alike, and never in
   // the level's spec, so a save keeps its level fingerprint.
@@ -654,7 +657,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
       } else lane = moverDriver === undefined ? createShardfileScriptLane(shard, assets, options) : moverDriver.compose(shard, assets, options);
       if (moverDriver !== undefined) {
         const stateWorld = lane.world;
-        const runtime = moverDriver.install(host, lane, { id: 'movers.declared', restoreFlags: new Set(host.flags.all), hulls: vehicleHulls(shard, vehicles),
+        const runtime = moverDriver.install(host, lane, { id: 'movers.declared', restoreFlags: new Set(host.flags.all), hulls: vehicleHulls(shard),
           activation: { ground: () => playerGrounds(host), shared: id => {
             const field = shard.state.shared.find(row => row.id === id);
             const value = field === undefined ? undefined : stateWorld.publicField(field.name);
@@ -768,6 +771,8 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     const decisions = decisionRows.length === 0 ? undefined : new ShardDecisions(decisionRuntime(host, sceneFields(lane), adds ?? undefined), shard, assets, ports.sections ?? new Map(), encounters, quest, movers, ports.quest?.fact, ports.restoring ?? false, ports.navigation, ports.scriptDisabled);
     // All individual/custom aliases and encounter recipes have admitted successfully before setup draws or group work.
     const groups = preparedGroups.install(ports.restoring ?? false);
+    // MIRROR-SALT-ZONE MSZ9b: the docks' vehicles, on the wire and in the saves, before the first physics step
+    const vehicleRuntime = installVehicles(host, vehicles, ports.restoring === true || isSimHostRestoring(host));
     if (!host.embedded && !ports.restoring) host.physics.step();
     // Crowd setup is last: all scripts, actor/group controllers, quests, encounters and physics have admitted.
     const crowds = preparedCrowds.install(host, ports.restoring ?? false);
@@ -797,7 +802,7 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     installDeclaredPatrols(host, creatures.patrols ?? [], ports.restoring === true); // OF37b: the patrol primitive
     installDeclaredRanks(host, shard.creatures.spawns); // OF33b: the elites primitive, a ranked body's blows
     recordPrimitives(host, shard); // OF17b1: the list comes from the sections, never a host list
-    return { riding, grapple, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, dispose: () => { host.dispose(); } };
+    return { riding, grapple, selectedInteraction, interact, itemHooks: seats.hooks, ...(decisions === undefined ? {} : { decisions }), host, lane, actors, quest, encounters, water, colliders, groups, crowds, movers, vehicles: vehicleRuntime, dispose: () => { host.dispose(); } };
   } catch (error) { host.dispose(); throw error; }
 }
 

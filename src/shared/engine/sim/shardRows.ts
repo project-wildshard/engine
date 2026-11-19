@@ -63,6 +63,8 @@ export function publishScriptBody(host: RowHost, id: string, read: () => ScriptN
   if (bodies.has(wire)) throw new Error(`Duplicate script row ${id}`);
   bodies.set(wire, read);
 }
+/** Take a script body's row off the wire (MSZ9b: a vehicle that despawned); its id may be published again. */
+export function withdrawScriptBody(host: RowHost, id: string): void { bookOf(host).bodies.delete(`script:${id}`); }
 /** Publish the shard's public shared state. One lane owns a host's declared state. */
 export function publishShardState(host: RowHost, read: () => readonly StateNetRow[]): void {
   const book = bookOf(host);

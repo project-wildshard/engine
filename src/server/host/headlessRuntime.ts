@@ -40,7 +40,8 @@ import type { NativeAssemblyPorts } from '@wildshard/engine/game/shardfile/nativ
 import type { LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
 import { installCellHome } from '@wildshard/engine/game/grid/cellHome';
 import { vehicleHulls } from '@wildshard/engine/game/shardfile/vehicleHulls';
-import { dockedMovers, folderVehicles, shardVehicles } from '@wildshard/engine/game/shardfile/shardVehicles';
+import { folderVehicles, shardVehicles } from '@wildshard/engine/game/shardfile/shardVehicles';
+import { installVehicles } from '@wildshard/engine/game/plugin/vehicleRuntime';
 
 /** The same admitted bytes and native physics implementation used by the ordinary headless worker. */
 export interface HeadlessRuntimePreparation { shard: Shardfile; assets: ReadonlyMap<string, Uint8Array>; rapier: Rapier; readonly product: ShardFolder }
@@ -203,16 +204,15 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
   }
   const identity = { id: source.identity.slug, seed: source.identity.seed };
   if (plan.level.id !== identity.id || plan.level.seed !== identity.seed) throw new Error('Native runtime simulation identity mismatch');
-  // MIRROR-SALT-ZONE MSZ6: the product's `world/vehicles`; until MSZ8 each dock runs as a steer carry beside the declared ones
+  // MIRROR-SALT-ZONE MSZ9b: the product's `world/vehicles`, run by `VehicleRuntime` beside the declared movers
   const vehicles = provided.sections !== undefined ? shardVehicles(source, provided.sections) : decks === undefined ? shardVehicles(source) : folderVehicles(decks);
-  const docks = dockedMovers(source.movers, vehicles).slice(source.movers.length);
   return { ...plan, install: (host, context) => {
     installRoomRespawn(host, places);
     if (places.length > 0) registerInstalled(host, 'places'); // SS3: a room respawns its players at the page's named places
     installRopeDecks(host, decks, context.restoring); // NL5: the planks the page stands on
     installCableModes(host.scope, source.modes?.traverse ?? [], host.flags).bindNative(host);
     const declared = source.runtime?.binds?.includes('movers') === true || hasDeclaredClientPage(source) ? source.movers : [];
-    const carried = [...declared.filter(row => row.carry !== undefined), ...docks];
+    const carried = declared.filter(row => row.carry !== undefined);
     if (carried.length > 0) {
       let motion: MoverRuntime | null = null;
       host.onStep('movers.commands', () => {
@@ -225,10 +225,11 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
       motion = new MoverScriptDriver(carried, host).install(host, { content: { identity: source.identity,
         sim: { ...source.sim, bindings: [] }, state: source.state }, assets: new Map(),
         rules: { fields: {}, archetypes: [], events: [], maxEntities: 32 } },
-      { id: 'movers.carried', restoring: context.restoring, restoreFlags: new Set(host.flags.all), drive: true, hulls: vehicleHulls(source, vehicles) });
+      { id: 'movers.carried', restoring: context.restoring, restoreFlags: new Set(host.flags.all), drive: true, hulls: vehicleHulls(source) });
     }
     plan.install(host, context);
     if (carried.length > 0) registerInstalled(host, 'movers'); // SS3
+    installVehicles(host, vehicles, context.restoring);
     // SERVER-PARITY HS2: every other declared mover the page stands on (Driftwood's moored boat, a `platform` on the swell), when
     // the plan has no mover motion of its own. A plan that drives movers (Far Reach's recipe) owns them all, its skipped rows too.
     // Rope chains stay with the rope decks above (NL5). Its own step, joined: a room saved before HS2 has none and builds them.

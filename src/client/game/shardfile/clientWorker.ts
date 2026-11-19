@@ -795,7 +795,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     inputs[field] = value;
     for (const [handle, { body }] of bodies) if (client.entities.get(handle)?.id === id) { body.mem[field] = value; wirePage.drew(name); break; }
   }));
-  const decks = new NetMovers(client, wirePage.movers, player.position);
+  // MSZ9b: a vehicle's row poses the follower that knows its dock
+  const decks = new NetMovers(client, { get: id => wirePage.movers.get(id) ?? wirePage.vehicleView(id) }, player.position);
   scope.onDispose(net.world.addMover(decks));
   const creaturePrediction = new CreaturePrediction(client.interpolator, net.world, near, player.position);
   scope.onDispose(net.world.addMover(creaturePrediction));
@@ -830,7 +831,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
       self.x = feet.x; self.y = feet.y; self.z = feet.z; self.vx = player.velocity.x; self.vz = player.velocity.z;
       others.collide(self, dt, free);
     }
-    wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day()); decks.frame(renderTick);
+    wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day());
+    if (here) wirePage.syncVehicles(player.position);
+    decks.frame(renderTick);
     report.rows = animals === null ? animalRows(client) : shown; // a data cell's life draws them
     if (!quiet()) net.present(dt);
     const now = diagnosticNow(), { predictor } = net, seconds = (now - started) / 1000, tick = client.latest?.tick ?? 0;

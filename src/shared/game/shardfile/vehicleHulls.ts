@@ -1,8 +1,6 @@
 import { Euler, Quaternion, Vector3 } from 'three';
 import type { MoverBox } from '@wildshard/format/moverPose';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import type { Vehicles } from '@wildshard/format/vehicles';
-import { dockHulls, shardVehicles } from './shardVehicles';
 
 /**
  * SHARD-SOURCE SS-GP5: each steer vehicle's hull, as boxes in its own frame (about its rest, YXZ), by mover id.
@@ -11,10 +9,9 @@ import { dockHulls, shardVehicles } from './shardVehicles';
  * whose `panel` is the vehicle's id), written in the cell's frame at its rest. The sdk writes them inactive, so an engine
  * before this leaves them off; here they become the vehicle's kinematic body, which rides it (`MoverRuntime`,
  * `FollowedMovers`). A tread shape is no hull; at most 128 boxes, as a mover holds.
- * MIRROR-SALT-ZONE MSZ6: a `world/vehicles` dock's hull is its kind's (`dockHulls`), from the source's sections or `vehicles`.
  */
-export function vehicleHulls(source: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>, vehicles: Vehicles = shardVehicles(source)): ReadonlyMap<string, readonly MoverBox[]> {
-  const hulls = new Map<string, readonly MoverBox[]>(dockHulls(vehicles));
+export function vehicleHulls(source: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>): ReadonlyMap<string, readonly MoverBox[]> {
+  const hulls = new Map<string, readonly MoverBox[]>();
   for (const row of source.movers) {
     if (row.kind !== 'channel' || row.driver?.kind !== 'steer') continue;
     const back = new Quaternion().setFromEuler(new Euler(row.euler.x, row.euler.y, row.euler.z, 'YXZ')).invert();

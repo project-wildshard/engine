@@ -29,6 +29,17 @@ import type { MoverPose } from '@wildshard/format/moverPose';
 import type { PageAbility } from './clientRecipes';
 
 type Live = (client: NetClient) => (() => void) | undefined;
+/** MIRROR-SALT-ZONE MSZ9b: the vehicles a page follows off the wire (`FollowedVehicles`). */
+export interface VehicleFollower {
+  /** The view a vehicle's row poses, when it is one of these. */
+  readonly view: (id: string) => MoverView | undefined;
+  /** Once a frame: the wire's entity ids, this page's player and its feet. */
+  readonly sync: (ids: Iterable<string>, me: string | null, feet: { readonly x: number; readonly z: number }) => void;
+  /** The seat this page's player holds, a vehicle's pose and its kind, as the newest rows say. */
+  readonly seatOf: () => { readonly vehicle: string; readonly seat: number } | undefined;
+  readonly pose: (id: string) => MoverPose | undefined;
+  readonly kindOf: (id: string) => { readonly seats: readonly { readonly role: string }[]; readonly handling: { readonly speed: number; readonly boost: number } } | undefined;
+}
 /** A mover's look in one grid cell, as `WirePage.moverLooks` keys it. */
 export const moverLookKey = (instance: string, id: string): string => `${instance}\n${id}`;
 /** What a page draws of what its player holds. */
@@ -66,6 +77,8 @@ export class WirePage {
   /** TEMPLATE-E2E TC-E5b: a mover's drawn look (a grid cell's props panel) by `moverLookKey`, which its cell's collider view
    *  poses too. Keyed by cell: two copies of one product share their mover ids. */
   readonly moverLooks: Map<string, MoverView> = new Map<string, MoverView>();
+  /** MSZ9b: the vehicles each install follows, by its key (`page`, `scene`, `grid`): a grid cell's replaces the last one's. */
+  readonly vehicles: Map<string, VehicleFollower> = new Map<string, VehicleFollower>();
   /** Whether the server is carrying this player's body now. */
   led: () => boolean = () => false;
   /** Commands this page sent that the server has not stepped yet (SS-MS2a3b). */
@@ -80,6 +93,17 @@ export class WirePage {
   /** The head over a row's body, into `to`: what an elite's bar stands on. */
   readonly head: (body: number, to: Vector3) => boolean = (body, to) => this.heads(body, to);
   /** SS-MS2a3b: a mover's row in the newest frame, when that frame carried a sample of it (not a held copy). */
+  /** MSZ9b: a vehicle's row's view, from the followers that know its dock. */
+  vehicleView(id: string): MoverView | undefined {
+    for (const follower of this.vehicles.values()) { const view = follower.view(id); if (view !== undefined) return view; }
+    return undefined;
+  }
+  /** MSZ9b, once a frame: the followers read the vehicles and seats the wire has now. */
+  syncVehicles(feet: { readonly x: number; readonly z: number }): void {
+    const client = this.client; if (client === null || this.vehicles.size === 0) return;
+    const ids: string[] = []; for (const info of client.entities.values()) ids.push(info.id);
+    for (const follower of this.vehicles.values()) follower.sync(ids, client.welcome?.player ?? null, feet);
+  }
   moverRow(id: string): { readonly tick: number; readonly pose: MoverPose } | null {
     const client = this.client, frame = client?.latest;
     if (client === null || frame === null || frame === undefined) return null;

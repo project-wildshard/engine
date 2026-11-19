@@ -10,6 +10,9 @@ import type { SystemSpec } from '@wildshard/engine/app/systems';
 import { Scope } from '@wildshard/engine/app/scope';
 import { carryPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { FollowedMovers } from '../plugin/followedMovers';
+import { installVehicleRide } from '../plugin/steerRide';
+import { app } from '@wildshard/engine/app/runtime';
+import { playerModes } from '@wildshard/engine/player/modes';
 import { wirePage } from '../shardfile/wirePage';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { PLAY_INSTALLS, hasSteerRides, installPlay } from '../shardfile/playInstalls';
@@ -34,7 +37,7 @@ afterEach(() => { wirePage.led = led; });
 test('a copy\'s carries join its prompts, pressed on the cell\'s wire by the carry\'s id', () => {
   expect(cellRidePrompts(null)).toEqual([]);
   const movers = new FollowedMovers(data, { physics: null as never, scope: new Scope('grid-ride-prompts') });
-  const prompts = cellRidePrompts({ movers, claim: () => undefined });
+  const prompts = cellRidePrompts({ movers, vehicles: null, claim: () => undefined });
   expect(prompts.map(prompt => [prompt.label, prompt.wireId])).toEqual([
     ['Board the land-sail', carryPrompt('land-sail', 0)], ['Leave the land-sail', carryPrompt('land-sail', 1)]]);
   expect(prompts.map(prompt => prompt.radius)).toEqual([3, 0]); // on foot: board, never leave
@@ -42,7 +45,7 @@ test('a copy\'s carries join its prompts, pressed on the cell\'s wire by the car
 
 test('a copy\'s steer vehicle rides off the cell\'s wire for the stay, and only while the wire is this cell\'s', () => {
   const movers = new FollowedMovers(data, { physics: null as never, scope: new Scope('grid-steer-ride') });
-  const [board, leave] = cellRidePrompts({ movers, claim: () => undefined });
+  const [board, leave] = cellRidePrompts({ movers, vehicles: null, claim: () => undefined });
   if (board === undefined || leave === undefined) throw new Error('Missing land-sail prompts');
   const stay = new Scope('grid-steer-stay'), systems: SystemSpec[] = [], shown: ({ speed: number; boosting: boolean } | null)[] = [];
   const player = { yaw: 2, position: { x: 0, y: 1 + carry.seat, z: 0 } };
@@ -76,4 +79,25 @@ test('a copy with carries but no steer vehicle installs no steer ride', () => {
   for (const entry of PLAY_INSTALLS.filter(row => row.id === 'rides')) entry.install({ movers: ferry.data } as unknown as Shardfile, cellPlayPort(new Scope('grid-ferry-stay'), () => true,
     { system: spec => { systems.push(spec); }, movers: ferry, views: { steer: () => ({ show: () => undefined }) } }));
   expect(systems).toEqual([]);
+});
+
+test('MSZ9b: a seat in a vehicle puts the page\'s player in the drive mode, facing and turning with it', () => {
+  const scope = new Scope('vehicle-ride'), systems: SystemSpec[] = [], shown: ({ speed: number; boosting: boolean } | null)[] = [];
+  const player = { yaw: 2, position: { x: 0, y: 0, z: 0 }, ride: null, hover: false, swimming: false, wading: false };
+  let seat: { vehicle: string; seat: number } | undefined, yaw = 0.5, z = 0;
+  const port = { seatOf: () => seat, pose: () => ({ position: { x: 0, y: 0, z }, euler: { x: 0, y: yaw, z: 0 }, enabled: true }),
+    kindOf: () => ({ seats: [{ role: 'driver' }, { role: 'passenger' }], handling: { speed: 20, boost: 1.5 } }) };
+  installVehicleRide(() => port, { system: spec => { systems.push(spec); }, scope, player, view: { show: ride => { shown.push(ride); } }, boost: () => false });
+  const modes = playerModes(player), frame = (): void => { for (const system of systems) system.run(1 / 60, 0); app.events.ask('player.traversal', 1 / 60); };
+  frame();
+  expect(modes.current()).toBe('foot'); expect(shown).toEqual([]);
+  seat = { vehicle: 'yard.buggy:me', seat: 0 }; frame();
+  expect(modes.current()).toBe('drive');
+  expect(player.yaw).toBeCloseTo(0.5, 9); // boarding faces the heading
+  yaw = 0.8; z -= 0.3; frame(); // the buggy turns and moves: the view turns with it, and the chip shows its speed
+  expect(player.yaw).toBeCloseTo(0.8, 9);
+  expect(shown.at(-1)?.speed).toBeGreaterThan(0);
+  seat = undefined; frame();
+  expect(modes.current()).toBe('foot'); expect(shown.at(-1)).toBe(null);
+  scope.dispose();
 });

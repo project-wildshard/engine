@@ -6,5 +6,5 @@
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { DataCellMovers } from './dataCellMovers';
 
-/** A copy's carry prompts (board and leave, a steer vehicle's riding with it), for the copy's prompts. */
-export const cellRidePrompts = (movers: DataCellMovers | null): Interactable[] => movers?.movers.ridePrompts() ?? [];
+/** A copy's carry prompts (board and leave, a steer vehicle's riding with it), and its vehicles' (MSZ9b), for the copy's prompts. */
+export const cellRidePrompts = (movers: DataCellMovers | null): Interactable[] => [...movers?.movers.ridePrompts() ?? [], ...movers?.vehicles?.prompts() ?? []];

@@ -2,6 +2,25 @@ import type { StandingLook } from '@wildshard/engine/sim/shardRows';
 
 /** What a page's traversal prompts name on the wire: a server has no prompt row for these, so both sides spell the id from a row they each hold. */
 export const carryPrompt = (mover: string, end: number): string => `${mover}.ride.${String(end)}`;
+/** MIRROR-SALT-ZONE MSZ9b: a vehicle's prompts by wire id: a free seat's; a player dock's (which spawns that player's vehicle and
+ * seats them to drive); a seated rider's way out. A server's `VehicleRuntime` claims them, and each page spells them alike. */
+export const vehicleSeatPrompt = (vehicle: string, seat: number): string => `${vehicle}.seat.${String(seat)}`;
+export const vehicleDockPrompt = (dock: string): string => `${dock}.dock`;
+export const vehicleLeavePrompt = (vehicle: string): string => `${vehicle}.leave`;
+/** A per-player vehicle's id: its dock's, a colon, then its owner's (an act's id takes only `[a-zA-Z0-9._:-]`, and a dock's
+ * id has no colon). A shared dock's vehicle goes by the dock's own id. */
+export const playerVehicle = (dock: string, player: string): string => `${dock}:${player}`;
+/** The dock a vehicle id came from. */
+export const vehicleDockOf = (vehicle: string): string => { const cut = vehicle.indexOf(':'); return cut === -1 ? vehicle : vehicle.slice(0, cut); };
+const SEAT_ROW = 'vehicle.seat|';
+/** A taken seat's `state` row (MSZ9b): there while someone sits in it, gone when it empties; its value is 1. */
+export const vehicleSeatRow = (vehicle: string, seat: number, player: string): string => `${SEAT_ROW}${vehicle}|${String(seat)}|${player}`;
+/** A seat row's vehicle, seat and rider, or null for any other row. */
+export function parseVehicleSeatRow(name: string): { readonly vehicle: string; readonly seat: number; readonly player: string } | null {
+  if (!name.startsWith(SEAT_ROW)) return null;
+  const [vehicle, seat, ...player] = name.slice(SEAT_ROW.length).split('|'), index = Number(seat);
+  return vehicle === undefined || vehicle === '' || !Number.isInteger(index) || index < 0 || player.length === 0 ? null : { vehicle, seat: index, player: player.join('|') };
+}
 /** The view call a boss's strike goes by, with its id behind it: a page's telegraph has no body of its own to read one off. */
 export const BOSS_STRIKE = 'boss.strike.';
 /** What a roaming boss's fight tells its views, by name: a page on a server steps no fight. */

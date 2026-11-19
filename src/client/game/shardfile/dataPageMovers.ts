@@ -17,7 +17,8 @@ import { FollowedMovers, type MoverView } from '../plugin/followedMovers';
 import { moverPanelPose } from '../grid/neighbourPanels';
 import { wirePage } from './wirePage';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
-import { dockedShard } from '../../../shared/game/shardfile/shardVehicles';
+import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
+import { FollowedVehicles, panelLook } from '../plugin/followedVehicles';
 
 /** What a one-shard page lends its data movers. */
 export interface DataPagePorts {
@@ -29,8 +30,8 @@ export interface DataPagePorts {
 }
 
 /** Install a plain data page's movers in its physics, each posed off the wire with its drawn panel; they leave with `scope`. */
-export function installDataPageMovers(declared: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>, page: DataPagePorts): FollowedMovers | null {
-  const source = dockedShard(declared); // MIRROR-SALT-ZONE MSZ6: its `world/vehicles` docks ride as steer carries
+export function installDataPageMovers(source: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>, page: DataPagePorts): FollowedMovers | null {
+  installDataPageVehicles(source, page); // MIRROR-SALT-ZONE MSZ9b: its `world/vehicles`, beside its movers
   if (source.movers.length === 0) return null;
   // a saved end stands where the wire's first row puts it: the page holds no flags of its own here
   const movers = new FollowedMovers(source.movers, { physics: page.physics, scope: page.scope, restoreFlags: new Set(), hulls: vehicleHulls(source) });
@@ -48,4 +49,16 @@ export function installDataPageMovers(declared: Pick<Shardfile, 'movers'> & Part
   }
   page.prompts?.push(...movers.ridePrompts());
   return movers;
+}
+
+/** MIRROR-SALT-ZONE MSZ9b: a plain page's `world/vehicles`, each posed off its row with its hull and a copy of its kind's panel;
+ * their prompts join the page's. Null with no docks. */
+export function installDataPageVehicles(source: object, page: DataPagePorts, key = 'page'): FollowedVehicles | null {
+  const vehicles = shardVehicles(source);
+  if (vehicles.docks.length === 0) return null;
+  const followed = new FollowedVehicles(vehicles, { physics: page.physics, scope: page.scope, look: panelLook(page.panels, page.scope) });
+  wirePage.vehicles.set(key, followed);
+  page.scope.onDispose(() => { if (wirePage.vehicles.get(key) === followed) wirePage.vehicles.delete(key); });
+  page.prompts?.push(...followed.prompts());
+  return followed;
 }

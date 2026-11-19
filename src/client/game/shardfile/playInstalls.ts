@@ -10,7 +10,8 @@ import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { FollowedMovers } from '../plugin/followedMovers';
-import { installSteerRide, type SteerRider, type SteerRideView } from '../plugin/steerRide';
+import { installSteerRide, installVehicleRide, type SteerRider, type SteerRideView, type VehicleRidePort } from '../plugin/steerRide';
+import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
 import type { SteerRow } from '../plugin/steerPrediction';
 import type { PlayerWireInput } from '@wildshard/engine/player/Player';
 import { localWalkingMove } from '@wildshard/engine/player/walk';
@@ -87,8 +88,10 @@ export function heldMove(player: { sampleHeldCommand: () => PlayerWireInput }): 
 export const hasRaces = (source: Pick<Shardfile, 'quests'>): boolean => (source.quests.races?.length ?? 0) > 0;
 /** Whether a source declares any talk. */
 export const hasTalks = (source: Pick<Shardfile, 'targets'>): boolean => (source.targets.talks?.length ?? 0) > 0;
-/** Whether a source's movers hold a steer vehicle to ride. */
-export const hasSteerRides = (source: Pick<Shardfile, 'movers'>): boolean => source.movers.some(row => row.carry !== undefined && row.driver?.kind === 'steer');
+/** MSZ9b: whether a source's `world/vehicles` has a dock. */
+export const hasVehicles = (source: object): boolean => shardVehicles(source).docks.length > 0;
+/** Whether a source's movers hold a steer vehicle to ride, or (MSZ9b) its `world/vehicles` a dock. */
+export const hasSteerRides = (source: Pick<Shardfile, 'movers'>): boolean => source.movers.some(row => row.carry !== undefined && row.driver?.kind === 'steer') || hasVehicles(source);
 /** Whether a source projects a player field onto a held item (a lantern's fuel or light). */
 export const hasItemLines = (source: Pick<Shardfile, 'targets'>): boolean => (source.targets.itemFields ?? []).length > 0;
 
@@ -105,8 +108,11 @@ const talks: PlayInstall = { id: 'talks', wants: hasTalks, install: (source, por
   port.expose?.('shardfileTalks', { talks: () => installed.map(talk => ({ id: talk.id, node: talk.node() ?? null, open: box?.isOpen ?? false })) });
 } };
 
-/** SS-MS2a3 / SS-MS2a3b: a steer vehicle's rider: its leave prompt, the view behind its heading, its speed and boost. */
-const rides: PlayInstall = { id: 'rides', wants: hasSteerRides, install: (_source, port) => {
+/** SS-MS2a3 / SS-MS2a3b: a steer vehicle's rider: its leave prompt, the view behind its heading, its speed and boost. MSZ9b: a
+ * `world/vehicles` seat's, off the vehicles the wire's follower holds (`FollowedVehicles`), in the `drive` mode. */
+const rides: PlayInstall = { id: 'rides', wants: hasSteerRides, install: (source, port) => {
+  if (hasVehicles(source)) installVehicleRide((): VehicleRidePort | undefined => (port.live() ? wirePage.vehicles.values().next().value : undefined),
+    { system: port.system, scope: port.scope, player: port.rider, view: port.views.steer(), boost: port.boost });
   const movers = port.movers;
   if (movers === null) return;
   installSteerRide(movers, { system: port.system, led: port.led, player: port.rider, view: port.views.steer(), boost: port.boost,

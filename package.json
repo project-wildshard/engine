@@ -1118,6 +1118,7 @@
     "./game/plugin/brain": "./src/server/game/plugin/brain.ts",
     "./game/plugin/bossPhase": "./src/server/game/plugin/bossPhase.ts",
     "./game/plugin/mover": "./src/server/game/plugin/mover.ts",
+    "./game/plugin/vehicleRuntime": "./src/server/game/plugin/vehicleRuntime.ts",
     "./game/plugin/director": "./src/shared/game/plugin/director.ts",
     "./game/plugin/bodyBoss": "./src/shared/game/plugin/bodyBoss.ts",
     "./game/plugin/bossRecord": "./src/shared/game/plugin/bossRecord.ts",
