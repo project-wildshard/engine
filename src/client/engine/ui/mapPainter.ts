@@ -3,7 +3,7 @@ import { engineString } from '../../../shared/engine/strings';
 import { LAYER_PPM, type MapExtras, type Minimap } from './Minimap';
 import { ROOM_BG, fitRoom, paintRoom } from './roomMap';
 import { fitMapLabel } from './mapLabel';
-import { cellAt } from './mapView';
+import { cellAt, namesPlaces } from './mapView';
 import type { MapPoi, MapZone } from './Map';
 
 type Pin = MapPoi & { color?: string };
@@ -161,12 +161,15 @@ export class MapPainter {
       const lh = Math.max(12 * this.view.dpr(), 0.05 * CHUNK_SIZE * ppm);
       for (const l of extras.labels) {
         if (l.width !== undefined && l.height !== undefined) {
-          const text = (this.view._zoom() < 2 ? l.short ?? l.text : l.text).toUpperCase();
-          const width = l.width * ppm - 4 * this.view.dpr(), height = l.height * ppm;
-          const label = fitMapLabel(text, width, height, 11 * this.view.dpr(), 8 * this.view.dpr(), (line, font) => {
+          // the overview stops (the grid's 0.5x and 0.25x, MN13) name each zone by its short name ("CORAL DRIFT", not "OPEN PLOT · …")
+          const text = (namesPlaces(extras.grid, this.view._zoom()) ? l.text : l.short ?? l.text).toUpperCase();
+          const fit = (w: number, h: number, least = 8) => fitMapLabel(text, w * ppm - 4 * this.view.dpr(), h * ppm, 11 * this.view.dpr(), least * this.view.dpr(), (line, font) => {
             ctx.font = `700 ${font}px Rajdhani, sans-serif`; return ctx.measureText(line).width;
           });
-          const x = sx(l.x), y = sz(l.z), lineHeight = label.font * 1.15;
+          // MN9: a name its own box can't hold fills its larger box (the grid's overview: the whole cell)
+          let label = fit(l.width, l.height), box = { x: l.x, z: l.z, width: l.width, height: l.height };
+          if (label.lines.length === 0 && l.fill !== undefined) { label = fit(l.fill.width, l.fill.height, 7); box = l.fill; }
+          const x = sx(box.x), y = sz(box.z), width = box.width * ppm - 4 * this.view.dpr(), height = box.height * ppm, lineHeight = label.font * 1.15;
           ctx.font = `700 ${label.font}px Rajdhani, sans-serif`; ctx.fillStyle = l.color;
           for (const [i, line] of label.lines.entries()) {
             const at = y + (i - (label.lines.length - 1) / 2) * lineHeight;
@@ -186,7 +189,7 @@ export class MapPainter {
     // points of interest (their labels laid out clear of each other, the markers and your arrow)
     const fs = Math.max(11 * this.view.dpr(), side * 0.022 / this.view._zoom());
     const px = sx(pos.x), py = sz(pos.z), r = Math.max(7 * this.view.dpr(), fs * 0.6);
-    const tally = this.view.tally() ? this.layTally(list, ox, oy + side) : null;
+    const tally = this.view.tally() ? this.layTally(list, ox, oy + side, side) : null;
     if (tally !== null) held.push(tally);
     // the minimap's marks (Driftwood's sea chart: every unfound sea glass piece, E314) — under the pins, no labels, not
     // tallied; a bead in the piece's colour inside a white ring (a quest marker is a cyan diamond, a place a white dot)
@@ -200,7 +203,7 @@ export class MapPainter {
         ctx.lineWidth = 1.2 * this.view.dpr(); ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; ctx.stroke();
       }
     }
-    this.drawPois(list, sx, sz, fs, { x: px, y: py, r: r * 2.2 }, held);
+    this.drawPois(list, sx, sz, fs, { x: px, y: py, r: r * 2.2 }, held, namesPlaces(extras?.grid, this.view._zoom()));
     if (tally) this.drawTally(tally);
 
     // you
@@ -258,7 +261,7 @@ export class MapPainter {
 
   /** the points of interest: places (named dots), undiscovered places (dim "?"), quest markers (pulsing cyan diamonds, on top);
    *  then every label, placed where it covers no other label, marker or your arrow (`you`) */
-  private drawPois(list: Pin[], sx: (x: number) => number, sz: (z: number) => number, fs: number, you: { x: number; y: number; r: number }, avoid: readonly Box[]): void {
+  private drawPois(list: Pin[], sx: (x: number) => number, sz: (z: number) => number, fs: number, you: { x: number; y: number; r: number }, avoid: readonly Box[], named = true): void {
     const ctx = this.view.ctx, d = this.view.dpr();
     // the shard's zone names (setZones — Pine Hollow's THE RIDGE, THE OLD-GROWTH, …): big faint caps under everything, up to 2.5×
     if (this.view._zoom() <= 2.5 && this.view.zones().length > 0) {
@@ -270,7 +273,9 @@ export class MapPainter {
     ctx.font = `${fs}px JetBrains Mono, Menlo, monospace`;
     ctx.textBaseline = 'top'; ctx.textAlign = 'left';
     const pins = list.map((p) => {
-      const r = p.kind === 'quest' ? Math.max(6 * d, fs * 0.55) : p.kind === 'place' ? Math.max(4 * d, fs * 0.35) : Math.max(10 * d, fs * 0.85);
+      // MN13: unnamed (the grid's 0.5x and 0.25x) every place is a dot (an unfound one a ring with no "?") and a quest marker
+      // a small diamond, so a zone's marks never bury its name in a cell 55 pt wide
+      const r = !named ? (p.kind === 'quest' ? 4 * d : 2.5 * d) : p.kind === 'quest' ? Math.max(6 * d, fs * 0.55) : p.kind === 'place' ? Math.max(4 * d, fs * 0.35) : Math.max(10 * d, fs * 0.85);
       return { p, x: sx(p.x), y: sz(p.z), r, text: p.kind === 'unknown' ? engineString('s_8a8de823d5ed') : p.kind === 'quest' ? (p.short ?? p.label) : p.label, glyph: p.kind === 'quest', own: true };
     });
     // two unfound rings that would overlap (the sea cave by the wreck, at 1×) are pushed apart along the line between them
@@ -303,7 +308,8 @@ export class MapPainter {
         ctx.fillStyle = 'rgba(8, 20, 30, 0.72)';
         ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = 'rgba(6, 10, 18, 0.8)'; ctx.lineWidth = 3.5 * d; ctx.stroke();
-        ctx.setLineDash(this.view.dash()); ctx.strokeStyle = CYAN; ctx.lineWidth = 1.6 * d; ctx.stroke(); ctx.setLineDash(NO_DASH);
+        ctx.setLineDash(named ? this.view.dash() : NO_DASH); ctx.strokeStyle = CYAN; ctx.lineWidth = 1.6 * d; ctx.stroke(); ctx.setLineDash(NO_DASH);
+        if (!named) continue;
         ctx.save();
         ctx.font = `700 ${Math.round(m.r * 1.25)}px JetBrains Mono, Menlo, monospace`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillStyle = CYAN; ctx.fillText(engineString('s_8a8de823d5ed'), m.x, m.y + m.r * 0.06);
@@ -320,6 +326,8 @@ export class MapPainter {
       ctx.fillStyle = CYAN; ctx.strokeStyle = 'rgba(6, 10, 18, 0.9)'; ctx.lineWidth = 2 * d;
       diamond(ctx, m.x, m.y, m.r); ctx.fill(); ctx.stroke();
     }
+    // MN13: the grid's 0.5x and 0.25x name no places: the marks stay, the zones' names carry the overview
+    if (!named) { ctx.textAlign = 'center'; return; }
     // labels: ◆-tagged first, then places, then "?"; each takes the first candidate spot that is free (else the least covered)
     const taken: Box[] = [{ x0: you.x - you.r, y0: you.y - you.r, x1: you.x + you.r, y1: you.y + you.r }];
     for (const m of pins) taken.push({ x0: m.x - m.r, y0: m.y - m.r, x1: m.x + m.r, y1: m.y + m.r });
@@ -362,8 +370,10 @@ export class MapPainter {
   }
 
   /** E309 A: "PLACES n / N" (found / all places) on a navy glass plate in the bottom-left corner, fixed while you pan: inside
-   *  the chunk's corner while it is on screen (1×), else the frame's. Laid out first, so the place labels keep clear of it */
-  private layTally(list: readonly Pin[], chunkLeft: number, chunkBottom: number): Tally | null {
+   *  the chunk's corner while it is on screen (1×), else the frame's. Laid out first, so the place labels keep clear of it.
+   *  A chunk under twice the plate's width (the grid's 0.5× and 0.25×) puts it in the frame's corner too, off the zone's name
+   *  and your arrow (MN9) */
+  private layTally(list: readonly Pin[], chunkLeft: number, chunkBottom: number, side: number): Tally | null {
     let found = 0, all = 0;
     for (const p of list) { if (p.kind === 'place') { found++; all++; } else if (p.kind === 'unknown') all++; }
     if (all === 0) return null;
@@ -372,7 +382,8 @@ export class MapPainter {
     let w = 0;
     for (const ch of text) w += ctx.measureText(ch).width + sp;
     w -= sp;
-    const padX = 8 * d, h = fs + 10 * d, x0 = Math.max(10 * d, chunkLeft + 8 * d), y0 = Math.min(this.view.canvas.height - 10 * d, chunkBottom - 8 * d) - h;
+    const padX = 8 * d, h = fs + 10 * d, small = side < 2 * (w + padX * 2);
+    const x0 = small ? 10 * d : Math.max(10 * d, chunkLeft + 8 * d), y0 = (small ? this.view.canvas.height - 10 * d : Math.min(this.view.canvas.height - 10 * d, chunkBottom - 8 * d)) - h;
     return { x0, y0, x1: x0 + w + padX * 2, y1: y0 + h, text, fs, sp, padX };
   }
 

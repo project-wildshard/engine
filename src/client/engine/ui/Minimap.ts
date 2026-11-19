@@ -109,6 +109,9 @@ export interface MapExtraImage { readonly image: CanvasImageSource; readonly x: 
 export interface MapExtraLabel { readonly x: number; readonly z: number; readonly text: string; readonly color: string;
   /** Optional cell-local label box in metres, with a shorter overview name. */
   readonly width?: number; readonly height?: number; readonly short?: string;
+  /** MAP-NEXT MN9: the larger box (centre and size, metres) the label may fill when its own box can't hold it: on the grid
+   *  its whole cell, so every zone's name stays readable at the overview (0.25×), where the strip by its edge is too thin */
+  readonly fill?: { readonly x: number; readonly z: number; readonly width: number; readonly height: number };
   /** A place off this map (a neighbour's name across the road): drawn with an arrow toward it, never as this map's own title. */
   readonly toward?: boolean }
 

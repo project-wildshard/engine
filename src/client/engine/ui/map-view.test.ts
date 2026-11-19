@@ -9,7 +9,7 @@ import { withOwner } from '../../../shared/engine/app/ownership';
 import { legacyDouble } from '../../../test/engine/FakeGame';
 import { FullMap } from './Map';
 import type { MapExtras, Minimap } from './Minimap';
-import { OPEN_ZONE_FILL, SHARD_STOPS, cellAt, clampView, gridPpm, gridStops, nearestStop, openZoom, wholeCellsIn, type MapGrid } from './mapView';
+import { OPEN_ZONE_FILL, SHARD_STOPS, cellAt, clampView, gridPpm, gridStops, namesPlaces, nearestStop, openZoom, wholeCellsIn, type MapGrid } from './mapView';
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -85,10 +85,10 @@ function fixture(extras: MapExtras | null) {
   const frames: FrameRequestCallback[] = [];
   vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((frame: FrameRequestCallback) => { frames.push(frame); return frames.length; });
   vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => undefined);
-  const strokeRect = vi.fn<CanvasRenderingContext2D['strokeRect']>();
+  const strokeRect = vi.fn<CanvasRenderingContext2D['strokeRect']>(), fillText = vi.fn<(text: string, x: number, y: number) => void>();
   const ctx = legacyDouble<CanvasRenderingContext2D>({
     setTransform: () => undefined, clearRect: () => undefined, fillRect: () => undefined,
-    drawImage: () => undefined, strokeRect, strokeText: () => undefined, fillText: () => undefined,
+    drawImage: () => undefined, strokeRect, strokeText: () => undefined, fillText,
     measureText: text => legacyDouble<TextMetrics>({ width: text.length * 7 }),
     beginPath: () => undefined, moveTo: () => undefined, lineTo: () => undefined,
     closePath: () => undefined, save: () => undefined, restore: () => undefined,
@@ -102,7 +102,7 @@ function fixture(extras: MapExtras | null) {
   map.mount(document.body);
   map.setPois(() => []);
   map.setExtras(() => extras);
-  return { map, scope, frames, strokeRect };
+  return { map, scope, frames, strokeRect, fillText };
 }
 const gridExtras: MapExtras = { rects: [], images: [], labels: [], grid: GRID };
 const cellsAcross = (box: { x0: number; x1: number; z0: number; z1: number }): number => Math.min(box.x1 - box.x0, box.z1 - box.z0) / PITCH;
@@ -236,4 +236,37 @@ test('MN7: a 386 x 540 pt frame at each stop, every chip zooming about you', () 
     expect(box.z0).toBeGreaterThanOrEqual(-edge - 1e-6); expect(box.z1).toBeLessThanOrEqual(-edge + PITCH + 1e-6);
     map.setZoom(one.zoom); expect(ZONE / across()).toBeCloseTo(0.72); centred();
   } finally { scope.dispose(); }
+});
+
+test('MN13: the grid map names its places at 1x and 2x, and only marks them at 0.5x and 0.25x', () => {
+  const [quarter, half, one, two] = gridStops(GRID);
+  expect([quarter, half, one, two].map(stop => namesPlaces(GRID, stop?.zoom ?? 0))).toEqual([false, false, true, true]);
+  expect(namesPlaces(undefined, 1)).toBe(true); // a one-shard map always names them
+  const { map, scope, frames, fillText } = fixture(gridExtras);
+  try {
+    Object.defineProperty(map.root, 'clientWidth', { value: 386 });
+    Object.defineProperty(map.root, 'clientHeight', { value: 540 });
+    map.setPois(() => [{ x: 30, z: 40, label: 'THE PIER', kind: 'place' }, { x: -60, z: 80, label: 'CASTAWAY', kind: 'quest' }]);
+    map.update({ x: 0, z: 0 }, 0); map.show();
+    const named = (): string[] => { fillText.mockClear(); for (const frame of frames.splice(0)) frame(16); return fillText.mock.calls.map(([text]) => text).filter(text => text === 'THE PIER' || text === 'CASTAWAY'); };
+    for (const stop of gridStops(GRID)) {
+      map.setZoom(stop.zoom);
+      expect(named().sort(), `${String(stop.label)}x`).toEqual(stop.label >= 1 ? ['CASTAWAY', 'THE PIER'] : []);
+    }
+  } finally { scope.dispose(); }
+});
+
+test('MN9: at 0.25x a zone\'s name too long for the strip by its cell\'s edge fills its whole cell', () => {
+  const name = { x: PITCH, z: 250 - 90, text: 'Coral Drift', short: 'Coral Drift', color: '#eaf6ff', width: 468, height: 160 };
+  for (const fill of [undefined, { x: PITCH, z: 0, width: 468, height: 468 }]) {
+    const { map, scope, frames, fillText } = fixture({ ...gridExtras, labels: [fill === undefined ? name : { ...name, fill }] });
+    try {
+      Object.defineProperty(map.root, 'clientWidth', { value: 386 });
+      Object.defineProperty(map.root, 'clientHeight', { value: 540 });
+      map.update({ x: 0, z: 0 }, 0); map.show(); map.setZoom(1);
+      for (const frame of frames.splice(0)) frame(16);
+      const drawn = new Set(fillText.mock.calls.map(([text]) => text));
+      expect(drawn.has('CORAL') && drawn.has('DRIFT')).toBe(fill !== undefined);
+    } finally { scope.dispose(); }
+  }
 });

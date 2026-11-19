@@ -50,6 +50,10 @@ export function nearestStop(stops: readonly ZoomStop[], zoom: number): ZoomStop 
   return best;
 }
 
+/** MAP-NEXT MN13: whether the map names its places at `zoom`. On the grid, at 1x and 2x only: below the midpoint of 0.5x and
+ *  1x (a log scale) the places are marks with no names, and the zones' names carry the overview. A one-shard map always does. */
+export function namesPlaces(grid: MapGrid | undefined, zoom: number): boolean { return grid === undefined || zoom >= openZoom(grid) / Math.SQRT2; }
+
 /** device px per metre at `zoom`: zoom 1 fits the whole grid square to the short side, edge to edge */
 export function gridPpm(grid: MapGrid, shortSidePx: number, zoom: number): number { return (shortSidePx / gridSide(grid)) * zoom; }
 

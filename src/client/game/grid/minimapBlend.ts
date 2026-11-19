@@ -210,7 +210,8 @@ export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
   for (const cell of assembly.cells) {
     const x = cell.origin.x - ox, z = cell.origin.z - oz;
     const text = host.name(cell);
-    labels.push({ x, z: z + CHUNK_HALF - 90, text, short: text.split(' · ').at(-1) ?? text, color: NAME, width: CHUNK_HALF * 2 - 32, height: 160 });
+    labels.push({ x, z: z + CHUNK_HALF - 90, text, short: text.split(' · ').at(-1) ?? text, color: NAME, width: CHUNK_HALF * 2 - 32, height: 160,
+      fill: { x, z, width: assembly.pitch - 24, height: CHUNK_HALF * 2 - 32 } }); // MAP-NEXT MN9: the whole cell and its roads, at the overview
     if (atlas !== undefined) {
       const tile = atlas(cell.slug);
       if (tile !== null) { images.push({ ...tile, x, z, size: 2 * CHUNK_HALF, alpha: 1 }); continue; }

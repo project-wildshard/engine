@@ -92,3 +92,17 @@ test('the road minimap draws the atlas, not each cell\'s product (ZONE-ENTRY ZE1
   expect(road.images.filter(row => row.image === atlasImage)).toHaveLength(assembly.cells.length - 2);
   expect(road.images.every(row => row.alpha < 1)).toBe(true);
 });
+
+test('MAP-NEXT MN9: with every zone\'s map the 7 by 7 is 49 cells, no plain plot, every name free to fill its cell', () => {
+  const assembly = new GridAssembly({ developer: true, devserver: true }), home = assembly.cells[0];
+  if (home === undefined) throw new Error('Missing home');
+  const image = document.createElement('canvas');
+  const overlay = fullMapOverlay({ assembly, home, cells: new GridCellEvents(), worldFeet: () => home.origin, name: cell => cell.slug, image: () => null },
+    [], () => ({ image, crop: [0, 0, 256, 256] }));
+  const empty = overlay.rects.filter(r => r.color === '#2c3029');
+  expect(overlay.images.length + empty.length).toBe(49);
+  expect(overlay.rects.filter(r => r.color === '#69704f')).toEqual([]);
+  for (const [i, cell] of assembly.cells.entries()) {
+    expect(overlay.labels[i]?.fill).toEqual({ x: cell.origin.x - home.origin.x, z: cell.origin.z - home.origin.z, width: assembly.pitch - 24, height: 2 * CHUNK_HALF - 32 });
+  }
+});
