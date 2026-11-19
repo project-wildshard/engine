@@ -172,7 +172,7 @@ interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: 
   /** ZE10d2: an online shell's gate word and its adoption by the next session on this page (`shell.ts` `StartedOnline`) */
   enter?: (cell: string) => Promise<{ readonly x: number; readonly z: number; readonly yaw: number } | null>;
   adopt?: (next: { readonly loaded: string; readonly grid: OnlineGrid }) => void }
-interface OnlineGrid { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly reenterInPage: (cell: string, reload: () => void) => boolean; readonly goto?: boolean }
+interface OnlineGrid { readonly cell: string; readonly cells: readonly string[]; readonly placed: (cell: string, at: { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }) => void; readonly reenter: (cell: string) => void; readonly reenterInPage: (cell: string, reload: () => void) => boolean; readonly goto?: boolean; readonly spawn?: boolean }
 /** ZE10d2: the online shell a gate's `enter` handed over (its seat frozen at the gate of `cell`), for the next session on this page. */
 let handedOver: { readonly shell: Shell; readonly cell: string } | null = null;
 /** ZE10d2: past the door's `READY_MS` (120 s) a handed-over link no session took is let go. */
@@ -534,10 +534,10 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const onlineModule = (): Promise<OnlineModule> => bootTask('server:online-module', () => import(/* @vite-ignore */ `${root}/online.js`)) as Promise<OnlineModule>;
   const online = async (world: BuildWorld, storage: SaveStorage): Promise<Shell> => {
     const { grid } = ports, booted = grid?.booted;
-    const gridOf = (cell: string, goto: boolean): OnlineGrid | undefined => grid === null ? undefined : { cell, cells: grid.cells.map(row => row.instance), placed: (at, pose) => { grid.serverPlace?.(at, pose); }, reenter: next => { grid.reenter?.(next); },
+    const gridOf = (cell: string, goto: boolean, spawn = false): OnlineGrid | undefined => grid === null ? undefined : { cell, cells: grid.cells.map(row => row.instance), placed: (at, pose) => { grid.serverPlace?.(at, pose); }, reenter: next => { grid.reenter?.(next); },
       // a page with no in-place entry at all takes GO4's reload at once
       // the ask goes with the boot that made it (review MUST: a page sent back to the title mid-load never re-enters later)
-      reenterInPage: (next, reload) => { if (grid.reenterInPage === undefined) return false; scope.onDispose(regrids.ask(next, reload)); return true; }, ...(goto ? { goto: true } : {}) };
+      reenterInPage: (next, reload) => { if (grid.reenterInPage === undefined) return false; scope.onDispose(regrids.ask(next, reload)); return true; }, ...(goto ? { goto: true } : {}), ...(goto && spawn ? { spawn: true } : {}) };
     // ZE10d2: a gate's 0 handed this page's link over: the seat is frozen at that cell's gate, and this session's `ready` seats it past
     const kept = handedOver;
     handedOver = null;
@@ -553,7 +553,8 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
     const answered = await askNameToJoin(scope, { parent: document.body, doctor: () => { document.dispatchEvent(new CustomEvent('ws:doctor', { detail: 'join' })); } });
     // a page that left while it asked never joins (Codex review): a cancelled load must not take the device's seat
     if (!answered || scope.disposed) throw new Error('The page left before it joined the world');
-    const first = booted === undefined ? undefined : gridOf(booted, pageGoto() === booted);
+    // QA 11-19 row 52: a ZONE SELECT pick (chosen, with no gate's arrival) asks the door for the cell's spawn
+    const first = booted === undefined ? undefined : gridOf(booted, pageGoto() === booted, chosenCell() === booted && chosenArrival() === null);
     // MP2.2e1: a signed-in page joins with its join ticket, so the door seats its account; a guest, or a page the API can't answer,
     // joins as its device. The ticket is read at each hello, so a redial after a refresh sends the new one.
     // FM8b mode 27: the account service's 401 (a session that ended) signs the page out and is heard by the world's signed-out card,

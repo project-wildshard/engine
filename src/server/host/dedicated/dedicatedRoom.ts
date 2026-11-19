@@ -231,13 +231,14 @@ export class DedicatedRoom implements CrossTarget {
     if (lead) { this.departed.delete(entry.body); this.movePaid(entry.body, LEAD_SEAT); this.unparkLead(); }
     // Two who join together would otherwise stand inside each other.
     const stand = this.aside(spawn);
-    const player = lead ? this.lead : host.addPlayer(body, at ?? doc?.at ?? stand, at?.yaw ?? doc?.at.yaw ?? spawn.yaw);
+    const fresh = at === undefined && entry.spawn === true, from = fresh ? undefined : doc?.at;
+    const player = lead ? this.lead : host.addPlayer(body, at ?? from ?? stand, at?.yaw ?? from?.yaw ?? spawn.yaw);
     player.netName = entry.name;
     this.capBoard(player);
     if (lead) player.resetPose(stand, spawn.yaw);
     book.seat(body, doc?.ledger ?? { serial: 0, rows: [] });
     // Bind owned modifiers to the fresh body baseline before restoring its already modified health.
-    try { this.cell.owned.of(body); if (doc !== null) importPlayer(this.host, player, doc); if (at !== undefined) player.resetPose(at, at.yaw); }
+    try { this.cell.owned.of(body); if (doc !== null) importPlayer(this.host, player, doc); if (at !== undefined) player.resetPose(at, at.yaw); else if (fresh) player.resetPose(stand, spawn.yaw); }
     catch (error) {
       // No save or live link is installed on a failed continuation. Keep the durable copies intact.
       this.seats.delete(entry.device); this.bodies.delete(body); this.cell.owned.drop(body); book.drop(body);

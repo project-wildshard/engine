@@ -67,6 +67,14 @@ export function gotoCell(path: string | undefined): string | null {
   const query = path?.indexOf('?') ?? -1, cell = query < 0 ? null : new URLSearchParams(path?.slice(query + 1)).get('chunk');
   return cell !== null && /^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(cell) && cell.length <= 64 ? cell : null;
 }
+/** QA 11-19 row 52: a goto a fresh ZONE SELECT pick made (`&at=spawn`, `gotoSocket`) seats the player at the cell's spawn, never where
+ *  its save last stood (the step out onto the road, which handed them straight back to it). Only until the page is first seated: a
+ *  redial of the same page asks without it and comes back where it stood. An older page never says it. `at` is the harness's own
+ *  spawn-pose name (lint/url-params.json), read here on the world's socket only, never on a page. */
+export function gotoSpawn(path: string | undefined): boolean {
+  const query = path?.indexOf('?') ?? -1;
+  return query >= 0 && gotoCell(path) !== null && new URLSearchParams(path?.slice(query + 1)).get('at') === 'spawn';
+}
 
 /** IPv6 privacy addresses share their household /64; mapped IPv4 keeps its IPv4 bucket. */
 function connectionKey(address: string): string {
@@ -448,8 +456,8 @@ export class World {
   private admitUpgrade(request: IncomingMessage, socket: Duplex, head: Buffer, key: string, passed: boolean): void {
     const attempt = this.attempt(key, passed);
     if (attempt === null) { this.refuse('connections'); socket.end('HTTP/1.1 429 Too Many Requests\r\nConnection: close\r\nContent-Length: 0\r\n\r\n'); return; }
-    const goto = gotoCell(request.url);
-    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, key, attempt, goto); });
+    const goto = gotoCell(request.url), spawn = gotoSpawn(request.url);
+    this.server.handleUpgrade(request, socket, head, ws => { this.opened(ws, key, attempt, goto, spawn); });
   }
   /** SB42: the budget a live proof pass draws on (`pass:<lane>`), or null: no pass, a bad one, or an address past its bad passes. */
   private async passKey(text: string, ip: string): Promise<string | null> {
@@ -501,7 +509,7 @@ export class World {
     if (!this.words.has(key) && this.words.size >= MAX_TRACKED_IPS) { const oldest = this.words.keys().next().value; if (oldest !== undefined) this.words.delete(oldest); }
     words.push(now); this.words.set(key, words); this.refund(key, attempt);
   }
-  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt, goto: string | null): void {
+  private opened(socket: WebSocket, ip: string, attempt: ConnectAttempt, goto: string | null, spawn = false): void {
     const end = new SocketTransport(socket);
     this.sockets.set(ip, (this.sockets.get(ip) ?? 0) + 1); this.ends.add(end);
     // SB42: whether a hello came, and whether the door closed it for want of one
@@ -524,7 +532,7 @@ export class World {
     end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving} satisfies WorldWord)).buffer);
     end.onControl((control, bytes) => { if (control === 'device') this.deviceWord(end, bytes); });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { timedOut = true; this.refuse('hello-timeout'); end.close('refused'); });
-    const off = end.onMessage((_channel, bytes) => { spoke = true; off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto); });
+    const off = end.onMessage((_channel, bytes) => { spoke = true; off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto, spawn); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
   }
   /** DT4: a client's device word, untrusted: one per socket, read and bounded by `readDeviceWord`. A junk or oversized word is counted
@@ -549,8 +557,8 @@ export class World {
     seen.done = true;
     this.options.log(deviceLine(seen.who, seen.said));
   }
-  private async joining(end: SocketTransport, bytes: ArrayBuffer, goto: string | null): Promise<void> {
-    try { await this.hello(end, bytes, goto); }
+  private async joining(end: SocketTransport, bytes: ArrayBuffer, goto: string | null, spawn = false): Promise<void> {
+    try { await this.hello(end, bytes, goto, spawn); }
     catch (error) { if (!end.isOpen) return; this.options.log({ at: 'world.join', error: String(error) }); this.refuse(error instanceof SaveNewerError ? 'save-newer' : 'join-failed'); end.close(error instanceof SaveQuarantinedError ? 'refused' : 'retry'); }
   }
   /** Everyone in the grid or on their way: the cap counts all of them, whichever cell they stand in (J182). */
@@ -630,7 +638,7 @@ export class World {
     return () => { this.deleting.delete(seat); };
   }
   /** The join: check, find where they stand, let them load, seat them. */
-  private async hello(end: SocketTransport, sent: ArrayBuffer, goto: string | null): Promise<void> {
+  private async hello(end: SocketTransport, sent: ArrayBuffer, goto: string | null, spawn = false): Promise<void> {
     const bytes = sent;
     const view = new Uint8Array(bytes);
     // WR5 (5.5, J54 replaced): the door reads the v1 bootstrap. A v0.1.x hello or an older major reloads, a newer major
@@ -654,10 +662,10 @@ export class World {
     // review M1: an account being deleted dials again in a moment, after which it is a fresh account
     if (this.deleting.has(seat)) { end.close('retry'); return; }
     this.joiners.set(seat, (this.joiners.get(seat) ?? 0) + 1);
-    try { await this.join(end, bytes, goto, hello, said.output, admitted); }
+    try { await this.join(end, bytes, goto, hello, said.output, admitted, spawn); }
     finally { const left = (this.joiners.get(seat) ?? 1) - 1; if (left > 0) this.joiners.set(seat, left); else this.joiners.delete(seat); }
   }
-  private async join(end: SocketTransport, sent: ArrayBuffer, goto: string | null, hello: Hello, said: { readonly player: string; readonly name: string }, admitted: { readonly seat: string; readonly from?: string }): Promise<void> {
+  private async join(end: SocketTransport, sent: ArrayBuffer, goto: string | null, hello: Hello, said: { readonly player: string; readonly name: string }, admitted: { readonly seat: string; readonly from?: string }, spawn = false): Promise<void> {
     let bytes = sent;
     const { seat } = admitted;
     // MP2.2d: the first sign-in from a device with guest progress moves it to the account, once (`saves/claim.ts`).
@@ -714,10 +722,13 @@ export class World {
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     const slug = this.cellFor(last, aim), saved = await (saves.readWitness?.(device,cellShard(slug)) ?? saves.read(device,cellShard(slug))), at = arrival?.at; // preserve ZE9's entry continuation
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
-    const { spawn } = await this.ask(slug, device, end);
+    const { spawn: stand } = await this.ask(slug, device, end);
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
+    // QA 11-19 row 52: a ZONE SELECT pick of this cell starts at its spawn; its save (progress, and where it last stood) still loads
+    // (the door seats a goto in its cell whenever this world opens it: `cellFor`)
+    const fresh = spawn && at === undefined && goto !== null && this.links.has(cellName(goto));
     // GO3: `shard` is what a one-shard page loads, `cell` the grid instance a grid page stands in.
-    end.control('resume', new TextEncoder().encode(JSON.stringify({ shard: cellShard(slug), cell: slug, at: at ?? saved.doc?.at ?? spawn })).buffer);
+    end.control('resume', new TextEncoder().encode(JSON.stringify({ shard: cellShard(slug), cell: slug, at: at ?? (fresh ? stand : saved.doc?.at ?? stand) })).buffer);
     this.sayCountdown(end);
     await new Promise<void>(resolve => {
       const timer = this.scope.timeout(this.options.readyMs ?? READY_MS, () => { this.refuse('ready-timeout'); end.close('refused'); resolve(); });
@@ -726,7 +737,7 @@ export class World {
     });
     if (!end.isOpen || this.pending.get(device)?.end !== end || this.draining) return;
     this.pending.delete(device);
-    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.checkpoint===undefined?{}:{checkpoint:saved.checkpoint}), ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }), ...(at === undefined ? {} : { arrival: at }) }, bytes);
+    this.seat(slug, end, { device, name, body, doc: saved.doc, seq: saved.seq, ...(saved.checkpoint===undefined?{}:{checkpoint:saved.checkpoint}), ...(saved.recovery === undefined ? {} : { recovery: saved.recovery }), ...(saved.previous === undefined ? {} : { previous: saved.previous }), ...(at === undefined ? {} : { arrival: at }), ...(fresh ? { spawn: true } : {}) }, bytes);
   }
   /**
    * GC15: a seat's feet left cell `from` for `to`. On the same worker the door reads their save on `to`'s shard and orders the move, which

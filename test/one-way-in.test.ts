@@ -12,7 +12,7 @@ import { titlePrefetchChoice } from '../src/client/game/grid/titlePrefetchChoice
 import { saves } from '../src/shared/engine/saves/runtime';
 import { gridEntryShown } from '../src/client/game/grid/menu';
 import { gotoSocket } from '../src/client/host/online/shell';
-import { gotoCell } from '../src/server/host/dedicated/world';
+import { gotoCell, gotoSpawn } from '../src/server/host/dedicated/world';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
@@ -102,10 +102,15 @@ test('Infinite Wildshard stays Developer-only, even on a world that hosts the gr
 test('the dial names the goto cell; the door reads only a well-formed one', () => {
   expect(gotoSocket('wss://play.example/', undefined)).toBe('wss://play.example/');
   expect(gotoSocket('wss://play.example/', 'driftwood-isle')).toBe('wss://play.example/?chunk=driftwood-isle');
+  // QA 11-19 row 52: a fresh ZONE SELECT pick asks for the cell's spawn; the door hears it only beside a goto
+  expect(gotoSocket('wss://play.example/', 'driftwood-isle', true)).toBe('wss://play.example/?chunk=driftwood-isle&at=spawn');
+  expect(gotoSocket('wss://play.example/', undefined, true)).toBe('wss://play.example/');
+  expect([gotoSpawn('/?chunk=driftwood-isle&at=spawn'), gotoSpawn('/?chunk=driftwood-isle'), gotoSpawn('/?at=spawn'), gotoSpawn(undefined)]).toEqual([true, false, false, false]);
   expect([gotoCell('/'), gotoCell('/?chunk=driftwood-isle'), gotoCell('/?chunk=template-2&x=1'), gotoCell('/?chunk=../etc'), gotoCell(undefined)])
     .toEqual([null, 'driftwood-isle', 'template-2', null, null]);
   const source = readFileSync('src/client/game/shardfile/clientWorker.ts', 'utf8');
-  expect(source, 'a grid page asks for its booted cell only when Shard select sent it there').toMatch(/gridOf\(booted, pageGoto\(\) === booted\)/u);
+  expect(source, 'a grid page asks for its booted cell only when Shard select sent it there, and its spawn only for a pick with no gate arrival')
+    .toMatch(/gridOf\(booted, pageGoto\(\) === booted, chosenCell\(\) === booted && chosenArrival\(\) === null\)/u);
 });
 
 test('the door seats a goto in the cell it names, over the player\'s last place; a cell it doesn\'t open falls back to that place', { timeout: 120_000 }, async () => {

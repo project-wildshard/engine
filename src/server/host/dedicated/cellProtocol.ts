@@ -31,6 +31,8 @@ export interface SeatEntry {
   readonly home?: string;
   /** ZE9c: a zone entry's redial mid-load: the pose past the gate it stands at in this cell, whatever its doc says. */
   readonly arrival?: ResumeAt;
+  /** QA 11-19 row 52: a ZONE SELECT pick of this cell: the seat stands at the spawn (stepped aside), whatever its doc says. */
+  readonly spawn?: true;
 }
 /** What the door says to a worker. */
 export type CellOrder =

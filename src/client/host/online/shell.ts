@@ -306,7 +306,9 @@ export interface StartOnline {
      *  is GO4's way if it can't. False when this page never enters in place (`reload` is the caller's to run). */
     readonly reenterInPage?: (cell: string, reload: () => void) => boolean;
     /** GO7: Shard select sent this page to `cell`, so every dial asks the door to seat it there (`gotoSocket`). */
-    readonly goto?: boolean };
+    readonly goto?: boolean;
+    /** QA 11-19 row 52: a fresh ZONE SELECT pick (no gate's arrival): until the page is first seated, its dials ask for the cell's spawn */
+    readonly spawn?: boolean };
   /** The signed release file, and the key that signed it. */
   readonly release: string; readonly key: string;
   /** OF4: where the page keeps the last verified release file. The page's own saves hold it: this bundle's saves have no storage, and
@@ -335,9 +337,11 @@ const doctor = (from: string): void => { document.dispatchEvent(new CustomEvent(
 /** GO7: the address a page dials. A page Shard select sent to a grid cell names it (`?chunk=`, the shard page's own name for where it
  *  enters, ZS5), and the door seats it there when it
  *  hosts that cell; any other page dials the bare address and takes the seat the world keeps (GO5). An older door ignores the query. */
-export function gotoSocket(socket: string, cell: string | undefined): string {
+export function gotoSocket(socket: string, cell: string | undefined, spawn = false): string {
   if (cell === undefined) return socket;
   const url = new URL(socket); url.searchParams.set('chunk', cell);
+  // QA 11-19 row 52: a ZONE SELECT pick starts at the cell's spawn, never where its save last stood (the step out onto the road)
+  if (spawn) url.searchParams.set('at', 'spawn');
   return url.href;
 }
 
@@ -451,7 +455,7 @@ export function readReleaseEarly(config: { readonly release: string; readonly ke
 export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const { release: at, key, keep, identity, recordTag, grid, leaving = OWN_LEAVING, session, ...link } = config;
   // ZE10d2: a gate's adoption moves the page's slug, grid and goto to the cell entered (a redial then asks for that cell)
-  let loadedNow = link.loaded, gridNow = grid, goto = grid?.goto === true ? grid.cell : undefined;
+  let loadedNow = link.loaded, gridNow = grid, goto = grid?.goto === true ? grid.cell : undefined, spawn = goto !== undefined && grid?.spawn === true;
   const toTitle = (from = 'release page'): void => { leaving.unload(`${from}: title screen`); location.replace(new URL('/', location.origin).toString()); };
   const dial = await takeRelease(at, () => readRelease(at, key, keep ?? NO_KEEP, leaving));
   const { file: release, fresh } = dial, { socket } = release;
@@ -505,7 +509,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
   // GO4: a grid page re-enters the grid in the seat's cell: the tap that brought it here comes along (QA row 16), and the URL stays bare.
   const regrid = (cell: string): void => { entering(loadedNow); leaving.unload(`online seat in another grid cell (${cell})`); gridNow?.reenter(cell); };
-  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto), address: () => gotoSocket(dialing, goto), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
+  const shell = connectOnline({ ...link, ...(grid === undefined ? {} : { gridCell: grid.cell, gridCells: grid.cells }), socket: gotoSocket(socket, goto, spawn), address: () => gotoSocket(dialing, goto, spawn), identity: named,record:{install:telemetry.install,session:crypto.randomUUID(),send:telemetry.send,...(tag===undefined?{}:{tag})} }, {
     link: (state, reason) => {
       waitingForSeat = state === 'full'; screens.link(state, reason); saves.link(state === 'live'); tooOld.link(state === 'live');
       // FM8b mode 27: each drop asks the account service for a fresh ticket before the redial needs it, so a session that ended is
@@ -555,7 +559,8 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   // a tap the world must hear waits for the link: the hold card says so, and the tap is never sent late
   shell.client.gateActions(what => screens.allow(what));
   void settled(shell.booted, leaving);
-  void shell.booted.then(() => { seated = true; return undefined; });
+  // QA 11-19 row 52: seated once, a redial comes back where the player stands
+  void shell.booted.then(() => { seated = true; spawn = false; return undefined; });
   const chat = chatLines(scope, shell.client, document.body, screens.holdChat);
   voiceUi(scope, new VoiceChat(scope, shell.voice), chat);
   scope.listen(window,'pagehide',()=>{shell.flushRecords();});
@@ -568,6 +573,6 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   });
   return { ...shell, dispose: () => { scope.dispose(); shell.dispose(); },
     // ZE10d2: from the door's `arrive` every dial asks for the cell entered (ZE9c seats a redial in the hold there)
-    enter: async cell => { if (tooOld.refuse('zone')) return null; const pose = await shell.enter?.(cell) ?? null; if (pose !== null) goto = cell; return pose; },
-    adopt: next => { loadedNow = next.loaded; gridNow = next.grid; goto = next.grid.cell; shell.rehome?.(next.grid.cell); } };
+    enter: async cell => { if (tooOld.refuse('zone')) return null; const pose = await shell.enter?.(cell) ?? null; if (pose !== null) { goto = cell; spawn = false; } return pose; },
+    adopt: next => { loadedNow = next.loaded; gridNow = next.grid; goto = next.grid.cell; spawn = false; shell.rehome?.(next.grid.cell); } };
 }
