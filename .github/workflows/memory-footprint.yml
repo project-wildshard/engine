@@ -107,7 +107,9 @@ jobs:
         run: |
           # an older source commit (a ci run queued before STR22 landed) has no walk meter: nothing to judge (44448117281)
           if [[ ! -f scripts/memory/walk-ci.mjs ]]; then echo "::notice::source commit has no scripts/memory/walk-ci.mjs; walk not judged"; exit 0; fi
-          bash scripts/ci-playwright-install.sh --no-shell chromium
+          # the [S] walk launches Playwright's default headless Chromium, the headless shell (44452949533 had only the full
+          # browser and judged nothing)
+          bash scripts/ci-playwright-install.sh chromium
           record=()
           if [[ "$MEMORY_RECORD" == true ]]; then record+=(--record); fi
           node scripts/memory/walk-ci.mjs tmp/memory-ledger/preview tmp/memory-footprint/walk "${record[@]}"
