@@ -36,7 +36,7 @@ test('a taken lever\'s takes stay: Brasscap\'s rack, ammo boxes and strongbox re
   const shard = (await loadHeadlessFolder(builtFolder('brasscap-mesa'))).shardfile;
   const takes = new Set((shard.targets.itemActions ?? []).filter(action => action.item === LEVER && action.action === 3).map(action => action.scene));
   const rows = shard.targets.interactions.filter(row => takes.has(row.scene));
-  expect(rows.map(row => row.id).sort()).toEqual(['brasscap.ammo.camp-1', 'brasscap.ammo.camp-2', 'brasscap.ammo.camp-3', 'brasscap.rack.use', 'brasscap.strongbox.use']);
+  expect(rows.map(row => row.id).sort()).toEqual(['brasscap.ammo.arena', 'brasscap.ammo.camp-1', 'brasscap.ammo.camp-2', 'brasscap.ammo.camp-3', 'brasscap.rack.use', 'brasscap.strongbox.use']);
   const spent = spentUses(shard, { read: () => 0, taken: item => item === LEVER });
   expect(rows.filter(row => spent(row)).map(row => row.id)).toEqual([]);
   const prompts = copyPrompts(shard, spent);
