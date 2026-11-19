@@ -254,8 +254,11 @@ export class Loading {
     // LS4: a fatal load screen covers this card; it copies the same report through this source.
     if (!this.scoped) setDiagnosticsSource(() => this.diagnosticsText());
     // index.html paints this panel from its first bytes (src/client/engine/boot/shell.ts): adopt it; a page without it gets a fresh one
-    const shell = this.scoped ? null : document.querySelector<HTMLElement>('.ws-load[data-shell]');
-    if (shell) { stopShellClock(); this.root = shell; delete shell.dataset['shell']; mountUi(shell, this.scope, document.body); }
+    // QA 11-19 row 17: a zone entry's card (`beginNavigationShell` on a page that already ran a session) is this boot's card too.
+    // Adopting only `[data-shell]` left a second, fresh card under it: the entry's card stayed on top with a dead clock and
+    // "0 / 111 files", and the live card's PLAY (Developer ▸ Hold at loading screen) sat beneath it where no tap reached.
+    const shell = this.scoped ? null : document.querySelector<HTMLElement>('.ws-load[data-shell]') ?? adoptableNavigationCard();
+    if (shell) { stopShellClock(); this.root = shell; delete shell.dataset['shell']; shell.dataset['adopted'] = ''; mountUi(shell, this.scope, document.body); }
     else {
       this.root = document.createElement('div');
       this.root.className = 'ws-load';
@@ -895,6 +898,8 @@ export class Loading {
     this.tickClock(); this.clockScope.dispose();
     this.root.dataset['ready'] = 'true';
     this.root.dataset['hold'] = 'true';
+    // QA 11-19 row 17 (Jake: "I have no idea what the waiting state is about"): a held card names its holder
+    set(this.els.suFact, engineString('s_loading_held'));
     const play = document.createElement('button');
     play.type = 'button'; play.className = 'ws-load-play'; play.textContent = engineString('s_loading_play');
     const body = this.root.querySelector<HTMLElement>('.ws-load-body');
@@ -963,11 +968,29 @@ export class Loading {
   }
 }
 
+/** A zone entry's open card (`beginNavigationShell`): its own, or one an earlier Loading of this entry left behind (its
+ *  scope gone, the card still held by the entry). Never a veil copy. Its earlier rows go: this Loading paints it afresh. */
+function adoptableNavigationCard(): HTMLElement | null {
+  const card = document.querySelector<HTMLElement>('.ws-load[data-navigation]:not([data-veil])');
+  if (card === null) return null;
+  if (card.dataset['adopted'] !== undefined) {
+    const keep = ['navigation', 'startedAt', 'clockStartedAt'] as const, kept = keep.map(key => [key, card.dataset[key]] as const);
+    const name = card.querySelector('[data-el="slug"]')?.textContent ?? '';
+    for (const key of Object.keys(card.dataset)) delete card.dataset[key];
+    for (const [key, value] of kept) if (value !== undefined) card.dataset[key] = value;
+    card.innerHTML = loadShellTemplate();
+    const title = card.querySelector('[data-el="slug"]'); if (title !== null) title.textContent = name;
+  }
+  return card;
+}
+
 /** Begin before product hydration; the session adopts this same panel and clock when its plan becomes available. */
 export function beginLoading(chunk: { id: string; name: string; trace?: boolean }): Loading {
   if (currentLoading?.id === chunk.id && !currentLoading.loading.scope.disposed) return currentLoading.loading;
   currentLoading?.loading.scope.dispose();
-  const loading = new Loading(chunk);
+  // QA 11-19 row 17: a page boot's card lives for the page, not for whatever owner is ambient: on a same-page zone entry that
+  // was the retired session's, which took the card's clock, paints and taps with it while the boot went on beneath
+  const loading = withOwner(app.engineScope, () => new Loading(chunk));
   currentLoading = { id: chunk.id, loading };
   loading.scope.onDispose(() => { if (currentLoading?.loading === loading) currentLoading = null; });
   return loading;

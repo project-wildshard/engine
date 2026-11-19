@@ -420,7 +420,8 @@ export function start(): Promise<void> {
 async function startPage(): Promise<void> {
   // DL21: a start whose card stops moving (step, setup share, bytes) names its step after a bounded wait instead of
   // leaving a dead card; the fatal modal's RELOAD HERE is the retry (src/client/engine/boot/stuckStep.ts)
-  const card = (): HTMLElement | null => document.querySelector<HTMLElement>('.ws-load');
+  // never the SB5 veil copy (a still image of the last card, Loading.ts `veilCard`): its frozen dataset is no boot's progress
+  const card = (): HTMLElement | null => document.querySelector<HTMLElement>('.ws-load:not([data-veil])');
   // S4: the report says why: the card's step, rows, files, bytes, the link and visibility
   // best effort: a failed read never stops the report or the modal (Codex, J206)
   const stall = (): Record<string, unknown> => {

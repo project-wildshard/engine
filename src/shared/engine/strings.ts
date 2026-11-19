@@ -363,6 +363,7 @@ export const ENGINE_STRINGS = {
   "s_loading_memory_risk": "This world may crash this phone",
   "s_loading_play": "PLAY",
   "s_loading_play_anyway": "Play anyway",
+  "s_loading_held": "Held by the Developer switch · tap PLAY",
   "s_ef2a15f49495": "Nocked",
   "s_d01476dfee7e": "Loaded",
   "s_a4b350a14964": "Reloading",

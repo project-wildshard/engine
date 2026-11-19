@@ -98,6 +98,8 @@ it('holds complete bars and frozen timings until PLAY, then enters once after th
   expect(play.nextElementSibling?.classList.contains('ws-load-foot')).toBe(true);
   expect(loading.root.querySelector<HTMLElement>('.ws-load-body')?.dataset['scroll']).toBe('true');
   expect(play.textContent).toBe('PLAY'); expect(document.activeElement).toBe(play);
+  // QA 11-19 row 17: the held card says what holds it, so a finished load never reads as a stuck one
+  expect(loading.root.querySelector('[data-el="suFact"]')?.textContent).toBe('Held by the Developer switch · tap PLAY');
   expect(loading.playRequested).toBe(false);
   expect(loading.root.dataset['download']).toBe('100'); expect(loading.root.dataset['setup']).toBe('100');
   const clock = loading.root.querySelector('[data-el="clock"]')?.textContent;
