@@ -41,8 +41,8 @@ async function walk(name) {
   }
   const peaks = /** @type {number[]} */ (data.webkit.map((/** @type {any} */ r) => r.walk?.aboveSettled?.webcontent).filter((/** @type {unknown} */ v) => typeof v === 'number'));
   const rate = walkRateRow(baseline, data.walk, judging);
-  const line = rate.line === null ? 'none: new content, record it' : mb(rate.line);
-  summary(`Walk ratchet ${baseline.zone} (${name}, ${String(data.walk.bytesPerSecond.n)} runs): ${mb(data.walk.bytesPerSecond.median)} MB/s allocated [S] (${rate.status}, baseline ${rate.baseline === null ? 'none' : mb(rate.baseline)} on ${rate.previousKey ?? '-'}, line ${line}), WebContent peak ${mb(data.walk.peakAboveSettled.median)} MB above settled [K]`);
+  const soft = rate.line === null ? 'none: new content, record it' : mb(rate.line);
+  summary(`Walk ratchet ${baseline.zone} (${name}, ${String(data.walk.bytesPerSecond.n)} runs): ${mb(data.walk.bytesPerSecond.median)} MB/s allocated [S] (${rate.status}, baseline ${rate.baseline === null ? 'none' : mb(rate.baseline)} on ${rate.previousKey ?? '-'}, line ${soft}), WebContent peak ${mb(data.walk.peakAboveSettled.median)} MB above settled [K]`);
   for (const line of reportedLines(baseline, data.walk, peaks)) summary(line);
   return data.walk;
 }

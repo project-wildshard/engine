@@ -1,3 +1,5 @@
+import type {BudgetBaselines,BudgetCaps} from '../budgets/files.mjs';
+
 export interface FrameSummary {fps:number;p95:number;gpu95:number;draws95:number;tris95:number}
 export interface NineReading {
  renderer:string;seconds:number;throttle:number;dpr:number;phone:boolean;
@@ -5,7 +7,6 @@ export interface NineReading {
  play:{pixelRatio:number;all:FrameSummary;minutes:FrameSummary[];
  route:{name:string;reached:number;stuck:unknown[];path:number[][]}};
 }
-import type {BudgetBaselines,BudgetCaps} from '../budgets/files.mjs';
 export interface NineJudging {contentKey:string;budgets:{caps:BudgetCaps;baselines:BudgetBaselines}}
 export const NINE_LIMITS: Readonly<{fps:number;frame95:number;gpu95:number;controlMs:number;shadersMs:number;firstFrameMs:number}>;
 export const NINE_STREET_KEYS: Readonly<{triangles95:string;draws95:string}>;

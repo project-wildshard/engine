@@ -1,3 +1,6 @@
+import type { BudgetBaselines, BudgetCaps } from '../budgets/files.mjs';
+import type { LedgerRow } from './ledgerVerdict.mjs';
+
 export interface MemoryLines { playingBytes: number; loadingBytes: number }
 export interface ArmedMemory { lines: MemoryLines; zones: Set<string>; readings: Map<string, MemoryLines> }
 export interface PhoneFootprint { playing: number; loading: number }
@@ -7,7 +10,7 @@ export function footprintBootFor(zone: string, armed: ReadonlySet<string>, place
 export function ledgerZones(available: readonly string[], armed: ReadonlySet<string>, requested?: readonly string[]): string[];
 export function guardZone(zone: string, armed: ReadonlySet<string>, run: () => Promise<void>, log: (line: string) => void): Promise<void>;
 export function phoneFootprint(zone: string, runs: readonly unknown[], model: unknown, boot: 'standalone' | 'online'): PhoneFootprint;
-export function footprintLines(caps: import('../budgets/files.mjs').BudgetCaps): MemoryLines;
+export function footprintLines(caps: BudgetCaps): MemoryLines;
 export function comparePhoneFootprint(reading: PhoneFootprint, lines: MemoryLines): string | null;
 export function judgeFootprint(input: { zone: string; reads: readonly PhoneFootprint[]; contentKey: string;
-  budgets: { caps: import('../budgets/files.mjs').BudgetCaps; baselines: import('../budgets/files.mjs').BudgetBaselines } }): import('./ledgerVerdict.mjs').LedgerRow[];
+  budgets: { caps: BudgetCaps; baselines: BudgetBaselines } }): LedgerRow[];

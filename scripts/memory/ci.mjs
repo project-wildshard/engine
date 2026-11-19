@@ -142,7 +142,7 @@ try {
       const { rows } = await checkReads({ first, remeasure: probeFootprint, record,
         judge: reads => judgeFootprint({ zone: chunk, reads, contentKey, budgets }) });
       budgetRows.push(...rows);
-      for (const row of rows) if (row.target !== null && row.value > row.target) {
+      for (const row of rows) if (row.target !== null && row.value !== null && row.value > row.target) {
         console.log(`${chunk}: ${row.key} ${row.value} B past the ${row.target} B target (J445: the may-crash card with Play anyway, never a refusal)`);
       }
       // Past the 1.5 GB loading cap refuses an armed zone now (guardZone); a regression is reported once at the end.
