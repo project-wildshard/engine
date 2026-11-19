@@ -150,7 +150,8 @@ test('RL3: a page whose entry graph never arrived reloads once at 12 s; a runnin
   later[0]?.(); expect(reload).toHaveBeenCalledTimes(1); // the title arrived: nothing to do
   timers.mockRestore();
   const inline = /<script data-loading-first-paint>([\s\S]*?)<\/script>/u.exec(html)?.[1] ?? '';
-  expect(inline.trim().split('\n').length).toBeLessThanOrEqual(15);
+  // the inline first-paint script stays small; QA 11-19 row 19 (b000479f2) added its wait while responses still arrive
+  expect(inline.trim().split('\n').length).toBeLessThanOrEqual(21);
 });
 
 test('the first-paint panel survives failed title start and retires only after the real deck is mounted', () => {
@@ -277,13 +278,16 @@ test('QA 11-13: the static bar moves from the boot record: files, then the entry
   const settle = (): Promise<void> => new Promise(resolve => { setTimeout(resolve, 150); });
   const timing = (window as unknown as { __bootTiming: { resources: { url: string; responseStatus: number | null }[]; mark: (op: string) => void } }).__bootTiming;
   frames.now = 300; await settle();
-  expect(text()).toBe('Loading · 0.3 s'); expect(width()).toBe('0%');
+  expect(text()).toBe('Loading the page · 0.3 s'); expect(width()).toBe('0%'); // QA 11-19 row 19: the line says what it loads
   const files = [...window.document.querySelectorAll('script[type="module"][src],link[rel="modulepreload"],link[rel="stylesheet"]')]
     .map(node => new URL(node.getAttribute('src') ?? node.getAttribute('href') ?? '', 'https://launch.test/').href);
   expect(files.length).toBeGreaterThan(4);
   timing.resources.push({ url: files[0] ?? '', responseStatus: 200 }, { url: files[1] ?? '', responseStatus: 0 }); // a failed fetch counts nothing
   frames.now = 1200; await settle();
-  expect(text()).toBe(`Loading · 1 of ${files.length} files · 1.2 s`); expect(width()).toBe(`${Math.round(80 / files.length)}%`);
+  // row 19: it names the first file still missing (here the failed one), its hash dropped
+  const waiting = (files[1] ?? '').split('/').pop()?.replace(/-[A-Za-z0-9_-]{8}(?=\.\w+$)/u, '') ?? '';
+  expect(waiting).toMatch(/^[\w.-]+\.(js|css)$/u);
+  expect(text()).toBe(`Loading ${waiting} · 1 of ${String(files.length)} files · 1.2 s`); expect(width()).toBe(`${Math.round(80 / files.length)}%`);
   timing.mark('app:entry-body'); frames.now = 1500; await settle();
   expect(text()).toBe('Starting · 1.5 s');
   frames.now = 9600; await settle();
@@ -302,7 +306,7 @@ test('QA 11-13: a page the entry turns into the title later (a player reload, an
   frames.now = 400; await settle();
   expect(text()).toBe('Loading'); // a world page: the hidden shell is left alone
   window.document.documentElement.classList.add('title-first'); frames.now = 700; await settle();
-  expect(text()).toBe('Loading · 0.7 s');
+  expect(text()).toBe('Loading the page · 0.7 s');
 });
 
 // STAGING-BUGBASH SB44 (staging v0.1.38, a v0.1.36 WebKit shell): the online shell's fresh release read named a newer build, so the
