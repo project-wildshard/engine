@@ -11,6 +11,7 @@
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
 //   --local-qa=<verdict.json> staging go-live (SQ7): the local QA verdict on the parent of the release commit.
 //   --qa-out=<dir>           staging go-live writes one verdict.json here (J434). It runs the candidate and live QA itself.
+//   --zone-entry-resume=<file>  continue a held phone tour for this build already live on staging.
 //   --observer-proof=<file>  reuse an exact MS9 transition witness when verifying a staging build already live.
 //   --qa=<verdict.json>      production needs staging go-live's verdict with the J451 phone tour for its exact build.
 //   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
@@ -148,10 +149,11 @@ try {
   for (phase of phases) {
     if (bundled && (phase === 'upload' || phase === 'check')) continue;
     if (bundled && phase === 'go-live' && localQaSource !== undefined) {
-      const proof = value('observer-proof');
+      const proof = value('observer-proof'), resume = value('zone-entry-resume');
       await deployStaging({ root, build, release: `v${manifest.version}`, source: localQaSource,
         out: resolve(value('qa-out') ?? join(root, 'tmp', 'staging-deploy', build, String(Date.now()))),
         ...(localQa === undefined ? {} : { localQa }), ...(proof === undefined ? {} : { observerProof: resolve(proof) }),
+        ...(resume === undefined ? {} : { zoneEntryResume: resolve(resume) }),
         readState, get: async url => (await fetch200(url)).json(), phase: run, log });
     } else await run(/** @type {import('./page-release/flow.mjs').Phase} */ (phase));
   }

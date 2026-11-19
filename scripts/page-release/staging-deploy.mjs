@@ -93,12 +93,13 @@ async function runQa({ root, out, build, release, name, candidate, deploy }) {
   return result;
 }
 
-/** @param {string} out @param {string} build @returns {Promise<import('./flow.mjs').ZoneEntryProof | undefined>} */
-async function runZoneEntry(out, build) {
+/** @param {string} out @param {string} build @param {string} [resume] @returns {Promise<import('./flow.mjs').ZoneEntryProof | undefined>} */
+async function runZoneEntry(out, build, resume) {
   const dir = join(out, 'zone-entry');
   const job = start({file:'bash', args:[join(scripts, 'browser-lane.sh'), '--max', '120', process.execPath,
     join(scripts, 'zone-gate-proof.mjs'), `--base=${stage.origin}`, `--out=${dir}`, '--engine=webkit',
-    '--target=far-reach', '--deploy', '--walk-all', `--expected-build=${build}`], cwd:toolsRoot, out, name:'zone-entry'});
+    '--target=far-reach', '--deploy', '--walk-all', `--expected-build=${build}`,
+    ...(resume === undefined ? [] : [`--resume=${resume}`])], cwd:toolsRoot, out, name:'zone-entry'});
   const code = await job.done, proof = read(join(dir, 'zone-entry.json'));
   if (code !== 0 && proof?.failure === undefined) {
     return {build, pass:false, failure:{from:'driftwood-isle', to:'far-reach', reason:'The browser did not complete the zone-entry smoke'}};
@@ -106,10 +107,10 @@ async function runZoneEntry(out, build) {
   return proof;
 }
 
-/** @param {{ root:string, build:string, release:string, source:string, out:string, observerProof?:string,
+/** @param {{ root:string, build:string, release:string, source:string, out:string, observerProof?:string, zoneEntryResume?:string,
  * localQa?:import('./flow.mjs').QaVerdict, readState:() => any, get:(url:string) => Promise<any>,
  * phase:(name:import('./flow.mjs').Phase, qa?:import('./flow.mjs').QaVerdict) => Promise<unknown>, log:(line:string)=>void }} opts */
-export async function deployStaging({ root, build, release, source, out, observerProof, localQa, readState, get, phase, log }) {
+export async function deployStaging({ root, build, release, source, out, observerProof, zoneEntryResume, localQa, readState, get, phase, log }) {
   const reportPath = join(out, 'verdict.json'), shared = join(toolsRoot, 'tmp', 'staging-observer'), observerRoot = join(root, 'tmp', 'staging-deploy', build);
   if (existsSync(reportPath)) throw new RefusedError('Choose a fresh staging deploy evidence directory');
   mkdirSync(out, { recursive: true, mode: 0o700 });
@@ -138,6 +139,7 @@ export async function deployStaging({ root, build, release, source, out, observe
     if (gap !== undefined) throw new RefusedError(`staging go-live needs --local-qa=<verdict.json>: ${gap}`);
     const page = await get(`${stage.origin}/version.json`), alreadyLive = page.build === build;
     if (!alreadyLive && observerProof !== undefined) throw new RefusedError('External observer evidence is for verifying an already live release');
+    if (!alreadyLive && zoneEntryResume !== undefined) throw new RefusedError('A zone-entry resume requires the build already live on staging');
     observation = read(observerProof ?? observedPath);
     step = 'MMO observer';
     if (!alreadyLive && observation === undefined) {
@@ -197,7 +199,7 @@ export async function deployStaging({ root, build, release, source, out, observe
       }
     }
     step = 'zone entry';
-    zoneEntry = await runZoneEntry(out, build);
+    zoneEntry = await runZoneEntry(out, build, zoneEntryResume);
     const entryGap = zoneEntryGap(zoneEntry, build);
     if (entryGap !== undefined) throw new RefusedError(entryGap);
     if (liveProblem !== undefined) { step = 'live smoke'; throw new RefusedError(liveProblem); }

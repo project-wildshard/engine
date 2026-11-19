@@ -6,7 +6,8 @@ import { deployFrameProblem } from './journey-proof.mjs';
 /** @typedef {{from:Cell, to:Cell}} Leg */
 /** @typedef {{from:string,to:string}} Pair */
 /** @typedef {{from:string,to:string,ms:number}} Arrival */
-/** @typedef {{expected:number, arrivals:Arrival[], failure?:Pair & {reason:string}, pass:boolean}} Tour */
+/** @typedef {Pair & {reason:string}} CrossingFailure */
+/** @typedef {{expected:number, arrivals:Arrival[], failure?:CrossingFailure, retries?:CrossingFailure[], resumedFrom?:number, pass:boolean}} Tour */
 const SIDES = /** @type {const} */ ([[1, 0], [0, 1], [-1, 0], [0, -1]]);
 const DRIFTWOOD = 'driftwood-isle', SKY = 'far-reach', HALF = 250, ENTRY_MS = 90_000, APPROACH_MS = 120_000;
 export const FIRST_ZONE_PAIR = Object.freeze({from: DRIFTWOOD, to: SKY});
@@ -44,6 +45,49 @@ export function zoneEntryTour(cells) {
   return route;
 }
 
+/** Keep a reported prefix only when the same phone build and the current live route agree with it.
+ * @param {readonly Leg[]} route @param {unknown} proof @param {string} build @param {number} from */
+export function resumeZoneEntry(route, proof, build, from) {
+  const prior = /** @type {Partial<Tour> & {build?:string, engine?:string, profile?:string} | null} */ (proof);
+  if (prior?.build !== build || prior.engine !== 'webkit' || prior.profile !== 'phone' || prior.pass !== false) {
+    throw new Error('Resume needs a held phone WebKit proof for the same staging build');
+  }
+  if (!Array.isArray(prior.arrivals) || !Number.isSafeInteger(from) || from < 1 || from > route.length || prior.arrivals.length !== from-1) {
+    throw new Error('Resume must start at the next crossing after the saved prefix');
+  }
+  /** @param {Pair | undefined} pair @param {Leg | undefined} leg */
+  const matches = (pair, leg) => typeof pair === 'object' && pair !== null && leg !== undefined &&
+    pair.from === leg.from.instance && pair.to === leg.to.instance;
+  if (prior.expected !== route.length || !matches(prior.failure, route[from-1]) ||
+      !prior.arrivals.every((arrival, index) => matches(arrival, route[index]) && Number.isFinite(arrival.ms) && arrival.ms > 0)) {
+    throw new Error('The saved prefix does not match the live route');
+  }
+  return [...prior.arrivals];
+}
+
+/** @template T @param {(attempt:1 | 2) => Promise<T | undefined>} run */
+export async function retryZoneEntry(run) {
+  const first = await run(1);
+  return first === undefined ? undefined : run(2);
+}
+
+/** The shortest route already played to the source of a held crossing.
+ * @param {readonly Leg[]} qualified @param {string} home @param {string} destination @returns {Leg[]} */
+export function zoneEntryCorridor(qualified, home, destination) {
+  /** @type {{at:string, legs:Leg[]}[]} */
+  const pending = [{at:home, legs:[]}];
+  const seen = new Set([home]);
+  for (const {at, legs} of pending) {
+    if (at === destination) return legs;
+    for (const leg of qualified) {
+      if (leg.from.instance !== at || seen.has(leg.to.instance)) continue;
+      seen.add(leg.to.instance);
+      pending.push({at:leg.to.instance, legs:[...legs, leg]});
+    }
+  }
+  throw new Error('No completed route reaches the held crossing source');
+}
+
 /** @typedef {{x:number,z:number}} Point */
 /** @typedef {Point & {ride:boolean}} ApproachPoint */
 /** @typedef {readonly [number,number,number]} PortalPoint */
@@ -61,13 +105,18 @@ const face = (page, from, toward) => page.evaluate(yaw => {
   /** @type {any} */ (window).__wildshard.world.player.yaw = yaw;
 }, Math.atan2(from.x-toward.x, from.z-toward.z));
 
+// A bad approach and a stalled destination both use the entry timer. Keep the last scene state.
 /** @param {Page} page */
-function loadingDetail(page) {
+function crossingDetail(page) {
   return page.evaluate(() => {
     const rows = Array.from(document.querySelectorAll('.ws-load [data-el="foot"]'));
     const visible = rows.find(row => row.getClientRects().length > 0);
     const st = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.();
-    return String(visible?.textContent?.trim() ?? st?.cellStep?.step ?? '').replaceAll(/\s+/gu, ' ').slice(0, 150);
+    const loading = String(visible?.textContent?.trim() ?? st?.cellStep?.step ?? '').replaceAll(/\s+/gu, ' ').slice(0, 150);
+    const here = st?.feet;
+    const position = here === undefined ? '' : `, feet ${Number(here.x).toFixed(1)}, ${Number(here.z).toFixed(1)}`;
+    const grid = st === undefined ? '' : `home ${String(st.home ?? 'none')}, gate ${String(st.gate?.cell ?? 'none')}${position}`;
+    return [grid, loading].filter(Boolean).join('; ');
   }).catch(() => '');
 }
 
@@ -233,46 +282,97 @@ async function arrived(page, target, center, end) {
   throw new Error('Walk input did not move the player within the entry window');
 }
 
-/** @param {Page} page @param {Point} origin @param {Tour} result @param {() => void} save */
-export async function walkZoneEntryTour(page, origin, result, save) {
-  const {cells, pitch} = await page.evaluate(() => {
+/** @param {Page} page */
+const gridLayout = page => page.evaluate(() => {
     const st = /** @type {any} */ (window).__wildshard.shard.grid.state();
     return /** @type {{cells: Cell[],pitch:number}} */ (st);
-  });
+});
+
+/** @param {Page} page @param {Point} origin @param {Tour} result @param {() => void} save
+ * @param {{restart:()=>Promise<Page>, resume?:{proof:unknown, build:string, from:number}}} options */
+export async function walkZoneEntryTour(page, origin, result, save, {restart, resume}) {
+  const {cells, pitch} = await gridLayout(page);
   const route = zoneEntryTour(cells);
   result.expected = route.length;
-  const start = route[0]?.from.cell;
+  const start = route[0]?.from;
   if (start === undefined) throw new Error('The live grid contains no gate crossings');
-  /** @type {Cell | undefined} */ let previous;
-  for (const leg of route) {
-    const {from, to} = leg, pair = {from: from.instance, to: to.instance};
-    const center = {x: origin.x+(from.cell[0]-start[0])*pitch, z: origin.z+(from.cell[1]-start[1])*pitch};
+  let walkingPage = page;
+  const layoutId = (/** @type {readonly Cell[]} */ rows) => JSON.stringify([...rows]
+    .sort((a, b) => a.instance.localeCompare(b.instance))
+    .map(({instance,slug,cell}) => [instance,slug,cell]));
+  const layout = layoutId(cells);
+  const reboot = async () => {
+    const reopened = await restart(), next = await gridLayout(reopened);
+    if (next.pitch !== pitch || layoutId(next.cells) !== layout) {
+      throw new Error('The live grid changed while restarting the tour');
+    }
+    return reopened;
+  };
+  /** @param {Page} crossingPage @param {Leg} leg @param {Cell | undefined} previous */
+  const cross = async (crossingPage, leg, previous) => {
+    const {from, to} = leg;
+    const center = {x: origin.x+(from.cell[0]-start.cell[0])*pitch, z: origin.z+(from.cell[1]-start.cell[1])*pitch};
     const dx = to.cell[0]-from.cell[0], dz = to.cell[1]-from.cell[1];
     const gate = {x: center.x+dx*(pitch-HALF+2), z: center.z+dz*(pitch-HALF+2)};
     const targetCenter = {x:center.x+dx*pitch,z:center.z+dz*pitch};
-    const arrivedFrom = previous;
+    const approachEnd = Date.now()+APPROACH_MS;
+    await bounded(APPROACH_MS, async () => {
+      const approach = previous === undefined
+        ? [{x:center.x+dx*(HALF-15), z:center.z+dz*(HALF-15), ride:false}]
+        : roadApproach(await exitToRoad(crossingPage, from, previous, center, approachEnd), leg, center, pitch);
+      for (const point of approach) await approachPoint(crossingPage, point, approachEnd);
+    }, 'The walker timed out on the gate approach');
+    const started = Date.now();
+    await bounded(ENTRY_MS, async () => {
+      await walk(crossingPage, gate, started+ENTRY_MS, {arriving: to.instance});
+      await arrived(crossingPage, to.instance, targetCenter, started+ENTRY_MS);
+    }, 'The next world did not reach drawn, interactive play within 90 seconds');
+    return Date.now()-started;
+  };
+  /** @param {Cell} destination */
+  const position = async destination => {
+    const corridor = zoneEntryCorridor(route.slice(0, result.arrivals.length), start.instance, destination.instance);
+    /** @type {Cell | undefined} */ let last;
+    for (const leg of corridor) {
+      console.log(`POSITION ${leg.from.instance} -> ${leg.to.instance}`);
+      await cross(walkingPage, leg, last);
+      last = leg.from;
+    }
+    return last;
+  };
+  if (resume !== undefined) {
+    result.arrivals = resumeZoneEntry(route, resume.proof, resume.build, resume.from);
+    result.resumedFrom = resume.from;
+  }
+  let needsPositioning = resume !== undefined;
+  /** @type {Cell | undefined} */ let previous;
+  for (const leg of route.slice(result.arrivals.length)) {
+    const {from, to} = leg, pair = {from: from.instance, to: to.instance};
     result.failure = {...pair, reason: 'The runner stopped during this crossing'};
     save();
-    try {
-      const approachEnd = Date.now()+APPROACH_MS;
-      await bounded(APPROACH_MS, async () => {
-        const approach = arrivedFrom === undefined
-          ? [{x: center.x+dx*(HALF-15), z: center.z+dz*(HALF-15), ride: false}]
-          : roadApproach(await exitToRoad(page, from, arrivedFrom, center, approachEnd), leg, center, pitch);
-        for (const point of approach) await approachPoint(page, point, approachEnd);
-      }, 'The walker timed out on the gate approach');
-      const started = Date.now();
-      await bounded(ENTRY_MS, async () => {
-        await walk(page, gate, started+ENTRY_MS, {arriving: to.instance});
-        await arrived(page, to.instance, targetCenter, started+ENTRY_MS);
-      }, 'The next world did not reach drawn, interactive play within 90 seconds');
-      result.arrivals.push({...pair, ms: Date.now()-started});
-      previous = from;
-      console.log(`PASS ${pair.from} -> ${pair.to}`);
-    } catch (error) {
-      const loading = await Promise.race([loadingDetail(page), delay(2000, '')]);
-      const reason = error instanceof Error ? error.message : String(error);
-      result.failure = {...pair, reason: `${reason.split('\n')[0]}${loading ? ` (loading ${loading})` : ''}`};
+    const failure = await retryZoneEntry(async attempt => {
+      try {
+        if (attempt === 2) { walkingPage = await reboot(); needsPositioning = true; }
+        if (needsPositioning) previous = await position(from);
+        result.arrivals.push({...pair, ms:await cross(walkingPage, leg, previous)});
+        previous = from;
+        needsPositioning = false;
+        console.log(`PASS ${pair.from} -> ${pair.to}`);
+        return undefined;
+      } catch (error) {
+        const detail = await Promise.race([crossingDetail(walkingPage), delay(2000, '')]);
+        const reason = error instanceof Error ? error.message : String(error);
+        const missed = {...pair, reason: `${reason.split('\n')[0]}${detail ? ` (${detail})` : ''}`};
+        if (attempt === 1) {
+          (result.retries ??= []).push(missed);
+          console.log(`RETRY ${pair.from} -> ${pair.to}: ${missed.reason}`);
+          save();
+        }
+        return missed;
+      }
+    });
+    if (failure !== undefined) {
+      result.failure = failure;
       return;
     }
   }

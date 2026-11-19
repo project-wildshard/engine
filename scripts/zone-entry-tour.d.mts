@@ -2,6 +2,7 @@ import type { Page } from 'playwright';
 
 export interface Cell {
   instance: string;
+  slug?: string;
   cell: readonly [number, number];
 }
 interface Pair {
@@ -12,14 +13,20 @@ export interface Tour {
   expected: number;
   arrivals: (Pair & {ms: number})[];
   failure?: Pair & {reason: string};
+  retries?: (Pair & {reason: string})[];
+  resumedFrom?: number;
   pass: boolean;
 }
 
 export const FIRST_ZONE_PAIR: Readonly<Pair>;
 export function zoneEntryTour(cells: readonly Cell[]): {from: Cell; to: Cell}[];
+export function resumeZoneEntry(route: readonly {from: Cell; to: Cell}[], proof: unknown, build: string, from: number): Tour['arrivals'];
+export function retryZoneEntry<T>(run: (attempt: 1 | 2) => Promise<T | undefined>): Promise<T | undefined>;
+export function zoneEntryCorridor(qualified: readonly {from: Cell; to: Cell}[], home: string, destination: string): {from: Cell; to: Cell}[];
 export function roadApproach(last: Cell, leg: {from: Cell; to: Cell}, center: {x: number; z: number}, pitch: number): {x: number; z: number; ride: boolean}[];
 interface Point {x: number; z: number}
 type PortalPoint = readonly [number, number, number];
 export function portalExitPlan(entries: readonly {road: {at: PortalPoint}; route: readonly PortalPoint[]}[], center: Point, incoming: Point):
   {walk: Point[]; decks: (Point & {dx: number; dz: number})[]} | null;
-export function walkZoneEntryTour(page: Page, origin: {x: number; z: number}, result: Tour, save: () => void): Promise<void>;
+export function walkZoneEntryTour(page: Page, origin: Point, result: Tour, save: () => void,
+  options: {restart:()=>Promise<Page>;resume?:{proof:unknown;build:string;from:number}}): Promise<void>;

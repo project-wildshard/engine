@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { portalExitPlan, roadApproach, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
+import { portalExitPlan, resumeZoneEntry, retryZoneEntry, roadApproach, zoneEntryCorridor, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
 
 const cells = [
   {instance:'driftwood-isle', cell:[0, 0]},
@@ -24,6 +24,44 @@ test('opens with Driftwood into Sky Reach and walks both directions of every liv
 
 test('refuses a partial tour when a live cell is disconnected', (): void => {
   expect((): void => { zoneEntryTour([...cells, {instance:'stranded', cell:[3, 3]}]); }).toThrow(/outside the walking tour/u);
+});
+
+test('resumes only the next crossing after an exact live route prefix', (): void => {
+  const build = 'a'.repeat(40), route = zoneEntryTour(cells);
+  const prefix = {
+    build, engine:'webkit', profile:'phone', pass:false, expected:route.length,
+    arrivals:[{from:'driftwood-isle',to:'far-reach',ms:25}],
+    failure:{from:'far-reach',to:'south-west',reason:'entry timed out'},
+  };
+  expect(resumeZoneEntry(route, prefix, build, 2)).toEqual(prefix.arrivals);
+  expect(() => resumeZoneEntry(route, prefix, build, 3)).toThrow(/next crossing/u);
+  expect(() => resumeZoneEntry(route, {...prefix, build:'b'.repeat(40)}, build, 2)).toThrow(/same staging build/u);
+  expect(() => resumeZoneEntry(route, {...prefix, arrivals:[{...prefix.arrivals[0], to:'west'}]}, build, 2)).toThrow(/live route/u);
+  expect(() => resumeZoneEntry(route, {...prefix, failure:{from:'far-reach',to:'west',reason:'hold'}}, build, 2)).toThrow(/live route/u);
+});
+
+test('retries the same crossing once and reports the second failure', async () => {
+  const calls: number[] = [];
+  const result = await retryZoneEntry(async attempt => {
+    calls.push(attempt);
+    return `failed ${String(attempt)}`;
+  });
+  expect(calls).toEqual([1,2]);
+  expect(result).toBe('failed 2');
+  calls.length = 0;
+  expect(await retryZoneEntry(async attempt => { calls.push(attempt); return undefined; })).toBeUndefined();
+  expect(calls).toEqual([1]);
+  calls.length = 0;
+  expect(await retryZoneEntry(async attempt => { calls.push(attempt); return attempt === 1 ? 'busy' : undefined; })).toBeUndefined();
+  expect(calls).toEqual([1,2]);
+});
+
+test('returns to a held source over the shortest directed route already qualified', (): void => {
+  const route = zoneEntryTour(cells);
+  const saved = route.slice(0, 6);
+  expect(zoneEntryCorridor(saved,'driftwood-isle','south-west')).toEqual(route.slice(0,2));
+  expect(zoneEntryCorridor(saved,'driftwood-isle','driftwood-isle')).toEqual([]);
+  expect(() => zoneEntryCorridor(route.slice(0,1),'far-reach','driftwood-isle')).toThrow(/No completed route/u);
 });
 
 test('rides the long public road from Nine’s west gate and walks both turn-ins', (): void => {

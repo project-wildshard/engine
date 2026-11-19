@@ -13,7 +13,9 @@
 // ZE15 (opus-gcm18): `--base=https://staging.wildshard.io` is the online form on staging (a guest seat, every socket guarded to the
 // staging door, J205), and `--target=` takes any of Driftwood's four neighbours (pine-hollow north, far-reach south), each walked from
 // the spawn by grid-crossing-walk-proof.mjs's route. Staging's fresh boot can't be placed, so its playingMB is reported, not held.
-import { mkdirSync, writeFileSync } from 'node:fs';
+// J451: `--walk-all --expected-build=<sha>` walks the phone tour. `--resume=<held zone-entry.json> --from=33`
+// continues at crossing 33 and uses a fresh `--out`. Omit `--from` to take the next crossing from the held report.
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
@@ -28,12 +30,20 @@ const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${na
 const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire');
 const deploy = process.argv.includes('--deploy');
 const liveTour = process.argv.includes('--walk-all'), expectedBuild = flag('expected-build', '');
+const resumeFile = flag('resume', ''), fromFlag = flag('from', '');
 if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: zone-gate-proof.mjs --base=<staging, preview or loopback url> --out=<dir>');
 // ZE15/ZE22: staging is a world build like the rig's (J205: a guest seat, the socket guarded to the staging door; never production)
 const staging = base === 'https://staging.wildshard.io', online = staging || process.argv.includes('--online');
 if (liveTour && (!staging || engineName !== 'webkit' || !/^[0-9a-f]{40}$/u.test(expectedBuild))) {
   throw new Error('--walk-all requires staging, WebKit and --expected-build');
 }
+if ((resumeFile !== '' && !liveTour) || (fromFlag !== '' && resumeFile === '') ||
+    (resumeFile !== '' && absolute(resumeFile) === join(out, 'zone-entry.json'))) {
+  throw new Error('Resume needs --walk-all, --resume=<held zone-entry.json> and a fresh --out; --from is the next 1-based crossing');
+}
+const prior = resumeFile === '' ? undefined : JSON.parse(readFileSync(resumeFile, 'utf8'));
+const resume = prior === undefined ? undefined : {proof:prior, build:expectedBuild,
+  from: fromFlag === '' ? (Array.isArray(prior?.arrivals) ? prior.arrivals.length+1 : 0) : Number(fromFlag)};
 const desk = (/^(\d+)x(\d+)@([\d.]+)$/u.exec(flag('viewport', '2992x1434@2')) ?? [0, '2992', '1434', '2']).slice(1).map(Number);
 const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(resolve, ms); });
 const HALF = 250;
@@ -91,6 +101,28 @@ const servedBuild = async () => {
   const response = await fetch(`${base}/version.json`, {cache:'no-store', signal:AbortSignal.timeout(15_000)});
   return response.ok ? String((await response.json()).build) : '';
 };
+
+/** @param {import('playwright').BrowserContext} context @param {import('playwright').Page} page */
+async function bootDriftwood(context, page) {
+  await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
+  await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+  await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
+  await page.goto(`${base}/?mute=1&nolock=1${staging ? '&fps=60' : ''}`, { waitUntil: 'load' });
+  await page.locator('.ws-main-select').click({ timeout: 120_000 });
+  if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) {
+    await page.locator('#ws-name-box input').fill(staging ? `ZE ${Date.now().toString(36).slice(-5)}` : 'gate');
+    await page.locator('#ws-name-box button[type=submit]').click();
+  }
+  await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
+  const index = await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes('Driftwood Isle')));
+  if (index < 0) throw new Error('No Driftwood Isle card');
+  await page.locator('.ws-menu-dots i').nth(index).click();
+  await page.locator('.ws-menu-play').click();
+  await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: deploy ? 90_000 : 180_000, polling: 100 });
+  await sleep(2000);
+  await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
+}
+
 const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
 let code = 1;
 try {
@@ -110,24 +142,22 @@ try {
     W.WebSocket = class extends Real { constructor(/** @type {any[]} */ ...args) { super(...args); W.__zeSockets.push({ url: String(args[0]), at: Date.now(), socket: this }); } };
   });
   const sockets = () => page.evaluate(() => /** @type {any[]} */ (/** @type {any} */ (window).__zeSockets ?? []).map(row => ({ url: String(row.url).replace(/[?#].*$/u, ''), at: row.at, open: row.socket.readyState === 1 }))).catch(() => null);
-  await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
-  await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-  await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
-  await page.goto(`${base}/?mute=1&nolock=1${staging ? '&fps=60' : ''}`, { waitUntil: 'load' });
-  await page.locator('.ws-main-select').click({ timeout: 120_000 });
-  if (await page.locator('#ws-name-box input').waitFor({ timeout: 30_000 }).then(() => true).catch(() => false)) { await page.locator('#ws-name-box input').fill(staging ? `ZE ${Date.now().toString(36).slice(-5)}` : 'gate'); await page.locator('#ws-name-box button[type=submit]').click(); }
-  await page.locator('.ws-menu-card').first().waitFor({ state: 'visible', timeout: 30_000 });
-  const index = await page.evaluate(() => [...document.querySelectorAll('.ws-menu-card')].findIndex(row => (row.textContent ?? '').includes('Driftwood Isle')));
-  if (index < 0) throw new Error('No Driftwood Isle card');
-  await page.locator('.ws-menu-dots i').nth(index).click();
-  await page.locator('.ws-menu-play').click();
-  await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: deploy ? 90_000 : 180_000, polling: 100 });
-  await sleep(2000);
-  await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
+  await bootDriftwood(context,page);
   const state = () => page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard.shard.grid.state(), wf = st.live?.live?.worldFeet ?? W.__wildshard.world.player.position; return { x: Number(wf.x.toFixed(2)), z: Number(wf.z.toFixed(2)), gate: st.gate ?? null, walls: st.softWalls ?? null, inside: st.inside, cur: st.live?.live?.current ?? null }; });
   const origin = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
   if (liveTour) {
-    await walkZoneEntryTour(page, origin, tour, saveTour);
+    let active = context;
+    const restart = async () => {
+      await active.close();
+      if (await servedBuild() !== expectedBuild) throw new Error('The staging build changed before the crossing could restart');
+      active = await browser.newContext({...PHONE,isMobile:true});
+      await active.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
+      const next = await active.newPage();
+      await watchFaults(next, result.errors);
+      await bootDriftwood(active,next);
+      return next;
+    };
+    await walkZoneEntryTour(page, origin, tour, saveTour, {restart, ...(resume === undefined ? {} : {resume})});
     if (tour.pass && await servedBuild() !== expectedBuild) throw new Error('The staging build changed during the zone-entry smoke');
     code = tour.pass ? 0 : 1;
     if (tour.failure !== undefined) console.log(`FAIL ${tour.failure.from} -> ${tour.failure.to}: ${tour.failure.reason}`);
