@@ -25,6 +25,8 @@ export interface StuckStepPorts {
   readonly now?: () => number;
   readonly every: (ms: number, run: () => void) => () => void;
   readonly stalled: (step: string, stuckMs: number) => void;
+  /** Whether the page is hidden now (default never): a hidden page's seconds never count (QA 11-19 row 17) */
+  readonly hidden?: () => boolean;
 }
 
 /** Watch `started` until it settles; calls `stalled` at most once. Returns the stop. */
@@ -38,6 +40,8 @@ export function watchStuckStep(started: Promise<unknown>, ports: StuckStepPorts,
     // Nine's main thread ~23 s, 44272554796; Driftwood's props read "no progress for 61 s", 44276449981), not a stopped boot.
     const watched = Math.min(at - looked, 2000);
     looked = at;
+    // a backgrounded page (a phone's app switcher, a locked screen) is not a stopped boot: its seconds never count
+    if (ports.hidden?.() === true) return;
     // a wait on the player holds the bound at zero; whatever follows it gets the whole bound again
     if (player || signature !== last) { last = signature; stuck = 0; return; }
     stuck += watched;

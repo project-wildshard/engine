@@ -136,3 +136,15 @@ test('S4: rows lose every query and fragment before they leave the page', () => 
   const rows = ['parts/driftwood-0.bin?token=secret&id=7 1.2 MB', 'world#frag done'];
   expect(stuckContext({ dataset: { step: 'download' }, rows })['rows']).toEqual(['parts/driftwood-0.bin 1.2 MB', 'world done']);
 });
+
+// QA 11-19 row 17 (coordinator's worst-case model: "measured on visible time only, so a backgrounded page doesn't count"):
+// a hidden page's seconds never count toward the bound, however its throttled timer ticks; visible seconds still do
+test('seconds while the page is hidden never count toward the bound', () => {
+  let hidden = false;
+  const h = harness(() => ({ step: 'home', signature: 'home|10|0' }));
+  watchStuckStep(never, { ...h.ports, hidden: () => hidden }, 60_000);
+  h.tick(30_000);
+  hidden = true; h.tick(600_000); expect(h.stalls).toEqual([]);
+  hidden = false; h.tick(29_000); expect(h.stalls).toEqual([]);
+  h.tick(1000); expect(h.stalls).toEqual([['home', 60_000]]);
+});

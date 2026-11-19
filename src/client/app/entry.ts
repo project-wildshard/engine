@@ -441,6 +441,7 @@ async function startPage(): Promise<void> {
   const started = startSelected();
   watchStuckStep(started, {
     progress: () => progressOfCard(card(), document),
+    hidden: () => document.visibilityState === 'hidden',
     every: (ms, run) => { const timer = entryScope.interval(ms, run); return () => { entryScope.cancelTimer(timer); }; },
     stalled: (step, stuckMs) => { const why = stall(); void (async () => { (await import('@wildshard/engine/ui/ErrorModal')).showError(stuckMessage(step, { stuckMs }), '', why); })(); },
   });
