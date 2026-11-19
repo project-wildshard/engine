@@ -22,7 +22,7 @@ export function checkServerOutput(outDir, preview) {
   const files = existsSync(b) ? readdirSync(b, { recursive: true, withFileTypes: true })
     .filter(row => row.isFile()).map(row => relative(outDir, resolve(row.parentPath, row.name))) : [];
   const server = files.filter(standaloneServerFile);
-  if (!preview && server.length !== 0) throw new Error(`Unexpected in-page server output: ${server.join(', ')}`);
+  if (!preview && server.length > 0) throw new Error(`Unexpected in-page server output: ${server.join(', ')}`);
   if (preview && !server.some(path => /\/serverWorker[^/]*\.js$/u.test(path))) throw new Error('Preview build has no server worker');
 }
 
