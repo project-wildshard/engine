@@ -5,70 +5,52 @@ import { tmpdir } from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- The carried-book case writes a small dist.
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { BASELINE_FILE, checkShardSizes, ratchetShardSizes, readPhoneDownloads, type ShardSizeBaseline } from '../scripts/shard-size-gate.mjs';
+import { BASELINE_FILE, checkShardSizes, pinnedContentKeys, readPhoneDownloads, shardMeasures } from '../scripts/shard-size-gate.mjs';
+import { readBaselines, readCaps } from '../scripts/budgets/files.mjs';
 
-const limits = { newShardHardCapBytes: 60_000_000, toleranceBytes: 100_000, ratchetSlackBytes: 1_000_000 };
-const baseline: ShardSizeBaseline = { limits, raises: [], shards: {
-  held: { baselinePhoneBytes: 20_000_000, recordedPhoneBytes: 19_000_000, ceilingPhoneBytes: 20_000_000, shrinkOnly: false },
-  over: { baselinePhoneBytes: 50_000_000, recordedPhoneBytes: 90_000_000, ceilingPhoneBytes: 90_000_000, shrinkOnly: true },
-} };
-const errors = (downloads: Record<string, number>, input: ShardSizeBaseline = baseline): string[] => checkShardSizes(input, downloads).errors;
+// BUDGET-CAPS BC4 (J444, J437): the download is judged by the budget verdict. The hard cap is J338's 100 MB; the soft
+// line is the recorded baseline plus 10% for the same pinned revision; a new revision is new content.
+const caps = { schema: 1, about: '', caps: { 'download/phone/*': { hard: 100_000_000, unit: 'bytes', kind: 'exact' as const, decision: 'J338', why: 'w' } } };
+const budgets = { caps, baselines: { schema: 1, about: '', baselines: {
+  'download/phone/driftwood-isle': { value: 21_082_585, contentKey: 'driftwood-isle@4' },
+  'download/phone/held': { value: 20_000_000, contentKey: 'held@1' },
+} } };
+const keys = { 'driftwood-isle': 'driftwood-isle@5', held: 'held@1' };
+const errors = (downloads: Record<string, number>, contentKeys: Record<string, string> = keys): string[] => checkShardSizes(budgets, downloads, { contentKeys }).errors;
 
-test('a shard at or under its ceiling passes; the tolerance absorbs build noise', () => {
-  expect(errors({ held: 20_050_000, over: 90_050_000 })).toEqual([]);
+test('Driftwood rev 5 at 22,218,404 B against rev 4\'s 21,082,585 B baseline passes as raised (J437)', () => {
+  const result = checkShardSizes(budgets, { 'driftwood-isle': 22_218_404, held: 20_000_000 }, { contentKeys: keys });
+  expect(result.errors).toEqual([]);
+  expect(result.rows.find(row => row.key === 'download/phone/driftwood-isle')?.status).toBe('raised');
+});
+
+test('the same revision 10% over its baseline fails as a regression, 9% passes', () => {
+  const same = { ...keys, 'driftwood-isle': 'driftwood-isle@4' };
+  expect(errors({ 'driftwood-isle': 23_190_844, held: 20_000_000 }, same)[0]).toContain('regressed');
+  expect(errors({ 'driftwood-isle': 22_980_000, held: 20_000_000 }, same)).toEqual([]);
+});
+
+test('past 100 MB fails on any revision, and a shard with no baseline is held to the hard cap alone', () => {
+  expect(errors({ 'driftwood-isle': 101_000_000, held: 20_000_000 })[0]).toContain('100.00 MB hard cap');
+  expect(errors({ 'driftwood-isle': 22_000_000, held: 20_000_000, fresh: 99_000_000 }, { ...keys, fresh: 'fresh@1' })).toEqual([]);
+  expect(errors({ 'driftwood-isle': 22_000_000, held: 20_000_000, fresh: 101_000_000 }, { ...keys, fresh: 'fresh@1' })[0]).toContain('fresh');
+});
+
+test('a 30% smaller shard passes: nothing fails for getting smaller', () => {
+  expect(errors({ 'driftwood-isle': 22_000_000, held: 14_000_000 })).toEqual([]);
 });
 
 test('a baseline shard with no row is refused, unless a cook adds it and the gate runs again', () => {
   const [message] = errors({ held: 20_000_000 });
-  expect(message).toContain('over has a baseline and no row');
-  expect(checkShardSizes(baseline, { held: 20_000_000 }, { cooksAfter: true }).errors).toEqual([]);
+  expect(message).toContain('driftwood-isle has a baseline and no row');
+  expect(checkShardSizes(budgets, { held: 20_000_000 }, { contentKeys: keys, cooksAfter: true }).errors).toEqual([]);
 });
 
-test('growth past the baseline is refused, naming the shard and the way out', () => {
-  const [message] = errors({ held: 21_000_000, over: 90_000_000 });
-  expect(message).toContain('held downloads 21.00 MB');
-  expect(message).toContain('raises');
-});
-
-test('a shrink-only shard cannot grow, and a shrink must be latched in the same change', () => {
-  expect(errors({ held: 20_000_000, over: 91_000_000 })[0]).toContain('shrink-only');
-  expect(errors({ held: 20_000_000, over: 80_000_000 })[0]).toContain('--ratchet');
-});
-
-test('a new shard is held to the hard cap, and only a new shard', () => {
-  const both = { held: 20_000_000, over: 90_000_000 };
-  expect(errors({ ...both, fresh: 59_000_000 })).toEqual([]);
-  expect(errors({ ...both, fresh: 61_000_000 })[0]).toContain('hard cap');
-});
-
-test('a ratchet follows a shrink-only shard past its baseline, and the old room is gone', () => {
-  const lower = ratchetShardSizes(baseline, { over: 70_000_000 });
-  expect(lower.shards['over']).toMatchObject({ ceilingPhoneBytes: 70_000_000, latchedPhoneBytes: 70_000_000, shrinkOnly: true });
-  expect(errors({ held: 20_000_000, over: 75_000_000 }, lower)[0]).toContain('over downloads');
-  const past = ratchetShardSizes(lower, { over: 40_000_000 });
-  expect(past.shards['over']).toMatchObject({ ceilingPhoneBytes: 40_000_000, latchedPhoneBytes: 40_000_000, shrinkOnly: true });
-  expect(errors({ held: 20_000_000, over: 40_000_000 }, past)).toEqual([]);
-  expect(errors({ held: 20_000_000, over: 49_000_000 }, past)[0]).toContain('over downloads');
-  const regrown: ShardSizeBaseline = { ...past, shards: { ...past.shards, over: { baselinePhoneBytes: 50_000_000, recordedPhoneBytes: 90_000_000, ceilingPhoneBytes: 50_000_000, latchedPhoneBytes: 40_000_000, shrinkOnly: true } } };
-  expect(errors({ held: 20_000_000, over: 50_000_000 }, regrown)[0]).toContain('"raises"');
-});
-
-test('a ratchet leaves build noise inside the slack alone', () => {
-  expect(ratchetShardSizes(baseline, { over: 89_500_000 }).shards['over']?.ceilingPhoneBytes).toBe(90_000_000);
-});
-
-test('a ratchet leaves a shard at its baseline alone', () => {
-  expect(ratchetShardSizes(baseline, { held: 15_000_000 }).shards['held']?.ceilingPhoneBytes).toBe(20_000_000);
-  expect(ratchetShardSizes(baseline, { held: 25_000_000 }).shards['held']?.ceilingPhoneBytes).toBe(20_000_000);
-});
-
-test('a ceiling edited upward is refused until a raise names Jake\'s decision', () => {
-  const edited = (raises: ShardSizeBaseline['raises']): ShardSizeBaseline => ({ limits, raises, shards: { ...baseline.shards,
-    over: { baselinePhoneBytes: 50_000_000, recordedPhoneBytes: 90_000_000, ceilingPhoneBytes: 95_000_000, shrinkOnly: true } } });
-  expect(errors({ held: 20_000_000, over: 95_000_000 }, edited([]))[0]).toContain('"raises"');
-  expect(errors({ held: 20_000_000, over: 95_000_000 }, edited([{ shard: 'over', toBytes: 95_000_000, decision: 'soon', why: 'x' }]))[0]).toContain('names no decision');
-  expect(errors({ held: 20_000_000, over: 95_000_000 }, edited([{ shard: 'over', toBytes: 95_000_000, decision: 'G1100', why: 'the new forest' }]))).toEqual([]);
-  expect(errors({ held: 20_000_000, over: 95_000_000 }, edited([{ shard: 'over', toBytes: 95_000_000, decision: 'J299', why: 'audio in DOWNLOAD' }]))).toEqual([]);
+test('measures carry each shard\'s pinned revision as its content key; an unpinned product is engine content', () => {
+  expect(shardMeasures({ held: 5, other: 6 }, { held: 'held@1' })).toEqual({ measures: {
+    'download/phone/held': { value: 5, contentKey: 'held@1' }, 'download/phone/other': { value: 6, contentKey: 'engine' } } });
+  const pinned = pinnedContentKeys();
+  expect(pinned['driftwood-isle']).toMatch(/^driftwood-isle@\d+$/u);
 });
 
 test('the book read is this build\'s own, never one a deploy carried in, and no book means nothing to check', () => {
@@ -107,11 +89,12 @@ test('a cooked row is read with the engine half its page also downloads', () => 
   expect(readPhoneDownloads(dist)).toEqual({ cooked: 61, built: 60 });
 });
 
-test('the committed baseline is self-standing and internally lawful', () => {
-  const file = JSON.parse(readFileSync(BASELINE_FILE, 'utf8')) as ShardSizeBaseline & {
-    baseline: { commit: string }; method: { steps: readonly string[] } };
+test('the committed numbers are lawful: the measurement record stays as history, the budgets judge it', () => {
+  const file = JSON.parse(readFileSync(BASELINE_FILE, 'utf8')) as { baseline: { commit: string }; method: { steps: readonly string[] }; shards: Record<string, unknown> };
   expect(file.baseline.commit).toMatch(/^[0-9a-f]{40}$/u);
   expect(file.method.steps.join('\n')).toContain(file.baseline.commit);
-  expect(Object.keys(file.shards)).toHaveLength(6);
-  expect(checkShardSizes(file, {}, { cooksAfter: true }).errors).toEqual([]);
+  expect(file).not.toHaveProperty('raises');
+  expect(file).not.toHaveProperty('limits');
+  for (const row of Object.values(file.shards)) expect(row).not.toHaveProperty('shrinkOnly');
+  expect(checkShardSizes({ caps: readCaps(), baselines: readBaselines() }, {}, { contentKeys: pinnedContentKeys(), cooksAfter: true }).errors).toEqual([]);
 });

@@ -1,6 +1,6 @@
 {
  "schema": 1,
- "about": "What each shard downloaded before DOWNLOAD began, and what a build may ship. scripts/shard-size-gate.mjs reads this on every web build. Plan: docs/plans/multi-repo/SHARD-SIZE-PLAN.md in project-wildshard-meta.",
+ "about": "The measured history of each shard's phone download: what it downloaded at the baseline and recorded commits, and how that was measured. It judges nothing since BUDGET-CAPS BC4 (J444): scripts/shard-size-gate.mjs reads the hard cap from budgets/caps.json and each shard's baseline from budgets/baselines.json. The old latch, raises and the 60 MB cap are in git at 161063f3. Plan: docs/plans/multi-repo/SHARD-SIZE-PLAN.md in project-wildshard-meta.",
  "baseline": {
   "commit": "1474f7deb9cb190cab32bc8a3388c2adefc119ef",
   "committed": "2026-10-29T14:41:01-05:00",
@@ -31,66 +31,10 @@
    "git worktree remove tmp/size-baseline/old && git worktree prune"
   ]
  },
- "limits": {
-  "newShardHardCapBytes": 60000000,
-  "targetPhoneBytes": [
-   30000000,
-   40000000
-  ],
-  "targetSource": "Estimate: docs/plans/multi-repo/research/cooking-and-packs.md. The target is printed in the plan and refuses nothing.",
-  "toleranceBytes": 256000,
-  "ratchetSlackBytes": 1000000
- },
- "update": {
-  "shrink": "After a change saves bytes: node scripts/shard-size-gate.mjs dist --ratchet, and commit this file with the change. The build refuses a shrink-only shard more than 1 MB under its ceiling until this is done. A shrink-only ceiling follows the shard down past its baseline (latchedPhoneBytes), so it can't regrow into the old room.",
-  "grow": "Only on Jake's word: set ceilingPhoneBytes and add {shard, toBytes, decision, why} to raises, naming his G, E or J number. A raised ceiling with no such row is refused.",
-  "remeasure": "To change the baseline itself, redo method.steps from baseline.commit, or move baseline.commit on Jake's word and redo them there."
- },
- "raises": [
-  {
-   "shard": "pine-hollow",
-   "toBytes": 41824808,
-   "decision": "J299",
-   "why": "AUDIO AU1 (J299, Jake 2026-11-12: audio downloads at DOWNLOAD and is cached): the boot audio set moved into the phone download, +4.73 MB over the 37.09 MB latch, inside J303's 10 MB audio budget. Raised by opus-rel14 for v0.1.14."
-  },
-  {
-   "shard": "driftwood-isle",
-   "toBytes": 22460181,
-   "decision": "J299",
-   "why": "AUDIO AU1 (J299, Jake 2026-11-12: audio downloads at DOWNLOAD and is cached): the boot audio set moved into the phone download, +3.28 MB over the 19.18 MB latch, inside J303's 10 MB audio budget. Raised by opus-rel14 for v0.1.14."
-  },
-  {
-   "shard": "nalati-grasslands",
-   "toBytes": 44038111,
-   "decision": "J299",
-   "why": "AUDIO AU1 (J299, Jake 2026-11-12: audio downloads at DOWNLOAD and is cached): the boot audio set moved into the phone download, +5.49 MB over the 38.55 MB latch, inside J303's 10 MB audio budget. Raised by opus-rel14 for v0.1.14."
-  },
-  {
-   "shard": "nine-dragon-stack",
-   "toBytes": 34683878,
-   "decision": "J299",
-   "why": "AUDIO AU1 (J299, Jake 2026-11-12: audio downloads at DOWNLOAD and is cached): the boot audio set moved into the phone download, +2.29 MB over the 32.40 MB latch, inside J303's 10 MB audio budget. Raised by opus-rel14 for v0.1.14."
-  },
-  {
-   "shard": "far-reach",
-   "toBytes": 26340742,
-   "decision": "J338",
-   "why": "GC30b (J338, Jake 2026-11-13: \"let's have it look GREAT FIRST ; then optimize megabytes later\", up to 50 MB a shard, 100 MB the hard ceiling): Sky Reach rev 3 (cdbb400c) gives Far Reach its entry docks and ships its phone tier as copies of the desktop GLBs, +0.36 MB over the 25.98 MB latch. The look stays; megabytes are optimised later. Raised by opus-farreach."
-  },
-  {
-   "shard": "driftwood-isle",
-   "toBytes": 27218404,
-   "decision": "J437",
-   "why": "Driftwood rev 5 adds revised piano, sound effects and shard assets. The staging phone pack measures 22,218,404 B. Raise the soft ceiling from 21,082,585 B to that measurement plus J431's 5,000,000 B margin."
-  }
- ],
  "shards": {
   "pine-hollow": {
    "baselinePhoneBytes": 78299562,
    "recordedPhoneBytes": 111018672,
-   "ceilingPhoneBytes": 41824808,
-   "latchedPhoneBytes": 37091647,
-   "shrinkOnly": true,
    "baseline": {
     "phone": {
      "wireBytes": 78299562,
@@ -169,9 +113,6 @@
   "driftwood-isle": {
    "baselinePhoneBytes": 23757802,
    "recordedPhoneBytes": 26278506,
-   "ceilingPhoneBytes": 27218404,
-   "marginPhoneBytes": 5000000,
-   "shrinkOnly": true,
    "baseline": {
     "phone": {
      "wireBytes": 23757802,
@@ -245,14 +186,11 @@
     "head": "0c14ad7a53687c6a1fdd9982edf60bcffbffea4973c71dc19178321cefeb2458",
     "bytes": 94310912,
     "mountsAssetsBytes": 12076637
-   },
-   "latchedPhoneBytes": 22218404
+   }
   },
   "far-reach": {
    "baselinePhoneBytes": 49888072,
    "recordedPhoneBytes": 53585115,
-   "ceilingPhoneBytes": 26340742,
-   "shrinkOnly": true,
    "baseline": {
     "phone": {
      "wireBytes": 49888072,
@@ -322,14 +260,11 @@
     "head": "66eacdbb4a7c306d36e58396004e9bdb92230fe51d7a518b995cd3dd59973f51",
     "bytes": 66691072,
     "mountsAssetsBytes": 29602062
-   },
-   "latchedPhoneBytes": 25980736
+   }
   },
   "sunscar-dunes": {
    "baselinePhoneBytes": 12421514,
    "recordedPhoneBytes": 11650341,
-   "ceilingPhoneBytes": 12421514,
-   "shrinkOnly": false,
    "baseline": {
     "phone": {
      "wireBytes": 12421514,
@@ -406,8 +341,6 @@
   "nalati-grasslands": {
    "baselinePhoneBytes": 58179472,
    "recordedPhoneBytes": 57946689,
-   "ceilingPhoneBytes": 44038111,
-   "shrinkOnly": true,
    "baseline": {
     "phone": {
      "wireBytes": 58179472,
@@ -480,14 +413,11 @@
     "head": "bc6e2b7a18ed6c12789f05141efce427df068bbd1fffd0354a2b9243a3d94526",
     "bytes": 151324160,
     "mountsAssetsBytes": 58906158
-   },
-   "latchedPhoneBytes": 38552070
+   }
   },
   "nine-dragon-stack": {
    "baselinePhoneBytes": 21798837,
    "recordedPhoneBytes": 42130782,
-   "ceilingPhoneBytes": 27202151,
-   "shrinkOnly": true,
    "baseline": {
     "phone": {
      "wireBytes": 21798837,
@@ -558,8 +488,7 @@
     "head": "a5d4967755a7cb21756b0d81e21e86b032525e29f7952eee182707d25da37bf8",
     "bytes": 113122816,
     "mountsAssetsBytes": 19473265
-   },
-   "latchedPhoneBytes": 27202151
+   }
   }
  }
 }

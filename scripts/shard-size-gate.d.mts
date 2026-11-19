@@ -1,13 +1,11 @@
-/** SHARD-SIZE row 1: each web build refuses a shard whose phone download grew. */
-export interface ShardSizeRow { baselinePhoneBytes: number; recordedPhoneBytes: number; ceilingPhoneBytes: number; latchedPhoneBytes?: number; marginPhoneBytes?: number; shrinkOnly: boolean }
-export interface ShardSizeRaise { shard: string; toBytes: number; decision: string; why: string }
-export interface ShardSizeBaseline {
-  limits: { newShardHardCapBytes: number; toleranceBytes: number; ratchetSlackBytes: number };
-  shards: Record<string, ShardSizeRow>;
-  raises: readonly ShardSizeRaise[];
-}
+/** SHARD-SIZE row 1, judged by BUDGET-CAPS BC4: each web build judges each shard's phone download by the budget verdict. */
+import type { BudgetBaselines, BudgetCaps } from './budgets/files.mjs';
+import type { BudgetMeasures, BudgetRow } from './budgets/cli.mjs';
+
 export const BASELINE_FILE: string;
+export const PINS_FILE: string;
 export function readPhoneDownloads(dist: string): Record<string, number> | null;
-export function checkShardSizes(baseline: ShardSizeBaseline, downloads: Record<string, number>, options?: { cooksAfter?: boolean }): { errors: string[]; notes: string[] };
-export function ratchetShardSizes<T extends { limits: { ratchetSlackBytes: number }; shards: Record<string, Pick<ShardSizeRow, 'ceilingPhoneBytes' | 'latchedPhoneBytes' | 'marginPhoneBytes' | 'shrinkOnly'>> }>(baseline: T, downloads: Record<string, number>): T;
+export function pinnedContentKeys(root?: string): Record<string, string>;
+export function shardMeasures(downloads: Record<string, number>, contentKeys: Record<string, string>): BudgetMeasures;
+export function checkShardSizes(budgets: { caps: BudgetCaps; baselines: BudgetBaselines }, downloads: Record<string, number>, options: { contentKeys: Record<string, string>; cooksAfter?: boolean; hardOnly?: boolean }): { errors: string[]; notes: string[]; rows: BudgetRow[] };
 export function folderBuckets(folder: string): { totalBytes: number; files: number; buckets: Record<string, number> };

@@ -24,3 +24,11 @@
 - BC3 lint, fixed forward: `judgeAll` builds rows with `Object.assign`
   (no-map-spread), the CLI finds its one positional (prefer-array-find), and
   `cli.d.mts` gets its blank line. It had refused main-push from this clone.
+- P0 fix forward: `js/session/raw` 4,400,000 -> 4,450,000 in `lint/ratchet.json`.
+  Main run 44464496865 built session raw 4,400,336 B after tonight's feature
+  pushes (CC11a2c ability rows, FS17, TR-3 ring). Under J444 that is a declared
+  raise by engine features, not a regression.
+- BC4: `shard-size-gate.mjs` judges `download/phone/<slug>` with the verdict:
+  the content key is the pinned revision, so a new revision is `raised`. The
+  latch, the raises list and the 60 MB number are gone; 100 MB (J338) is the
+  hard cap in caps.json.

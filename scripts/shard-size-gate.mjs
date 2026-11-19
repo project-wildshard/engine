@@ -1,19 +1,27 @@
 #!/usr/bin/env node
-// SHARD-SIZE row 1 (docs/plans/multi-repo/SHARD-SIZE-PLAN.md in project-wildshard-meta): every web build refuses a shard whose
-// phone download grew. It reads the packs book, the list the page really downloads: `client.<slug>.phone.wireBytes`.
-// budgets/shard-size-baseline.json holds the ceilings, the measured old numbers, how they were measured and how to
-// change them on purpose. I12's older check read a tier selection, so Pine passed at 67 MB while phones took 111.
+// SHARD-SIZE row 1, judged by BUDGET-CAPS BC4 (meta docs/plans/BUDGET-CAPS-PLAN.md; J444, J437): every web build reads
+// each shard's phone download from the packs book (`client.<slug>.phone.wireBytes`, what the page really downloads) and
+// judges it with scripts/budgets/verdict.mjs. The hard cap is budgets/caps.json `download/phone/*` (J338, 100 MB). The
+// baseline is budgets/baselines.json `download/phone/<slug>`, tied to the shard's pinned revision: a new revision is new
+// content and only the hard cap applies until it is recorded; the same revision 10% over its baseline is a regression.
+// Nothing fails for getting smaller. budgets/shard-size-baseline.json keeps the measured history and how it was measured.
 //
-//   node scripts/shard-size-gate.mjs [dist]             refuse growth (scripts/build-app.mjs runs this)
+//   node scripts/shard-size-gate.mjs [dist]                 judge (scripts/build-app.mjs runs this)
 //   node scripts/shard-size-gate.mjs [dist] --cooks-after   the build of a deploy whose cook adds shards: a row may still be missing
-//   node scripts/shard-size-gate.mjs [dist] --ratchet   lower the ceilings of shards that shrank, in the baseline file
-//   node scripts/shard-size-gate.mjs --folders <root>   print each shard folder's size by bucket, for a re-measure
+//   node scripts/shard-size-gate.mjs [dist] --hard-only     fail only past a hard cap (release qualification)
+//   node scripts/shard-size-gate.mjs [dist] --measures <f>  also write the measures for scripts/budgets/cli.mjs
+//   node scripts/shard-size-gate.mjs [dist] --record        record these downloads as the baselines
+//   node scripts/shard-size-gate.mjs --folders <root>       print each shard folder's size by bucket, for a re-measure
 import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { contentDirOf } from './app-build/splitOutput.mjs';
+import { budgetTable, failed, judgeAll, recordAll } from './budgets/cli.mjs';
+import { readBaselines, readCaps, writeBaselines } from './budgets/files.mjs';
 
 export const BASELINE_FILE = 'budgets/shard-size-baseline.json';
+export const PINS_FILE = 'test/pins/shardfiles.json';
+const KEY = 'download/phone/';
 const MB = bytes => `${(bytes / 1e6).toFixed(2)} MB`;
 
 /** Each product's phone download from a built `dist` (its book in `dist-content/` when split), or null for a build with
@@ -38,65 +46,41 @@ export function readPhoneDownloads(dist) {
   return Object.fromEntries(Object.entries(client).map(([slug, row]) => [slug, row.phone.wireBytes + (cooked(row) ? engine : 0)]));
 }
 
-/** What a shard may legally have as a ceiling: its baseline, or the last approved raise. A shrink-only shard may also sit
- * at the level it held when the baseline was recorded (`recordedPhoneBytes`), never higher. Once a ratchet latched it
- * (`latchedPhoneBytes`), that is the level: a shard that reached it never gets the old room back without a raise.
- * @param {string} slug
- * @param {{ baselinePhoneBytes: number, recordedPhoneBytes: number, latchedPhoneBytes?: number, shrinkOnly: boolean }} row
- * @param {readonly { shard: string, toBytes: number }[]} raises */
-function legalCeiling(slug, row, raises) {
-  const approved = raises.filter(raise => raise.shard === slug).map(raise => raise.toBytes);
-  return Math.max(row.latchedPhoneBytes ?? Math.max(row.baselinePhoneBytes, row.shrinkOnly ? row.recordedPhoneBytes : 0), ...approved);
+/** Each pinned shard's content key, `<slug>@<revision>`, from the pins this tree builds.
+ * @param {string} [root] @returns {Record<string, string>} */
+export function pinnedContentKeys(root = resolve(import.meta.dirname, '..')) {
+  const { shards } = JSON.parse(readFileSync(resolve(root, PINS_FILE), 'utf8'));
+  return Object.fromEntries(shards.map((/** @type {{ slug: string, revision: number }} */ pin) => [pin.slug, `${pin.slug}@${pin.revision}`]));
 }
 
-/** Refuse growth. Pure: the baseline file's parsed contents and the measured downloads in, messages out. A baseline shard
- * with no row is refused too (a shard that left the build must arrive through the cook, or nothing measures it), unless
- * `cooksAfter` says a later step adds rows and the gate runs again on its output.
- * @param {{ limits: { newShardHardCapBytes: number, toleranceBytes: number, ratchetSlackBytes: number },
- *   shards: Record<string, { baselinePhoneBytes: number, recordedPhoneBytes: number, ceilingPhoneBytes: number, marginPhoneBytes?: number, shrinkOnly: boolean }>,
- *   raises: readonly { shard: string, toBytes: number, decision: string, why: string }[] }} baseline
+/** The downloads as budget measures; a product with no pin is the engine's own content.
+ * @param {Record<string, number>} downloads @param {Record<string, string>} contentKeys */
+export function shardMeasures(downloads, contentKeys) {
+  return { measures: Object.fromEntries(Object.entries(downloads).map(([slug, value]) => [`${KEY}${slug}`, { value, contentKey: contentKeys[slug] ?? 'engine' }])) };
+}
+
+/** Judge the downloads. Pure: the two budget files and the measured downloads in, messages and table rows out. A
+ * baseline shard with no row is refused too (a shard that left the build must arrive through the cook, or nothing
+ * measures it), unless `cooksAfter` says a later step adds rows and the gate runs again on its output.
+ * @param {{ caps: import('./budgets/files.mjs').BudgetCaps, baselines: import('./budgets/files.mjs').BudgetBaselines }} budgets
  * @param {Record<string, number>} downloads
- * @param {{ cooksAfter?: boolean }} [options]
- * @returns {{ errors: string[], notes: string[] }} */
-export function checkShardSizes(baseline, downloads, { cooksAfter = false } = {}) {
-  const errors = [], notes = [], { limits, shards, raises } = baseline;
-  for (const raise of raises) {
-    // J-numbers are Jake's decisions since the split (meta MULTI-REPO-PLAN section 2); G and E are the singleplayer-era logs.
-    if (!/^[GEJ]\d+$/u.test(raise.decision) || raise.why.trim() === '') errors.push(`shard size: the raise of ${raise.shard} names no decision (G###, E### or J###) and why`);
+ * @param {{ contentKeys: Record<string, string>, cooksAfter?: boolean, hardOnly?: boolean }} options */
+export function checkShardSizes({ caps, baselines }, downloads, { contentKeys, cooksAfter = false, hardOnly = false }) {
+  const errors = [], notes = [];
+  for (const key of Object.keys(baselines.baselines)) {
+    if (!key.startsWith(KEY) || downloads[key.slice(KEY.length)] !== undefined || cooksAfter) continue;
+    errors.push(`shard size: ${key.slice(KEY.length)} has a baseline and no row in the book, so nothing measures it. A shard leaves the build only through the cook, with this gate run on the cooked output.`);
   }
-  for (const [slug, row] of Object.entries(shards)) {
-    const legal = legalCeiling(slug, row, raises);
-    if (row.ceilingPhoneBytes > legal) errors.push(`shard size: ${slug}'s ceiling ${MB(row.ceilingPhoneBytes)} is past the ${MB(legal)} it may hold; a raise needs a row in "raises" with Jake's decision (${BASELINE_FILE})`);
-    if (!row.shrinkOnly && row.ceilingPhoneBytes > row.baselinePhoneBytes) errors.push(`shard size: ${slug} has a ceiling past its baseline, so it must be shrinkOnly; run --ratchet`);
-    const bytes = downloads[slug];
-    if (bytes === undefined) {
-      if (!cooksAfter) errors.push(`shard size: ${slug} has a baseline and no row in the book, so nothing measures it. A shard leaves the build only through the cook, with this gate run on the cooked output.`);
-      continue;
-    }
-    const measured = row.ceilingPhoneBytes - (row.marginPhoneBytes ?? 0);
-    if (bytes > row.ceilingPhoneBytes + limits.toleranceBytes) errors.push(`shard size: ${slug} downloads ${MB(bytes)} on a phone, past its ${MB(row.ceilingPhoneBytes)} ceiling (baseline ${MB(row.baselinePhoneBytes)}${row.shrinkOnly ? ', shrink-only' : ''}). For added content, record the new soft ceiling and the content in "raises" in ${BASELINE_FILE} (J438/J439). Investigate growth without added content.`);
-    else if (bytes < measured - limits.ratchetSlackBytes && row.shrinkOnly) errors.push(`shard size: ${slug} shrank to ${MB(bytes)}; latch it in this change: node scripts/shard-size-gate.mjs dist --ratchet`);
-    if (row.shrinkOnly) notes.push(`shard size: ${slug} ${MB(bytes)} shrink-only, ${MB(bytes - row.baselinePhoneBytes)} over its baseline`);
+  const rows = judgeAll(caps, baselines, shardMeasures(downloads, contentKeys));
+  for (const row of rows) {
+    const slug = row.key.slice(KEY.length);
+    if (row.status === 'unknown') errors.push(`shard size: ${row.key} has no cap entry in budgets/caps.json`);
+    else if (row.status === 'over-hard') errors.push(`shard size: ${slug} downloads ${MB(row.value ?? 0)} on a phone, past the ${MB(row.hard ?? 0)} hard cap (budgets/caps.json; a hard cap moves only on Jake's word)`);
+    else if (row.status === 'regressed' && !hardOnly) errors.push(`shard size: ${slug} regressed: ${MB(row.value ?? 0)} on the same content (${row.contentKey}) as its ${MB(row.baseline ?? 0)} baseline, at or past the ${MB(row.line ?? 0)} soft line. Growth with no new content is a fix row; an engine feature declares it: node scripts/budgets/cli.mjs declare ${row.key} --why "<feature>"`);
+    else if (row.status === 'raised') notes.push(`shard size: ${slug} ${MB(row.value ?? 0)} is new content (${row.previousKey ?? 'no baseline'} -> ${row.contentKey}); record it: node scripts/shard-size-gate.mjs dist --record`);
   }
-  for (const [slug, bytes] of Object.entries(downloads)) {
-    if (!Object.hasOwn(shards, slug) && bytes > limits.newShardHardCapBytes) errors.push(`shard size: new shard ${slug} downloads ${MB(bytes)} on a phone, past the ${MB(limits.newShardHardCapBytes)} hard cap for a shard with no baseline`);
-  }
-  return { errors, notes };
-}
-
-/** The baseline with each shrink-only ceiling lowered to what the shard downloads now, past its baseline if it got there:
- * a shard that reached 58 can't regrow to a 78 baseline unrefused. A shard held at its baseline stays there, and so does one
- * inside the slack. A declared content margin stays above the measured download when it shrinks.
- * @template {{ limits: { ratchetSlackBytes: number }, shards: Record<string, { ceilingPhoneBytes: number, latchedPhoneBytes?: number, marginPhoneBytes?: number, shrinkOnly: boolean }> }} T
- * @param {T} baseline @param {Record<string, number>} downloads @returns {T} */
-export function ratchetShardSizes(baseline, downloads) {
-  const shards = Object.fromEntries(Object.entries(baseline.shards).map(([slug, row]) => {
-    const bytes = downloads[slug];
-    const margin = row.marginPhoneBytes ?? 0;
-    if (bytes === undefined || bytes >= row.ceilingPhoneBytes - margin - baseline.limits.ratchetSlackBytes || !row.shrinkOnly) return [slug, row];
-    return [slug, { ...row, ceilingPhoneBytes: bytes + margin, latchedPhoneBytes: bytes }];
-  }));
-  return { ...baseline, shards };
+  if (failed(rows, { hardOnly }) && errors.length === 0) errors.push('shard size: the budget verdict failed');
+  return { errors, notes, rows };
 }
 
 /** One shard folder's bytes by bucket: `blobs/<kind>`, `mounts/<name>`, then each other top-level name.
@@ -116,22 +100,31 @@ export function folderBuckets(folder) {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const args = process.argv.slice(2), root = resolve(import.meta.dirname, '..'), file = resolve(root, BASELINE_FILE);
+  const args = process.argv.slice(2), root = resolve(import.meta.dirname, '..');
+  const flag = name => { const at = args.indexOf(name); return at === -1 ? undefined : args[at + 1]; };
   if (args[0] === '--folders') {
-    const out = resolve(args[1] ?? root, 'out'), baseline = JSON.parse(readFileSync(file, 'utf8'));
-    console.info(JSON.stringify(Object.fromEntries(Object.keys(baseline.shards).map(slug => [slug, folderBuckets(join(out, slug))])), null, 1));
+    const out = resolve(args[1] ?? root, 'out'), history = JSON.parse(readFileSync(resolve(root, BASELINE_FILE), 'utf8'));
+    console.info(JSON.stringify(Object.fromEntries(Object.keys(history.shards).map(slug => [slug, folderBuckets(join(out, slug))])), null, 1));
   } else {
-    const ratchet = args.includes('--ratchet'), cooksAfter = args.includes('--cooks-after'), dist = resolve(args.find(arg => !arg.startsWith('--')) ?? 'dist');
+    const measuresFile = flag('--measures');
+    const dist = resolve(args.find((arg, index) => !arg.startsWith('--') && args[index - 1] !== '--measures') ?? 'dist');
     const downloads = readPhoneDownloads(dist);
     if (downloads === null) console.info(`shard size: ${dist} has no packs book; nothing to check`);
     else {
-      const baseline = JSON.parse(readFileSync(file, 'utf8'));
-      if (ratchet) writeFileSync(file, `${JSON.stringify(ratchetShardSizes(baseline, downloads), null, 1)}\n`);
-      const { errors, notes } = checkShardSizes(ratchet ? JSON.parse(readFileSync(file, 'utf8')) : baseline, downloads, { cooksAfter });
+      const contentKeys = pinnedContentKeys(root), caps = readCaps(root);
+      if (measuresFile !== undefined) writeFileSync(resolve(measuresFile), `${JSON.stringify(shardMeasures(downloads, contentKeys), null, 1)}\n`);
+      if (args.includes('--record')) {
+        const recorded = recordAll(caps, readBaselines(root), shardMeasures(downloads, contentKeys));
+        for (const error of recorded.errors) console.error(error);
+        if (recorded.errors.length === 0) writeBaselines(recorded.baselines, root);
+      }
+      const { errors, notes, rows } = checkShardSizes({ caps, baselines: readBaselines(root) }, downloads,
+        { contentKeys, cooksAfter: args.includes('--cooks-after'), hardOnly: args.includes('--hard-only') });
+      console.info(budgetTable(rows));
       for (const note of notes) console.info(note);
       for (const error of errors) console.error(error);
       if (errors.length > 0) process.exitCode = 1;
-      else console.info(`shard size: ${Object.keys(downloads).length} products within their phone ceilings`);
+      else console.info(`shard size: ${Object.keys(downloads).length} products within their budgets`);
     }
   }
 }
