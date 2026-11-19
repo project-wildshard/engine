@@ -22,3 +22,10 @@ test('KP2 (Jake 2026-11-09, "you can\'t have a closed tab"): no default binding 
 test('dodge keeps V and Alt/Option: the muscle memory stays, and the hint names both', () => {
   expect(INPUT_CONTEXTS.find((context) => context.id === 'onFoot')?.keys?.dodge).toEqual(['KeyV', 'AltLeft']);
 });
+
+test('J473 (Jake, 2026-11-19: "dont fucking tuch shit bro"): a talk blocks none of FIRE, AIM, DODGE and JUMP', () => {
+  const dialog = INPUT_CONTEXTS.find((context) => context.id === 'dialog');
+  expect(dialog?.actions).toEqual(['use', 'confirm', 'back']);
+  const blocks = dialog?.blocks;
+  expect(blocks === 'below' ? ['below'] : (blocks ?? []).filter((action) => ['attack', 'heavy', 'aim', 'jump', 'dodge'].includes(action))).toEqual([]);
+});

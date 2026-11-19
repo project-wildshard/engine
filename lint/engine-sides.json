@@ -498,6 +498,7 @@
     "src/client/engine/ui/idleHudRelease.ts": "client",
     "src/client/engine/ui/HUD.ts": "client",
     "src/client/engine/ui/fightMark.ts": "client",
+    "src/client/engine/quest/view/talkPages.ts": "client",
     "src/client/engine/ui/hudAdapters.ts": "client",
     "src/client/engine/ui/hudSlots.ts": "client",
     "src/client/engine/ui/HurtArc.ts": "client",

@@ -27,7 +27,9 @@ export const INPUT_CONTEXTS: readonly InputContextDef[] = [
   { id: 'title', actions: ['confirm', 'nav.left', 'nav.right'], blocks: 'below', enabled: () => app.state === 'title', keys: { confirm: ['*'], 'nav.left': ['ArrowLeft'], 'nav.right': ['ArrowRight'] } },
   { id: 'menu', actions: ['nav.left', 'nav.right', 'tab', 'confirm', 'back', 'pause', 'bag', 'map', 'journal', 'note', 'use'], blocks: 'below',
     keys: { 'nav.left': ['ArrowLeft', 'KeyA'], 'nav.right': ['ArrowRight', 'KeyD'], tab: ['Tab'], confirm: ['Enter', 'Space'], use: ['KeyE'], back: ['Escape'], map: ['KeyM'], journal: ['KeyJ'], note: ['KeyN'] } },
-  { id: 'dialog', actions: ['use', 'confirm', 'back'], blocks: ['attack', 'heavy', 'aim', 'reload', 'swap', 'jump', 'dodge'], keys: { use: ['KeyE'], confirm: ['Enter'], back: ['Escape'] } },
+  // J473 (Jake, 2026-11-19 grill wave 1: controls stay live in a talk): an NPC's dialogue box takes E, Enter and Escape and blocks
+  // nothing, so FIRE, AIM, DODGE and JUMP keep working and the stick walks off (firing or walking off closes the box)
+  { id: 'dialog', actions: ['use', 'confirm', 'back'], keys: { use: ['KeyE'], confirm: ['Enter'], back: ['Escape'] } },
   { id: 'explore', actions: [...movement, 'fly.up', 'fly.down', 'fly.boost', 'pane.1', 'pane.2', 'pane.3', 'map', 'back', 'quickNote', 'focus'], blocks: 'below',
     keys: { ...moveKeys, 'fly.up': ['KeyE', 'Space'], 'fly.down': ['KeyQ', 'KeyC'], 'fly.boost': ['ShiftLeft', 'ShiftRight'], 'pane.1': ['Digit1'], 'pane.2': ['Digit2'], 'pane.3': ['Digit3'], map: ['KeyM'], quickNote: ['F8'], focus: ['KeyF'], back: ['Escape'] } },
 ];

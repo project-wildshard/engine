@@ -1,6 +1,6 @@
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { InputService } from '../input/InputService';
-import { UiLayers } from '../ui/layers';
+import { UiLayers, uiInputContext } from '../ui/layers';
 import { hudSlots } from '../ui/hudSlots';
 
 /** Displayed UI state follows the active resident level. */
@@ -13,11 +13,14 @@ export class AppUi extends UiLayers {
   connectInput(input: InputService, scope: Scope): void {
     if (this.inputConnected) { this.refresh(); return; }
     this.inputConnected = true;
-    let menu = false;
+    let held: '' | 'dialog' | 'menu' = '';
     this.connect(() => {
       if (!input.hasContext('menu')) return;
-      if (this.blocking && !menu) { if (!input.contexts.includes('menu')) input.push('menu', scope); menu = true; }
-      else if (!this.blocking && menu) { input.pop('menu'); menu = false; }
+      const want = uiInputContext(this.blocking, this.menuOpen, input.hasContext('dialog'));
+      if (want === held) return;
+      if (held !== '') input.pop(held);
+      if (want !== '' && !input.contexts.includes(want)) input.push(want, scope);
+      held = want;
     }, this.active);
     input.bind('back', () => { this.back(); }, scope, () => this.blocking);
     this.refresh();

@@ -299,6 +299,7 @@ export const ENGINE_STRINGS = {
   "s_4f911ee89601": "[E] ",
   "s_f13a1ed0cf3c": "CLOSE",
   "s_c93aad5dddf0": "NEXT ▸",
+  "s_talk_leave": "LEAVE",
   "s_9404497cf77d": "⟦0⟧ / ⟦1⟧",
   "s_671fd067cc0e": "▲",
   "s_4a4322f3623e": "Discovered · ⟦0⟧",

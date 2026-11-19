@@ -70,6 +70,15 @@
 .ws-quest-talk-foot b { color: var(--ws-cyan); font-weight: 400; }
 #hud.touch .ws-quest-talk-foot b { padding: 4px 10px; margin: -4px -6px -4px 0; border: 1px solid var(--ws-cyan-line); background: rgba(143, 227, 255, 0.08); }
 #hud.intro .ws-quest-talk { display: none; }
+.ws-quest-talk-acts { display: flex; gap: 10px; }
+.ws-quest-talk-leave { display: none; }
+/* J473 row 4 (Jake, 2026-11-19 grill wave 3): on a phone the talk box sits just above the thumbs' disc row (the touch bar,
+   its 10 px gap, a disc and 10 px), 12 px from each side, under the crosshair's 120 pt keep-out; 17 px text, three lines a
+   page (talkPages.ts), so the box keeps one height; NEXT and LEAVE are its footer buttons. FIRE, AIM, DODGE and JUMP stay. */
+#hud.touch .ws-quest-talk { left: calc(env(safe-area-inset-left, 0px) + 12px); right: calc(env(safe-area-inset-right, 0px) + 12px); width: auto; bottom: calc(max(15vh, 104px) + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px)) * 0.5 + min(15vw, 84px) + 20px); transform: translateY(12px); padding: 10px 13px; }
+#hud.touch .ws-quest-talk.show { transform: none; cursor: default; }
+#hud.touch .ws-quest-talk-text { font-size: 17px; line-height: 1.3; min-height: 3.9em; }
+#hud.touch .ws-quest-talk-leave { display: inline-block; color: var(--ws-text-dim); }
 /* TE-ENG3: a node's choices show once its last line is typed out */
 .ws-quest-talk-choices { display: none; flex-direction: column; gap: 4px; margin-top: 8px; counter-reset: ws-talk-choice; }
 .ws-quest-talk.choosing .ws-quest-talk-choices { display: flex; }

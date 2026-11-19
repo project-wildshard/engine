@@ -2,6 +2,7 @@ import type { UiHandle } from '../../ui/layers';
 import { DialogueClock } from '../../../../shared/engine/quest/dialogueClock';
 import { uiScope, mountUi } from '../../ui/ownership';
 import { engineString } from '../../../../shared/engine/strings';
+import { talkPages } from './talkPages';
 /**
  * The adventure's own HUD pieces (kept out of HUD.ts, which the HUD agent owns) — DOM in `#hud`, styled by
  * src/client/engine/ui/styles/quest.css (prefix ws-quest-):
@@ -21,6 +22,7 @@ import { exploreChannel } from '../../app/view/exploreChannel';
 import { listenPage } from '../../input/dom';
 
 const hudRoot = (): HTMLElement => document.getElementById('hud') ?? document.body;
+const touchHud = (): boolean => document.getElementById('hud')?.classList.contains('touch') === true;
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent?: HTMLElement): HTMLElementTagNameMap[K] => {
   const e = document.createElement(tag); e.className = cls; parent?.append(e); return e;
 };
@@ -182,7 +184,10 @@ export class DialogueBox {
   private text = el('div', 'ws-quest-talk-text', this.root);
   private foot = el('div', 'ws-quest-talk-foot', this.root);
   private page = el('span', '', this.foot);
-  private next = el('b', '', this.foot);
+  /** J473 row 4: the footer's two buttons (LEAVE shows on a touch HUD only; E / Escape do the same on a keyboard) */
+  private acts = el('span', 'ws-quest-talk-acts', this.foot);
+  private leave = el('b', 'ws-quest-talk-leave', this.acts);
+  private next = el('b', 'ws-quest-talk-next', this.acts);
   /** TE-ENG3: a node's choices, under its last line: E takes the first, a digit or a tap takes its own. */
   private readonly options = el('div', 'ws-quest-talk-choices', this.root);
   private choices: readonly DialogueChoice[] = [];
@@ -195,11 +200,20 @@ export class DialogueBox {
   /** chars per second of the type-out */
   cps = 60;
 
-  /** E (desktop) and a tap anywhere on the box (touch) advance it; the game's "[E]" prompt is hidden while it is open */
+  /** E or a click on the box (desktop) and NEXT (touch) advance it; LEAVE closes it. J473 row 4 (Jake, 2026-11-19 grill wave
+   *  3: "NEXT and LEAVE buttons", not tap-the-box): on a touch HUD a tap elsewhere on the box does nothing. Firing closes it
+   *  (FIRE, AIM, DODGE and JUMP stay live in a talk: the `dialog` input context blocks none of them). */
   constructor(scope: Scope = uiScope('dialogue')) {
     this.scope = scope;
     mountUi(this.root, this.scope, hudRoot());
-    scope.listen(this.root, 'pointerdown', (e) => { e.stopPropagation(); e.preventDefault(); this.advance(); });
+    this.leave.textContent = engineString('s_talk_leave');
+    scope.listen(this.root, 'pointerdown', (e) => {
+      e.stopPropagation(); e.preventDefault();
+      const at = e.target instanceof Element ? e.target : null;
+      if ((at?.closest('.ws-quest-talk-leave') ?? null) !== null) { this.close(false); return; }
+      if ((at?.closest('.ws-quest-talk-next') ?? null) !== null || !touchHud()) this.advance();
+    });
+    app.input.bind('attack', () => { this.close(false); }, scope, () => this.open_);
     for (const action of ['use', 'confirm'] as const) app.input.bind(action, () => { this.advance(); }, scope,
       () => this.open_ && (this.layer?.top ?? false) && app.clock.real * 1000 - this.openT >= 150);
     scope.listen(this.options, 'pointerdown', (e) => {
@@ -233,10 +247,20 @@ export class DialogueBox {
     if (lines.length === 0) { onDone(); return; }
     this.name.textContent = name;
     this.setChoices(choices);
-    this.clock.open(lines); this.finish_ = onDone; this.layer?.dispose();
+    this.clock.open(this.paged(lines)); this.finish_ = onDone; this.layer?.dispose();
     this.layer = app.ui.push('modal', { root: this.root, presentation: 'world', order: -42, yieldsToMenu: true, back: () => { this.close(false); } }, this.scope); this.openT = app.clock.real * 1000;
     this.root.classList.add('show');
     this.render();
+  }
+
+  /** J473 row 4: on a touch HUD a line that wraps past 3 lines in the box splits into pages (measured in the box's own font). */
+  private paged(lines: string[]): string[] {
+    if (!touchHud() || typeof getComputedStyle !== 'function') return lines;
+    const width = this.text.clientWidth, pen = document.createElement('canvas').getContext('2d');
+    if (pen === null || width <= 0) return lines;
+    pen.font = getComputedStyle(this.text).font;
+    // a hair of slack: the page's own wrapping (kerning, subpixel widths) can break a line a little earlier than the pen
+    return lines.flatMap((line) => talkPages(line, (text) => pen.measureText(text).width, width * 0.97));
   }
 
   /** Replace the open node's choices, its lines and place kept: a flag they read changed. */
@@ -274,7 +298,7 @@ export class DialogueBox {
     this.text.textContent = this.clock.text;
     this.root.classList.toggle('choosing', this.choosing);
     this.page.textContent = engineString('s_9404497cf77d', [this.clock.index + 1, this.clock.count]);
-    const touch = document.getElementById('hud')?.classList.contains('touch') === true;
+    const touch = touchHud();
     this.next.textContent = engineString('s_4ecdc2db1bc2', [touch ? '' : engineString('s_4f911ee89601'), this.clock.index + 1 < this.clock.count ? engineString('s_c93aad5dddf0') : engineString('s_f13a1ed0cf3c')]);
   }
 }

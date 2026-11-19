@@ -2,6 +2,11 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import {pagePresentation,type ForegroundView} from '../app/view/presentation';
 
 export type UiLayer = 'hud' | 'gameMenu' | 'menu' | 'modal' | 'error';
+/** The input context a UI stack over the world takes: none with nothing over the HUD; `dialog` for an NPC's dialogue box with
+ *  no menu over it (J473: FIRE, AIM, DODGE and JUMP stay live in a talk), when the game defines one; else `menu`. */
+export function uiInputContext(blocking: boolean, menuOpen: boolean, hasDialog: boolean): '' | 'dialog' | 'menu' {
+  return !blocking ? '' : !menuOpen && hasDialog ? 'dialog' : 'menu';
+}
 export interface UiView {
   root: HTMLElement;
   back: () => void;

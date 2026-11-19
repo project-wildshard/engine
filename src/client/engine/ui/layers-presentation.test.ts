@@ -2,7 +2,7 @@
 import {expect,test} from 'vitest';
 import {Scope} from '../../../shared/engine/app/scope';
 import {pagePresentation} from '../app/view/presentation';
-import {UiLayers} from './layers';
+import {UiLayers,uiInputContext} from './layers';
 
 const view=(presentation?:'opaque'|'glass'|'world')=>({root:document.createElement('div'),back:()=>undefined,...(presentation===undefined?{}:{presentation})});
 test('coverage metadata preserves input ownership while opaque, glass and world select presentation',()=>{
@@ -63,4 +63,11 @@ test('J457: <html data-ws-talk> marks an open NPC dialogue box, under a menu too
     // a glass or opaque screen alone is never a talk
     const shop=scope.child('shop');layers.push('modal',view('glass'),shop);expect(root.dataset['wsTalk']).toBeUndefined();shop.dispose();
   }finally{scope.dispose();delete root.dataset['wsTalk'];delete root.dataset['wsMenu'];}
+});
+
+test('J473 (Jake, 2026-11-19: FIRE, AIM, DODGE and JUMP stay live in a talk): a dialogue box takes the dialog context, a menu over it the menu context',()=>{
+  expect(uiInputContext(false,false,true)).toBe('');
+  expect(uiInputContext(true,false,true)).toBe('dialog');
+  expect(uiInputContext(true,true,true)).toBe('menu');
+  expect(uiInputContext(true,false,false)).toBe('menu');
 });
