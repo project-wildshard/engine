@@ -208,3 +208,70 @@ test('a look with a phone skin draws it on the phone tier and its full skin on d
   expect(phone.skin.geometry.boundingBox?.min.x).toBeCloseTo(-1, 6);
   expect(desktop.skin.geometry.boundingBox?.min.x).toBeCloseTo(-0.5, 6);
 });
+
+interface GltfJson { scenes: { nodes: number[] }[]; nodes: Record<string, unknown>[]; meshes: { primitives: { attributes: Record<string, number>; indices: number; material: number }[] }[];
+  materials: unknown[]; skins: { joints: number[]; inverseBindMatrices: number }[]; animations: { channels: { target: { node: number } }[]; samplers: { input: number; output: number }[] }[];
+  accessors: { bufferView: number }[]; bufferViews: { byteOffset: number }[]; buffers: { byteLength: number }[] }
+const glbParts = (glb: Uint8Array): { json: GltfJson; bin: Buffer } => {
+  const bytes = Buffer.from(glb), length = bytes.readUInt32LE(12);
+  return { json: JSON.parse(bytes.subarray(20, 20 + length).toString()) as GltfJson, bin: bytes.subarray(20 + length + 8) };
+};
+/** ONE-FORMAT CC51c: two skin GLBs packed into one, each species under its own node (`left`, `right`); every name inside
+ *  (mesh, joints, the `idle` clip) is the same in both. */
+function packGlbs(left: Uint8Array, right: Uint8Array): Uint8Array {
+  const a = glbParts(left), b = glbParts(right).json, bBin = glbParts(right).bin, offset = a.bin.length + ((4 - (a.bin.length % 4)) % 4);
+  const nodes = a.json.nodes.length, accessors = a.json.accessors.length;
+  const json: GltfJson = {
+    ...a.json,
+    nodes: [...a.json.nodes, ...b.nodes.map((node) => ({ ...node, ...(Array.isArray(node['children']) ? { children: (node['children'] as number[]).map((i) => i + nodes) } : {}),
+      ...(typeof node['mesh'] === 'number' ? { mesh: node['mesh'] + a.json.meshes.length } : {}), ...(typeof node['skin'] === 'number' ? { skin: node['skin'] + a.json.skins.length } : {}) })),
+    { name: 'left', children: a.json.scenes[0]?.nodes ?? [] }, { name: 'right', children: (b.scenes[0]?.nodes ?? []).map((i) => i + nodes) }],
+    meshes: [...a.json.meshes, ...b.meshes.map((mesh) => ({ ...mesh, primitives: mesh.primitives.map((p) => ({ ...p, indices: p.indices + accessors, material: p.material + a.json.materials.length,
+      attributes: Object.fromEntries(Object.entries(p.attributes).map(([k, i]) => [k, i + accessors])) })) }))],
+    materials: [...a.json.materials, ...b.materials],
+    skins: [...a.json.skins, ...b.skins.map((skin) => ({ joints: skin.joints.map((i) => i + nodes), inverseBindMatrices: skin.inverseBindMatrices + accessors }))],
+    animations: [...a.json.animations, ...b.animations.map((clip) => ({ ...clip, channels: clip.channels.map((c) => ({ ...c, target: { ...c.target, node: c.target.node + nodes } })),
+      samplers: clip.samplers.map((s) => ({ ...s, input: s.input + accessors, output: s.output + accessors })) }))],
+    accessors: [...a.json.accessors, ...b.accessors.map((x) => ({ ...x, bufferView: x.bufferView + a.json.bufferViews.length }))],
+    bufferViews: [...a.json.bufferViews, ...b.bufferViews.map((view) => { view.byteOffset += offset; return view; })],
+    buffers: [{ byteLength: offset + bBin.length }],
+  };
+  json.scenes = [{ nodes: [json.nodes.length - 2, json.nodes.length - 1] }];
+  let text = Buffer.from(JSON.stringify(json));
+  text = Buffer.concat([text, Buffer.alloc((4 - (text.length % 4)) % 4, 0x20)]);
+  const bin = Buffer.concat([a.bin, Buffer.alloc(offset - a.bin.length), bBin]), header = Buffer.alloc(12), jh = Buffer.alloc(8), bh = Buffer.alloc(8);
+  header.writeUInt32LE(0x46546c67, 0); header.writeUInt32LE(2, 4); header.writeUInt32LE(12 + 8 + text.length + 8 + bin.length, 8);
+  jh.writeUInt32LE(text.length, 0); jh.writeUInt32LE(0x4e4f534a, 4); bh.writeUInt32LE(bin.length, 0); bh.writeUInt32LE(0x004e4942, 4);
+  return new Uint8Array(Buffer.concat([header, jh, text, bh, bin]));
+}
+
+/** A skin look over the packed pair, drawing the species `mesh` names (none: the whole file). */
+async function loadedPacked(mesh?: string) {
+  await prepareGlbCost();
+  const glb = packGlbs(skinGlb(false), skinGlb(false, false, 2)), cost = parseGlbData(glb), file = sha(glb);
+  const skin = new TextEncoder().encode(JSON.stringify({
+    row: { id: 'test.glow', file, family: 'toon', cost: { decoded: cost.decoded, gpu: cost.gpu, triangles: cost.triangles, draws: cost.draws },
+      rig: { skeleton: 'test.glow', joints: [['body', 'head']], clips: ['idle'], sockets: ['body', 'head'], ...(mesh === undefined ? {} : { mesh }) } },
+    binding: { skin: 'test.glow', material: { family: 'pbr', vertexColours: false }, loops: ['idle'] },
+  }));
+  const look = { id: 'test.glow.look', species: 'test.glow', recipe: 'platform.skin', material: null, parameters: { skin: sha(skin) },
+    animation: { recipe: 'platform.clips', parameters: { attackSpan: 1 } } };
+  const source = { rows: { looks: [look], species: [{ id: 'test.glow', variants: [{ id: 'plain' }] }] },
+    files: [{ hash: sha(skin), kind: 'json', dependencies: [file] }, { hash: file, kind: 'glb', dependencies: [] }], look: { materials: {} } };
+  const skins = await loadClientSkins(source as never, new Map([[sha(skin), skin], [file, glb]]), () => new THREE.MeshStandardMaterial(), new Scope('packed skin'), 'desktop');
+  const loadedSkin = skins.get('test.glow.look'); if (loadedSkin === undefined) throw new Error('skin not loaded');
+  return loadedSkin;
+}
+
+test('a skin naming its packed node draws that species and plays its own clip (ONE-FORMAT CC51c)', async () => {
+  const left = await loadedPacked('left'), right = await loadedPacked('right');
+  left.geometry.computeBoundingBox(); right.geometry.computeBoundingBox();
+  expect(left.geometry.boundingBox?.min.x).toBeCloseTo(-0.5, 6);
+  expect(right.geometry.boundingBox?.min.x).toBeCloseTo(-1, 6);
+  expect(right.bones).toEqual(left.bones);
+  // both clips are named `idle`; each species samples its own (the head rises 1.1 m on the left, 1.2 m on the right)
+  const head = (skin: typeof left): number[] => Array.from(skin.clips.get('idle')?.tracks.find((track) => track.bone === 'head')?.interpolant.evaluate(1) ?? []);
+  expect(head(left)[1]).toBeCloseTo(1.1, 6);
+  expect(head(right)[1]).toBeCloseTo(1.2, 6);
+  await expect(loadedPacked('middle')).rejects.toThrow(/expected one packed node middle/u);
+});

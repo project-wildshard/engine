@@ -9,7 +9,7 @@
  *   const skin = await loadSkin(bytes, row, binding, material);   // admitted, bound, posed at the clip's first frame
  *   skin.play('walk'); skin.update(dt);                            // per frame, as the engine's rigs do
  */
-import { Float32BufferAttribute, PropertyBinding, type BufferGeometry, type Material, type Object3D, type SkinnedMesh } from 'three';
+import { Float32BufferAttribute, PropertyBinding, type AnimationClip, type BufferGeometry, type KeyframeTrack, type Material, type Object3D, type SkinnedMesh } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as v from 'valibot';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -47,13 +47,13 @@ const SourceNames = v.object({ nodes: v.array(v.object({ name: v.optional(v.stri
 /** The parser's associations retain original node identity after Three sanitizes
  * names. Bind renamed animation targets by UUID so dots and colliding sanitized
  * spellings never become a PropertyBinding path. The GLB remains untouched. */
-function restoreSkinNames(file: GLTF, sockets: readonly string[]): void {
+function restoreSkinNames(file: GLTF, sockets: readonly string[], root: Object3D = file.scene, animations: readonly AnimationClip[] = file.animations): void {
   const raw: unknown = file.parser.json, source = v.parse(SourceNames, raw);
   const joints = new Set<Object3D>();
-  file.scene.traverse(node => { if (isSkin(node)) for (const bone of node.skeleton.bones) joints.add(bone); });
+  root.traverse(node => { if (isSkin(node)) for (const bone of node.skeleton.bones) joints.add(bone); });
   const requested = new Set(sockets), seen = new Map<string, Object3D>();
   const names: { node: Object3D; original: string }[] = [];
-  file.scene.traverse(node => {
+  root.traverse(node => {
     const index = file.parser.associations.get(node)?.nodes, original = index === undefined ? undefined : source.nodes[index]?.name;
     if (joints.has(node) && (original === undefined || original === '')) throw new Error('skin joint has no original node identity');
     if (original === undefined || (!joints.has(node) && !requested.has(original))) return;
@@ -65,13 +65,47 @@ function restoreSkinNames(file: GLTF, sockets: readonly string[]): void {
     if (renamed.has(node.name)) throw new Error(`ambiguous loaded skin node ${node.name}`);
     renamed.set(node.name, node);
   }
-  for (const clip of file.animations) for (const track of clip.tracks) {
+  for (const clip of animations) for (const track of clip.tracks) {
     const path = PropertyBinding.parseTrackName(track.name), node = renamed.get(path.nodeName);
     if (node === undefined) continue;
     if (path.objectName !== undefined || path.objectIndex !== undefined || path.propertyIndex !== undefined) throw new Error(`unsupported renamed skin track ${track.name}`);
     track.name = `${node.uuid}.${path.propertyName}`;
   }
   for (const { node, original } of names) node.name = original;
+}
+
+/**
+ * ONE-FORMAT CC51c: one species of a packed GLB (several small species in one file, format `skin-materials`
+ * `packedSpecies`). The skin row's `rig.mesh` names the node holding its species; its subtree becomes the skin's root and
+ * its clips are the ones whose every track moves a node in it. Two species on one skeleton share every name, so each
+ * kept track is bound to its node by UUID first (three's loaded names are unique, the GLB's are not); the other species'
+ * meshes are disposed. Without `rig.mesh` the whole file is the skin, as before.
+ */
+function packedSkin(file: GLTF, row: SkinRow): { root: Object3D; clips: AnimationClip[] } {
+  const mesh = row.rig.mesh;
+  if (mesh === undefined) return { root: file.scene, clips: file.animations };
+  const raw: unknown = file.parser.json, source = v.parse(SourceNames, raw), roots: Object3D[] = [], byName = new Map<string, Object3D>();
+  file.scene.traverse(node => {
+    byName.set(node.name, node);
+    const index = file.parser.associations.get(node)?.nodes;
+    if (index !== undefined && source.nodes[index]?.name === mesh) roots.push(node);
+  });
+  const root = roots[0];
+  if (root === undefined || roots.length !== 1) throw new Error(`skin ${row.id}: expected one packed node ${mesh}`);
+  const inside = new Set<Object3D>(); root.traverse(node => { inside.add(node); });
+  const target = (track: KeyframeTrack): Object3D | undefined => byName.get(PropertyBinding.parseTrackName(track.name).nodeName);
+  const clips = file.animations.filter(clip => clip.tracks.length > 0 && clip.tracks.every(track => { const node = target(track); return node !== undefined && inside.has(node); }));
+  for (const clip of clips) for (const track of clip.tracks) {
+    const node = target(track), path = PropertyBinding.parseTrackName(track.name);
+    if (node !== undefined) track.name = `${node.uuid}.${path.propertyName}`;
+  }
+  root.removeFromParent();
+  file.scene.traverse(node => {
+    if (!isSkin(node)) return;
+    node.geometry.dispose();
+    for (const material of Array.isArray(node.material) ? node.material : [node.material]) material.dispose();
+  });
+  return { root, clips };
 }
 
 /**
@@ -134,8 +168,9 @@ export async function loadSkin(glb: Uint8Array, row: SkinRow, binding: SkinBindi
   cost.decoded += skinLayerDecoded(binding.poseLayers ?? {}, row.rig.joints[0]?.length ?? 0);
   if (cost.gpu > row.cost.gpu || cost.decoded > row.cost.decoded || cost.triangles > row.cost.triangles || cost.draws > row.cost.draws) throw new Error(`skin ${row.id}: cost above its declaration`);
   const file = await (await prepareRigLoader()).createRigLoader().parseBytesAsync(glb, '');
-  restoreSkinNames(file, row.rig.sockets);
-  const meshes: SkinnedMesh[] = []; file.scene.traverse((node) => { if (isSkin(node)) meshes.push(node); });
+  const { root, clips } = packedSkin(file, row);
+  restoreSkinNames(file, row.rig.sockets, root, clips);
+  const meshes: SkinnedMesh[] = []; root.traverse((node) => { if (isSkin(node)) meshes.push(node); });
   // a GLB mesh's primitives (one per GLB material) load as sibling skinned meshes: merged into the first, grouped by `parts`
   const mesh = meshes[0], node = meshes.length > 1 ? mesh?.parent : mesh;
   const groups = mergePrimitives(meshes, parts, row.id);
@@ -145,7 +180,7 @@ export async function loadSkin(glb: Uint8Array, row: SkinRow, binding: SkinBindi
   mesh.material = groups === 1 ? material : Array.from({ length: groups }, () => material);
   const extras: unknown = (node ?? mesh).userData['castShadow'];
   mesh.castShadow = extras === true; mesh.receiveShadow = true;
-  const rig = bindRig(file.scene, file.animations, { skeleton: row.rig.skeleton, clips: row.rig.clips, sockets: row.rig.sockets }, { skeleton: row.rig.skeleton, joints: row.rig.joints });
+  const rig = bindRig(root, clips, { skeleton: row.rig.skeleton, clips: row.rig.clips, sockets: row.rig.sockets }, { skeleton: row.rig.skeleton, joints: row.rig.joints });
   const states: Record<string, { clip: CreatureSkinClipName; fade: number }> = {};
   for (const name of row.rig.clips) states[name] = { clip: name, fade: 0 };
   const machine = new AnimMachine({ states, loops: binding.loops }, rig);
@@ -154,7 +189,7 @@ export async function loadSkin(glb: Uint8Array, row: SkinRow, binding: SkinBindi
   const layers = new Map(Object.entries(binding.poseLayers ?? {}).filter((entry): entry is [string, NonNullable<typeof entry[1]>] => entry[1] !== undefined).map(([name, data]) => [name, skinPoseLayers(mesh, data)]));
   let activeLayers: ReturnType<typeof skinPoseLayers> | undefined;
   const player: SkinPlayer = {
-    root: file.scene, mesh, rig, machine, cost,
+    root, mesh, rig, machine, cost,
     get clip() { return current; },
     play: (name) => {
       activeLayers?.restore();
