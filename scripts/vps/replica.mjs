@@ -14,7 +14,7 @@
 //     replica. Its stdout (the worker lines mmo-bots.mjs reads) comes back to the caller, and both go when it ends.
 //   replica.mjs start <seconds> <workers> <seats> <cells> postgres
 //     MMO-SERVER E7.4b.b: the same, but its saves go to a scratch cluster, a throwaway apt Postgres 16 cluster
-//     (16 wildshard-replica, port 5439, socket only, peer for postgres and one per-run scram password for the replica's
+//     (16 wildshard_replica, port 5439, socket only, peer for postgres and one per-run scram password for the replica's
 //     role), so a Postgres outage can be witnessed on apt Postgres without blipping a channel's saves. Only the constants
 //     below name a cluster: the channels' own cluster and databases are never touched.
 //   replica.mjs pg-restart  restarts only the scratch cluster, while a replica runs on it.
@@ -31,7 +31,9 @@ export const RELEASE_PUBLIC_KEY = '302a300506032b657003210012e17122631777e2a6ad6
 export const UNIT = 'wildshard-replica', DOOR = 'wildshard-replica-door', PORT = 18796, INNER = 18797, CPUS = '9-12';
 const PROXYD = '/usr/lib/systemd/systemd-socket-proxyd';
 // E7.4b.b: the scratch cluster. Its name, port, role and database are this file's own, never a channel's.
-export const PG_VERSION = '16', CLUSTER = 'wildshard-replica', PG_PORT = 5439, PG_ROLE = 'replica', PG_DATABASE = 'saves_replica';
+// Debian's postgresql@ unit uses %I in its config path. The version separator is the only dash in the instance.
+export const PG_VERSION = '16', CLUSTER = 'wildshard_replica', PG_PORT = 5439, PG_ROLE = 'replica', PG_DATABASE = 'saves_replica';
+const OLD_CLUSTER = 'wildshard-replica';
 const PG_SOCKET = '/var/run/postgresql', PG_UNIT = `postgresql@${PG_VERSION}-${CLUSTER}.service`;
 const PACK_ORIGIN = 'https://packs.wildshard.io', MAX_BUNDLE = 256 * 1024 * 1024;
 const CELL = /^[a-z0-9][a-z0-9-]{0,63}(?:,[a-z0-9][a-z0-9-]{0,63}){0,7}$/u, HEX40 = /^[0-9a-f]{40}$/u, HEX64 = /^[0-9a-f]{64}$/u;
@@ -122,7 +124,8 @@ export function doorArgs(run) {
 
 // The engine's test hands it a made-up /etc, its own key and stand-ins; never as root, so sudo cannot.
 const test = process.geteuid?.() !== 0 ? process.env.WILDSHARD_REPLICA_TEST : undefined;
-const ETC = `${test ?? ''}/etc/wildshard`, PG_ETC = `${test ?? ''}/etc/postgresql/${PG_VERSION}/${CLUSTER}`, FOLDER = test !== undefined ? join(test, 'replica') : `/var/lib/${UNIT}`;
+const ETC = `${test ?? ''}/etc/wildshard`, PG_CONFIG = `${test ?? ''}/etc/postgresql/${PG_VERSION}`;
+const PG_ETC = join(PG_CONFIG, CLUSTER), FOLDER = test !== undefined ? join(test, 'replica') : `/var/lib/${UNIT}`;
 const CLEAN = { PATH: '/usr/sbin:/usr/bin:/sbin:/bin', HOME: '/root', LANG: 'C.UTF-8' };
 
 /** @param {string} message @returns {never} */
@@ -138,7 +141,9 @@ function exec(command, args, how = {}) {
 }
 /** E7.4b.b: drop the scratch cluster if it exists. It holds only a replica's throwaway saves. */
 function dropScratch() {
-  if (existsSync(PG_ETC)) exec('/usr/bin/pg_dropcluster', ['--stop', PG_VERSION, CLUSTER]);
+  for (const name of [CLUSTER, OLD_CLUSTER]) {
+    if (existsSync(join(PG_CONFIG, name))) exec('/usr/bin/pg_dropcluster', ['--stop', PG_VERSION, name]);
+  }
 }
 /** E7.4b.b: a fresh scratch cluster with the replica's role and database; its DATABASE_URL, or a stop. */
 function makeScratch() {
