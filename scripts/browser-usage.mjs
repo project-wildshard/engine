@@ -19,7 +19,7 @@ export function reservedSlots(active){
  /** @type {Map<string|undefined,number>} */const roots=new Map(),weights=new Map();
  for(const row of active){
   let cursor=row;const seen=new Set();
-  while(cursor.borrowedFrom!=null&&tokens.has(cursor.borrowedFrom)&&!seen.has(cursor.token)){seen.add(cursor.token);cursor=/** @type {LedgerRow} */(tokens.get(cursor.borrowedFrom));}
+  while(typeof cursor.borrowedFrom==='string'&&tokens.has(cursor.borrowedFrom)&&!seen.has(cursor.token)){seen.add(cursor.token);cursor=/** @type {LedgerRow} */(tokens.get(cursor.borrowedFrom));}
   roots.set(cursor.token,cursor.slots??0);
   if(row.browser===true)weights.set(cursor.token,(weights.get(cursor.token)??0)+(row.browserWeight??BROWSER_CORES));
  }
