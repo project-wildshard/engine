@@ -49,7 +49,13 @@ async function installPageRide(ctx: Pick<ShardContext, 'game' | 'system' | 'scop
   // Validate the director, traversal and detached panel before a ledger, mounted veil or system can be allocated.
   const lane = createPortalRide(portalRings(source, rows)), rider = portalRider(world.player, () => world.physics, source);
   const panel = declarePanel(rows.veil);
-  const emit = typeof facts === 'function' ? facts : projectRuntimeFacts(bindRuntimeLedger(facts, facts.product.shardfile, facts.product.slug), facts.game.runtime?.play?.progress);
+  // Ordinary pages record the landing from the server's wire fact.
+  let emit: PortalFacts = () => undefined;
+  if (typeof facts === 'function') emit = facts;
+  else if (facts.product.shardfile.runtime !== null) {
+    const native = projectRuntimeFacts(bindRuntimeLedger(facts, facts.product.shardfile, facts.product.slug), facts.game.runtime?.play?.progress);
+    emit = (name, entity) => { native(name, entity); };
+  }
   original.check();
   // O18: the veil belongs to this entered scope, even after the asynchronous module read.
   const owner = uiScope('PortalVeil', ctx.scope);
