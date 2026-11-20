@@ -1,4 +1,5 @@
 import type { ActorTags } from '@wildshard/engine/app/actor';
+import { peopleMetrics } from './metricsPeopleSql';
 import type { Database } from './database';
 
 export type RoomMetricChannel = 'staging' | 'production';
@@ -24,19 +25,8 @@ export interface RoomMetricDay {
 }
 export type ReadRoomMetricDay = (channel: RoomMetricChannel, day: string) => Promise<RoomMetricDay>;
 
-const daily = `with bounds as (
-    select (extract(epoch from $2::date::timestamp at time zone 'UTC') * 1000)::bigint as start_ms
-  ), presence as (
-    select actor, lane, player_key from metric_sessions, bounds
-    where channel = $1 and started_ms < bounds.start_ms + 86400000
-      and (ended_ms > bounds.start_ms or started_ms >= bounds.start_ms)
-    union
-    select 'human', null, player_key from human_players where channel = $1 and day = $2::date
-  )
-  select metric, slug, actor, lane, value from metrics_daily where channel = $1 and day = $2::date
-  union all select 'dau', '', actor, '', count(distinct player_key) from presence group by actor
-  union all select 'dau', '', actor, lane, count(distinct player_key) from presence
-    where actor = 'agent' and lane is not null and lane <> '' group by actor, lane
+const daily = `select metric, slug, actor, lane, value from metrics_daily where channel = $1 and day = $2::date
+  union all select metric, slug, actor, lane, value from (${peopleMetrics}) as people
   order by metric, slug, actor, lane`;
 
 const zones = `select slug, coalesce(seats.humans, 0) as humans, coalesce(seats.agents, 0) as agents,

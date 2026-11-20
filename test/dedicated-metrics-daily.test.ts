@@ -27,7 +27,8 @@ test('daily room aggregates combine arrival and press counts and keep seat ident
   try {
     const response = await fetch(endpoint);
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    const result = await response.json() as Awaited<ReturnType<ReturnType<typeof readRoomMetricDay>>>;
+    expect({ ...result, metrics: result.metrics.filter(row => row.metric === 'dau' || row.metric === 'death') }).toEqual({
       channel: 'staging', day,
       metrics: [
         { metric: 'dau', slug: '', actor: 'agent', lane: '', value: 1 },

@@ -1489,6 +1489,7 @@
     "src/server/host/dedicated/saves/database.ts": "server",
     "src/server/host/dedicated/saves/roomSessionStore.ts": "server",
     "src/server/host/dedicated/saves/metricsDailyStore.ts": "server",
+    "src/server/host/dedicated/saves/metricsPeopleSql.ts": "server",
     "src/server/host/dedicated/saves/roomGameStore.ts": "server",
     "src/server/host/dedicated/saves/migrate.ts": "server",
     "src/server/host/dedicated/saves/pgDatabase.ts": "server",
