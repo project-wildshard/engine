@@ -49,6 +49,8 @@ test.each([{grid: false, packs: false}, {grid: true, packs: false}, {grid: false
   const tier = {TIER: 'desktop', initializeTier: (): Promise<void> => {tier.TIER = 'phone'; return Promise.resolve();}};
   const run = continuation({
     runtimePacksOn: () => packs,
+    noteWorldBoot: (at: number, selectedTier: string, slug: string) => {transport.push(['boot', at, selectedTier, slug]);},
+    noteWorldStep: (step: string) => {transport.push(step);},
     load: (name: string): Promise<unknown> => {
       if (name === './assetTables') return Promise.resolve({prepareAssetTables: () => tables.ready});
       if (name.endsWith('/core/tier')) return Promise.resolve(tier);
@@ -65,7 +67,7 @@ test.each([{grid: false, packs: false}, {grid: true, packs: false}, {grid: false
     document: {querySelector: () => ({})},
   });
   await beforeCompletion(started.ready, run); await Promise.resolve();
-  expect(transport).toEqual([packs, 'start']);
+  expect(transport).toEqual([packs, ['boot', 0, 'phone', 'example'], 'download', 'start']);
   expect(calls).toEqual([['example', grid ? 'grid' : 'client', 'phone', '100'], 'paint']);
   tables.finish(); await run; expect(calls).toHaveLength(2);
   job.finish(); await job.ready; expect(calls.at(-1)).toBe('stop');

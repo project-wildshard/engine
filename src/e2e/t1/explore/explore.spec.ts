@@ -1,6 +1,15 @@
 import { expect, test } from '../../../../scripts/browser-test.mjs'
 
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+
+test.use({ viewport: { width: 800, height: 600 } })
+
+/** Exercise the button handler without pointer or focus animation. */
+async function activate(button: Locator): Promise<void> {
+  await expect(button).toBeVisible()
+  await expect(button).toBeEnabled()
+  await button.dispatchEvent('click')
+}
 
 async function cameraXZ(page: Page): Promise<readonly [number, number]> {
   return await page.evaluate((): readonly [number, number] => {
@@ -38,8 +47,7 @@ test('Explore browses, flies and inspects without a socket or durable saves', as
   const viewer = page.locator('.ws-x.show')
   await expect(viewer).toHaveAttribute('data-mode', 'hub', { timeout: 65_000 })
 
-  // Native button activation needs no rendered-frame pointer stability checks.
-  await viewer.getByRole('button', { name: /World explorer/u }).press('Enter')
+  await activate(viewer.getByRole('button', { name: /World explorer/u }))
   await expect(viewer).toHaveAttribute('data-mode', 'world')
   const [x, z] = await cameraXZ(page)
   await page.keyboard.down('KeyW')
@@ -58,11 +66,9 @@ test('Explore browses, flies and inspects without a socket or durable saves', as
     await page.keyboard.up('KeyW')
   }
 
-  await viewer
-    .getByRole('button', { name: 'Models', exact: true })
-    .press('Enter')
+  await activate(viewer.getByRole('button', { name: 'Models', exact: true }))
   const model = viewer.locator('button.ws-x-model').first()
-  await model.press('Enter')
+  await activate(model)
   await expect(viewer.locator('.ws-x-sheet .ws-x-name')).toHaveText(/\S/u)
   const saves: unknown = await page.evaluate(`(async () => {
     const keys = [...Object.keys(localStorage), ...Object.keys(sessionStorage)];
@@ -76,11 +82,12 @@ test('Explore browses, flies and inspects without a socket or durable saves', as
   expect(
     await page.locator('html').getAttribute('data-gameplay-notice-seen'),
   ).toBeNull()
-  await viewer.getByRole('button', { name: /Catalog/u }).press('Enter')
-  await viewer.getByRole('button', { name: 'Back', exact: true }).press('Enter')
-  await viewer
-    .getByRole('button', { name: 'Back to zones', exact: true })
-    .press('Enter')
+  await activate(viewer.getByRole('button', { name: /Catalog/u }))
+  await activate(viewer.getByRole('button', { name: 'Back', exact: true }))
+  await expect(viewer).toHaveAttribute('data-mode', 'hub')
+  await activate(
+    viewer.getByRole('button', { name: 'Back to zones', exact: true }),
+  )
   await expect(list.getByRole('link', { name: 'Signal Dunes' })).toBeVisible()
   expect(sockets).toEqual([])
 })
