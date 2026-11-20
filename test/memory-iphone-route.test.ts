@@ -1,7 +1,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13): the route bench's numbers. The device half runs on the iPhone 13
 // (meta project/evidence/iphone13-driftwood/).
 import { expect, test } from 'vitest';
-import { gapWork, nameLongFrames, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
+import { gapWork, nameLongFrames, otherKind, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
 import { linkStages, linkTable } from '../scripts/memory/iphone/link.mjs';
 import { legSummary, routeFor, routeTable, worstSegment, type LegSample } from '../scripts/memory/iphone/route.mjs';
 
@@ -103,4 +103,19 @@ test('DF8 (mini-driftwood13i): gapWork names the GPU waits and long timers insid
   const log = { reads: [[1020, '2d.getImageData', 41], [1950, 'gl.readPixels', 5]] as [number, string, number][], tasks: [[1005, 'setTimeout:look', 9], [1500, 'setTimeout:far', 30]] as [number, string, number][] };
   expect(gapWork(named, log)).toEqual([['2d.getImageData:41', 'setTimeout:look:9'], ['gl.readPixels:5']]);
   expect(gapWork(named, {})).toEqual([[], []]);
+});
+
+test('DF8 (mini-driftwood13m): an other frame is a stamped callback, held by unwrapped work, or free', () => {
+  const stamps: [number, [number, number, string][], number, number][] = [
+    [1100, [[1010, 30, 'event.Worker.message:onWorker'], [1000, 12, 'raf:tick']], 0, 0],
+    [1200, [[1150, 40, 'raf:t=>{if(e!==this.epoch)return}']], 35, 50],
+    [1300, [], 3, 3],
+  ];
+  const at = (ms: number) => ({ at: ms, ms: 60, cause: 'other' });
+  expect(otherKind(at(1100), { stamps })).toBe('task event.Worker.message:onWorker');
+  expect(otherKind(at(1200), { stamps })).toBe('held');
+  expect(otherKind(at(1300), { stamps })).toBe('free');
+  expect(otherKind(at(1400), { stamps })).toBeNull();
+  expect(otherKind(at(1100), {})).toBeNull();
+  expect(gapWork([at(1100)], { stamps })).toEqual([['event.Worker.message:onWorker:30', 'raf:tick:12', 'probe late max 0 sum 0']]);
 });

@@ -25,7 +25,7 @@ import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone } from './safari.mjs';
-import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
+import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, otherKind, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 
 const { values } = parseArgs({ options: {
@@ -136,7 +136,8 @@ async function bench() {
               row.named = named;
               /** @type {Record<string, number>} */
               const byCause = {};
-              for (const n of named) byCause[n.cause] = (byCause[n.cause] ?? 0) + 1;
+              // mini-driftwood13m: with `debug.taskStamp` on, an `other` frame says whether a callback, unwrapped work or nothing held the main thread
+              for (const n of named) { const kind = n.cause === 'other' ? otherKind(n, log ?? {}) : null; if (kind !== null) { n.causes.push(kind); n.cause = `other ${kind.split(' ')[0] ?? ''}`; } byCause[n.cause] = (byCause[n.cause] ?? 0) + 1; }
               console.log(`  long frames by cause: ${JSON.stringify(byCause)}`);
               const gaps = gapWork(named, log ?? {});
               row.gaps = gaps;

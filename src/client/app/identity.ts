@@ -4,7 +4,10 @@ import { installBrowserSaveEnvironment } from '@wildshard/engine/saves/view/stor
 import { installBrowserScopeEnvironment } from '@wildshard/engine/app/view/scopeEnvironment';
 import { installAppIdentity } from '@wildshard/engine/app/identity';
 import { WILDSHARD_IDENTITY } from '@wildshard/engine/game/identity';
+import { startTaskStamp } from '@wildshard/engine/core/taskStamp';
 
 installAppIdentity(WILDSHARD_IDENTITY);
 installBrowserSaveEnvironment();
 installBrowserScopeEnvironment();
+// DF8 (mini-driftwood13m): `debug.taskStamp` wraps every later timer, listener and observer (the first page script)
+startTaskStamp();

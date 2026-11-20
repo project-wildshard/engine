@@ -148,9 +148,11 @@ const gameSplit = () => { try { const ring = g.frameMs.length, a = (g.frameI - 1
 // frame preparation): [page ms, update ms, render ms, top system:ms, parts]
 const fc = window.__wildshard?.frameCost, BUCKETS = ['physics', 'animals', 'elites', 'player', 'hud', 'audio', 'world', 'quest'];
 log.costs = [];
-if (fc && typeof fc === 'object') { fc.on = true; fc.onFrame = (f) => { if (f.update <= 30 || log.costs.length >= 400) return;
-  const parts = []; BUCKETS.forEach((b, i) => { const v = f.buckets[i] ?? 0; if (v >= 2) parts.push(b + ':' + Math.round(v)); });
-  for (const [k, v] of f.otherParts) if (v >= 2) parts.push(k + ':' + Math.round(v));
+// mini-driftwood13m: updates over 18 ms (the one-off 21 to 35 ms stalls) and parts of 1 ms or more, so a stall in the grid's
+// late step names its part (DF13's laps: grid.late view cover, rings, life, bands, frame, ring tiles)
+if (fc && typeof fc === 'object') { fc.on = true; fc.onFrame = (f) => { if (f.update <= 18 || log.costs.length >= 400) return;
+  const parts = []; BUCKETS.forEach((b, i) => { const v = f.buckets[i] ?? 0; if (v >= 1) parts.push(b + ':' + Math.round(v)); });
+  for (const [k, v] of f.otherParts) if (v >= 1) parts.push(k + ':' + Math.round(v));
   log.costs.push([Math.round(f.t), Math.round(f.update), Math.round(f.render), f.top + ':' + Math.round(f.topMs), parts.join(',')]); }; }
 let last = performance.now();
 const tick = (now) => { if (window.__wsFrameLog !== log) return;
@@ -174,7 +176,12 @@ const fc = window.__wildshard?.frameCost; if (fc && typeof fc === 'object') { fc
 if (log === null) return null;
 const f = log.frames, keep = new Set();
 f.forEach((x, i) => { if (x[1] > 45 || x[2] > 0 || x[4] > 65536 || x[5] > 65536 || x[9] > 1 || x[10] > 5 || (x[13] ?? '') !== '') { keep.add(i); if (i > 0) keep.add(i - 1); } });
-return { count: f.length, from: f[0]?.[0] ?? 0, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders, costs: log.costs ?? [], reads: log.reads ?? [], tasks: log.tasks ?? [], sys: Object.entries(log.sysHist ?? {}).filter(([, h]) => h[3] > 0).map(([id, h]) => [id, h[0], Math.round(h[1]), h[2], h[3], Math.round(h[4])]) };
+// mini-driftwood13m: with \`debug.taskStamp\` on (core/taskStamp.ts), each frame over 45 ms's stamped callbacks (the 8 longest,
+// [start, ms, label]) and its late probes (the longest and the sum, ms): [frame page ms, stamps, longest late, late sum]
+const ts = window.__wsTaskStamp, stamps = [];
+if (ts && typeof ts.read === 'function') for (const x of f) if (x[1] > 45) { const from = x[0] - x[1], late = ts.lates(from, x[0]);
+  stamps.push([x[0], ts.read(from, x[0]).sort((a, b) => b[1] - a[1]).slice(0, 8), late.reduce((m, l) => Math.max(m, l[1]), 0), late.reduce((m, l) => m + l[1], 0)]); }
+return { count: f.length, from: f[0]?.[0] ?? 0, stamps: ts ? stamps : null, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders, costs: log.costs ?? [], reads: log.reads ?? [], tasks: log.tasks ?? [], sys: Object.entries(log.sysHist ?? {}).filter(([, h]) => h[3] > 0).map(([id, h]) => [id, h[0], Math.round(h[1]), h[2], h[3], Math.round(h[4])]) };
 `;
 
 /**
@@ -223,6 +230,31 @@ export function gapWork(named, log) {
     const start = n.at - n.ms, end = n.at;
     /** @type {[number, string][]} */ const found = [];
     for (const [t, name, ms] of [...(log.reads ?? []), ...(log.tasks ?? [])]) if (t + ms > start && t < end) found.push([ms, `${name}:${String(Math.round(ms))}`]);
-    return found.sort((a, b) => b[0] - a[0]).slice(0, 5).map((f) => f[1]);
+    // mini-driftwood13m: `debug.taskStamp`'s callbacks in the frame (FRAME_LOG_READ's stamps) and how late its probe ran
+    const stamped = (log.stamps ?? []).find((s) => s[0] === n.at);
+    if (stamped !== undefined) {
+      for (const [, ms, label] of stamped[1]) found.push([ms, `${label}:${String(Math.round(ms))}`]);
+      found.push([-1, `probe late max ${String(stamped[2])} sum ${String(stamped[3])}`]);
+    }
+    return found.sort((a, b) => b[0] - a[0]).slice(0, 9).map((f) => f[1]);
   });
+}
+
+/**
+ * mini-driftwood13m: an `other` frame (no game work, link, upload or collection) split by `debug.taskStamp`: `task` (a
+ * stamped callback of 20 ms or more outside the game's own frame callback ran in it), `held` (the probe ran 20 ms or more
+ * late with no such callback: work nothing wraps, as an `await` continuation, style and layout or a collection the Heap
+ * agent missed) or `free` (the probe ran on time: the main thread was free, so the frame waited elsewhere). Null without
+ * the stamps. Pure.
+ * @param {{ at: number, ms: number, cause: string }} n @param {{ stamps?: [number, [number, number, string][], number, number][] | null }} log
+ * @param {(label: string) => boolean} [gameFrame] the game's own frame callback (the shared frame scheduler's driver, an
+ *   anonymous arrow that reads `this.epoch`) and the log's own tick, left out
+ * @returns {string | null}
+ */
+export function otherKind(n, log, gameFrame = (label) => label === 'raf:tick' || (label.startsWith('raf:') && label.includes('epoch'))) {
+  const stamped = (log.stamps ?? []).find((s) => s[0] === n.at);
+  if (stamped === undefined) return null;
+  const task = stamped[1].find(([, ms, label]) => ms >= 20 && !gameFrame(label));
+  if (task !== undefined) return `task ${task[2]}`;
+  return stamped[2] >= 20 ? 'held' : 'free';
 }
