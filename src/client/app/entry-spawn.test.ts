@@ -154,7 +154,6 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/core/clock': {diagnosticNow: () => reserveClock.now},
     './assetTables': {prepareAssetPackRead: () => ({ready: resolved}), adoptInlineMounts: () => Promise.resolve(0)},
     '@wildshard/engine/game/shardfile/folder': {},
-    '@wildshard/engine/game/shardfile/preparedCandidate': {releaseInlineCandidate: () => 0},
     '@wildshard/engine/boot/tables': {publicBytes: () => ({})},
     '@wildshard/engine/boot/contentRead': {readContent: () => Promise.reject(new Error('no pickup reads here'))},
   };
@@ -165,7 +164,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/game/systems/species/view/boar', '@wildshard/engine/game/plugin/weaponFamily']) modules[name] = kit;
   const result: unknown = runInNewContext(stripTypeScriptTypes(`${body}; startSelected();`), {
     runtimePacksOn: () => packs, search: new URLSearchParams('chunk=example'), unloadedTitleRow: () => undefined, dataPointer,
-    shaderSourceCacheEnabled: () => Promise.resolve(false),
+    shaderSourceCacheEnabled: () => Promise.resolve(false), releaseInlineCandidate: () => 0,
     prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, entryScope: {child: () => imageOwner}, selectedImages: undefined, crashResume: null,
     document: {getElementById: (id: string) => authored && id === 'ws-shardfile' ? {} : null, baseURI: 'https://example.invalid/', documentElement: {classList: {remove: noop, contains: () => false}}, querySelector: () => null},
     performance: {measure: noop},
