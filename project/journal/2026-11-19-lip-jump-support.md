@@ -11,3 +11,6 @@ refused. Bisected on Driftwood's journeys (d68d21903 passes, cfec551b5 fails); a
 
 The recorded motion traces (page, legacy, versioned) moved with this law: in the page trace the lip branch changes jump
 support on 120 ticks and lets 2 presses through. They are re-recorded with MOTION_TRACE_RECORD=1 in the next commit.
+
+The page law at 24.3 frames/s and the wet, driver and walking host traces moved too (the lip branch changes support on
+382 page-law ticks and lets 4 presses through); re-recorded in a follow-up. Every motion-trace fixture test passes.
