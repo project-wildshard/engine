@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, ShaderMaterial, Texture } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import { SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
-import { installStaticViewMerge, primeStaticMerges, mergeableMaterial, mergeableMesh, staticMerge, STATIC_MERGE_DEFAULT, STATIC_MERGE_PHONE_LOW, SWEEP_STEPS } from './staticViewMerge';
+import { installStaticViewMerge, primeStaticMerges, NO_VIEW_MERGE, mergeableMaterial, mergeableMesh, staticMerge, STATIC_MERGE_DEFAULT, STATIC_MERGE_PHONE_LOW, SWEEP_STEPS } from './staticViewMerge';
 import { propMerge } from '../shardfile/groundMerge';
 
 const tri = (x: number): BufferGeometry => new BufferGeometry().setAttribute('position', new Float32BufferAttribute([x, 0, 0, x + 1, 0, 0, x, 0, 1], 3));
@@ -28,6 +28,10 @@ test('only plain opaque meshes on a world-space material merge', () => {
   expect(mergeableMaterial(graph(false, true))).toBe('translation');
   const lit = Object.assign(new ShaderMaterial({ uniforms: { lightMap: { value: new Texture() } } }), { isGraphShaderMaterial: true, readsModelSpace: false, movesVertices: false });
   expect(mergeableMaterial(lit)).toBeNull(); // a sampled texture keeps a graph off the merge
+  const env = Object.assign(new ShaderMaterial({ uniforms: { envMap: { value: new Texture() }, dfgLUT: { value: new Texture() } } }), { isGraphShaderMaterial: true, readsModelSpace: false, movesVertices: false });
+  expect(mergeableMaterial(env)).toBe('any'); // the scene's lighting textures do not
+  const baked = new MeshBasicMaterial(); baked.userData[NO_VIEW_MERGE] = true;
+  expect(mergeableMaterial(baked)).toBeNull();
   expect(mergeableMesh(new Mesh(tri(0), basic))).toBe(true);
   const hooked = new Mesh(tri(0), basic); hooked.onBeforeRender = function onBeforeRender() { /* reads the mesh */ };
   expect(mergeableMesh(hooked)).toBe(false);

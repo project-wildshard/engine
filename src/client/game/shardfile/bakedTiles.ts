@@ -39,6 +39,7 @@ import { tiledMesh } from './tiledMesh';
 import { bakedPlacementPoses } from '../../../shared/game/shardfile/bakedPlacementPoses';
 import { readContent } from '@wildshard/engine/boot/contentRead';
 import { mergeView } from './groundMerge';
+import { NO_VIEW_MERGE } from '../grid/staticViewMerge';
 
 /** What a row is drawn into: the product its files resolve against, the live world, and the scope its pieces leave with
  *  (absent: the ambient owner, as a resident world's build). */
@@ -104,6 +105,7 @@ export async function installBakedTiles(owner: BakedTilesOwner, input: BakedTile
     setLentTexture(row.look, map.param, texture);
   }
   const material = lentLook(row.look), group = new THREE.Group(), tiles: THREE.Mesh[] = [];
+  markBakedLook(material);
   if (row.sky) sky.setupMaterial(material);
   group.name = row.id; owner.parent.add(group);
   const follow = row.toonDay ? followToonLook(product, row.look) : null;
@@ -137,6 +139,7 @@ async function placeFamilies(owner: BakedTilesOwner, row: BakedTilesRow, instanc
   const geometry = new Map<string, THREE.BufferGeometry>();
   protos.traverse(o => { if (isMesh(o)) geometry.set(o.name, o.geometry); });
   const materials = Object.fromEntries(Object.entries(instances.looks).map(([slot, entry]) => [slot, lentLook(entry.look)]));
+  for (const look of Object.values(materials)) markBakedLook(look);
   const ctx = modelContext(owner.sky), slice = slicer();
   const batch = owner.scope !== undefined && TIER === 'phone' && bakedPropBatchEnabled(row.id);
   const batchMeshes: THREE.Mesh[] = [];
@@ -163,6 +166,10 @@ async function placeFamilies(owner: BakedTilesOwner, row: BakedTilesRow, instanc
 }
 
 const batchSlot = jsonSlot('debug.bakedPropBatch', 'device');
+
+/** DF10: a baked set's looks stay out of the static view merge (`debug.staticMerge`). The cove's tiles and props drew black
+ *  merged on relay 1's look board, and again with their normals kept (mini-df10b's shots, 2026-11-20). */
+function markBakedLook(look: THREE.Material): void { look.userData[NO_VIEW_MERGE] = true; }
 
 export function bakedPropBatchEnabled(row: string): boolean {
   try { return batchSlot.read() === row; } catch { return false; }

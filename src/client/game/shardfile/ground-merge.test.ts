@@ -264,3 +264,25 @@ test('the merge owns its output and refreshes reused source positions and bounds
   expect(next?.boundingBox?.max.y).toBe(25);
   scope.dispose(); await settle(); mesh.geometry.dispose(); material.dispose();
 });
+
+test('DF10: a region merge fills a custom channel some members lack, as GL reads a missing attribute; keyed channels split', async () => {
+  const parent = new THREE.Group(), material = new THREE.MeshBasicMaterial(), scope = new Scope('region');
+  const piece = (x: number, extra: Record<string, [number[], number]>): THREE.Mesh => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([x, 0, 0, x + 1, 0, 0, x, 0, 1], 3));
+    for (const [name, [values, size]] of Object.entries(extra)) g.setAttribute(name, new THREE.Float32BufferAttribute(values, size));
+    const mesh = new THREE.Mesh(g, material); parent.add(mesh); return mesh;
+  };
+  const merge = propMerge(parent, material, { receive: false, order: 0, grouping: 'region', ignore: [] });
+  merge.add(piece(0, { aAnim: [[0.5, 0.5, 0.5], 1] }), scope);
+  merge.add(piece(10, {}), scope);
+  merge.add(piece(20, { aDir: [[1, 2, 3, 4, 5, 6], 2] }), scope);
+  merge.add(piece(30, { color: [[1, 1, 1, 1, 1, 1, 1, 1, 1], 3] }), scope);
+  await settle();
+  try {
+    expect(merge.meshes.length).toBe(2); // the coloured piece keeps its own layout
+    const one = merge.meshes.find(mesh => !mesh.geometry.hasAttribute('color')); if (one === undefined) throw new Error('no merge');
+    expect(Array.from(one.geometry.getAttribute('aAnim').array)).toEqual([0.5, 0.5, 0.5, 0, 0, 0, 0, 0, 0]);
+    expect(Array.from(one.geometry.getAttribute('aDir').array)).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6]);
+  } finally { scope.dispose(); }
+});

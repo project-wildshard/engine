@@ -28,6 +28,8 @@ import { ownedArray, ownedCopy, type OwnedLabel } from '@wildshard/engine/core/o
 const MERGE_ARRAYS: OwnedLabel = { owner: 'engine/ground-merge', asset: 'member-arrays', kind: 'geometry-cpu' };
 
 const HALF = 250, COARSE = 125, BLOCK = 250;
+/** DF10 (mini-df10b): the channels three's program keys on (presence or size), which a region merge never pads */
+const KEYED_CHANNELS: ReadonlySet<string> = new Set(['position', 'normal', 'tangent', 'uv', 'uv1', 'uv2', 'uv3', 'color']);
 /** an attribute's change count (an interleaved one counts on its buffer) */
 const versionOf = (attribute: BufferAttribute | InterleavedBufferAttribute): number => attribute instanceof InterleavedBufferAttribute ? attribute.data.version : attribute.version;
 /** an attribute's float storage and layout when three's readers would return its stored values unchanged (not normalized,
@@ -150,8 +152,9 @@ export class GroundMerge {
     const size = this.grouping === 'cell' || this.grouping === 'region' ? HALF * 2 : BLOCK;
     const cell = `${String(Math.floor((x + HALF) / size))},${String(Math.floor((z + HALF) / size))}`;
     if (this.grouping === 'quadrant') return cell;
-    // A cell (or block) merge never drops a channel supplied by another member.
-    const layout = Object.entries(member.mesh.geometry.attributes).filter(([name]) => !this.ignore.has(name)).map(([name, attribute]) => `${name}:${String(attribute.itemSize)}:${String(attribute.normalized)}`).sort().join('|');
+    // A cell (or block) merge never drops a channel supplied by another member. DF10 (mini-df10b): a region merge keys only
+    // the channels three's program keys on; a custom channel some members lack is filled as GL fills a missing attribute.
+    const layout = Object.entries(member.mesh.geometry.attributes).filter(([name]) => !this.ignore.has(name) && (this.grouping !== 'region' || KEYED_CHANNELS.has(name))).map(([name, attribute]) => `${name}:${String(attribute.itemSize)}:${String(attribute.normalized)}`).sort().join('|');
     return `${cell}|${layout}`;
   }
 
@@ -170,7 +173,11 @@ export class GroundMerge {
     block.merged = null;
     if (old !== null) { old.removeFromParent(); old.geometry.dispose(); }
     const first = block.members.values().next().value; if (first === undefined) return;
-    const names = Object.keys(first.mesh.geometry.attributes).filter(name => !this.ignore.has(name) && [...block.members.values()].every(member => member.mesh.geometry.hasAttribute(name))), parentInverse = new Matrix4(), toParent = new Matrix4();
+    const members = [...block.members.values()], region = this.grouping === 'region';
+    // a region merge carries every custom channel any member has (its widest size); the rest, the channels all share
+    const names = region ? [...new Set(members.flatMap(member => Object.keys(member.mesh.geometry.attributes)))].filter(name => !this.ignore.has(name))
+      : Object.keys(first.mesh.geometry.attributes).filter(name => !this.ignore.has(name) && members.every(member => member.mesh.geometry.hasAttribute(name)));
+    const parentInverse = new Matrix4(), toParent = new Matrix4();
     this.parent.updateWorldMatrix(true, false); parentInverse.copy(this.parent.matrixWorld).invert();
     // Size the output first. On phone, fill its channels directly: keeping
     // transformed member channels would retain another copy beside the draw.
@@ -181,7 +188,7 @@ export class GroundMerge {
     for (const part of parts) { vertices += part.position.count; indices += part.triangles.length; }
     if (indices === 0) return;
     const channels = names.map(name => {
-      const size = first.mesh.geometry.getAttribute(name).itemSize;
+      const size = Math.max(...members.map(member => member.mesh.geometry.hasAttribute(name) ? member.mesh.geometry.getAttribute(name).itemSize : 0));
       return { name, size, values: new Float32Array(vertices * size) };
     });
     const index = vertices > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
@@ -197,7 +204,8 @@ export class GroundMerge {
       const turned = (this.grouping === 'block' || this.grouping === 'region') && !isTranslation(toParent);
       const normal = turned ? new Matrix3().getNormalMatrix(toParent) : null;
       const tangent = turned ? new Matrix3().setFromMatrix4(toParent) : null;
-      for (const { name, values } of channels) {
+      for (const { name, size: width, values } of channels) {
+        if (!geometry.hasAttribute(name) || geometry.getAttribute(name).itemSize !== width) { fillDefault(values, base, position.count, width, geometry.hasAttribute(name) ? geometry.getAttribute(name) : null); continue; }
         const attribute = geometry.getAttribute(name), size = attribute.itemSize;
         if (attribute.count !== position.count) throw new Error(`Ground merge member lacks ${name}`);
         const rotation = size < 3 ? null : name === 'normal' ? normal : name === 'tangent' ? tangent : null;
@@ -268,6 +276,12 @@ export class GroundMerge {
     member.triangles = { key, version, values };
     return values;
   }
+}
+
+/** A member's `count` vertices of a channel it lacks, or has narrower, as GL reads it: its own components, then (0, 0, 0, 1). */
+function fillDefault(values: Float32Array, base: number, count: number, width: number, own: GeometryAttribute | null): void {
+  const have = own === null ? 0 : Math.min(own.itemSize, width);
+  for (let i = 0; i < count; i++) for (let c = 0; c < width; c++) values[(base + i) * width + c] = c < have && own !== null ? own.getComponent(i, c) : c === 3 ? 1 : 0;
 }
 
 /** a transform with no rotation or scale (its upper 3 x 3 the identity) */

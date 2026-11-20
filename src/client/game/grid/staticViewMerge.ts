@@ -28,6 +28,8 @@ import { graphicsMode, PIXELS_EVENT } from '@wildshard/engine/core/graphicsMode'
 import { MERGED_COPY, MERGED_VIEW } from '@wildshard/engine/core/shadowLayer';
 import { mergeView } from '../shardfile/groundMerge';
 
+/** A material's mark: never in a view merge (bakedTiles' lent looks, whose lightmaps drew black merged). */
+export const NO_VIEW_MERGE = 'noViewMerge';
 export const STATIC_MERGE_SLOT = 'debug.staticMerge';
 export const STATIC_MERGE_DEFAULT = false;
 /** Unset at phone Low: off until a cooled phone pair and the look board decide. */
@@ -57,19 +59,23 @@ const DEFAULT_RENDER_HOOK: unknown = Reflect.get(Mesh.prototype, 'onBeforeRender
 export function mergeableMaterial(material: unknown): 'any' | 'translation' | null {
   if (Array.isArray(material) || typeof material !== 'object' || material === null) return null;
   const m = material as Material;
-  if (!m.visible || m.transparent || m.userData['sceneAlpha'] === true || m.userData['sceneCard'] === true) return null;
+  if (!m.visible || m.transparent || m.userData['sceneAlpha'] === true || m.userData['sceneCard'] === true || m.userData[NO_VIEW_MERGE] === true) return null;
   if (Reflect.get(m, 'isGraphShaderMaterial') === true) {
-    // a graph that samples a texture (the cove's baked lightmaps) drew black merged on the look board: keep it off
+    // a graph that samples a texture of its own (the cove's baked lightmaps) drew black merged on the look board: keep it off
     if (Reflect.get(m, 'readsModelSpace') !== false || samplesTexture(m)) return null;
     return Reflect.get(m, 'movesVertices') === false ? 'any' : 'translation';
   }
   return m instanceof ShaderMaterial ? null : 'any';
 }
-/** Whether a shader material's uniforms hold a texture. */
+/** three's scene lighting textures, the same for every mesh a scene draws (its PMREM environment and the DFG table): every
+ *  lit graph holds them, so they never keep a graph off the merge (mini-df10b: counting them left the kit unmerged) */
+const SCENE_TEXTURES: ReadonlySet<string> = new Set(['envMap', 'dfgLUT']);
+/** Whether a shader material's uniforms hold a texture of its own (not the scene's lighting). */
 function samplesTexture(material: Material): boolean {
   const uniforms: unknown = Reflect.get(material, 'uniforms');
   if (typeof uniforms !== 'object' || uniforms === null) return false;
-  return Object.values(uniforms).some((uniform: unknown) => {
+  return Object.entries(uniforms).some(([name, uniform]: [string, unknown]) => {
+    if (SCENE_TEXTURES.has(name)) return false;
     const value: unknown = typeof uniform === 'object' && uniform !== null ? Reflect.get(uniform, 'value') : undefined;
     return value instanceof Texture || (Array.isArray(value) && value.some(item => item instanceof Texture));
   });
