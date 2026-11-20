@@ -10,7 +10,7 @@ import { landedBy } from '@wildshard/engine/combat/damageBook';
 import { isDevColliders, isDevGround, swapDevBoxes, swapDevGround } from '@wildshard/engine/game/devColliders';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import { heldArmsOf } from '@wildshard/engine/game/weapons/nativeHeld';
-import { questBooks } from '@wildshard/engine/quest/players';
+import { isCredit, questBooks } from '@wildshard/engine/quest/players';
 import type { SimHost } from '@wildshard/engine/sim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { isHarnessFlag, isHarnessGod, isHarnessHits, isHarnessMove, isHarnessPlace, isHarnessStill } from '../../../shared/host/standalone/harnessPlace';
@@ -46,7 +46,14 @@ export function applyDev(host: SimHost, body: string, message: unknown, state: D
   }
   if (isHarnessMove(message)) { const other = bodyOf(message.move); if (other === undefined) return { ok: false, reason: `no seat for ${message.move}` }; placeBody(host, other, message); return { ok: true, tick }; }
   if (isHarnessPlace(message)) { placeBody(host, body, message); return { ok: true, tick }; }
-  if (isHarnessFlag(message)) { questBooks(host).of(body).flags.set(message.flag); return { ok: true, tick }; }
+  if (isHarnessFlag(message)) {
+    questBooks(host).of(body).flags.set(message.flag);
+    // A death raised by hand is filed as a kill files it: the player's credit and the world's record of the fall. With only the
+    // credit, Driftwood's chapter (it reads the world's `dead:captain`) never started the reward, and the quest stayed on its last
+    // step after the card (meta QA-FEEDBACK-2026-11-20-mini row 10)
+    if (isCredit(message.flag)) host.flags.set(message.flag);
+    return { ok: true, tick };
+  }
   if (isHarnessHits(message)) {
     const by = message.hits;
     host.events.answer('damage.modify', req => req === null || landedBy(req, host.players) === null ? req : { ...req, amount: req.amount * by }, host.scope, { order: 90 });

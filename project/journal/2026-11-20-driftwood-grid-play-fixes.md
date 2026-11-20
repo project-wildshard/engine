@@ -34,3 +34,10 @@ QA-FEEDBACK-2026-11-20-mini rows 3 to 6, from IPHONE13-DRIFTWOOD DW8 and DW9.
   for `left`, drains that save's writes, then `resetSave` deletes the row and moves its receipts to a `reset:<uuid>` player, as
   `anonymise` does; joins for that seat get `retry` until it is done. The seat is the hello's, so only your own save can go. Test
   `room-new-game` resets through a room and re-enters with no flags. The VPS gets it with the next release.
+
+## Row 10: the quest stayed on its last step (mini-dw-fix2)
+
+A dev-world replay raised `dead:captain` with the dev hook and the room never finished the quest. A real kill in a room
+bench files the world's `dead:captain` and the player's credit; the chapter reads the world's, runs the reward and files
+`seen:reward` and `quest:driftwood-done`. The hook filed only the credit, so it now files the world's record too.
+Test `driftwood-room-quest-end`.
