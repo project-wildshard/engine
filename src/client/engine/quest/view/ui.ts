@@ -212,6 +212,8 @@ export class SteerChip {
   /** MSZ12: a vehicle seat's gear (R N D, the one in use lit) and its controls' hints, shown while seated */
   private readonly gears = el('div', 'ws-quest-steer-gears', this.root);
   private readonly gear = new Map((['R', 'N', 'D'] as const).map(letter => { const g = el('b', '', this.gears); g.textContent = letter; return [letter, g] as const; }));
+  /** MSZ12b: the seat's speed in km/h, beside the gear */
+  private readonly kmh = el('span', 'ws-quest-steer-kmh', this.gears);
   private readonly seatHint = el('div', 'ws-quest-steer-boost ws-quest-steer-seat', this.root);
   /** MSZ18: *Vehicles stay in this zone*, for a moment after the cell's edge turns a vehicle back */
   private readonly stayNote = el('div', 'ws-quest-steer-stay', this.root);
@@ -224,12 +226,13 @@ export class SteerChip {
     el('span', 'ws-quest-steer-key', this.seatHint).textContent = engineString('s_drive_keys');
     el('span', 'ws-quest-steer-touch', this.seatHint).textContent = engineString('s_drive_touch');
   }
-  show(ride: { readonly speed: number; readonly boosting: boolean; readonly gear?: 'R' | 'N' | 'D' } | null): void {
+  show(ride: { readonly speed: number; readonly boosting: boolean; readonly gear?: 'R' | 'N' | 'D'; readonly kmh?: number } | null): void {
     this.root.classList.toggle('show', ride !== null);
     if (ride === null) return;
     this.fill.style.width = `${String(Math.round(ride.speed * 100))}%`;
     this.root.classList.toggle('boosting', ride.boosting);
     for (const [letter, g] of this.gear) g.classList.toggle('on', ride.gear === letter);
+    this.kmh.textContent = ride.kmh === undefined ? '' : engineString('s_drive_kmh', [ride.kmh]);
   }
   /** MIRROR-SALT-ZONE MSZ12: a vehicle seat is taken or left: the gauge shows its gear and the seat's hints, and on a phone the
    *  seat's discs (BRAKE, BOOST, HORN, LEAVE) take the walk's places (`DriveDiscs`). */

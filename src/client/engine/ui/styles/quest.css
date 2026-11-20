@@ -61,7 +61,13 @@
 .ws-quest-steer.show.tappable { pointer-events: auto; cursor: pointer; }
 /* MSZ12: a vehicle seat's gauge: the gear (R N D, the one in use lit) and the seat's hints in place of the board's */
 .ws-quest-steer-gears { display: none; justify-content: center; gap: 14px; font-family: var(--ws-mono); font-size: 12px; font-weight: 700; color: var(--ws-text-dim); }
-.ws-quest-steer-gears b.on { color: var(--ws-cyan); }
+.ws-quest-steer-gears b { padding: 1px 6px; }
+.ws-quest-steer-gears b.on { color: #06101a; background: var(--ws-cyan); }
+/* MSZ12b: a seat's gauge stands on its own dark ground over a bright bonnet, its gear lit as a filled pill, its speed in km/h */
+.ws-quest-steer.seated { background: var(--ws-glass-deep); }
+.ws-quest-steer.seated .ws-quest-steer-gears { font-size: 14px; align-items: center; }
+#hud.touch .ws-quest-steer.seated { bottom: calc(env(safe-area-inset-bottom, 0px) + 196px); } /* clear of HORN and BOOST */
+.ws-quest-steer-kmh { min-width: 64px; margin-left: 6px; text-align: right; font-size: 16px; color: var(--ws-text); }
 .ws-quest-steer.seated .ws-quest-steer-gears { display: flex; }
 .ws-quest-steer-seat, .ws-quest-steer.seated .ws-quest-steer-boost:not(.ws-quest-steer-seat) { display: none; }
 .ws-quest-steer.seated .ws-quest-steer-seat { display: block; }

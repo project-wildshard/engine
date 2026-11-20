@@ -22,7 +22,7 @@ export interface SteerRideView {
 }
 /** What the chip shows of a ride: its speed (a share of the boosted top), whether it boosts, and (MSZ12, a vehicle seat) its
  *  gear: R rolling back, N standing, D rolling forward. */
-export interface SteerRideShown { readonly speed: number; readonly boosting: boolean; readonly gear?: 'R' | 'N' | 'D' }
+export interface SteerRideShown { readonly speed: number; readonly boosting: boolean; readonly gear?: 'R' | 'N' | 'D'; readonly kmh?: number }
 /** The page's player as a steer ride reads and turns it: the view looks along `yaw` (forward is (-sin yaw, -cos yaw), as a
  *  steer vehicle's heading). */
 export interface SteerRider {
@@ -155,7 +155,7 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
   readonly system: (spec: SystemSpec) => void; readonly scope: Scope; readonly player: SteerRider; readonly view: SteerRideView; readonly boost: () => boolean;
 }): void {
   let seated: { readonly vehicle: string; readonly seat: number } | null = null, last: MoverPose | null = null, heading = 0, looked = 0, idle = 0, speed = 0, lookedPitch = SEAT_PITCH;
-  let shown: SteerRideShown | null = null, chase = false, stowed = false, rolling = 0, braking = 0;
+  let shown: SteerRideShown | null = null, chase = false, stowed = false, hid = false, rolling = 0, braking = 0;
   // the reserved `drive` mode: the page's player's mode while a seat holds it (the server leads the body; the walk stands down)
   playerModes(page.player as unknown as ModePlayer).register({ id: 'drive', hud: 'ride', traverse: () => seated !== null }, page.scope, { events: app.events });
   // MSZ11: the seat's eye reads the seat live at the camera's pose, off the vehicle as the page draws it then
@@ -175,9 +175,11 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
       app.input.pop('drive'); braking = 0;
     }
     page.view.seated?.(on);
-    const equipment = app.equipment; // the held item is stowed in a seat, as other pages show it (MSZ10)
-    if (on && equipment !== null && !equipment.stowed) { equipment.stowed = true; stowed = true; }
-    if (!on && stowed) { stowed = false; if (equipment !== null) equipment.stowed = false; }
+    // the held item is stowed in a seat, as other pages show it (MSZ10), and out of the seat's view: lowered, a blade still
+    // crossed a portrait phone's windscreen (MSZ12b's tape), so it hides as a creature mount's rider's does (`pageFacets.ts`)
+    const equipment = app.equipment;
+    if (on && equipment !== null && !equipment.stowed) { equipment.stowed = true; stowed = true; hid = equipment.visible; equipment.visible = false; }
+    if (!on && stowed) { stowed = false; if (equipment !== null) { equipment.stowed = false; if (hid) equipment.visible = true; } hid = false; }
   };
   page.view.tap?.(() => { if (seated !== null) chase = !chase; });
   page.scope.onDispose(() => { if (seated !== null) { seated = null; sit(false); } });
@@ -217,7 +219,8 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
     const kind = port.kindOf(held.vehicle), top = kind === undefined ? 1 : kind.handling.speed * kind.handling.boost;
     const driving = kind?.seats[held.seat]?.role === 'driver';
     const gear = Math.abs(rolling) < RECENTRE_SPEED ? 'N' : rolling > 0 ? 'D' : 'R';
-    const next = { speed: Math.max(0, Math.min(1, speed / top)), boosting: driving && page.boost() && speed > RECENTRE_SPEED, gear } as const;
-    if (shown === null || Math.abs(shown.speed - next.speed) > 0.01 || shown.boosting !== next.boosting || shown.gear !== next.gear) { shown = next; page.view.show(next); }
+    // MSZ12b: a vehicle seat's gauge reads its speed in km/h too (a blind board could not read a bare bar)
+    const next = { speed: Math.max(0, Math.min(1, speed / top)), boosting: driving && page.boost() && speed > RECENTRE_SPEED, gear, kmh: gear === 'N' ? 0 : Math.round(Math.abs(rolling) * 3.6) } as const;
+    if (shown === null || Math.abs(shown.speed - next.speed) > 0.01 || shown.boosting !== next.boosting || shown.gear !== next.gear || shown.kmh !== next.kmh) { shown = next; page.view.show(next); }
   } });
 }

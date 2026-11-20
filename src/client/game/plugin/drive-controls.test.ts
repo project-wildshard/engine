@@ -118,3 +118,12 @@ test('the edge\'s turn-back says vehicles stay in the zone on the chip, for a mo
     expect(chip.root.classList.contains('staying')).toBe(false);
   } finally { vi.useRealTimers(); }
 });
+
+// MSZ12b: the seat's gauge reads its speed in km/h beside the lit gear (a blind board could not read a bare bar)
+test('the seat\'s gauge shows its speed in km/h and lights the gear in use', () => {
+  scope = new Scope('drive-gauge');
+  const chip = new SteerChip(scope);
+  chip.seated(true); chip.show({ speed: 0.5, boosting: false, gear: 'D', kmh: 37 });
+  expect(chip.root.querySelector('.ws-quest-steer-kmh')?.textContent).toBe('37 km/h');
+  expect([...chip.root.querySelectorAll('.ws-quest-steer-gears b.on')].map(g => g.textContent)).toEqual(['D']);
+});
