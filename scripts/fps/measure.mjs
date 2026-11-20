@@ -71,11 +71,12 @@ export function routeScript(route, profile, approach, passBreakdown) {
         const gpu = debug === null ? null : gl.getParameter(debug.UNMASKED_RENDERER_WEBGL);
         const witness = { build: window.__WS_BUILD_ID__ ?? null, dpr: renderer.getPixelRatio(), css: [innerWidth, innerHeight],
           gpu, level: game.level.id, phoneGraphics: game.phoneGraphics, programs: renderer.info.programs?.length ?? null };
-        const legs = [], links = observeProgramLinks(gl);
+        const legs = [], approached = [], links = observeProgramLinks(gl);
         try {
         for (const leg of approach) {
           const result = await runLeg({...leg, approach: true, cap: ${JSON.stringify(cap)}});
-          if (result.error) return {witness, legs, error: leg.name + ': ' + result.error};
+          approached.push({name:leg.name,nav:result.nav,ms:result.ms,error:result.error});
+          if (result.error) return {witness, legs, approach:approached, error: leg.name + ': ' + result.error};
         }
         for (const leg of route) {
           const startPrograms = renderer.info.programs?.length ?? null;
@@ -87,7 +88,7 @@ export function routeScript(route, profile, approach, passBreakdown) {
             startPrograms, programLinksAfterControl: links.count() });
           if (result.error) break;
         }
-        return { witness, legs };
+        return { witness, legs, approach:approached };
         } finally { links.stop(); }
       })();
     }, { once: true });
