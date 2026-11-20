@@ -9,13 +9,19 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { learnPlacedCells } from '../src/client/game/grid/placedCells';
 import { placedContent, type PlacedContentPorts } from '../src/client/game/grid/placedContent';
-import { clearPlacedSpawns, placedLoose, placedSpawn } from '../src/client/game/boot/placedSpawn';
+import { clearPlacedSpawns, devCookedMap, placedLoose, placedSpawn } from '../src/client/game/boot/placedSpawn';
 import { entryProgramsURL, setSpawnPacks, startSpawnDownload } from '../src/client/game/boot/spawnDownload';
 import { installTitleManifests, titleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { cookReceipt } from '../src/cook/game/cookJob';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
 const SLUG = 'new-author-shard', HASH = 'a'.repeat(64), BUILD = 'b1', VALIDATOR = 'f'.repeat(64);
+test('a dev map stamp serves the two cook sizes for the local shard', () => {
+  expect(devCookedMap(SLUG, 'full', SLUG)).toBe(`/shardfiles/${SLUG}/cooked-map-v1.png`);
+  expect(devCookedMap(`_${SLUG}`, 'cell', SLUG)).toBe(`/shardfiles/${SLUG}/cooked-map-v1-cell.png`);
+  expect(devCookedMap(SLUG, 'cell', undefined)).toBeUndefined();
+  expect(devCookedMap(SLUG, 'cell', 'another-shard')).toBeUndefined();
+});
 const PACKS = 'https://packs.example/', URL_AT = `${PACKS}releases/staging-placements.json`, API = 'https://api.example';
 const ENTRY_AT = `${API}/api/catalogue/shards/${SLUG}`, INDEX_AT = `${PACKS}index/${BUILD}/${HASH}.json`;
 const key = generateKeyPairSync('ed25519'), publicKey = key.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');

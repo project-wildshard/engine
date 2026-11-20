@@ -110,7 +110,7 @@ import { talkStandIns } from '../shardfile/declaredTalks';
 import { copyMarks } from './copyIdentity';
 import { CellMinimaps } from './minimapBlend';
 import { leaseMapImage } from '../shardfile/mapImage';
-import { placedCookedMap } from '../boot/placedSpawn';
+import { devCookedMap, placedCookedMap } from '../boot/placedSpawn';
 import { crossingSaveStatus, installBorderShimmer, type BorderShimmerState, type CrossingSaveStatus } from './borderShimmer';
 import { refusalReporter, saveFailedReporter } from './screenReports';
 import { GAME_STRINGS } from '../../../shared/game/strings';
@@ -628,7 +628,9 @@ export class GridSession {
       const owner = { allocator: this.allocator, scope: host.scope };
       // J450: the cook's own map of the zone (the home's full size, every other cell's copy), behind an author's look/map; a
       // build-pinned slug has none here, as its atlas tile is drawn from it (scripts/app-build/worldMapAtlas.ts)
-      const cooked = placedCookedMap(slug, this.mapImages.fullSized(slug) ? 'full' : 'cell');
+      const size = this.mapImages.fullSized(slug) ? 'full' : 'cell';
+      const cooked = placedCookedMap(slug, size) ?? (DEVSERVER
+        ? devCookedMap(slug, size, (globalThis as { __WS_DEV_COOKED_MAP__?: unknown }).__WS_DEV_COOKED_MAP__) : undefined);
       const metadata = await (gridShardfileFolder(slug, owner, 'optional-metadata') ?? Promise.resolve(null))
         .catch((error: unknown) => { if (cooked === undefined) throw error; return null; });
       if (metadata === null) return cooked;

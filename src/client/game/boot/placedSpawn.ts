@@ -42,6 +42,10 @@ export function placedCookedMap(slug: string, size: CookedMapSize): string | und
   const row = placed.get(bare(slug));
   return row?.maps === true ? placedLoose(`/${cookedMapPath(row.slug, size)}`) : undefined;
 }
+/** The local author server stamps the slug only after its two map images are ready. */
+export function devCookedMap(slug: string, size: CookedMapSize, stamp: unknown): string | undefined {
+  return stamp === bare(slug) ? `/${cookedMapPath(slug, size)}` : undefined;
+}
 /** The bare slug a loose page path (`/shardfiles/<slug>/…`, `/programs/<slug>.json`) belongs to; undefined for any other path. */
 export function looseSlug(pathname: string): string | undefined {
   const match = LOOSE_PATH.exec(pathname), named = match?.[1] ?? match?.[2];
