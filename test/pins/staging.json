@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "fae50be2c4aa65e5f4fdd3ec73c7a1df11dd6d59f578508ced2c6aa99cc27427",
+  "catalogueHash": "dc77e23affed4b877a886b2f6aae7b4e7c961e82973bb0d309717c008b9ce862",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -840,8 +840,8 @@
       {
         "slug": "sunscar-dunes",
         "name": "Signal Dunes",
-        "revision": 4,
-        "hash": "c60d7a649fc496b708de38cfb56c727dc8ed9b6ebf84dae3eadaf3e7eb4c0f11"
+        "revision": 5,
+        "hash": "8d9f9754aea8230a3aa7809010a89a3c9538f1eb2f8c47383c8da6501b78801d"
       }
     ],
     "missing": []
@@ -1017,9 +1017,9 @@
     },
     {
       "slug": "sunscar-dunes",
-      "revision": 4,
-      "hash": "c60d7a649fc496b708de38cfb56c727dc8ed9b6ebf84dae3eadaf3e7eb4c0f11",
-      "bytes": 11399168
+      "revision": 5,
+      "hash": "8d9f9754aea8230a3aa7809010a89a3c9538f1eb2f8c47383c8da6501b78801d",
+      "bytes": 11474944
     }
   ]
 }
