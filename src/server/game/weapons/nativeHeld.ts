@@ -41,6 +41,7 @@ import { nativePopulationOf } from '../riding/nativePopulation';
 import { nativeTamingOf } from '../riding/nativeTaming';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { nativeStealthOf } from '../stealth/nativeStealth';
+import { heldArrowTargets, heldContacts } from './nativeHeldTargets';
 
 const finite=v.pipe(v.number(),v.finite()),count=v.pipe(finite,v.integer(),v.minValue(0)),vector=v.tuple([finite,finite,finite]);
 const SwingSaved=v.strictObject({move:v.nullable(count),swingT:finite,comboIdx:count,lastSwingEnd:finite,cooldown:finite,
@@ -66,7 +67,8 @@ export interface HeldTick { readonly commands: () => readonly HeldCommand[]; rea
 /** The assembly row, with its weather rows read. */
 export interface HeldArmsRow { readonly step: string; readonly slots: string; readonly weather: unknown; readonly input: { readonly attack: string; readonly swap: string; readonly aim: string; readonly pitch: string } }
 export type HeldRay = (host: SimHost, from: Vector3, direction: Vector3, distance: number, hit: ReturnType<typeof nativeRangedHit>) => ReturnType<typeof nativeRangedHit>;
-/** An encounter lends its actual target and continuation identity. Ordinary animal/spear keys remain roster-owned; this port affects arrows only. */
+
+/** Encounter arrows may keep a stable identity outside the population roster. */
 export interface HeldArrowTargets {
   readonly ray: (host: SimHost, from: Vector3, direction: Vector3, distance: number, hit: TargetHit | null) => TargetHit | null;
   readonly key: (host: SimHost, target: TargetAnimal) => string | null;
@@ -104,7 +106,7 @@ export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'secti
   const order=slots.equipment.order??slots.registration,available=new Set([bowSlot.id,bladeSlot.id,spearSlot.id]);
   if(order.some(id=>!available.has(id))||order.length!==3)throw new Error('The ordinary arsenal must retain its three real weapons');
   return (host, context) => {
-    const { combat, tick, contacts, arrowTargets } = context, room = context.room === true;
+    const { combat, tick, contacts = heldContacts, arrowTargets = heldArrowTargets } = context, room = context.room === true;
     const taming = nativeTamingOf(host);
     if (taming === undefined || mountedPlayerOf(host) === undefined) throw new Error('Weapons require actual native riding');
     if (owners.has(host)) throw new Error('Native held equipment already has an owner');
@@ -153,15 +155,14 @@ export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'secti
       return key(actor);
     };
     const arrowKey=(actor:TargetAnimal):string=>{
-      if(arrowTargets===undefined)return key(actor);
       const id=arrowTargets.key(host,actor);if(id===null)return key(actor);
       if(host.entities.has(id)||arrowTargets.resolve(host,id)!==actor)throw new Error('Encounter arrow target identity changed');
       return id;
     };
     const arrowBody=(id:string):TargetAnimal=>{
       const actor=host.entities.get(id);if(actor!==undefined)return actor;
-      const target=arrowTargets?.resolve(host,id);
-      if(target===undefined||target===null||arrowTargets?.key(host,target)!==id)throw new Error('Missing encounter arrow target');
+      const target=arrowTargets.resolve(host,id);
+      if(target===null||arrowTargets.key(host,target)!==id)throw new Error('Missing encounter arrow target');
       return target;
     };
     const bodies=():AnimalSim[]=>[...host.entities.values()].filter(actor=>actor.alive&&actor!==mount.horse);
@@ -172,7 +173,7 @@ export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'secti
     const random=():number=>host.rng.stream('gameplay').next();
     const ray=(from:Vector3,dir:Vector3,distance:number)=>{
       const original=nativeRangedHit(bodies(),from,dir,distance);
-      const hit=contacts===undefined?original:contacts(host,from,dir,distance,original);return hit===null||hit.body===null?null:{animal:hit.body,point:hit.point,distance:hit.distance,headshot:hit.head,...(hit.part===undefined?{}:{part:hit.part,multiplier:hit.multiplier})};
+      const hit=contacts(host,from,dir,distance,original);return hit===null||hit.body===null?null:{animal:hit.body,point:hit.point,distance:hit.distance,headshot:hit.head,...(hit.part===undefined?{}:{part:hit.part,multiplier:hit.multiplier})};
     };
     const spearContacts=new PolearmContact<AnimalSim>({raycast:ray,same:(animal,target)=>animal===target,
       contact:(animal,amount,point,dir,from,moveId,part)=>host.combat.hit({source:striker,sourceTags:['actor.player',spearItem.id,'dmg.melee'],
@@ -187,7 +188,7 @@ export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'secti
     const arrows=new ProjectileLaw<{seq:number},null>(bow.rows.arrow.maxFlying>0?{...bow.rows.arrow,length,
       substeps:bow.base.projectile?.substeps??4,lifetime:bow.base.projectile?.lifetime??12}:(()=>{throw new Error('Missing bow flight slots');})(),{
       feet:player.position,extent:host.level.ground.size/2,floorAt:floor,world:(from,to,radius)=>worldHit(host.physics,from,to,radius),
-      targets:(from,dir,distance)=>{const hit=ray(from,dir,distance);return arrowTargets===undefined?hit:arrowTargets.ray(host,from,dir,distance,hit);},
+      targets:(from,dir,distance)=>{const hit=ray(from,dir,distance);return arrowTargets.ray(host,from,dir,distance,hit);},
       wind:()=>wind,surface:wall=>wall.material==='flesh'?'flesh':wall.material==='wood'||wall.material==='planks'?'wood':'ground',
       random,canRecover:()=>bolts<bow.base.quiver,recover:survived=>{if(survived)bolts=Math.min(bow.base.quiver,bolts+1);},
       flight:()=>({seq:0}),stuck:()=>null,moved:()=>undefined,ended:()=>undefined,settled:()=>undefined,changed:()=>undefined,removed:()=>undefined,impact:()=>undefined,

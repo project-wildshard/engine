@@ -33,6 +33,7 @@ import type { nativeRangedHit } from '../plugin/nativeItems';
 import type { EncounterIntake } from '../population/encounterIntake';
 import { readEncounterIntake } from '../population/encounterBook';
 import { DirectedLaw } from '../population/directedLaw';
+import { bindHeldContacts } from '../weapons/nativeHeldTargets';
 import { nativePopulationOf } from '../riding/nativePopulation';
 import { nativeHerdCollection } from '../shardfile/groupRuntime';
 
@@ -276,6 +277,7 @@ export async function preparePatrol(product:Pick<ShardFolder,'json'>,files:Patro
       if(rider===undefined||point===undefined)throw new Error('Missing original patrol target joint');
       rider.view.jointPoint(rows.ride.figure.bone,point.at,out);
     };
+    bindHeldContacts(host,(_host,from,dir,distance,hit)=>target(from,dir,distance,hit));
     owners.set(host,{law,readiness,shots:()=>shots,hits:()=>totalHits,target,aimPoint});host.scope.onDispose(()=>{owners.delete(host);poses.clear();scopes.clear();});
     };
   }};

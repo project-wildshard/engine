@@ -26,8 +26,8 @@ import { installGroundBoss } from '../boss/native';
 import { EliteCore, memoryElitePersistence, type EliteCoreRule, type EliteCoreScript } from '../../../shared/game/eliteSystem';
 import { installNativeHeldAmmunition } from '../loadout/nativeAmmunition';
 import { prepareHeldArms } from '../weapons/nativeHeld';
-import { openArenaArrows, prepareOpenArenaHost, type OpenArenaRuntime } from '../boss/openArenaNative';
-import { patrolOf, preparePatrol } from '../boss/patrolNative';
+import { prepareOpenArenaHost, type OpenArenaRuntime } from '../boss/openArenaNative';
+import { preparePatrol } from '../boss/patrolNative';
 import { prepareSlots } from '../boss/slotsNative';
 import type { Wind } from '@wildshard/engine/world/steppeWind';
 import { dayClock } from '../../../shared/game/looks/dayClock';
@@ -198,8 +198,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     case 'held.arms': {
       const arms = await prepareHeldArms(product, { ...row, weather: await readAssemblyInput<unknown>(product, row.weather) }), stealth = prepareNativeStealth(product);
       return run => { if (run.context.room === true) { installCombatMotion(run.host, run.context, row.speed); const tick = at.ports.heldTick(run.context);
-        arms(run.host, { combat: combatOf(run), room: true, tick, arrowTargets: openArenaArrows,
-          contacts: (host, from, direction, distance, hit) => patrolOf(host)?.target(from, direction, distance, hit) ?? hit });
+        arms(run.host, { combat: combatOf(run), room: true, tick });
         // SS4: the sneak shot the page doubles, decided here from each player's own Hidden state. Installed after the arms so
         // exportSeats keeps its indexes; a shot therefore reads the state one tick old, where the page reads the same frame's.
         // SS3: the held arms own the room's equip swap, the server half of the page's catalogue kit

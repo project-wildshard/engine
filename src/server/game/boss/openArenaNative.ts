@@ -31,6 +31,10 @@ import { nativeGroupCollection } from '../shardfile/groupRuntime';
 import { applyWeatherCover, type WeatherReactions } from '../weather/reactions';
 import { prepareChapterRecords, type ChapterRecords } from '../quest/chapterRecords';
 import { heldArmsOf, type HeldArrowTargets, type HeldCommand } from '../weapons/nativeHeld';
+import { bindHeldArrowTarget, heldArrowTargets } from '../weapons/nativeHeldTargets';
+
+/** The original tape adapter uses the same registered encounter target. */
+export const openArenaArrows: HeldArrowTargets = heldArrowTargets;
 
 /** The `use` value that takes a fallen arena's reward. */
 const TAKE = 2;
@@ -51,12 +55,6 @@ export interface OpenArenaPorts { readonly presentation: OpenArenaPresentation; 
   readonly closedInputOwner?: ((host: SimHost) => void) | undefined; readonly grantItem?: ((player: string, item: string, count: number) => void) | undefined }
 const owners = new WeakMap<SimHost, NativeOpenArena>();
 export function openArenaOf(host: SimHost): NativeOpenArena | undefined { return owners.get(host); }
-/** The fallen heart's arrows: encounter contacts lend their target and continuation identity. */
-export const openArenaArrows: HeldArrowTargets = {
-  ray: (host, from, dir, distance, hit) => { const owner = owners.get(host); return owner === undefined ? hit : owner.fight.target(from, dir, distance, hit); },
-  key: (host, target) => { const owner = owners.get(host); return owner?.fight.combatTarget === target ? owner.target : null; },
-  resolve: (host, id) => { const owner = owners.get(host); return owner !== undefined && id === owner.target ? owner.fight.combatTarget : null; },
-};
 /** One arena's lifecycle and the loans it gives its host. */
 export interface OpenArenaRuntime {
   readonly eliteDamage: (actor: HuntBody, request: { readonly point: { readonly x: number; readonly z: number } }) => number;
@@ -154,6 +152,8 @@ export async function prepareOpenArenaHost(product: Pick<ShardFolder, 'json' | '
       actRoutes(host).interactions.set(`${data.definition.id}.tie`,{actorId:row.input.use,value:1});
       // the tie prompt is the fight's to judge, so a page hears it: its reach in centimetres, and which line it reads in the units place
       publishOwned(host,`${row.id}.tie`,(_player,out)=>{out.set(OWNED_ROW.tie,Math.round(prompt.radius*100)*10+(prompt.label===data.lines.tieOnFoot?1:prompt.label===data.lines.tieQuiet?2:0));});
+      bindHeldArrowTarget(host, { key: row.target, target: fight.combatTarget,
+        ray: (from, dir, distance, nearest) => fight.target(from, dir, distance, nearest) });
       advance=run;owners.set(host,{fight,boss,records,target:row.target,locked:()=>locked,reward:()=>reward,storm:()=>actual.storm.stormActive,
         weather:()=>({state:actual.storm.weather.state,left:actual.storm.weather.phaseLeft}),
         rewardPrompt:()=>rewardPoint===null?null:{position:rewardPoint.clone(),radius:2.6,label:data.reward.prompt}});

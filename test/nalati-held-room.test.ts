@@ -5,6 +5,8 @@ import type { NetCommand } from '@wildshard/wire/netCommand';
 import type { NetTickAct } from '../src/shared/engine/net/acts';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { heldArmsOf } from '../src/server/game/weapons/nativeHeld';
+import { heldArrowTargets } from '../src/server/game/weapons/nativeHeldTargets';
+import { openArenaOf } from '../src/server/game/boss/openArenaNative';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -56,3 +58,18 @@ test('a bot fights with a sabre and a polearm of their own', async () => {
   expect(held().every(row => row.source === bot.health)).toBe(true);
   live.dispose();
 }, 120_000);
+
+test('the arena lends its real arrow target only for the lifetime of the room', async () => {
+  const live = await nalati(true), { host } = live;
+  const key = 'encounter:storm-titan:heart';
+  try {
+    const arena = openArenaOf(host);
+    if (arena === undefined) throw new Error('Missing admitted arena');
+    expect(heldArrowTargets.resolve(host, key)).toBe(arena.fight.combatTarget);
+    expect(heldArrowTargets.key(host, arena.fight.combatTarget)).toBe(key);
+    expect(host.entities.has(key)).toBe(false);
+  } finally {
+    live.dispose();
+  }
+  expect(heldArrowTargets.resolve(host, key)).toBeNull();
+});
