@@ -19,6 +19,7 @@ import { passSplitLimit } from '../render/passSplit';
 import { bindDrawWatch } from '../render/drawCheck';
 import { jsonSlot } from '../saves/slots';
 import { TIER } from './tier';
+import { readWatchPixels } from './watchPixels';
 
 /** what a look found */
 export type WorldLook = 'drawn' | 'transparent' | 'black';
@@ -78,14 +79,16 @@ export const LOOKS_S: readonly number[] = [3, 8, 20, 45];
 /** Watch a world reached control: the looks in LOOKS_S, each skipped while it cannot judge. */
 export function installWorldWatch(host: WorldWatchHost, looks: readonly number[] = LOOKS_S): void {
   let reported = false, failed = 0, stopped = false;
+  const asyncRead = TIER === 'desktop' && looks.length > 0 && jsonSlot('debug.worldWatchDrawCheck', 'device').read() === true;
+  const canLook = (): boolean => !stopped && !host.scope.disposed && !host.scope.disposing
+    && document.visibilityState === 'visible' && !host.hold && !host.contextLost() && host.playing();
   const report = (why: string, look: WorldLook | 'hidden', fatal: boolean): void => {
     const detail = { look, why, graphics: graphicsMode(), passSplit: passSplitLimit(), ...host.detail() };
     console.warn(`[world-watch] ${why}`, detail);
     emitFault({ system: 'world-watch', error: Object.assign(new Error(`World not drawn: ${why}`), { detail }), verdict: fatal ? 'uncaught' : 'retry' });
   };
   const lookOnce = async (): Promise<void> => {
-    if (stopped || host.scope.disposed || host.scope.disposing) return;
-    if (document.visibilityState !== 'visible' || host.hold || host.contextLost() || !host.playing()) return;
+    if (!canLook()) return;
     const hiddenBy = canvasHiddenBy(getComputedStyle(host.canvas));
     if (hiddenBy !== null) {
       // the world is drawn but kept off screen: put it back, and say so once
@@ -100,9 +103,15 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
       if (!reported && !host.hold && document.visibilityState === 'visible') { reported = true; report(`no world frame drew in ${String(CAPTURE_WAIT_MS)} ms of play`, 'black', false); }
       return;
     }
-    const ctx = copy.getContext('2d', { willReadFrequently: true });
-    if (ctx === null || copy.width === 0 || copy.height === 0) return;
-    const look = judgeWorldPixels(ctx.getImageData(0, 0, copy.width, copy.height).data);
+    if (copy.width === 0 || copy.height === 0) return;
+    let pixels = asyncRead ? await readWatchPixels(copy, host.scope, CAPTURE_WAIT_MS) : null;
+    if (asyncRead && !canLook()) return;
+    if (pixels === null) {
+      const ctx = copy.getContext('2d', { willReadFrequently: true });
+      if (ctx === null) return;
+      pixels = ctx.getImageData(0, 0, copy.width, copy.height).data;
+    }
+    const look = judgeWorldPixels(pixels);
     if (look === 'drawn') { failed = 0; return; }
     failed++;
     if (failed === 1) { if (!reported) { reported = true; report(`the world reads ${look} after control`, look, false); } return; }
@@ -111,7 +120,5 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
     report(`the world still reads ${look} ${String(failed)} looks after control`, look, true);
   };
   for (const s of looks) host.scope.timeout(s * 1000, () => { void lookOnce(); });
-  if (TIER === 'desktop' && looks.length > 0 && jsonSlot('debug.worldWatchDrawCheck', 'device').read() === true) {
-    bindDrawWatch(host.canvas, host.scope);
-  }
+  if (asyncRead) bindDrawWatch(host.canvas, host.scope);
 }
