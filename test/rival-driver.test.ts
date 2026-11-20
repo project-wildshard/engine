@@ -1,6 +1,6 @@
 import type { VehicleHandling } from '@wildshard/format/vehicles';
 import { expect, test } from 'vitest';
-import { rivalAdvance, rivalCap, rivalCommand, rivalCourse, rivalPoint, type RivalCourse } from '../src/shared/engine/sim/rivalDriver';
+import { RIVAL_FREE, rivalAdvance, rivalCap, rivalCommand, rivalCourse, rivalPoint, rivalUnwedge, type RivalCourse, type RivalObstacle, type RivalWedge } from '../src/shared/engine/sim/rivalDriver';
 import { stepVehicle, vehicleAt, type VehicleState, type VehicleWorld } from '../src/shared/engine/sim/vehicle';
 
 // MIRROR-SALT-ZONE MSZ33: the rival's AI driver laps a line on the engine's own vehicle step: he keeps to it, slows into its
@@ -85,4 +85,44 @@ test('in a sail, downwind or upwind, he drives to his speed, not to a fixed stic
     expect(Math.max(...speeds)).toBeLessThan(4.5 + 1); // the wind behind him adds nothing past his speed
     expect(Math.min(...speeds)).toBeGreaterThan(4.5 - 1); // nor holds him back under it
   }
+});
+
+// MSZ33b: Mirror Salt's Pan Slalom, idle: the player's buggy parked on his line stopped him for good and nobody won.
+/** Drive a buggy rival down a straight 200 m line past `bodies` (none of them move); his run's closest pass and widest swing. */
+function past(bodies: readonly RivalObstacle[]): { travelled: number; closest: number; widest: number; end: number } {
+  const course = rivalCourse([[0, 0, 0], [0, 0, -200]], false, BUGGY, 16);
+  let state: VehicleState = vehicleAt({ x: 0, y: 0, z: 0 }, 0), travelled = 0, closest = Infinity, widest = 0;
+  for (let i = 0; i < 60 * 25 && travelled < 190; i++) { // to his finish (past an open line's end he would circle it)
+    state = stepVehicle(state, rivalCommand(state, course, travelled, 0, 40, BUGGY, 16, bodies, FLAT.side), BUGGY, FLAT, DT);
+    travelled = rivalAdvance(course, travelled, state.x, state.z);
+    for (const body of bodies) closest = Math.min(closest, Math.hypot(state.x - body.x, state.z - body.z) - body.r - FLAT.side);
+    widest = Math.max(widest, Math.abs(state.x));
+  }
+  return { travelled, closest, widest, end: Math.abs(state.x) };
+}
+
+test('a vehicle stopped on his line he steers round, clear of its hull, and comes back onto the line', () => {
+  for (const x of [0, 0.8, -0.8]) { // dead on it, and a little either side
+    const run = past([{ x, z: -60, r: 2.2 }]);
+    expect(run.closest).toBeGreaterThan(0.3); // never touches it
+    expect(run.travelled).toBeGreaterThanOrEqual(190); // and drives on to his finish
+    expect(run.end).toBeLessThan(1); // back on his line
+  }
+});
+
+test('a vehicle parked clear of his line he drives straight past', () => {
+  expect(past([{ x: 6, z: -60, r: 2.2 }]).widest).toBeLessThan(0.3);
+});
+
+test('wedged with his stick forward he backs off, turned the other way, then drives on', () => {
+  const stopped = vehicleAt({ x: 0, y: 0, z: 0 }, 0), forward = { throttle: 1, turn: 0.5, boost: false };
+  let wedge: RivalWedge = RIVAL_FREE, backed = 0;
+  for (let i = 0; i < 60 * 4; i++) {
+    const out = rivalUnwedge(wedge, stopped, forward, DT); wedge = out.wedge;
+    if (out.command.throttle < 0) { backed++; expect(out.command.turn).toBe(-0.5); }
+  }
+  expect(backed).toBeGreaterThan(60); // backed off at least a second's worth
+  expect(backed).toBeLessThan(60 * 3); // and drove on between
+  const moving = { ...stopped, forward: 5 };
+  expect(rivalUnwedge(RIVAL_FREE, moving, forward, 2).command).toBe(forward); // a rival under way is never wedged
 });

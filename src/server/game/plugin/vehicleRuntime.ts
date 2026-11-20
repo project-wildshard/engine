@@ -9,7 +9,7 @@ import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { STEER_PROBE } from '@wildshard/engine/sim/moverMotion';
 import { publishScriptBody, publishWorldState, withdrawScriptBody, type StateNetRow } from '@wildshard/engine/sim/shardRows';
 import { castVehicleHull, edgeHit, firstHit, VEHICLE_EDGE_OWNER, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullFrom, type HullShapes, type VehicleReach } from '@wildshard/engine/sim/vehicleHull';
-import { rivalAdvance, rivalCommand, rivalCourse, type RivalCourse } from '@wildshard/engine/sim/rivalDriver';
+import { RIVAL_FREE, rivalAdvance, rivalCommand, rivalCourse, rivalUnwedge, type RivalCourse, type RivalWedge } from '@wildshard/engine/sim/rivalDriver';
 import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type VehicleImpact, type VehicleState, type VehicleStepOut, type VehicleWorld } from '@wildshard/engine/sim/vehicle';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
@@ -96,9 +96,13 @@ interface RivalRun {
   readonly total: number;
   readonly band: number; readonly top: number;
   travelled: number; chased: number; finished: boolean;
+  /** MSZ33b: how long he has sat wedged, and backed off. */
+  wedge: RivalWedge;
 }
 /** MSZ33: m a rival starts beside his line (to its right), clear of the player on it; his finish counts this short of its end. */
 const RIVAL_BESIDE = 3.5, RIVAL_FINISH = 3;
+/** MSZ33b: m within which a rival sees another vehicle he may have to steer round. */
+const RIVAL_SEES = 60;
 /** MSZ33: m of catch-up band a rival keeps when his race names none. */
 export const RIVAL_BAND = 40;
 /** MSZ33: a rival's vehicle id: his dock's, for the player and race he races. */
@@ -196,7 +200,7 @@ export class VehicleRuntime {
     const closed = (race.laps ?? 1) > 1, course = rivalCourse(rival.line, closed, kind.handling, rival.speed);
     const [x0, y0, z0] = rival.line[0] ?? [0, 0, 0], [x1, , z1] = rival.line[1] ?? [x0, y0, z0 - 1];
     const yaw = Math.atan2(-(x1 - x0), -(z1 - z0)), at: [number, number, number] = [x0 + Math.cos(yaw) * RIVAL_BESIDE, y0, z0 - Math.sin(yaw) * RIVAL_BESIDE];
-    const run: RivalRun = { player, race: race.id, course, total: course.length * (closed ? race.laps ?? 1 : 1), band: rival.band ?? RIVAL_BAND, top: rival.speed, travelled: 0, chased: 0, finished: false };
+    const run: RivalRun = { player, race: race.id, course, total: course.length * (closed ? race.laps ?? 1 : 1), band: rival.band ?? RIVAL_BAND, top: rival.speed, travelled: 0, chased: 0, finished: false, wedge: RIVAL_FREE };
     return this.spawnAt({ ...dock, at, yaw }, `rival.${race.id}.${player}`, undefined, run);
   }
   /** MSZ33: whether `race`'s rival has finished `player`'s run (one sent home, or never out, has not). */
@@ -211,12 +215,17 @@ export class VehicleRuntime {
   }
   /** MSZ33: `race`'s rival for `player` goes home. */
   stopRival(player: string, race: string): void { const id = this.rivalOf(player, race); if (id !== undefined) this.despawn(id); }
-  /** MSZ33: a rival's stick: his AI along his line, against how far the player has come; past his finish he brakes and holds. */
-  private rivalStick(vehicle: Live, rival: RivalRun): VehicleCommand {
+  /** MSZ33: a rival's stick: his AI along his line, against how far the player has come; past his finish he brakes and holds.
+   *  MSZ33b: he steers round the other vehicles out, and backs off whatever still wedges him. */
+  private rivalStick(vehicle: Live, rival: RivalRun, dt: number): VehicleCommand {
     if (rival.finished) return { throttle: 0, turn: 0, boost: false, brake: true };
     const body = this.host?.players.get(rival.player);
     if (body !== undefined) rival.chased = rivalAdvance(rival.course, rival.chased, body.position.x, body.position.z);
-    return rivalCommand(vehicle.state, rival.course, rival.travelled, rival.travelled - rival.chased, rival.band, vehicle.kind.handling, rival.top);
+    const bodies = [...this.live.values()].filter(other => other !== vehicle && Math.hypot(other.state.x - vehicle.state.x, other.state.z - vehicle.state.z) < RIVAL_SEES).map(other => ({ x: other.state.x, z: other.state.z, r: Math.max(other.world.bow, other.world.stern, other.world.side) }));
+    const command = rivalCommand(vehicle.state, rival.course, rival.travelled, rival.travelled - rival.chased, rival.band, vehicle.kind.handling, rival.top, bodies, vehicle.world.side);
+    const free = rivalUnwedge(rival.wedge, vehicle.state, command, dt);
+    rival.wedge = free.wedge;
+    return free.command;
   }
   /** MSZ14: s before a wrecked vehicle's dock has it back, or none while it is out (or was never wrecked). */
   respawning(id: string): number | undefined { return this.wrecked.get(id)?.left; }
@@ -325,7 +334,7 @@ export class VehicleRuntime {
     }
     for (const vehicle of this.live.values()) {
       const driver = this.driver(vehicle.id), rival = vehicle.rival;
-      const command = rival !== undefined ? this.rivalStick(vehicle, rival) : driver === null ? NEUTRAL : this.ports.stick(driver, vehicle.state.yaw) ?? NEUTRAL;
+      const command = rival !== undefined ? this.rivalStick(vehicle, rival, dt) : driver === null ? NEUTRAL : this.ports.stick(driver, vehicle.state.yaw) ?? NEUTRAL;
       out.impact = null;
       vehicle.state = stepVehicle(vehicle.state, command, vehicle.kind.handling, vehicle.world, dt, out);
       if (out.impact !== null && out.impact !== undefined) this.hand(vehicle, out.impact);

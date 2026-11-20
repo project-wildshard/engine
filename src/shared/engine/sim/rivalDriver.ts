@@ -7,6 +7,7 @@ import { VEHICLE_GRAVITY, type VehicleCommand, type VehicleState } from './vehic
  * to drive. He steers at a point ahead on the line (farther the faster he goes), takes each stretch at the speed its bend
  * allows (his tyres' grip, braking in time for the next bend), and keeps within a catch-up band of the player: past it ahead
  * he eases off, past it behind he pushes, so a race stays close but a player who drives the line well still wins.
+ * MSZ33b: a vehicle stopped on his line he steers round, and if something still wedges him he backs off and comes round.
  */
 
 /** A racing line, measured: its points, the distance along it to each, its length and the speed each point allows (m, m/s). */
@@ -37,6 +38,14 @@ const BRAKE_OVER = 1.5;
 const SPEED_GAIN = 1.5;
 /** m either side of his last place along the line a projection searches (so a line that passes near itself is never cut). */
 const SEARCH = 60;
+/** MSZ33b: m of room he leaves between his side and a body he passes. */
+const PASS_ROOM = 1.5;
+/** MSZ33b: he looks this far along his line for a body in his way: at least `AVOID_MIN` m, and `AVOID_TIME` s at his speed. */
+const AVOID_MIN = 14, AVOID_TIME = 2.5;
+/** MSZ33b: m/s he passes a body at. */
+const PASS_SPEED = 8;
+/** MSZ33b: s with his stick forward and under `WEDGED_SPEED` m/s before he backs off, and s he backs for. */
+const WEDGED_AFTER = 1.2, WEDGED_SPEED = 0.4, BACK_FOR = 1.4;
 
 const tau = 2 * Math.PI;
 const ORIGIN = { x: 0, y: 0, z: 0 } as const;
@@ -106,16 +115,64 @@ export function rivalAdvance(course: RivalCourse, travelled: number, x: number, 
   return Math.max(0, best);
 }
 
+/** MSZ33b: a body a rival may meet: where it stands and how far its hull reaches from there (m). */
+export interface RivalObstacle { readonly x: number; readonly z: number; readonly r: number }
+
+/** Of the line `d` m along, its point and its right (unit, across the way it runs). */
+function lineFrame(course: RivalCourse, d: number): { readonly x: number; readonly z: number; readonly rx: number; readonly rz: number } {
+  const p = rivalPoint(course, d), a = rivalPoint(course, d - 1), b = rivalPoint(course, d + 1), tx = b.x - a.x, tz = b.z - a.z, n = Math.hypot(tx, tz) || 1;
+  return { x: p.x, z: p.z, rx: -tz / n, rz: tx / n };
+}
+
+/**
+ * MSZ33b: where a rival `travelled` m along his line steers to get round the nearest body in his way, or none in it. A body is
+ * in his way when it stands on his line ahead, nearer it than its reach, his half width `side` and `PASS_ROOM` together; he
+ * passes it on the side of the line it leaves the more room on, as far off it as that clearance, then comes back to his line.
+ */
+export function rivalPass(course: RivalCourse, travelled: number, speed: number, bodies: readonly RivalObstacle[], side: number): { readonly x: number; readonly z: number } | null {
+  const reach = Math.max(AVOID_MIN, speed * AVOID_TIME);
+  let pass: { x: number; z: number } | null = null, nearest = Infinity;
+  for (const body of bodies) {
+    const along = rivalAdvance(course, travelled, body.x, body.z), gap = along - travelled;
+    if (gap < -body.r || gap > reach + body.r || gap >= nearest) continue;
+    const at = lineFrame(course, along), off = (body.x - at.x) * at.rx + (body.z - at.z) * at.rz, clear = body.r + side + PASS_ROOM;
+    // (measured to its nearest point on the line: a body past the search finds none, and reads as far off it)
+    if (Math.hypot(body.x - at.x, body.z - at.z) >= clear) continue;
+    // a body right of the line (`off` > 0) he passes on its left; aim beside it, a body's reach on so he clears its far end
+    const shift = off > 0 ? off - clear : off + clear, beyond = lineFrame(course, along + body.r);
+    pass = { x: beyond.x + beyond.rx * shift, z: beyond.z + beyond.rz * shift }; nearest = gap;
+  }
+  return pass;
+}
+
+/** MSZ33b: how long a rival has sat wedged with his stick forward, and how long he has left backing off (s). */
+export interface RivalWedge { readonly stuck: number; readonly backing: number }
+export const RIVAL_FREE: RivalWedge = { stuck: 0, backing: 0 };
+/**
+ * MSZ33b: a rival's stick past anything his line and `rivalPass` miss (a parked hull at an angle, a wall): held forward under
+ * `WEDGED_SPEED` for `WEDGED_AFTER` s he backs off for `BACK_FOR` s, the stick turned the other way (backing swings the nose
+ * the way it pointed), then drives on. A vehicle that cannot reverse just tries again.
+ */
+export function rivalUnwedge(wedge: RivalWedge, state: VehicleState, command: VehicleCommand, dt: number): { readonly wedge: RivalWedge; readonly command: VehicleCommand } {
+  const back = { throttle: -1, turn: -command.turn, boost: false };
+  if (wedge.backing > 0) return { wedge: { stuck: 0, backing: Math.max(0, wedge.backing - dt) }, command: back };
+  const stuck = command.throttle > 0 && Math.abs(state.forward) < WEDGED_SPEED ? wedge.stuck + dt : 0;
+  return stuck < WEDGED_AFTER ? { wedge: { stuck, backing: 0 }, command } : { wedge: { stuck: 0, backing: BACK_FOR }, command: back };
+}
+
 /** What a rival's stick does this step: `state` where he is, `travelled` m along his line, `lead` m he is ahead of the player
- *  (negative behind), `band` his catch-up band, `top` his speed on a straight. */
-export function rivalCommand(state: VehicleState, course: RivalCourse, travelled: number, lead: number, band: number, handling: Pick<VehicleHandling, 'speed' | 'boost'>, top: number): VehicleCommand {
-  const speed = Math.max(0, state.forward), aim = rivalPoint(course, travelled + Math.max(LOOK_MIN, speed * LOOK_PER_SPEED));
+ *  (negative behind), `band` his catch-up band, `top` his speed on a straight; MSZ33b: `bodies` he may meet and his own half
+ *  width `side`, to steer round any in his way. */
+export function rivalCommand(state: VehicleState, course: RivalCourse, travelled: number, lead: number, band: number, handling: Pick<VehicleHandling, 'speed' | 'boost'>, top: number, bodies: readonly RivalObstacle[] = [], side = 1): VehicleCommand {
+  const speed = Math.max(0, state.forward), pass = bodies.length === 0 ? null : rivalPass(course, travelled, speed, bodies, side);
+  const aim = pass ?? rivalPoint(course, travelled + Math.max(LOOK_MIN, speed * LOOK_PER_SPEED));
   const want = Math.atan2(-(aim.x - state.x), -(aim.z - state.z)), error = wrap(want - state.yaw);
   // a right turn lowers yaw: a target to the right (a negative error) is a positive turn
   const turn = clamp(-error * STEER_GAIN, -1, 1);
   let target = Math.min(top, rivalCap(course, travelled), rivalCap(course, travelled + speed));
   if (lead > band) target *= Math.max(RIVAL_EASE, 1 - ((lead - band) / band) * (1 - RIVAL_EASE));
   else if (lead < -band) target *= RIVAL_PUSH;
+  if (pass !== null) target = Math.min(target, PASS_SPEED);
   if (Math.abs(error) > TURN_ERROR) target = Math.min(target, TURN_SPEED);
   const boost = target > handling.speed && handling.boost > 1, most = handling.speed * (boost ? handling.boost : 1);
   const throttle = state.forward > target + BRAKE_OVER ? -clamp((state.forward - target) / (4 * BRAKE_OVER), 0, 1) : clamp((target + SPEED_GAIN * (target - state.forward)) / most, 0, 1);
