@@ -61,7 +61,9 @@ function declaring(source: Shardfile): Shardfile {
   const runtime = own === null || spawns === undefined ? own : { ...own, spawns: Object.fromEntries(Object.entries(spawns)
     .map(([key, rows]) => [key, (rows as readonly { id: string }[]).filter(row => row.id !== KING)])) as typeof spawns };
   return { ...source, runtime, rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
-    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: parsed.creatures };
+    // Pine's own declared herds (r8 on) stay beside the King's group
+    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: { ...source.creatures, brains: [...source.creatures.brains, ...parsed.creatures.brains],
+    spawns: [...source.creatures.spawns, ...parsed.creatures.spawns] } };
 }
 function resident(fixture: Shipped, shard: Shardfile, snapshot?: string): Promise<NativeHeadlessResident> {
   const product: ShardFolder = { ...fixture.product, shardfile: shard };

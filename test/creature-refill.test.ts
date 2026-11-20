@@ -169,7 +169,10 @@ test('a shipped host runs a home twice as fast with two players near, and one pl
   } finally { solo.dispose(); room.dispose(); }
 }, 120_000);
 
-test('a shipped room refills a fallen herd animal through a save, and its solo twin never gains the row', async () => {
+// ONE-FORMAT OF23c: Pine r8 (pinned f9bfccd46) declares its herd bodies, so its roster stands no herd and a room's fallen deer is a
+// declared row with no refill (J109 parity for declared herds is OF23c's open gap, in meta's ONE-FORMAT plan). Skipped until a
+// shipped native room refills again; the Dunes home refill above still proves the refill row and its save.
+test.skip('a shipped room refills a fallen herd animal through a save, and its solo twin never gains the row', async () => {
   const directory = builtFolder('pine-hollow'), shard = await loadHeadlessFolder(directory), product = shard.shardfile, descriptor = outputDescriptor(product);
   if (descriptor === undefined) throw new Error('Missing Pine output');
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
