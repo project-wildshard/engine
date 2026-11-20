@@ -169,3 +169,19 @@ test('the shipped `pg` driver over TCP: migrations, writes, a corrupt doc, and a
   await expect(db.transaction(async sql => { await sql.exec('update player set name = \'Gone\''); throw new Error('Rolled back'); })).rejects.toThrow('Rolled back');
   expect((await db.query('select name from player')).rows).toEqual([{ name: 'Ann' }]);
 });
+
+test('a dropped Postgres connection rejects the transaction and the pool reconnects', async () => {
+  const held = await openPglite();
+  const server = new PGLiteSocketServer({ db: held.pglite, port: 0, host: '127.0.0.1' });
+  await server.start();
+  const db = openPg(`postgresql://postgres@${server.getServerConn()}/postgres?sslmode=disable`);
+  closers.push(async () => { await db.close(); await server.stop(); await held.close(); });
+
+  await expect(db.transaction(async sql => {
+    await server.stop();
+    await sql.exec('select 1');
+  })).rejects.toThrow(/connection terminated|not queryable/iu);
+
+  await server.start();
+  await expect(db.transaction(sql => sql.query('select 42 as answer'))).resolves.toEqual({ rows: [{ answer: 42 }] });
+});

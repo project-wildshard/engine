@@ -32,12 +32,25 @@ export function openPg(url: string, onError: (error: Error) => void = () => unde
   return { ...sqlOf(pool),
     transaction: async <Result>(work: (sql: Sql) => Promise<Result>): Promise<Result> => {
       const client = await pool.connect();
+      let unusable = false;
+      // pg's pool listens only while the client is idle. A checked-out
+      // socket can die during a query or between statements.
+      const disconnected = (): void => { unusable = true; };
+      client.on('error', disconnected);
       try {
         await client.query('begin');
         const result = await work(sqlOf(client));
         await client.query('commit');
         return result;
-      } catch (error) { await client.query('rollback'); throw error; } finally { client.release(); }
+      } catch (error) {
+        if (!unusable) {
+          try { await client.query('rollback'); } catch { unusable = true; }
+        }
+        throw error;
+      } finally {
+        client.off('error', disconnected);
+        client.release(unusable);
+      }
     },
     close: async (): Promise<void> => { await pool.end(); } };
 }
