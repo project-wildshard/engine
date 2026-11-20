@@ -174,3 +174,13 @@ test("a fresh guest reaches the gate's centre line first, then walks along it to
   expect(spawnApproach('driftwood-isle', {x:-0.5, z:-194}, {x:0, z:0}, -1, 0)).toEqual([
     {x:-235, z:-194, ride:false}, {x:-235, z:0, ride:false}]);
 });
+
+test("a fresh Brasscap guest leaves town around the canyon wall before taking the east gate", (): void => {
+  const center = {x:-562.5, z:-562.5}, depot = {x:-564.1, z:-559.9};
+  expect(spawnApproach('brasscap-mesa', depot, center, 1, 0)).toEqual([
+    {x:-558.5, z:-559.9, ride:false},
+    {x:-558.5, z:-517.5, ride:false},
+    {x:-487.5, z:-517.5, ride:false},
+    {x:-437.5, z:-562.5, ride:false},
+    {x:-327.5, z:-562.5, ride:false}]);
+});

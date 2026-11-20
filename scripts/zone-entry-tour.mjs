@@ -403,7 +403,8 @@ export function roadApproach(last, leg, center, pitch) {
  * @param {Page} page @param {Leg} leg @param {Point} center @param {number} pitch @param {number} end */
 async function smokeApproach(page, leg, center, pitch, end) {
   const {from,to} = leg, dx = to.cell[0]-from.cell[0], dz = to.cell[1]-from.cell[1];
-  const portals = await portalExits(page, from.slug ?? from.instance, true);
+  const slug = from.slug ?? from.instance;
+  const portals = await portalExits(page, slug, true);
   const plans = SIDES.map(([x,z]) => portalExitPlan(portals, center, {x,z})).filter(plan => plan !== null && plan.walk.length > 0);
   const at = await feet(page);
   if (at !== null) {
@@ -411,20 +412,23 @@ async function smokeApproach(page, leg, center, pitch, end) {
       .sort((a,b) => a.distance-b.distance)[0];
     if (nearest !== undefined) return roadApproach(await walkPortalExit(page,from,nearest.plan,end),leg,center,pitch);
   }
-  return spawnApproach(from.instance, at ?? center, center, dx, dz);
+  return spawnApproach(slug, at ?? center, center, dx, dz);
 }
 
 /** A fresh guest's walk from its spawn to the gate approach, `dx`/`dz` the gate's side. Driftwood keeps the original gate
  *  proof's shore route round its harbour. Elsewhere the walker joins the gate's centre line on the gate's half of the cell
  *  and walks along it: the entryway's line is clear, a straight line from the spawn can climb onto a ledge and meet a wall
  *  (mirror-salt's west), and the cell's centre piece stands on the line (open-plot-4-2's).
- * @param {string} instance @param {Point} at @param {Point} center @param {number} dx @param {number} dz @returns {ApproachPoint[]} */
-export function spawnApproach(instance, at, center, dx, dz) {
+ * @param {string} slug @param {Point} at @param {Point} center @param {number} dx @param {number} dz @returns {ApproachPoint[]} */
+export function spawnApproach(slug, at, center, dx, dz) {
   /** @type {(readonly [number,number])[]} */
   let lead = [];
-  if (instance === DRIFTWOOD) {
+  if (slug === DRIFTWOOD) {
     if (dx !== 0) lead = [[dx*235,-194]];
     else if (dz > 0) lead = [[-235,-194],[-235,0],[-200,20],[-200,235]];
+  } else if (slug === 'brasscap-mesa' && dx > 0) {
+    // From the depot, go south of the canyon wall before turning east onto the gate's line.
+    lead = [[4,2.6],[4,45],[75,45],[125,0]];
   } else {
     // join the line on the gate's half, never nearer the centre than HALF/2: a cell's centre piece stands on its lines
     const along = dx !== 0 ? (at.x-center.x)*dx : (at.z-center.z)*dz, onto = dx*Math.max(along, HALF/2), ontoZ = dz*Math.max(along, HALF/2);
