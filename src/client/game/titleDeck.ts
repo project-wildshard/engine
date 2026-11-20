@@ -314,7 +314,9 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   let stripes: HTMLElement[] = [];
   let cardScope = scope.child('title-deck-cards');
   let index = 0;
-  let swipedAt = 0; // a swipe's trailing click must not re-select the card under the finger
+  // a swipe's trailing click must not re-select the card under the finger; -Infinity, not 0: a page under 400 ms old (a fast
+  // preview load, a proof's first click) took every card click for a swipe's
+  let swipedAt = -Infinity;
   const fill = (): void => {
     cardScope.dispose(); cardScope = scope.child('title-deck-cards');
     // J313: a draft's card (Thin Ice, off the grid by J305) never loads, so only Developer sees it

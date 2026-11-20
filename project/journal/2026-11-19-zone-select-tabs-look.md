@@ -17,3 +17,15 @@ never empties.
 
 Calls made with Jake away: feats read "0 FEATS" for an unvisited zone rather than NOT VISITED (the blind judge read
 NOT VISITED as a missing count); drafts appear only on ALL; the build pill drops under the tab row on Zone Select.
+
+## ZS11: a fresh upload in NEW
+
+An upload the API auto-placed after the build already reaches the title through the placement file (SA46 cards it from its
+catalogue entry, HG4 dresses it in the hero the cook copied), so NEW needs no card of its own: `zoneTabs` orders the build's
+cards and the placed ones alike. `test/zone-select-new.test.ts` holds it end to end with a signed fixture file and catalogue
+entry: the card is first in NEW in its cooked hero, ENTER ZONE enters it, and its `?chunk=` page finds its cell. Call made
+with Jake away: HG4 stands in NEW too, so an upload with no hero stays Developer only rather than wearing the plain card
+(Jake, 2026-11-17: "in zone select there are zones without hero images that's bad").
+
+A first card click inside 400 ms of a page's load was taken for a swipe's trailing click (`swipedAt` started at 0); it
+starts at -Infinity now. The T1 Brasscap fixture's ALL row click on a fast preview page hit it.
