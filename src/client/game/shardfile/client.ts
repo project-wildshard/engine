@@ -69,6 +69,7 @@ import { loadScenePostGraphCompiler } from '@wildshard/engine/render/graphBacken
 import { frameLookOf } from '../grid/frameLook';
 import { abilityRows, clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ClientRigLooks, type ShardViewRecipe } from './clientRecipes';
 import { loadClientRigLooks } from './clientRigLooks';
+import { withoutRuntimeCreatures } from './runtimeCreatureOwner';
 import { clientNativeBook } from './clientNativeBook';
 import { loadItemModels, loadStaticModels } from './itemModels';
 import { attachmentRefs, withAttachments } from './clientAttachments';
@@ -120,6 +121,10 @@ export interface ShardfileClientBindings {
   /** Declared water rows and collider-only props are installed by the data client by default. A native transition may
    *  let its runtime consume them exactly once (G164: Driftwood's sea row with its dry sockets and its socket landings). */
   worldOwner?: 'declared' | 'runtime';
+  /** TEMPORARY (ONE-FORMAT OF22b4 bridge; OF27d removes it): `runtime` when the client plan's
+   *  `population.product-creatures` draws the creatures, so the data client installs none of the declared ones
+   *  (runtimeCreatureOwner.ts). */
+  creatureOwner?: 'declared' | 'runtime';
   /** Platform installers receive the emitted audio declaration and its admitted recording reader.
    * An absent reader preserves existing native catalogue resolution; a declared reader refuses unknown paths. */
   audioProfiles?: (play: ShardPlayHost, product: { source: Shardfile['audio']; read: ((path: string) => Promise<ArrayBuffer>) | undefined }) => DeclaredAudioPorts['profiles'];
@@ -234,7 +239,9 @@ export class ShardfileClient {
     }
     // M3: a native runtime's bound sections (runtime.binds) are its own to install (runtimePageRows.ts); the data client never installs them
     // P1: a runtime-bound splat ground the Debug row draws streams through this client (its primary files keep their transport)
-    const data = bindings.nativeRuntime === true ? withSplatGround(withoutRuntimeRows(source), source) : source;
+    const runtimeData = bindings.nativeRuntime === true ? withSplatGround(withoutRuntimeRows(source), source) : source;
+    // TEMPORARY (OF22b4 bridge): the plan's product creatures draw the declared ones until their looks are rows (OF27d)
+    const data = bindings.creatureOwner === 'runtime' ? withoutRuntimeCreatures(runtimeData) : runtimeData;
     if (bindings.nativeRuntime === true) { const ground = splatGroundFiles(data); assets.releaseTransport(new Set([...runtimeBoundWorldFiles(source)].filter(ref => !ground.has(ref)))); }
     this.source = data; this.assets = assets; this.bindings = bindings; this.curveState = source.state;
     // a runtime that owns the client stages draws nothing of this data, but a splat ground the Debug row draws (P1)
