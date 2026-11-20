@@ -37,6 +37,10 @@ const RETURN_QUIET_MS = 5_000;
  *  app switch suspends the page, so the drop is only noticed on return and its `downMs` already holds the suspended time;
  *  J449's `hidden` quiet alone missed it. An outage that outlasts the grace shows its banner then. */
 const RESUME_GRACE_MS = 5_000;
+/** QA 11-19 row 56, the Coordinator's call (21:14 Cancún): an outage noticed on that return (down when the page comes back, or
+ *  within RESUME_GRACE_MS of it) stays quiet whatever its length: no banner, no Welcome back card, no Reconnected notice. It shows
+ *  only when its redial fails (a second dial goes out) or the link is still down this long after the return. */
+const RESUME_QUIET_MS = 30_000;
 /** FM4b modes 21 and 22, sampled once a second while live: a pong RTT over this is slow; five in a row spanning this much are unstable. */
 const SLOW_RTT_MS = 250, UNSTABLE_SPAN_MS = 250;
 /** Mode 22: the share of frames the server says it skipped for this client (`lossPct`), not measured TCP loss. */
@@ -213,8 +217,12 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   /** row 56: when the page last came back to the front (Date.now), and whether it is within RESUME_GRACE_MS of it */
   let resumedAt = -Infinity;
   const inGrace = (): boolean => Date.now() - resumedAt < RESUME_GRACE_MS;
+  /** row 56: this outage was noticed on a return (set when it starts in the grace, or is down at the return; cleared when live) */
+  let resumeOutage = false;
+  /** row 56: a return's outage whose first redial is still going, within RESUME_QUIET_MS of the return */
+  const resumeQuiet = (): boolean => resumeOutage && Date.now() - resumedAt < RESUME_QUIET_MS && hooks.progress().dials <= 1;
   /** J449 and row 56: back from the background, the socket's own redial, not yet long enough to stall play */
-  const quietBack = (): boolean => down() && (inGrace() || (hooks.why() === 'hidden' && hooks.progress().downMs < RETURN_QUIET_MS));
+  const quietBack = (): boolean => down() && (resumeQuiet() || (hooks.why() === 'hidden' && hooks.progress().downMs < RETURN_QUIET_MS));
   /** a banner quietBack kept down: the once-a-second check shows it when the quiet ends with the link still down */
   let quietHeld = false;
   /** FM4b modes 5 to 8: down, online, and no dial on this page ever reached the world, for 10 s. A restart or an old server's cut
@@ -467,18 +475,29 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
   };
   scope.interval(1000, sampleQuality);
   // J449 and row 56: a quiet return that outlasts its quiet has stalled play: its banner shows then
-  scope.interval(1000, () => { if (quietHeld && banner.hidden === true && down() && !quietBack() && open?.kind !== 'auth') paintBanner(); });
+  scope.interval(1000, () => {
+    if (!quietHeld || banner.hidden !== true || !down() || quietBack() || open?.kind === 'auth') return;
+    paintBanner();
+    // a Welcome back the quiet kept down opens now
+    const away = hooks.progress().away;
+    if (away !== undefined && open === null) awayCard(away);
+  });
   const resumed = (): void => {
     if (document.visibilityState !== 'visible') return;
     resumedAt = Date.now();
+    // row 56: down at the return is the return's outage. The page's own clock can see the drop before this event (an iOS wake), so
+    // a banner or Welcome back painted while hidden was never seen: it goes quiet now
+    if (down()) { resumeOutage = true; seen = false; if (open?.kind === 'away') close('replaced'); }
     // a chip from before the switch is no word on the line now
     hideQuality('replaced'); slowRun = unstableRun = goodRun = 0; rtts.length = 0;
-    if (banner.hidden !== true && open?.kind !== 'auth') paintBanner();
+    if ((banner.hidden !== true || down()) && open?.kind !== 'auth') paintBanner();
   };
   scope.listen(document, 'visibilitychange', resumed);
   scope.listen(window, 'pageshow', resumed);
   const link = (next: LinkState, why?: string): void => {
     state = next; reason = why;
+    // row 56: an outage that starts in a return's grace is that return's (quiet); one already down keeps what it was
+    if (down() && !wasDown) resumeOutage = inGrace();
     if (state !== 'live') hideQuality('replaced');
     // FM8b mode 27: the signed-out card stays up through the link's own changes; only its buttons close it
     if (open?.kind === 'auth') { banner.hidden = true; return; }
@@ -490,7 +509,8 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       if (hooks.why() === 'offline') { offlineCard(); return; }
       if (open?.kind === 'offline') close('recovered');
       const away = hooks.progress().away;
-      if (away !== undefined) { awayCard(away); return; }
+      // row 56: a return's quiet redial keeps Welcome back down too; the once-a-second check opens it if the quiet ends down
+      if (away !== undefined) { if (!resumeQuiet()) awayCard(away); else quietHeld = true; return; }
       if (open?.kind === 'away') close('recovered');
       if (unreachable()) { reachCard(); return; }
       if (open?.kind === 'reach') close('replaced');
@@ -499,6 +519,7 @@ export function linkScreens(scope: Scope, hooks: LinkScreenHooks, parent: HTMLEl
       return;
     }
     if (state === 'live') {
+      resumeOutage = false;
       if (open !== null) seen = true;
       close('recovered');
       if (wasDown && seen) notice(); // J449: a reconnect nobody saw says nothing

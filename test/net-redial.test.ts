@@ -433,3 +433,60 @@ test('FM4b modes 5 to 8: a page that never heard the world says so in its progre
   expect(redial.progress.neverHeard).toBeUndefined();
   redial.dispose();
 });
+
+// QA 11-19 row 56 (staging v0.1.53, iOS Simulator back from 2 min in Settings): the door answered three dials 3.4 s and 3.2 s apart
+// and seated two of them, but each missed DROP_MS's first frame and was dropped, so the link came back 9.7 s after the return.
+function answeredHarness(answers: boolean): { redial: Redial; links: FakeLink[]; heard: () => void; answer: () => void; run: (ms: number) => void; freeze: (ms: number) => void } {
+  let clock = 0;
+  const first = new FakeLink(), links = [first], listeners = new Map<Transport, () => void>();
+  const client = new NetClient(first, () => clock), frames: ((value: DecodedFrame) => void)[] = [], onFrame = client.onFrame.bind(client);
+  vi.spyOn(client, 'onFrame').mockImplementation(fn => { frames.push(fn); return onFrame(fn); });
+  const redial = new Redial({ client, transport: first, now: () => clock, random: () => 0.5, onState: () => undefined,
+    dial: () => { const link = new FakeLink(); links.push(link); return link; },
+    ...answers ? { answered: (transport: Transport, heard: () => void) => { listeners.set(transport, heard); return () => { listeners.delete(transport); }; } } : {} });
+  return { redial, links, heard: () => { for (const fn of frames) fn(frame); }, answer: () => { listeners.get(links.at(-1) as Transport)?.(); },
+    run: ms => { for (let left = ms; left > 0; left -= 50) { clock += 50; vi.advanceTimersByTime(50); } },
+    freeze: ms => { clock += ms; } };
+}
+
+test('row 56: a dial the world answered gets 10 s for its first frame, so a slow return is one dial, not three', () => {
+  for (const answers of [true, false]) {
+    const { redial, links, heard, answer, run, freeze } = answeredHarness(answers);
+    heard(); run(100);
+    // back from a 2-minute suspend: the stale link goes and the dial goes out at once
+    freeze(120_000); redial.check(120_000); run(400);
+    expect(links).toHaveLength(2);
+    run(2000); answer();
+    run(1500);
+    if (!answers) { expect(links, 'unanswered, it is dropped at 3 s as before').toHaveLength(3); redial.dispose(); continue; }
+    expect(links[1]?.closedAs, 'the answered dial is kept past 3 s').toBeNull();
+    heard(); run(100);
+    expect(redial.told).toBe('live');
+    expect(links).toHaveLength(2);
+    redial.dispose();
+  }
+});
+
+test('row 56: an answered dial that never carries a frame is still dropped, at 10 s', () => {
+  const { redial, links, heard, answer, run } = answeredHarness(true);
+  heard(); links[0]?.fail('lost'); run(400);
+  expect(links).toHaveLength(2);
+  answer(); run(9000);
+  expect(links).toHaveLength(2);
+  run(2000);
+  expect(links[1]?.closedAs).toBe('stalled');
+  redial.dispose();
+});
+
+test('row 56: the page freezing under a dial is not the dial failing (SB31 for a link in flight)', () => {
+  const { redial, links, heard, run, freeze } = answeredHarness(false);
+  heard(); links[0]?.fail('lost'); run(400);
+  expect(links).toHaveLength(2);
+  run(1000);
+  // a 2.5 s long task: no timer runs, and the dial's frame waits behind it
+  freeze(2500); run(100);
+  expect(links, 'the frozen time does not count against the dial').toHaveLength(2);
+  heard(); run(100);
+  expect(redial.told).toBe('live');
+  redial.dispose();
+});

@@ -617,13 +617,13 @@ test('a quiet background drop still gives a tap its hold card, and the offline c
   scope.dispose();
 });
 
-test('QA 11-19 row 56: for 5 s after the page comes back, the redial is quiet whatever the cause; a longer outage still shows', () => {
+test('QA 11-19 row 56: a redial after the page comes back is quiet whatever the cause, until it fails or passes 30 s', () => {
   vi.useFakeTimers();
   try {
     const stats = { rttMs: 80, lossPct: 0, sentBytes: 0, recvBytes: 0 };
-    let downMs = 17_190, why: LinkCause = 'closed';
+    let downMs = 17_190, dials = 1, why: LinkCause = 'closed';
     const scope = new Scope('test.resume');
-    const screens = linkScreens(scope, { retry: () => undefined, dialNow: () => undefined, reload: () => undefined, progress: () => ({ dials: 1, nextDialMs: 1800, downMs }), why: () => why, stats: () => stats });
+    const screens = linkScreens(scope, { retry: () => undefined, dialNow: () => undefined, reload: () => undefined, progress: () => ({ dials, nextDialMs: 1800, downMs }), why: () => why, stats: () => stats });
     const banner = (): HTMLElement | null => document.querySelector<HTMLElement>('#ws-reconnect-strip:not([hidden])');
     const chip = (kind: string): HTMLElement | null => document.querySelector<HTMLElement>(`.ws-link-notice[data-failmode="${kind}"]`);
     const back = (): void => { document.dispatchEvent(new Event('visibilitychange')); };
@@ -638,19 +638,72 @@ test('QA 11-19 row 56: for 5 s after the page comes back, the redial is quiet wh
     stats.rttMs = 900; vi.advanceTimersByTime(4900);
     expect(chip('slow')).toBeNull(); expect(chip('lossy')).toBeNull();
     stats.rttMs = 80; vi.advanceTimersByTime(10_000);
-    // an outage that outlasts the grace shows its banner once the grace ends
+    // the Coordinator's call (21:14): a return's outage stays quiet past the 5 s grace, and shows once it passes 30 s
     back(); why = 'silent'; downMs = 0;
     screens.link('reconnecting', 'silent');
-    vi.advanceTimersByTime(4000);
+    vi.advanceTimersByTime(9700);
+    expect(banner(), 'the 9.7 s resume redial of 11-19 says nothing').toBeNull();
+    vi.advanceTimersByTime(19_000);
     expect(banner()).toBeNull();
     vi.advanceTimersByTime(2000);
     expect(banner()?.dataset['failmode']).toBe('half-open');
     screens.link('live');
     expect(chip('reconnected'), 'a seen outage says Reconnected').not.toBeNull();
+    // a return's redial that fails (a second dial goes out) shows at once, on the next second's check
+    vi.advanceTimersByTime(10_000);
+    back(); why = 'closed';
+    screens.link('reconnecting', 'closed');
+    vi.advanceTimersByTime(3000);
+    expect(banner()).toBeNull();
+    dials = 2; vi.advanceTimersByTime(1000);
+    expect(banner()?.dataset['failmode']).toBe('drop reset');
+    dials = 1; screens.link('live');
     // and with no return in the last 5 s, a drop shows at once, as before
-    vi.advanceTimersByTime(10_000); why = 'closed';
+    vi.advanceTimersByTime(10_000);
     screens.link('reconnecting', 'closed');
     expect(banner()).not.toBeNull();
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('QA 11-19 row 56: back from minutes away, Welcome back waits out the quiet redial too, and opens if the quiet ends down', () => {
+  vi.useFakeTimers();
+  try {
+    const { scope, screens, set } = harness();
+    const welcome = (): HTMLElement | null => document.querySelector<HTMLElement>('.ws-link-scrim[data-failmode~="background-long"]');
+    set({ why: 'hidden', dials: 1, nextDialMs: null, downMs: 0, away: { ms: 120_000, how: 'hidden' } });
+    document.dispatchEvent(new Event('visibilitychange'));
+    screens.link('reconnecting', 'hidden');
+    vi.advanceTimersByTime(9700);
+    expect(welcome(), 'no Welcome back over a redial that is still going').toBeNull();
+    screens.link('live');
+    expect(document.querySelector('.ws-link-notice'), 'nor Reconnected after it').toBeNull();
+    // the same return whose redial fails: Welcome back opens on the next second's check
+    vi.advanceTimersByTime(60_000);
+    document.dispatchEvent(new Event('visibilitychange'));
+    screens.link('reconnecting', 'hidden');
+    vi.advanceTimersByTime(2000);
+    expect(welcome()).toBeNull();
+    set({ dials: 2, downMs: 6000 }); vi.advanceTimersByTime(1000);
+    expect(welcome()?.textContent).toContain('Welcome back');
+    scope.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('QA 11-19 row 56: a drop the page clock saw before the visibility event (an iOS wake) goes quiet at the return', () => {
+  vi.useFakeTimers();
+  try {
+    const { scope, screens, set } = harness();
+    const welcome = (): HTMLElement | null => document.querySelector<HTMLElement>('.ws-link-scrim[data-failmode~="background-long"]');
+    set({ why: 'hidden', dials: 0, nextDialMs: 200, downMs: 0, away: { ms: 120_000, how: 'asleep' } });
+    screens.link('reconnecting', 'hidden');
+    expect(welcome(), 'painted while the page was not yet visible').not.toBeNull();
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(welcome()).toBeNull();
+    expect(document.querySelector('#ws-reconnect-strip:not([hidden])')).toBeNull();
+    set({ dials: 1 }); vi.advanceTimersByTime(5000);
+    screens.link('live');
+    expect(document.querySelector('.ws-link-notice'), 'nobody saw it, so no Reconnected').toBeNull();
     scope.dispose();
   } finally { vi.useRealTimers(); }
 });

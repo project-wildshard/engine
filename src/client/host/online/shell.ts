@@ -197,7 +197,9 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const records=config.record===undefined?undefined:new NetRecords(client,{...config.record,build:config.build,level:config.loaded,
     correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
   const address = config.address ?? ((): string => config.socket);
-  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(address()));}, ...view.mayRedial === undefined ? {} : { mayDial: view.mayRedial }, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); } });
+  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(address()));}, ...view.mayRedial === undefined ? {} : { mayDial: view.mayRedial }, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); },
+    // row 56: a dial the door has spoken on gets longer to carry its first frame; every link here is a WebSocketTransport (`dial`)
+    answered: (transport, heard) => (transport as WebSocketTransport).onControl(() => { heard(); }) });
   // A held seat comes straight back with no `resume`: a tab reloaded inside J114's 30 s.
   // GO4: on a grid page, a held seat in another cell than the page booted re-enters the grid there, as a `resume` would say.
   const offFirst = client.onFrame(() => {

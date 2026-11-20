@@ -30,6 +30,10 @@ export interface LinkAway { readonly ms: number; readonly how: 'hidden' | 'aslee
 const STRIP_MS = 1000;
 /** No frame for this long: the socket is dead, whatever it says. A dial that has shown no frame in this time goes the same way. */
 const DROP_MS = 3000;
+/** QA 11-19 row 56: a dial the world has answered (the door's first word) is given this long to carry its first frame. Back from a
+ *  2-minute iOS suspend the page is slow for seconds and the door reads the seat's save before it seats it, so each answered dial
+ *  missed DROP_MS, was dropped and dialled again from scratch: three dials and 9.7 s on staging v0.1.53 (a held seat each time). */
+const ANSWERED_MS = 10_000;
 /** J114's hold is over by now, so what comes back is a resume and not the same body. */
 const RESUMING_MS = 35_000;
 /** The dial carries on this long, and then asks. */
@@ -67,6 +71,9 @@ export interface RedialOptions {
    * to check `version.json` and reload only if it names another build.
    */
   readonly onCut?: (reason: string) => void;
+  /** Row 56: calls `heard` when the world answers a dialled link (any door word before a frame); returns the unsubscribe. Such a dial
+   *  gets ANSWERED_MS, not DROP_MS, to carry its first frame. Absent: every dial gets DROP_MS. */
+  readonly answered?: (transport: Transport, heard: () => void) => () => void;
   readonly now?: () => number;
   readonly random?: () => number;
   /** FM4b mode 2: does the device say it has a network? Default `navigator.onLine`; a browser with no answer counts as online. */
@@ -87,6 +94,9 @@ export class Redial {
   private readonly offFrame: () => void;
   private transport: Transport;
   private offClose: () => void;
+  /** Row 56: the dial in flight was answered by the world */
+  private answered = false;
+  private offAnswered: () => void = () => undefined;
   private state: LinkState = 'live';
   /** up: frames are expected. down: dialling. stopped: waiting for `retry`, or finished. */
   private phase: 'up' | 'down' | 'stopped' = 'up';
@@ -146,7 +156,7 @@ export class Redial {
     const now = this.now();
     this.phase = 'down'; this.lostAt = now; this.dialAt = now; this.dials = 0; this.show('reconnecting');
   }
-  dispose(): void { this.scope.dispose(); this.offFrame(); this.offClose(); }
+  dispose(): void { this.scope.dispose(); this.offFrame(); this.offClose(); this.offAnswered(); }
 
   private heard(): void {
     const now = this.now(), wasDown = this.phase === 'down';
@@ -164,13 +174,15 @@ export class Redial {
       if (silent >= DROP_MS) this.lose(now); else if (silent >= STRIP_MS) this.show('reconnecting');
     } else if (this.phase === 'down') { if (this.state === 'live' && now >= this.quietUntil) this.show('reconnecting'); this.redial(now); }
   }
+  /** The dial in flight has shown no frame for too long: DROP_MS, or ANSWERED_MS once the world answered it (row 56). */
+  private dialStale(now: number): boolean { return this.dialled !== null && now - this.dialled >= (this.answered ? ANSWERED_MS : DROP_MS); }
   private redial(now: number): void {
-    if (this.waitingForSeat) { if (this.dialled === null && now >= this.dialAt) this.dial(now); else if (this.dialled !== null && now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
-    if (this.offline(now)) { if (this.dialled !== null && now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
+    if (this.waitingForSeat) { if (this.dialled === null && now >= this.dialAt) this.dial(now); else if (this.dialStale(now)) { this.failedDial(now); this.drop(); } return; }
+    if (this.offline(now)) { if (this.dialStale(now)) { this.failedDial(now); this.drop(); } return; }
     const out = now - this.lostAt;
     if (out >= GIVE_UP_MS) { this.stop(); this.show('lost'); return; }
     if (out >= RESUMING_MS) this.show('resuming');
-    if (this.dialled !== null) { if (now - this.dialled >= DROP_MS) { this.failedDial(now); this.drop(); } return; }
+    if (this.dialled !== null) { if (this.dialStale(now)) { this.failedDial(now); this.drop(); } return; }
     if (now >= this.dialAt) this.dial(now);
   }
   /**
@@ -194,6 +206,8 @@ export class Redial {
     const transport = this.options.dial();
     this.offClose(); this.transport = transport; this.dialled = now; this.dials++;
     this.offClose = this.watchClose(transport);
+    this.offAnswered(); this.answered = false;
+    this.offAnswered = this.options.answered?.(transport, () => { if (transport === this.transport) this.answered = true; }) ?? ((): void => undefined);
     this.options.client.rejoin(transport);
   }
   private failedDial(now: number): void {
@@ -241,7 +255,12 @@ export class Redial {
     if (gap < AWAY_MS && hiddenMs < AWAY_MS) {
       // SB31: a freeze of the page's own (a long task on arrival: 11.5 s on staging Pine Hollow) is not the link's silence: frames
       // that came in it are queued behind it, so the watch counts only the time the page could have read them
-      if (gap >= STRIP_MS) { this.thawedAt = now; if (this.phase === 'up' && this.heardAt !== null) this.heardAt += gap - WATCH_MS; }
+      if (gap >= STRIP_MS) {
+        this.thawedAt = now;
+        if (this.phase === 'up' && this.heardAt !== null) this.heardAt += gap - WATCH_MS;
+        // row 56: the same for a dial in flight: its frames wait behind the freeze too
+        if (this.phase === 'down' && this.dialled !== null) this.dialled += gap - WATCH_MS;
+      }
       return;
     }
     const how = hiddenMs >= AWAY_MS || this.awayFor?.how === 'hidden' ? 'hidden' : 'asleep', ms = Math.max(gap, hiddenMs, this.awayFor?.ms ?? 0);
