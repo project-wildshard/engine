@@ -8,3 +8,9 @@ requires its native boss row" at `level.play`, so `wildshard prepare` sat on the
 timeout (publish rehearsal 44677378444, reproduced locally). A spawned owner with no boss row now draws the keeper's
 homes alone and leaves the body to the declared encounter, as an ownerless plan already did (OF19c0b).
 `test/page-rows-declared-owner.test.ts` failed first on the same error.
+
+**Second wall, same boot.** With the boss row fixed, a preparation client built from `a5de2fff5` stopped at the next
+`level.play` throw: "Quest summon requires its actual encounter". The quest page sent a declared encounter's summon to
+the wire only when the plan's owner row did not name it; Dunes rev 5's owner row names the Matriarch and the page binds
+no fight for her. `questSummonOwner` now says who answers a summon: the page's fight for a keeper boss it binds, else the
+server's declared encounter. With both fixes `wildshard prepare` passes on rev 5 locally (51 programs).

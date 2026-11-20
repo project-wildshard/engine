@@ -59,6 +59,16 @@ export function installClientQuestPage(ctx: ShardContext, input: unknown, reside
   runtime.hooks.questFlags = () => quest.quest.isComplete ? [quest.quest.def.completeFlag] : [];
 }
 
+/** Who answers a quest page's `{ spawn }` summon: the page's own fight for the plan keeper's boss (`page`), or the server's
+ *  declared encounter, which the page then draws from the wire (`wire`; OF19c0). OF19d: a declared encounter the plan's owner
+ *  row also names (Dunes rev 5's Matriarch: her owner row files her flag, fact and coins) binds no page fight, so it is the
+ *  server's too. Anything else is a summon of nothing. */
+export function questSummonOwner(target: string, page: { owner: string | undefined; fight: boolean; encounters: readonly { entity: string }[] }): 'page' | 'wire' {
+  if (page.fight && target === page.owner) return 'page';
+  if (page.encounters.some(encounter => encounter.entity === target)) return 'wire';
+  throw new Error('Quest summon requires its actual encounter');
+}
+
 /** Stage installation follows the original held/spawned encounter boundary.
  * Captures invoke the same typed actions and native mover commands as play. */
 export function finishClientQuestPage(ctx: ShardContext, input: unknown): void {
@@ -70,10 +80,8 @@ export function finishClientQuestPage(ctx: ShardContext, input: unknown): void {
   const owner = ctx.product.section('sim/runtime-plan').recipe.population.owner;
   for (const request of host.summons) {
     const fight = book.fight, actions = bindings.get(request.director) ?? [];
-    // OF19c0: a summon of a declared encounter arms the server's fight; the page draws it from the wire
-    if (owner?.actor !== request.target && source.encounters.some(encounter => encounter.entity === request.target)) actions.push({ action: { spawn: request.target }, run: () => undefined });
-    else if (fight === null || request.target !== owner?.actor) throw new Error('Quest summon requires its actual encounter');
-    else actions.push({ action: { spawn: request.target }, run: fight.summon });
+    const by = questSummonOwner(request.target, { owner: owner?.actor, fight: fight !== null, encounters: source.encounters });
+    actions.push({ action: { spawn: request.target }, run: by === 'page' && fight !== null ? fight.summon : () => undefined });
     bindings.set(request.director, actions);
   }
   book.stages = bindPageQuestStages(ctx, source, { flags: quest.flags, actor: id => clientPopulationActor(ctx, id), bindings, motion: native });
