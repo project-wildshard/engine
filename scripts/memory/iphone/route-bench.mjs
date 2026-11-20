@@ -2,7 +2,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--route <name>] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C>] [--census] [--voices] [--frames] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames] [--out <dir>] [--dry-run]
 //
 // --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
 // --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
@@ -31,7 +31,7 @@ import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstS
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, route: { type: 'string' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
-  slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, out: { type: 'string' }, udid: { type: 'string' },
+  slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, 'cool-outside': { type: 'boolean' }, cooled: { type: 'boolean' }, out: { type: 'string' }, udid: { type: 'string' },
   'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'cache-off': { type: 'boolean' }, frames: { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
@@ -224,7 +224,8 @@ async function phoneTools() {
       const deadline = Date.now() + 10 * 60_000;
       let now = reading();
       const line = values['cool-to'] === undefined ? (idle === null ? null : idle + 3) : Number(values['cool-to']);
-      if (line === null) return now;
+      // --cool-outside: the outer process cooled the phone before taking the locks; inside them, only read (DF10 mini-df10c)
+      if (line === null || values.cooled === true) return now;
       while (now !== null && now > line && Date.now() < deadline) {
         console.log(`cooling: ${String(now)} °C against ${String(line)} °C`);
         await pause(15_000);
@@ -247,6 +248,18 @@ async function phoneTools() {
   };
 }
 
+/** Wait (at most 30 min) for the battery to reach `line` °C, outside the locks. @param {number} line */
+async function coolOutside(line) {
+  const { batteryTemperature, command, doctor } = await import('./doctor.mjs');
+  const facts = doctor({ udid: values.udid, sharedPort: '4444' });
+  const reading = () => batteryTemperature(command('idevicediagnostics', ['-u', facts.udid, 'ioregentry', 'AppleSmartBattery']).output)?.celsius ?? null;
+  const deadline = Date.now() + 30 * 60_000;
+  for (let now = reading(); now !== null && now > line && Date.now() < deadline; now = reading()) {
+    console.log(`cooling outside the locks: ${String(now)} °C against ${String(line)} °C`);
+    await pause(30_000);
+  }
+}
+
 if (values['dry-run']) {
   console.log(JSON.stringify({ zone: values.zone, runs, caps, base, driver: values.driver, slots, out, route, legs: routeFor(route).map((leg) => `${leg.name} (${leg.kind} ${String(leg.seconds)} s)`) }, null, 2));
 } else if (!values['with-locks']) {
@@ -254,8 +267,12 @@ if (values['dry-run']) {
   const root = join(homedir(), 'projects/games/wildshard/engine/tmp');
   mkdirSync(root, { recursive: true });
   const locks = values.driver === 'inspector' ? ['-k', join(root, 'iphone13.lock'), '/usr/bin/lockf', '-k', join(root, 'mini-measure.lock')] : ['-k', join(root, 'mini-measure.lock')];
+  // --cool-outside (DF10, the coordinator 2026-11-20: cool before the locks, never inside them): wait for --cool-to here,
+  // touching nothing but the battery reading, then take the locks for one boot without cooling again
+  const cooled = values['cool-outside'] === true && values.driver === 'inspector' && values['cool-to'] !== undefined;
+  if (cooled) await coolOutside(Number(values['cool-to']));
   console.log(`Waiting for ${values.driver === 'inspector' ? 'iphone13.lock, then ' : ''}mini-measure.lock`);
-  const child = spawn('/usr/bin/lockf', [...locks, process.execPath, import.meta.filename, ...process.argv.slice(2), '--out', out, '--with-locks'], { stdio: 'inherit' });
+  const child = spawn('/usr/bin/lockf', [...locks, process.execPath, import.meta.filename, ...process.argv.slice(2), '--out', out, '--with-locks', ...(cooled ? ['--cooled'] : [])], { stdio: 'inherit' });
   const [code] = await once(child, 'exit');
   process.exitCode = code ?? 1;
 } else {
