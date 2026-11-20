@@ -45,3 +45,15 @@ test('shard-pin records only the moved Ring 1 product or slice before committing
   expect(commit).toBeGreaterThan(record);
   expect(flow.slice(commit)).toMatch(/-- test\/pins\/shardfiles\.json [^\n]*test\/pins\/ring-digests\.json/u);
 });
+
+// Runs 44604771920 and 44695767780: a Ring 1 pin runs ring-setup, whose pnpm install points core.hooksPath at .githooks, and
+// pre-commit then refused the pin branch outside .worktrees/. The runner commits as a non-ring pin does, with no local hooks.
+test('shard-pin commits its pin branch with no local hooks after ring-setup', () => {
+  const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
+  const setup = flow.indexOf('uses: ./.github/actions/ring-setup'), unset = flow.indexOf('git config --unset core.hooksPath');
+  const branch = flow.indexOf('git switch -c "$branch"'), commit = flow.indexOf('git commit');
+  expect(setup).toBeGreaterThan(-1);
+  expect(unset).toBeGreaterThan(setup);
+  expect(branch).toBeGreaterThan(unset);
+  expect(commit).toBeGreaterThan(unset);
+});

@@ -110,6 +110,11 @@ jobs:
           TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           branch="plan/pin-$SLUG-r$REVISION"
+          # ring-setup's pnpm install points core.hooksPath at .githooks, whose
+          # pre-commit refuses a plan branch outside .worktrees/ (runs
+          # 44604771920, 44695767780). This runner commits and pushes the pin
+          # branch as a non-ring pin does, with no local hooks: land gates it.
+          git config --unset core.hooksPath || true
           git config user.name 'shard-pin'
           git config user.email 'shard-pin@users.noreply.github.com'
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
