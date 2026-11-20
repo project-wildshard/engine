@@ -533,6 +533,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/AUDIO_WARM_WORKER_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/BOOT_ROAD_PROGRAMS_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

@@ -20,7 +20,7 @@ import { jsonSlot } from '../saves/slots';
  * runs per frame; setListener only stores four numbers.
  */
 import type { Vector3 } from 'three';
-import { footstep, whoosh, impact, hurt, death, plunge, bubbleBed, noiseLoop, impulseChannel, interact, STEP_KINDS, MATERIALS, INTERACT_SOUNDS, type Room } from './gen';
+import { FAMILIES, type Family, type FamilyName, type VoiceWork } from './voiceFamilies';
 
 /** meta IPHONE13-DRIFTWOOD DW3 (mini-driftwood13b, 2026-11-19): iOS Safari 18.6 has no requestIdleCallback, so the prewarm's
  *  "idle" slices fall back to this timer. At 16 ms they ran between nearly every pair of frames: about 375 ms of the main
@@ -36,34 +36,31 @@ function audioWarmPaceMs(): number {
   try { return audioWarmPace(jsonSlot(AUDIO_WARM_PACE_SLOT, 'device').read()); } catch { return AUDIO_WARM_PACE_DEFAULT_MS; }
 }
 
+/** meta IPHONE13-DRIFTWOOD DW3 (mini-driftwood13d): the prewarm renders in a worker (voiceRender.worker.ts) when the device
+ *  slot `debug.audioWarmWorker` is true; a play that finds its family unrendered still renders on the main thread. */
+export const AUDIO_WARM_WORKER_SLOT = 'debug.audioWarmWorker';
+export const AUDIO_WARM_WORKER_DEFAULT = false;
+let warmWorkerPicked: boolean | undefined;
+/** Whether the prewarm renders off the main thread; read once per page. */
+export function audioWarmWorkerOn(): boolean {
+  if (warmWorkerPicked !== undefined) return warmWorkerPicked;
+  let saved: unknown = null;
+  try { saved = jsonSlot(AUDIO_WARM_WORKER_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
+  warmWorkerPicked = typeof saved === 'boolean' ? saved : AUDIO_WARM_WORKER_DEFAULT;
+  return warmWorkerPicked;
+}
+/** The render worker's port, as the pool uses it (a real Worker, or a test's). */
+export type VoiceRenderPort = Pick<Worker, 'postMessage' | 'terminate'> & EventTarget;
+let makeRenderPort = (): VoiceRenderPort | null => typeof Worker === 'function'
+  ? new Worker(new URL('voiceRender.worker.ts', import.meta.url), { type: 'module', name: 'voice-render' }) : null;
+/** Tests only: read the slot again (or force it), and swap the worker. */
+export function resetAudioWarmWorker(on?: boolean, port?: () => VoiceRenderPort | null): void {
+  warmWorkerPicked = on; if (port !== undefined) makeRenderPort = port;
+}
+/** a worker render that takes longer than this is given up and rendered on the main thread */
+const WORKER_RENDER_DEADLINE_MS = 5000;
+
 interface Host { readonly ctx: BaseAudioContext; readonly sfx: GainNode; readonly ready: boolean }
-type Gen = (sr: number, seed: number) => Float32Array;
-/** `half`: rendered at half the context rate (sounds with nothing above ~6 kHz — the long vocals, the bubble bed): half the
- *  render time and memory, and the source resamples on play (IRs must stay at the context rate: ConvolverNode requires it) */
-export interface Family { n: number; ch: 1 | 2; half?: boolean; gen: Gen | ((sr: number, seed: number, ch: number) => Float32Array) }
-
-const fam = (n: number, gen: Gen, half = false): Family => ({ n, ch: 1, half, gen });
-const room = (r: Room): Family => ({ n: 1, ch: 2, gen: (sr: number, seed: number, ch: number) => impulseChannel(r, sr, seed, ch) });
-
-/** every family: the name the callers use → variant count + generator */
-export const FAMILIES: Record<string, Family> = {
-  ...Object.fromEntries(STEP_KINDS.map((k) => [`step-${k}`, fam(5, (sr, s) => footstep(k, sr, s))])),
-  whoosh: fam(4, (sr, s) => whoosh(sr, s)),
-  'whoosh-heavy': fam(3, (sr, s) => whoosh(sr, s, true)),
-  // a level's own families (creature vocals, wind-ups, its own impact materials) are its voice table (`voices.register`)
-  ...Object.fromEntries(MATERIALS.filter((m) => m !== 'shell').map((m) => [`impact-${m}`, fam(4, (sr, s) => impact(m, sr, s))])),
-  hurt: fam(3, (sr, s) => hurt(sr, s), true),
-  death: fam(2, (sr, s) => death(sr, s), true),
-  'plunge-down': fam(2, (sr, s) => plunge(sr, s, false)),
-  'plunge-up': fam(2, (sr, s) => plunge(sr, s, true)),
-  'bubble-bed': fam(1, (sr, s) => bubbleBed(sr, s), true),
-  'noise-white': fam(1, (sr, s) => noiseLoop(sr, s, false)),
-  'noise-pink': fam(1, (sr, s) => noiseLoop(sr, s, true)),
-  ...Object.fromEntries(INTERACT_SOUNDS.map((k) => [`ui-${k}`, fam(k === 'glyph' ? 1 : 2, (sr, s) => interact(k, sr, s))])),
-  'ir-hold': room('hold'), 'ir-cave': room('cave'), 'ir-shrine': room('shrine'),
-  'ir-cabin': room('cabin'), 'ir-den': room('den'), 'ir-oldgrowth': room('oldgrowth'), 'ir-bowl': room('bowl'), // Pine Hollow (PH-A5)
-};
-export type FamilyName = keyof typeof FAMILIES;
 
 export interface PlayOpts {
   /** linear gain (default 1) */
@@ -104,6 +101,10 @@ export class VoicePool {
   private lx = 0; private ly = 0; private lz = 0; private yaw = 0;
   private last = new Map<string, number>();
   private done = new Set<string>();
+  /** DW3: the prewarm's render worker (undefined until first used, null when off or failed) and its one job in flight */
+  private renderPort: VoiceRenderPort | null | undefined;
+  private inFlight: { id: number; name: string; family: Family; v: number; c: number; sr: number; deadline: ReturnType<Scope['timeout']> } | null = null;
+  private jobIds = 0;
 
   private readonly tables = new Map<string, Family | { clips: () => readonly SampleVoice[] | undefined; policy?: SamplePolicy }>();
   private readonly host: Host;
@@ -112,6 +113,7 @@ export class VoicePool {
     this.scope.onDispose(() => {
       this.bufs.clear(); this.warm.length = 0; this.warming = false;
       this.last.clear(); this.done.clear(); this.tables.clear();
+      this.inFlight = null; this.renderPort?.terminate(); this.renderPort = null;
     });
   }
   private get live(): boolean { return !this.scope.disposed && !this.scope.disposing; }
@@ -235,25 +237,69 @@ export class VoicePool {
     const job = this.warm.shift();
     if (!job) { this.warming = false; return; }
     const [name, vc] = job;
+    if (audioWarmWorkerOn() && this.renderOff(name, vc >> 1, vc & 1)) return;
     this.variant(name, vc >> 1, vc & 1);
     this.next();
+  }
+  /** DW3: post one prewarm slice to the render worker; false when it must render here (no worker, no work, already done) */
+  private renderOff(name: string, v: number, c: number): boolean {
+    const f = this.family(name);
+    if (!f || this.done.has(`${name}/${v}/${c}`)) return false;
+    const work: VoiceWork | undefined = f.work ?? (FAMILIES[name] === f ? { kind: 'family', name } : undefined);
+    if (work === undefined) return false;
+    const port = this.port();
+    if (port === null) return false;
+    const id = ++this.jobIds, sr = f.half === true ? this.host.ctx.sampleRate / 2 : this.host.ctx.sampleRate;
+    const deadline = this.scope.timeout(WORKER_RENDER_DEADLINE_MS, () => { this.dropPort('deadline'); });
+    this.inFlight = { id, name, family: f, v, c, sr, deadline };
+    try { port.postMessage({ id, work, sr, seed: v + 1, ch: c }); } catch (error) { this.dropPort(String(error)); }
+    return true;
+  }
+  private port(): VoiceRenderPort | null {
+    if (this.renderPort !== undefined) return this.renderPort;
+    try { this.renderPort = makeRenderPort(); } catch { this.renderPort = null; }
+    const port = this.renderPort;
+    if (port === null) return null;
+    this.scope.listen(port, 'message', (event: Event) => { this.workerReply((event as MessageEvent<{ id?: unknown; data?: unknown; error?: unknown }>).data); });
+    this.scope.listen(port, 'error', (event: Event) => { event.preventDefault(); this.dropPort('worker failed'); });
+    return port;
+  }
+  /** a worker reply: store the channel unless the family moved on or a play rendered it first, then the next slice */
+  private workerReply(reply: { id?: unknown; data?: unknown; error?: unknown }): void {
+    const job = this.inFlight;
+    if (!this.live || job === null || reply.id !== job.id) return;
+    if (!(reply.data instanceof Float32Array)) { this.dropPort(typeof reply.error === 'string' ? reply.error : 'malformed reply'); return; }
+    this.inFlight = null; this.scope.cancelTimer(job.deadline);
+    if (this.family(job.name) === job.family && !this.done.has(`${job.name}/${String(job.v)}/${String(job.c)}`)) this.store(job.name, job.family, job.v, job.c, reply.data, job.sr);
+    this.next();
+  }
+  /** the worker is gone for this page: the job in flight (if any) and the rest render here */
+  private dropPort(reason: string): void {
+    console.warn(`[audio] voice render worker off: ${reason}`);
+    const job = this.inFlight;
+    this.renderPort?.terminate(); this.renderPort = null;
+    this.inFlight = null;
+    if (job !== null) this.scope.cancelTimer(job.deadline);
+    if (job !== null && this.live) { this.variant(job.name, job.v, job.c); this.next(); }
+  }
+  /** one rendered channel into its variant's AudioBuffer (made by the first channel stored) */
+  private store(name: string, f: Family, v: number, c: number, data: Float32Array, sr: number): void {
+    const list = this.bufs.get(name) ?? []; this.bufs.set(name, list);
+    const b = list[v] ?? observeAudioMemory(this.host.ctx.createBuffer(f.ch, data.length, sr), {
+      owner: this.memoryOwner, asset: `audio/procedural/${name}/${String(v)}`,
+    }); list[v] = b;
+    b.getChannelData(c).set(data);
+    this.done.add(`${name}/${String(v)}/${String(c)}`);
   }
   /** one variant rendered into its AudioBuffer — every channel, or only `ch` (prewarm renders a stereo IR a channel per slice) */
   private variant(name: string, v: number, ch = -1): AudioBuffer | undefined {
     const f = this.family(name); if (!f) return undefined;
-    const list = this.bufs.get(name) ?? []; this.bufs.set(name, list);
     const ctx = this.host.ctx, sr = f.half === true ? ctx.sampleRate / 2 : ctx.sampleRate;
     for (let c = 0; c < f.ch; c++) {
-      const key = `${name}/${v}/${c}`;
-      if ((ch >= 0 && c !== ch) || this.done.has(key)) continue;
-      const data = f.gen(sr, v + 1, c);
-      const b = list[v] ?? observeAudioMemory(ctx.createBuffer(f.ch, data.length, sr), {
-        owner: this.memoryOwner, asset: `audio/procedural/${name}/${v}`,
-      }); list[v] = b;
-      b.getChannelData(c).set(data);
-      this.done.add(key);
+      if ((ch >= 0 && c !== ch) || this.done.has(`${name}/${String(v)}/${String(c)}`)) continue;
+      this.store(name, f, v, c, f.gen(sr, v + 1, c), sr);
     }
-    return list[v];
+    return this.bufs.get(name)?.[v];
   }
 
   /** every channel of every variant of `name` is rendered (a caller can build on it without a synchronous render) */

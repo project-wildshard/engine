@@ -11,6 +11,7 @@ import { spatialAudio } from './util';
 import { audioLog } from './audioLog';
 import type { Audio } from './Audio';
 import type { VoiceTable, PlayOpts } from './Voices';
+import type { Family } from './voiceFamilies';
 import type { AudioDecode, AudioRead } from './SetScore';
 import { TIER } from '../core/tier';
 
@@ -44,11 +45,12 @@ function ownCatalogue(catalogue:CueCatalogue,key:string,scope?:Scope):void {
 /** Native bank construction owns generator closures; the caller supplies only validated recipes. */
 export function declaredVoiceTable(rows:Pick<AudioData,'bank'|'pcm'>):VoiceTable {
  const families=rows.bank?.families??{};
- return Object.fromEntries(Object.entries(families).map(([id,row])=>{
+ return Object.fromEntries(Object.entries(families).map(([id,row]):[string,Family]=>{
   const source=row.source;
-  if(source.kind==='impact')return [id,{...row,gen:(sr:number,seed:number)=>impact(source.material,sr,seed)}];
+  // `work`: the same render as plain data, for the prewarm's worker (Voices.ts, DW3)
+  if(source.kind==='impact')return [id,{...row,gen:(sr:number,seed:number)=>impact(source.material,sr,seed),work:{kind:'impact',material:source.material}}];
   const program=rows.pcm?.[source.id];if(program===undefined)throw new Error(`Missing PCM program: ${source.id}`);
-  return [id,{...row,gen:(sr:number,seed:number)=>renderPcm(program,sr,seed)}];
+  return [id,{...row,gen:(sr:number,seed:number)=>renderPcm(program,sr,seed),work:{kind:'pcm',program}}];
  }));
 }
 /** Sample/procedural playback, grouped barks and positional sample-first phrases on the existing voice pool. */

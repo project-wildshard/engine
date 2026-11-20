@@ -63,6 +63,8 @@
     "src/client/engine/audio/unlock.ts": "client",
     "src/client/engine/audio/util.ts": "client",
     "src/client/engine/audio/Voices.ts": "client",
+    "src/client/engine/audio/voiceFamilies.ts": "client",
+    "src/client/engine/audio/voiceRender.worker.ts": "client",
     "src/client/engine/blocks.ts": "client",
     "src/client/engine/boot.ts": "client",
     "src/client/engine/boot/audioFiles.ts": "client",

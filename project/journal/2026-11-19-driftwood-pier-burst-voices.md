@@ -12,3 +12,9 @@ pace (`debug.audioWarmPaceMs`) could not help: it spaces the slices, but each sl
 
 The census on the phone (`--census`) also showed no shadow-pass draws in a 760k-triangle boot; the boots that read
 about 1.2 M triangles and about 111 draws still need a census taken inside one.
+
+`debug.audioWarmWorker` renders the prewarm in a module worker (`voiceRender.worker.ts`). The families and the render
+moved to `voiceFamilies.ts` so the worker imports no DOM; a declared family carries its render as data (`work`: an
+impact material or a PCM program). One job is in flight at a time; a failed or late (5 s) reply turns the worker off for
+the page and renders that job and the rest on the main thread. A play that finds its family unrendered still renders on
+the spot, as before. Off by default until the cooled phone pairs decide.

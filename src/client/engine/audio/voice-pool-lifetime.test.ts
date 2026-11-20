@@ -4,7 +4,8 @@ import { withOwner } from '../../../shared/engine/app/ownership';
 import { legacyDouble } from '../../../test/engine/FakeGame';
 import { realGc } from '../../../test/engine/realGc';
 import { memoryAttribution } from '../../../shared/engine/core/memoryAttribution';
-import { VoicePool, type Family } from './Voices';
+import type { Family } from './voiceFamilies';
+import { VoicePool } from './Voices';
 
 class Pcm implements AudioBuffer {
   readonly duration: number;
