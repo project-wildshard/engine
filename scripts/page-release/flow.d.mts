@@ -55,7 +55,7 @@ export interface Deps {
 }
 export const SMOKE_SCENARIOS: readonly string[];
 /** STAGING-QA SQ15: one staging-qa.mjs verdict, the candidate's or live staging's. */
-export interface ZoneEntryProof { build?: string; engine?: string; profile?: string; pass?: boolean; expected?: number; arrivals?: readonly {from: string; to: string}[]; failure?: {from: string; to: string; reason: string} }
+export interface ZoneEntryProof { build?: string; engine?: string; profile?: string; mode?: string; pass?: boolean; expected?: number; arrivals?: readonly {from: string; to: string}[]; failure?: {from: string; to: string; reason: string} }
 export interface QaVerdict { qa?: boolean; kind?: string; full?: boolean; build?: string; release?: string; url?: string; deploymentId?: string; roomsSerial?: number; proofs?: readonly { id?: string; pass?: boolean }[]; scenarios?: readonly { id?: string; status?: string }[]; hold?: boolean; findings?: readonly { scenario?: string; severity?: string; text?: string }[]; problem?: string; deploy?: {zoneEntry?: ZoneEntryProof} }
 export const QA_LEGS: Readonly<{ candidate: readonly string[]; staging: readonly string[] }>;
 export function qaGap(qa: QaVerdict | undefined, build: string): string | undefined;

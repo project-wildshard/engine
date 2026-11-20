@@ -97,9 +97,8 @@ async function runQa({ root, out, build, release, name, candidate, deploy }) {
 async function runZoneEntry(out, build, resume) {
   const dir = join(out, 'zone-entry');
   const job = start({file:'bash', args:[join(scripts, 'browser-lane.sh'), '--max', '120', process.execPath,
-    join(scripts, 'zone-gate-proof.mjs'), `--base=${stage.origin}`, `--out=${dir}`, '--engine=webkit',
-    '--target=far-reach', '--deploy', '--walk-all', `--expected-build=${build}`,
-    ...(resume === undefined ? [] : [`--resume=${resume}`])], cwd:toolsRoot, out, name:'zone-entry'});
+    join(scripts, 'zone-entry-tour.mjs'), `--out=${dir}`, `--expected-build=${build}`,
+    ...(resume === undefined ? [] : [`--zone-entry-resume=${resume}`])], cwd:toolsRoot, out, name:'zone-entry'});
   const code = await job.done, proof = read(join(dir, 'zone-entry.json'));
   if (code !== 0 && proof?.failure === undefined) {
     return {build, pass:false, failure:{from:'driftwood-isle', to:'far-reach', reason:'The browser did not complete the zone-entry smoke'}};

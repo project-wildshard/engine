@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
-import { portalExitPlan, resumeZoneEntry, retryZoneEntry, roadApproach, zoneEntryCorridor, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
+import { featuredZoneEntry, portalExitPlan, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, zoneEntryCorridor, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
+import { zoneEntryGap } from '../scripts/page-release/flow.mjs';
+import curated from '../src/server/game/zoneSelect/featured.json';
 
 const cells = [
   {instance:'driftwood-isle', cell:[0, 0]},
@@ -7,6 +9,41 @@ const cells = [
   {instance:'west', cell:[-1, 0]},
   {instance:'south-west', cell:[-1, -1]},
 ] as const;
+
+const featuredCells = curated.map((slug, index) => ({instance:`cell-${index}`, slug,
+  cell: [index % 4, Math.floor(index / 4)] as const}));
+
+test('the smoke seeds two real entries per featured shard and assigns 5/5/6', () => {
+  const route = featuredZoneEntry(featuredCells, 476);
+  expect(route).toHaveLength(16);
+  expect(featuredZoneEntry([...featuredCells].reverse(), 476)).toEqual(route);
+  expect(featuredZoneEntry(featuredCells, 477)).not.toEqual(route);
+  expect(smokeBatches(route.map((_, index) => index)).map(batch => batch.length)).toEqual([5,5,6]);
+  for (const cell of featuredCells) expect(route.filter(leg => leg.to.instance === cell.instance)).toHaveLength(2);
+  for (const {from,to} of route) expect(Math.abs(from.cell[0]-to.cell[0])+Math.abs(from.cell[1]-to.cell[1])).toBe(1);
+  expect(() => featuredZoneEntry(featuredCells.slice(1), 476)).toThrow(/missing featured/u);
+});
+
+test('a retry carries passed pairs forward and only redoes failed indexed pairs for the same build', () => {
+  const route = featuredZoneEntry(featuredCells, 476), build = 'a'.repeat(40);
+  const pairs = route.map(({from,to}, index) => ({index,from:from.instance,to:to.instance}));
+  const all = pairs.map(pair => ({...pair,ms:700})), failed = new Set([1, 7, 14]);
+  const arrivals = all.filter(pair => !failed.has(pair.index));
+  const failures = pairs.filter(pair => failed.has(pair.index)).map(pair => ({...pair,reason:'timed out'}));
+  const report = {engine:'webkit',profile:'phone',mode:'smoke',seed:476,build,cells:featuredCells,expected:16,
+    arrivals, failures, failure:failures[0], pass:false};
+  expect(stagedTourProof({deploy:{zoneEntry:report}})).toBe(report);
+  expect(stagedTourProof(report)).toBe(report);
+  expect(retrySmokeEntries(route, report, build, 476)).toEqual({arrivals,pending:[1,7,14]});
+  expect(() => retrySmokeEntries(route, report, 'b'.repeat(40), 476)).toThrow(/same staging build/u);
+  expect(() => retrySmokeEntries(route, report, build, 477)).toThrow(/seed/u);
+  expect(() => retrySmokeEntries(route, {...report,arrivals:[...arrivals, ...arrivals.slice(0, 1)]}, build, 476)).toThrow(/pair/u);
+  const complete = {...report,pass:true,arrivals:all,failures:[],failure:undefined};
+  expect(zoneEntryGap(complete, build)).toBeUndefined();
+  expect(zoneEntryGap(complete, 'b'.repeat(40))).toMatch(/for this build/u);
+  expect(smokeGap({...report,pass:true})).toMatch(/16 seeded crossings/u);
+  expect(smokeGap({...report,pass:true,arrivals:all.map((pair, index) => index===0 ? {...pair,to:pair.from} : pair),failures:[]})).toMatch(/16 seeded crossings/u);
+});
 
 test('opens with Driftwood into Sky Reach and walks both directions of every live edge in one circuit', (): void => {
   const route = zoneEntryTour(cells);

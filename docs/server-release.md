@@ -119,7 +119,7 @@ Each phase refuses until the one before it has run for the same SHA
 `check` and `go-live` also need the `v<version>` tag on origin at this
 SHA and `staging.wildshard.io` already serving it; `go-live` needs
 `--qa=<verdict.json>` from `staging go-live` for the exact build,
-including the full J451 zone-entry result on the staging origin.
+including the J476 zone-entry result on the staging origin.
 The staging verdict replaced `--after-staging-proofs` (Doctor and the live
 two-player proof), `verify-staging.sh`'s eight journeys and two zone
 sweeps, and `--smoke`: about 42 minutes a release (J427). Go-live
@@ -159,14 +159,21 @@ client and redials with the same identities. Go-live holds on a failed
 redial or lost durable progress. A changed hash with both bots playing
 from later checkpoints, with their coins and ledger retained, is an
 inconclusive progress comparison reported as P2. After the alias move
-the command reruns live M3. J451 then walks from Driftwood into Sky
-Reach on phone-profile WebKit and crosses each live shared edge in
-both directions in that session. Every arrival needs drawn play and
-working movement within 90 seconds. A failure names the pair in
-`verdict.json` and holds the release.
+the command reruns live M3. The J476 smoke walks 16 seeded crossings
+on phone-profile WebKit. Three sessions run 5, 5 and 6 crossings. Each
+featured shard is entered twice through live shared gates. Every arrival
+needs drawn play and working movement within 90 seconds. The staging
+`verdict.json` keeps every failed pair and holds the release until all 16
+have passed on the same build.
 The local verdict must name the release commit's parent. Use the final
 verdict as production's `--qa` input. For an already live release,
 `--observer-proof=<file>` supplies its saved MS9 witness for verification.
+Pass the held staging verdict (or its `zone-entry/zone-entry.json`) as
+`--zone-entry-resume=<file>` to rerun only the failing crossings.
+For a standalone smoke, run `scripts/browser-lane.sh node
+scripts/zone-entry-tour.mjs --expected-build=<sha> --out=<dir>`.
+Use `--seed <number>` to repeat a draw, `--retry-failed <verdict.json>`
+to carry forward successful pairs, or `--full-route` for the original walk.
 Print the train order with
 `node scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z`.
 

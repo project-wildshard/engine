@@ -16,6 +16,7 @@
 // J205: the flow opens no socket. Nothing here ever joins a channel; production proofs are static.
 import {createHash, createPublicKey, verify} from 'node:crypto';
 import {LEGS} from '../staging-qa-budget.mjs';
+import {smokeGap} from '../zone-entry-tour.mjs';
 
 export const PACKS_ORIGIN = 'https://packs.wildshard.io';
 /** Where every channel's page sends `/api/{errors,telemetry,inbox}` (API-CLOUDFLARE AC11). */
@@ -394,15 +395,16 @@ async function productionGates(phase, deps, refuse) {
  *   deploy?: {zoneEntry?: ZoneEntryProof} }} QaVerdict
  */
 
-/** @typedef {{build?:string,engine?:string,profile?:string,pass?:boolean,expected?:number,arrivals?:readonly {from:string,to:string}[],
+/** @typedef {{build?:string,engine?:string,profile?:string,mode?:string,pass?:boolean,expected?:number,arrivals?:readonly {from:string,to:string}[],
  *   failure?:{from:string,to:string,reason:string}}} ZoneEntryProof */
 
-/** J451 binds the complete post-deploy WebKit tour to the staging build.
+/** J476 binds the post-deploy WebKit smoke to the staging build. J451 full-route proofs remain readable.
  * @param {ZoneEntryProof | undefined} proof @param {string} build */
 export function zoneEntryGap(proof, build) {
   if (proof === undefined || proof.build !== build) return 'no J451 zone-entry smoke for this build';
   if (proof.failure !== undefined) return `${proof.failure.from} -> ${proof.failure.to}: ${proof.failure.reason}`;
   if (proof.engine !== 'webkit' || proof.profile !== 'phone') return 'J451 zone-entry smoke needs phone-profile WebKit';
+  if (proof.mode === 'smoke') return smokeGap(proof);
   const {arrivals, expected} = proof, first = arrivals?.[0];
   if (proof.pass !== true || !Array.isArray(arrivals) || !Number.isSafeInteger(expected) ||
       expected !== arrivals.length || first?.from !== 'driftwood-isle' || first.to !== 'far-reach') {

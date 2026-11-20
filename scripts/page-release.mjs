@@ -11,7 +11,7 @@
 //   --wait=<minutes>         check: how long to wait for the signed serial and /health (default 45)
 //   --local-qa=<verdict.json> staging go-live (SQ7): the local QA verdict on the parent of the release commit.
 //   --qa-out=<dir>           staging go-live writes one verdict.json here (J434). It runs the candidate and live QA itself.
-//   --zone-entry-resume=<file>  continue a held phone tour for this build already live on staging.
+//   --zone-entry-resume=<file>  rerun failed crossings from this live staging build's held phone smoke or resume a full tour.
 //   --observer-proof=<file>  reuse an exact MS9 transition witness when verifying a staging build already live.
 //   --qa=<verdict.json>      production needs staging go-live's verdict with the J451 phone tour for its exact build.
 //   --content                build: stamp the content set's base into dist/ and keep the split (PZ6); upload: publish
