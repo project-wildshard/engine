@@ -44,14 +44,16 @@ test('launch, attach and persistent contexts are marked exactly once', async () 
   assert.deepEqual(await engine.launchPersistentContext('profile', options), expected);
 });
 
-test.skipIf(!existsSync(chromium.executablePath()))('a wrapped iPhone context sends the marker to an owned page', async () => {
+// The hosted share can have full Chromium without the separate headless shell.
+const executablePath = chromium.executablePath();
+test.skipIf(!existsSync(executablePath))('a wrapped iPhone context sends the marker to an owned page', async () => {
   const server = createServer((request, response) => response.end(JSON.stringify(request.headers)));
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
   assert.ok(address && typeof address !== 'string');
   try {
-    const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic', '--mute-audio'] });
+    const browser = await chromium.launch({ executablePath, headless: true, args: ['--use-mock-keychain', '--password-store=basic', '--mute-audio'] });
     try {
       const phone = devices['iPhone 13'];
       assert.ok(phone);

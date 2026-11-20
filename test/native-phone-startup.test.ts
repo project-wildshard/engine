@@ -1,9 +1,11 @@
 // @vitest-environment node
 import { expect, test } from 'vitest';
+import { agentUrl } from '../scripts/agent-marker.mjs';
 import { openPhoneBrowser, runNativePhoneCommand } from '../scripts/parity/phone-route-browser.mjs';
 
 test('a cold content visit retains prepared Safari while clearing all game storage before bootstrap', async () => {
   const base = 'http://127.0.0.1:4400/', destination = `${base}?tier=phone`;
+  const probe = agentUrl(new URL('/version.json', base).href);
   const commands: string[][] = [], expressions: string[] = [], methods: string[] = [];
   let closed = 0, proxyClosed = 0;
   const page = await openPhoneBrowser('simulator', base, 'tmp', {
@@ -14,7 +16,7 @@ test('a cold content visit retains prepared Safari while clearing all game stora
       return args[0] === 'getenv' ? '/owned/inspector.sock' : '';
     },
     proxy: () => ({ kill: () => { proxyClosed++; return true; } }),
-    targets: () => Promise.resolve([{ url: `${base}version.json`, webSocketDebuggerUrl: 'ws://127.0.0.1/owned' }]),
+    targets: () => Promise.resolve([{ url: probe, webSocketDebuggerUrl: 'ws://127.0.0.1/owned' }]),
     close: () => { closed++; },
     inspector: () => ({
       opened: Promise.resolve(), close: () => undefined, waitForPageTarget: () => Promise.resolve(),
@@ -31,7 +33,7 @@ test('a cold content visit retains prepared Safari while clearing all game stora
   try {
     await page.cold(destination, 'window.__paintWitness=true');
     expect(commands.map(args => args[0])).toEqual(['getenv', 'openurl']);
-    expect(commands[1]).toEqual(['openurl', 'owned-native-device', `${base}version.json`]);
+    expect(commands[1]).toEqual(['openurl', 'owned-native-device', probe]);
     const clear = expressions.findIndex(expression => expression.includes('localStorage.clear()'));
     expect(clear).toBeGreaterThanOrEqual(0);
     const clearing = expressions[clear];
