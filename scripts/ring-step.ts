@@ -8,11 +8,11 @@
 // A platform with no baseline fails a full comparison. `--update` records measurements in the running platform's baseline.
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
 import './bake-loader.mjs';
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, resolve } from 'node:path';
+import { ringStepDigest } from './ring-step-digest.mjs';
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol.ts';
 
 interface Ring { readonly products: readonly string[]; readonly slices: readonly string[] }
@@ -21,7 +21,6 @@ type Digests = Record<string, Record<string, Record<string, readonly string[]>>>
 
 const option = (name: string): string | undefined => { const at = process.argv.indexOf(`--${name}`); return at === -1 ? undefined : process.argv[at + 1]; };
 const TICKS = Number(option('ticks') ?? 240), LINK = 60, BASELINE = 'test/pins/ring-digests.json', PLATFORM = `${process.platform}-${process.arch}`;
-const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 /** One fixed line of play: a walk, with a jump and a dodge in it. It installs every host and moves the player. A host that sleeps until
  *  its own verb is proved to load, not to work: that's what the tapes in row 7 are for. */
 const line = (tick: number): HeadlessCommand => ({ kind: 'player', moveX: 0.3 * Math.sin(tick / 90), moveZ: -1, yaw: 0, ...(tick % 47 === 0 ? { jump: true as const } : {}), ...(tick % 97 === 0 ? { dodge: true as const } : {}) });
@@ -44,7 +43,7 @@ async function stepDeclared(shard: Awaited<ReturnType<typeof loadHeadlessFolder>
     for (let tick = 1; tick <= TICKS; tick++) {
       const commit = await sim.step([{ source: 'ring', commands: [line(tick)] }]);
       if (commit.tick !== tick) throw new Error(`Stepped to tick ${commit.tick}, not ${tick}`);
-      if (tick % LINK === 0) chain.push(sha256(`${chain.at(-1) ?? ''}${commit.snapshot}`));
+      if (tick % LINK === 0) chain.push(ringStepDigest(chain.at(-1) ?? '', commit.snapshot));
     }
     return chain;
   } finally { await sim.dispose(); }
@@ -57,7 +56,7 @@ async function stepResident(input: { shard: Awaited<ReturnType<typeof loadHeadle
   try {
     for (let tick = 1; tick <= TICKS; tick++) {
       resident.step([line(tick)]);
-      if (tick % LINK === 0) chain.push(sha256(`${chain.at(-1) ?? ''}${serializeSimSnapshot(snapshotSimHostBytes(resident.host))}`));
+      if (tick % LINK === 0) chain.push(ringStepDigest(chain.at(-1) ?? '', serializeSimSnapshot(snapshotSimHostBytes(resident.host))));
     }
     if (resident.host.state.tick !== TICKS) throw new Error(`Stepped to tick ${resident.host.state.tick}, not ${TICKS}`);
     return chain;
