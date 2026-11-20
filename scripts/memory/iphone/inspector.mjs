@@ -89,7 +89,11 @@ async function attach(socketUrl, { overrides = [] }) {
     // Sent in order without waiting: a paused target answers only once resumed, and it queues these first
     /** @type {Promise<unknown>[]} */
     const sent = [];
-    if (bootstrapScript !== '') sent.push(send('Page.setBootstrapScript', { source: bootstrapScript }, 15_000, to));
+    if (bootstrapScript !== '') {
+      // WebKit dispatches the new-global bootstrap hook only to an enabled Page agent.
+      sent.push(send('Page.enable', {}, 15_000, to));
+      sent.push(send('Page.setBootstrapScript', { source: bootstrapScript }, 15_000, to));
+    }
     if (overrides.length > 0) {
       // Interception needs the Network agent on, which also keeps response bodies for the inspector. Resource caching
       // stays on: a Nine boot with it off lost its tab at texture upload. A cached response never reaches the interception,
@@ -204,6 +208,7 @@ async function attach(socketUrl, { overrides = [] }) {
      * @param {string} source */
     async bootstrap(source) {
       await ready;
+      await send('Page.enable', {}, 15_000);
       await send('Page.setBootstrapScript', { source }, 15_000);
       await send('Target.setPauseOnStart', { pauseOnStart: true }, 5_000, null);
       bootstrapScript = source;

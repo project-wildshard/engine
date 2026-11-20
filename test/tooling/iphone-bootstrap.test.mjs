@@ -37,10 +37,16 @@ test('capture fixtures precede provisional page execution without enabling Netwo
   try {
     await driver.bootstrap('window.fixture = "low"');
     const socket = Socket.current;
+    const enableOld = socket.sent.findIndex(m => m.target === 'old' && m.method === 'Page.enable');
+    const installOld = socket.sent.findIndex(m => m.target === 'old' && m.method === 'Page.setBootstrapScript');
+    expect(enableOld).toBeGreaterThanOrEqual(0);
+    expect(installOld).toBeGreaterThan(enableOld);
     socket.message({method:'Target.targetCreated',params:{targetInfo:{type:'page',targetId:'next',isProvisional:true,isPaused:true}}});
+    const enable = socket.sent.findIndex(m => m.target === 'next' && m.method === 'Page.enable');
     const install = socket.sent.findIndex(m => m.target === 'next' && m.method === 'Page.setBootstrapScript');
     const resume = socket.sent.findIndex(m => m.method === 'Target.resume' && m.params.targetId === 'next');
-    expect(install).toBeGreaterThanOrEqual(0);
+    expect(enable).toBeGreaterThanOrEqual(0);
+    expect(install).toBeGreaterThan(enable);
     expect(resume).toBeGreaterThan(install);
     expect(socket.sent[install].params.source).toBe('window.fixture = "low"');
     expect(socket.sent.some(m => m.method === 'Network.enable')).toBe(false);
