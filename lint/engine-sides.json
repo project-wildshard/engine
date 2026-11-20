@@ -759,6 +759,7 @@
     "src/client/game/grid/refusal.ts": "client",
     "src/client/game/grid/regionalBuildCheckpoint.ts": "client",
     "src/client/game/grid/regionalInputs.ts": "client",
+    "src/client/game/grid/regionalKitWire.ts": "client",
     "src/client/game/grid/regionalRuntime.ts": "client",
     "src/client/game/grid/regionalView.ts": "client",
     "src/client/game/grid/regionalWorld.ts": "client",

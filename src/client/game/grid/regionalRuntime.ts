@@ -43,6 +43,7 @@ import { ownedSave } from '../../../shared/game/saves';
 import { readOnlySave, wirePage } from '../shardfile/wirePage';
 import { Owned } from '../../../shared/game/loot/Owned';
 import type { EnteredEquipment } from './enteredEquipment';
+import { regionalKitOnWire } from './regionalKitWire';
 import { SkinLocker } from '../cosmetics/locker';
 import { coverRuntimeAssets } from './assetResidency';
 import { FrameCamera } from '@wildshard/engine/world/frameCamera';
@@ -430,7 +431,9 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
               const equipment = request.page.equipment, weapons = localPlay.weapons;
               await timeClientPreparation(request.cell.slug, 'entry.selection', () => weapons.settleSelection());
               if(owner.disposed||owner.disposing)throw new Error('Regional runtime left while preparing selected equipment');
-              if (equipment !== undefined) installEnteredRuntimeService(entered, entry => { equipment.bind(weapons, entry); });
+              // OF19d: a cell whose server runs its held weapon takes the road's wire, so the server hears its lash
+              const wire = regionalKitOnWire(shardFolderFromAdmission(request.admitted, scope));
+              if (equipment !== undefined) installEnteredRuntimeService(entered, entry => { equipment.bind(weapons, entry, { wire }); });
               for (const animal of localPlay.animals.animals) animal.motionConstraint = hostConstraint(host, animal.dims.bodyRadius * animal.scale);
               // G217 stays up until the actual page composer has warmed this newly entered world and kit.
               // Authored ctx.root is a sibling of the native scene under this view; its lights draw on entry too.
