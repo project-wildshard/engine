@@ -3,7 +3,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { publishOwned, sayFightView } from '@wildshard/engine/sim/shardRows';
 import { hasNativeInventory, nativeInventoryKeeps, creditNativeInventory } from '../../../shared/game/inventoryLaw';
-import { declaredHarvestDrops, harvestDrops } from '../../../shared/game/harvest';
+import { declaredHarvestDrops } from '../../../shared/game/harvest';
 import type { SpeciesRow } from '@wildshard/engine/ai/species';
 import { registerInstalled } from '../shardfile/installedSides';
 
@@ -41,7 +41,7 @@ export function installNativeHarvest(host: SimHost, species: readonly Pick<Speci
       const feet = host.players.get(player)?.position;
       if (!pending.has(row.id) || feet === undefined || Math.hypot(feet.x-row.x, feet.z-row.z)>4 || Math.abs(feet.y-row.y)>6) return;
       const granted: number[] = [];
-      for (const [index, item] of (row.drops ?? harvestDrops(row.kind, row.variant)).entries())
+      for (const [index, item] of (row.drops ?? []).entries())
         if (nativeInventoryKeeps(host, 'pack', item) && creditNativeInventory(host, 'pack', {item,count:1})) granted.push(index);
       pending.delete(row.id); routes.claims.delete(id);
       sayFightView(host, id, granted);
@@ -50,7 +50,7 @@ export function installNativeHarvest(host: SimHost, species: readonly Pick<Speci
   host.events.on('actor.died', ({ actor }) => {
     const body=host.entities.get(actor.id);if(body===undefined||pending.has(body.entityId))return;
     const {x,y,z}=body.position;
-    const drops = body.harvest === undefined ? harvestDrops(body.kind, body.variant) : declaredHarvestDrops(body.harvest, body.variant);
+    const drops = declaredHarvestDrops(body.harvest ?? [], body.variant);
     if(drops.some(item=>nativeInventoryKeeps(host,'pack',item)))
       bind({id:body.entityId,kind:body.kind,variant:body.variant,x,y,z,drops});
   },host.scope);

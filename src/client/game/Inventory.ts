@@ -1,5 +1,5 @@
 import { ITEMS, isItemId } from '../../shared/game/bag/itemCatalog';
-import { declaredHarvestDrops, harvestDrops } from '../../shared/game/harvest';
+import { declaredHarvestDrops } from '../../shared/game/harvest';
 import type { HarvestDrop } from '@wildshard/format/harvestRows';
 import type { IconId } from '@wildshard/engine/ui/icons';
 import { findTitleManifest } from './shard/titleList';
@@ -25,7 +25,7 @@ import { DEFAULT_PACK_SLOTS, addInventory, takeInventory } from '../../shared/ga
  * Owned (src/shared/game/loot/Owned.ts) — `had(id)` lets the loadout move an old save's flag across.
  *
  *   inventory.add('venison', 1);   inventory.items → [{ id, count }] in the order first picked up
- *   inventory.harvest('elk', 'bull')   → what this shard's pack takes from that carcass (Pine Hollow: nothing)
+ *   inventory.harvest(carcass.kind, carcass.variant, carcass.harvest) → the declared drops the pack keeps
  *   inventory.onChange = () => menu.refresh();
  */
 
@@ -33,9 +33,9 @@ import { DEFAULT_PACK_SLOTS, addInventory, takeInventory } from '../../shared/ga
 /** Item identities come from the active shard catalogue. */
 export type ItemId = string;
 
-/** what a carcass of (kind, variant) yields when harvested */
-export function harvestOf(kind: string, variant?: string, declared?: readonly HarvestDrop[]): ItemId[] {
-  return (declared === undefined ? harvestDrops(kind, variant) : declaredHarvestDrops(declared, variant ?? '')).filter(isItemId);
+/** Yield the carcass's authored drops. Keep the kind argument for existing inventory clients. */
+export function harvestOf(_kind: string, variant?: string, declared?: readonly HarvestDrop[]): ItemId[] {
+  return declaredHarvestDrops(declared ?? [], variant ?? '').filter(isItemId);
 }
 
 export const PACK_SLOTS: 12 = DEFAULT_PACK_SLOTS;

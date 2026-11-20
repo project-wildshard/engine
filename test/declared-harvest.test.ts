@@ -54,7 +54,7 @@ test('declared units and selectors cross the actual page inventory without a kin
   for (const item of result) expect(inventory.add(item)).toBe(true);
   expect(new Inventory('custom-harvest').items.map(row => [row.id, row.count])).toEqual([['moon.trophy', 2], ['sun.trophy', 1]]);
   expect(inventory.harvest('boar', 'elite', [])).toEqual([]);
-  expect(inventory.harvest('boar', 'elite')).toContain('boar-meat');
+  expect(inventory.harvest('boar', 'elite')).toEqual([]);
 });
 test('the real server pays declared trophies once, only within the existing reach', () => {
   const f = fixture();
@@ -181,16 +181,25 @@ test('ambiguous old pending harvest refuses before changing any live pending cla
   } finally { f.host.dispose(); }
 });
 
-test('new undeclared pending payouts survive restore when same-kind owners differ', () => {
-  const legacy = ['boar-meat', 'boar-hide', 'boar-tusk'];
-  const first = fixture(3, [], legacy), second = fixture(3, [{ kind: 'boar' }, { kind: 'boar', harvest: drops }], legacy);
+test('a kind-only death leaves no pending claim even when the pack would keep the old items', () => {
+  const f = fixture(3, [], ['boar-meat', 'boar-hide', 'boar-tusk']);
   try {
-    first.kill(null); const saved = first.saved.snapshot();
-    expect(saved).toMatchObject([{ drops: legacy }]);
-    second.saved.restore(saved); second.claim();
-    expect(second.pack.snapshot()).toEqual({ counts: { 'boar-meat': 1, 'boar-hide': 1, 'boar-tusk': 1 }, order: legacy });
-    second.claim(); expect(second.pack.count('boar-meat')).toBe(1);
-  } finally { first.host.dispose(); second.host.dispose(); }
+    f.kill(null);
+    expect(f.saved.snapshot()).toEqual([]);
+    expect(actRoutes(f.host).claims.has('harvest.custom.carcass')).toBe(false);
+  } finally { f.host.dispose(); }
+});
+test('a released pending payout with recorded drops survives mixed same-kind owners', () => {
+  const legacy = ['boar-meat', 'boar-hide', 'boar-tusk'];
+  const f = fixture(3, [{ kind: 'boar' }, { kind: 'boar', harvest: drops }], legacy);
+  try {
+    f.saved.restore([{ ...oldPending, drops: legacy }]);
+    const claim = (): void => { actRoutes(f.host).claims.get('harvest.old.pending')?.(leadPlayer(f.host).id); };
+    claim();
+    expect(f.pack.snapshot()).toEqual({ counts: { 'boar-meat': 1, 'boar-hide': 1, 'boar-tusk': 1 }, order: legacy });
+    claim();
+    expect(f.pack.count('boar-meat')).toBe(1);
+  } finally { f.host.dispose(); }
 });
 test('old dropless saves refuse a mix of absent and declared owners before clearing claims', () => {
   const mixed = [{ kind: 'boar' }, { kind: 'boar', harvest: drops }];
