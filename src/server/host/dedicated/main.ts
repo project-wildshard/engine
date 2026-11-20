@@ -26,7 +26,7 @@ import { savesUrl } from './saves/pgDatabase';
 import { within } from './saves/saveStore';
 import { ZoneEntries, ZONE_ENTRY_MINUTE_MS } from './zoneEntries';
 import { metricsCurrentRoute } from './metricsCurrentRoute';
-import { readZoneUploads, zoneSelectRoute, zoneSelectTabs } from './zoneSelect';
+import { readZoneUploads, zoneCatalogueUrl, zoneSelectRoute, zoneSelectTabs } from './zoneSelect';
 import { zoneSelectPressRoute } from './zoneSelectPress';
 import { ServerReports } from './serverReports';
 import { RoomSessions } from './roomSessions';
@@ -154,7 +154,7 @@ let activationReceiver: ReturnType<typeof uploadActivationReceiver> | undefined;
 // MMO-PLAN MP2.5a: a signed-in page's export and delete, with its join ticket as the proof. Memory saves have none.
 const { exportAccount: exporting, deleteAccount: deleting } = saves;
 const accounts = exporting === undefined || deleting === undefined ? undefined : accountRoutes({ ticketKey: ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, allowedOrigins: trust.allowedOrigins, hold: seat => world.holdForDelete(seat), exportAccount: exporting, deleteAccount: deleting, deleted: account => { world.forgetAccount(account); }, log });
-const catalogueAt = new URL('/api/catalogue', placementAt !== undefined && /^https?:/u.test(placementAt) ? placementAt : 'https://api.wildshard.io');
+const catalogueAt = zoneCatalogueUrl(placementAt);
 const zoneSelect = zoneSelectRoute({
   channel: release.channel, allowedOrigins: trust.allowedOrigins,
   world: () => ({ serial: release.serial, slugs: world.openShards() }),

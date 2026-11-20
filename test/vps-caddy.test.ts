@@ -75,3 +75,17 @@ test('MMO-PLAN MP2.5a: both sites pass a game page\'s account export and delete 
     expect(body).toContain('header_up -CF-Connecting-IP');
   }
 });
+
+test('ZONE-SELECT-SERVED ZS14: both sites pass exactly GET /zone-select and POST/OPTIONS /zone-select/enter to their own door', () => {
+  const caddyfile = render('203.0.113.7');
+  for (const [host, port] of [['rooms.wildshard.io', 8790], ['rooms-staging.wildshard.io', 8791]] as const) {
+    const block = site(caddyfile, host);
+    expect(block, host).toContain('\t@zone_select {\n\t\tmethod GET\n\t\tpath /zone-select\n\t}\n');
+    expect(block, host).toContain('\t@zone_select_enter {\n\t\tmethod POST OPTIONS\n\t\tpath /zone-select/enter\n\t}\n');
+    const start = block.indexOf('\thandle @zone_select_enter {\n');
+    const body = block.slice(start, block.indexOf('\n\t}\n', start) + 3);
+    expect(body, 'another site\'s page is refused first').toMatch(/^\thandle @zone_select_enter \{\n\t\trespond @foreign 403\n\t\theader Cache-Control no-store\n/u);
+    expect(body).toContain(`reverse_proxy 127.0.0.1:${String(port)} {`);
+    expect(block.match(/path \/zone-select\S*/gu), 'no wildcard under /zone-select').toEqual(['path /zone-select', 'path /zone-select/enter']);
+  }
+});

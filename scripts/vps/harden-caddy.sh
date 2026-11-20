@@ -5,7 +5,8 @@
 # Cloudflare customer could point a proxied name here. A per-zone client certificate closes that, later, if it matters.
 #   rooms.wildshard.io          WebSocket upgrade on / to production 127.0.0.1:8790; /up is 200 while production's /health is
 #   rooms-staging.wildshard.io  the same to staging 127.0.0.1:8791 (D2), /up included, so Sentry can watch staging from outside
-# Both also pass /account/export and /account/delete (MMO-PLAN MP2.5a) from the game's pages.
+# Both also pass /account/export and /account/delete (MMO-PLAN MP2.5a) from the game's pages, and Zone Select's exact
+# GET /zone-select and POST/OPTIONS /zone-select/enter (ZONE-SELECT-SERVED ZS14).
 # Everything else is 404, /health included (it stays tailnet-only); a page outside the game's own hosts gets 403.
 # The client address is Cloudflare's CF-Connecting-IP, believed only from Cloudflare's ranges, and handed on as the one
 # X-Forwarded-For hop, which the server's TRUST_PROXY=caddy reads (VH10); CF-Connecting-IP itself never reaches the server.
@@ -60,6 +61,30 @@ https://$host {
 	}
 	handle @room_metrics {
 		reverse_proxy 127.0.0.1:$port
+	}
+	# ZONE-SELECT-SERVED (J470, ZS14): the title's served list and its ENTER ZONE funnel press, these exact paths only.
+	# The door answers CORS, the list's 30 s cache and the press's rate limit itself; the press is never stored by a cache.
+	@zone_select {
+		method GET
+		path /zone-select
+	}
+	handle @zone_select {
+		reverse_proxy 127.0.0.1:$port {
+			header_up X-Forwarded-For {client_ip}
+			header_up -CF-Connecting-IP
+		}
+	}
+	@zone_select_enter {
+		method POST OPTIONS
+		path /zone-select/enter
+	}
+	handle @zone_select_enter {
+		respond @foreign 403
+		header Cache-Control no-store
+		reverse_proxy 127.0.0.1:$port {
+			header_up X-Forwarded-For {client_ip}
+			header_up -CF-Connecting-IP
+		}
 	}
 	@socket {
 		path /

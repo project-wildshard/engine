@@ -31,6 +31,16 @@ interface ZoneSelectOptions {
   readonly log: (line: Record<string, unknown>) => void;
 }
 
+/**
+ * Where the door reads upload metadata (J471: api-server owns it). The box's PLACEMENT_URL is the signed file on
+ * packs.wildshard.io, which has no `/api/catalogue` (ZS14: staging logged `Catalogue HTTP 404` and New stayed empty), so
+ * only a loopback placement source (a local API in dev) names the catalogue's origin too.
+ */
+export function zoneCatalogueUrl(placementAt: string | undefined): URL {
+  const local = placementAt !== undefined && /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?\//u.test(placementAt);
+  return new URL('/api/catalogue', local ? placementAt : 'https://api.wildshard.io');
+}
+
 /** Per-upload metadata can be cached independently of room arrivals or channel placement. */
 export async function readZoneUploads(at: URL): Promise<readonly Upload[]> {
   const response = await fetch(at, { redirect: 'error', signal: AbortSignal.timeout(CATALOGUE_MS) });

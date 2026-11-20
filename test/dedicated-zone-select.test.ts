@@ -5,7 +5,7 @@ import { parse } from 'valibot';
 import { zoneSelectPressRoute } from '../src/server/host/dedicated/zoneSelectPress';
 import { MarkerSeats } from '../src/server/host/dedicated/markerSeats';
 import { metricsCurrentRoute } from '../src/server/host/dedicated/metricsCurrentRoute';
-import { zoneSelectRoute, zoneSelectTabs } from '../src/server/host/dedicated/zoneSelect';
+import { zoneCatalogueUrl, zoneSelectRoute, zoneSelectTabs } from '../src/server/host/dedicated/zoneSelect';
 import { ZoneSelectSchema, type ZoneSelectCard } from '../src/shared/game/grid/zoneSelectRows';
 
 const staging = 'https://staging.wildshard.io';
@@ -167,4 +167,10 @@ test('marker audit holds mismatches with their confirmed seat and forgets old bu
   expect(await (await fetch(door)).json()).toEqual({ channel: 'staging', since: 0, seats: 1, leaks: 1, lanes: { 'web-smoke': 1 } });
   now = 3_600_000;
   expect(audit.read()).toEqual({ since: 60_000, seats: 0, leaks: 0, lanes: {} });
+});
+
+test('the box reads upload metadata from the API, never from the signed placement host', () => {
+  expect(zoneCatalogueUrl('https://packs.wildshard.io/releases/staging-placements.json').href).toBe('https://api.wildshard.io/api/catalogue');
+  expect(zoneCatalogueUrl(undefined).href).toBe('https://api.wildshard.io/api/catalogue');
+  expect(zoneCatalogueUrl('http://127.0.0.1:8787/releases/staging-placements.json').href).toBe('http://127.0.0.1:8787/api/catalogue');
 });
