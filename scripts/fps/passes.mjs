@@ -1,3 +1,14 @@
+/** Check the requested diagnostic independently of the measurement host.
+ * @param {readonly string[]} profiles @param {{dockOnly?:boolean,coldOnly?:boolean}} run */
+export function passBreakdownAllowed(profiles, run) {
+  return run.dockOnly === true && run.coldOnly === true && profiles.every(name => name.startsWith('desktop-'));
+}
+
+/** @param {string | undefined} bench */
+export function requirePassBench(bench) {
+  if (bench !== '1') throw new Error('Live pass breakdown needs WS_BENCH=1');
+}
+
 /**
  * CPU submission inside each composer pass. Serialized into the browser and
  * attached only after control, so the probe shares the stock route's boot.

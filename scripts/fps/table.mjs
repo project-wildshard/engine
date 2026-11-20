@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // DF6 / J464. One browser at a time on the mini.
 // node scripts/fps/table.mjs --zone driftwood-isle [--profiles NAME,...] [--runs 3] [--base ORIGIN]
-// --dock-only --cold-only is a short diagnostic. Add --pass-breakdown for CPU submit by pass.
+// --dock-only --cold-only is a short diagnostic. With WS_BENCH=1, add --pass-breakdown for CPU submit by pass.
 // The full matrix includes both desktop sizes and a warm repeat.
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,6 +15,7 @@ import { assembleCapture, atomicJson, cellPath, openResume, readCell, signature 
 import { agentFetch } from '../agent-requests.mjs';
 import { capFor, readCaps } from '../budgets/files.mjs';
 import { routeFor } from '../memory/iphone/route.mjs';
+import { passBreakdownAllowed, requirePassBench } from './passes.mjs';
 
 /** @typedef {Omit<Parameters<typeof import('./measure.mjs').measureFps>[0], 'cpu' | 'floor'> & {factor:string|null}} ProfileSpec */
 const PHONE = /** @type {const} */ ({ browser: 'chromium', tier: 'phone', width: 402, height: 812, dpr: 3 });
@@ -125,9 +126,10 @@ async function main() {
   if (zone !== 'driftwood-isle') throw new Error('DF2 defines a route for driftwood-isle');
   const selected = choices.profiles.split(',');
   const passBreakdown = choices['pass-breakdown'] === true;
-  if (passBreakdown && (!choices['dock-only'] || !choices['cold-only'] || selected.some(name => !name.startsWith('desktop-')))) {
+  if (passBreakdown && !passBreakdownAllowed(selected, {dockOnly:choices['dock-only'], coldOnly:choices['cold-only']})) {
     throw new Error('Pass breakdown needs desktop profiles with --dock-only --cold-only');
   }
+  if (passBreakdown && !choices['dry-run']) requirePassBench(process.env.WS_BENCH);
   const count = Number(choices.runs);
   if (!Number.isSafeInteger(count)||count<1||new Set(selected).size!==selected.length||selected.some(p=>!keys.includes(p)))
     throw new Error('Use a positive run count and a unique list of known profiles');

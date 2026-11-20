@@ -1,10 +1,9 @@
-import { chromium, webkit, devices } from '../browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { developerSettings, harnessPins, saveFixture, NAME_ASKED } from '../debug-settings.mjs';
 import { loadingCardIndex } from '../loading-benchmark/catalogue.mjs';
 import { legSummary, routeLegOnPage } from '../memory/iphone/route.mjs';
 import { fpsVerdict } from './verdict.mjs';
-import { observePasses } from './passes.mjs';
+import { observePasses, requirePassBench } from './passes.mjs';
 
 /** @typedef {{browser:'webkit'|'chromium', cpu:number, graphics:'low'|'high', tier:'phone'|'desktop',
  * width:number, height:number, dpr:1|2|3, cap:30|60|null, floor:number}} Profile */
@@ -91,7 +90,8 @@ export function routeScript(route, profile, approach, passBreakdown) {
 }
 
 /** @param {Profile} profile */
-function openProfile(profile) {
+async function openProfile(profile) {
+  const { chromium, webkit } = await import('../browser-playwright.mjs');
   const native = profile.cap === null ? ['--disable-gpu-vsync', '--disable-frame-rate-limit'] : [];
   return profile.browser === 'webkit' ? webkit.launch({ headless: true }) :
     chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist', ...native] });
@@ -99,6 +99,7 @@ function openProfile(profile) {
 
 /** @param {import('playwright').Browser} browser @param {Profile} profile */
 async function openContext(browser, profile) {
+  const { devices } = await import('../browser-playwright.mjs');
   const { defaultBrowserType: _type, ...device } = devices['iPhone 15 Pro'];
   const context = await browser.newContext({ ...(profile.cap === null ? {} : device),
     viewport: { width: profile.width, height: profile.height }, deviceScaleFactor: profile.dpr });
@@ -175,6 +176,7 @@ async function capture(context, profile, { base, zone, route, approach = [], pas
 /** One cold capture per fresh browser context. Its optional warm repeat keeps the actual HTTP and SW caches.
  * @param {Profile} profile @param {{base:string,zone:string,route:RouteLeg[],approach?:RouteLeg[],passBreakdown?:boolean,signal:AbortSignal,warm?:boolean}} options */
 export async function measureFps(profile, options) {
+  if (options.passBreakdown) requirePassBench(process.env.WS_BENCH);
   const browser = await openProfile(profile);
   try {
     const context = await openContext(browser, profile);

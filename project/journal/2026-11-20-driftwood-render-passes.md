@@ -8,3 +8,8 @@ inside that event. A timed-out entry reports its last loading text
 and page faults. A pass capture reports elapsed CPU submission,
 with nested shadow work charged separately, and restores its hooks
 when the dock leg ends. The ordinary matrix keeps its Metal timer.
+
+Hosted run 44718239669 exposed the Mac host lookup in the
+admission test's CLI dry-run. The fixture now tests admission
+without the host lookup. Real pass diagnostics require
+`WS_BENCH=1`.

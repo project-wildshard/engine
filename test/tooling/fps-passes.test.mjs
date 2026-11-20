@@ -1,8 +1,7 @@
-import { spawnSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { expect, test } from 'vitest';
 import { routeScript } from '../../scripts/fps/measure.mjs';
-import { observePasses } from '../../scripts/fps/passes.mjs';
+import { observePasses, passBreakdownAllowed, requirePassBench } from '../../scripts/fps/passes.mjs';
 
 test('measures exclusive pass submit per composer frame and restores the hooks', () => {
   let t = 0;
@@ -59,10 +58,11 @@ test('installs the desktop pass probe before navigation and waits for control', 
 });
 
 test('the table admits pass diagnostics only for short cold desktop runs', () => {
-  const run = (...args) => spawnSync(process.execPath, ['scripts/fps/table.mjs', '--dry-run', '--pass-breakdown', ...args], { encoding: 'utf8' });
-  const admitted = run('--profiles', 'desktop-high', '--dock-only', '--cold-only');
-  expect(admitted.status).toBe(0);
-  expect(JSON.parse(admitted.stdout).plan).toHaveLength(2);
-  expect(run('--profiles', 'desktop-high', '--cold-only').stderr).toContain('Pass breakdown needs');
-  expect(run('--profiles', 'phone-low', '--dock-only', '--cold-only').stderr).toContain('Pass breakdown needs');
+  const dock = { dockOnly: true, coldOnly: true };
+  expect(passBreakdownAllowed(['desktop-high', 'desktop-native'], dock)).toBe(true);
+  expect(passBreakdownAllowed(['desktop-high'], { ...dock, dockOnly: false })).toBe(false);
+  expect(passBreakdownAllowed(['desktop-high'], { ...dock, coldOnly: false })).toBe(false);
+  expect(passBreakdownAllowed(['desktop-high', 'phone-low'], dock)).toBe(false);
+  expect(() => requirePassBench(undefined)).toThrow('WS_BENCH=1');
+  expect(() => requirePassBench('1')).not.toThrow();
 });
