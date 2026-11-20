@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "hosts": {
+    "Mac17,16": {
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+      "factors": {
+        "desktopTypical": {
+          "factor": 2,
+          "qualified": true,
+          "decision": "J467"
+        },
+        "desktopNative": {
+          "factor": 1,
+          "qualified": true,
+          "decision": "J467"
+        },
+        "phoneNormal": {
+          "device": "iPhone 13",
+          "qualified": false,
+          "stagingBuild": "cf47558efae969356af515e8148a1f91d445c78b",
+          "temperatureC": 36.29,
+          "capFps": 30,
+          "phone": {
+            "updateP50Ms": 4,
+            "renderP50Ms": 5,
+            "frameP95Ms": 59,
+            "trianglesP95": 804284,
+            "drawsP95": 110,
+            "programsMax": 167
+          },
+          "reason": "The local reconstruction draws a smaller scene. The phone JS and math prices are still owed."
+        },
+        "phoneLpm": {
+          "device": "iPhone 17 Pro",
+          "qualified": false,
+          "reference": {
+            "version": "0.1.50",
+            "updateP50Ms": 5,
+            "renderP50Ms": 6
+          },
+          "reason": "The Low Power Mode recording predates the minimum calibration release v0.1.52."
+        }
+      },
+      "cpuDiagnostics": {
+        "build": "cf47558ef-mwolyhcs",
+        "zone": "driftwood-isle",
+        "mode": "local dev single cell, phone Low, 30 fps",
+        "dock": [
+          {
+            "throttle": 1,
+            "updateP50Ms": 1.1,
+            "renderP50Ms": 1.4,
+            "frameP95Ms": 37.2,
+            "trianglesP95": 708263,
+            "drawsP95": 85,
+            "programsMax": 96
+          },
+          {
+            "throttle": 2,
+            "updateP50Ms": 2,
+            "renderP50Ms": 2.8,
+            "frameP95Ms": 34.9,
+            "trianglesP95": 722370,
+            "drawsP95": 87,
+            "programsMax": 95
+          },
+          {
+            "throttle": 3,
+            "updateP50Ms": 2.6,
+            "renderP50Ms": 4,
+            "frameP95Ms": 38.1,
+            "trianglesP95": 716250,
+            "drawsP95": 84,
+            "programsMax": 95
+          },
+          {
+            "throttle": 4,
+            "updateP50Ms": 5,
+            "renderP50Ms": 7,
+            "frameP95Ms": 37.5,
+            "trianglesP95": 722898,
+            "drawsP95": 86,
+            "programsMax": 95
+          },
+          {
+            "throttle": 6,
+            "updateP50Ms": 5.7,
+            "renderP50Ms": 8.4,
+            "frameP95Ms": 38.2,
+            "trianglesP95": 722184,
+            "drawsP95": 84,
+            "programsMax": 95
+          },
+          {
+            "throttle": 8,
+            "updateP50Ms": 7,
+            "renderP50Ms": 11.3,
+            "frameP95Ms": 40.6,
+            "trianglesP95": 716210,
+            "drawsP95": 84,
+            "programsMax": 95
+          }
+        ],
+        "microbench": [
+          {
+            "throttle": 1,
+            "slopeMsPerItem": {
+              "rig": 0.00096354,
+              "body": 0.031667,
+              "agent": 0.0011198
+            }
+          },
+          {
+            "throttle": 2,
+            "slopeMsPerItem": {
+              "rig": 0.0020052,
+              "body": 0.064818,
+              "agent": 0.0022656
+            }
+          },
+          {
+            "throttle": 3,
+            "slopeMsPerItem": {
+              "rig": 0.0028906,
+              "body": 0.096068,
+              "agent": 0.0034635
+            }
+          },
+          {
+            "throttle": 4,
+            "slopeMsPerItem": {
+              "rig": 0.0041146,
+              "body": 0.12953,
+              "agent": 0.0047135
+            }
+          },
+          {
+            "throttle": 6,
+            "slopeMsPerItem": {
+              "rig": 0.0061458,
+              "body": 0.19174,
+              "agent": 0.0064844
+            }
+          },
+          {
+            "throttle": 8,
+            "slopeMsPerItem": {
+              "rig": 0.0078646,
+              "body": 0.25781,
+              "agent": 0.0096875
+            }
+          }
+        ]
+      },
+      "gpu": {
+        "qualified": false,
+        "basis": "Phone gpu~ p95 includes frame pacing and compositor waits. The Metal timer measures submitted rendering work.",
+        "phoneBuild": "cf47558efae969356af515e8148a1f91d445c78b",
+        "phoneGpuApproxP95Ms": {
+          "dock spawn": 25.7,
+          "pier to beach": 0.7,
+          "plateau climb": 3.7,
+          "castaway camp (NPC)": 0.7
+        },
+        "metalBuild": "cf47558ef-mwolyhcs",
+        "metal": [
+          {
+            "segment": "dock spawn",
+            "gpuMsPerFrame": 0.956,
+            "triangles": 710241,
+            "draws": 85
+          },
+          {
+            "segment": "pier to beach",
+            "gpuMsPerFrame": 1.024,
+            "triangles": 656127,
+            "draws": 74
+          },
+          {
+            "segment": "plateau climb",
+            "gpuMsPerFrame": 0.718,
+            "triangles": 546371,
+            "draws": 82
+          }
+        ],
+        "reason": "A matched three-run Metal and phone route with two held-out segments is still owed."
+      }
+    }
+  }
+}
