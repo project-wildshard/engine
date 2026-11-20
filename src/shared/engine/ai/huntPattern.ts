@@ -822,9 +822,11 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
    * later; otherwise (a head came up) they only get a nudge of awareness — a sentry freezing must not empty the
    * clearing, or there is never a shot.
    */
-  /** A body's herd: the roster's by `a.herd`, else a declared one (`HuntPorts.herdOf`), else none. */
+  /** A body's herd: the roster's by `a.herd`, else a declared one (`HuntPorts.herdOf`), else none. A declared body keeps
+   *  AnimalSim's `herd = 0` and a layer hunt rolls no herds, so a missing roster herd still asks the port (OF23c: without
+   *  it a declared herd had no centre, and Pine's den bears walked a random walk 30 m out onto the trail). */
   private herdFor(a: A): HuntHerd<A> | null {
-    return a.herd >= 0 ? this.herds[a.herd] ?? null : this.ports.herdOf?.(a) ?? null;
+    return (a.herd >= 0 ? this.herds[a.herd] : undefined) ?? this.ports.herdOf?.(a) ?? null;
   }
 
   private alertHerd(a: A, bolt: boolean): void {
