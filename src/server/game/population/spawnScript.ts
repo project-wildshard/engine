@@ -31,6 +31,7 @@ import { SCRIPT_V1_EVENTS, SCRIPT_V1_READS, SCRIPT_V1_LISTS, type ScriptV1Comman
 import { sha256 } from '../../../shared/game/plugin/moduleHash';
 import { admitScriptContract } from '@wildshard/format/scriptContract';
 import { populationRoster } from './roster';
+import { ABSENT_Y } from '../shardfile/declaredSpawnWhen';
 import { nativePopulationOf } from '../riding/nativePopulation';
 import { ANIMAL_STATES } from '@wildshard/engine/entities/animalStates';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
@@ -182,16 +183,36 @@ export class SpawnScript {
       else if (rows.script.on.includes('start')) this.v2.enqueue(0,binding.id,[1,0,0,0,0,0],this.v2Identities());
     }
   }
-  /** Native binding takes existing platform authorities and rows, never per-shard ports. */
-  static native(host: SimHost, input: unknown,v2Owners?: SpawnV2Owners,worldActions?: readonly V2WorldActionLoan[],queries?: SpawnQueryLoansV2): SpawnScript {
+  /** Native binding takes existing platform authorities and rows, never per-shard ports. `declared` (ONE-FORMAT OF23c): the
+   * level's declared bodies lent to this script, an elite program's main standing as a `creatures.spawns` row in its spawn
+   * group. Such a body is the script's boot body before any of the roster's; retiring it takes it out of the world (absent,
+   * as a `when` row is: no brain, blow or death), and spawning its kind and variant stands it again at the site, whole, on its
+   * own id and rank. The roster never spawns or retires a lent body. */
+  static native(host: SimHost, input: unknown,v2Owners?: SpawnV2Owners,worldActions?: readonly V2WorldActionLoan[],queries?: SpawnQueryLoansV2,declared: readonly string[] = []): SpawnScript {
     if (queries !== undefined && [...queries.worlds.values()].some(world => world.physics !== host.physics)) throw new Error('Foreign native query world');
     const rows = parseSpawnScript(input), roster = populationRoster(host, rows.roster);
     for (const row of rows.species) roster.validateSpawn(row.kind, row.variant);
-    return new SpawnScript(rows, { spawn: roster.spawn, retire: actor => {
+    const lent = declared.map(id => { const body = host.entities.get(id); if (body === undefined || roster.actor(id) !== null) throw new Error(`Declared script body ${id} names no declared body`); const lentBody: ControlledBody = body; return lentBody; });
+    if (lent.some(body => !rows.species.some(row => row.kind === body.kind && row.variant === body.variant))) throw new Error('Declared script body has no species row in its script');
+    const own = (id: string): ControlledBody | null => lent.find(body => body.entityId === id) ?? null;
+    return new SpawnScript(rows, { spawn: (kind, x, z, yaw, variant) => {
+      const body = lent.find(row => row.kind === kind && row.variant === variant && (row.hidden === true || !row.alive));
+      if (body === undefined) return roster.spawn(kind, x, z, yaw, variant);
+      Object.assign(body, { hidden: false }); body.place(x, z, yaw); body.revive(); body.motor?.resetAt?.(body.position); host.flags.clear(`dead:${body.entityId}`);
+      return body;
+    }, retire: actor => {
+      const declaredBody = own(actor.entityId);
+      if (declaredBody !== null) {
+        Object.assign(declaredBody, { hidden: true }); declaredBody.alive = false; declaredBody.position.y = ABSENT_Y; declaredBody.motor?.resetAt?.(declaredBody.position);
+        host.flags.clear(`dead:${declaredBody.entityId}`); return;
+      }
       const body = roster.actor(actor.entityId); if (body !== actor) throw new Error('Foreign native script actor');
       roster.retire(body);
-    }, actor: roster.actor,
-      height: (x, z) => host.groundHeightAt(x, z), available: roster.available, boot: () => roster.bodies().filter(row => row.scripted).map(row => row.actor),
+    }, actor: id => roster.actor(id) ?? own(id),
+      height: (x, z) => host.groundHeightAt(x, z), available: roster.available,
+      // a lent identity is that body's alone: the roster's own lair body of its kind and variant is never the script's
+      boot: () => [...lent.filter(body => body.alive && body.hidden !== true), ...roster.bodies().filter(row => row.scripted
+        && !lent.some(body => body.kind === row.actor.kind && body.variant === row.actor.variant)).map(row => row.actor)],
       reach: (body, target) => canReach(body, target, host.physics) },v2Owners,worldActions === undefined ? undefined : { world: worldActions },queries,host);
   }
   /** Borrow the installed mounted-world population explicitly. This is not a

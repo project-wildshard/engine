@@ -34,7 +34,7 @@ export async function readEliteFeature(product: ShardFolder, name: string): Prom
 }
 
 /** Native named encounters take only the real simulation/clock authorities and rows. Fight decisions run in v1 guests. */
-export function installNativeEliteFeature(host: SimHost, day: DayCycleClock, input: unknown): {
+export function installNativeEliteFeature(host: SimHost, day: DayCycleClock, input: unknown, declared: readonly { readonly id: string; readonly group?: string | undefined }[] = []): {
   readonly core: EliteCore<EliteDecisions>; readonly scripts: readonly EliteDecisions[]; readonly initialize: () => void;
 } {
   const rows = parseEliteFeature(input);
@@ -43,7 +43,12 @@ export function installNativeEliteFeature(host: SimHost, day: DayCycleClock, inp
   const core = new EliteCore<EliteDecisions>({ players: host.players, condition: rule => rule === 'always'
     || (rule === 'dusk' ? day.dusk > 0.5 : rule === 'night' ? day.night > 0.5 : false) }, drops.hooks, host.level.id, memoryElitePersistence(host.level.id, pageStateOf(host, '.elites')));
   drops.bind(core);
-  const scripts = rows.fights.map(row => { const program = SpawnScript.native(host, row.program); return new EliteDecisions(row, () => program, rows, host.level.seed); });
+  // ONE-FORMAT OF23c: a fight whose main stands as a declared spawn row in its program's spawn group drives that body
+  const scripts = rows.fights.map(row => {
+    const binding = row.program.script.binding, group = 'spawnGroup' in binding ? binding.spawnGroup : undefined;
+    const lent = group === undefined ? [] : declared.filter(spawn => spawn.group === group).map(spawn => spawn.id);
+    const program = SpawnScript.native(host, row.program, undefined, undefined, undefined, lent); return new EliteDecisions(row, () => program, rows, host.level.seed);
+  });
   for (const script of scripts) { const entry = core.add(script); publishEncounter(host, script.def.id, () => eliteNetView(entry)); }
   const saved = v.strictObject({ version: v.literal(rows.version), ...EliteCoreContinuationSchema.entries, scripts: v.array(savedScript), stun: v.nullable(root), others: v.exactOptional(v.record(v.string(), root)) });
   type Stun = v.InferOutput<typeof root>;
