@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import * as v from 'valibot';
 import { expect, test } from 'vitest';
-import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
+import { parseShardfile, shardfileRules, type Shardfile } from '@wildshard/format/shardSchema';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { ShardCreatures } from '@wildshard/format/creatures';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
@@ -116,3 +116,13 @@ test('Driftwood\'s chapter wakes the declared Captain: the fight waits for the a
     expect(host.flags.has(DEAD)).toBe(false);
   } finally { restored?.dispose(); live.dispose(); }
 }, 180_000);
+
+// OF22c2 (format 0.55.2): with his runtime boss spawn gone, the shipped Captain decision row's public fields (rise, phase,
+// arena, ...) live on his declared spawn, which a `boss` encounter retains as the runtime boss spawn did: the shard's
+// semantic rules admit them.
+test('a declared Captain keeps his decision row\'s public fields with no runtime boss spawn', async () => {
+  const fixture = await shipped(), shard = declaring(fixture);
+  expect(shard.runtime?.spawns?.bosses).toEqual([]);
+  expect(shard.state.shared.some(field => field.privacy === 'public' && field.type !== 'string')).toBe(true);
+  expect(shardfileRules(shard)).not.toContain('runtime-bound state supports host fields and retained-actor numeric fields');
+}, 60_000);
