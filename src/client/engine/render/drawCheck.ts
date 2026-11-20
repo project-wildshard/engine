@@ -13,6 +13,16 @@
  */
 import * as THREE from 'three';
 import type { Renderer } from './renderer';
+import type { Scope } from '../../../shared/engine/app/scope';
+
+const drawWatchOwners = new WeakMap<HTMLCanvasElement | OffscreenCanvas, Scope>();
+
+/** A live world watch judges the presented canvas for this scope. */
+export function bindDrawWatch(canvas: HTMLCanvasElement, owner: Scope): void {
+  if (owner.disposed || owner.disposing) return;
+  drawWatchOwners.set(canvas, owner);
+  owner.onDispose(() => { if (drawWatchOwners.get(canvas) === owner) drawWatchOwners.delete(canvas); });
+}
 
 /** whether this renderer's GPU can draw into half-float colour targets (asking also enables the extension) */
 export function halfFloatTargets(renderer: Pick<Renderer, 'extensions'>): boolean {
@@ -73,6 +83,8 @@ export class DrawCheck {
   afterDraw(frame: number): void {
     if (this.done || !DRAW_CHECK_FRAMES.includes(frame)) return;
     const { renderer } = this.host, gl = renderer.getContext();
+    const watch = drawWatchOwners.get(gl.canvas);
+    if (watch !== undefined && !watch.disposed && !watch.disposing) return;
     if (gl.isContextLost()) return; // GpuRecovery owns a lost context
     const prev = renderer.getRenderTarget();
     let why = '', certain = false;

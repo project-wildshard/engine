@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
-import { DRAW_CHECK_FRAMES, DrawCheck, fitHdrTarget, hdrTargetType } from './drawCheck';
+import { Scope } from '../../../shared/engine/app/scope';
+import { bindDrawWatch, DRAW_CHECK_FRAMES, DrawCheck, fitHdrTarget, hdrTargetType } from './drawCheck';
 
 // QA-FEEDBACK-2026-11-13 row 6: an Android Chrome player saw the HUD over the page's background, and nothing was reported.
 
@@ -18,8 +19,9 @@ test('the HDR targets fall back to 8-bit where the GPU cannot draw into half flo
 const COMPLETE = 0x8cd5, INCOMPLETE_ATTACHMENT = 0x8cd6;
 function fixture(status: number, alpha: number) {
   const reports: { message: string; certain: boolean }[] = [], bound: (THREE.WebGLRenderTarget | null)[] = [];
+  const canvas = {} as HTMLCanvasElement;
   const gl = {
-    FRAMEBUFFER: 0x8d40, FRAMEBUFFER_COMPLETE: COMPLETE, RGBA: 0x1908, UNSIGNED_BYTE: 0x1401, drawingBufferWidth: 100, drawingBufferHeight: 200,
+    canvas, FRAMEBUFFER: 0x8d40, FRAMEBUFFER_COMPLETE: COMPLETE, RGBA: 0x1908, UNSIGNED_BYTE: 0x1401, drawingBufferWidth: 100, drawingBufferHeight: 200,
     isContextLost: () => false,
     checkFramebufferStatus: () => status,
     readPixels: (_x: number, _y: number, _w: number, _h: number, _f: number, _t: number, px: Uint8Array) => { px[3] = alpha; },
@@ -33,7 +35,7 @@ function fixture(status: number, alpha: number) {
     report: (error, certain) => { reports.push({ message: error.message, certain }); },
   });
   const run = (): void => { for (let frame = 1; frame <= 400; frame++) check.afterDraw(frame); };
-  return { reports, run, bound };
+  return { canvas, check, reports, run, bound };
 }
 
 test('an incomplete world target is reported once, at the first check, as certain', () => {
@@ -49,4 +51,19 @@ test('a canvas transparent at both checks is reported; a drawn one never is', ()
   expect(blank.reports).toEqual([{ message: expect.stringContaining(`the canvas stayed transparent at frames ${DRAW_CHECK_FRAMES.join(' and ')}`), certain: false }]);
   const drawn = fixture(COMPLETE, 255); drawn.run();
   expect(drawn.reports).toEqual([]);
+});
+
+test('a live world watch owns only its own canvas until its scope retires', () => {
+  const covered = fixture(INCOMPLETE_ATTACHMENT, 255), other = fixture(INCOMPLETE_ATTACHMENT, 255);
+  const watch = new Scope('world watch');
+  try {
+    bindDrawWatch(covered.canvas, watch);
+    covered.check.afterDraw(DRAW_CHECK_FRAMES[0] ?? 0);
+    expect(covered.bound).toEqual([]);
+    other.run();
+    expect(other.reports).toHaveLength(1);
+    watch.dispose();
+    covered.check.afterDraw(DRAW_CHECK_FRAMES[1] ?? 0);
+    expect(covered.reports).toEqual([{ message: expect.stringContaining('target is incomplete'), certain: true }]);
+  } finally { watch.dispose(); }
 });
