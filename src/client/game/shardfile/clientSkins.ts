@@ -13,7 +13,7 @@
 import { macrotask } from '@wildshard/engine/boot/plan';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { buildTier, type Tier } from '@wildshard/engine/core/tier';
-import { BufferAttribute, Euler, InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
+import { BufferAttribute, DoubleSide, Euler, InterpolateLinear, Matrix4, Quaternion, Vector3, MeshStandardMaterial, MeshLambertMaterial, type AnimationClip, type Bone, type BufferGeometry, type Material, type KeyframeTrack, type Interpolant } from 'three';
 import { is } from 'valibot';
 import type { ClipName } from '@wildshard/engine/anim/rig';
 import type { RunningAbility } from '@wildshard/engine/ai/strikes';
@@ -42,6 +42,7 @@ interface SampledClip { duration: number; tracks: readonly SampledTrack[]; layer
 export interface ClientSkin {
   readonly id: string;
   readonly geometry: BufferGeometry;
+  readonly doubleSided?: boolean;
   readonly bones: readonly BoneDef[];
   /** a fresh family material per rig (the hit flash writes its emissive), scope-owned like the loader's catalogue */
   readonly material: () => MeshStandardMaterial | MeshLambertMaterial;
@@ -156,7 +157,7 @@ async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLoo
     // Instances use sampled tracks; the temporary player's mixer never plays.
     // Keep its mesh/skeleton scope-owned, but release unused actions/bindings.
     player.machine.dispose();
-    return { id: row.id, geometry, bones: restBones(joints, player.mesh.skeleton.boneInverses, row.id), material, parts, clips,
+    return { id: row.id, geometry, ...(drawn.side === DoubleSide ? { doubleSided: true } : {}), bones: restBones(joints, player.mesh.skeleton.boneInverses, row.id), material, parts, clips,
       skeleton: row.rig.skeleton, sockets: row.rig.sockets, attackSpan, ...(clipMap === undefined ? {} : { clipMap }) };
 }
 
@@ -422,7 +423,7 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
     // OF27b: each variant wears its own coat (its skin file's material: maps, sheen, rim, glow)
     material: (_sky, _glow, _intensity, variant) => (variant === undefined ? skin : select(variant.id)).material(),
     ...(skin.parts.length === 0 ? {} : { partMaterials: () => skin.parts.map((part) => part()) }),
-    skin: (variant) => { const selected = select(variant.id); return { geometry: selected.geometry, map: null, normalMap: null, bones: bones(selected), overgrown: false }; },
+    skin: (variant) => { const selected = select(variant.id); return { geometry: selected.geometry, ...(selected.doubleSided === true ? { doubleSided: true } : {}), map: null, normalMap: null, bones: bones(selected), overgrown: false }; },
     ...(quadruped ? { postPose: animate } : { animate }),
   };
 }

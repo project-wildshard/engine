@@ -52,13 +52,13 @@ function skinGlb(glow: boolean, mixed = false, size = 1): Uint8Array {
   return new Uint8Array(Buffer.concat([header, jh, text, bh, bin]));
 }
 
-async function loaded(glow: boolean, materials?: Record<string, string>, mixed = false, variants = false, phone?: 'phone' | 'desktop') {
+async function loaded(glow: boolean, materials?: Record<string, string>, mixed = false, variants = false, phone?: 'phone' | 'desktop', doubleSided = false) {
   await prepareGlbCost();
   const glb = skinGlb(glow, mixed), cost = parseGlbData(glb), file = sha(glb);
   const metadata = {
     row: { id: 'test.glow', file, family: 'toon', rig: { skeleton: 'test.glow', joints: [['body', 'head']], clips: ['idle'], sockets: ['body', 'head'] },
       cost: { decoded: cost.decoded, gpu: cost.gpu, triangles: cost.triangles, draws: cost.draws } },
-    binding: { skin: 'test.glow', material: { family: 'pbr', vertexColours: false }, ...(materials === undefined ? {} : { materials }), loops: ['idle'] },
+    binding: { skin: 'test.glow', material: { family: 'pbr', vertexColours: false, doubleSided }, ...(materials === undefined ? {} : { materials }), loops: ['idle'] },
   };
   const skin = new TextEncoder().encode(JSON.stringify(metadata));
   const look = { id: 'test.glow.look', species: 'test.glow', recipe: 'platform.skin', material: null, parameters: { skin: sha(skin) },
@@ -67,8 +67,8 @@ async function loaded(glow: boolean, materials?: Record<string, string>, mixed =
     look: { materials: { 'test.eye': { family: 'emissive', colour: [1, 0.8, 0.2], intensity: 3 } } } };
   const compiled: THREE.Material[] = [];
   const compile = (entry: unknown): THREE.Material => {
-    const family = (entry as { family?: string }).family;
-    const material = family === 'emissive' ? new THREE.MeshBasicMaterial({ color: 0xffcc33 }) : new THREE.MeshStandardMaterial({ color: 0xb4583a });
+    const { family, doubleSided: both } = entry as { family?: string; doubleSided?: boolean };
+    const material = family === 'emissive' ? new THREE.MeshBasicMaterial({ color: 0xffcc33 }) : new THREE.MeshStandardMaterial({ color: 0xb4583a, side: both === true ? THREE.DoubleSide : THREE.FrontSide });
     compiled.push(material); return material;
   };
   const assets = new Map([[sha(skin), skin], [file, glb]]), scope = new Scope('skin parts');
@@ -110,6 +110,14 @@ test('a skin with no map stays one material and one group, even over two GLB mat
     expect(skin.geometry.groups.map((group) => [group.start, group.count, group.materialIndex])).toEqual([[0, 9, 0]]);
     expect(skinSpeciesLook(look, { id: 'test.glow', kind: 'test.glow', dims: { feet: [] } } as never, skin).partMaterials).toBeUndefined();
   }
+});
+
+test('a cooked thin-sheet skin lends its double-sided choice with the hull', async () => {
+  const { skin, look, scope } = await loaded(false, undefined, false, false, undefined, true);
+  try {
+    const view = skinSpeciesLook(look, { id: 'test.glow', kind: 'test.glow', dims: { feet: [] } } as never, skin);
+    expect(view.skin?.({ id: 'plain' } as Parameters<NonNullable<typeof view.skin>>[0], [], [])?.doubleSided).toBe(true);
+  } finally { scope.dispose(); }
 });
 
 test('primitives whose same channel differs in encoding still merge', async () => {
