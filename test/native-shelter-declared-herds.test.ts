@@ -49,8 +49,12 @@ function declaring(source: Shardfile, spawns: readonly Spawn[]): Shardfile {
     parameters: {}, animation: { recipe: 'of23b.clips', parameters: {} } }));
   const parsed = parseShardfile({ ...base, rows: { ...base.rows, species: rows.rows.species, strikes: rows.rows.strikes, looks },
     creatures: { ...base.creatures, brains: rows.rows.brains, spawns } });
-  return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
-    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: parsed.creatures };
+  // Pine r8 (pinned 4b49472a7) ships its own deer and boar rows and declares its herds: its rows stand, the fixture adds only
+  // the rows it lacks, and the test's spawns stand beside r8's
+  const own = new Set(source.rows.species.map(row => row.id)), added = parsed.rows.species.filter(row => !own.has(row.id));
+  return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...added], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
+    looks: [...source.rows.looks, ...parsed.rows.looks.filter(row => added.some(species => species.id === row.species))] },
+    creatures: { ...source.creatures, brains: [...source.creatures.brains, ...parsed.creatures.brains], spawns: [...source.creatures.spawns, ...parsed.creatures.spawns] } };
 }
 const deer = rows.rows.species.find(row => row.kind === 'deer');
 if (deer === undefined) throw new Error('Missing Pine deer row');

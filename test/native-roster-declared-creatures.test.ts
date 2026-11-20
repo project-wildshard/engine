@@ -14,7 +14,7 @@ import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import type { SimHost } from '../src/server/engine/sim';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
@@ -35,8 +35,8 @@ async function shipped() {
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Missing admitted pine-hollow output');
-  // the files a server reads (a Ring 1 slice carries only these)
-  const assets = new Map(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider))
+  // every file the product holds: Pine r8's declared herds read their skin rigs
+  const assets = new Map(descriptor.index.files
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   return { product, shard, assets, rapier };
@@ -49,8 +49,12 @@ function declaring(source: Shardfile, spawns: readonly Spawn[]): Shardfile {
     parameters: {}, animation: { recipe: 'of23b.clips', parameters: {} } }));
   const parsed = parseShardfile({ ...base, rows: { ...base.rows, species: rows.rows.species, strikes: rows.rows.strikes, looks },
     creatures: { ...base.creatures, brains: rows.rows.brains, spawns } });
-  return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
-    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: parsed.creatures };
+  // Pine r8 (pinned 4b49472a7) ships its own deer and boar rows and declares its herds: its rows stand, the fixture adds only
+  // the rows it lacks, and the test's spawns stand beside r8's
+  const own = new Set(source.rows.species.map(row => row.id)), added = parsed.rows.species.filter(row => !own.has(row.id));
+  return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...added], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
+    looks: [...source.rows.looks, ...parsed.rows.looks.filter(row => added.some(species => species.id === row.species))] },
+    creatures: { ...source.creatures, brains: [...source.creatures.brains, ...parsed.creatures.brains], spawns: [...source.creatures.spawns, ...parsed.creatures.spawns] } };
 }
 const spawnRows = (ids: readonly [string, string]): Spawn[] => [[3, -234], [-3, -234]].map(([x, z], index) => {
   const species = rows.rows.species[index]; if (species === undefined || x === undefined || z === undefined) throw new Error('Missing converted species');
@@ -107,7 +111,8 @@ test("Pine's native roster stands declared spawns beside its bodies, ticks them,
 // as a roster diverging from its page, never as two owners of one body.
 test("a declared creature id moves the roster's own ids past it; one the bake still rolls refuses", async () => {
   const fixture = await shipped();
-  await expect(resident(fixture, declaring(fixture.shard, spawnRows(['creature:7', BOAR])))).rejects.toThrow(/diverges from the page at creature:8/u);
+  // Pine r8 declares its herds (creature:0 to 159): its roster's bake starts at its reserves, creature:161
+  await expect(resident(fixture, declaring(fixture.shard, spawnRows(['creature:161', BOAR])))).rejects.toThrow(/diverges from the page at creature:162/u);
 }, 120_000);
 
 // OF23c (elites): a declared id past the roster's own leaves the roster's ids where its page put them. Pine's elites stand
