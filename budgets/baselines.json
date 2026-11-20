@@ -19,9 +19,10 @@
    "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "download/phone/sunscar-dunes": {
-   "value": 11426624,
-   "contentKey": "sunscar-dunes@2",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 11462235,
+   "contentKey": "sunscar-dunes@5",
+   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
+   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
   },
   "download/phone/nalati-grasslands": {
    "value": 43820637,
@@ -837,34 +838,36 @@
    }
   },
   "ledger/sunscar-dunes/control": {
-   "value": 150542907,
-   "contentKey": "sunscar-dunes@2",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 142403998,
+   "contentKey": "sunscar-dunes@5",
+   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
+   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
-    "workers": 6414963,
-    "geometry": 8451616,
-    "textures": 81072452,
+    "workers": 6481442,
+    "geometry": 8446696,
+    "textures": 72793076,
     "scene": 528392,
     "audio": 0,
-    "loading": 49859308,
+    "loading": 49938216,
     "margin": 0
    }
   },
   "ledger/sunscar-dunes/peak": {
-   "value": 191115497,
-   "contentKey": "sunscar-dunes@2",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 196841614,
+   "contentKey": "sunscar-dunes@5",
+   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
+   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
-    "workers": 6414963,
-    "geometry": 8451616,
-    "textures": 81072452,
+    "workers": 6481442,
+    "geometry": 8446696,
+    "textures": 81181676,
     "scene": 528392,
     "audio": 0,
-    "loading": 90431898,
+    "loading": 95987232,
     "margin": 0
    }
   },
@@ -1793,22 +1796,22 @@
    "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
   },
   "render/phone-low/triangles/sunscar-dunes": {
-   "value": 285835,
-   "contentKey": "sunscar-dunes@2",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 276837,
+   "contentKey": "sunscar-dunes@5",
+   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
+   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
   },
   "render/phone-low/draws/sunscar-dunes": {
    "value": 54,
-   "contentKey": "sunscar-dunes@2",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "sunscar-dunes@5",
+   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
+   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
   },
   "render/phone-low/programs/sunscar-dunes": {
-   "value": 48,
-   "contentKey": "sunscar-dunes@2",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 50,
+   "contentKey": "sunscar-dunes@5",
+   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
+   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
   }
  }
 }
