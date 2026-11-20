@@ -29,9 +29,10 @@
    "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "download/phone/nine-dragon-stack": {
-   "value": 27211533,
-   "contentKey": "nine-dragon-stack@3",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 26970533,
+   "contentKey": "nine-dragon-stack@5",
+   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
+   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
   },
   "js/grid-session/raw": {
    "value": 41896,
@@ -908,14 +909,16 @@
    "why": "STR22: first hosted memory-footprint run on main to judge the walk (44468967622 at 41d629f2), median of 3 (3.44-3.83 MB/s); the mini's 7.30 pin is not comparable"
   },
   "nine/boot/retained-geometry": {
-   "value": 13225571,
-   "contentKey": "nine-dragon-stack@3",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 8106593,
+   "contentKey": "nine-dragon-stack@5",
+   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
+   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
   },
   "nine/boot/live-heap": {
-   "value": 209737927,
-   "contentKey": "nine-dragon-stack@3",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 199926631,
+   "contentKey": "nine-dragon-stack@5",
+   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
+   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
   },
   "nine/street/triangles95": {
    "value": 904000,
@@ -1430,22 +1433,22 @@
    "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
   },
   "render/phone-low/triangles/nine-dragon-stack": {
-   "value": 681550,
-   "contentKey": "nine-dragon-stack@3",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 527095,
+   "contentKey": "nine-dragon-stack@5",
+   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
+   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
   },
   "render/phone-low/draws/nine-dragon-stack": {
-   "value": 99,
-   "contentKey": "nine-dragon-stack@3",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 87,
+   "contentKey": "nine-dragon-stack@5",
+   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
+   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
   },
   "render/phone-low/programs/nine-dragon-stack": {
-   "value": 65,
-   "contentKey": "nine-dragon-stack@3",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 50,
+   "contentKey": "nine-dragon-stack@5",
+   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
+   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
   },
   "render/phone-low/triangles/open-plot-alien-plain": {
    "value": 44156,
