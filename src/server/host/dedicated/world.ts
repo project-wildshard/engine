@@ -17,7 +17,7 @@ import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { PLAYER_TICKET_PUBLIC_KEY, admit, passOf } from './ticket';
 import { decodeFirstMessage, encodeHello, type Hello } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
-import { decodeEnter, encodeArrive, encodeCountdown, encodeEnter, type WorldWord } from '@wildshard/engine/net/socketFrames';
+import { decodeEnter, decodeSavesAsk, encodeArrive, encodeCountdown, encodeEnter, encodeSaves, type RoomSave, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
 import { AGENT_HEADER, classifyActor, type ActorMark, type ActorTags } from '@wildshard/engine/app/actor';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
@@ -26,7 +26,7 @@ import type { ChatReport } from '@wildshard/engine/net/chat';
 import type { CellOrder, ResumeAt, SavedCheckpoint, SeatEntry, WorkerNews, WorkerReading, WorkerResident } from './cellProtocol';
 import type { MotionSnapshot } from '@wildshard/engine/game/grid/simulation';
 import { bodyId } from './seats';
-import { SaveNewerError, type PlayerDoc } from './playerDoc';
+import { roomSaveOf, SaveNewerError, type PlayerDoc } from './playerDoc';
 import { LEAVE_FLAG, LEFT, pumpSocket } from './socketPump';
 import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
@@ -148,6 +148,9 @@ export interface PlayerSaves {
   exportAccount?: (account: string) => Promise<AccountExport | undefined>;
   /** MP2.5a: delete an account, leaving anonymous ledger rows; whether there was one. */
   deleteAccount?: (account: string) => Promise<boolean>;
+  /** QA-FEEDBACK-2026-11-20-mini row 9: New Game. Forget this player's save on one shard, once its writes on the way have landed;
+   *  whether there was one. Left out, the door never offers the `saves` word. */
+  reset?: (device: string, shard: string) => Promise<boolean>;
   /** MP2.4: claim a cleaned Name for this device and answer what everyone reads (`Name#1234`). Left out, the Name goes as typed. */
   name?: (device: string, name: string) => Promise<string>;
   /** Wait for what is on its way, at most `ms`. */
@@ -249,6 +252,10 @@ export class World {
   /** Review M1: seats inside a join between the ticket's read and their seat, and seats mid-delete, so neither starts beside the other. */
   private readonly joiners = new Map<string, number>();
   private readonly deleting = new Set<string>();
+  /** QA-FEEDBACK-2026-11-20-mini row 9: seats whose New Game is under way: the door seats them again only once it is done. */
+  private readonly resets = new Set<string>();
+  /** Sockets with a `saves` read under way: one at a time each. */
+  private readonly savesReading = new WeakSet<SocketTransport>();
   /** Review 2 M1: accounts deleted here, until every join ticket they could hold has expired (api-server's tickets last an hour). */
   private readonly gone = new Map<string, number>();
   /** MP2.4: the Name each body was seated with, which a held body keeps when its player comes back. */
@@ -600,8 +607,10 @@ export class World {
     // DEVICE-TELEMETRY DT3: `device: 1` says this door reads the client's device word; a client sends it only then.
     // FM4 deploy-blocked: while a deploy is due, the seconds left before the move (a title's Enter world holds in the last 15 s)
     const moving = this.grace === null ? {} : { moving: { inS: Math.max(0, Math.ceil((this.grace.endsAt - diagnosticNow()) / 1000)) } };
-    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving} satisfies WorldWord)).buffer);
-    end.onControl((control, bytes) => { if (control === 'device') this.deviceWord(end, bytes); });
+    // row 9: `saves: 1` says this door answers a seated page's `saves` word (its saves here, and New Game)
+    const saves = this.options.saves.reset === undefined ? {} : { saves: 1 as const };
+    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving,...saves} satisfies WorldWord)).buffer);
+    end.onControl((control, bytes) => { if (control === 'device') this.deviceWord(end, bytes); else if (control === 'saves') void this.savesWord(end, bytes); });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { timedOut = true; this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { spoke = true; off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto, spawn); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
@@ -715,6 +724,62 @@ export class World {
     for (const [id, until] of this.gone) if (until <= now) this.gone.delete(id);
     this.gone.set(account, now + GONE_MS);
   }
+  /**
+   * QA-FEEDBACK-2026-11-20-mini row 9: a seated page's `saves` word. The page can't see the room's copy of its saves (the Saves card
+   * read "QUESTS 0 DONE · EMPTY" mid-quest) nor reset it (New Game reloaded into every flag). The seat is the one this socket's hello
+   * was admitted as, so a player only ever reads or resets their own save. A word from a socket with no seat is refused.
+   */
+  private async savesWord(end: SocketTransport, bytes: ArrayBuffer): Promise<void> {
+    const ask = decodeSavesAsk(bytes), device = [...this.seatSockets].find(([, socket]) => socket.end === end)?.[0];
+    if (ask === null || device === undefined) { this.refuse('saves-word'); return; }
+    if ('reset' in ask) {
+      if (!await this.newGame(device, end, ask.reset) && end.isOpen) end.control('saves', encodeSaves({ reset: ask.reset, ok: false }));
+      return;
+    }
+    if (this.savesReading.has(end)) return;
+    this.savesReading.add(end);
+    try {
+      const read: Record<string, RoomSave | null> = {};
+      for (const shard of ask.read) {
+        // a save the door can't read now (pending, quarantined, from a newer server) shows as nothing here: the card keeps the page's
+        try { const saved = await this.options.saves.read(device, shard); read[shard] = saved.doc === null ? null : roomSaveOf(saved.doc, shard); } catch { read[shard] = null; }
+        if (!end.isOpen) return;
+      }
+      end.control('saves', encodeSaves({ read }));
+    } finally { this.savesReading.delete(end); }
+  }
+  /**
+   * Row 9: New Game on `shard`. The body leaves first, as at a quit (the link closes plainly): its cell writes its last doc and lets it
+   * go, so no later checkpoint can write the old save back. Then the save is forgotten, its writes on the way landed first; the seat's
+   * joins wait meanwhile (`retry`). False, with the link still open, when it can't start: a crossing or zone entry under way, a reset
+   * already running, or no saves that reset.
+   */
+  private async newGame(device: string, end: SocketTransport, shard: string): Promise<boolean> {
+    const { saves } = this.options, reset = saves.reset;
+    if (reset === undefined || this.draining || this.resets.has(device) || this.crossings.has(device) || this.outs.has(device) || this.entries.has(device) || this.redials.has(device)) return false;
+    this.resets.add(device);
+    const from = this.seated.get(device);
+    this.quits.add(end); end.close(LEFT);
+    try {
+      if (from !== undefined && !await this.untilLeft(device, from)) { this.options.log({ at: 'save.reset-refused', shard, reason: 'still-seated' }); return true; }
+      const found = await reset(device, shard);
+      this.options.log({ at: 'save.reset', shard, found });
+    } catch (error) { this.options.log({ at: 'save.reset-failed', shard, error: error instanceof Error ? error.message : String(error) }); }
+    finally { this.resets.delete(device); }
+    return true;
+  }
+  /** Row 9: whether the seat let go of `from` (its cell said `left`) within the hold a quit takes. */
+  private untilLeft(device: string, from: string, ms = 10_000): Promise<boolean> {
+    const waiting = new Scope('dedicated.reset'), until = diagnosticNow() + ms;
+    return new Promise<boolean>(resolve => {
+      const look = (): void => {
+        if (this.seated.get(device) !== from) { waiting.dispose(); resolve(true); return; }
+        if (diagnosticNow() >= until || this.draining) { waiting.dispose(); resolve(false); return; }
+        waiting.timeout(20, look);
+      };
+      look();
+    });
+  }
   /** Review M1: hold a seat out of the world while it is deleted; undefined (nothing held) when it is playing. */
   holdForDelete(seat: string): (() => void) | undefined {
     if (this.isPlaying(seat) || this.deleting.has(seat)) return undefined;
@@ -745,6 +810,8 @@ export class World {
     const { seat } = admitted;
     // review M1: an account being deleted dials again in a moment, after which it is a fresh account
     if (this.deleting.has(seat)) { end.close('retry'); return; }
+    // row 9: a New Game under way forgets this seat's save once its body has gone: the join waits for it, so it reads no old save
+    if (this.resets.has(seat)) { end.close('retry'); return; }
     this.joiners.set(seat, (this.joiners.get(seat) ?? 0) + 1);
     try { await this.join(end, bytes, goto, hello, said.output, admitted, spawn); }
     finally { const left = (this.joiners.get(seat) ?? 1) - 1; if (left > 0) this.joiners.set(seat, left); else this.joiners.delete(seat); }

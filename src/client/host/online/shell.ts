@@ -6,7 +6,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { NetClient } from '@wildshard/engine/net/client';
 import type { NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
-import { decodeArrive, decodeCountdown, decodeEnter, encodeEnter, type ArriveWord, type Countdown, type WorldWord } from '@wildshard/engine/net/socketFrames';
+import { decodeArrive, decodeCountdown, decodeEnter, decodeSavesAnswer, encodeEnter, encodeSaves, worldReadsSaves, type ArriveWord, type Countdown, type RoomSave, type SavesAsk, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { encodeDeviceWord, worldReadsDevice } from '@wildshard/engine/net/deviceWord';
 import { subscribePersistence, type PersistenceWord } from '@wildshard/engine/net/persistenceWord';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
@@ -89,8 +89,21 @@ export interface OnlineView {
    *  `ready` for the seat the door holds there); false and `regrid` goes on. */
   readonly regridInPage?: (cell: string) => boolean;
 }
+/** QA-FEEDBACK-2026-11-20-mini row 9: this player's saves in the room, asked on the live link of a door that says it answers. */
+export interface RoomSavesPort {
+  /** Each shard's save as the room holds it (null: nothing there); null when the door can't say (an older door, the link is down,
+   *  no answer in time). */
+  read: (shards: readonly string[]) => Promise<Readonly<Record<string, RoomSave | null>> | null>;
+  /** New Game on `shard`: true when the door took it (it let the body go and closed the link plainly; it forgets the save before this
+   *  player is seated again). False: refused, no such door, or no answer; the save is unchanged and play goes on. */
+  reset: (shard: string) => Promise<boolean>;
+}
+/** Row 9: how long the page waits for the door's answer to a `saves` word. */
+const SAVES_ANSWER_MS = 8000;
 /** A running online session. */
 export interface OnlineShell {
+  /** Row 9: the room's copy of this player's saves (`RoomSavesPort`). */
+  readonly roomSaves: RoomSavesPort;
   readonly client: NetClient;
   /** J218: voice chat's signalling, on whichever socket is live. */
   readonly voice: VoiceLink;
@@ -153,6 +166,8 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   let loaded = false, link: WebSocketTransport | null = null, down = false, unseated: WebSocketTransport | null = null, arrive: (value: { tick: number; restored: boolean }) => void = () => undefined;
   const booted = new Promise<{ tick: number; restored: boolean }>(resolve => { arrive = resolve; });
   const voices = new Set<(word: VoiceHeard) => void>(), encoder = new TextEncoder(), decoder = new TextDecoder();
+  // row 9: the links whose door said it answers a `saves` word
+  const savesDoors = new WeakSet<WebSocketTransport>();
   const voice: VoiceLink = { send: word => { link?.control('voice', encoder.encode(JSON.stringify(word)).buffer); },
     on: listener => { voices.add(listener); return () => { voices.delete(listener); }; } };
   const hear = (transport: WebSocketTransport): WebSocketTransport => {
@@ -163,7 +178,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     transport.onControl((control, bytes) => {
       if(control==='playtest'){playtest=true;return;}
       // DEVICE-TELEMETRY DT3: a door whose first word says it reads the device word hears this page's snapshot, once per socket
-      if (control === 'world') { if (worldReadsDevice(bytes)) sendDevice(transport, config.build); return; }
+      if (control === 'world') { if (worldReadsDevice(bytes)) sendDevice(transport, config.build); if (worldReadsSaves(bytes)) savesDoors.add(transport); return; }
       if (control === 'voice') {
         let word: VoiceHeard;
         try { word = JSON.parse(decoder.decode(bytes)) as VoiceHeard; } catch { return; }
@@ -214,9 +229,31 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   });
   client.hello(config.build, config.identity);
   const tickOf = (): number => client.latest?.tick ?? 0, idle = (): void => undefined;
+  // row 9: one `saves` word on the live link and its answer: `pick` reads the answer it waits for, `closed` what a close means
+  const askSaves = <T>(word: SavesAsk, pick: (answer: NonNullable<ReturnType<typeof decodeSavesAnswer>>) => T | undefined, closed: T, none: T): Promise<T> => new Promise<T>(resolve => {
+    const on = link;
+    if (on === null || down || !savesDoors.has(on)) { resolve(none); return; }
+    const asking = new Scope('online.saves'), offs: (() => void)[] = [], done = (value: T): void => { for (const off of offs.splice(0)) off(); asking.dispose(); resolve(value); };
+    asking.timeout(SAVES_ANSWER_MS, () => { done(none); });
+    offs.push(on.onClose(() => { done(closed); }), on.onControl((control, bytes) => {
+      if (control !== 'saves') return;
+      const said = decodeSavesAnswer(bytes), picked = said === null ? undefined : pick(said);
+      if (picked !== undefined) done(picked);
+    }));
+    on.control('saves', encodeSaves(word));
+  });
+  const roomSaves: RoomSavesPort = {
+    read: shards => askSaves<Readonly<Record<string, RoomSave | null>> | null>({ read: shards }, said => 'read' in said ? said.read : undefined, null, null),
+    // the door takes a New Game by closing this link plainly: no redial follows, the page is going (it reloads into the reset save)
+    reset: async shard => {
+      const taken = await askSaves<boolean>({ reset: shard }, said => 'reset' in said && said.reset === shard ? false : undefined, true, false);
+      if (taken) redial.dispose();
+      return taken;
+    },
+  };
   // MEMORY-STRUCTURE STR4: on a dev server, the harness verbs and the dev hook reach its control channel (DEVSERVER pages only)
   const dev = typeof __DEVSERVER__ === 'boolean' && __DEVSERVER__ ? devControls(address, config.identity.player) : null;
-  return { client, voice, redials: true, booted, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
+  return { client, voice, redials: true, booted, roomSaves, ready: () => { loaded = true; unseated?.control('ready'); unseated = null; },
     visible: hiddenMs => { redial.check(hiddenMs); }, retry: () => { redial.retry(); }, progress: () => redial.progress, why: () => redial.why, dialNow: () => { redial.dialNow(); },
     pause: idle, resume: idle, hold: idle, bossGod: dev?.bossGod ?? idle, still: dev?.still ?? idle, hardHits: dev?.hardHits ?? idle, place: dev?.place ?? idle, raise: dev?.raise ?? idle,
     ...dev === null ? {} : { devColliders: dev.devColliders, devGround: dev.devGround, devControl: dev },

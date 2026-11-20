@@ -107,6 +107,24 @@ export async function readSave<Doc>(db: Database, epoch: number, player: string,
   return { doc: previous, source: 'previous', seq, revision };
 }
 
+/**
+ * QA-FEEDBACK-2026-11-20-mini row 9: New Game on a room. The player's save on this shard goes, and its receipts move to a fresh
+ * `reset:<uuid>` player named "Reset", as `account.ts`'s `anonymise` does for a player that goes: the ledger still adds up, and no
+ * receipt is read back as a grant the reset doc lacks (or quarantines a save with no doc). The place row stays: the next join seats
+ * them in the same cell, at its spawn. False when there was nothing to forget. The caller lets the body go and drains its writes first.
+ */
+export function resetSave(db: Database, epoch: number, player: string, shard: string): Promise<boolean> {
+  return db.transaction(async (sql: Sql) => {
+    const receipts = await sql.query('select 1 from ledger_receipt where player_id = $1 and epoch = $2 and shard = $3 limit 1', [player, epoch, shard]);
+    if (receipts.rows.length > 0) {
+      const anonymous = `reset:${crypto.randomUUID()}`;
+      await sql.query('insert into player (id, name) values ($1, \'Reset\')', [anonymous]);
+      await sql.query('update ledger_receipt set player_id = $4 where player_id = $1 and epoch = $2 and shard = $3', [player, epoch, shard, anonymous]);
+    }
+    const gone = await sql.query('delete from player_save where player_id = $1 and epoch = $2 and shard = $3 returning seq', [player, epoch, shard]);
+    return gone.rows.length > 0 || receipts.rows.length > 0;
+  });
+}
 /** Promote a successfully imported previous copy, without overwriting a newer checkpoint. */
 export async function healSave(db: Database, epoch: number, player: string, shard: string, seq: number): Promise<void> {
   await within(READ_MS, () => db.query(HEAL, [player, epoch, shard, seq]));

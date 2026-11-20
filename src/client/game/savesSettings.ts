@@ -18,7 +18,7 @@ import { SaveStore, type SaveStorage } from '@wildshard/engine/saves/store';
 import type { GameMenu } from '@wildshard/engine/ui/Menu';
 import { mountUi } from '@wildshard/engine/ui/ownership';
 import { catalogueDocument } from '../../shared/game/grid/catalogueDocument';
-import { previewNewGame, resetNewGame, type NewGameProgress, type NewGameSummary } from '../../shared/game/newGame';
+import { previewNewGame, resetNewGame, roomPreview, type NewGameProgress, type NewGameSummary } from '../../shared/game/newGame';
 import type { LocalSaveInstance } from '../../shared/game/instanceSaves';
 import { catalogueManifests } from './shard/titleList';
 import { wirePage } from './shardfile/wirePage';
@@ -115,6 +115,13 @@ const readOnly = (storage: SaveStorage): SaveStorage => ({ get length() { return
 /** J130: what the server's copy of each save holds. A page on a server (every grid cell) keeps its progress there, and the
  *  page's own copy stays empty, so the cards read "QUESTS 0 DONE · EMPTY" mid-quest (meta QA-FEEDBACK-2026-11-20-mini row 5). */
 async function serverPreviews(instances: readonly LocalSaveInstance[]): Promise<Map<string, NewGameSummary>> {
+  // row 9: an online page's server is the room, which keeps this player's copy itself: the room says what it holds
+  const room = await wirePage.roomSaves?.read([...new Set(instances.map((instance) => instance.shard))]).catch(() => null);
+  if (room !== undefined && room !== null) {
+    const found = new Map<string, NewGameSummary>();
+    for (const instance of instances) { const save = room[instance.shard]; if (save !== undefined && save !== null) found.set(instance.id, roomPreview(instance, save)); }
+    return found;
+  }
   const saves = await openIndexedSaves(serverSaveDatabase()), out = new Map<string, NewGameSummary>();
   try {
     const store = new SaveStore({ local: readOnly(saves.storage), session: readOnly(saves.storage) });
@@ -162,6 +169,24 @@ function openSheet(card: SaveCardSpec, summary: NewGameSummary, opts: SavesSetti
   scope.listen(keep, 'click', close);
   scope.listen(confirm, 'click', () => {
     confirm.disabled = true;
+    // QA-FEEDBACK-2026-11-20-mini row 9: an online page's save is the room's. The room resets it first (it lets the body go and forgets
+    // the save before this player is seated again); a refusal leaves everything as it was, and play goes on
+    const room = wirePage.roomSaves;
+    if (room !== null) {
+      void room.reset(card.instance.shard).then((taken) => {
+        if (!taken) { status.textContent = SAVES_STRINGS.refused; status.hidden = false; confirm.disabled = false; return false; }
+        let afterRoom: (() => void) | undefined;
+        try { afterRoom = opts.beforeReset?.(card.instance); } catch { /* the room's copy is gone either way: the page goes on to reload */ }
+        reset(card.instance);
+        const leave = (): void => {
+          if (!opts.grid) { (opts.toTitle ?? exitSessionToTitle)(); return; }
+          afterRoom?.(); markReload('new game', 'new-game'); location.reload();
+        };
+        void resetServerCopy(card.instance).then(leave, leave);
+        return true;
+      }, () => { status.textContent = SAVES_STRINGS.refused; status.hidden = false; confirm.disabled = false; });
+      return;
+    }
     // a refusal leaves the disk and every live binding as they were: keep playing
     let afterReset: (() => void) | undefined;
     try { afterReset = opts.beforeReset?.(card.instance); }

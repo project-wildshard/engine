@@ -63,7 +63,7 @@ import { DAY_ROW, NET_POSE } from '@wildshard/engine/sim/shardRows';
 import { POSE_NAMES } from '@wildshard/engine/net/acts';
 import { poseInputNames } from '../../../shared/game/plugin/channelPrograms';
 import type { EncounterRow } from '../boss/barFeed';
-import { wirePage, type DayFollower } from './wirePage';
+import { wirePage, type DayFollower, type RoomSaves } from './wirePage';
 import type { VehicleReport } from '../plugin/followedVehicles';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
@@ -170,7 +170,7 @@ interface OnlineSession {
 interface OnlineModule { readonly startOnline: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving; loaded: string; build: string; identity: (name?: string) => NetIdentity; grid?: OnlineGrid; session?: OnlineSession }) => Promise<Shell>;
   /** TR-4b: the release read, begun at the boot's data step (shell.ts `readReleaseEarly`) */
   readonly readReleaseEarly?: (config: BuildWorld & { keep: ReleaseKeep; leaving: OnlineLeaving }) => void }
-interface Shell { readonly redials?: true; devColliders?: (name: string, boxes: readonly DevBox[]) => void; devGround?: (ground: DevGround) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void;
+interface Shell { readonly redials?: true; readonly roomSaves?: RoomSaves; devColliders?: (name: string, boxes: readonly DevBox[]) => void; devGround?: (ground: DevGround) => void; pause: () => void; hold: (on: boolean) => void; bossGod: () => void; still: () => void; raise: (flag: string) => void; join: (id: string, x: number, y: number, z: number) => { readonly client: NetClient; readonly move: (x: number, y: number, z: number) => void }; readonly client: NetClient; readonly booted: Promise<{ readonly restored: boolean }>; place: (x: number, y: number, z: number, yaw: number) => void; hardHits: (by: number) => void; ready: () => void; leave?: () => Promise<void>; save: () => Promise<{ readonly tick: number; readonly ok: boolean }>; probe: () => Promise<{ readonly tickMs: number }>; dispose: () => void;
   /** ZE10d2: an online shell's gate word and its adoption by the next session on this page (`shell.ts` `StartedOnline`) */
   enter?: (cell: string) => Promise<{ readonly x: number; readonly z: number; readonly yaw: number } | null>;
   adopt?: (next: { readonly loaded: string; readonly grid: OnlineGrid }) => void }
@@ -599,6 +599,10 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   }
   // A page that can keep nothing still joins, with a device id for this page only.
   const shell = await (world !== undefined && route === 'online' ? online(world, page ?? pageOnlyStorage()) : standalone()), { client } = shell;
+  // QA-FEEDBACK-2026-11-20-mini row 9: Settings' Saves card and New Game reach the room's copy through this page's link
+  const roomSaves = shell.roomSaves ?? null;
+  wirePage.roomSaves = roomSaves;
+  scope.onDispose(() => { if (wirePage.roomSaves === roomSaves) wirePage.roomSaves = null; });
   // ZE10d2: a handed-over link no session took (this one is not online) goes; the door's hold keeps the seat for a later dial
   if (handedOver !== null) { handedOver.shell.dispose(); handedOver = null; }
   void shell.booted.catch(() => undefined);

@@ -2,7 +2,7 @@ import {checkpointCertificate} from './checkpointWitness';
 import type { ChatReport } from '@wildshard/engine/net/chat';
 import { migrate } from './saves/migrate';
 import { openPg } from './saves/pgDatabase';
-import { healSave, lastCell, placeOf, readSave, recoveryReceipts, SaveQuarantinedError, within, writeSave, type SaveWrite } from './saves/saveStore';
+import { healSave, lastCell, placeOf, readSave, recoveryReceipts, resetSave, SaveQuarantinedError, within, writeSave, type SaveWrite } from './saves/saveStore';
 import { SaveWriteQueue } from './saves/writeQueue';
 import { claimName, CLAIM_MS } from './saves/names';
 import { claimSaves } from './saves/claim';
@@ -60,6 +60,8 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
     where: async device => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return await placeOf(db, epoch, device) ?? await lastCell(db, epoch, device); },
     read:(device,shard)=>read(device,shard), readWitness:(device,shard)=>read(device,shard,true),
     recover: (device, shard, seq) => healSave(db, epoch, device, shard, seq),
+    // row 9: a write still queued would put the old save back after the reset
+    reset: async (device, shard) => { if (!await queue.drain(3000, device, shard)) throw new Error('Player save is pending'); return resetSave(db, epoch, device, shard); },
     name: namesOver(db, naming),
     claim: async (device, account) => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return claimSaves(db, device, account); },
     expire: days => expireGuests(db, days),
@@ -81,6 +83,7 @@ export function memoryPlayerSaves(): PlayerSaves {
   return { zoneEntries: memoryZoneEntryStore(), where: device => { const last = [...held.values()].reverse().find(row => row.player === device); return Promise.resolve(last === undefined ? null : last.cell ?? last.shard); }, read: (device, shard) => { try { const row = held.get(`${device}\0${shard}`); return Promise.resolve({ doc: row === undefined ? null : admitDoc(row.doc, row.saveVersion, shard), seq: row?.seq ?? 0 }); } catch (error) { return Promise.reject(error instanceof Error ? error : new Error(String(error))); } },
     // WR7: as Postgres does, an older server's doc never lands on a newer one.
     write: write => { const key = `${write.player}\0${write.shard}`, prior = held.get(key); if (prior === undefined || prior.saveVersion <= write.saveVersion) held.set(key, write); }, report: () => true, drain: () => Promise.resolve(true),
+    reset: (device, shard) => Promise.resolve(held.delete(`${device}\0${shard}`)),
     // MP2.2d, as `saves/claim.ts`: the device's rows move to an account with none.
     claim: (device, account) => {
       const rows = [...held.values()];

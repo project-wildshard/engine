@@ -33,6 +33,7 @@ import type { SimCommand } from '@wildshard/engine/sim';
 import { vehicleMotionRow } from '../../../shared/game/shardfile/wirePrompts';
 import type { VehicleReport, VehicleWire } from '../plugin/followedVehicles';
 import type { VehicleRow } from '../plugin/vehiclePrediction';
+import type { RoomSave } from '@wildshard/engine/net/socketFrames';
 
 type Live = (client: NetClient) => (() => void) | undefined;
 /** MIRROR-SALT-ZONE MSZ9b: the vehicles a page follows off the wire (`FollowedVehicles`). */
@@ -82,8 +83,15 @@ const TALKED = 'talked:';
 
 /** A client's rows, through a seat that may not have one yet. */
 const rowsOf = (seat: { readonly client: NetClient | null }): Pick<NetClient, 'latest' | 'stateField'> => ({ get latest() { return seat.client?.latest ?? null; }, stateField: (frame, name) => seat.client?.stateField(frame, name) });
+/** QA-FEEDBACK-2026-11-20-mini row 9: the room's copy of this player's saves, on an online page whose door answers (shell.ts `RoomSavesPort`). */
+export interface RoomSaves {
+  readonly read: (shards: readonly string[]) => Promise<Readonly<Record<string, RoomSave | null>> | null>;
+  readonly reset: (shard: string) => Promise<boolean>;
+}
 /** One page's seat on the wire. */
 export class WirePage {
+  /** Row 9: an online page's room saves; null on a page whose server is in the page, or whose door is older. */
+  roomSaves: RoomSaves | null = null;
   /** The server's client once this page has one. */
   client: NetClient | null = null;
   /** Ends the session's server: Settings stops it before it touches what it saves. */

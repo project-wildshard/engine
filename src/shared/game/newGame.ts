@@ -1,4 +1,5 @@
 import type { SaveStore } from '@wildshard/engine/saves/store';
+import type { RoomSave } from '@wildshard/engine/net/socketFrames';
 import { instanceSaveIdentity, type LocalSaveInstance } from './instanceSaves';
 
 /** Optional quest identities let an unloaded shard's card count completion from its legacy flags without executing its runtime. */
@@ -46,6 +47,12 @@ export function previewNewGame(store: SaveStore, instance: LocalSaveInstance, qu
   const entries = store.inspectShard(instanceSaveIdentity(instance));
   return { instance: { ...instance }, before: progress(entries, quests), after: empty(), kept: ['profile', 'feats', 'other-shards'],
     removedKeys: Object.keys(entries).filter((key) => !kept(key)).sort() };
+}
+/** QA-FEEDBACK-2026-11-20-mini row 9: a room's copy of a save (the player's own flags, their quests, their store's document on the
+ *  shard), read as `previewNewGame` reads a page's: a grid page keeps its progress there and its own copy stays empty. */
+export function roomPreview(instance: LocalSaveInstance, save: RoomSave, quests: readonly NewGameQuest[] = []): NewGameSummary {
+  const entries = { ...save.keys, flags: { data: save.flags }, 'platform.continuation': { data: { flags: save.flags, quests: save.quests } } };
+  return { instance: { ...instance }, before: progress(entries, quests), after: empty(), kept: ['profile', 'feats', 'other-shards'], removedKeys: [] };
 }
 /** Confirm a fresh preview and reset durably; old live checkpoints cannot revive it. Reload the page or evict/rebind this instance including frozen grid residents only when applied is true; a refusal keeps playing intact. */
 export function resetNewGame(store: SaveStore, instance: LocalSaveInstance, quests: readonly NewGameQuest[] = []): { applied: boolean; summary: NewGameSummary } {

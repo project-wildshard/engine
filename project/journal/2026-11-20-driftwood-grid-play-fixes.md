@@ -25,3 +25,12 @@ QA-FEEDBACK-2026-11-20-mini rows 3 to 6, from IPHONE13-DRIFTWOOD DW8 and DW9.
   `rewardFor`) said on finish that a completion card had taken the carry over, as a page's does. The room has no card, so the
   ride stayed carried for good, through reloads and for every later player in the room. Its finish now always returns false
   (the flag is still filed once), and a finished beat's save no longer restores the carry.
+- Row 9 (mini-dw-fix2), New Game on a grid room: 59337d474 read and reset the in-page server's IndexedDB copy, but a room keeps
+  each player's save itself (the dev world's store, Postgres on the VPS) and the page could neither read nor reset it, so the
+  card read EMPTY and NEW GAME reloaded into every flag (a reload re-linked the held body, and the store still had the save). The
+  page now asks its door on its own socket: a `saves` control word (prefix 13, outside the wire lock, offered only by a door whose
+  first word says `saves: 1`). `read` answers the room's copy per shard (`roomSaveOf`: own flags, quests, store document), which
+  the card reads with `roomPreview`. `reset` lets the body go as a quit does (its cell writes the last doc and releases it), waits
+  for `left`, drains that save's writes, then `resetSave` deletes the row and moves its receipts to a `reset:<uuid>` player, as
+  `anonymise` does; joins for that seat get `retry` until it is done. The seat is the hello's, so only your own save can go. Test
+  `room-new-game` resets through a room and re-enters with no flags. The VPS gets it with the next release.

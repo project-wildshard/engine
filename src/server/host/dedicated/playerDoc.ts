@@ -15,6 +15,7 @@ import { hostVehicles } from '@wildshard/engine/game/plugin/vehicleRuntime';
 import type { RespawnRowFields } from '@wildshard/engine/sim/respawn';
 import { keepUnknown, known } from '@wildshard/engine/saves/shape';
 import { validPlayerStore } from './playerStore';
+import type { RoomSave } from '@wildshard/engine/net/socketFrames';
 
 /** Bumped only with a migration. A doc at this version that does not parse boots from `previous`, then fresh, and is reported
  *  as a contract failure; a doc from a newer server is never loaded, migrated or overwritten here (WIRE-STABILITY WR7). */
@@ -62,6 +63,16 @@ export function admitDoc(doc: unknown, version: number, shard: string, contract?
     try { contract?.(`PlayerDoc v${String(version)} on ${shard} does not parse`); } catch { /* a report never breaks a read */ }
   }
   return parsed;
+}
+/** QA-FEEDBACK-2026-11-20-mini row 9: what a page's Saves card reads of a doc: the player's own flags, their quests' state and their
+ *  store's document on `shard` (purse, pack, owned; `previewNewGame` reads the same keys from a page's own copy). */
+export function roomSaveOf(doc: PlayerDoc, shard: string): RoomSave {
+  let keys: Record<string, unknown> = {};
+  for (const [name, text] of Object.entries(doc.store)) {
+    if (name.slice(name.lastIndexOf('.') + 1) !== shard) continue;
+    try { const parsed: unknown = JSON.parse(text); if (typeof parsed === 'object' && parsed !== null && 'keys' in parsed && typeof parsed.keys === 'object' && parsed.keys !== null) keys = parsed.keys as Record<string, unknown>; } catch { /* a card reads nothing of a document it can't parse */ }
+  }
+  return { flags: [...doc.book.flags], quests: doc.book.quests.map(quest => ({ started: quest.started, currentId: quest.currentId })), keys };
 }
 /** The doc to write: `next`, with every field of the doc the seat was read from that this server does not know. */
 export function carryDoc(read: PlayerDoc | null, next: PlayerDoc): PlayerDoc {

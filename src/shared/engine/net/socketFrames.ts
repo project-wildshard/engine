@@ -6,9 +6,9 @@ import type { NetChannel } from './transport';
 // `NET_SCHEMA_HASH` does not move.
 
 /** The prefix byte of every message on a game socket. */
-export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9, SOCKET_DEVICE = 10, SOCKET_ENTER = 11, SOCKET_ARRIVE = 12;
+export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9, SOCKET_DEVICE = 10, SOCKET_ENTER = 11, SOCKET_ARRIVE = 12, SOCKET_SAVES = 13;
 /** The messages outside the game protocol: the server's word on where to load, the client's that it has, and the server's that a new build is coming (J174). */
-export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world' | 'device' | 'enter' | 'arrive';
+export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world' | 'device' | 'enter' | 'arrive' | 'saves';
 /** GO4: the door's first word on every socket, before any hello: how many grid cells it hosts and, since opus-route2, the shard each
  *  one runs, and nothing else (D7 keeps `/health` off the rooms address, so a page learns this here). A one-shard page joins only a
  *  world that names its shard. A build from before it ignores the prefix. */
@@ -20,7 +20,10 @@ export interface WorldWord { readonly cells: number; readonly shards: readonly s
   readonly status?: Readonly<Record<string, unknown>>;
   /** FM4 deploy-blocked (J174): in the first word, the seconds left before a deploy's move, while one is due. A page on the title hears
    *  it on its own socket before any hello (an older door never says it; an older client ignores it). */
-  readonly moving?: { readonly inS: number } }
+  readonly moving?: { readonly inS: number };
+  /** QA-FEEDBACK-2026-11-20-mini row 9: 1 when this door answers a seated page's `saves` word (its saves here, New Game). An older
+   *  door never says it, and closes `refused` on a prefix it does not know, so a page asks only after hearing this. */
+  readonly saves?: 1 }
 /** J218: a voice word is JSON in a few hundred bytes; an SDP travels in pieces of this many characters, under the room's 1024-byte cap. */
 export const VOICE_PIECE_CHARS = 400;
 /** The server sends no frame while this much is waiting (E7.1). Delta-against-ack heals, and the next frame is just bigger. */
@@ -51,7 +54,7 @@ export function closeReason(code: number): string {
 /** The prefix of a game message on `channel`. */
 export const channelPrefix = (channel: NetChannel): number => channel === 'reliable' ? SOCKET_RELIABLE : SOCKET_UNRELIABLE;
 /** The prefix of a control message. */
-export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : control === 'device' ? SOCKET_DEVICE : control === 'enter' ? SOCKET_ENTER : control === 'arrive' ? SOCKET_ARRIVE : SOCKET_COUNTDOWN;
+export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : control === 'device' ? SOCKET_DEVICE : control === 'enter' ? SOCKET_ENTER : control === 'arrive' ? SOCKET_ARRIVE : control === 'saves' ? SOCKET_SAVES : SOCKET_COUNTDOWN;
 /**
  * ZONE-ENTRY ZE9a (J352): the client's word at a gate's 0, `{ cell }`, the cell it goes into. The road takes it only from a seat standing
  * in that cell's buffer, never into its own home, and freezes the body; it answers a word it won't take on the same prefix with the
@@ -86,6 +89,66 @@ export function decodeArrive(bytes: ArrayBuffer): ArriveWord | null {
     const { at } = said, pose = { x: 'x' in at ? at.x : Number.NaN, y: 'y' in at ? at.y : Number.NaN, z: 'z' in at ? at.z : Number.NaN, yaw: 'yaw' in at ? at.yaw : Number.NaN };
     return Object.values(pose).every(value => typeof value === 'number' && Number.isFinite(value)) ? { cell: said.cell, at: pose as ArriveWord['at'] } : null;
   } catch { return null; }
+}
+/**
+ * QA-FEEDBACK-2026-11-20-mini row 9: a grid page's saves live in the room, which the page can neither read nor reset itself. A seated
+ * page asks the door on its own socket, so the seat it asks for is always the one its hello was admitted as: `read` names shards and
+ * the door answers this player's save on each; `reset` asks for New Game on one shard. The door takes a reset by letting the body go
+ * (the link closes plainly) and forgets that save before this player is seated again; it answers only a refusal.
+ */
+export type SavesAsk = { readonly read: readonly string[] } | { readonly reset: string };
+/** One shard's save as the room holds it: the player's own flags, their quests' state, and their store's document on that shard. */
+export interface RoomSave { readonly flags: readonly string[]; readonly quests: readonly { readonly started: boolean; readonly currentId: string | null }[]; readonly keys: Readonly<Record<string, unknown>> }
+/** The door's answer: each shard asked, with null where it holds nothing (or can't read it now); or a reset it refused. */
+export type SavesAnswer = { readonly read: Readonly<Record<string, RoomSave | null>> } | { readonly reset: string; readonly ok: false };
+/** A shard's slug, as a save names it. */
+const SAVES_SLUG = /^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u, SAVES_ASK_BYTES = 4096, SAVES_SLUGS = 64, SAVES_ANSWER_BYTES = 512 * 1024;
+const savesSlug = (value: unknown): value is string => typeof value === 'string' && value.length <= 64 && SAVES_SLUG.test(value);
+/** A `saves` word, either way. */
+export function encodeSaves(word: SavesAsk | SavesAnswer): ArrayBuffer { return new TextEncoder().encode(JSON.stringify(word)).buffer; }
+const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+/** What a page asks, or null for a word that makes no sense (untrusted: bounded, and every shard must look like a slug). */
+export function decodeSavesAsk(bytes: ArrayBuffer): SavesAsk | null {
+  if (bytes.byteLength > SAVES_ASK_BYTES) return null;
+  try {
+    const said: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    if (!record(said)) return null;
+    if ('reset' in said) return savesSlug(said['reset']) ? { reset: said['reset'] } : null;
+    const read = said['read'];
+    if (!Array.isArray(read) || read.length > SAVES_SLUGS) return null;
+    const slugs: unknown[] = read;
+    return slugs.every(savesSlug) ? { read: [...new Set(slugs)] } : null;
+  } catch { return null; }
+}
+function roomSave(value: unknown): RoomSave | null | undefined {
+  if (value === null) return null;
+  if (!record(value) || !Array.isArray(value['flags']) || !Array.isArray(value['quests']) || !record(value['keys'])) return undefined;
+  const flags: unknown[] = value['flags'], quests: unknown[] = value['quests'];
+  if (!flags.every(flag => typeof flag === 'string')) return undefined;
+  const rows: { started: boolean; currentId: string | null }[] = [];
+  for (const row of quests) {
+    if (!record(row) || typeof row['started'] !== 'boolean' || (row['currentId'] !== null && typeof row['currentId'] !== 'string')) return undefined;
+    rows.push({ started: row['started'], currentId: row['currentId'] });
+  }
+  return { flags, quests: rows, keys: value['keys'] };
+}
+/** What the door answered, or null for a word that makes no sense. */
+export function decodeSavesAnswer(bytes: ArrayBuffer): SavesAnswer | null {
+  if (bytes.byteLength > SAVES_ANSWER_BYTES) return null;
+  try {
+    const said: unknown = JSON.parse(new TextDecoder().decode(bytes));
+    if (!record(said)) return null;
+    if ('reset' in said) return savesSlug(said['reset']) && said['ok'] === false ? { reset: said['reset'], ok: false } : null;
+    const read = said['read'];
+    if (!record(read)) return null;
+    const out: Record<string, RoomSave | null> = {};
+    for (const [slug, value] of Object.entries(read)) { const save = roomSave(value); if (!savesSlug(slug) || save === undefined) return null; out[slug] = save; }
+    return { read: out };
+  } catch { return null; }
+}
+/** Whether a door's first word says it answers `saves` (an older door's word never does). */
+export function worldReadsSaves(bytes: ArrayBuffer): boolean {
+  try { const said: unknown = JSON.parse(new TextDecoder().decode(bytes)); return record(said) && said['saves'] === 1; } catch { return false; }
 }
 /** J174: seconds until everyone moves, and the build they move to, which a client preloads. */
 export interface Countdown { readonly seconds: number; readonly build: string }
