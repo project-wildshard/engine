@@ -1,16 +1,14 @@
 # NPM-PUBLISH (meta docs/plans/NPM-PUBLISH-PLAN.md; Jake 2026-11-12: "publish stuff to npm so it can be installed
-# without git links"). A vX.Y.Z release tag publishes @wildshard/engine to npm by trusted publishing (OIDC): no
+# without git links"). The release train publishes @wildshard/engine to npm by trusted publishing (OIDC): no
 # token is stored anywhere, and npm attaches the provenance itself. npm adds a trusted publisher only to a package
 # that already exists, so the first version is published by hand (plan row NP4); until then this job skips with a
 # notice. A manual run with placeholder=true publishes a README-only 0.0.x from this same file, so it proves the
 # trusted publisher end to end without a release (NPM-PUBLISH smoke row).
-# Dispatch staging_build to publish the exact staging build on npm next. J475 admits exact green release CI.
+# J475: staging_build publishes a SHA-versioned prerelease to next. The train dispatches publish_final after prod QA.
 name: npm-publish
-run-name: ${{ inputs.promote_latest && format('npm latest {0}', inputs.promote_latest) || inputs.staging_build && format('npm next {0}', inputs.staging_build) || 'npm-publish' }}
+run-name: ${{ inputs.publish_final && format('npm latest {0}', inputs.publish_final) || inputs.staging_build && format('npm next {0}', inputs.staging_build) || 'npm-publish' }}
 
 on:
-  push:
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
   workflow_dispatch:
     inputs:
       placeholder:
@@ -29,7 +27,7 @@ on:
         description: Exact-build qualification JSON or the J475 release CI receipt
         type: string
         default: ''
-      promote_latest:
+      publish_final:
         description: Published version tag already live on signed production
         type: string
         default: ''
@@ -46,23 +44,28 @@ concurrency:
 jobs:
   publish:
     if: >-
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_dispatch' &&
-       github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main' &&
-       !inputs.placeholder && inputs.promote_latest == '' &&
-       inputs.staging_build != '' && inputs.staging_qualification != '')
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main' &&
+      !inputs.placeholder &&
+      ((inputs.publish_final == '' && inputs.staging_build != '' && inputs.staging_qualification != '') ||
+       (inputs.publish_final != '' && inputs.staging_build == '' && inputs.staging_qualification == ''))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      RELEASE_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.staging_build || github.sha }}
-      RELEASE_TAG: ${{ github.ref_name }}
+      RELEASE_BUILD: ${{ inputs.staging_build }}
+      RELEASE_TAG: ${{ inputs.publish_final }}
+      NPM_CHANNEL: ${{ inputs.publish_final == '' && 'next' || 'latest' }}
     steps:
-      - name: Validate the staging build input
-        if: github.event_name == 'workflow_dispatch'
-        run: '[[ "$RELEASE_BUILD" =~ ^[a-f0-9]{40}$ ]]'
+      - name: Validate the release request
+        run: |
+          if [[ "$NPM_CHANNEL" = next ]]; then
+            [[ "$RELEASE_BUILD" =~ ^[a-f0-9]{40}$ ]]
+          else
+            [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ env.RELEASE_BUILD }}
+          ref: ${{ inputs.publish_final != '' && format('refs/tags/{0}', inputs.publish_final) || inputs.staging_build }}
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -74,7 +77,7 @@ jobs:
       - name: Install the pinned build dependencies
         run: pnpm install --frozen-lockfile --config.ci=false
       - name: Admit the exact staging release for npm next
-        if: github.event_name == 'workflow_dispatch'
+        if: env.NPM_CHANNEL == 'next'
         env:
           GH_TOKEN: ${{ github.token }}
           E7_RELEASE_PUBLIC_KEY: ${{ vars.E7_RELEASE_PUBLIC_KEY }}
@@ -194,114 +197,8 @@ jobs:
           console.log('Exact signed staging build admitted for npm next', page.clientVersion, release.serial);
           JS
           printf 'RELEASE_TAG=v%s\n' "$version" >> "$GITHUB_ENV"
-      # Trusted publishing needs npm 11.5.1 or later.
-      - name: Use an npm that can publish by OIDC
-        run: |
-          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$(npm --version)" ||
-            npm install --global npm@11.16.0
-          npm --version
-      - name: Build the versioned local author server
-        run: node scripts/build-server.mjs --dev --out dist/dev-server
-      - name: Check package version, bins and exports
-        run: |
-          node scripts/npm-artifact.mjs "$RUNNER_TEMP/engine-npm" > "$RUNNER_TEMP/engine-npm.json"
-          # shellcheck disable=SC2016 # the quoted script is JavaScript with template literals
-          node -e '
-          const { appendFileSync, readFileSync } = require("node:fs");
-          const { execFileSync } = require("node:child_process");
-          const packed = JSON.parse(readFileSync(process.argv[2], "utf8"));
-          const pkg = JSON.parse(execFileSync("tar", ["-xOf", packed.filename, "package/package.json"], { encoding: "utf8" }));
-          const version = process.argv[1].replace(/^v/, "");
-          if (pkg.version !== version) throw new Error(`tag says ${version}, package.json says ${pkg.version}`);
-          if (pkg.private) throw new Error(`${pkg.name} is private`);
-          const files = new Set(packed.files.map((file) => file.path));
-          for (const name of ["main.mjs", "cellWorker.mjs", "rapier.wasm", "bundle.json", "migrations/0001-saves.sql"]) {
-            if (!files.has(`dist/dev-server/${name}`)) throw new Error(`not in the tarball: dev server ${name}`);
-          }
-          if (!files.has("node_modules/@wildshard/format/package.json")) throw new Error("not in the tarball: frozen shard format");
-          for (const patch of Object.values(pkg.pnpm?.patchedDependencies ?? {})) {
-            if (!files.has(patch)) throw new Error(`not in the tarball: ${patch}`);
-          }
-          const targets = [];
-          const walk = (value) => typeof value === "string" ? targets.push(value) : Object.values(value ?? {}).forEach(walk);
-          walk(pkg.exports); walk(pkg.bin);
-          const { posix } = require("node:path");
-          for (const file of files) {
-            if (!/(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(file)) continue;
-            if (file.startsWith("node_modules/")) continue;
-            const config = JSON.parse(execFileSync("tar", ["-xOf", packed.filename, "package/" + file], { encoding: "utf8" }));
-            const parents = Array.isArray(config.extends) ? config.extends : [config.extends];
-            const inputs = [...parents, ...(config.references ?? []).map(row => row.path)];
-            for (const input of inputs) {
-              if (typeof input !== "string" || !input.startsWith(".")) continue;
-              const target = posix.normalize(posix.join(posix.dirname(file), input));
-              const candidates = [target, target + ".json", posix.join(target, "tsconfig.json")];
-              if (!candidates.some(candidate => files.has(candidate)))
-                throw new Error("not in the tarball: compiler input " + target);
-            }
-          }
-          const missing = [...new Set(targets)].filter((target) => !target.includes("*")).map((target) => target.replace(/^\.\//, "")).filter((target) => !files.has(target));
-          if (missing.length > 0) throw new Error(`not in the tarball: ${missing.join(", ")}`);
-          appendFileSync(process.env.GITHUB_ENV, `ENGINE_NPM_ARCHIVE=${packed.filename}\n`);
-          console.log(`${pkg.name}@${pkg.version}: ${files.size} files, ${packed.size} bytes packed, every bin and export inside`);
-          ' "$RELEASE_TAG" "$RUNNER_TEMP/engine-npm.json"
-      # Every engine version carries a changelog (Jake, 2026-11-10); changelog-tag.yml checks the same, but a
-      # separate workflow cannot stop this one.
-      - name: Require the release changelog section at its commit
-        run: node scripts/changelog.mjs check "$RELEASE_TAG" --at="$RELEASE_BUILD"
-      - name: Publish, unless this is the package's first version or it is already out
-        run: |
-          name=$(node -p 'require("./package.json").name')
-          version=$(node -p 'require("./package.json").version')
-          if ! npm view "$name" version >/dev/null 2>&1; then
-            echo "::notice::$name is not on npm yet: its first version is published by hand (NPM-PUBLISH NP4), then trusted publishing takes over."
-            exit 0
-          fi
-          if npm view "$name@$version" version >/dev/null 2>&1; then
-            if [[ "$GITHUB_EVENT_NAME" = push ]]; then
-              tags=$(npm view "$name" dist-tags --json)
-              if ! printf '%s' "$tags" | node -e '
-                const tags = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
-                process.exit(tags.next === process.argv[1] && tags.latest !== process.argv[1] ? 1 : 0);
-              ' "$version"; then
-                echo "::error::$name@$version needs an authorized npm latest dist-tag promotion."
-                exit 1
-              fi
-            fi
-            echo "::notice::$name@$version is already on npm."
-            exit 0
-          fi
-          args=(--provenance --access public --ignore-scripts)
-          if [[ "$GITHUB_EVENT_NAME" = workflow_dispatch ]]; then args+=(--tag next); fi
-          npm publish "${args[@]}" "$ENGINE_NPM_ARCHIVE"
-
-  promote-latest:
-    if: >-
-      github.event_name == 'workflow_dispatch' &&
-      github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main' &&
-      !inputs.placeholder && inputs.promote_latest != '' &&
-      inputs.staging_build == '' && inputs.staging_qualification == ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      RELEASE_TAG: ${{ inputs.promote_latest }}
-    steps:
-      - name: Validate the requested release tag
-        run: '[[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]'
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: refs/tags/${{ env.RELEASE_TAG }}
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: package.json
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-        with:
-          package_json_file: package.json
-      - uses: ./.github/actions/org-deps
-      - name: Install the pinned signature reader
-        run: pnpm install --frozen-lockfile --config.ci=false
-      - name: Verify the published tag against signed production
+      - name: Admit the exact production release for npm latest
+        if: env.NPM_CHANNEL == 'latest'
         env:
           E7_RELEASE_PUBLIC_KEY: ${{ vars.E7_RELEASE_PUBLIC_KEY }}
         run: |
@@ -333,21 +230,95 @@ jobs:
           assert.equal(page.saveEpoch, release.saveEpoch);
           console.log('Signed production build admitted for npm latest', manifest.version, release.serial);
           JS
-      - name: Move npm latest to the production release
+          printf 'RELEASE_BUILD=%s\n' "$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      # Trusted publishing needs npm 11.5.1 or later.
+      - name: Use an npm that can publish by OIDC
         run: |
-          version=${RELEASE_TAG#v}
-          npm install --global npm@11.21.3
-          if [[ "$(npm view '@wildshard/engine@latest' version --prefer-online)" == "$version" ]]; then
+          node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a===11&&(b>5||(b===5&&c>=1)))?0:1)' "$(npm --version)" ||
+            npm install --global npm@11.16.0
+          npm --version
+      - name: Build the versioned local author server
+        run: node scripts/build-server.mjs --dev --out dist/dev-server
+      - name: Check package version, bins and exports
+        run: |
+          args=("$RUNNER_TEMP/engine-npm")
+          if [[ "$NPM_CHANNEL" = next ]]; then args+=("$RELEASE_BUILD"); fi
+          node scripts/npm-artifact.mjs "${args[@]}" > "$RUNNER_TEMP/engine-npm.json"
+          # shellcheck disable=SC2016 # the quoted script is JavaScript with template literals
+          node -e '
+          const { appendFileSync, readFileSync } = require("node:fs");
+          const { execFileSync } = require("node:child_process");
+          const packed = JSON.parse(readFileSync(process.argv[2], "utf8"));
+          const pkg = JSON.parse(execFileSync("tar", ["-xOf", packed.filename, "package/package.json"], { encoding: "utf8" }));
+          const version = process.argv[1].replace(/^v/, "");
+          if (process.env.NPM_CHANNEL === "next") {
+            const prefix = version + "-next.";
+            const suffix = pkg.version.slice(prefix.length);
+            if (!pkg.version.startsWith(prefix) || !/^[a-f0-9]{8,40}$/.test(suffix) ||
+                !process.env.RELEASE_BUILD.startsWith(suffix) || pkg.gitHead !== process.env.RELEASE_BUILD)
+              throw new Error("The next archive does not name the exact release build");
+          } else if (pkg.version !== version) {
+            throw new Error(`tag says ${version}, package.json says ${pkg.version}`);
+          }
+          if (pkg.private) throw new Error(`${pkg.name} is private`);
+          const files = new Set(packed.files.map((file) => file.path));
+          for (const name of ["main.mjs", "cellWorker.mjs", "rapier.wasm", "bundle.json", "migrations/0001-saves.sql"]) {
+            if (!files.has(`dist/dev-server/${name}`)) throw new Error(`not in the tarball: dev server ${name}`);
+          }
+          if (!files.has("node_modules/@wildshard/format/package.json")) throw new Error("not in the tarball: frozen shard format");
+          for (const patch of Object.values(pkg.pnpm?.patchedDependencies ?? {})) {
+            if (!files.has(patch)) throw new Error(`not in the tarball: ${patch}`);
+          }
+          const targets = [];
+          const walk = (value) => typeof value === "string" ? targets.push(value) : Object.values(value ?? {}).forEach(walk);
+          walk(pkg.exports); walk(pkg.bin);
+          const { posix } = require("node:path");
+          for (const file of files) {
+            if (!/(?:^|\/)tsconfig(?:\.[^/]+)?\.json$/.test(file)) continue;
+            if (file.startsWith("node_modules/")) continue;
+            const config = JSON.parse(execFileSync("tar", ["-xOf", packed.filename, "package/" + file], { encoding: "utf8" }));
+            const parents = Array.isArray(config.extends) ? config.extends : [config.extends];
+            const inputs = [...parents, ...(config.references ?? []).map(row => row.path)];
+            for (const input of inputs) {
+              if (typeof input !== "string" || !input.startsWith(".")) continue;
+              const target = posix.normalize(posix.join(posix.dirname(file), input));
+              const candidates = [target, target + ".json", posix.join(target, "tsconfig.json")];
+              if (!candidates.some(candidate => files.has(candidate)))
+                throw new Error("not in the tarball: compiler input " + target);
+            }
+          }
+          const missing = [...new Set(targets)].filter((target) => !target.includes("*")).map((target) => target.replace(/^\.\//, "")).filter((target) => !files.has(target));
+          if (missing.length > 0) throw new Error(`not in the tarball: ${missing.join(", ")}`);
+          appendFileSync(process.env.GITHUB_ENV, `ENGINE_NPM_ARCHIVE=${packed.filename}\nNPM_VERSION=${pkg.version}\n`);
+          console.log(`${pkg.name}@${pkg.version}: ${files.size} files, ${packed.size} bytes packed, every bin and export inside`);
+          ' "$RELEASE_TAG" "$RUNNER_TEMP/engine-npm.json"
+      # Every engine version carries a changelog (Jake, 2026-11-10); changelog-tag.yml checks the same, but a
+      # separate workflow cannot stop this one.
+      - name: Require the release changelog section at its commit
+        run: node scripts/changelog.mjs check "$RELEASE_TAG" --at="$RELEASE_BUILD"
+      - name: Publish the exact archive with its channel tag
+        run: |
+          name=$(node -p 'require("./package.json").name')
+          if ! npm view "$name" version >/dev/null 2>&1; then
+            echo "::notice::$name is not on npm yet. Its first version is published by hand (NPM-PUBLISH NP4)."
             exit 0
           fi
-          test "$(npm view '@wildshard/engine@next' version --prefer-online)" = "$version"
-          npm dist-tag add "@wildshard/engine@$version" latest
+          if npm view "$name@$NPM_VERSION" version --prefer-online >/dev/null 2>&1; then
+            if [[ "$NPM_CHANNEL" = latest && "$(npm view "$name@latest" version --prefer-online)" != "$NPM_VERSION" ]]; then
+              echo "::error::$name@$NPM_VERSION already exists and latest is on another release."
+              exit 1
+            fi
+            echo "::notice::$name@$NPM_VERSION is already on npm."
+            exit 0
+          fi
+          npm publish --provenance --access public --ignore-scripts --tag "$NPM_CHANNEL" "$ENGINE_NPM_ARCHIVE"
 
   placeholder:
     # Only main's copy of this file: the trusted publisher is bound to the file name, not the branch.
     if: >-
       github.event_name == 'workflow_dispatch' && inputs.placeholder &&
-      inputs.staging_build == '' && inputs.promote_latest == '' && github.ref == 'refs/heads/main'
+      inputs.staging_build == '' && inputs.staging_qualification == '' && inputs.publish_final == '' &&
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:

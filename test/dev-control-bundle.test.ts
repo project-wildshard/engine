@@ -52,10 +52,23 @@ test('the npm artifact carries the native dev server and frozen format', () => {
   expect(unpack.status, unpack.stderr).toBe(0);
   const content = readFileSync(join(extracted, 'package/node_modules/@wildshard/format', module));
   expect(content.equals(readFileSync(join(installedFormat, module)))).toBe(true);
-  const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as { pnpm: { patchedDependencies?: Record<string, string> } };
+  const manifest = JSON.parse(readFileSync('package.json', 'utf8')) as {
+    version: string; pnpm: { patchedDependencies?: Record<string, string> };
+  };
   for (const patch of Object.values(manifest.pnpm.patchedDependencies ?? {})) {
     expect(readFileSync(join(extracted, 'package', patch)).equals(readFileSync(patch))).toBe(true);
   }
+  const nextBuild = '0123456789abcdef0123456789abcdef01234567';
+  const next = spawnSync(process.execPath, [resolve('scripts/npm-artifact.mjs'), join(scratch, 'next'), nextBuild],
+    { cwd: staged, encoding: 'utf8' });
+  expect(next.status, next.stderr).toBe(0);
+  const nextArchive = JSON.parse(next.stdout) as { filename: string };
+  const nextManifest = spawnSync('tar', ['-xOzf', nextArchive.filename, 'package/package.json'], { encoding: 'utf8' });
+  expect(nextManifest.status, nextManifest.stderr).toBe(0);
+  expect(JSON.parse(nextManifest.stdout)).toMatchObject({
+    version: `${manifest.version}-next.0123456789a`, gitHead: nextBuild,
+  });
+  expect(readFileSync(join(staged, 'package.json'), 'utf8')).toBe(readFileSync('package.json', 'utf8'));
 }, 30_000);
 
 test('a dev bundle is never packed for a box', () => {

@@ -5,8 +5,9 @@ import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const destination = process.argv[2];
-if (destination === undefined) throw new Error('Usage: node scripts/npm-artifact.mjs <output-dir>');
+const [destination, nextBuild] = process.argv.slice(2);
+if (destination === undefined || (nextBuild !== undefined && !/^[a-f0-9]{40}$/u.test(nextBuild)))
+  throw new Error('Usage: node scripts/npm-artifact.mjs <output-dir> [<exact-next-build>]');
 const root = process.cwd(), output = resolve(destination);
 mkdirSync(output, { recursive: true });
 const stage = mkdtempSync(join(output, '.engine-npm-'));
@@ -20,6 +21,15 @@ try {
   execFileSync('tar', ['-xzf', join(stage, bare.filename), '-C', stage]);
   const unpacked = join(stage, 'package'), manifest = join(unpacked, 'package.json');
   const pkg = JSON.parse(readFileSync(manifest, 'utf8'));
+  if (nextBuild !== undefined) {
+    if (!/^\d+\.\d+\.\d+$/u.test(pkg.version)) throw new Error('An npm next archive needs a stamped release version');
+    // SemVer forbids leading zeroes in an all-numeric identifier. Extend the prefix to include a letter when needed.
+    const short = nextBuild.slice(0, 8);
+    const suffix = /^0\d+$/u.test(short) ? nextBuild.slice(0, nextBuild.search(/[a-f]/u) + 1) : short;
+    if (suffix === '') throw new Error('The build cannot be labelled with a valid SemVer SHA prefix');
+    pkg.version = `${pkg.version}-next.${suffix}`;
+    pkg.gitHead = nextBuild;
+  }
   const format = join(root, 'node_modules/@wildshard/format');
   const deps = JSON.parse(readFileSync(join(format, 'package.json'), 'utf8')).dependencies;
   for (const name of ['@wildshard/format', ...Object.keys(deps)]) {
