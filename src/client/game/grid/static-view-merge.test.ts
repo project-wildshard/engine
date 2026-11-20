@@ -2,7 +2,8 @@
 // meta DRIFTWOOD-FPS DF10 (mini-df10): a region's still set pieces drawn one view mesh per material; a member that moves
 // or hides draws on its own again.
 import { expect, test } from 'vitest';
-import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, ShaderMaterial, Texture } from 'three';
+import { BufferAttribute, BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, ShaderMaterial, Texture } from 'three';
+import { gpuOnlyAttributes } from '@wildshard/engine/core/gpuOnly';
 import { Scope } from '@wildshard/engine/app/scope';
 import { SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
 import { installStaticViewMerge, primeStaticMerges, NO_VIEW_MERGE, mergeableMaterial, mergeableMesh, staticMerge, STATIC_MERGE_DEFAULT, STATIC_MERGE_PHONE_LOW, SWEEP_STEPS } from './staticViewMerge';
@@ -39,6 +40,13 @@ test('only plain opaque meshes on a world-space material merge', () => {
   expect(mergeableMesh(shared)).toBe(true);
   const ranged = new Mesh(tri(0), basic); ranged.geometry.setDrawRange(0, 1);
   expect(mergeableMesh(ranged)).toBe(false);
+  const gpu = new Mesh(tri(0), basic); gpu.geometry.setAttribute('color', new Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1], 3));
+  gpuOnlyAttributes(gpu.geometry, 'test');
+  expect(mergeableMesh(gpu)).toBe(false); // its colours leave the CPU at upload: a merge would copy nothing (black)
+  const released = new Mesh(tri(0), basic); released.geometry.setAttribute('color', new Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1], 3));
+  const colour = released.geometry.getAttribute('color'); if (!(colour instanceof BufferAttribute)) throw new Error('no colour');
+  colour.array = colour.array.slice(0, 0);
+  expect(mergeableMesh(released)).toBe(false);
 });
 
 test('still meshes sharing a material merge after a sweep; a moved one leaves for good; off ends every merge', async () => {

@@ -3,7 +3,7 @@
  * only on the GPU, so an in-place WebGL restore brings it back empty. A module that makes such a bake marks it here, and
  * src/client/engine/core/GpuRecovery.ts reloads the page on a context loss instead of restoring in place (E54).
  */
-import { BufferAttribute, BufferGeometry, CompressedCubeTexture, CompressedTexture, Data3DTexture, DataArrayTexture, DataTexture, Mesh, type Object3D, SkinnedMesh, StaticDrawUsage, type Texture } from 'three';
+import { BufferAttribute, BufferGeometry, CompressedCubeTexture, CompressedTexture, Data3DTexture, DataArrayTexture, DataTexture, type InterleavedBufferAttribute, Mesh, type Object3D, SkinnedMesh, StaticDrawUsage, type Texture } from 'three';
 import { enteredOwner } from '../../../shared/engine/app/ownership';
 import { resourceScope } from '../../../shared/engine/app/resources';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -59,6 +59,9 @@ export function refillGpuOnly(attribute: BufferAttribute, array: Float32Array): 
   Reflect.deleteProperty(attribute, 'needsUpdate');
   attribute.array = array; attribute.needsUpdate = true;
 }
+/** DF10 (mini-df10b): whether `gpuOnlyAttributes` gives this attribute's CPU copy up at its upload (a merge that copies
+ *  vertices must not read it: after the upload it reads an empty array, and the static view merge drew black). */
+export function isGpuOnlyAttribute(attribute: BufferAttribute | InterleavedBufferAttribute): boolean { return attribute instanceof BufferAttribute && releasedAs.has(attribute); }
 function lateWrite(attribute: BufferAttribute): void {
   const where = releasedAs.get(attribute) ?? 'gpu-only';
   if (lateWriters.has(where)) return;

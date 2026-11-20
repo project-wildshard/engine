@@ -20,12 +20,13 @@
  * primed member that moves before its first sweep (a piece placed or snapped after the load) leaves without a refusal and
  * joins again once still; after that first sweep it is a member like any other.
  */
-import { Matrix4, Mesh, ShaderMaterial, Texture, type Material, type Object3D } from 'three';
+import { BufferAttribute, Matrix4, Mesh, ShaderMaterial, Texture, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { TIER } from '@wildshard/engine/core/tier';
 import { graphicsMode, PIXELS_EVENT } from '@wildshard/engine/core/graphicsMode';
 import { MERGED_COPY, MERGED_VIEW } from '@wildshard/engine/core/shadowLayer';
+import { isGpuOnlyAttribute } from '@wildshard/engine/core/gpuOnly';
 import { mergeView } from '../shardfile/groundMerge';
 
 /** A material's mark: never in a view merge (bakedTiles' lent looks, whose lightmaps drew black merged). */
@@ -88,6 +89,8 @@ export function mergeableMesh(object: Object3D): object is Mesh {
   if ((Reflect.get(mesh, 'onBeforeRender') !== DEFAULT_RENDER_HOOK && sharedHook(mesh) === undefined) || Reflect.get(mesh, 'onAfterRender') !== DEFAULT_AFTER_HOOK) return false;
   const position = geometry.getAttribute('position');
   if (position === undefined || position.count > MAX_MEMBER_VERTICES) return false;
+  // a channel that lives on the GPU only (or has already gone there) has nothing for the merge to copy: it drew black
+  if (Object.values(geometry.attributes).some(attribute => isGpuOnlyAttribute(attribute) || (attribute instanceof BufferAttribute && attribute.array.length < attribute.count * attribute.itemSize))) return false;
   const drawn = geometry.index?.count ?? position.count;
   if (Object.keys(geometry.morphAttributes).length > 0 || geometry.groups.length > 0 || geometry.drawRange.start !== 0 || geometry.drawRange.count < drawn) return false;
   return mergeableMaterial(mesh.material) !== null;
