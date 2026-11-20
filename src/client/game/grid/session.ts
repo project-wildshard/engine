@@ -43,6 +43,7 @@ import type { StepProgress } from '@wildshard/engine/boot/plan';
 import { WORK_SLICE_MS, workSlice } from '@wildshard/engine/core/workSlice';
 import { app } from '@wildshard/engine/app/runtime';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { frameCost } from '@wildshard/engine/core/frameCost';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { installEntrySockets } from '@wildshard/engine/physics/entrySockets';
 import { installStripCollider } from '@wildshard/engine/physics/stripColliders';
@@ -116,7 +117,7 @@ import { GAME_STRINGS } from '../../../shared/game/strings';
 import { classifyRefusal, pageShardRefusals, type ShardRefusal } from './refusal';
 import { tileRing } from '../shardfile/tileDriver';
 import { readGridSeamData, type GridSeamAddress } from '../../../shared/game/grid/seamData';
-import { readGridStripsOrSeeds } from '../../../shared/game/grid/compiledStrips';
+import { OUTER_BLOCK_READS, readGridStripsOrSeeds } from '../../../shared/game/grid/compiledStrips';
 import { startRoadGrain } from './roadGrainPreparation';
 import { startRoadSigns } from './roadSignPreparation';
 import { RoadMapShare } from './roadResources';
@@ -127,6 +128,7 @@ import { admittedRuntimeFolder } from '../shardfile/runtimeFolder';
 import { gridArea } from './area';
 import { offerCellLook, type CellLook } from './dataCellLooks';
 import { NearColliders, outerCollidersNearOn } from './nearColliders';
+import { outerStartPacedOn } from './outerPaced';
 import type { ProbeArea } from '@wildshard/engine/debug/probe';
 
 /** D12: the A1 outer ring's share of a drawn frame (ms). On the phone tier its strips, colliders and road stop 4 ms after
@@ -380,7 +382,8 @@ export class GridSession {
   private roadLanding: Promise<void> = Promise.resolve();
   /** loading-speed A1: builds the outer ring's road once (null: none to build, or started) */
   private startOuterRoad: (() => void) | null = null;
-  private startOuterFar: (() => void) | null = null;
+  /** one queued neighbour's far declaration a step; true once none are left */
+  private startOuterFar: (() => boolean) | null = null;
   /** Initial visible fallbacks precede optional near/model decoding. Once ready,
    * ordinary distance streaming and explicit crossings keep their own fences. */
   private initialFarReady = false;
@@ -540,7 +543,10 @@ export class GridSession {
         if (owner.disposed || owner.disposing || host.scope.disposed || host.scope.disposing) throw new Error('Grid session left during outer seam preparation');
         await background.check();
       };
-      if (preparedOuter !== undefined) return preparedOuter(owner, pause);
+      if (preparedOuter !== undefined) {
+        const readAt = frameCost.on ? diagnosticNow() : undefined;
+        try { return await preparedOuter(owner, pause, outerStartPacedOn() ? OUTER_BLOCK_READS : undefined); } finally { if (readAt !== undefined) frameCost.other('grid.outer read start', diagnosticNow() - readAt); }
+      }
       const outerRead = await readGridStripsOrSeeds(address.geometry, source, instance, { scope: owner, allocator },
         (url, signal) => fetch(url, { signal }), pause, (x, z) => !ring(x, z), 'outer');
       if (outerRead !== null && 'strips' in outerRead) return outerRead.strips;
@@ -659,9 +665,16 @@ export class GridSession {
       catch { /* the proxy's own load charges it */ }
     };
     for (const cell of this.neighbours) if (backgroundReady() || initialRing.has(cell.instance)) void declare(cell);
-    if (!backgroundReady()) this.startOuterFar = () => {
-      for (const cell of this.neighbours) if (!initialRing.has(cell.instance)) void declare(cell);
-    };
+    // DF8 (mini-driftwood13g): paced (`debug.outerStartPaced`, outerPaced.ts), one neighbour's declaration a step once the
+    // background opens, not all of them in the reveal frame that opened it (11 ms of their reads' synchronous starts on the
+    // iPhone 13, beside the outer road's start)
+    if (!backgroundReady()) {
+      const rest = this.neighbours.filter((cell) => !initialRing.has(cell.instance));
+      this.startOuterFar = () => {
+        if (!outerStartPacedOn()) { for (const cell of rest.splice(0)) void declare(cell); return true; }
+        const cell = rest.shift(); if (cell !== undefined) void declare(cell); return rest.length === 0;
+      };
+    }
     for (const cell of this.assembly.cells) { const manifest = findShard(cell.slug); this.names.set(cell.slug, manifest?.name ?? cell.slug); }
     this.constructorTiming?.('home');
     // the deck: one generator run (`create` runs it sliced and hands it over), one draw, the same vertices as the platform colliders
@@ -932,7 +945,12 @@ export class GridSession {
     // system above, not on every 60 Hz fixed step: at the phone's 30 fps cap the second step of each frame redid it
     // (rings.step's tile choice and its per-frame upload budget twice a frame, on Driftwood's road entry ~1.6k Simulator
     // samples); headless hosts keep it in the fixed step
-    host.onFixed((dt) => { this.step(dt, host.frame === undefined); this.life.fixed(); });
+    host.onFixed((dt) => {
+      this.step(dt, host.frame === undefined);
+      const lifeAt = frameCost.on ? diagnosticNow() : undefined;
+      this.life.fixed();
+      if (lifeAt !== undefined) frameCost.sectionOther('grid.life fixed', diagnosticNow() - lifeAt);
+    });
     // read at call time: a desktop images-first home settles its claim's bytes at the handoff (GC21 row 53)
     const homeClaim = residency.home(), homeResidency = (): { instance: string; bytes: number } => ({ instance: homeClaim.instance, bytes: homeClaim.bytes });
     host.scope.onDispose(app.debug.scopedExpose('grid', { state: () => this.state(), roadView: () => this.roadBudget.view(), roadResident: () => this.roadBudget.resident(),
@@ -1141,14 +1159,19 @@ export class GridSession {
   /** One fixed step: the rings from the player's world pose and velocity, then the cell events. `view` false: the
    *  drawn parts (`viewStep`) wait for the frame's late system. */
   step(dt: number, view = true): void {
+    // DF8 (mini-driftwood13g): the dev fps panel's split of this step (core/frameCost.ts; one boolean read while it is off),
+    // so a long reveal frame names the part of the grid's step it was in
+    const timed = frameCost.on;
+    let lapAt = timed ? diagnosticNow() : 0;
+    const lap = (label: string): void => { if (!timed) return; const now = diagnosticNow(); frameCost.sectionOther(label, now - lapAt); lapAt = now; };
     const at = this.world();
     if (this.last !== null && dt > 0) { this.velocity = { x: (at.x - this.last.x) / dt, z: (at.z - this.last.z) / dt }; }
     this.last = at;
     const speed = Math.hypot(this.velocity.x, this.velocity.z);
-    if (this.startOuterFar !== null && this.host.backgroundReady?.() !== false) { const start = this.startOuterFar; this.startOuterFar = null; start(); }
+    if (this.startOuterFar !== null && this.host.backgroundReady?.() !== false) { if (this.startOuterFar()) this.startOuterFar = null; lap('grid.step outer far'); }
     // Match L1's 400 m reach plus the rings' four-second travel lookahead. Distant
     // cells keep their baked proxy without admitting their full product at boot.
-    if (this.startOuterRoad !== null && this.roadSettled && this.host.backgroundReady?.() !== false) { const start = this.startOuterRoad; this.startOuterRoad = null; start(); }
+    if (this.startOuterRoad !== null && this.roadSettled && this.host.backgroundReady?.() !== false) { const start = this.startOuterRoad; this.startOuterRoad = null; start(); lap('grid.step outer road'); }
     // DL17 (G872): the cell the player is in, drawn by its regional runtime, admits no second tile copy of itself (the
     // home re-read ~225 of its files after control for it); leaving starts it while the runtime is still resident. A
     // runtime whose ground is those tiles (D189: Pine) still admits them, or its far proxy stays over the spawn
@@ -1158,10 +1181,12 @@ export class GridSession {
       const distance = Math.hypot(Math.max(0, Math.abs(at.x - cell.origin.x) - CHUNK_HALF), Math.max(0, Math.abs(at.z - cell.origin.z) - CHUNK_HALF));
       if (this.assembly.approaching(distance, 400 + Math.min(speed, 60) * 4)) void this.admitNeighbour?.(cell).catch(() => undefined);
     }
-    if (this.nearColliders !== null) { const feet = this.host.feet(); this.nearColliders.step(feet.x, feet.z, speed); }
+    lap('grid.step neighbours');
+    if (this.nearColliders !== null) { const feet = this.host.feet(); this.nearColliders.step(feet.x, feet.z, speed); lap('grid.step near colliders'); }
     this.softWalls.step();
     this.stepGate(at);
-    if (view) this.viewStep();
+    lap('grid.step walls and gate');
+    if (view) { this.viewStep(); lap('grid.step view'); }
     const inside = this.assembly.at(at.x, at.z), active = this.live === null ? this.home.instance : this.live.live.current();
     // GC2: online, prediction on the rim of a cell the server still walls (C5) is not a departure
     const held = active !== null && this.live?.serverHolds(active) === true, origin = held ? this.assembly.cell(active).origin : null;

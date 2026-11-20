@@ -228,7 +228,7 @@ export function mergeGridBlocks(blocks: readonly DecodedGridBlock[], within: (x:
 interface GridStripOwner { readonly scope: Scope; readonly allocator: ResidencyAllocator }
 type GridStripFetch = (url: string, signal: AbortSignal) => Promise<Response>;
 /** Continuation of the original admitted source, restricted to its owner tree. */
-export type DeferredGridStrips = (scope: Scope, pause: () => Promise<void>) => Promise<readonly GeneratedStrip[]>;
+export type DeferredGridStrips = (scope: Scope, pause: () => Promise<void>, reads?: number) => Promise<readonly GeneratedStrip[]>;
 export interface CompiledGridRead extends DecodedGridStrips { readonly readOuter?: DeferredGridStrips }
 
 function liveGridOwner(scope: Scope): void { if (scope.disposed || scope.disposing) throw new Error('Grid admission scope disposed'); }
@@ -263,14 +263,36 @@ async function inflateGridLook(bytes: Uint8Array, expected: number, scope: Scope
 
 /** Read and decode one phase's blocks for `home` (`key` names its charges), then merge what `within` keeps. */
 function readGridBlocks(blocks: readonly CompiledGridBlock[], key: string, home: string, owner: GridStripOwner, read: GridStripFetch,
-  pause: () => Promise<void>, within: (x: number, z: number) => boolean): Promise<DecodedGridStrips> {
-  return decodeGridBlocks(blocks, key, home, owner, read, pause, decoded => mergeGridBlocks(decoded, within));
+  pause: () => Promise<void>, within: (x: number, z: number) => boolean, reads = Infinity): Promise<DecodedGridStrips> {
+  return decodeGridBlocks(blocks, key, home, owner, read, pause, decoded => mergeGridBlocks(decoded, within), true, reads);
+}
+
+/**
+ * DF8 (mini-driftwood13g): a paced outer ring (`debug.outerStartPaced`, client grid/outerPaced.ts) reads at most this many
+ * of its blocks at a time. Its ~40 blocks started ~80 fetches in one task, in the reveal's fixed step: 32 to 41 ms of their
+ * synchronous starts on the iPhone 13. Each next read starts as one lands; the home's own read, on the load's path, still
+ * starts all of its blocks at once.
+ */
+export const OUTER_BLOCK_READS = 4;
+
+/** `fn` over `items` with at most `limit` in flight, results in order; the first failure stops new starts and rejects. */
+export async function pooled<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  let next = 0, failed = false;
+  const lane = async (): Promise<void> => {
+    while (!failed && next < items.length) {
+      const i = next++;
+      try { out[i] = await fn(items[i] as T); } catch (error) { failed = true; throw error; }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, lane));
+  return out;
 }
 
 /** Read and decode these blocks under `key`'s charges; `finish` makes the published result (its arrays keep the source charge).
  *  `retain: false` (SB38e's seeds): no look, and `finish` copies what it keeps, so every charge ends with the read. */
 async function decodeGridBlocks<T>(blocks: readonly CompiledGridBlock[], key: string, home: string, owner: GridStripOwner, read: GridStripFetch,
-  pause: () => Promise<void>, finish: (decoded: readonly DecodedGridBlock[]) => T, retain = true): Promise<T> {
+  pause: () => Promise<void>, finish: (decoded: readonly DecodedGridBlock[]) => T, retain = true, reads = Infinity): Promise<T> {
   liveGridOwner(owner.scope);
   const abort = new AbortController(), forget = owner.scope.capture('disposers', () => { abort.abort(); });
   const reservations: { readonly release: () => void }[] = [];
@@ -288,7 +310,10 @@ async function decodeGridBlocks<T>(blocks: readonly CompiledGridBlock[], key: st
     let released = false;
     releaseSource = (): void => { if (!released) { released = true; for (const lease of sourceLeases) lease.release(); } };
     forgetSource = owner.scope.capture('disposers', releaseSource);
-    const wire = await Promise.all(blocks.map(async block => { const [header, body] = await Promise.all([fetchAsset(block.header), fetchAsset(block.body)]); return { header, body }; }));
+    const readBlock = async (block: CompiledGridBlock): Promise<{ header: Uint8Array<ArrayBuffer>; body: Uint8Array<ArrayBuffer> }> => {
+      const [header, body] = await Promise.all([fetchAsset(block.header), fetchAsset(block.body)]); return { header, body };
+    };
+    const wire = reads >= blocks.length ? await Promise.all(blocks.map(readBlock)) : await pooled(blocks, reads, readBlock);
     liveGridOwner(owner.scope);
     const metadata = wire.map(({ header }) => parseCompiledGridHeader(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(header))));
     const lookBytes = retain ? metadata.reduce((sum, row) => sum + (row.look?.codec === 'deflate' ? row.look.vertices * (row.look.colours === true ? 24 : 12) + 1 : 0), 0) : 0;
@@ -330,12 +355,12 @@ function deferredGridBlocks(blocks: readonly CompiledGridBlock[], home: string, 
   const snapshot = blocks.map(block => ({ header: { ...block.header }, body: { ...block.body } }));
   const parent = owner.scope, allocator = owner.allocator;
   let consumed = false;
-  return (scope, pause) => {
+  return (scope, pause, reads) => {
     if (!scope.belongsTo(parent)) return Promise.reject(new Error('Grid strip continuation has another owner'));
     if (scope.disposed || scope.disposing) return Promise.reject(new Error('Grid admission scope disposed'));
     if (consumed) return Promise.reject(new Error('Grid strip continuation already consumed'));
     consumed = true;
-    return readGridBlocks(snapshot, gridStripPageKey(home, 'outer'), home, { scope, allocator }, read, pause, within).then(result => result.strips);
+    return readGridBlocks(snapshot, gridStripPageKey(home, 'outer'), home, { scope, allocator }, read, pause, within, reads).then(result => result.strips);
   };
 }
 

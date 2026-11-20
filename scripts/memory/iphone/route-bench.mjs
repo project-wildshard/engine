@@ -120,6 +120,10 @@ async function bench() {
               row.frames = log;
               const long = (log?.frames ?? []).filter((/** @type {any[]} */ f) => f[1] > 50);
               console.log(`  frames: ${String(log?.count ?? 0)} logged, ${String(long.length)} over 50 ms, ${String(long.filter((/** @type {any[]} */ f) => f[2] > 0 || f[4] > 65536 || f[5] > 65536).length)} of them with links or big uploads, ${String(log?.adds?.length ?? 0)} scene adds`);
+              // DF8: each update over 50 ms with the game's own split (FRAME_LOG_START's costs)
+              for (const c of (log?.costs ?? []).filter((/** @type {any[]} */ cost) => cost[1] > 50)) {
+                console.log(`  update ${String(c[1])} ms at ${String(Math.round((c[0] - (log?.from ?? 0)) / 100) / 10)} s: top ${String(c[3])}; ${String(c[4])}`);
+              }
             } catch (error) { row.framesError = String(error); }
           }
           if (values.census === true) {

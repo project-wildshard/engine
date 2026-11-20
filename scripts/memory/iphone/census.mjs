@@ -110,6 +110,15 @@ try { const byPhase = g.app.systemsByPhase(), wrapped = new WeakSet();
 // DF8: the game's own update and render ms for its last two frames (Game's rings), so a long frame says which side it was
 const gameSplit = () => { try { const ring = g.frameMs.length, a = (g.frameI - 1 + ring) % ring, b = (g.frameI - 2 + ring) % ring;
   return [Math.round(g.updateMs[a]), Math.round(g.renderMs[a]), Math.round(g.updateMs[b]), Math.round(g.renderMs[b])]; } catch { return null; } };
+// DF8 (mini-driftwood13g): the game's own frame-cost split (core/frameCost.ts, on for the log's life): every update over 30 ms
+// with its buckets, its longest system and the unbucketed parts (each system by name, event delivery, phase scheduling,
+// frame preparation): [page ms, update ms, render ms, top system:ms, parts]
+const fc = window.__wildshard?.frameCost, BUCKETS = ['physics', 'animals', 'elites', 'player', 'hud', 'audio', 'world', 'quest'];
+log.costs = [];
+if (fc && typeof fc === 'object') { fc.on = true; fc.onFrame = (f) => { if (f.update <= 30 || log.costs.length >= 400) return;
+  const parts = []; BUCKETS.forEach((b, i) => { const v = f.buckets[i] ?? 0; if (v >= 2) parts.push(b + ':' + Math.round(v)); });
+  for (const [k, v] of f.otherParts) if (v >= 2) parts.push(k + ':' + Math.round(v));
+  log.costs.push([Math.round(f.t), Math.round(f.update), Math.round(f.render), f.top + ':' + Math.round(f.topMs), parts.join(',')]); }; }
 let last = performance.now();
 const tick = (now) => { if (window.__wsFrameLog !== log) return;
   const progs = r.info.programs ?? [], fresh = [];
@@ -123,13 +132,14 @@ return 'logging';
 
 /** In the page: FRAME_LOG_START's log, and stop logging: { count, frames: [page ms, interval ms, links, tex uploads,
  * texels, buffer bytes, triangles, geometries, new programs, renderer.render calls, uniform-lookup ms, programs looked up
- * slowly], adds: [page ms, parent>child, triangles] }. Only the frames
+ * slowly], adds: [page ms, parent>child, triangles], costs: FRAME_LOG_START's update splits }. Only the frames
  * that are long (over 45 ms), link, or upload more than 64k texels or 64 KB, and the frame before each, so the socket
  * holds it. */
 export const FRAME_LOG_READ = `
 const log = window.__wsFrameLog ?? null; window.__wsFrameLog = undefined;
+const fc = window.__wildshard?.frameCost; if (fc && typeof fc === 'object') { fc.on = false; fc.onFrame = null; }
 if (log === null) return null;
 const f = log.frames, keep = new Set();
 f.forEach((x, i) => { if (x[1] > 45 || x[2] > 0 || x[4] > 65536 || x[5] > 65536 || x[9] > 1 || x[10] > 5 || (x[13] ?? '') !== '') { keep.add(i); if (i > 0) keep.add(i - 1); } });
-return { count: f.length, from: f[0]?.[0] ?? 0, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders };
+return { count: f.length, from: f[0]?.[0] ?? 0, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders, costs: log.costs ?? [] };
 `;
