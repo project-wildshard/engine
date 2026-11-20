@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { SHADOW_LAYER } from '../core/shadowLayer';
 import { geometryBoundsSteps } from './geometryBounds';
-import { castWholeInLastCascade } from './cascadeCull';
+import { castWholeInLastCascade, drawWholeOnlyInShadows } from './cascadeCull';
+import { jsonSlot } from '../saves/slots';
+import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
 
 /**
  * E153: island-wide merged casters draw into each shadow map in pieces.
@@ -41,6 +43,8 @@ const whole = new WeakSet<THREE.Object3D>();
 export function keepShadowWhole(mesh: THREE.Mesh): void { whole.add(mesh); }
 
 export interface ShadowChunkReport { meshes: number; pieces: number; tris: number }
+/** what the view splits made on this page so far */
+export const viewReport: ShadowChunkReport = { meshes: 0, pieces: 0, tris: 0 };
 
 /** Triangles a split walks between pause points (SF67: an island-wide terrain is ~0.5 M triangles, one 0.3 s task at 4×). */
 const PAUSE_EVERY = 16384;
@@ -62,7 +66,20 @@ function* chunkWork(scene: THREE.Scene, report: ShadowChunkReport): Generator<vo
     if (n > 0) { report.meshes++; report.pieces += n; report.tris += triangles(mesh.geometry); }
     yield;
   }
+  if (!viewPiecesOn()) return;
+  const wide: THREE.Mesh[] = [];
+  scene.traverse((o) => { if (viewEligible(o)) wide.push(o); });
+  for (const mesh of wide) {
+    if (mesh.geometry.boundingSphere === null) yield* geometryBoundsSteps(mesh.geometry, 'sphere');
+    mesh.updateWorldMatrix(true, false);
+    const reach = (mesh.geometry.boundingSphere?.radius ?? 0) * mesh.matrixWorld.getMaxScaleOnAxis();
+    if (!(reach >= MIN_RADIUS) || triangles(mesh.geometry) < MIN_TRIS) continue;
+    const n = yield* splitView(mesh);
+    if (n > 0) { viewReport.meshes++; viewReport.pieces += n; viewReport.tris += triangles(mesh.geometry); }
+    yield;
+  }
 }
+
 
 
 /**
@@ -72,11 +89,13 @@ function* chunkWork(scene: THREE.Scene, report: ShadowChunkReport): Generator<vo
  */
 export async function chunkShadowCastersSliced(scene: THREE.Scene, due: () => Promise<void> | null): Promise<ShadowChunkReport> {
   const report: ShadowChunkReport = { meshes: 0, pieces: 0, tris: 0 };
+  const viewBefore = viewReport.pieces;
   const work = chunkWork(scene, report);
   while (work.next().done !== true) {
     const pause = due();
     if (pause !== null) await pause;
   }
+  if (viewReport.pieces > viewBefore) console.info(`[view] ${String(viewReport.meshes)} meshes in ${String(viewReport.pieces)} pieces (${String(viewReport.tris)} tris)`);
   return report;
 }
 
@@ -187,6 +206,154 @@ function* split(mesh: THREE.Mesh): Generator<void, number> {
   // DW: the last cascade draws it whole, in one draw, the others its pieces (cascadeCull.ts); a never-culled mesh would
   // skip that test and cast into every map, so it keeps its pieces alone
   if (mesh.frustumCulled) castWholeInLastCascade(mesh, pieces.children.filter(isMesh));
+  mesh.add(pieces);
+  pieces.updateMatrixWorld(true);
+  return pieces.children.length;
+}
+
+// meta DRIFTWOOD-FPS DF9 / IPHONE13-DRIFTWOOD DW3 (mini-driftwood13c, 2026-11-19): island-wide meshes drawn in the VIEW by
+// pieces too. Driftwood's ground (108k triangles, a 354 m sphere), its merged palms, rocks, kit and cove props were drawn
+// whole at every yaw: at the dock 742k triangles facing the island and still 439k facing the open sea, where at most a
+// quarter of each mesh is in view. With the device slot on, each opaque, static, single-material mesh at least MIN_RADIUS
+// wide and MIN_TRIS big gets up to VIEW_CELLS view pieces (drawRanges into one index of its own, sorted by square, sharing
+// its vertex buffers and material), each frustum-culled on its own. The mesh itself still draws in every shadow pass, and
+// in a view frame that sees at least VIEW_WHOLE_SHARE of it (one draw, not many). Same triangles, material and transform:
+// the same pixels, fewer vertices when most of a mesh is out of view, for a few more draws. Grid spawn, phone Low
+// (Chromium census): 746k / 527k / 435k triangles at yaw 0 / 90 / 180 become 712k / 348k / 255k, 79 / 61 / 58 draws
+// become 90 / 64 / 58.
+
+/** The device slot (true or false); with none, VIEW_PIECES_DEFAULT. */
+export const VIEW_PIECES_SLOT = 'debug.viewPieces';
+/** Off until the iPhone 13 pairs decide (vertices against draws). */
+export const VIEW_PIECES_DEFAULT = false;
+/** squares per mesh at most (4 x 4): a view piece is a draw */
+export const VIEW_CELLS = 16;
+/** a view frame that sees at least this share of a mesh's triangles draws it whole, in one draw (facing Driftwood's
+ *  island every piece is in view: the pieces would only add draws) */
+export const VIEW_WHOLE_SHARE = 0.75;
+/** triangles a view piece holds at least (Driftwood at the dock facing the island: 16 squares a mesh drew 137 calls
+ *  against 79 for 8 % fewer triangles) */
+export const VIEW_TRIS_PER_CELL = 6000;
+let viewPicked: boolean | undefined;
+/** Whether island-wide meshes draw in the view by pieces; read once per page. */
+export function viewPiecesOn(): boolean {
+  if (viewPicked !== undefined) return viewPicked;
+  let saved: unknown = null;
+  try { saved = jsonSlot(VIEW_PIECES_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
+  viewPicked = typeof saved === 'boolean' ? saved : VIEW_PIECES_DEFAULT;
+  return viewPicked;
+}
+/** Tests only: read the slot again (or force it). */
+export function resetViewPieces(on?: boolean): void { viewPicked = on; }
+
+const SCRATCH = { owner: 'shadowChunks.viewPieces', kind: 'scratch' } as const;
+/** the view pieces' one index per mesh (2 or 4 bytes a vertex of its triangles) */
+const VIEW_INDEX = { owner: 'shadowChunks.viewPieces', kind: 'geometry-cpu' } as const;
+
+interface ViewUserData { viewChunked?: boolean; viewPiece?: boolean }
+
+function viewEligible(o: THREE.Object3D): o is THREE.Mesh {
+  if (!isMesh(o) || !o.frustumCulled || (o.layers.mask & 1) === 0) return false;
+  const data = o.userData as ViewUserData & ChunkUserData;
+  if (data.viewChunked === true || data.viewPiece === true) return false;
+  // a shadow piece (SHADOW_LAYER, never the view's) is out by its layer; a split caster itself stays a candidate
+  if ('isInstancedMesh' in o || 'isSkinnedMesh' in o || 'isBatchedMesh' in o) return false;
+  if (Array.isArray(o.material) || o.material.transparent) return false;
+  const g = o.geometry, pos = g.attributes['position'];
+  if (!(pos instanceof THREE.BufferAttribute) || pos.usage !== THREE.StaticDrawUsage) return false;
+  if (Object.keys(g.morphAttributes).length > 0 || g.groups.length > 1) return false;
+  // whole: no range, or one that covers every index (the island dressing sets its own full range)
+  return g.drawRange.start === 0 && g.drawRange.count >= (g.index === null ? pos.count : g.index.count);
+}
+
+/** the mesh's triangles into at most VIEW_CELLS squares of its local xz, as view pieces under it; the mesh leaves the view.
+ *  Returns the pieces made (0: it stays whole). */
+function* splitView(mesh: THREE.Mesh): Generator<void, number> {
+  const g: THREE.BufferGeometry = mesh.geometry;
+  const pos = g.attributes['position'];
+  if (pos === undefined) return 0;
+  const src = g.index, nTri = triangles(g);
+  const indices = src === null ? null : src.array, xyz = pos instanceof THREE.BufferAttribute && !pos.normalized && pos.itemSize === 3 ? pos.array : null;
+  const vert = (t: number, k: number): number => (indices !== null ? indices[3 * t + k] ?? 0 : 3 * t + k);
+  yield* geometryBoundsSteps(g, 'box');
+  const box = g.boundingBox;
+  if (box === null) return 0;
+  const w = box.max.x - box.min.x, d = box.max.z - box.min.z;
+  // a piece per VIEW_TRIS_PER_CELL triangles, 2 to VIEW_CELLS: a small mesh pays few draws for its cut
+  const cells = Math.min(VIEW_CELLS, Math.max(2, Math.floor(nTri / VIEW_TRIS_PER_CELL)));
+  const cell = Math.max(1e-3, Math.sqrt((w * d) / cells), w / 4, d / 4);
+  const nx = Math.max(1, Math.ceil(w / cell)), nz = Math.max(1, Math.ceil(d / cell));
+  const cellOf = ownedArray(Uint8Array, nTri, SCRATCH), counts = ownedArray(Uint32Array, nx * nz, SCRATCH);
+  for (let t = 0; t < nTri; t++) {
+    let cx = 0, cz = 0;
+    for (let k = 0; k < 3; k++) { const v = vert(t, k); cx += xyz !== null ? xyz[3 * v] ?? 0 : pos.getX(v); cz += xyz !== null ? xyz[3 * v + 2] ?? 0 : pos.getZ(v); }
+    const ix = Math.min(nx - 1, Math.max(0, Math.floor((cx / 3 - box.min.x) / cell)));
+    const iz = Math.min(nz - 1, Math.max(0, Math.floor((cz / 3 - box.min.z) / cell)));
+    const c = iz * nx + ix;
+    cellOf[t] = c; counts[c] = (counts[c] ?? 0) + 1;
+    if (t % PAUSE_EVERY === PAUSE_EVERY - 1) yield;
+  }
+  let used = 0;
+  for (const c of counts) if (c > 0) used++;
+  if (used < 2) return 0;
+  const start = ownedArray(Uint32Array, nx * nz, SCRATCH);
+  let acc = 0;
+  for (let c = 0; c < counts.length; c++) { start[c] = acc; acc += counts[c] ?? 0; }
+  const index = pos.count > 65535 ? ownedArray(Uint32Array, nTri * 3, VIEW_INDEX) : ownedArray(Uint16Array, nTri * 3, VIEW_INDEX);
+  const fill = ownedArray(Uint32Array, nx * nz, SCRATCH);
+  fill.set(start);
+  for (let t = 0; t < nTri; t++) {
+    const c = cellOf[t] ?? 0, at = fill[c] ?? 0;
+    fill[c] = at + 1;
+    for (let k = 0; k < 3; k++) index[3 * at + k] = vert(t, k);
+    if (t % PAUSE_EVERY === PAUSE_EVERY - 1) yield;
+  }
+  const shared = new THREE.BufferAttribute(index, 1);
+  const pieces = new THREE.Group();
+  pieces.name = `${mesh.name || 'mesh'}-view-pieces`;
+  pieces.matrixAutoUpdate = false;
+  const bounds = new THREE.Box3(), p = new THREE.Vector3();
+  for (let c = 0; c < counts.length; c++) {
+    const count = counts[c] ?? 0;
+    if (count === 0) continue;
+    const geo = new THREE.BufferGeometry();
+    for (const [name, attr] of Object.entries(g.attributes)) geo.setAttribute(name, attr);
+    geo.setIndex(shared);
+    const first = (start[c] ?? 0) * 3;
+    geo.setDrawRange(first, count * 3);
+    bounds.makeEmpty();
+    for (let i = first; i < first + count * 3; i++) {
+      const v = index[i] ?? 0;
+      bounds.expandByPoint(xyz !== null ? p.set(xyz[3 * v] ?? 0, xyz[3 * v + 1] ?? 0, xyz[3 * v + 2] ?? 0) : p.fromBufferAttribute(pos, v));
+    }
+    if (count > PAUSE_EVERY / 4) yield;
+    geo.boundingBox = bounds.clone();
+    geo.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
+    const piece = new THREE.Mesh(geo, mesh.material);
+    piece.name = `${pieces.name}-${String(c)}`;
+    piece.castShadow = false;
+    piece.receiveShadow = mesh.receiveShadow;
+    piece.renderOrder = mesh.renderOrder;
+    (piece.userData as ViewUserData & ChunkUserData).viewPiece = true;
+    (piece.userData as ChunkUserData).shadowChunked = true;
+    piece.matrixAutoUpdate = false;
+    piece.onBeforeRender = (...a) => { mesh.onBeforeRender(...a); };
+    piece.onAfterRender = (...a) => { mesh.onAfterRender(...a); };
+    pieces.add(piece);
+  }
+  (mesh.userData as ViewUserData).viewChunked = true;
+  const parts = pieces.children.filter(isMesh), share = parts.map(piece => piece.geometry.drawRange.count / (nTri * 3));
+  let drawnWhole = true;
+  drawWholeOnlyInShadows(mesh, (frustum) => {
+    let seen = 0;
+    for (let k = 0; k < parts.length; k++) if (frustum.intersectsObject(parts[k] as THREE.Mesh)) seen += share[k] ?? 0;
+    drawnWhole = seen >= VIEW_WHOLE_SHARE;
+    return drawnWhole;
+  });
+  for (const piece of parts) {
+    const own = piece.intersectsFrustum.bind(piece);
+    piece.intersectsFrustum = (frustum: THREE.Frustum | THREE.FrustumArray): boolean => !drawnWhole && own(frustum);
+  }
   mesh.add(pieces);
   pieces.updateMatrixWorld(true);
   return pieces.children.length;

@@ -198,6 +198,17 @@ export function installCascadeCull(csm: CSM, camera: THREE.PerspectiveCamera): v
 }
 
 /**
+ * meta DRIFTWOOD-FPS DF9 (mini-driftwood13c, 2026-11-19): a mesh drawn in the view by its pieces (shadowChunks.ts
+ * `debug.viewPieces`) is drawn whole in a view frame only when `view` says so (most of it in view), else by its pieces;
+ * every shadow pass still sees it as before (its own test, or the last cascade's).
+ */
+export function drawWholeOnlyInShadows(mesh: THREE.Mesh, view: (frustum: THREE.Frustum) => boolean = () => false): void {
+  const prev = mesh.intersectsFrustum.bind(mesh);
+  mesh.intersectsFrustum = (frustum: THREE.Frustum | THREE.FrustumArray): boolean =>
+    shadowPass > 0 ? prev(frustum) : frustum instanceof THREE.Frustum && prev(frustum) && view(frustum);
+}
+
+/**
  * DW (Driftwood draw budget, engine-performance §10): the last cascade draws a chunked island-wide caster (shadowChunks.ts)
  * whole, in one draw, and skips its pieces; every other cascade and ghost keeps the pieces. The last cascade's footprint
  * reaches the camera's far plane, so it took most of a mesh's pieces anyway (18 + 5 of Driftwood's spawn's 62 far draws).
