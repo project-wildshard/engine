@@ -20,9 +20,12 @@ export function worldReadsDevice(bytes: ArrayBuffer): boolean {
   catch { return false; }
 }
 
-type Kind = 'text' | 'long' | 'number' | 'flag' | 'list';
+type Kind = 'text' | 'long' | 'number' | 'flag' | 'list' | 'actor';
 /** A device snapshot: every field optional. Nothing else crosses the wire. */
 export interface DeviceSnapshot {
+  /** The page's public metrics classification. The room can strengthen it. */
+  readonly actor?: 'human' | 'agent';
+  readonly lane?: string;
   readonly build?: string;
   // User-Agent Client Hints (Chromium): `model` names an Android phone ("Pixel 8", "SM-S918B")
   readonly ua?: string; readonly model?: string; readonly platform?: string; readonly platformVersion?: string; readonly architecture?: string;
@@ -39,7 +42,7 @@ export interface DeviceSnapshot {
 type Field = keyof DeviceSnapshot;
 /** Each field's kind, which `cleanDevice` bounds it by. */
 const FIELDS: Readonly<Record<Field, Kind>> = {
-  build: 'text',
+  build: 'text', actor: 'actor', lane: 'text',
   ua: 'long', model: 'text', platform: 'text', platformVersion: 'text', architecture: 'text', bitness: 'text', wow64: 'flag', mobile: 'flag',
   brands: 'list', fullVersionList: 'list', formFactors: 'list',
   gpu: 'text', gpuVendor: 'text', maxTexture: 'number', astc: 'flag', etc2: 'flag', bptc: 'flag',
@@ -69,6 +72,7 @@ export function cleanDevice(raw: unknown): DeviceSnapshot {
     try { value = (raw as Record<string, unknown>)[field]; } catch { continue; }
     if (kind === 'text' || kind === 'long') { const said = text(value, kind === 'long' ? LONG_MAX : TEXT_MAX); if (said !== undefined) out[field] = said; }
     else if (kind === 'number') { if (typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 1e9) out[field] = Math.round(value * 1000) / 1000; }
+    else if (kind === 'actor') { if (value === 'human' || value === 'agent') out[field] = value; }
     else if (kind === 'flag') { if (typeof value === 'boolean') out[field] = value; }
     else if (Array.isArray(value)) {
       const items = value.slice(0, LIST_ITEMS).map(item => text(item, ITEM_MAX)).filter((item): item is string => item !== undefined);

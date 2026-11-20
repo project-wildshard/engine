@@ -3,6 +3,7 @@ import { createServer, type Server } from 'node:http';
 import { afterEach, expect, test, vi } from 'vitest';
 import { parse } from 'valibot';
 import { zoneSelectPressRoute } from '../src/server/host/dedicated/zoneSelectPress';
+import { MarkerSeats } from '../src/server/host/dedicated/markerSeats';
 import { metricsCurrentRoute } from '../src/server/host/dedicated/metricsCurrentRoute';
 import { zoneSelectRoute, zoneSelectTabs } from '../src/server/host/dedicated/zoneSelect';
 import { ZoneSelectSchema, type ZoneSelectCard } from '../src/shared/game/grid/zoneSelectRows';
@@ -150,4 +151,20 @@ test('the metrics door reads only the requested window and the live seat totals'
   expect(entries).toHaveBeenCalledExactlyOnceWith(7);
   expect((await fetch(new URL('/metrics/current/2', door))).status).toBe(404);
   expect((await fetch(door, { method: 'POST' })).status).toBe(405);
+});
+
+test('marker audit holds mismatches with their confirmed seat and forgets old buckets', async () => {
+  let now = 0;
+  const audit = new MarkerSeats(() => now);
+  const minute = audit.seated();
+  expect(audit.leak(minute, { actor: 'agent', lane: 'web-smoke', why: 'user-agent' }, 'human')).toBe(true);
+  expect(audit.leak(minute, { actor: 'agent', why: 'automated-ua' }, undefined)).toBe(false);
+  const door = await open(metricsCurrentRoute({
+    channel: 'staging', entries: async () => [], selection: async () => ({ popular: [] }),
+    live: () => ({ humans: 0, agents: 0, zones: {} }), log: () => undefined,
+    markers: () => audit.read(),
+  }), '/metrics/markers');
+  expect(await (await fetch(door)).json()).toEqual({ channel: 'staging', since: 0, seats: 1, leaks: 1, lanes: { 'web-smoke': 1 } });
+  now = 3_600_000;
+  expect(audit.read()).toEqual({ since: 60_000, seats: 0, leaks: 0, lanes: {} });
 });

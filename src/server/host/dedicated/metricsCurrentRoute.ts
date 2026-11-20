@@ -2,6 +2,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RoomMetricChannel } from './saves/metricsDailyStore';
 import type { ZoneEntryTotal } from './saves/zoneEntries';
+import type { MarkerReading } from './markerSeats';
 import type { World } from './world';
 import type { ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 
@@ -23,6 +24,7 @@ interface OverviewOptions {
   readonly selection: (entries: readonly ZoneEntryTotal[]) => Promise<Pick<ZoneSelectDocument, 'popular'>>;
   readonly log: (line: Record<string, unknown>) => void;
   readonly now?: () => number;
+  readonly markers?: () => MarkerReading;
 }
 
 export function metricsCurrentRoute(options: OverviewOptions): (request: IncomingMessage, response: ServerResponse) => boolean {
@@ -51,6 +53,12 @@ export function metricsCurrentRoute(options: OverviewOptions): (request: Incomin
   }
   return (request, response) => {
     const path = request.url?.split('?')[0] ?? '';
+    if (path === '/metrics/markers' && options.markers !== undefined) {
+      if (request.method !== 'GET') { response.writeHead(405, { allow: 'GET' }).end(); return true; }
+      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'public, max-age=30' })
+        .end(JSON.stringify({ channel: options.channel, ...options.markers() }));
+      return true;
+    }
     if (!path.startsWith(PREFIX)) return false;
     const days = WINDOWS.get(path.slice(PREFIX.length));
     if (days === undefined) { response.writeHead(404).end(); return true; }

@@ -11,6 +11,8 @@ import { encodeDeviceWord, worldReadsDevice } from '@wildshard/engine/net/device
 import { subscribePersistence, type PersistenceWord } from '@wildshard/engine/net/persistenceWord';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
 import {NetRecords} from '@wildshard/engine/net/netRecord';
+import { pageActor } from '@wildshard/engine/telemetry/pageActor';
+import { actorTags } from '@wildshard/engine/app/actor';
 import {onlineTelemetry} from '@wildshard/engine/telemetry/runtime';
 import type {NetRecord,NetCorrection} from '@wildshard/engine/net/measurements';
 import { markUnload } from '@wildshard/engine/boot/lastEnd';
@@ -134,7 +136,7 @@ const DEVICE_GPU_WAIT_MS = 10_000;
 function sendDevice(transport: WebSocketTransport, build: string): void {
   const send = async (): Promise<void> => {
     const { deviceSnapshot } = await import('@wildshard/engine/telemetry/deviceSnapshot');
-    transport.control('device', encodeDeviceWord({ ...await deviceSnapshot(DEVICE_GPU_WAIT_MS), build }));
+    transport.control('device', encodeDeviceWord({ ...await deviceSnapshot(DEVICE_GPU_WAIT_MS), build, ...actorTags(pageActor()) }));
   };
   void send().catch(() => undefined);
 }

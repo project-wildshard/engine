@@ -43,7 +43,15 @@ import { SeatQueue } from './seatQueue';
 import type { ZoneEntryStore } from './saves/zoneEntries';
 import type { RoomSessions, RoomSessionStore } from './roomSessions';
 import type { RoomGameStore } from './roomGameMetrics';
+import { MarkerSeats, type MarkerReading } from './markerSeats';
 import type { ReadRoomMetricDay } from './saves/metricsDailyStore';
+
+interface SocketActor {
+  mark: ActorMark;
+  claimed?: ActorTags['actor'];
+  seatMinute?: number;
+  leaked?: boolean;
+}
 
 export interface LivePlayers {
   readonly humans: number;
@@ -229,8 +237,9 @@ export class World {
   private readonly queue = new SeatQueue();
   /** DEVICE-TELEMETRY DT4: each socket's device word and the player its hello named, until the one `client.device` line is written. */
   private readonly devices = new WeakMap<SocketTransport, { said?: DeviceSnapshot; who?: DeviceWho; done: boolean }>();
-  private readonly actors = new WeakMap<SocketTransport, { mark: ActorMark }>();
-  private readonly seatActors = new Map<string, { mark: ActorMark }>();
+  private readonly actors = new WeakMap<SocketTransport, SocketActor>();
+  private readonly seatActors = new Map<string, SocketActor>();
+  private readonly markerSeats = new MarkerSeats();
   /** Clients loading: each holds a seat, and has no body yet. */
   private readonly pending = new Map<string, PendingSeat>();
   /** Who has a body, by link or by hold, and in which cell. */
@@ -417,6 +426,14 @@ export class World {
         this.voiceBodies.get(device)?.(body);
         const socket=this.seatSockets.get(device);
         if (socket !== undefined && socket.admission === news.admission) {
+          if (!socket.confirmed) {
+            const observed = this.seatActors.get(device);
+            const minute = this.markerSeats.seated();
+            if (observed !== undefined) {
+              observed.seatMinute = minute;
+              this.markLeak(observed);
+            }
+          }
           socket.confirmed = true;
           const actor = this.seatActors.get(device)?.mark;
           if (actor !== undefined) this.options.sessions?.seated(device, roadHome(from) === null ? cellShard(from) : null, actor);
@@ -597,9 +614,20 @@ export class World {
     const said = readDeviceWord(bytes);
     if (said === null) { this.refuse('device-word'); this.options.log({ at: 'client.device-refused', bytes: bytes.byteLength }); seen.done = true; this.devices.set(end, seen); return; }
     const actor = this.actors.get(end);
-    if (actor !== undefined && actor.mark.actor === 'human') actor.mark = classifyActor({ userAgent: said.ua });
+    if (actor !== undefined) {
+      if (said.actor !== undefined) actor.claimed = said.actor;
+      if (actor.mark.actor === 'human') actor.mark = classifyActor({
+        userAgent: said.ua, stored: said.actor === 'agent' ? said.lane ?? '1' : null,
+      });
+      this.markLeak(actor);
+    }
     seen.said = said; this.devices.set(end, seen); this.deviceSeen(end);
   }
+  private markLeak(actor: SocketActor): void {
+    if (actor.leaked !== true && actor.seatMinute !== undefined) actor.leaked = this.markerSeats.leak(actor.seatMinute, actor.mark, actor.claimed);
+  }
+  markerReading(): MarkerReading { return this.markerSeats.read(); }
+
   /** DT4: the hello named this socket's player. */
   private devicePlayer(end: SocketTransport, who: DeviceWho): void {
     const seen = this.devices.get(end) ?? { done: false };

@@ -171,7 +171,7 @@ const dailyMetrics = saves.metricsDaily === undefined || release.channel === 'pr
   : roomMetricsDailyRoute({ channel: release.channel, read: saves.metricsDaily, log });
 const metricsChannel = release.channel;
 const currentMetrics = arrivals === undefined || metricsChannel === 'preview' ? undefined : metricsCurrentRoute({
-  channel: metricsChannel, live: () => world.livePlayers(), entries: days => arrivals.totals(days), log,
+  channel: metricsChannel, markers: () => world.markerReading(), live: () => world.livePlayers(), entries: days => arrivals.totals(days), log,
   selection: async entries => zoneSelectTabs(metricsChannel, { serial: release.serial, slugs: world.openShards() },
     await readZoneUploads(catalogueAt).catch(() => []), entries),
 });

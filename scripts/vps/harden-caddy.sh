@@ -56,7 +56,7 @@ https://$host {
 	# METRICS: only dated and current aggregates go out. The loopback Prometheus port and /health stay private.
 	@room_metrics {
 		method GET
-		path /metrics/daily/* /metrics/current/*
+		path /metrics/daily/* /metrics/current/* /metrics/markers
 	}
 	handle @room_metrics {
 		reverse_proxy 127.0.0.1:$port
