@@ -26,7 +26,7 @@ export function agentHeaders() {
  * @param {string} address */
 export function agentUrl(address) {
   const url = new URL(address);
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return address;
+  if (!['http:', 'https:', 'ws:', 'wss:'].includes(url.protocol)) return address;
   if (url.searchParams.get(AGENT_QUERY)) return address;
   url.searchParams.set(AGENT_QUERY, name());
   return url.href;

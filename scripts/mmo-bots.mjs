@@ -33,6 +33,9 @@
 // (`serverFrom`). Every value that reaches the host's shell is a checked slug, number, hex or fixed path.
 // Everything goes in tmp/mmo-bots/<stamp>/ by default, or in the bounded `--work-dir tmp/<lane>/...` path; the release tree is
 // removed after the run and the report stays.
+// oxlint-disable-next-line import/no-unassigned-import -- Install the network marker for this probe.
+import './agent-fetch.mjs';
+import { agentUrl } from './agent-marker.mjs';
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -271,7 +274,8 @@ if (mode === 'replica') {
 requireCandidate();
 if (mode === 'staging' && !outsideProof) await stagingRoom('before the first hello');
 const result = join(work, 'bots.json'), playing = readings.length;
-const botArgs = [url, release.engineBuild, String(bots), String(seconds), tag];
+const botUrl = agentUrl(url);
+const botArgs = [release.engineBuild, String(bots), String(seconds), tag];
 if (botsOnHost && hostSsh !== null) {
   // The bots' one bundle (no wasm: their route cursor is plain math) goes to the run's host directory; nothing else of this Mac does.
   hostSsh(`mkdir -p ${away}/bots && cat > ${away}/bots/mmoBots.mjs`, readFileSync(join(out, 'mmoBots.mjs')));
@@ -280,8 +284,8 @@ if (botsOnHost && hostSsh !== null) {
 let checkpointRestart = null;
 const code = await new Promise(resolve => {
   const child = botsOnHost && remote !== undefined
-    ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
-    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : '', values.tailnet ? 'tailnet' : 'public'], { stdio: ['ignore', 'pipe', 'inherit'] });
+    ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" '${botUrl}' ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
+    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), botUrl, ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : '', values.tailnet ? 'tailnet' : 'public'], { stdio: ['ignore', 'pipe', 'inherit'] });
   botsChild = child;
   let restart = Promise.resolve();
   // E7.4b.c: at this second, the helper either restarts the scratch cluster or arms a restart during a checkpoint.

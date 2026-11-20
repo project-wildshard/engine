@@ -9,6 +9,7 @@
 // would have. Never through Funnel: staging's bots use the Mac's one address, so at most 4 join it.
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
+import { agentHeaders, agentUserAgent } from '../../../scripts/agent-marker.mjs';
 import { NET_BUTTONS } from '../../../src/shared/engine/input/netButtons';
 import { PLAYER_CLASS } from '../../../src/shared/engine/net/netSchemas';
 import { PhysicsRouteCursor, type WalkPoint } from '../../../src/shared/host/headlessJourney';
@@ -47,10 +48,9 @@ const STAGING_PAGE = 'https://staging.wildshard.io';
 /** `RoomBot` dials the global `WebSocket` as it is made; for that moment it is one that says this bot's address and, off loopback,
  *  the staging page's Origin. */
 function withAddress<T>(index: number, make: () => T): T {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...agentHeaders(), 'user-agent': agentUserAgent('node') };
   if (addresses === 'forwarded') headers['x-forwarded-for'] = `198.18.${String(Math.floor(index / 250))}.${String(index % 250 + 1)}`;
   if (!loopback) headers['origin'] = STAGING_PAGE;
-  if (Object.keys(headers).length === 0) return make();
   const Native = globalThis.WebSocket;
   globalThis.WebSocket = class extends Native { constructor(at: string | URL) { super(at, { headers } as unknown as string[]); } };
   try { return make(); } finally { globalThis.WebSocket = Native; }

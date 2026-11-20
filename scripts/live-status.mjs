@@ -7,6 +7,8 @@
 // it answers yes/no per channel for the page and the server: local git first (`merge-base --is-ancestor`), else
 // GitHub's public compare API (on the reader App token when this machine has one, scripts/gh-limit.mjs).
 // Exit 0 when every source answered; 1 when one could not be read (its line says which); 2 on bad arguments.
+// oxlint-disable-next-line import/no-unassigned-import -- Install the network marker for this probe.
+import './agent-fetch.mjs';
 import {spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 import {readerToken} from './gh-limit.mjs';

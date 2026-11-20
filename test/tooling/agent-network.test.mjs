@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
+import { test, vi } from 'vitest';
+import { agentHeaders, agentUserAgent } from '../../scripts/agent-marker.mjs';
+import { markedFetch } from '../../scripts/agent-fetch.mjs';
+
+test('passes third-party reads through and marks only the game request', async () => {
+  const original = vi.fn(async () => new Response(null, { status: 204 }));
+  const fetch = markedFetch(original);
+  const external = 'https://api.github.com/';
+  await fetch(external);
+  assert.deepEqual(original.mock.calls[0], [external, undefined]);
+  const request = new Request('https://staging.wildshard.io/health', { headers: { 'x-proof': 'caller' } });
+  await fetch(request);
+  const [, options] = original.mock.calls[1] ?? [];
+  assert.ok(options?.headers instanceof Headers);
+  assert.equal(options.headers.get('x-proof'), 'caller');
+  assert.equal(options.headers.get('x-wildshard-agent'), agentHeaders()['x-wildshard-agent']);
+  assert.equal(options.headers.get('user-agent'), agentUserAgent('node'));
+});
+
+test('preloaded fetch and WebSocket preserve the handshake and mark an owned endpoint', async () => {
+  const server = createServer((request, response) => response.end(JSON.stringify(request.headers)));
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  try {
+    const base = `127.0.0.1:${address.port}`;
+    const headers = await (await fetch(`http://${base}/`, { headers: { 'user-agent': 'Proof UA' } })).json();
+    const marker = agentHeaders()['x-wildshard-agent'];
+    assert.equal(headers['x-wildshard-agent'], marker);
+    assert.equal(headers['user-agent'], agentUserAgent('Proof UA'));
+
+    const upgraded = once(server, 'upgrade');
+    const link = new WebSocket(`ws://${base}/?cell=proof`, 'sample-protocol');
+    link.addEventListener('error', () => undefined);
+    const [request, socket] = await upgraded;
+    socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    const destination = new URL(request.url, `http://${base}`);
+    assert.equal(destination.searchParams.get('cell'), 'proof');
+    assert.equal(destination.searchParams.get('agent'), marker);
+    assert.equal(request.headers['x-wildshard-agent'], marker);
+    assert.equal(request.headers['sec-websocket-protocol'], 'sample-protocol');
+  } finally { await new Promise(resolve => { server.close(resolve); }); }
+});

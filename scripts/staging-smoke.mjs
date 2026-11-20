@@ -22,6 +22,8 @@
 //   (c) the T1 suite (src/e2e/t1) or the J386 gate (verify-staging.sh) cannot hold it, and
 //   (d) it adds at most 45 s, keeping the whole run under 10 minutes.
 // Otherwise it becomes a hard check in an existing scenario, or an engine T1 test.
+// oxlint-disable-next-line import/no-unassigned-import -- Install the network marker for this probe.
+import './agent-fetch.mjs';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { SCENARIOS, runScenario } from './staging-smoke/scenarios.mjs';
