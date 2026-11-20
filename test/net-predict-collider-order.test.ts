@@ -90,11 +90,13 @@ test('far-reach: a walk glancing off the windmill is the same in any collider or
  * on the floor, inside the stone, and steps the same in any collider order.
  */
 test('nine-dragon-stack: a walk pressed along the balustrade stays on the floor in any collider order', () => {
-  interface Placed { readonly id: string; readonly name: string; readonly file: string; readonly category?: string; readonly surface: string; readonly colliderOwner?: string; readonly when?: { readonly variant?: string }; readonly colliders: readonly { readonly kind: string }[] }
-  const scene = JSON.parse(readFileSync('out/nine-dragon-stack/sections/world/scenes.json', 'utf8')) as { entry: { blocks: { pieces: Placed[] } } };
-  const nine = scene.entry.blocks.pieces.filter(piece => piece.when?.variant !== 'open').map(piece => ({ id: piece.id, name: piece.name, file: piece.file, active: true,
-    ...(piece.category === undefined ? {} : { category: piece.category }), surface: piece.surface, ...(piece.colliderOwner === undefined ? {} : { owner: piece.colliderOwner }),
-    colliders: piece.colliders.filter(collider => collider.kind === 'box') })) as unknown as Piece[];
+  // ONE-FORMAT OF21 (Nine rev 6): the scene pieces carry no colliders; the room builds the shard's own prop rows, the open
+  // world's solids (`props.colliders`, no panel, active at load), so the walk stands on those.
+  interface Row { readonly id: string; readonly initialActive: boolean; readonly panel: string | null; readonly shapes: readonly { readonly kind: string; readonly surface?: string }[] }
+  const props = JSON.parse(readFileSync('out/nine-dragon-stack/sections/world/props.json', 'utf8')) as { props: { colliders: Row[] } };
+  const nine = props.props.colliders.filter(row => row.initialActive && row.panel === null).map(row => ({ id: row.id, name: row.id, file: '',
+    active: true, surface: row.shapes[0]?.surface ?? 'stone', colliders: row.shapes.filter(shape => shape.kind === 'box') })) as unknown as Piece[];
+  expect(nine.some(piece => piece.id.startsWith('nds-well-balustrade'))).toBe(true);
   const pressed: Step = () => ({ x: -1 / 60, y: -22 / 3600, z: -7 / 60 });
   // the stone's inner face (squareParts WELL_RUNS: x = 0.2 by the square, 0.7 by the street, a 0.62 m plinth) plus the radius
   for (const [run, start, face] of [['square', { x: 0.95, y: 125.02, z: 7.5 }, 0.2 + 0.31], ['street', { x: 1.6, y: 125.02, z: -28 }, 0.7 + 0.31]] as const) {
