@@ -69,3 +69,20 @@ test('a lap counts only once driven: a point near the start on lap one is not la
   expect(rivalAdvance(course, course.length - 3, start.x, start.z - 2)).toBeCloseTo(course.length + 2, 0);
   expect(rivalAdvance(course, 10, 30, -60)).toBeLessThan(70); // across the infield on the back straight: still the first
 });
+
+test('in a sail, downwind or upwind, he drives to his speed, not to a fixed stick', () => {
+  const line: [number, number, number][] = [[0, 0, 0], [0, 0, -400]];
+  for (const toward of [[0, -1], [0, 1]] as const) { // with the wind, then into it
+    const sail: VehicleHandling = { ...SAIL, speed: 12, wind: { toward: [...toward], push: 4 } };
+    const course = rivalCourse(line, false, sail, 4.5);
+    let state: VehicleState = vehicleAt({ x: 0, y: 0, z: 0 }, 0), travelled = 0;
+    const speeds: number[] = [];
+    for (let i = 0; i < 60 * 30; i++) {
+      state = stepVehicle(state, rivalCommand(state, course, travelled, 0, 40, sail, 4.5), sail, FLAT, DT);
+      travelled = rivalAdvance(course, travelled, state.x, state.z);
+      if (i > 60 * 5) speeds.push(state.forward);
+    }
+    expect(Math.max(...speeds)).toBeLessThan(4.5 + 1); // the wind behind him adds nothing past his speed
+    expect(Math.min(...speeds)).toBeGreaterThan(4.5 - 1); // nor holds him back under it
+  }
+});

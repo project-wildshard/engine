@@ -32,6 +32,9 @@ const TURN_ERROR = 0.7, TURN_SPEED = 6;
 export const RIVAL_EASE = 0.6, RIVAL_PUSH = 1.15;
 /** m/s over his target past which he brakes rather than lifts. */
 const BRAKE_OVER = 1.5;
+/** Of each m/s he is off his target, the share of his stick he adds (under) or takes off (over): a sail's wind pushes him
+ *  past a fixed stick downwind and holds him back upwind, so he drives to his speed, not to a stick. */
+const SPEED_GAIN = 1.5;
 /** m either side of his last place along the line a projection searches (so a line that passes near itself is never cut). */
 const SEARCH = 60;
 
@@ -115,6 +118,6 @@ export function rivalCommand(state: VehicleState, course: RivalCourse, travelled
   else if (lead < -band) target *= RIVAL_PUSH;
   if (Math.abs(error) > TURN_ERROR) target = Math.min(target, TURN_SPEED);
   const boost = target > handling.speed && handling.boost > 1, most = handling.speed * (boost ? handling.boost : 1);
-  const throttle = state.forward > target + BRAKE_OVER ? -clamp((state.forward - target) / (4 * BRAKE_OVER), 0, 1) : clamp(target / most, 0, 1);
+  const throttle = state.forward > target + BRAKE_OVER ? -clamp((state.forward - target) / (4 * BRAKE_OVER), 0, 1) : clamp((target + SPEED_GAIN * (target - state.forward)) / most, 0, 1);
   return { throttle, turn, boost };
 }
