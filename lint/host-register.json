@@ -23,6 +23,8 @@
     {"key":"src/shared/game/boss/slotLaw.ts#SlotEncounterLaw","kept":"game G601","merged":["silly G520 (chargebacks:18)"]}
   ],
   "dropped": [
+    {"key":"src/client/game/boss/presentation.ts","from":{"source":"pending-users","line":1313,"selector":"src/client/game/boss/presentation.ts"},"reason":"deleted by ONE-FORMAT OF22c3: Driftwood declares its Captain, no shared boss presentation"},
+    {"key":"src/shared/game/boss/wake.ts","from":{"source":"pending-users","line":1296,"selector":"src/shared/game/boss/wake.ts"},"reason":"deleted by ONE-FORMAT OF22c3: Driftwood declares its Captain, no shared boss wake"},
     {"key":"src/sharddev/bake/post-graph-look.test.ts","from":{"source":"host-bar","line":75,"selector":"src/sharddev/bake/post-graph-look.test.ts"},"reason":"a test file the line cites, not a host"},
     {"key":"src/game/server/systems/looks/trample-trail.test.ts","from":{"source":"host-bar","line":77,"selector":"src/game/server/systems/looks/trample-trail.test.ts"},"reason":"a test file the line cites, not a host"},
     {"key":"game/server/population/pageGroups#PageActorGroups","from":{"source":"host-bar","line":83,"selector":"game/server/population/pageGroups#PageActorGroups"},"reason":"no such module in engine or the pinned format package"},
