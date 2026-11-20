@@ -159,10 +159,15 @@ test('steps round a pillar on the straight line: a hop, then side-steps that alt
 
 test("a fresh guest reaches the gate's centre line first, then walks along it to the approach", (): void => {
   // mirror-salt's straight line from its spawn to the west approach climbs onto a ledge and meets a rock wall at
-  // (1455, 1717); the centre line from (1673, 1687.5) is clear (opus-gate-p0, staging 6bab8fcc)
+  // (1455, 1717); the centre line is clear (opus-gate-p0, staging 6bab8fcc)
   const center = {x:1687.5, z:1687.5};
   expect(spawnApproach('mirror-salt', {x:1673, z:1837.5}, center, -1, 0)).toEqual([
-    {x:1673, z:1687.5, ride:false}, {x:1452.5, z:1687.5, ride:false}]);
+    {x:1562.5, z:1687.5, ride:false}, {x:1452.5, z:1687.5, ride:false}]);
+  // it joins the line on the gate's half, clear of the centre (open-plot-4-2's centre piece held the walker at (1134.9, 8.7))
+  expect(spawnApproach('open-plot-4-2', {x:1124, z:-45}, {x:1125, z:0}, -1, 0)).toEqual([
+    {x:1000, z:0, ride:false}, {x:890, z:0, ride:false}]);
+  expect(spawnApproach('pastel-plain', {x:-562.5+200, z:30}, {x:-562.5, z:0}, 0, 1)).toEqual([
+    {x:-562.5, z:125, ride:false}, {x:-562.5, z:235, ride:false}]);
   // already on the line: straight along it
   expect(spawnApproach('open-plot-2-0', {x:-1, z:-1170}, {x:0, z:-1125}, 0, 1)).toEqual([{x:0, z:-890, ride:false}]);
   // Driftwood keeps the shore route round its harbour

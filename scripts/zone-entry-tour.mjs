@@ -415,8 +415,9 @@ async function smokeApproach(page, leg, center, pitch, end) {
 }
 
 /** A fresh guest's walk from its spawn to the gate approach, `dx`/`dz` the gate's side. Driftwood keeps the original gate
- *  proof's shore route round its harbour. Elsewhere the walker reaches the gate's centre line first and walks along it: the
- *  entryway's line is clear, and a straight line from the spawn can climb onto a ledge and meet a wall (mirror-salt's west).
+ *  proof's shore route round its harbour. Elsewhere the walker joins the gate's centre line on the gate's half of the cell
+ *  and walks along it: the entryway's line is clear, a straight line from the spawn can climb onto a ledge and meet a wall
+ *  (mirror-salt's west), and the cell's centre piece stands on the line (open-plot-4-2's).
  * @param {string} instance @param {Point} at @param {Point} center @param {number} dx @param {number} dz @returns {ApproachPoint[]} */
 export function spawnApproach(instance, at, center, dx, dz) {
   /** @type {(readonly [number,number])[]} */
@@ -424,8 +425,12 @@ export function spawnApproach(instance, at, center, dx, dz) {
   if (instance === DRIFTWOOD) {
     if (dx !== 0) lead = [[dx*235,-194]];
     else if (dz > 0) lead = [[-235,-194],[-235,0],[-200,20],[-200,235]];
-  } else if (dx !== 0 && Math.abs(at.z-center.z) > 3) lead = [[at.x-center.x, 0]];
-  else if (dz !== 0 && Math.abs(at.x-center.x) > 3) lead = [[0, at.z-center.z]];
+  } else {
+    // join the line on the gate's half, never nearer the centre than HALF/2: a cell's centre piece stands on its lines
+    const along = dx !== 0 ? (at.x-center.x)*dx : (at.z-center.z)*dz, onto = dx*Math.max(along, HALF/2), ontoZ = dz*Math.max(along, HALF/2);
+    if (dx !== 0 && Math.abs(at.z-center.z) > 3) lead = [[onto, 0]];
+    else if (dz !== 0 && Math.abs(at.x-center.x) > 3) lead = [[0, ontoZ]];
+  }
   return [...lead, /** @type {const} */ ([dx*(HALF-15),dz*(HALF-15)])]
     .map(([x,z]) => ({x:center.x+x,z:center.z+z,ride:false}));
 }

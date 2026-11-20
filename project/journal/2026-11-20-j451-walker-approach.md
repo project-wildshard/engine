@@ -19,5 +19,7 @@ toward its point again.
 A third case came up on the rerun. mirror-salt's straight line from its
 spawn to the west approach climbs onto a ledge and runs into a rock
 wall, and side-steps don't clear it. A fresh guest away from Driftwood
-now walks to the gate's centre line first, then along that line to the
-approach. Driftwood keeps its shore route.
+now joins the gate's centre line on the gate's half of the cell, at
+least HALF/2 from the centre, then walks along that line to the
+approach. Joining the line at the centre stalled open-plot-4-2 on its
+centre piece. Driftwood keeps its shore route.
