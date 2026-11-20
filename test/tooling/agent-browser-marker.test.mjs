@@ -35,8 +35,8 @@ test('launch, attach and persistent contexts are marked exactly once', async () 
   const instance = { chromium: engine };
   installBrowserActorMarker(instance);
   installBrowserActorMarker(instance);
-  const options = { userAgent: 'Phone UA', extraHTTPHeaders: { 'X-Proof': 'yes' }, isMobile: true };
-  const expected = { ...options, userAgent: agentUserAgent(options.userAgent), extraHTTPHeaders: { 'x-proof': 'yes', ...agentHeaders() } };
+  const options = { userAgent: 'Phone UA', extraHTTPHeaders: { 'X-Proof': 'yes', 'X-Wildshard-Agent': 'old' }, isMobile: true };
+  const expected = { ...options, userAgent: agentUserAgent(options.userAgent), extraHTTPHeaders: { 'X-Proof': 'yes' } };
   for (const launch of [engine.launch, engine.connect, engine.connectOverCDP]) {
     const opened = await launch();
     assert.deepEqual(await opened.newContext(options), expected);
@@ -48,25 +48,51 @@ test('launch, attach and persistent contexts are marked exactly once', async () 
 
 // The hosted share can have full Chromium without the separate headless shell.
 const executablePath = chromium.executablePath();
-test.skipIf(!existsSync(executablePath))('a wrapped iPhone context sends the marker to an owned page', async () => {
-  const server = createServer((request, response) => response.end(JSON.stringify(request.headers)));
+/** @param {import('node:http').RequestListener} handle */
+async function origin(handle) {
+  const server = createServer(handle);
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
   assert.ok(address && typeof address !== 'string');
+  return { url: `http://127.0.0.1:${address.port}/`, close: () => new Promise(resolve => { server.close(resolve); }) };
+}
+
+test.skipIf(!existsSync(executablePath))('phone and default pages keep their marker without a cross-origin preflight', async () => {
+  const own = await origin((request, response) => response.end(JSON.stringify(request.headers)));
+  /** @type {Array<string | undefined>} */
+  const methods = [];
+  const content = await origin((request, response) => {
+    methods.push(request.method);
+    if (request.method === 'OPTIONS') { response.writeHead(403).end(); return; }
+    response.setHeader('Access-Control-Allow-Origin', '*');
+    response.end(JSON.stringify(request.headers));
+  });
   try {
     const browser = await chromium.launch({ executablePath, headless: true, args: [...KEYCHAIN_ARGS] });
     try {
       const phone = devices['iPhone 13'];
       assert.ok(phone);
       const page = await browser.newPage(phone);
-      const reply = await page.goto(`http://127.0.0.1:${address.port}/`);
+      const reply = await page.goto(own.url);
       const headers = await reply?.json();
-      assert.equal(headers?.['x-wildshard-agent'], agentHeaders()['x-wildshard-agent']);
+      assert.equal(headers?.['x-wildshard-agent'], undefined);
       assert.equal(headers?.['user-agent'], agentUserAgent(phone.userAgent));
       assert.equal(await page.evaluate(() => navigator.userAgent), agentUserAgent(phone.userAgent));
+
+      const context = await browser.newContext();
+      const plainPage = await context.newPage();
+      const plainReply = await plainPage.goto(own.url);
+      const plainHeaders = await plainReply?.json();
+      assert.equal(plainHeaders?.['x-wildshard-agent'], undefined);
+      assert.equal(await plainPage.evaluate(() => navigator.userAgent), agentUserAgent(plainHeaders?.['user-agent']));
+      for (const tab of [page, plainPage]) {
+        const cross = await tab.evaluate(async url => (await fetch(url)).json(), content.url);
+        assert.equal(cross['x-wildshard-agent'], undefined);
+      }
+      assert.deepEqual(methods, ['GET', 'GET']);
     } finally { await browser.close(); }
-  } finally { await new Promise(resolve => { server.close(resolve); }); }
+  } finally { await Promise.all([own.close(), content.close()]); }
 });
 
 test('native game URL launchers import the agent marker', () => {

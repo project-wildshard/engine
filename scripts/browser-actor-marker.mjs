@@ -1,16 +1,34 @@
-import { agentHeaders, agentUserAgent } from './agent-marker.mjs';
+import { agentUserAgent } from './agent-marker.mjs';
+import markers from '../src/shared/engine/app/actorMarkers.json' with { type: 'json' };
 
 const browsers = new WeakSet();
 const engines = new WeakSet();
 
 /** @template {import('playwright').BrowserContextOptions} Options @param {Options} [options] */
 function markedContext(options) {
-  const headers = Object.fromEntries(Object.entries(options?.extraHTTPHeaders ?? {}).map(([key, value]) => [key.toLowerCase(), value]));
+  const headers = options?.extraHTTPHeaders;
   return {
     ...options,
-    extraHTTPHeaders: { ...headers, ...agentHeaders() },
+    ...(headers === undefined ? {} : {
+      extraHTTPHeaders: Object.fromEntries(Object.entries(headers).filter(([key]) => key.toLowerCase() !== markers.header)),
+    }),
     ...(options?.userAgent === undefined ? {} : { userAgent: agentUserAgent(options.userAgent) }),
   };
+}
+
+/** Keep the engine's default network UA when the caller did not specify a device.
+ * The app reads this suffix and carries its actor marker to the room.
+ * @template {import('playwright').BrowserContext | import('playwright').Page} Target
+ * @param {Target} target @param {string | undefined} userAgent @returns {Promise<Target>}
+ */
+async function markDefaultUA(target, userAgent) {
+  if (userAgent === undefined) {
+    await target.addInitScript((suffix) => {
+      const base = navigator.userAgent;
+      Object.defineProperty(navigator, 'userAgent', { configurable: true, value: `${base} ${suffix}` });
+    }, agentUserAgent(''));
+  }
+  return target;
 }
 
 /** @param {import('playwright').Browser} browser */
@@ -18,8 +36,8 @@ function markedBrowser(browser) {
   if (browsers.has(browser)) return browser;
   browsers.add(browser);
   const context = browser.newContext.bind(browser), page = browser.newPage.bind(browser);
-  browser.newContext = options => context(markedContext(options));
-  browser.newPage = options => page(markedContext(options));
+  browser.newContext = async options => markDefaultUA(await context(markedContext(options)), options?.userAgent);
+  browser.newPage = async options => markDefaultUA(await page(markedContext(options)), options?.userAgent);
   return browser;
 }
 
@@ -38,7 +56,7 @@ export function installBrowserActorMarker(playwright) {
     }
     if (typeof engine.launchPersistentContext === 'function') {
       const persistent = engine.launchPersistentContext.bind(engine);
-      engine.launchPersistentContext = (dir, options) => persistent(dir, markedContext(options));
+      engine.launchPersistentContext = async (dir, options) => markDefaultUA(await persistent(dir, markedContext(options)), options?.userAgent);
     }
   }
 }
