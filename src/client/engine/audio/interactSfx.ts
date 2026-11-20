@@ -88,8 +88,9 @@ export class InteractSfx {
   }
 
   /** an interactable's sound, placed at the object */
-  interact(sound: InteractSound, at?: At, o: { gain?: number; delay?: number; release?: boolean } = {}): void {
+  interact(sound: InteractSound, at?: At, o: { gain?: number; delay?: number; release?: boolean } = {}): boolean {
     const base = INTERACT_LEVEL[sound] * (o.gain ?? 1) * (o.release === true ? 0.6 : 1);
-    this.audio.voices.play(`ui-${sound}`, { gain: base, rate: o.release === true ? 1.18 : 1, at, delay: o.delay ?? 0, jitter: sound === 'chime' || sound === 'glyph' ? 0.02 : 0.05 });
+    // MZ31: whether it sounded (a quest landing logs it)
+    return this.audio.voices.play(`ui-${sound}`, { gain: base, rate: o.release === true ? 1.18 : 1, at, delay: o.delay ?? 0, jitter: sound === 'chime' || sound === 'glyph' ? 0.02 : 0.05 }) !== undefined;
   }
 }

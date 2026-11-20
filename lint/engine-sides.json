@@ -927,6 +927,7 @@
     "src/client/game/quest/chapterDirector.ts": "client",
     "src/client/game/quest/chapterView.ts": "client",
     "src/client/game/quest/continuation.ts": "client",
+    "src/client/game/quest/questLanding.ts": "client",
     "src/client/game/quest/contractBoardPage.ts": "client",
     "src/client/game/quest/declaredPage.ts": "client",
     "src/client/game/quest/elitePage.ts": "client",

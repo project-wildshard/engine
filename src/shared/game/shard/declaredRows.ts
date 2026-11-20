@@ -52,8 +52,8 @@ function journalStats(rules: JournalRow['stats']['default'], entry: EntryDef, st
 }
 function declaredJournal(row: JournalRow, image?: (ref: string) => string): ShardCompendium {
   if (image === undefined) throw new Error('Rich journal requires admitted image URLs');
-  const icons = row.icons.map(rule => ({ ...rule, resolved: 'image' in rule ? { image: image(rule.image),
-    ...(rule.tint === undefined ? {} : { tint: rule.tint }) } : rule.icon }));
+  // format 0.56 (shard-format 036b383, codex-ci21): every selector names an image, never a glyph
+  const icons = row.icons.map(rule => ({ ...rule, resolved: { image: image(rule.image), ...(rule.tint === undefined ? {} : { tint: rule.tint }) } }));
   const entries = row.entries.map(entry => ({ ...entry, plate: { ...entry.plate, sketch: image(entry.plate.sketch),
     ...(entry.plate.silhouette === undefined ? {} : { silhouette: image(entry.plate.silhouette) }) } }));
   return { chunkId: row.chunkId, skin: { className: row.className, title: row.title, tabs: row.tabs,

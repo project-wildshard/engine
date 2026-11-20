@@ -10,6 +10,7 @@ import { BLANK_CHIP, installDeclaredQuests, type QuestPresenter } from '../shard
 import { wirePage } from '../shardfile/wirePage';
 import type { RegionalRuntimePage } from './regionalRuntime';
 import { stayContext } from './stayContext';
+import { enteredLandingPorts, installQuestLandings } from '../quest/questLanding';
 
 /** The events and the presentation the quests use: the page's (`enterDataCellQuests`), or a test's. */
 export interface DataCellQuestPorts { readonly events?: Events; readonly present: QuestPresenter }
@@ -29,5 +30,8 @@ export async function enterDataCellQuests(source: Pick<Shardfile, 'quests' | 'id
   const ui = await import('../plugin/ui');
   if (stay.disposed || stay.disposing) return;
   const at = stayContext(page.context, stay, instance);
-  installCellQuests(source, stay, here, { events: at.app.events, present: (quest, options) => { ui.installQuestPresentation(at, quest, options); } });
+  const states = installCellQuests(source, stay, here, { events: at.app.events, present: (quest, options) => { ui.installQuestPresentation(at, quest, options); } });
+  // meta MOSSGATE-ZONE MZ31: the copy's declared steps and payoffs land where they happened, while the wire is this cell's
+  const ports = enteredLandingPorts(at, `${source.identity.slug}.${instance}`);
+  if (ports !== null) installQuestLandings(states, { ...ports, frame: (run) => { ports.frame((dt) => { if (here()) run(dt); }); } }, stay);
 }

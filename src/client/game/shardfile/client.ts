@@ -35,6 +35,7 @@ import { macrotask } from '@wildshard/engine/boot/plan';
 import { loadingUnits } from '@wildshard/engine/boot/waits';
 import { Mesh, Object3D, Vector3 } from 'three';
 import { installDeclaredQuests } from './declaredQuests';
+import { enteredLandingPorts, installQuestLandings } from '../quest/questLanding';
 import { placementLedger, recordWireFacts } from './wireFacts';
 import { declaredFields, hasDeclaredHud, installDeclaredHud, type BossPanelPorts } from './declaredHud';
 import { Flags } from '@wildshard/engine/world/interact/flags';
@@ -773,11 +774,14 @@ export class ShardfileClient {
         talkBox: () => { if (presentation === null) throw new Error('Missing talk presentation module'); return presentation.talkBox(ctx.scope.child('talks')); } } });
     // SS-GP1: one install with a grid data cell's (`grid/dataCellQuests.ts`)
     const installQuests = (quests: Shardfile['quests'], at: ShardContext, ui: typeof presentation): void => {
-      installDeclaredQuests(quests, flags, ctx.app.events, at.scope, (quest, options) => {
+      const states = installDeclaredQuests(quests, flags, ctx.app.events, at.scope, (quest, options) => {
         // a retained (grid) runtime's chip, pins and card are its entered cell's only
         if (ui === null) throw new Error('Missing quest presentation module');
         if (retainsRuntimeServices(ctx)) ui.installEnteredQuestPresentation(at, quest, options); else ui.installQuestPresentation(at, quest, options);
       });
+      // meta MOSSGATE-ZONE MZ31: each declared step and payoff lands where it happened
+      const ports = enteredLandingPorts(at, ctx.manifest.slug);
+      if (ports !== null) installQuestLandings(states, ports, at.scope);
     };
     // SHARD-SOURCE AP19 (DEVSERVER): `wildshard watch`'s soft restart rebuilds the quest views from a new quest section, so on a
     // watched (one-shard) page they live in one child scope it replaces; elsewhere they are the context's, as they always were.
