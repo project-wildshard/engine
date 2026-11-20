@@ -73,24 +73,10 @@
    "known": []
   },
   "nine-dragon-stack": {
-   "row": "SERVER-PARITY SS10, GRID-CROSSING GC36 (J322: no edge walls, so the page's standalone deck caps at the edge, 1 m slivers at |x| or |z| 249 to 250 that stood inside the server's walls, have no server twin; a re-recorded page half (scripts/side-parity.mjs --record) drops them once the bake does); ONE-FORMAT OF21 (Nine rev 5): the page builds its client/plan world.assembly solids over the same prop rows the room builds, so it holds every server solid plus copies (named owner@scene and plain); no server solid is missing from the page. Nine rev 6 drops the assembly collision (and the stale client-plan entry), then these lines go",
+   "row": "SERVER-PARITY SS10, GRID-CROSSING GC36; ONE-FORMAT OF21: Nine rev 6 drops the client-plan assembly collision and the stale client-plan entry; its re-recorded page half clears 15 of rev 5's 28 lines (the decks, crossings, floors, fronts, grapple guard and square copies, and the 1 m edge slivers). Left, all carried from rev 5: scene props the page names owner@scene where the room names owner.scene (same shape), and the nds-set booth, parasol and pavilion pieces the page builds twice over the room's one. No server solid is missing from the page",
    "known": [
-    "deck.east (stone): 4 page collider(s) more than the server holds in the same place",
-    "deck.north (stone): 4 page collider(s) more than the server holds in the same place",
-    "deck.south (stone): 4 page collider(s) more than the server holds in the same place",
-    "deck.west (stone): 4 page collider(s) more than the server holds in the same place",
     "nds-banyan@paifang (stone): 1 page collider(s) the server holds as nds-banyan.paifang (stone), same shape",
-    "nds-crossings (metal): 36 page collider(s) the server holds as nds-crossings.1 (metal), same shape",
-    "nds-crossings (metal): 72 page collider(s) more than the server holds in the same place",
-    "nds-crossings (stone): 100 page collider(s) more than the server holds in the same place",
-    "nds-crossings (stone): 35 page collider(s) the server holds as nds-crossings.1 (stone), same shape",
-    "nds-crossings (wood): 42 page collider(s) the server holds as nds-crossings.1 (wood), same shape",
-    "nds-crossings (wood): 84 page collider(s) more than the server holds in the same place",
     "nds-earth-god-shrine@paifang (stone): 1 page collider(s) the server holds as nds-earth-god-shrine.paifang (stone), same shape",
-    "nds-floors (stone): 16 page collider(s) with no server match, e.g. [-250, 0, -5, -249, 3, -4]",
-    "nds-floors (stone): 71 page collider(s) more than the server holds in the same place",
-    "nds-fronts (stone): 10 page collider(s) more than the server holds in the same place",
-    "nds-grapple-guard (stone): 2 page collider(s) more than the server holds in the same place",
     "nds-hawker-stall@paifang (wood): 1 page collider(s) the server holds as nds-hawker-stall.paifang (wood), same shape",
     "nds-kowloon-stele@paifang (stone): 1 page collider(s) the server holds as nds-kowloon-stele.paifang (stone), same shape",
     "nds-landing-planter@stair-terraces (stone): 8 page collider(s) the server holds as nds-landing-planter.stair-terraces (stone), same shape",
@@ -101,8 +87,7 @@
     "nds-set-booth (wood): 5 page collider(s) more than the server holds in the same place",
     "nds-set-parasol (metal): 6 page collider(s) more than the server holds in the same place",
     "nds-set-pavilion (wood): 15 page collider(s) more than the server holds in the same place",
-    "nds-well-balustrade@paifang (stone): 3 page collider(s) the server holds as nds-well-balustrade.paifang (stone), same shape",
-    "square (stone): 1 page collider(s) more than the server holds in the same place"
+    "nds-well-balustrade@paifang (stone): 3 page collider(s) the server holds as nds-well-balustrade.paifang (stone), same shape"
    ]
   },
   "pine-hollow": {
