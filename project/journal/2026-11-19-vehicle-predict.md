@@ -16,3 +16,11 @@
   run went through the wall for that reason alone.
 - `net-lag-proof.mjs --vehicle` drives a shard's nearest dock and prints corrections a minute; its live run waits on a local
   build with a dock (J475: pack the engine into the shard repo).
+
+## MSZ17: two players
+
+- `test/dedicated-vehicle-two.test.ts`: three bots in a dedicated cell over real sockets. A taken driver's seat refuses a
+  second ask, a taken passenger seat too; each player's own buggy comes from the same player dock once it stands clear; a
+  passenger stays led within 1.5 m of the seat through a full circle; a ram moves a parked, braking buggy and every seat holds.
+  No engine change was needed: MSZ9's seats and MSZ13's bounce already held it; the passenger's page follows rows (MSZ16
+  predicts only the driver's seat).
