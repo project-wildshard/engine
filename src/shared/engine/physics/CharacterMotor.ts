@@ -74,6 +74,9 @@ const DECK_REACH = 0.1;
 const REST_LIFT = 0.0005;
 const UP = { x: 0, y: 1, z: 0 } as const;
 const SLOPE_CONTACT = 1, WALL_CONTACT = 2, BANK_CONTACT = 4;
+const DOWN = { x: 0, y: -1, z: 0 } as const;
+/** A grounded move that got under this share of what it asked for is stalled (`stepOver`). */
+const STALLED = 0.02;
 /** NL14b1: half the span `smoothBank` measures the terrain's slope over, and how far over and under the feet it looks. */
 const BANK_SPAN = 0.15, BANK_RAY_UP = 1, BANK_RAY_DOWN = 2;
 /** How much of the push into a bank is dropped: none below the climb limit, all a little past it, a ramp between, so a
@@ -354,6 +357,35 @@ export class CharacterMotor {
     return retry.y <= Math.min(rise, this.opts.step) && retry.y >= -Math.min(rise, this.opts.snap) ? retry : null;
   }
 
+  /**
+   * A stalled grounded move tried once more from one step height up, flat, then set down. It is kept only when the capsule
+   * goes most of the way and lands, within a step of where it stood, on ground it may walk (so a steep slope stays a wall).
+   */
+  private stepOver(want: Vec3, predicate: ((collider: Collider) => boolean) | undefined): Vec3 | null {
+    const { R, world } = this.physics, start = this.translation, step = this.opts.step, skin = this.kcc.offset();
+    const flags = R.QueryFilterFlags.EXCLUDE_SENSORS, x = start.x, y = start.y, z = start.z;
+    // as high as a step, or as the roof lets it (a low beam over the wreck's corner)
+    const up = world.castShape(start, this.rot, UP, this.collider.shape, 0, step, false, flags, this.filter, this.collider, undefined, predicate);
+    const rise = up === null ? step : up.time_of_impact - skin;
+    if (rise < 2 * skin) return null;
+    start.y = y + rise;
+    this.collider.setTranslation(start);
+    const impulses = this.kcc.applyImpulsesToDynamicBodies();
+    this.kcc.setApplyImpulsesToDynamicBodies(false);
+    try { this.kcc.computeColliderMovement(this.collider, this.flatWant(want), flags, this.filter, predicate); }
+    finally { this.kcc.setApplyImpulsesToDynamicBodies(impulses); start.x = x; start.y = y; start.z = z; this.collider.setTranslation(start); }
+    const flat = this.kcc.computedMovement(this.retryMovement ??= { x: 0, y: 0, z: 0 }), wantH = Math.hypot(want.x, want.z);
+    if (Math.hypot(flat.x, flat.z) < wantH * 0.5) return null;
+    const probe = this.probe; probe.x = x + flat.x; probe.y = y + rise + flat.y; probe.z = z + flat.z;
+    const down = world.castShape(probe, this.rot, DOWN, this.collider.shape, 0, rise + this.opts.snap, false, flags, this.filter, this.collider, undefined, predicate);
+    if (down === null) return null;
+    // ground too steep to walk (the box's edge itself) may be crossed level or downhill, never climbed
+    const landed = probe.y - down.time_of_impact + skin - y, walkable = Math.abs(down.normal2.y) >= Math.cos(this.kcc.maxSlopeClimbAngle());
+    if (landed > (walkable ? step : skin) || landed < -this.opts.snap) return null;
+    flat.y = landed;
+    return flat;
+  }
+
   /** Begin grounded downward moves on a ray-measured float32 skin plane above nearly flat static support.
    * Tiny height differences otherwise choose different coplanar contacts and change a later wall slide.
    * A terrain ray describes one triangle, not the capsule's heightfield contact; leave that contact to the controller. */
@@ -476,6 +508,13 @@ export class CharacterMotor {
       const retry = contacts === (SLOPE_CONTACT | WALL_CONTACT) && movedH < wantH * 0.99 ? this.slideAboveSlope(want, pred)
         : contacts === (BANK_CONTACT | WALL_CONTACT) ? this.slideOffBank(feet, want, pred) : null;
       if (retry !== null) { m = retry; grounded = true; }
+    }
+    // QA-FEEDBACK-2026-11-20-mini row 4: feet perched on a box's top edge (grounded, with no ground under their centre) read
+    // the edge as a slope too steep to climb, not a wall, so the controller never steps up it; between two walls (Driftwood's
+    // wreck hull) no move got out, jumps included. Feet on ground that stall (a bank, a wall) keep their stall.
+    if (!ignoreGround && this.opts.group === 'PLAYER' && this.opts.length === undefined && lifted === 0 && r.grounded && r.groundCollider === null && want.y <= 0 && wantH > 1e-6 && Math.hypot(m.x, m.z) < wantH * STALLED) {
+      const over = this.stepOver(want, pred);
+      if (over !== null) { m = over; grounded = true; }
     }
     feet.x += m.x; feet.y += m.y + lifted; feet.z += m.z;
     if (sideways && Math.abs(feet.y - (this.restPlane + this.kcc.offset() + REST_LIFT)) < 1e-6) feet.y = this.restPlane + this.kcc.offset();

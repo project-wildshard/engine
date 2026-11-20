@@ -15,3 +15,9 @@ QA-FEEDBACK-2026-11-20-mini rows 3 to 6, from IPHONE13-DRIFTWOOD DW8 and DW9.
   handoff for good (`primeFailure`), and `RoadTileBacking.step` threw it on every grid frame. Now the handoff's pins are
   released and asked for again (the streamer's own back-off refetches); after `ROAD_PRIME_TRIES` it reports one
   `grid.road-tiles` fault and keeps the whole road meshes, which were never retired.
+- Row 4, the wedge inside the wreck hull at (150.7, 0.5, -1.3): the feet perched on a plank box's top edge, hull walls on two
+  sides and a beam 5 cm over the head. The edge contact reads as a 52-degree slope (past the 40-degree climb), not a wall, so
+  Rapier's autostep never fires; no direction and no jump moved the capsule. `CharacterMotor.stepOver`: a grounded player
+  move that stalls under 2% while perched (grounded, no ground under the feet's centre) is tried again from as high as a step
+  or the roof allows, and kept when it lands on walkable ground within a step, or crosses steep ground without climbing.
+  Feet on ground keep their stall, so the bank and pocket prediction tests are unchanged.
