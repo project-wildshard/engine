@@ -27,6 +27,9 @@ export interface AmbientFlockBird {
   ax: number; ay: number; az: number; bx: number; by: number; bz: number; tx: number; ty: number; tz: number; yaw0: number; call: boolean;
 }
 interface Point { x: number; y: number; z: number }
+/** DF11: the flock's own scratch point. An `{ x, y, z }` literal shares its hidden class with every such literal in the page,
+ *  whose fields other code can widen to hold anything; a class keeps these three as doubles written in place. */
+class FlockPoint implements Point { x = 0; y = 0; z = 0; }
 /** A perch in the content's local frame. */
 export interface AmbientPerch { readonly x:number;readonly y:number;readonly z:number }
 /** Current player position; private visitor state belongs to its content owner. */
@@ -46,8 +49,8 @@ export class AmbientFlock {
   private readonly perchYaw: number[];
   private readonly occupied: Int8Array;
   private readonly pool: AmbientFlockCall[] = Array.from({ length: 8 }, () => ({ x: 0, y: 0, z: 0, cue: '', gain: 1 }));
-  private readonly p: Point = { x: 0, y: 0, z: 0 };
-  private readonly q: Point = { x: 0, y: 0, z: 0 };
+  private readonly p: Point = new FlockPoint();
+  private readonly q: Point = new FlockPoint();
   private time = 0;
   private callTimer: number;
   readonly row: AmbientFlockData;

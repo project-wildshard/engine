@@ -136,16 +136,24 @@ function cosInto(x: number, out: Float64Array, at: number): void {
 const trigOut = new Float64Array(1);
 function sin(x: number): number { sinInto(x, trigOut, 0); return trigOut[0] ?? Number.NaN; }
 function cos(x: number): number { cosInto(x, trigOut, 0); return trigOut[0] ?? Number.NaN; }
+/** Marks this table's sin and cos, so a second bundled copy of this module (the page carries more than one) knows the
+ *  installed Math.sin for the same function: one source in one build, the same bits. */
+const PORTABLE_MARK = Symbol.for('wildshard.portableMath.v1');
+Object.defineProperty(sin, PORTABLE_MARK, { value: true });
+Object.defineProperty(cos, PORTABLE_MARK, { value: true });
+const portableFn = (fn: unknown): boolean => typeof fn === 'function' && Reflect.get(fn, PORTABLE_MARK) === true;
 
 /** DF11: `Math.sin(x)` into `out[at]`, the realm's own function's bits (the portable one where it is installed). A double
  *  returned from a call that is not inlined is a fresh heap number; written into a typed slot it is none (the portable sin
  *  and cos returns were ~12 KB a dock frame at 3x). */
 export function sinTo(x: number, out: Float64Array, at: number): void {
-  if (Math.sin === sin) sinInto(x, out, at); else out[at] = Math.sin(x);
+  const installed = Math.sin;
+  if (installed === sin || portableFn(installed)) sinInto(x, out, at); else out[at] = installed(x);
 }
 /** DF11: `Math.cos(x)` into `out[at]`, as `sinTo`. */
 export function cosTo(x: number, out: Float64Array, at: number): void {
-  if (Math.cos === cos) cosInto(x, out, at); else out[at] = Math.cos(x);
+  const installed = Math.cos;
+  if (installed === cos || portableFn(installed)) cosInto(x, out, at); else out[at] = installed(x);
 }
 function tan(x: number): number {
   if (!Number.isFinite(x) || x === 0 || Math.abs(x) >= 268435456) return nativeTan(x);
