@@ -70,24 +70,25 @@ function kCos(x: number, y: number): number {
   return w + (((1 - w) - hz) + (z * r - x * y));
 }
 /** x = n * pi/2 + (hi + lo): Cody–Waite reduction (fdlibm's first step, and its second for larger n). Returns n and leaves
- *  hi and lo in `reducedHi` / `reducedLo`: a returned triple was a fresh array per sin and cos, the sim's and the frame's
- *  largest single allocator on Pine (MEMORY-STRUCTURE STR20) */
-let reducedHi = 0, reducedLo = 0;
+ *  hi and lo in `reducedParts` [hi, lo]: a returned triple was a fresh array per sin and cos, the sim's and the frame's
+ *  largest single allocator on Pine (MEMORY-STRUCTURE STR20). DF11: a typed slot, not two module `let`s; V8 boxed every
+ *  double stored to a module binding (two heap numbers a sin or cos, ~16 KB a dock frame at 3x) */
+const reducedParts = new Float64Array(2);
 function reduced(x: number): number {
   const n = Math.round(x * INV_PIO2);
   const r0 = x - n * PIO2_1, w0 = n * PIO2_1T;
   const y0 = r0 - w0;
-  if (Math.abs(n) < 32) { reducedHi = y0; reducedLo = (r0 - y0) - w0; return n; }
+  if (Math.abs(n) < 32) { reducedParts[0] = y0; reducedParts[1] = (r0 - y0) - w0; return n; }
   // a second pass for larger n (fdlibm's 2nd iteration)
   const t = r0, w = n * PIO2_2, r = t - w, w2 = n * PIO2_2T - ((t - r) - w);
   const y = r - w2;
-  reducedHi = y; reducedLo = (r - y) - w2;
+  reducedParts[0] = y; reducedParts[1] = (r - y) - w2;
   return n;
 }
 function sin(x: number): number {
   if (!Number.isFinite(x) || x === 0 || Math.abs(x) >= 268435456) return nativeSin(x);
   if (Math.abs(x) <= Math.PI / 4) return kSin(x, 0);
-  const n = reduced(x), hi = reducedHi, lo = reducedLo;
+  const n = reduced(x), hi = reducedParts[0] ?? 0, lo = reducedParts[1] ?? 0;
   switch (((n % 4) + 4) % 4) {
     case 0: return kSin(hi, lo);
     case 1: return kCos(hi, lo);
@@ -98,7 +99,7 @@ function sin(x: number): number {
 function cos(x: number): number {
   if (!Number.isFinite(x) || Math.abs(x) >= 268435456) return nativeCos(x);
   if (Math.abs(x) <= Math.PI / 4) return kCos(x, 0);
-  const n = reduced(x), hi = reducedHi, lo = reducedLo;
+  const n = reduced(x), hi = reducedParts[0] ?? 0, lo = reducedParts[1] ?? 0;
   switch (((n % 4) + 4) % 4) {
     case 0: return kCos(hi, lo);
     case 1: return -kSin(hi, lo);
