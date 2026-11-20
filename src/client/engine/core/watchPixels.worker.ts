@@ -1,8 +1,15 @@
+let context: OffscreenCanvasRenderingContext2D | undefined;
+
 export function sampleWatchBitmap(image: ImageBitmap): Uint8ClampedArray | null {
-  const ctx = new OffscreenCanvas(image.width, image.height).getContext('2d', { willReadFrequently: true });
+  const { width, height } = image;
+  const ctx = context ?? new OffscreenCanvas(width, height).getContext('2d', { willReadFrequently: true });
   if (ctx === null) return null;
+  context = ctx;
+  if (ctx.canvas.width !== width) ctx.canvas.width = width;
+  if (ctx.canvas.height !== height) ctx.canvas.height = height;
+  ctx.clearRect(0, 0, width, height);
   ctx.drawImage(image, 0, 0);
-  return ctx.getImageData(0, 0, image.width, image.height).data;
+  return ctx.getImageData(0, 0, width, height).data;
 }
 
 self.onmessage = (event: MessageEvent<unknown>): void => {

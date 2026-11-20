@@ -19,7 +19,7 @@ import { passSplitLimit } from '../render/passSplit';
 import { bindDrawWatch } from '../render/drawCheck';
 import { jsonSlot } from '../saves/slots';
 import { TIER } from './tier';
-import { readWatchPixels } from './watchPixels';
+import { watchPixelReader } from './watchPixels';
 
 /** what a look found */
 export type WorldLook = 'drawn' | 'transparent' | 'black';
@@ -80,6 +80,7 @@ export const LOOKS_S: readonly number[] = [3, 8, 20, 45];
 export function installWorldWatch(host: WorldWatchHost, looks: readonly number[] = LOOKS_S): void {
   let reported = false, failed = 0, stopped = false;
   const asyncRead = TIER === 'desktop' && looks.length > 0 && jsonSlot('debug.worldWatchDrawCheck', 'device').read() === true;
+  const readPixels = asyncRead ? watchPixelReader(host.scope) : null;
   const canLook = (): boolean => !stopped && !host.scope.disposed && !host.scope.disposing
     && document.visibilityState === 'visible' && !host.hold && !host.contextLost() && host.playing();
   const report = (why: string, look: WorldLook | 'hidden', fatal: boolean): void => {
@@ -104,7 +105,7 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
       return;
     }
     if (copy.width === 0 || copy.height === 0) return;
-    let pixels = asyncRead ? await readWatchPixels(copy, host.scope, CAPTURE_WAIT_MS) : null;
+    let pixels = readPixels === null ? null : await readPixels(copy, CAPTURE_WAIT_MS);
     if (asyncRead && !canLook()) return;
     if (pixels === null) {
       const ctx = copy.getContext('2d', { willReadFrequently: true });
