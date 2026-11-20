@@ -4,8 +4,8 @@ import { saveEnvironment } from '../../../shared/engine/saves/environment';
 import type { SaveStorage } from '../../../shared/engine/saves/store';
 
 const key = 'ws-agent';
-// The title and online host can carry separate module instances in their own bundles.
-const slot = Symbol.for('wildshard.page-actor');
+// The title and online host share the explicit entry marker across bundles.
+const querySlot = Symbol.for('wildshard.page-agent-query');
 
 export function classifyActorTab(search: string, storage: Pick<SaveStorage, 'getItem' | 'setItem'> | null | undefined, facts: ActorFacts): ActorMark {
   const query = new URLSearchParams(search).getAll(AGENT_QUERY).find(value => value.length > 0) ?? null;
@@ -17,15 +17,15 @@ export function classifyActorTab(search: string, storage: Pick<SaveStorage, 'get
   return classifyActor({ ...facts, query, stored });
 }
 
-/** Read the entry URL once before SPA travel can change it. */
+/** Keep the explicit URL marker through navigation, including with storage disabled. */
 export function pageActor(): ActorMark {
-  const current = Reflect.get(globalThis, slot) as ActorMark | undefined;
+  const current = Reflect.get(globalThis, querySlot) as ActorMark | undefined;
   if (current !== undefined) return current;
   if (typeof window === 'undefined') return classifyActor({});
   const marked = classifyActorTab(window.location.search, saveEnvironment().storage('session'), {
     userAgent: window.navigator.userAgent, webdriver: window.navigator.webdriver, harness: harnessPins() !== undefined,
     doorPass: Reflect.get(window, '__wildshardDoorPass'),
   });
-  Reflect.set(globalThis, slot, marked);
+  if (marked.why === 'query') Reflect.set(globalThis, querySlot, marked);
   return marked;
 }
