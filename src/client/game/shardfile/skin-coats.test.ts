@@ -60,3 +60,13 @@ test('each skin variant draws in its own material', () => {
   expect(look.material?.(sky, undefined, undefined, { id: 'ghost' } as never).name).toBe('ghost');
   expect(look.material?.(sky).name).toBe('hind');
 });
+
+test('OF23f: a variant look\'s phone tier transcodes each phone variant\'s coat and none of the desktop maps', () => {
+  const tiered = shard(true), look = tiered.rows.looks[0] as unknown as { parameters: Record<string, string> };
+  look.parameters['phoneVariants'] = H('6');
+  const file = (hash: string, dependencies: string[]): Shardfile['files'][number] =>
+    ({ hash, kind: 'json', dependencies, compressed: 1, decoded: 1, gpu: 0, triangles: 0, draws: 0, critical: false });
+  const files = [...tiered.files, file(H('5'), [H('a'), H('q')]), file(H('6'), [H('4'), H('5')])];
+  expect(skinTextureRefs({ ...tiered, files }, 'phone').sort()).toEqual([H('p'), H('q')]);
+  expect(skinTextureRefs({ ...tiered, files }, 'desktop').sort()).toEqual([H('b'), H('c'), H('n')]);
+});

@@ -93,7 +93,8 @@ function carriesGraph(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>)
   if (Object.values(shard.look.materials).some((entry) => entry.family === 'graph')) return true;
   return shard.rows.looks.some((row) => {
     if (row.recipe !== SKIN_LOOK_RECIPE) return false;
-    const bytes = assets.get(skinLookParameters(row).skin);
+    // OF23f: the phone fetches only a tiered look's phone skins, which share its material family
+    const { skin, phone } = skinLookParameters(row), bytes = assets.get(skin) ?? (phone === undefined ? undefined : assets.get(phone));
     return bytes !== undefined && isGraphEntry(parseSkinFile(bytes).binding.material);
   });
 }

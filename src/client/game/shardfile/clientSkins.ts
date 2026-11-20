@@ -26,7 +26,7 @@ import { Gunfire } from '@wildshard/engine/fx/gunfire';
 import { holdQuestRewards } from '../quest/reward';
 import { loadSkin } from './skinPlayback';
 import { compileSkinPoseLayers, bindSkinPoseLayers, type CompiledSkinPoseLayers } from './skinLayerPlayback';
-import { resolveSkinLookFiles, skinLookParameters } from '@wildshard/format/skinAssets';
+import { resolveSkinLookTier, skinLookParameters, skinLookTierRoots } from '@wildshard/format/skinAssets';
 import { SkinClipNameSchema, type CreatureSkinClipName } from '@wildshard/format/skinData';
 import { SKIN_LOOK_RECIPE, type SkinClipMap, type SkinClipState } from '@wildshard/format/skins';
 import { CREATURE_SKELETONS, skeletonBones, trailBoneNames } from '@wildshard/format/creatureSkeletons';
@@ -98,10 +98,9 @@ export async function loadClientSkins(source: Pick<Shardfile, 'rows' | 'files' |
   for (const look of source.rows.looks) {
     if (look.recipe !== SKIN_LOOK_RECIPE) continue;
     if (skins.size > 0) await macrotask(); // SF67: a skin a task (the template's two were one 124-132 ms task at 4x CPU)
-    const parameters = skinLookParameters(look), admitted = resolveSkinLookFiles(source, look, assets);
-    // ONE-FORMAT CC51b: the phone tier draws the look's lighter phone skin (same rig, clips, sockets and material) and
-    // never parses the full one; a variant look has no phone skin.
-    const resolved = tier === 'phone' && admitted.phone !== undefined ? { skin: admitted.phone } : admitted;
+    // ONE-FORMAT CC51b, OF23f: the phone tier draws the look's lighter phone skin and, on a variant look, its phone
+    // variant table (same rig, clips, sockets and material); tier selection never fetches the desktop skins there
+    const parameters = skinLookParameters(look), resolved = resolveSkinLookTier(source, look, { assets, tier });
     const loaded = new Map<string, ClientSkin>();
     for (const file of [resolved.skin, ...(resolved.variants?.values() ?? [])]) {
       if (!loaded.has(file.hash)) loaded.set(file.hash, await loadClientSkin(file, {
@@ -131,7 +130,7 @@ export function colourForVertexMaterial(geometry: BufferGeometry, material: Mate
 }
 
 interface SkinLoadContext { source: Pick<Shardfile, 'look'>; assets: ReadonlyMap<string, Uint8Array>; compile: (entry: unknown) => Material; scope: Scope; lookId: string; attackSpan: number; clipMap?: SkinClipMap }
-async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLookFiles>['skin'], { source, assets, compile, scope, lookId, attackSpan, clipMap }: SkinLoadContext): Promise<ClientSkin> {
+async function loadClientSkin({ row, binding }: ReturnType<typeof resolveSkinLookTier>['skin'], { source, assets, compile, scope, lookId, attackSpan, clipMap }: SkinLoadContext): Promise<ClientSkin> {
     const glb = assets.get(row.file); if (glb === undefined) throw new Error(`skin look ${lookId}: missing admitted skin GLB`);
     const material = materialFactory(compile, binding.material);
     // TE-ENG10: the binding's GLB material name -> look.materials id, as props.materials maps a prop's; each mapped part
@@ -278,14 +277,15 @@ export class SkinDriver {
 
 /**
  * ONE-FORMAT OF27b: the textures this tier's skin files name (each skin file's dependencies after its GLB): the look's
- * skin and its variants', or on the phone tier its phone skin's where it has one, as `loadClientSkins` draws them.
+ * skin and its variants', or on the phone tier its phone skin's and phone variants' where it has them, as `loadClientSkins`
+ * draws them.
  */
 export function skinTextureRefs(source: Pick<Shardfile, 'rows' | 'files'>, tier: Tier = buildTier()): string[] {
   const files = new Map(source.files.map((file) => [file.hash, file]));
   return [...new Set(source.rows.looks.flatMap((look) => {
     if (look.recipe !== SKIN_LOOK_RECIPE) return [];
-    const parameters = skinLookParameters(look), table = parameters.variants === undefined ? [] : files.get(parameters.variants)?.dependencies ?? [];
-    const skins = tier === 'phone' && parameters.phone !== undefined ? [parameters.phone] : [parameters.skin, ...table];
+    const [head, table] = skinLookTierRoots(skinLookParameters(look), tier);
+    const skins = [head, ...(table === undefined ? [] : files.get(table)?.dependencies ?? [])];
     return skins.flatMap((hash) => files.get(hash)?.dependencies.slice(1) ?? []);
   }))];
 }
