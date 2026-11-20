@@ -34,7 +34,10 @@ export async function installChapterWakeEncounter(ctx: ShardContext, input: unkn
 }> {
   const rows = parseChapterWake(input), source = ctx.product.shardfile;
   const flags = boundQuestState(ctx.scope, rows.quest).flags;
-  const spawnOwner = bindRuntimeBoss(ctx, source, rows.spawn, undefined, { identity: 'runtime' });
+  // K6b, OF22c1's page half: a wake row naming a declared spawn with a `boss` encounter wakes that fight on the server (Driftwood's
+  // Captain, OF22c2); its body and bar come off the wire, so the page binds no runtime boss row (it has none)
+  const declaredFight = source.encounters.some(row => row.entity === rows.spawn && row.kind === 'boss');
+  const spawnOwner = declaredFight ? null : bindRuntimeBoss(ctx, source, rows.spawn, undefined, { identity: 'runtime' });
   const director = await readChapterDirector(ctx, rows.director);
   const world = ctx.game.runtime?.world, play = ctx.game.runtime?.play;
   if (ctx.scope.disposed || world === undefined || world === null || play === undefined || play === null
@@ -49,7 +52,7 @@ export async function installChapterWakeEncounter(ctx: ShardContext, input: unkn
     fell = false;
   } });
   const spawn = (): void => {
-    if (actor !== null || rowBar !== null) return;
+    if (actor !== null || rowBar !== null || spawnOwner === null) return;
     try {
       actor = spawnOwner.spawn(); if (actor === null) throw new Error('Declared chapter body unavailable');
       actor.herd = -1; actor.mem[rows.encounter.fields.poolX] = pool.x; actor.mem[rows.encounter.fields.poolZ] = pool.z;

@@ -94,7 +94,7 @@ import { installShardfileColliders } from '../../../shared/game/shardfile/collis
 import type { ClientAssets } from './clientAssets';
 import { installDeclaredItems, leverLines, rackMeleeRows, rackToolRows, standScenes, takenLine, type DeclaredItems } from '../../../shared/game/shardfile/items';
 import { declaredLever } from '../plugin/weaponFamily';
-import { runtimeBoundWorldFiles, withoutRuntimeRows } from "../../../shared/game/plugin/runtimeRows";
+import { runtimeBinds, runtimeBoundWorldFiles, withoutRuntimeRows } from "../../../shared/game/plugin/runtimeRows";
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { nearPlaceholderRoots } from '@wildshard/format/nearPlaceholder';
 
@@ -189,6 +189,8 @@ function withoutPresentation(source: Shardfile): Shardfile {
 type DataMode = 'full' | 'empty' | 'presentation';
 /** How far (m) the viewer moves before the tile residency re-centres, when the terrain declares no `follow`. */
 const FOLLOW = 5;
+/** K6b: a native runtime that binds `items` builds its own equipment (Driftwood's held claims): its data page holds no item. */
+const RUNTIME_OWNED_ITEMS: DeclaredItems = { primary: null, secondary: null, extras: [], tools: [], order: [], runtimes: new Map(), install: () => undefined, step: () => undefined };
 
 /** The existing Game's world/kit/play stages install one authored level, one borrowed simulation and the normal equipment/HUD. */
 /** SR11 (C9): on the wire an item request is the scene the server takes it by. False: no wire or no scene, so it queues on this page. */
@@ -230,6 +232,8 @@ export class ShardfileClient {
   /** CC30c: the GLBs creature attachments draw, by hash */
   private attachmentModels: Awaited<ReturnType<typeof loadStaticModels>> = new Map();
   private readonly mode: DataMode;
+  /** K6b: the native runtime binds `items` (its own held equipment), so this page installs none. */
+  private readonly runtimeItems: boolean;
   private readonly nativeFeatures: boolean;
   /** The declared state as authored: a runtime-bound host field keeps its default for the look's curves. */
   private readonly curveState: Shardfile['state'];
@@ -246,6 +250,7 @@ export class ShardfileClient {
     const data = bindings.creatureOwner === 'runtime' ? withoutRuntimeCreatures(runtimeData) : runtimeData;
     if (bindings.nativeRuntime === true) { const ground = splatGroundFiles(data); assets.releaseTransport(new Set([...runtimeBoundWorldFiles(source)].filter(ref => !ground.has(ref)))); }
     this.source = data; this.assets = assets; this.bindings = bindings; this.curveState = source.state;
+    this.runtimeItems = bindings.nativeRuntime === true && runtimeBinds(source).has('items');
     // a runtime that owns the client stages draws nothing of this data, but a splat ground the Debug row draws (P1)
     this.mode = bindings.runtimeStagesOnly === true ? splatGroundFiles(data).size > 0 ? 'presentation' : 'empty' : bindings.nativeRuntime !== true ? 'full'
       : emptyRuntimePageData(data, bindings.audioOwner, bindings.worldOwner) ? 'empty'
@@ -483,6 +488,8 @@ export class ShardfileClient {
       const { dims, scale = 1 } = target.target; // a row's body knows its own measures
       return { ...target, aimPoint: target.position.clone().add(new Vector3(0, dims === undefined ? 0.9 : dims.bodyY * scale, 0)), reach: (dims?.bodyRadius ?? 0) * scale };
     };
+    // K6b: a full runtime page (Driftwood's declared roster, OF27d) whose runtime binds `items` leaves the equipment to it
+    if (this.runtimeItems) return;
     runtime.buildEquipment = () => {
       // a retained (grid) runtime's item input contexts are entered-only (installPageItemContexts), so copies never collide
       const retained = retainsRuntimeServices(ctx); if (retained) installPageItemContexts(ctx, source);
@@ -537,7 +544,7 @@ export class ShardfileClient {
 
   private *playSteps(ctx: ShardContext, presentation: typeof ScriptPresentation | null, lootPresentation: typeof LootPresentation | null, compendium: typeof CompendiumPresentation | null): Generator<void, void> {
     if (this.mode !== 'full' || this.nativeFeatures) return;
-    const runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play, items = this.items, tiles = this.worldTiles;
+    const runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play, items = this.items ?? (this.runtimeItems ? RUNTIME_OWNED_ITEMS : undefined), tiles = this.worldTiles;
     const health = ctx.app.player;
     if (runtime === undefined || world === null || world === undefined || play === null || play === undefined || items === undefined || tiles === undefined || health === null) throw new Error('Shardfile requires the normal play stage');
     const source = this.source, identity = { instance: this.bindings.instance, shard: source.identity.slug, revision: source.identity.revision };
