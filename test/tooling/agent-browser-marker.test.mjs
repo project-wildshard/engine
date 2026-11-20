@@ -7,6 +7,7 @@ import { test } from 'vitest';
 import { agentHeaders, agentUrl, agentUserAgent } from '../../scripts/agent-marker.mjs';
 import { installBrowserActorMarker } from '../../scripts/browser-actor-marker.mjs';
 import { chromium, devices } from '../../scripts/browser-playwright.mjs';
+import { KEYCHAIN_ARGS } from '../../scripts/chromium-keychain.mjs';
 
 test('agent URL and user agent markers preserve existing context', () => {
   const initial = 'https://staging.wildshard.io/?tier=phone#start';
@@ -41,7 +42,8 @@ test('launch, attach and persistent contexts are marked exactly once', async () 
     assert.deepEqual(await opened.newContext(options), expected);
     assert.deepEqual(await opened.newPage(options), expected);
   }
-  assert.deepEqual(await engine.launchPersistentContext('profile', options), expected);
+  const { launchPersistentContext } = engine;
+  assert.deepEqual(await launchPersistentContext('profile', options), expected);
 });
 
 // The hosted share can have full Chromium without the separate headless shell.
@@ -53,7 +55,7 @@ test.skipIf(!existsSync(executablePath))('a wrapped iPhone context sends the mar
   const address = server.address();
   assert.ok(address && typeof address !== 'string');
   try {
-    const browser = await chromium.launch({ executablePath, headless: true, args: ['--use-mock-keychain', '--password-store=basic', '--mute-audio'] });
+    const browser = await chromium.launch({ executablePath, headless: true, args: [...KEYCHAIN_ARGS] });
     try {
       const phone = devices['iPhone 13'];
       assert.ok(phone);

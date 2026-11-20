@@ -5,7 +5,6 @@ import {lstat,open} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {installBrowserActorMarker} from './browser-actor-marker.mjs';
 
 const MAX_BYTES=4096,READ_BYTES=4097,START=0,PRIVATE_MODE_BASE=0o100,SCHEMA_VERSION=1;
 /** @typedef {import('./browser-machine-loader.d.mts').BrowserPolicyRecord} BrowserPolicyRecord */
@@ -89,6 +88,11 @@ async function reserveMachineBrowserAdmission(options={}){
 }
 /** Preserve the exact consumer-resolved Playwright instance while admitting it.
  * @template {object} Namespace @param {Namespace} playwright @returns {Promise<Namespace>} */
-async function admittedPlaywright(playwright){await installMachineBrowserAdmission(playwright);installBrowserActorMarker(playwright);return playwright;}
+async function admittedPlaywright(playwright){
+ await installMachineBrowserAdmission(playwright);
+ const {installBrowserActorMarker}=await import('./browser-actor-marker.mjs');
+ installBrowserActorMarker(playwright);
+ return playwright;
+}
 
 export{installMachineBrowserAdmission,reserveMachineBrowserAdmission,admittedPlaywright};

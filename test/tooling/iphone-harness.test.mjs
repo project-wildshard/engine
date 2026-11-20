@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { runInNewContext } from 'node:vm';
 import { afterEach, expect, test, vi } from 'vitest';
+import { agentUrl } from '../../scripts/agent-marker.mjs';
 import { commands } from '../../scripts/memory/iphone-footprint.mjs';
 import { frameSummary } from '../../scripts/memory/iphone/frames.mjs';
 import { activityMonitor, footprintWindow, timedSample } from '../../scripts/memory/iphone/record.mjs';
@@ -75,11 +76,11 @@ test('recorded Nine boot reaches control after the origin wait, cold reset, slot
   const driver = await openSharedSafari(endpoint, 'test-device');
   const boot = await enterZone(driver, { base, slug: record.slug, slots: { 'debug.phoneBudget': true, 'debug.loadGc': true } });
   expect(boot).toMatchObject({ outcome: 'control', state: { build: record.build }, origin: {
-    href: `${base}/robots.txt`, cache: { caches: 0, serviceWorkers: 0, databases: 0, http: 'may carry' },
+    href: agentUrl(`${base}/robots.txt`), cache: { caches: 0, serviceWorkers: 0, databases: 0, http: 'may carry' },
   } });
   expect(boot.origin.saved).toContainEqual({ scope: 'device', key: 'debug.phoneBudget', data: true });
   const navigation = calls.filter(([method, path]) => method === 'POST' && path === '/url').map(([, , body]) => body.url);
-  expect(navigation).toEqual([`${base}/robots.txt`, `${base}/slug/${record.slug}`]);
+  expect(navigation).toEqual([`${base}/robots.txt`, `${base}/slug/${record.slug}`].map(agentUrl));
   expect(calls.some(([, path]) => path === '/element/enter/click')).toBe(true);
   expect(calls.some(([, path]) => path.includes('screenshot'))).toBe(false);
 });
