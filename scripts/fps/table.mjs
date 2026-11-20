@@ -19,6 +19,7 @@ import { capFor, readCaps } from '../budgets/files.mjs';
 import { fpsPlan } from './plan.mjs';
 import { passBreakdownAllowed, requirePassBench } from './passes.mjs';
 import { workloadCounts } from './workload.mjs';
+import { runBatch } from './batch.mjs';
 
 /** @typedef {import('./plan.mjs').ProfileSpec} ProfileSpec */
 const root = resolve(import.meta.dirname, '../..');
@@ -29,7 +30,7 @@ const keys = Object.keys(fpsPlan().profiles);
 const choices = parseArgs({ options: {
   zone: { type:'string', default:'driftwood-isle' }, profiles:{ type:'string', default:keys.join(',') },
   runs:{ type:'string' }, qualify:{ type:'boolean' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
-  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' }, device:{ type:'string' },
+  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' }, 'worker-batch':{ type:'string' }, device:{ type:'string' },
 } }).values;
 const sampling = fpsPlan({qualify:choices.qualify,runs:choices.runs,dockOnly:choices['dock-only'],coldOnly:choices['cold-only']});
 const {profiles,route,count} = sampling;
@@ -89,14 +90,14 @@ async function worker(job) {
   } finally { clearInterval(playing); process.removeListener('SIGINT',interrupt); process.removeListener('SIGTERM',interrupt); }
 }
 
-/** @param {Job} job @param {AbortSignal} signal */
+/** @param {Job|Job[]} job @param {AbortSignal} signal */
 async function measureCell(job, signal) {
   for (;;) {
     // Join the kernel queue even while another measurement owns the GPU.
     // The worker checks for unrelated GPU users after acquiring this lease.
     signal.throwIfAborted();
-    const child = spawn('/usr/bin/lockf',['-k',lock,join(root,'scripts/browser-lane.sh'),'--max','5',
-      process.execPath,import.meta.filename,'--worker',JSON.stringify(job)],{stdio:'inherit',detached:true});
+    const child = spawn('/usr/bin/lockf',['-k',lock,join(root,'scripts/browser-lane.sh'),'--max',Array.isArray(job) ? '20' : '5',
+      process.execPath,import.meta.filename,Array.isArray(job) ? '--worker-batch' : '--worker',JSON.stringify(job)],{stdio:'inherit',detached:true});
     const stop = () => {
       try { if (child.pid !== undefined) process.kill(-child.pid, 'SIGTERM'); }
       catch (error) {
@@ -151,7 +152,7 @@ async function main() {
   const version = await agentFetch(new URL('/version.json',base),{signal:AbortSignal.timeout(10_000)});
   const {build} = await version.json();
   if (!version.ok || typeof build !== 'string' || build === '') throw new Error('The served build could not be pinned');
-  const source = ['fps/table.mjs','fps/plan.mjs','fps/matrix.mjs','fps/measure.mjs','fps/workload.mjs',...(passBreakdown?['fps/passes.mjs']:[]),'fps/verdict.mjs','memory/iphone/route.mjs']
+  const source = ['fps/table.mjs','fps/plan.mjs','fps/batch.mjs','fps/matrix.mjs','fps/measure.mjs','fps/workload.mjs',...(passBreakdown?['fps/passes.mjs']:[]),'fps/verdict.mjs','memory/iphone/route.mjs']
     .map(file => readFileSync(join(root,'scripts',file),'utf8'));
   const config = {mode:sampling.mode,build,host,base,zone,count,plan,route,warm:sampling.warm,...(passBreakdown?{passBreakdown}:{}),method:signature(source)};
   const fingerprint = signature(config);
@@ -178,12 +179,21 @@ async function main() {
   }));
   let resumedCells = 0;
   try {
-    for (let rep=0; rep<count; rep++) {
-      for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
-        stop.signal.throwIfAborted();
-        if (readCell(job.output,fingerprint,build,job) !== null) { resumedCells++; continue; }
-        const status = await measureCell(job,stop.signal);
-        console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : 'incomplete'}`);
+    if (sampling.mode === 'quick') {
+      // A short table queues once. Each worker still opens and closes its own browser.
+      const pending = groups.flat().filter(job => {
+        if (readCell(job.output,fingerprint,build,job) === null) return true;
+        resumedCells++; return false;
+      });
+      if (pending.length > 0) await measureCell(pending,stop.signal);
+    } else {
+      for (let rep=0; rep<count; rep++) {
+        for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
+          stop.signal.throwIfAborted();
+          if (readCell(job.output,fingerprint,build,job) !== null) { resumedCells++; continue; }
+          const status = await measureCell(job,stop.signal);
+          console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : 'incomplete'}`);
+        }
       }
     }
   } catch (error) {
@@ -215,6 +225,17 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  try { process.exitCode = choices.worker ? await worker(JSON.parse(choices.worker)) : await main(); }
+  try {
+    if (choices['worker-batch']) {
+      let interrupted = false;
+      const stop = () => { interrupted = true; };
+      process.once('SIGINT',stop); process.once('SIGTERM',stop);
+      try {
+        process.exitCode = await runBatch(/** @type {Job[]} */ (JSON.parse(choices['worker-batch'])),worker,
+          (job,status) => console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : 'incomplete'}`),
+          () => interrupted || existsSync(marker));
+      } finally { process.removeListener('SIGINT',stop); process.removeListener('SIGTERM',stop); }
+    } else process.exitCode = choices.worker ? await worker(JSON.parse(choices.worker)) : await main();
+  }
   catch (error) { console.error(error); process.exitCode = 3; }
 }
