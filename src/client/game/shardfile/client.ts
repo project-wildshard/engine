@@ -17,6 +17,7 @@ import { RaceClockChip, SteerChip } from '@wildshard/engine/quest/view/ui';
 import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 import type { FollowedMovers } from '../plugin/followedMovers';
 import { installDataPageMovers } from './dataPageMovers';
+import { vehicleSoundPort } from '../plugin/vehicleSounds';
 import { installDataPageBodies } from './touchViews';
 import { admitClientPlan, installClientPhase, type AdmittedClientPlan, type ClientPhase } from './clientPlan';
 import { materialTextureRefs } from '@wildshard/format/materials';
@@ -617,7 +618,7 @@ export class ShardfileClient {
     // TEMPLATE-E2E TC-E5c: a plain shard's lift and doors stand on its page; a client plan's movers install their own
     let pageMovers: FollowedMovers | null = null;
     if (this.bindings.nativeRuntime !== true && !(this.plan?.features ?? []).some(row => row.kind === 'world.movers' || row.kind === 'motion.channels')) {
-      const movers = installDataPageMovers(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map(), prompts: runtime.interactables });
+      const movers = installDataPageMovers(source, { physics: world.physics, scope: ctx.scope, panels: tiles.props?.panels ?? new Map(), prompts: runtime.interactables, sounds: vehicleSoundPort(source.audio, this.assets.audioRead()) });
       if (movers !== null) {
         ctx.scope.onDispose(() => { if (movers.riding()) world.player.carried = false; });
         pageMovers = movers; // a steer vehicle's rider is the play list's `rides` entry

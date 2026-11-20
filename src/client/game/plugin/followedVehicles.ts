@@ -13,9 +13,11 @@ import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, Vehicles } from '@wildshard/format/vehicles';
 import { dockHulls, dockUnlocked, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
-import { parseVehicleSeatRow, parseVehicleWornRow, parseVehicleWreckRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
+import type { AudioData } from '@wildshard/format/audio';
+import { parseVehicleHornRow, parseVehicleSeatRow, parseVehicleWornRow, parseVehicleWreckRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { vehiclePoint, type MoverView } from './followedMovers';
 import { rowState, statePose, VehiclePrediction, type VehicleRow } from './vehiclePrediction';
+import { vehicleSoundSources, VehicleSounds, type VehicleHearing, type VehicleSoundOut, type VehicleSoundState } from './vehicleSounds';
 
 /** m within which a seat's or a dock's prompt shows (the server's `SEAT_REACH`). */
 const SEAT_REACH = 2.5;
@@ -58,7 +60,15 @@ export interface FollowedVehiclePorts {
   readonly look?: (kind: VehicleKind, id: string) => VehicleLook | null;
   /** MSZ14b: a hurt vehicle's smoke and break-apart; none draws neither. */
   readonly fx?: VehicleFxPort;
+  /** MSZ15: where its vehicles' sounds go and the shard's cues and recordings its kinds' `sounds` rows name; none is silent. */
+  readonly sounds?: { readonly out: VehicleSoundOut; readonly audio: Pick<AudioData, 'cues' | 'recordings'> };
 }
+/** MSZ15: where one vehicle was drawn over the last moments, for its sound: its velocity is read over `MOTION_WINDOW` s, so a
+ *  held or caught-up frame of its rows does not read as a lurch. */
+interface Motion { readonly back: { t: number; x: number; z: number }[]; t: number; vx: number; vz: number; quiet: number; peak: number }
+/** MSZ15: s a velocity is read over (and a hit against the one before it), m/s of change across that that is a hit (harder
+ *  than any brake), s a hit stays heard, and the m in one frame that is a jump (a respawn, a vehicle brought home), not a move. */
+const MOTION_WINDOW = 0.1, HIT_CHANGE = 5, HIT_QUIET = 0.3, JUMP = 5;
 /** MSZ14c: a page's look and fx for its vehicles, lent once its panels are drawn (a grid cell's load after its physics). */
 export interface VehicleDress { readonly look: (kind: VehicleKind, id: string) => VehicleLook | null; readonly fx?: VehicleFxPort }
 
@@ -103,6 +113,12 @@ export class FollowedVehicles {
   /** MSZ16: the vehicle this page's player drives, stepped here on its commands. */
   private predicted: { readonly id: string; readonly run: VehiclePrediction } | null = null;
   private readonly shapes: HullShapes = new Map();
+  /** MSZ15: the vehicles' sounds, the horns held (off their `vehicleHornRow`s), each one's motion off its drawn poses, and
+   *  the throttle and horn of this page's own driving. */
+  private readonly sounds: VehicleSounds | null;
+  private readonly horns = new Set<string>();
+  private readonly motions = new Map<string, Motion>();
+  private readonly mine = { throttle: 0, horn: false };
   constructor(vehicles: Vehicles, ports: FollowedVehiclePorts) {
     this.vehicles = vehicles; this.ports = ports; this.lookOf = ports.look; this.fx = ports.fx;
     this.kinds = new Map(vehicles.kinds.map(kind => [kind.id, kind]));
@@ -113,6 +129,9 @@ export class FollowedVehicles {
     // MSZ14c: a look outlives this follower (a grid cell's panels outlast its physics), so it hides as the follower goes
     ports.scope.onDispose(() => { for (const vehicle of this.live.values()) vehicle.body.dispose(); this.live.clear(); for (const look of this.looks.values()) look?.hide(); });
     this.made = this.makePrompts();
+    const sounds = ports.sounds;
+    this.sounds = sounds === undefined ? null : new VehicleSounds(sounds.out, kind => vehicleSoundSources(kind, sounds.audio));
+    ports.scope.onDispose(() => { this.sounds?.dispose(); });
   }
   /** MSZ14c: draw with `dress` from now on: a vehicle out with no look yet takes one where its row stands. */
   dress(dress: VehicleDress): void {
@@ -173,12 +192,13 @@ export class FollowedVehicles {
   sync(ids: Iterable<string>, me: string | null, feet: { readonly x: number; readonly z: number }, ownedFlags?: ReadonlySet<string>): void {
     this.ownedFlags = ownedFlags;
     this.me = me; this.feet.x = feet.x; this.feet.z = feet.z;
-    const out = new Set<string>(); this.seats.clear(); this.wornOut.clear(); this.wrecks.clear();
+    const out = new Set<string>(); this.seats.clear(); this.wornOut.clear(); this.wrecks.clear(); this.horns.clear();
     for (const id of ids) {
       if (id.startsWith(SCRIPT)) { const vehicle = id.slice(SCRIPT.length); if (this.docks.has(vehicleDockOf(vehicle))) out.add(vehicle); continue; }
       if (!id.startsWith(STATE)) continue;
       const worn = parseVehicleWornRow(id.slice(STATE.length)); if (worn !== null) { this.wornOut.add(worn); continue; }
       const wreck = parseVehicleWreckRow(id.slice(STATE.length)); if (wreck !== null) { this.wrecks.add(wreck); continue; }
+      const horn = parseVehicleHornRow(id.slice(STATE.length)); if (horn !== null) { this.horns.add(horn); continue; }
       const row = parseVehicleSeatRow(id.slice(STATE.length)); if (row === null) continue;
       let seats = this.seats.get(row.vehicle);
       if (seats === undefined) { seats = this.kindOf(row.vehicle)?.seats.map(() => null) ?? []; this.seats.set(row.vehicle, seats); }
@@ -204,8 +224,9 @@ export class FollowedVehicles {
       const row = wire.row(vehicle.id);
       this.predicted = { id: vehicle.id, run: new VehiclePrediction(vehicle.kind.handling, this.worldOf(vehicle), rowState(row ?? { pose: vehicle.pose }, { forward: 0, slip: 0 })) };
     }
-    const { run } = this.predicted;
-    run.step(vehicleCommandOf(command, run.state().yaw));
+    const { run } = this.predicted, stick = vehicleCommandOf(command, run.state().yaw);
+    run.step(stick);
+    this.mine.throttle = Math.abs(stick.throttle); this.mine.horn = stick.horn === true; // MSZ15: heard at once, not a row later
     const row = wire.row(vehicle.id), snaps = run.snaps;
     if (row !== null && run.settle(row, wire.behind)) { this.driven.corrections++; this.driven.snaps += run.snaps - snaps; this.driven.worst = Math.max(this.driven.worst, run.worst); }
     this.place(vehicle, run);
@@ -214,6 +235,7 @@ export class FollowedVehicles {
   frame(dt: number): void {
     const predicted = this.predicted, vehicle = predicted === null ? undefined : this.live.get(predicted.id);
     if (predicted !== null && vehicle !== undefined) { predicted.run.ease(dt); this.place(vehicle, predicted.run); }
+    this.hear(dt);
     const fx = this.fx; if (fx === undefined) return;
     for (const id of this.wornOut) { const worn = this.live.get(id); if (worn !== undefined) fx.smokeFrom(id, worn.pose, dt); }
     fx.frame(dt, this.wornOut);
@@ -228,6 +250,52 @@ export class FollowedVehicles {
   takeEdge(): boolean { return this.predicted?.run.takeEdge() ?? false; }
   /** MSZ16: the prediction of the vehicle this page's player drives, while it drives one. */
   prediction(): VehiclePrediction | null { return this.predicted?.run ?? null; }
+  /** MSZ15: what a proof reads of a vehicle's sound now: its loop's rate, its skid, its wind and its hits so far. */
+  sound(id: string): VehicleSoundState | undefined { return this.sounds?.state(id); }
+  /** MSZ15, a drawn frame: each vehicle out as its sound hears it. The one this page drives speaks for itself (its prediction's
+   *  speeds and hits, and the stick); every other one moves as its drawn poses show it, a sudden change of velocity a hit. */
+  private hear(dt: number): void {
+    const sounds = this.sounds; if (sounds === null || dt <= 0) return;
+    const held = this.seatOf(), hearings: VehicleHearing[] = [];
+    for (const vehicle of this.live.values()) {
+      const { x, y, z } = vehicle.pose.position, yaw = vehicle.pose.euler.y, motion = this.motionOf(vehicle.id, x, z, dt);
+      const fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw), aboard = held?.vehicle === vehicle.id;
+      const run = this.predicted?.id === vehicle.id ? this.predicted.run : null, state = run?.state();
+      hearings.push({
+        id: vehicle.id, kind: vehicle.kind, at: { x, y, z }, aboard,
+        forward: state?.forward ?? motion.vx * fx + motion.vz * fz, slip: state?.slip ?? motion.vx * rx + motion.vz * rz,
+        throttle: run === null ? 0 : this.mine.throttle, horn: this.horns.has(vehicle.id) || (run !== null && this.mine.horn),
+        impact: run !== null ? run.takeImpact() : motion.struck,
+      });
+    }
+    for (const id of this.motions.keys()) if (!this.live.has(id)) this.motions.delete(id);
+    sounds.frame(dt, hearings, this.feet);
+  }
+  /** MSZ15: a vehicle's velocity off its drawn poses over the last `MOTION_WINDOW` s, and how hard it was hit this frame: the
+   *  most its velocity changed from the window before, when no brake could make it (heard once, as that change passes its
+   *  peak, then quiet for `HIT_QUIET` s). A jump starts it again from rest. */
+  private motionOf(id: string, x: number, z: number, dt: number): Motion & { readonly struck: number } {
+    let motion = this.motions.get(id);
+    const last = motion?.back[motion.back.length - 1];
+    if (motion === undefined || last === undefined || Math.hypot(x - last.x, z - last.z) > JUMP) {
+      motion = { back: [], t: 0, vx: 0, vz: 0, quiet: 0, peak: 0 }; this.motions.set(id, motion);
+    }
+    motion.t += dt; motion.quiet = Math.max(0, motion.quiet - dt);
+    const { back, t } = motion; back.push({ t, x, z });
+    while (back.length > 2 && (back[1]?.t ?? t) <= t - 2 * MOTION_WINDOW) back.shift();
+    const at = (when: number): { t: number; x: number; z: number } | undefined => { let found: { t: number; x: number; z: number } | undefined; for (const row of back) if (row.t <= when) found = row; return found; };
+    const mid = at(t - MOTION_WINDOW), first = mid === undefined ? undefined : at(mid.t - MOTION_WINDOW);
+    if (mid === undefined || t - mid.t <= 0) return { ...motion, struck: 0 };
+    motion.vx = (x - mid.x) / (t - mid.t); motion.vz = (z - mid.z) / (t - mid.t);
+    let struck = 0;
+    if (first !== undefined && mid.t - first.t > 0 && motion.quiet === 0) {
+      const change = Math.hypot(motion.vx - (mid.x - first.x) / (mid.t - first.t), motion.vz - (mid.z - first.z) / (mid.t - first.t));
+      // heard at its peak: the windows take a few frames to see the whole of a bounce
+      if (change >= HIT_CHANGE && change > motion.peak) motion.peak = change;
+      else if (motion.peak > 0) { struck = motion.peak; motion.peak = 0; motion.quiet = HIT_QUIET; }
+    }
+    return { ...motion, struck };
+  }
   /** MSZ14: whether a vehicle is worn enough to smoke (its look reads it, MSZ14b). */
   worn(id: string): boolean { return this.wornOut.has(id); }
   /** The prompts this page offers for its vehicles: the same objects every call, which follow the vehicles. */

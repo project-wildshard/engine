@@ -15,7 +15,7 @@ import { FollowedMovers, type MoverView } from '../plugin/followedMovers';
 import { moverLookKey, wirePage } from '../shardfile/wirePage';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
-import { FollowedVehicles, type VehicleDress } from '../plugin/followedVehicles';
+import { FollowedVehicles, type FollowedVehiclePorts, type VehicleDress } from '../plugin/followedVehicles';
 
 /** MSZ14c: a cell's vehicles and the dress its drawn panels lend them, by instance. The two arrive in either order (the
  *  session admits a cell's physics and draws its panels apart), so whichever comes second dresses the vehicles. */
@@ -37,9 +37,9 @@ export interface DataCellMovers {
 }
 
 /** Install a data cell's movers in its region's physics; they leave with `scope`, and take the wire only once claimed. */
-export function installDataCellMovers(source: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>, region: { readonly physics: Physics; readonly scope: Scope }, instance: string): DataCellMovers | null {
-  // MSZ9b: its vehicles stand in its own physics; the grid's wire poses them once the feet are in it
-  const docks = shardVehicles(source), vehicles = docks.docks.length === 0 ? null : new FollowedVehicles(docks, { physics: region.physics, scope: region.scope });
+export function installDataCellMovers(source: Pick<Shardfile, 'movers'> & Partial<Pick<Shardfile, 'props'>>, region: { readonly physics: Physics; readonly scope: Scope }, instance: string, sounds?: FollowedVehiclePorts['sounds']): DataCellMovers | null {
+  // MSZ9b: its vehicles stand in its own physics; the grid's wire poses them once the feet are in it (MSZ15: and sound there)
+  const docks = shardVehicles(source), vehicles = docks.docks.length === 0 ? null : new FollowedVehicles(docks, { physics: region.physics, scope: region.scope, ...(sounds === undefined ? {} : { sounds }) });
   if (source.movers.length === 0 && vehicles === null) return null;
   // a saved end stands where the wire's first row puts it: the page holds no flags of its own here
   const movers = new FollowedMovers(source.movers, { physics: region.physics, scope: region.scope, restoreFlags: new Set(), hulls: vehicleHulls(source) });

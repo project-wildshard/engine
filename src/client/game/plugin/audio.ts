@@ -105,6 +105,8 @@ export function declaredWeaponVoices(audio: Audio): ReadonlyMap<string, (opts: C
     ['kit.swordSwing', () => { voices.swordSwing(); }], ['kit.swordHeavy', () => { voices.swordHeavy(); }],
     ['kit.swordHit', (opts) => { voices.swordHit('flesh', opts.pan, opts.gain); }],
     ['kit.reload', () => { voices.reload(); }], ['kit.weaponSwap', () => { voices.weaponSwap(); }],
+    // MSZ15: the material impact voices, which a vehicle kind's `impact` sound names
+    ...(['impact-wood', 'impact-stone', 'impact-flesh'] as const).map((family): [string, (opts: CombatCueOpts) => void] => [family, (opts) => { audio.voices.play(family, { gain: opts.gain ?? 1, pan: opts.pan ?? 0 }); }]),
   ]);
 }
 

@@ -23,6 +23,8 @@ export interface VehicleCommand {
   readonly boost: boolean;
   readonly handbrake?: boolean;
   readonly brake?: boolean;
+  /** MSZ15: the horn, held. Nothing steps on it: the runtime puts it on the wire for pages to sound. */
+  readonly horn?: boolean;
 }
 /** Where a vehicle is and how it moves. `forward` and `slip` are m/s along and across (right) its heading. */
 export interface VehicleState {

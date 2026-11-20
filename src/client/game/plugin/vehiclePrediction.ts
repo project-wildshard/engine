@@ -42,6 +42,8 @@ export class VehiclePrediction {
   worst = 0;
   /** MSZ18: a live step met the cell's edge since the page last asked (`takeEdge`). */
   private edged = false;
+  /** MSZ15: the hardest hit a live step met since the page last asked (`takeImpact`), m/s; 0 for none. */
+  private struck = 0;
   private readonly out: VehicleStepOut = { blocked: false, sliding: 0, impact: null };
   private readonly handling: VehicleHandling;
   private readonly world: VehicleWorld;
@@ -58,7 +60,9 @@ export class VehiclePrediction {
   step(command: VehicleCommand): VehicleState {
     this.out.impact = null;
     this.now = stepVehicle(this.now, command, this.handling, this.world, VEHICLE_DT, this.out);
-    if ((this.out.impact as VehicleStepOut['impact'])?.owner === VEHICLE_EDGE_OWNER) this.edged = true;
+    const impact = this.out.impact as VehicleStepOut['impact'];
+    if (impact?.owner === VEHICLE_EDGE_OWNER) this.edged = true;
+    else if (impact !== null && impact !== undefined) this.struck = Math.max(this.struck, impact.strength); // MSZ15: heard on the page
     this.steps.push({ command, after: this.now });
     if (this.steps.length > KEPT) this.steps.shift();
     return this.now;
@@ -99,6 +103,8 @@ export class VehiclePrediction {
   }
   /** MSZ18: whether a step met the cell's edge since the last ask (its chip says why the vehicle turned back). */
   takeEdge(): boolean { const edged = this.edged; this.edged = false; return edged; }
+  /** MSZ15: the hardest hit (closing speed, m/s) a step met since the last ask, the cell's edge aside; 0 for none. */
+  takeImpact(): number { const struck = this.struck; this.struck = 0; return struck; }
   /** Where the page has it now: its collider stands here. */
   state(): VehicleState { return this.now; }
   /** Where it is drawn now: the prediction, with a correction's lag still easing out. */

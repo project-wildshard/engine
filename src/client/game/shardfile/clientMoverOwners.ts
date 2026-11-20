@@ -10,6 +10,7 @@ import { materialGraphIr } from '@wildshard/format/materials';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { folderVehicles } from '../../../shared/game/shardfile/shardVehicles';
 import { FollowedVehicles } from '../plugin/followedVehicles';
+import { recordingReader, vehicleSoundPort } from '../plugin/vehicleSounds';
 import { wirePage } from './wirePage';
 
 export interface MoverMoorRows {readonly look:string;readonly water:number;readonly cleats:readonly [number,number]}
@@ -84,7 +85,7 @@ export async function installClientMoverOwners(ctx:ShardContext,rows:MoverOwnerR
   // MIRROR-SALT-ZONE MSZ9b: the product's `world/vehicles` follow their own rows beside the bound movers, with no owner view
   const vehicles=folderVehicles(ctx.product);
   if(vehicles.docks.length>0){
-    const followed=new FollowedVehicles(vehicles,{physics:world.physics,scope});
+    const audio=ctx.product.shardfile.audio,followed=new FollowedVehicles(vehicles,{physics:world.physics,scope,sounds:vehicleSoundPort(audio,recordingReader(audio,hash=>folderClosureFile(ctx.product,hash)))}); // MSZ15: its sounds
     wirePage.vehicles.set('scene',followed);scope.onDispose(()=>{if(wirePage.vehicles.get('scene')===followed)wirePage.vehicles.delete('scene');});
     ctx.game.runtime?.interactables.push(...followed.prompts());
   }

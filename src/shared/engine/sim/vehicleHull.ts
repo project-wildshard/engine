@@ -99,5 +99,5 @@ export function vehicleCommandOf(command: SimCommand, yaw: number): VehicleComma
   const boost = command.boost === true || command.sprint === true;
   const stick: VehicleCommand = steer === undefined ? steerStick({ x: command.moveX, z: command.moveZ }, yaw, boost)
     : { throttle: clamp(steer.keyY + steer.stickY), turn: clamp(steer.keyX + steer.stickX), boost };
-  return { ...stick, ...(command.brake === true ? { brake: true } : {}), ...(command.handbrake === true ? { handbrake: true } : {}) };
+  return { ...stick, ...(command.brake === true ? { brake: true } : {}), ...(command.handbrake === true ? { handbrake: true } : {}), ...(command.horn === true ? { horn: true } : {}) };
 }

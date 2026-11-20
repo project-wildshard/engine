@@ -13,6 +13,8 @@ import type { AudioMusicProfile, AudioSampleProfile, AudioZoneProfile } from '..
 /** Catalogue cue ids plus bounded wind recipes and a score mode, supplied as validated level data. */
 export interface DeclaredAudioData {
   cues: readonly { id: string; voice: string }[];
+  /** MSZ15: declared recordings by path; a cue whose voice is one is played by its owner (a vehicle's sounds), not routed here. */
+  recordings?: Readonly<Record<string, string>> | undefined;
   gameplay?:NonNullable<AudioData['gameplay']>;observations?:NonNullable<AudioData['observations']>;
   bank?: NonNullable<AudioData['bank']>; playback?: NonNullable<AudioData['playback']>; pcm?: NonNullable<AudioData['pcm']>; synth?: NonNullable<AudioData['synth']>;
   /** Extended profiles resolve only through platform catalogue installers. */
@@ -68,11 +70,12 @@ export function installDeclaredAudio(data:DeclaredAudioData,ports:DeclaredAudioP
   if(!('cues' in ports))throw new Error('Missing cue ports');
   if (data.ambience?.gust !== undefined) throw new Error('Gust beds require their declared native driver');
   if ((data.music !== undefined && ports.profiles?.music === undefined) || (data.samples !== undefined && ports.profiles?.samples === undefined) || (data.zones !== undefined && ports.profiles?.zones === undefined)) throw new Error('Audio profile requires its native catalogue installer');
-  const voices = new Map(data.cues.map((cue) => {
+  const routed = data.cues.filter((cue) => data.recordings?.[cue.voice] === undefined);
+  const voices = new Map(routed.map((cue) => {
     const voice = ports.voices.get(cue.voice); if (voice === undefined) throw new Error(`Unknown catalogue voice: ${cue.voice}`);
     return [cue.id, voice] as const;
   }));
-  if (voices.size !== data.cues.length) throw new Error('Duplicate audio cue');
+  if (voices.size !== routed.length) throw new Error('Duplicate audio cue');
   const routes = data.routing ?? [], routingPorts = {
     voices: new Map([...ports.voices].map(([id, voice]) => [id, (opts: CombatCueOpts): boolean => { voice(opts); return true; }])),
     later: (run: () => void, seconds: number) => { ports.scope.timeout(seconds * 1000, run); },

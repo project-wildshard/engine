@@ -108,7 +108,8 @@ import { createRegionalWorldFoundation, hangCellDataSky, registerRegionalTexture
 import { regionalDataCellBytes } from './runtimeCost';
 import { resolveLevelBounds } from '../../../shared/game/shard/runtime';
 import { declaredPlayArea, type PlayArea } from '@wildshard/engine/game/shardfile/playArea';
-import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
+import { folderClosureFile, type ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
+import { recordingReader, vehicleSoundPort } from '../plugin/vehicleSounds';
 import type { Bounds } from '@wildshard/engine/level/spec';
 import { pinFrameOffset } from '@wildshard/engine/ui/hudAdapters';
 
@@ -786,14 +787,15 @@ export class LiveGridSession {
         installEntrySockets(shell.physics, shell.scope, [{ x: 0, z: 0 }], 'backstop');
         installGridBorders(shell.physics, shell.scope);
         // TC-E5b: its lift and doors stand on this page, posed off the wire once the feet are in it
-        const movers = installDataCellMovers(copySource, shell, cell.instance);
+        let cellFolder: ReturnType<typeof shardFolderFromAdmission> | undefined;
+        const folder = (): ReturnType<typeof shardFolderFromAdmission> => (cellFolder ??= shardFolderFromAdmission(retained.admitted, shell.scope));
+        // MSZ15: its vehicles sound from its own recordings, read through the cell's product
+        const movers = installDataCellMovers(copySource, shell, cell.instance, vehicleSoundPort(copySource.audio, recordingReader(copySource.audio, hash => folderClosureFile(folder(), hash))));
         if (movers !== null) { this.dataMovers.set(cell.instance, movers); if (gridCells.cell?.instance === cell.instance) movers.claim(); }
         // SS9c: its touchable crates stand on this page where the server has them, once the feet are in it
         const touch = installDataCellBodies(copySource, shell, cell.instance);
         if (touch !== null) { this.dataBodies.set(cell.instance, touch); if (gridCells.cell?.instance === cell.instance) touch.claim(); }
         const transfer = regionTransferWalls(shell, this.page.traveller.motor.opts.radius), start = shell.level.player;
-        let cellFolder: ReturnType<typeof shardFolderFromAdmission> | undefined;
-        const folder = (): ReturnType<typeof shardFolderFromAdmission> => (cellFolder ??= shardFolderFromAdmission(retained.admitted, shell.scope));
         const completionRows = cellCompletionRows(folder()), lootRow = cellLootRow(copySource);
         shell.physics.step();
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);

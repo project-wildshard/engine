@@ -16,7 +16,7 @@ import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
 import type { Race } from '../../../shared/game/quest/declared';
 import { dockHulls, dockUnlocked, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
-import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow, vehicleWreckRow } from '../../../shared/game/shardfile/wirePrompts';
+import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleHornRow, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow, vehicleWreckRow } from '../../../shared/game/shardfile/wirePrompts';
 
 /**
  * MIRROR-SALT-ZONE MSZ8 and MSZ9: the vehicles a cell's server runs, beside `MoverRuntime`. It spawns each kind from its
@@ -85,6 +85,8 @@ interface Live {
   readonly seats: (string | null)[];
   /** s since its driver left (or since it spawned riderless). */
   idle: number;
+  /** MSZ15: its driver held the horn this step (`vehicleHornRow`). */
+  horn?: boolean;
   /** MSZ14: what is left of its health. */
   health: number;
   /** MSZ33: a race's rival, driven by his AI for one player's run; no seats, no wear, never saved. */
@@ -339,7 +341,7 @@ export class VehicleRuntime {
     for (const vehicle of this.live.values()) {
       const driver = this.driver(vehicle.id), rival = vehicle.rival;
       const command = rival !== undefined ? this.rivalStick(vehicle, rival, dt) : driver === null ? NEUTRAL : this.ports.stick(driver, vehicle.state.yaw) ?? NEUTRAL;
-      out.impact = null;
+      out.impact = null; vehicle.horn = command.horn === true;
       vehicle.state = stepVehicle(vehicle.state, command, vehicle.kind.handling, vehicle.world, dt, out);
       if (out.impact !== null && out.impact !== undefined) this.hand(vehicle, out.impact);
       vehicle.body?.setPose(poseOf(vehicle.state));
@@ -436,6 +438,7 @@ export class VehicleRuntime {
       // MSZ16: a driven vehicle's speeds along and across its heading, which its driver's page replays its commands from
       if (this.driver(vehicle.id) !== null) rows.push({ name: vehicleMotionRow(vehicle.id, 'forward'), value: vehicle.state.forward }, { name: vehicleMotionRow(vehicle.id, 'slip'), value: vehicle.state.slip });
       if (vehicle.health < VEHICLE_SMOKE * (vehicle.kind.health ?? VEHICLE_HEALTH)) rows.push({ name: vehicleWornRow(vehicle.id), value: 1 });
+      if (vehicle.horn === true && this.driver(vehicle.id) !== null) rows.push({ name: vehicleHornRow(vehicle.id), value: 1 }); // MSZ15
     }
     // MSZ14b: a wrecked vehicle's row while its dock waits to have it back, so a page breaks it apart rather than just losing it
     for (const id of this.wrecked.keys()) rows.push({ name: vehicleWreckRow(id), value: 1 });

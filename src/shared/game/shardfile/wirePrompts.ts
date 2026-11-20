@@ -27,6 +27,12 @@ export const parseVehicleWreckRow = (name: string): string | null => name.starts
 /** MSZ16: a driven vehicle's speed along (`forward`) or across (`slip`) its heading, m/s: a `state` row there while it has a
  *  driver, which the driver's page replays its unanswered commands from. */
 export const vehicleMotionRow = (vehicle: string, motion: 'forward' | 'slip'): string => `vehicle.${motion}|${vehicle}`;
+const HORN_ROW = 'vehicle.horn|';
+/** MSZ15: a vehicle whose driver holds its horn: a `state` row there while it is held, its value 1, so every page near it
+ *  sounds it. */
+export const vehicleHornRow = (vehicle: string): string => `${HORN_ROW}${vehicle}`;
+/** A horn row's vehicle, or null for any other row. */
+export const parseVehicleHornRow = (name: string): string | null => name.startsWith(HORN_ROW) && name.length > HORN_ROW.length ? name.slice(HORN_ROW.length) : null;
 /** A worn row's vehicle, or null for any other row. */
 export const parseVehicleWornRow = (name: string): string | null => name.startsWith(WORN_ROW) && name.length > WORN_ROW.length ? name.slice(WORN_ROW.length) : null;
 /** A seat row's vehicle, seat and rider, or null for any other row. */

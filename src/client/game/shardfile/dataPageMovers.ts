@@ -18,7 +18,7 @@ import { moverPanelPose } from '../grid/neighbourPanels';
 import { wirePage } from './wirePage';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
-import { FollowedVehicles } from '../plugin/followedVehicles';
+import { FollowedVehicles, type FollowedVehiclePorts } from '../plugin/followedVehicles';
 import { vehicleDress } from '../plugin/vehicleFx';
 
 /** What a one-shard page lends its data movers. */
@@ -26,6 +26,8 @@ export interface DataPagePorts {
   readonly physics: Physics; readonly scope: Scope;
   /** The page's props panels by id: a mover's look is the panel with its id. */
   readonly panels?: ReadonlyMap<string, Object3D>;
+  /** MSZ15: where its vehicles' sounds go, and its cues and recordings (`vehicleSoundPort`); none is silent. */
+  readonly sounds?: FollowedVehiclePorts['sounds'];
   /** The page's prompts, which take a carry mover's ride prompts. */
   readonly prompts?: Interactable[];
 }
@@ -60,7 +62,7 @@ export function installDataPageVehicles(source: object, page: DataPagePorts, key
   if (vehicles.docks.length === 0) return null;
   // MSZ14b: a hurt vehicle's smoke and break-apart draw beside its look, under its panels' root
   const dress = vehicleDress(vehicles.kinds, page.panels, page.scope);
-  const followed = new FollowedVehicles(vehicles, { physics: page.physics, scope: page.scope, ...dress });
+  const followed = new FollowedVehicles(vehicles, { physics: page.physics, scope: page.scope, ...dress, ...(page.sounds === undefined ? {} : { sounds: page.sounds }) });
   wirePage.vehicles.set(key, followed);
   page.scope.onDispose(() => { if (wirePage.vehicles.get(key) === followed) wirePage.vehicles.delete(key); });
   page.prompts?.push(...followed.prompts());
