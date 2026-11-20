@@ -35,10 +35,10 @@ test('the room door serves its own channel and counts only human arrivals for Po
     { slug: 'test-name', name: 'test-name' },
   ]);
   const totals = vi.fn(async () => [
-    { slug: 'pine-hollow', humans: 2, agents: 30 },
-    { slug: 'new-shard', humans: 3, agents: 0 },
-    { slug: 'driftwood-isle', humans: 2, agents: 0 },
-    { slug: 'nine-dragon-stack', humans: 100, agents: 0 },
+    { slug: 'pine-hollow', humans: 2, agents: 30, uniqueHumans: 2 },
+    { slug: 'new-shard', humans: 3, agents: 0, uniqueHumans: 1 },
+    { slug: 'driftwood-isle', humans: 2, agents: 0, uniqueHumans: 1 },
+    { slug: 'nine-dragon-stack', humans: 100, agents: 0, uniqueHumans: 100 },
   ]);
   const door = await open(zoneSelectRoute({
     channel: 'staging', allowedOrigins: [staging], world: () => ({ serial, slugs }),
@@ -54,7 +54,7 @@ test('the room door serves its own channel and counts only human arrivals for Po
     expect(document.channel).toBe('staging');
     expect(document.serial).toBe(5);
     expect(names(document.featured)).toEqual(['driftwood-isle', 'pine-hollow']);
-    expect(names(document.popular)).toEqual(['new-shard', 'driftwood-isle', 'pine-hollow']);
+    expect(names(document.popular)).toEqual(['new-shard', 'pine-hollow', 'driftwood-isle']);
     expect(names(document.new)).toEqual(['new-shard', 'pine-hollow']);
     expect(names(document.all)).toEqual(expect.arrayContaining(['_future', 'proof-town', 'test-name']));
     expect(document.popular.map(card => card.enters)).toEqual([3, 2, 2]);

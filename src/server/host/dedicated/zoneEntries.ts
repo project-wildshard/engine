@@ -35,7 +35,7 @@ export class ZoneEntries {
     if (actor === 'agent') row.agents++;
     else {
       row.humans++;
-      this.players.set(`${day}/${player}`, { day, player_key: player });
+      this.players.set(`${dateKey}/${player}`, { day, slug, player_key: player });
     }
     this.counts.set(dateKey, row);
   }

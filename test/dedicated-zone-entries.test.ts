@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import type { ActorTags } from '../src/shared/engine/app/actor';
 import { roadName } from '../src/server/host/dedicated/gridCells';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
-import { zoneEntryStore, type ZoneEntryStore } from '../src/server/host/dedicated/saves/zoneEntries';
+import { memoryZoneEntryStore, zoneEntryStore, type ZoneEntryStore } from '../src/server/host/dedicated/saves/zoneEntries';
 import { ZoneEntries } from '../src/server/host/dedicated/zoneEntries';
 import { gatewayDoor } from './fixtures/dedicated/gatewayDoor';
 import { openPglite } from './fixtures/pgliteDatabase';
@@ -50,11 +50,11 @@ test('the door counts confirmed Zone Select seats and walk-ins by actor', async 
   } finally { await door.close(); }
 });
 
-test('zone totals are channel-local, retries are idempotent and daily identities stay separate from zones', async () => {
-  const db = await openPglite();
+test.each(['database', 'memory'])('zone totals on %s deduplicate people across days and isolate channels', async backend => {
+  const db = backend === 'database' ? await openPglite() : undefined;
   try {
-    await migrate(db);
-    const store = zoneEntryStore(db);
+    if (db !== undefined) await migrate(db);
+    const store = db === undefined ? memoryZoneEntryStore() : zoneEntryStore(db);
     let now = Date.parse('2026-11-19T16:00:00Z'), fail = true;
     const retry: ZoneEntryStore = { ...store, async write(channel, batch) {
       await store.write(channel, batch);
@@ -73,12 +73,18 @@ test('zone totals are channel-local, retries are idempotent and daily identities
     staging.entered('account:one', home, { actor: 'human' });
     await live.flush();
     await staging.flush();
+    now += 86_400_000;
+    live.entered('account:one', home, { actor: 'human' });
+    await live.flush();
     expect(await live.totals()).toEqual(expect.arrayContaining([
-      { slug: home, humans: 2, agents: 1 }, { slug: other, humans: 1, agents: 0 },
+      { slug: home, humans: 3, agents: 1, uniqueHumans: 2 },
+      { slug: other, humans: 1, agents: 0, uniqueHumans: 1 },
     ]));
-    expect(await staging.totals()).toEqual([{ slug: home, humans: 1, agents: 0 }]);
-    const { rows } = await db.query('select player_key from human_players where channel = $1', ['production']);
-    expect(rows).toEqual([expect.objectContaining({ player_key: expect.stringMatching(/^[a-f0-9]{64}$/u) }),
-      expect.objectContaining({ player_key: expect.stringMatching(/^[a-f0-9]{64}$/u) })]);
-  } finally { await db.close(); }
+    expect(await live.totals(1)).toEqual([{ slug: home, humans: 1, agents: 0, uniqueHumans: 1 }]);
+    expect(await staging.totals()).toEqual([{ slug: home, humans: 1, agents: 0, uniqueHumans: 1 }]);
+    if (db !== undefined) {
+      const { rows } = await db.query('select distinct player_key from human_players where channel = $1', ['production']);
+      expect(rows).toEqual(Array.from({ length: 2 }, () => ({ player_key: expect.stringMatching(/^[a-f0-9]{64}$/u) })));
+    }
+  } finally { await db?.close(); }
 });

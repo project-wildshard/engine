@@ -63,7 +63,9 @@ function tabs(channel: ZoneSelectOptions['channel'], live: LiveZones, uploads: r
   const bySlug = new Map(visible.map(card => [card.slug, card]));
   const featured = FEATURED_ZONES.flatMap(slug => { const card = bySlug.get(slug); return card === undefined ? [] : [card]; });
   const order = new Map(featured.map((card, index) => [card.slug, index]));
+  const unique = new Map(counts.map(row => [row.slug, row.uniqueHumans]));
   const popular = [...visible].sort((a, b) => b.enters - a.enters ||
+    (a.enters === 0 ? 0 : (unique.get(b.slug) ?? 0) - (unique.get(a.slug) ?? 0)) ||
     (order.get(a.slug) ?? featured.length) - (order.get(b.slug) ?? featured.length) || name(a, b));
   const optedOut = new Set(uploads.filter(row => row.listedNew === false).map(row => row.slug));
   const fresh = visible.filter(card => card.firstUploadedAt !== null && !optedOut.has(card.slug) && !card.slug.startsWith('open-plot-'))
