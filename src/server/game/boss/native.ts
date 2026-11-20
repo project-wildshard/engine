@@ -25,7 +25,7 @@ import { pickPrompt } from '@wildshard/engine/world/interact/prompts';
 import { nearestOnGround } from '@wildshard/engine/sim/nearPlayer';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import { ABSENT_Y } from '../shardfile/declaredSpawnWhen';
-import { lendDeclaredBodies } from '../shardfile/declaredHerds';
+import { claimDeclaredFight, lendDeclaredBodies } from '../shardfile/declaredHerds';
 
 /** The actual native body remains owned by its installed population service; its limb pose roster publishes the ribs
  * volume (game/animation/limbPopulation `ribsWorld`: the chest chain, then the baked ribs point). */
@@ -76,6 +76,7 @@ function declaredGroundBodies(host: SimHost, row: RoamingEncounterRow, declared:
   for (const kind of new Set(adds.map(body => body.kind))) if (adds.filter(body => body.kind === kind).length < row.lanes.count)
     throw new Error(`Boss ${row.steps.fight} declares fewer ${kind} thralls than its ${String(row.lanes.count)} add lanes`);
   lendDeclaredBodies(host, bodies.map(body => body.entityId)); // a boss's group is never a herd
+  claimDeclaredFight(host, bosses.map(body => body.entityId)); // his `boss` encounter row is this fight's
   const leave = (body: NativeGroundBossBody): void => {
     body.hidden = true; body.alive = false; body.position.y = ABSENT_Y; body.motor?.resetAt?.(body.position); host.flags.clear(`dead:${body.entityId}`);
   };

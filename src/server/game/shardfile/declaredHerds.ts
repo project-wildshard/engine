@@ -18,13 +18,15 @@ export interface DeclaredHerd {
 interface Ledger {
   readonly groups: Map<string, { readonly members: AnimalSim[]; readonly at: [number, number][] }>;
   readonly lent: Set<string>;
+  /** OF23d: the declared bodies a native fight owns; a `boss` encounter naming one is that fight's, never a PhaseEncounter */
+  readonly fought: Set<string>;
   herds?: readonly DeclaredHerd[];
   byBody?: ReadonlyMap<AnimalSim, DeclaredHerd>;
 }
 const ledgers = new WeakMap<SimHost, Ledger>();
 function ledger(host: SimHost): Ledger {
   let found = ledgers.get(host);
-  if (found === undefined) { found = { groups: new Map(), lent: new Set() }; ledgers.set(host, found); }
+  if (found === undefined) { found = { groups: new Map(), lent: new Set(), fought: new Set() }; ledgers.set(host, found); }
   return found;
 }
 
@@ -43,6 +45,18 @@ export function lendDeclaredBodies(host: SimHost, ids: readonly string[]): void 
   const book = ledger(host);
   if (book.herds !== undefined) throw new Error('Declared herds are already read');
   for (const id of ids) book.lent.add(id);
+}
+
+/** OF23d: a native fight (Pine's `boss.ground`) owns these declared bodies: a `boss` encounter row naming one declares the
+ *  boss (his retained actor), and the native fight runs it, so the declared host stands no PhaseEncounter beside it. */
+export function claimDeclaredFight(host: SimHost, ids: readonly string[]): void {
+  const book = ledger(host);
+  for (const id of ids) book.fought.add(id);
+}
+
+/** Whether a native fight owns this declared body (see `claimDeclaredFight`). */
+export function declaredFightOwns(host: SimHost, id: string): boolean {
+  return ledgers.get(host)?.fought.has(id) === true;
 }
 
 /** The declared herds in spawn order, fixed on the first read (after every host installed). */

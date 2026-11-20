@@ -17,6 +17,7 @@ import { nativeGroundBossObservation } from '../src/server/game/boss/native';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { withoutRuntimeRows } from '../src/shared/game/plugin/runtimeRows';
 import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
@@ -51,6 +52,12 @@ const king = { ...boar, id: 'of23d.king', kind: 'antler-king', variants: [varian
 const thrall = { ...boar, id: 'of23d.boar.thrall', variants: [variant('thrall')], body: { ...boar.body, look: 'pine.look.thrall' } } as Species;
 const spawn = (id: string, species: Species, seed: number, dx: number): Spawn => ({ id, species: species.id, variant: species.variants[0]?.id ?? '',
   brain: null, strike: null, seed, scale: 1, at: [CLEARING.x + dx, 0, CLEARING.z - 6], yaw: 0, group: FIGHT }) as Spawn;
+/** OF23d (option B): his `boss` encounter row declares him (the retained actor his public decision fields need); the
+ *  native fight owns his body, so it runs the encounter and the declared host stands no PhaseEncounter beside it. */
+const KING_ROW: Shardfile['encounters'][number] = { id: 'pine.king.boss', entity: KING, kind: 'boss', panel: null, name: 'The Antler King',
+  title: 'The Antler King', retry: 'The Antler King', arena: { at: [CLEARING.x, 0, CLEARING.z], radius: 40 }, intro: 2, introShort: 1,
+  respawn: { at: [CLEARING.x, 0, CLEARING.z + 30], yaw: 0 },
+  phases: [{ at: 1, name: 'The King', caption: 'The King', speed: 3, stopDistance: 3, turnRate: 3 }] };
 function declaring(source: Shardfile): Shardfile {
   const base = emptyShardfile({ slug: 'of23d-king', name: 'King', author: 'Test', revision: 1, seed: 7 });
   const looks = [king, thrall].map(row => ({ id: row.body?.look ?? '', species: row.id, recipe: 'of23b.rig', material: null, parameters: {}, animation: { recipe: 'of23b.clips', parameters: {} } }));
@@ -60,7 +67,7 @@ function declaring(source: Shardfile): Shardfile {
   const own = source.runtime, spawns = own?.kind === 'client-plan' ? own.spawns : undefined;
   const runtime = own === null || spawns === undefined ? own : { ...own, spawns: Object.fromEntries(Object.entries(spawns)
     .map(([key, rows]) => [key, (rows as readonly { id: string }[]).filter(row => row.id !== KING)])) as typeof spawns };
-  return { ...source, runtime, rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
+  return { ...source, runtime, encounters: [...source.encounters, KING_ROW], rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
     // Pine's own declared herds (r8 on) stay beside the King's group
     looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: { ...source.creatures, brains: [...source.creatures.brains, ...parsed.creatures.brains],
     spawns: [...source.creatures.spawns, ...parsed.creatures.spawns] } };
@@ -89,6 +96,9 @@ test("a ground boss's declared body: raised by the night, his thralls from his g
   let restored: NativeHeadlessResident | undefined;
   try {
     const { host } = live, crowned = body(host, KING), pool = THRALLS.map(id => body(host, id));
+    // his boss row admits his public fields with no runtime boss, and the native fight, not a PhaseEncounter, runs him
+    expect(() => withoutRuntimeRows(shard)).not.toThrow();
+    expect(host.adapters.has(`encounter.${KING_ROW.id}`)).toBe(false);
     chest(crowned);
     // out of the world by day: no King, no thralls, and the group is no herd
     for (let tick = 0; tick < 30; tick++) { stand(host); live.step([]); }

@@ -12,6 +12,7 @@ import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
 import { installDataCreatureBands } from './dataCreatureBands';
 import { bindCreatureSenses, installCreatureSensesContract } from './creatureSenses';
 import { installCreatureVolumes } from './creatureVolumes';
+import { declaredFightOwns } from './declaredHerds';
 import { sizeCreatureSpawns } from './creatureSizes';
 import { dataPerchBrains, preflightPlainPerches } from './dataPerchBrains';
 import { dataCreaturePorts } from '../../../shared/game/shardfile/dataCreaturePorts';
@@ -174,17 +175,19 @@ export function installRuntimeCreatures(host: SimHost, shard: Shardfile, assets:
     if (owner === undefined || row?.entity !== owner.actor || body === undefined) return { saved: { defeated: false, rewardTaken: false, kills: 0 }, persist: () => undefined, reward: () => undefined };
     return declaredOwnerHooks(host, owner.row, body, { fact: ports.fact, coins: owner.coins }, () => fights.value?.get(id)?.boss);
   };
-  const encounters = installDeclaredEncounters(host, shard.encounters, id => ({ ...hooks(id), summoned: shard.encounters.some(row => row.id === id && ports.summoned.has(row.entity)) }), undefined,
-  new Set(shard.encounters.filter(row => actors.has(row.entity)).map(row => row.id)));
+  // OF23d: a `boss` row on a body a native fight owns declares that boss; the native fight runs him, so no PhaseEncounter
+  const rows = shard.encounters.filter(row => !(row.kind === 'boss' && declaredFightOwns(host, row.entity)));
+  const encounters = installDeclaredEncounters(host, rows, id => ({ ...hooks(id), summoned: rows.some(row => row.id === id && ports.summoned.has(row.entity)) }), undefined,
+  new Set(rows.filter(row => actors.has(row.entity)).map(row => row.id)));
   fights.value = encounters;
-  const adds = installEncounterAdds(host, shard.encounters, creatures.spawns, encounters, ports.restoring);
+  const adds = installEncounterAdds(host, rows, creatures.spawns, encounters, ports.restoring);
   if (owned.length > 0) new ShardDecisions(decisionRuntime(host, undefined, adds ?? undefined), shard, assets, new Map([...sections, ['sim/scripts', owned]]), encounters, undefined,
     undefined, ports.fact, ports.restoring);
   groups.install(ports.restoring);
   installDeclaredAttackable(host, shard);
   installDeclaredPatrols(host, creatures.patrols ?? [], ports.restoring);
   installDeclaredRanks(host, shard.creatures.spawns);
-  return new Map(shard.encounters.flatMap(row => {
+  return new Map(rows.flatMap(row => {
     const encounter = encounters.get(row.id);
     return encounter === undefined ? [] : [[row.entity, { summon: () => { encounter.summon(); }, locked: () => encounter.boss.state === 'intro' }] as const];
   }));

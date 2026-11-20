@@ -9,3 +9,13 @@
   `test/hunt-declared-herd.test.ts` fails before it.
 - Same lane: `test/ci/native-loadout.proof.mjs` (Pine r8 main red) aimed the King's head from a
   fixed post; it now stands before his chest and aims the chest lock point (`40655ea23`).
+
+## OF23d option B: a native fight takes over its boss's encounter row
+
+- The coordinator picked option B for the declared Antler King: Pine adds a `boss` encounter row on
+  his declared spawn (so his public `king.*` decision fields have a retained actor under the
+  existing format and engine rule), and the native `boss.ground` fight runs it.
+- Engine: the ground boss claims its boss body (`claimDeclaredFight`), and the declared creature
+  host stands no PhaseEncounter (nor its adds) for a `boss` row on a claimed body.
+- `native-ground-boss-declared` now ships the row: `withoutRuntimeRows` admits the fields with no
+  runtime boss, and no `encounter.<id>` adapter stands (fails without the takeover).
