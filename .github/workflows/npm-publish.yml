@@ -4,7 +4,7 @@
 # that already exists, so the first version is published by hand (plan row NP4); until then this job skips with a
 # notice. A manual run with placeholder=true publishes a README-only 0.0.x from this same file, so it proves the
 # trusted publisher end to end without a release (NPM-PUBLISH smoke row).
-# After staging qualification, dispatch staging_build to publish that exact build on npm next.
+# Dispatch staging_build to publish the exact staging build on npm next. J475 admits exact green release CI.
 name: npm-publish
 run-name: ${{ inputs.staging_build && format('npm next {0}', inputs.staging_build) || 'npm-publish' }}
 
@@ -26,7 +26,7 @@ on:
         type: string
         default: ''
       staging_qualification:
-        description: JSON from the exact build's completed staging qualification
+        description: Exact-build qualification JSON or the J475 release CI receipt
         type: string
         default: ''
 
@@ -88,7 +88,7 @@ jobs:
             [[ "$run" =~ ^[1-9][0-9]*$ && "$queue_attempt" =~ ^[1-9][0-9]*$ ]]
             attempt=(--attempt "$queue_attempt")
           fi
-          export RELEASE_BRANCH="$branch" QUEUE_ATTEMPT="${queue_attempt:-}"
+          export RELEASE_BRANCH="$branch" RELEASE_CI_RUN="$run" QUEUE_ATTEMPT="${queue_attempt:-}"
           gh run view "$run" "${attempt[@]}" --json headSha,headBranch,event,workflowName,attempt,status,conclusion,jobs | node -e '
             const assert = require("node:assert/strict");
             const ci = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
@@ -124,7 +124,12 @@ jobs:
           assert.equal(packageInfo.name, '@wildshard/engine');
           const proof = JSON.parse(process.env.STAGING_QUALIFICATION);
           assert.equal(proof.build, process.env.RELEASE_BUILD);
-          if (proof.preAliasSmokeV1 !== undefined) {
+          if (proof.j475 !== undefined) {
+            // J475: green release CI can publish to next while J451 runs.
+            // The exact CI and signed staging readback still apply to this dispatch.
+            assert.equal(process.env.QUEUE_ATTEMPT, '');
+            assert.equal(proof.j475.releaseCi, Number(process.env.RELEASE_CI_RUN));
+          } else if (proof.preAliasSmokeV1 !== undefined) {
             const smoke = proof.preAliasSmokeV1;
             const scenarios = ['K1', 'K2', 'K3', 'K4', 'K5', 'K6'];
             const sha256 = /^[a-f0-9]{64}$/u;
