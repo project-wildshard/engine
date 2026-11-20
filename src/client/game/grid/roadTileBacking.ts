@@ -13,6 +13,7 @@ import { coarseRoadTileSteps } from './roadTileCoarse';
 import { compactRoadTileSteps, type RoadTileGeometry } from './roadTileGeometry';
 import { persistRoadTile, ROAD_TILE_ARCHIVE_BYTES, ROAD_TILE_HEADER_BYTES, type RoadTileReference, type RoadTileStore } from './roadTileArchive';
 import { RoadTilePool } from './roadTilePool';
+import { roadHandoffPacedOn } from './roadHandoffPaced';
 import { roadCellKey, roadTileStream, type PreparedRoadTile, type RoadTileSource } from './roadTileStream';
 import { captureJobBytes, RoadTileCaptureWorker } from './roadTileCaptureWorker';
 import { captureJobTiles } from './roadTileCaptureJob';
@@ -83,6 +84,9 @@ export class RoadTileBacking {
   private capturing = false;
   private stream: TileStreamer<PreparedRoadTile> | null = null;
   private committed = false;
+  /** DF8: the handoff has started (the ring was ready once), and the sources already handed over */
+  private handingOff = false;
+  private readonly handedOff = new Set<Source>();
   private primed = false;
   private priming = false;
   /** The first handoff's tiles (chosen once, at the first step) and how often reading them failed. */
@@ -100,6 +104,8 @@ export class RoadTileBacking {
   private workerFailure: Error | null = null;
   private readonly captureWorker: RoadTileCaptureWorker | null;
   /** `origin` (the archive's URL origin) moves each source's capture to a worker; without it the page captures. */
+  /** DF8 (mini-driftwood13m): whether the handoff takes one material a step (`debug.roadHandoffPaced`); tests pass their own */
+  handoffPaced: () => boolean = roadHandoffPacedOn;
   constructor(private readonly scope: Scope, private readonly store: RoadTileStore, private readonly culler: RoadCuller, private readonly origin?: string) {
     if (scope.disposed || scope.disposing) throw new Error('Road backing owner retired');
     this.captureWorker = origin === undefined ? null : new RoadTileCaptureWorker(scope.child('capture-worker'));
@@ -301,18 +307,34 @@ export class RoadTileBacking {
     if (!this.priming) this.prime(camera, stream);
     else if (this.repin) { this.repin = false; this.requirePrime(stream); }
     stream.step(camera);
-    if (!this.committed && this.primed && stream.ready()) {
-      // Reveal first, so retiring a whole mesh cannot leave its ready children
-      // hidden. Geometry disposal precedes each corresponding lease shrink.
-      for (const source of this.sources.values()) if (source.pool !== null) source.pool.root.visible = true;
+    // DF8 (mini-driftwood13m): the stream and the handoff are timed apart, so a long step names which it was
+    const handoffAt = timedAt === undefined ? undefined : diagnosticNow();
+    if (timedAt !== undefined && handoffAt !== undefined) frameCost.sectionOther('grid.road tiles', handoffAt - timedAt);
+    if (!this.committed && (this.handingOff || (this.primed && stream.ready()))) {
+      // DF8: `debug.roadHandoffPaced` (roadHandoffPaced.ts) hands one material over a step, once the ring was ready
+      const paced = this.handoffPaced();
+      this.handingOff = true;
       for (const source of this.sources.values()) {
-        const previous = retireWholeRoadMesh(source.mesh);
-        this.culler.plans.delete(source.mesh); previous.dispose(); source.retire?.();
+        if (this.handedOff.has(source)) continue;
+        // Reveal first, so retiring a whole mesh cannot leave its ready children
+        // hidden. Geometry disposal precedes each corresponding lease shrink.
+        if (source.pool !== null) source.pool.root.visible = true;
+        if (!paced) continue;
+        this.retireSource(source);
+        break;
       }
-      this.committed = true;
-      for (const pin of this.initialPins) pin.release(); this.initialPins = [];
+      if (!paced) for (const source of this.sources.values()) this.retireSource(source);
+      if (this.handedOff.size === this.sources.size) {
+        this.committed = true; this.handingOff = false;
+        for (const pin of this.initialPins) pin.release(); this.initialPins = [];
+      }
     }
-    if (timedAt !== undefined) frameCost.sectionOther('grid.road tiles', diagnosticNow() - timedAt);
+    if (handoffAt !== undefined) frameCost.sectionOther('grid.road handoff', diagnosticNow() - handoffAt);
+  }
+  private retireSource(source: Source): void {
+    this.handedOff.add(source);
+    const previous = retireWholeRoadMesh(source.mesh);
+    this.culler.plans.delete(source.mesh); previous.dispose(); source.retire?.();
   }
   /** Bound the first handoff to the existing fine/coarse counts. Coarse
    * publication alone must not retire nearby full-detail roads. */

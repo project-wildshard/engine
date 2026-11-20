@@ -297,3 +297,31 @@ test('a road tile that never reads leaves the whole road drawn and reports once,
     expect(faults.filter(system => system === 'grid.road-tiles')).toHaveLength(1);
   } finally { off(); close(); }
 });
+
+// DF8 (mini-driftwood13m): paced, the handoff takes one material a step (its pool shows, then its whole mesh retires);
+// unpaced, every material in one step
+test.each([false, true])('the road handoff with two materials, paced %s', async on => {
+  const a = fixture(4), b = fixture(4), scope = new Scope('road handoff'), bodies = new Map<string, Uint8Array>();
+  try {
+    const backing = new RoadTileBacking(scope, {
+      get: hash => Promise.resolve(bodies.get(hash)?.slice() ?? null),
+      put: (hash, bytes) => { bodies.set(hash, bytes.slice()); return Promise.resolve(true); },
+    }, { pitch: 125, plans: new Map() });
+    backing.handoffPaced = () => on;
+    await capture(backing, a.mesh, a.plan); await capture(backing, b.mesh, b.plan);
+    const retired: string[] = [];
+    backing.retirement(a.mesh, () => { retired.push('a'); }); backing.retirement(b.mesh, () => { retired.push('b'); });
+    const lease = { id: 'road', shrink: () => undefined, update: () => undefined, hold: () => () => undefined, release: () => undefined };
+    backing.start({ x: 0, z: 0 }, { junctions: [] }, { reserve: claim => ({ ...lease, id: claim.id }) }, 'proof');
+    const camera = new PerspectiveCamera();
+    const drawn = (mesh: Mesh): boolean => mesh.layers.test(camera.layers);
+    let steps = 0;
+    for (; steps < 400 && retired.length === 0; steps++) { backing.step({ x: 10, z: 10, vx: 0, vz: 0 }); await new Promise<void>(resolve => { setTimeout(resolve, 0); }); }
+    if (on) {
+      expect(retired).toEqual(['a']); expect(drawn(a.mesh)).toBe(false); expect(drawn(b.mesh)).toBe(true); expect(backing.ready()).toBe(false);
+      backing.step({ x: 10, z: 10, vx: 0, vz: 0 });
+    }
+    expect(retired).toEqual(['a', 'b']); expect(drawn(a.mesh)).toBe(false); expect(drawn(b.mesh)).toBe(false);
+    expect(backing.ready()).toBe(true);
+  } finally { scope.dispose(); a.close(); b.close(); }
+});

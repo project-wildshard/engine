@@ -122,8 +122,9 @@ async function bench() {
               row.frames = log;
               const long = (log?.frames ?? []).filter((/** @type {any[]} */ f) => f[1] > 50);
               console.log(`  frames: ${String(log?.count ?? 0)} logged, ${String(long.length)} over 50 ms, ${String(long.filter((/** @type {any[]} */ f) => f[2] > 0 || f[4] > 65536 || f[5] > 65536).length)} of them with links or big uploads, ${String(log?.adds?.length ?? 0)} scene adds`);
-              // DF8: each update over 50 ms with the game's own split (FRAME_LOG_START's costs)
-              for (const c of (log?.costs ?? []).filter((/** @type {any[]} */ cost) => cost[1] > 50)) {
+              // DF8: each long update with the game's own split (FRAME_LOG_START's costs)
+              // mini-driftwood13m: from 25 ms, so the one-off stalls name their part
+              for (const c of (log?.costs ?? []).filter((/** @type {any[]} */ cost) => cost[1] > 25)) {
                 console.log(`  update ${String(c[1])} ms at ${String(Math.round((c[0] - (log?.from ?? 0)) / 100) / 10)} s: top ${String(c[3])}; ${String(c[4])}`);
               }
               // DF8 (mini-driftwood13h): each frame over 50 ms named (gc, compile, upload, update, render, other)
@@ -137,7 +138,7 @@ async function bench() {
               /** @type {Record<string, number>} */
               const byCause = {};
               // mini-driftwood13m: with `debug.taskStamp` on, an `other` frame says whether a callback, unwrapped work or nothing held the main thread
-              for (const n of named) { const kind = n.cause === 'other' ? otherKind(n, log ?? {}) : null; if (kind !== null) { n.causes.push(kind); n.cause = `other ${kind.split(' ')[0] ?? ''}`; } byCause[n.cause] = (byCause[n.cause] ?? 0) + 1; }
+              for (const n of named) { const kind = n.cause === 'other' ? otherKind(n, log ?? {}) : null; if (kind !== null) { n.causes.push(kind); n.cause = `other ${kind.startsWith('task ') ? 'task' : kind}`; } byCause[n.cause] = (byCause[n.cause] ?? 0) + 1; }
               console.log(`  long frames by cause: ${JSON.stringify(byCause)}`);
               const gaps = gapWork(named, log ?? {});
               row.gaps = gaps;

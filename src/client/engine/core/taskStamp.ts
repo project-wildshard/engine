@@ -4,7 +4,7 @@
  * ("other"), and WebKit's Timeline answers every record with a zero timestamp on iOS 18.6.2. With `debug.taskStamp` on, the
  * page stamps every callback the browser hands it (timers, animation frames, microtasks, event listeners and `on*`
  * handlers, worker and socket messages, the DOM observers, promise reactions) that runs `TASK_STAMP_MIN_MS` or more, and a
- * 10 ms probe timer records how late it fired: a late probe with no stamp is main-thread work nothing here wraps (a
+ * 10 ms probe timer records how late it fired, and a WeakRef sentinel it renews says when a collection ran: a late probe with no stamp is main-thread work nothing here wraps (a
  * collection, style and layout, an `await` continuation); an on-time probe in a long frame is a frame the main thread did
  * not hold up. The bench reads `window.__wsTaskStamp` (scripts/memory/iphone/census.mjs). Off by default, debug only: the
  * wrappers are installed once at page start, in the first page script (client/app/identity.ts).
@@ -30,8 +30,23 @@ export class TaskStampLog {
   private readonly lateT: number[] = [];
   private readonly lateMs: number[] = [];
   private ln = 0;
+  // collections seen by the probe's sentinel: [the probe before, the probe that found it gone]
+  private readonly gcFrom: number[] = [];
+  private readonly gcTo: number[] = [];
+  private gn = 0;
   record(t: number, ms: number, label: string): void { const i = this.n % RING; this.t[i] = t; this.ms[i] = ms; this.label[i] = label; this.n++; }
   late(due: number, ms: number): void { const i = this.ln % RING; this.lateT[i] = due; this.lateMs[i] = ms; this.ln++; }
+  /** a collection ran between two probes (the earlier probe's sentinel was gone at the later one) */
+  collected(from: number, to: number): void { const i = this.gn % RING; this.gcFrom[i] = from; this.gcTo[i] = to; this.gn++; }
+  /** the probe gaps with a collection in them that overlap [from, to): [gap start, gap end] */
+  collections(from: number, to: number): [number, number][] {
+    const out: [number, number][] = [];
+    for (let k = Math.max(0, this.gn - RING); k < this.gn; k++) {
+      const i = k % RING, a = this.gcFrom[i] ?? 0, b = this.gcTo[i] ?? 0;
+      if (a < to && b > from) out.push([Math.round(a), Math.round(b)]);
+    }
+    return out;
+  }
   /** the stamps that overlap [from, to): [start, ms, label] */
   read(from: number, to: number): [number, number, string][] {
     const out: [number, number, string][] = [];
@@ -67,7 +82,7 @@ function nameOf(fn: object): string {
 }
 
 /** Install the wrappers on `scope` (the page's window) and answer the log. Pure apart from `scope`. */
-export function installTaskStamp(scope: typeof globalThis, now: () => number = diagnosticNow): TaskStampLog {
+export function installTaskStamp(scope: typeof globalThis, now: () => number = diagnosticNow, promises = false): TaskStampLog {
   const log = new TaskStampLog();
   const timed = (kind: string, fn: AnyFn, label?: (self: unknown, args: unknown[]) => string): AnyFn => function stamped(this: unknown, ...args: unknown[]): unknown {
     const t = now();
@@ -135,7 +150,7 @@ export function installTaskStamp(scope: typeof globalThis, now: () => number = d
   }
   // promise reactions (`.then`, and `.catch` / `.finally`, which call it); an `await` continuation is not one of these
   const promise = (g['Promise'] as { prototype: { then: AnyFn } } | undefined)?.prototype;
-  if (promise !== undefined) {
+  if (promises && promise !== undefined) {
     const ownThen = promise.then;
     const stampedThen = function stampedThen(this: unknown, onFulfilled?: unknown, onRejected?: unknown): unknown {
       return ownThen.call(this, typeof onFulfilled === 'function' ? timed('then', onFulfilled as AnyFn) : onFulfilled,
@@ -146,21 +161,30 @@ export function installTaskStamp(scope: typeof globalThis, now: () => number = d
   }
   // the probe: due every PROBE_EVERY_MS on the page's own timer; how late it ran says whether the main thread was held
   if (typeof ownTimeout === 'function') {
-    let due = now() + PROBE_EVERY_MS;
-    const probe = (): void => { const at = now(), late = at - due; if (late >= PROBE_LATE_MS) log.late(due, late); due = at + PROBE_EVERY_MS; ownTimeout.call(scope, probe, PROBE_EVERY_MS); };
+    // a fresh object behind a WeakRef each probe: gone at the next probe means a collection ran between the two (an eden
+    // collection takes it as well as a full one), so a held frame can say it was the collector
+    const Weak = g['WeakRef'] as (new (target: object) => { deref: () => object | undefined }) | undefined;
+    let due = now() + PROBE_EVERY_MS, last = now(), sentinel = Weak === undefined ? null : new Weak({});
+    const probe = (): void => {
+      const at = now(), late = at - due; if (late >= PROBE_LATE_MS) log.late(due, late);
+      if (sentinel !== null && Weak !== undefined) { if (sentinel.deref() === undefined) log.collected(last, at); sentinel = new Weak({}); }
+      last = at; due = at + PROBE_EVERY_MS; ownTimeout.call(scope, probe, PROBE_EVERY_MS);
+    };
     ownTimeout.call(scope, probe, PROBE_EVERY_MS);
   }
   return log;
 }
 
-/** Whether the slot is on for this page (a saved `true`); storage blocked: off. */
-export function taskStampOn(): boolean {
-  try { return jsonSlot(TASK_STAMP_SLOT, 'device').read() === true; } catch { return false; }
+/** The slot: `true` stamps everything but promise reactions (their wrappers allocate a closure a call, which feeds the
+ *  collector the bench is looking for); `"all"` adds them; anything else is off. Storage blocked: off. */
+export function taskStampMode(): 'off' | 'on' | 'all' {
+  try { const saved = jsonSlot(TASK_STAMP_SLOT, 'device').read(); return saved === true ? 'on' : saved === 'all' ? 'all' : 'off'; } catch { return 'off'; }
 }
 
 /** client/app/identity.ts: install once when the slot is on, as `window.__wsTaskStamp`. */
 export function startTaskStamp(): void {
-  if (typeof window === 'undefined' || !taskStampOn()) return;
+  const mode = typeof window === 'undefined' ? 'off' : taskStampMode();
+  if (mode === 'off') return;
   const held = window as unknown as { __wsTaskStamp?: TaskStampLog };
-  held.__wsTaskStamp ??= installTaskStamp(window);
+  held.__wsTaskStamp ??= installTaskStamp(window, diagnosticNow, mode === 'all');
 }

@@ -67,6 +67,16 @@ describe('taskStamp', () => {
     page.spend(PROBE_EVERY_MS + 40); page.runDue();
     expect(log.lates(0, 1e9)).toEqual([[20, 40]]);
   });
+  test('a probe whose sentinel is gone marks a collection between it and the probe before', () => {
+    const page = fakeScope();
+    let alive = true;
+    class Weak { private readonly held: object; constructor(target: object) { this.held = target; } deref(): object | undefined { return alive ? this.held : undefined; } }
+    const log = installTaskStamp({ ...(page.scope as unknown as object), WeakRef: Weak } as unknown as typeof globalThis, page.now);
+    page.spend(PROBE_EVERY_MS); page.runDue();
+    expect(log.collections(0, 1e9)).toEqual([]);
+    alive = false; page.spend(PROBE_EVERY_MS); page.runDue();
+    expect(log.collections(0, 1e9)).toEqual([[10, 20]]);
+  });
   test('the ring answers only what overlaps the asked window', () => {
     const log = new TaskStampLog();
     log.record(100, 30, 'a'); log.record(200, 5, 'b');

@@ -10,6 +10,6 @@ export declare const FRAME_LOG_READ: string;
 /** DF8: what each long frame waited on (gc, compile, upload, update, render or other). */
 export declare function nameLongFrames(frames: unknown[][], collections?: [string, number, number][], over?: number): { at: number; ms: number; cause: string; causes: string[] }[];
 /** DF8: each long frame's work outside the game tick (GPU-waiting calls, long timers), longest first. */
-export declare function gapWork(named: { at: number; ms: number }[], log: { reads?: [number, string, number][]; tasks?: [number, string, number][]; stamps?: [number, [number, number, string][], number, number][] | null }): string[][];
+export declare function gapWork(named: { at: number; ms: number }[], log: { reads?: [number, string, number][]; tasks?: [number, string, number][]; stamps?: [number, [number, number, string][], number, number, (number | null)?][] | null }): string[][];
 /** DF8: an `other` frame split by `debug.taskStamp` (task, held or free); null without the stamps. */
-export declare function otherKind(n: { at: number; ms: number; cause: string }, log: { stamps?: [number, [number, number, string][], number, number][] | null }, gameFrame?: (label: string) => boolean): string | null;
+export declare function otherKind(n: { at: number; ms: number; cause: string }, log: { stamps?: [number, [number, number, string][], number, number, (number | null)?][] | null }, gameFrame?: (label: string) => boolean): string | null;

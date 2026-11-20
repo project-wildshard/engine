@@ -798,6 +798,7 @@
     "src/client/game/grid/roadSurfaceMaps.ts": "client",
     "src/client/game/grid/roadTileArchive.ts": "client",
     "src/client/game/grid/roadTileBacking.ts": "client",
+    "src/client/game/grid/roadHandoffPaced.ts": "client",
     "src/client/game/grid/roadTileCapture.worker.ts": "client",
     "src/client/game/grid/roadTileCaptureJob.ts": "client",
     "src/client/game/grid/roadTileCaptureWorker.ts": "client",

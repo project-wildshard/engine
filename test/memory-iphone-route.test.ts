@@ -106,16 +106,18 @@ test('DF8 (mini-driftwood13i): gapWork names the GPU waits and long timers insid
 });
 
 test('DF8 (mini-driftwood13m): an other frame is a stamped callback, held by unwrapped work, or free', () => {
-  const stamps: [number, [number, number, string][], number, number][] = [
+  const stamps: [number, [number, number, string][], number, number, number?][] = [
     [1100, [[1010, 30, 'event.Worker.message:onWorker'], [1000, 12, 'raf:tick']], 0, 0],
     [1200, [[1150, 40, 'raf:t=>{if(e!==this.epoch)return}']], 35, 50],
     [1300, [], 3, 3],
+    [1500, [], 40, 40, 1],
   ];
   const at = (ms: number) => ({ at: ms, ms: 60, cause: 'other' });
   expect(otherKind(at(1100), { stamps })).toBe('task event.Worker.message:onWorker');
   expect(otherKind(at(1200), { stamps })).toBe('held');
   expect(otherKind(at(1300), { stamps })).toBe('free');
   expect(otherKind(at(1400), { stamps })).toBeNull();
+  expect(otherKind(at(1500), { stamps })).toBe('held gc');
   expect(otherKind(at(1100), {})).toBeNull();
   expect(gapWork([at(1100)], { stamps })).toEqual([['event.Worker.message:onWorker:30', 'raf:tick:12', 'probe late max 0 sum 0']]);
 });
