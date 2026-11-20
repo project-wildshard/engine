@@ -8,9 +8,9 @@ import { signature } from './matrix.mjs';
 import { fpsVerdict } from './verdict.mjs';
 
 /** @typedef {{name:string,seconds:number}} Segment */
-/** @typedef {{build:string,css:number[],dpr:number,phone:boolean,low:boolean,shadowsOff:boolean}} Witness */
+/** @typedef {{build:string,css:number[],dpr:number,phone:boolean,low:boolean,shadowsOff:boolean,gpu?:string}} Witness */
 /** @typedef {{version:{build:string,rendererRevision:string},witness:Witness,
- * legs:(Parameters<typeof fpsVerdict>[0][number] & {summary?:{gpuApproxP95Ms:number},
+ * legs:(Parameters<typeof fpsVerdict>[0][number] & {cap:number|null,summary?:{gpuApproxP95Ms:number},
  * metal?:{frames:number,p95Ms:number|null}})[]}} Capture */
 /** @typedef {{phone:Capture,mac:Capture}} Pair */
 
@@ -28,9 +28,12 @@ export function fitGpu(pairs, route, training, heldOut) {
   if (training.length === 0 || heldOut.length < 2 || new Set(assigned).size !== assigned.length ||
       assigned.some(name => !names.includes(name))) throw new Error('Declare disjoint training and at least two held-out segments');
   const first = pairs[0].phone;
+  if (!first.version.build || !first.version.rendererRevision || first.witness.css.length !== 2 ||
+      first.witness.css.some(size => !Number.isFinite(size) || size <= 0) || first.witness.dpr !== 1)
+    throw new Error('Missing exact-build or raster witness for phone Low');
   for (const side of ['phone', 'mac']) {
     const captures = pairs.map(pair => pair[/** @type {'phone'|'mac'} */ (side)]);
-    if (new Set(captures.map(capture => signature(capture.legs))).size !== captures.length)
+    if (new Set(captures.map(capture => signature(capture.legs.map(({name,samples}) => ({name,samples}))))).size !== captures.length)
       throw new Error(`Duplicate ${side} capture is not an independent repeat`);
     for (const capture of captures) {
       const { witness, version } = capture;
@@ -41,6 +44,9 @@ export function fitGpu(pairs, route, training, heldOut) {
         throw new Error('Matched captures need the same build, renderer, raster and phone Low workload');
       if (fpsVerdict(capture.legs, route, 30).verdict === 'incomplete')
         throw new Error('A complete route, including navigation and every frame, is required');
+      if (capture.legs.some(leg => leg.cap !== 30)) throw new Error('GPU fit routes must use the same 30 fps cap');
+      if (side === 'mac' && (!/metal/iu.test(witness.gpu ?? '') || /software|swiftshader/iu.test(witness.gpu ?? '')))
+        throw new Error('GPU fit requires hardware Metal measurements');
     }
   }
   const segments = names.map(name => {

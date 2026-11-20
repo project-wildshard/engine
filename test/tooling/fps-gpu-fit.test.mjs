@@ -6,8 +6,8 @@ const training = ['dock','beach','village'], heldOut = ['fire','road'];
 function pairs() {
   return [1,2,3].map(run => {
     const capture = phone => ({version:{build:'exact',rendererRevision:'same-renderer'},
-      witness:{build:'exact',css:[390,664],dpr:1,phone:true,low:true,shadowsOff:true},
-      legs:route.map(({name}, index) => ({name, samples:[{seconds:1,frames:30,frameMs:Array.from({length:30}, () => 33 + run / 100)}],
+      witness:{build:'exact',css:[390,664],dpr:1,phone:true,low:true,shadowsOff:true,gpu:'ANGLE Metal'},
+      legs:route.map(({name}, index) => ({name,cap:30,samples:[{seconds:1,frames:30,frameMs:Array.from({length:30}, () => 33 + run / 100)}],
         summary:{gpuApproxP95Ms:2 * (index + run)}, metal:phone ? null : {frames:4,p95Ms:index + run}}))});
     return {phone:capture(true),mac:capture(false)};
   });
@@ -37,6 +37,9 @@ test('refuses duplicated, interrupted, mixed-build and mismatched graphics captu
     inputs => { inputs[0].mac.witness.build = 'different'; },
     inputs => { inputs[0].phone.witness.low = false; },
     inputs => { inputs[0].mac.witness.css = [402,812]; },
+    inputs => { inputs[0].phone.version.rendererRevision = ''; },
+    inputs => { inputs[0].phone.legs[1].cap = 60; },
+    inputs => { inputs[0].mac.witness.gpu = 'SwiftShader'; },
     inputs => { inputs[0].mac.legs[3].samples = []; },
     inputs => { inputs[0].phone.legs[4].error = 'stuck'; },
     inputs => { inputs[0].mac.legs[1].metal.frames = 0; },
@@ -44,4 +47,11 @@ test('refuses duplicated, interrupted, mixed-build and mismatched graphics captu
     const inputs = pairs(); mutate(inputs);
     expect(() => fitGpu(inputs,route,training,heldOut)).toThrow();
   }
+});
+
+test('changing a derived summary cannot turn the same raw capture into a repeat', () => {
+  const inputs = pairs();
+  inputs[2].phone = structuredClone(inputs[1].phone);
+  inputs[2].phone.legs[0].summary.gpuApproxP95Ms = 99;
+  expect(() => fitGpu(inputs,route,training,heldOut)).toThrow('independent');
 });
