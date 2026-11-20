@@ -2,6 +2,7 @@ import { once } from 'node:events';
 import { createServer, type Server } from 'node:http';
 import { afterEach, expect, test, vi } from 'vitest';
 import { parse } from 'valibot';
+import { zoneSelectPressRoute } from '../src/server/host/dedicated/zoneSelectPress';
 import { zoneSelectRoute } from '../src/server/host/dedicated/zoneSelect';
 import { ZoneSelectSchema, type ZoneSelectCard } from '../src/shared/game/grid/zoneSelectRows';
 
@@ -15,14 +16,14 @@ afterEach(async () => {
   }));
 });
 
-async function open(route: ReturnType<typeof zoneSelectRoute>): Promise<URL> {
+async function open(route: ReturnType<typeof zoneSelectRoute>, path = '/zone-select'): Promise<URL> {
   const server = createServer((request, response) => { if (!route(request, response)) response.writeHead(404).end(); });
   running.push(server);
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();
   if (address === null || typeof address === 'string') throw new Error('Missing Zone Select test address');
-  return new URL(`http://127.0.0.1:${address.port}/zone-select`);
+  return new URL(`http://127.0.0.1:${address.port}${path}`);
 }
 
 test('the room door serves its own channel and counts only human arrivals for Popular', async () => {
@@ -81,4 +82,50 @@ test('a catalogue outage leaves the live Featured list readable and the route ch
   expect(document.channel).toBe('production');
   expect(names(document.featured)).toEqual(['nine-dragon-stack']);
   expect(document.new).toEqual([]);
+});
+
+test('the door records valid presses separately by the common actor marker and honours CORS', async () => {
+  const press = vi.fn();
+  const url = await open(zoneSelectPressRoute({ channel: 'staging', allowedOrigins: [staging],
+    trustProxy: 'none', enterable: slug => slug === 'pine-hollow', press }), '/zone-select/enter');
+  const body = JSON.stringify({ slug: 'pine-hollow', channel: 'staging', audience: 'human' });
+  const allowed = await fetch(url, { method: 'OPTIONS', headers: { origin: staging } });
+  expect(allowed.status).toBe(204);
+  expect(allowed.headers.get('access-control-allow-origin')).toBe(staging);
+  expect(allowed.headers.get('access-control-allow-methods')).toBe('POST');
+  expect(allowed.headers.get('access-control-allow-headers')).toContain('x-wildshard-agent');
+  expect((await fetch(url, { method: 'POST', body, headers: { origin: 'https://foreign.example' } })).status).toBe(403);
+  expect((await fetch(url, { method: 'POST', body })).status).toBe(403);
+  expect((await fetch(url, { method: 'POST', body: '{', headers: { origin: staging } })).status).toBe(400);
+  expect((await fetch(url, { method: 'POST', body: '0'.repeat(1024), headers: { origin: staging } })).status).toBe(400);
+  expect((await fetch(url, { method: 'GET', headers: { origin: staging } })).status).toBe(405);
+  const human = { origin: staging, 'user-agent': 'Mozilla/5.0 Safari/605.1' };
+  for (const dropped of [body.replace('pine-hollow', 'unknown'), body.replace('staging', 'production')]) {
+    expect((await fetch(url, { method: 'POST', body: dropped, headers: human })).status).toBe(204);
+  }
+  expect(press).not.toHaveBeenCalled();
+  expect((await fetch(url, { method: 'POST', body, headers: human })).status).toBe(204);
+  expect((await fetch(url, { method: 'POST', body, headers: { ...human, 'x-wildshard-agent': 'header-lane' } })).status).toBe(204);
+  url.searchParams.set('agent', 'query-lane');
+  expect((await fetch(url, { method: 'POST', body, headers: human })).status).toBe(204);
+  expect(press.mock.calls).toEqual([
+    ['pine-hollow', { actor: 'human' }],
+    ['pine-hollow', { actor: 'agent', lane: 'header-lane' }],
+    ['pine-hollow', { actor: 'agent', lane: 'query-lane' }],
+  ]);
+});
+
+test('the press funnel drops the 31st request per address until a new minute', async () => {
+  let now = 12_000;
+  const press = vi.fn();
+  const url = await open(zoneSelectPressRoute({ channel: 'staging', allowedOrigins: [staging],
+    trustProxy: 'none', enterable: () => true, press, now: () => now }), '/zone-select/enter');
+  const send = async (): Promise<number> => (await fetch(url, {
+    method: 'POST', body: '{"slug":"pine-hollow","channel":"staging"}', headers: { origin: staging },
+  })).status;
+  for (let n = 0; n < 31; n++) expect(await send()).toBe(204);
+  expect(press).toHaveBeenCalledTimes(30);
+  now = 60_000;
+  expect(await send()).toBe(204);
+  expect(press).toHaveBeenCalledTimes(31);
 });

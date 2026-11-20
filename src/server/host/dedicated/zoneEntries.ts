@@ -7,10 +7,19 @@ export const ZONE_ENTRY_MINUTE_MS = 60_000;
 const MAX_MINUTE_ARRIVALS = 8192;
 interface PendingCount { day: string; slug: string; humans: number; agents: number }
 
+function bump(counts: Map<string, PendingCount>, day: string, slug: string, actor: ActorTags['actor']): string {
+  const key = `${day}/${slug}`, row = counts.get(key) ?? { day, slug, humans: 0, agents: 0 };
+  if (actor === 'agent') row.agents++;
+  else row.humans++;
+  counts.set(key, row);
+  return key;
+}
+
 /** The live door collects confirmed visits. Daily player keys are stored separately from the zone counts. */
 export class ZoneEntries {
   private readonly recent = new Map<string, number>();
   private readonly counts = new Map<string, PendingCount>();
+  private readonly presses = new Map<string, PendingCount>();
   private readonly players = new Map<string, ZoneEntryBatch['players'][number]>();
   private pending: ZoneEntryBatch | null = null;
   private flying: Promise<void> | null = null;
@@ -31,14 +40,14 @@ export class ZoneEntries {
     }
     this.recent.set(key, now);
     this.visits++;
-    const dateKey = `${day}/${slug}`, row = this.counts.get(dateKey) ?? { day, slug, humans: 0, agents: 0 };
-    if (actor === 'agent') row.agents++;
-    else {
-      row.humans++;
-      this.players.set(`${dateKey}/${player}`, { day, slug, player_key: player });
-    }
-    this.counts.set(dateKey, row);
+    const dateKey = bump(this.counts, day, slug, actor);
+    if (actor === 'human') this.players.set(`${dateKey}/${player}`, { day, slug, player_key: player });
     return true;
+  }
+
+  /** Only the press funnel uses this tally. No player identity is held. */
+  pressed(slug: string, { actor }: ActorTags): void {
+    bump(this.presses, new Date(this.now()).toISOString().slice(0, 10), slug, actor);
   }
 
   totals(days = 30): Promise<readonly ZoneEntryTotal[]> {
@@ -52,10 +61,11 @@ export class ZoneEntries {
     const cutoff = this.now() - ZONE_ENTRY_MINUTE_MS;
     for (const [key, at] of this.recent) if (at <= cutoff) this.recent.delete(key);
     if (this.pending === null) {
-      if (this.counts.size === 0) return Promise.resolve();
-      this.pending = { id: randomUUID(), counts: [...this.counts.values()], players: [...this.players.values()] };
+      if (this.counts.size === 0 && this.presses.size === 0) return Promise.resolve();
+      this.pending = { id: randomUUID(), counts: [...this.counts.values()], players: [...this.players.values()], presses: [...this.presses.values()] };
       this.counts.clear();
       this.players.clear();
+      this.presses.clear();
       this.visits = 0;
     }
     this.flying = this.persist(this.pending);

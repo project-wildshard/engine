@@ -26,6 +26,7 @@ import { savesUrl } from './saves/pgDatabase';
 import { within } from './saves/saveStore';
 import { ZoneEntries, ZONE_ENTRY_MINUTE_MS } from './zoneEntries';
 import { readZoneUploads, zoneSelectRoute } from './zoneSelect';
+import { zoneSelectPressRoute } from './zoneSelectPress';
 import { ServerReports } from './serverReports';
 import { ServerMetrics, metricsPort } from './serverMetrics';
 import { sendSentryTest, serverSentry } from './serverSentry';
@@ -148,8 +149,14 @@ const zoneSelect = zoneSelectRoute({
   totals: () => arrivals?.totals() ?? Promise.resolve([]),
   log,
 });
+const zoneSelectPress = zoneSelectPressRoute({
+  ...trust, channel: release.channel,
+  enterable: slug => world.openShards().includes(slug),
+  press: (slug, actor) => { arrivals?.pressed(slug, actor); },
+});
 const server = createServer((request, response) => {
   if (zoneSelect(request, response)) return;
+  if (zoneSelectPress(request, response)) return;
   if (activationReceiver?.(request, response)) return;
   if (accounts?.(request, response) === true) return;
   // MEMORY-STRUCTURE STR4: a dev server's control channel (`build-server.mjs --dev`); the box's bundle folds this away

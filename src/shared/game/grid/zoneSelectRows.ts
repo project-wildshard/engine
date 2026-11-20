@@ -2,6 +2,7 @@ import * as v from 'valibot';
 
 const Text = v.pipe(v.string(), v.nonEmpty());
 const Count = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
+export const ZONE_SELECT_PRESS_PATH = '/zone-select/enter';
 export interface ZoneSelectCard {
   readonly slug: string;
   readonly name: string;

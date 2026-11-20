@@ -66,11 +66,15 @@ test.each(['database', 'memory'])('zone totals on %s deduplicate people across d
     live.entered('account:one', home, { actor: 'human' });
     live.entered('account:one', other, { actor: 'human' });
     live.entered('device:agent', home, { actor: 'agent' });
+    live.pressed(home, { actor: 'human' });
+    live.pressed(home, { actor: 'agent' });
+    live.pressed(other, { actor: 'human' });
     await live.flush();
     await live.flush();
     now += 60_000;
     live.entered('device:anonymous', home, { actor: 'human' });
     staging.entered('account:one', home, { actor: 'human' });
+    staging.pressed(home, { actor: 'human' });
     await live.flush();
     await staging.flush();
     now += 86_400_000;
@@ -82,6 +86,11 @@ test.each(['database', 'memory'])('zone totals on %s deduplicate people across d
     ]));
     expect(await live.totals(1)).toEqual([{ slug: home, humans: 1, agents: 0, uniqueHumans: 1 }]);
     expect(await staging.totals()).toEqual([{ slug: home, humans: 1, agents: 0, uniqueHumans: 1 }]);
+    expect(await store.pressTotals('production', '2026-11-19')).toEqual(expect.arrayContaining([
+      { slug: home, humans: 1, agents: 1 }, { slug: other, humans: 1, agents: 0 },
+    ]));
+    expect(await store.pressTotals('staging', '2026-11-19')).toEqual([{ slug: home, humans: 1, agents: 0 }]);
+    expect(await store.pressTotals('production', '2026-11-20')).toEqual([]);
     if (db !== undefined) {
       const { rows } = await db.query('select distinct player_key from human_players where channel = $1', ['production']);
       expect(rows).toEqual(Array.from({ length: 2 }, () => ({ player_key: expect.stringMatching(/^[a-f0-9]{64}$/u) })));

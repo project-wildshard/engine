@@ -1511,6 +1511,7 @@
     "src/server/host/dedicated/world.ts": "server",
     "src/server/host/dedicated/zoneEntries.ts": "server",
     "src/server/host/dedicated/zoneSelect.ts": "server",
+    "src/server/host/dedicated/zoneSelectPress.ts": "server",
     "src/server/host/headless.ts": "server",
     "src/server/host/checkShardfile.ts": "server",
     "src/server/host/headlessFolder.ts": "server",
