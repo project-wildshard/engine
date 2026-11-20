@@ -146,5 +146,6 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       cadence.damaged(req.target, killed);
     }, host.scope);
   }
-  installDeclaredHerdSave(host); // OF23c: a declared herd's centre is saved
+  // OF23c: a declared herd's centre is saved, and (J109) a room's fallen herd body returns, unless it keeps its own timer
+  installDeclaredHerdSave(host, new Set(creatures.spawns.flatMap(spawn => spawn.respawn === undefined ? [] : [spawn.id])));
 }

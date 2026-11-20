@@ -1,5 +1,7 @@
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
+import { CreatureRefill } from '@wildshard/engine/entities/creatureRefill';
 import type { SimHost } from '@wildshard/engine/sim';
+import type { SimValue } from '@wildshard/engine/sim/stateAdapter';
 import * as v from 'valibot';
 
 /**
@@ -92,15 +94,45 @@ export function declaredHerdGoal(host: SimHost, body: AnimalSim): { x: number; z
 const finite = v.pipe(v.number(), v.finite());
 const SavedCentres = v.array(v.tuple([finite, finite]));
 const SAVE = 'creatures.herds';
+const REFILL_STEP = 'creatures.herds.refill', EMPTY: SimValue = { clock: 0, pending: [] };
 /** A declared herd's centre is saved state (the shelter moves it, its members ease it), as a roster herd's is. Installed
- *  once the layer hunts joined a group; a shard with no grouped hunt saves nothing new. */
-export function installDeclaredHerdSave(host: SimHost): void {
+ *  once the layer hunts joined a group; a shard with no grouped hunt saves nothing new.
+ *
+ *  OF23c, J109 (authors change nothing): in a room (two players, or a served world) a declared herd body that falls comes
+ *  back as a roster herd's does, after the refill's wait at its herd's centre, never in front of a player. The body that
+ *  fell is the one that returns, so the herd's numbers never change. A body with its own `respawn` timer (`timed`) keeps
+ *  it. The owed returns ride this save: one player's save, which never owes any, keeps the plain centres it always had. */
+export function installDeclaredHerdSave(host: SimHost, timed: ReadonlySet<string> = new Set()): void {
   if ((ledgers.get(host)?.groups.size ?? 0) === 0 || host.adapters.has(SAVE)) return;
+  const refill = new CreatureRefill({ players: () => [...host.players.values()], served: () => host.respawn.served, room: () => 1,
+    random: () => host.rng.stream('spawn').next(), spawn: ({ from, x, z }, yaw) => {
+      const body = host.entities.get(from);
+      if (body === undefined || body.alive) return;
+      body.place(x, z, yaw); body.revive(); body.motor?.resetAt?.(body.position); host.flags.clear(`dead:${from}`);
+    } });
+  host.events.on('actor.died', ({ actor }) => {
+    const body = host.entities.get(actor.id), herds = declaredHerds(host), herd = body === undefined ? null : declaredHerdOf(host, body);
+    if (body === undefined || herd === null || timed.has(body.entityId) || ledgers.get(host)?.lent.has(body.entityId) === true) return;
+    refill.left({ kind: body.kind, variant: body.variant, herd: herds.indexOf(herd), x: herd.cx, z: herd.cz, from: body.entityId });
+  }, host.scope);
+  host.events.on('world.slept', ({ seconds }) => { refill.slept(seconds); }, host.scope);
+  // drained, the refill's clock starts over, so a save with nothing owed (which keeps no clock) restores the same game
+  let owing = false;
+  host.onStep(REFILL_STEP, dt => {
+    refill.step(dt);
+    if (owing && refill.pending.length === 0) refill.state.restore(EMPTY);
+    owing = refill.pending.length > 0;
+  });
   // joined: a save from before declared herds carried centres restores without one (each centre stays where its bodies stood)
-  const adapter = { joined: true as const, snapshot: () => declaredHerds(host).map(herd => [herd.cx, herd.cz]), restore: (saved: unknown) => {
-    const centres = v.parse(SavedCentres, saved), herds = declaredHerds(host);
+  const adapter = { joined: true as const, snapshot: () => {
+    const centres = declaredHerds(host).map(herd => [herd.cx, herd.cz]);
+    return refill.pending.length === 0 ? centres : { centres, refill: refill.state.snapshot() };
+  }, restore: (saved: unknown) => {
+    const owed = Array.isArray(saved) ? null : v.parse(v.strictObject({ centres: v.unknown(), refill: v.unknown() }), saved);
+    const centres = v.parse(SavedCentres, owed === null ? saved : owed.centres), herds = declaredHerds(host);
     if (centres.length !== herds.length) throw new Error('Incompatible declared herd continuation');
     herds.forEach((herd, index) => { const [x, z] = centres[index] ?? [herd.cx, herd.cz]; herd.cx = x; herd.cz = z; });
+    refill.state.restore(owed === null ? EMPTY : owed.refill as SimValue); owing = refill.pending.length > 0;
   } };
   host.adapters.set(SAVE, adapter);
   host.scope.onDispose(() => { if (host.adapters.get(SAVE) === adapter) host.adapters.delete(SAVE); });

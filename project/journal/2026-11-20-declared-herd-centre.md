@@ -19,3 +19,15 @@
   host stands no PhaseEncounter (nor its adds) for a `boss` row on a claimed body.
 - `native-ground-boss-declared` now ships the row: `withoutRuntimeRows` admits the fields with no
   runtime boss, and no `encounter.<id>` adapter stands (fails without the takeover).
+
+## J109 for declared herds
+
+- 08c3bdc13 skipped the shipped-room refill test: Pine r8's herds are declared, and a room's
+  fallen declared herd body never came back (J109: authors change nothing).
+- The declared herd save now runs a `CreatureRefill`: in a room (two players or a served world)
+  a fallen herd body is owed, and the same body returns at its herd's centre after the wait, never
+  in front of a player. A body with its own `respawn` timer keeps it.
+- What is owed rides the `creatures.herds` save as `{ centres, refill }`; a save with nothing owed
+  (every solo save) keeps the plain centres array, so solo bytes and digests do not move. The
+  refill's clock starts over when it drains, so such a save restores the same game.
+- The Pine room test is back on, rewritten for the declared body (fails without the refill).

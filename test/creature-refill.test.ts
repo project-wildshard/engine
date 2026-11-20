@@ -1,6 +1,8 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The room journey runs the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
+import { declaredHerds } from '../src/server/game/shardfile/declaredHerds';
 import { afterEach, expect, test, vi } from 'vitest';
 import { manager } from '@wildshard/engine/test/manager';
 import { overrideTerrain } from '@wildshard/engine/test/terrain';
@@ -169,21 +171,23 @@ test('a shipped host runs a home twice as fast with two players near, and one pl
   } finally { solo.dispose(); room.dispose(); }
 }, 120_000);
 
-// ONE-FORMAT OF23c: Pine r8 (pinned f9bfccd46) declares its herd bodies, so its roster stands no herd and a room's fallen deer is a
-// declared row with no refill (J109 parity for declared herds is OF23c's open gap, in meta's ONE-FORMAT plan). Skipped until a
-// shipped native room refills again; the Dunes home refill above still proves the refill row and its save.
-test.skip('a shipped room refills a fallen herd animal through a save, and its solo twin never gains the row', async () => {
+// ONE-FORMAT OF23c: Pine r8 (pinned f9bfccd46) declares its herd bodies, so its roster stands no herd. J109 for declared herds:
+// a room's fallen herd body returns (the same body, at its herd's centre), owed in the herd save, which one player's save never
+// carries; that save keeps the plain centres it always had.
+test('a shipped room refills a fallen declared herd body through a save, and its solo twin never owes it', async () => {
   const directory = builtFolder('pine-hollow'), shard = await loadHeadlessFolder(directory), product = shard.shardfile, descriptor = outputDescriptor(product);
   if (descriptor === undefined) throw new Error('Missing Pine output');
-  const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
+  const assets = new Map(serverInputFiles(descriptor.index.files, product).map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const open = (snapshot?: string): ReturnType<typeof createNativeHeadlessResident> => createNativeHeadlessResident({ shard: product, assets, rapier, product: shard }, snapshot);
   const solo = await open(), room = await open();
-  const rows = (host: typeof solo.host): string[] => [...host.adapters.keys()].filter(id => id.endsWith('.refill'));
-  const victim = [...room.host.entities.values()].find(actor => actor.herd >= 0);
-  if (victim === undefined) throw new Error('Pine has no herd body');
-  const count = room.host.entities.size;
+  const debt = (host: typeof solo.host): unknown => { const saved = host.adapters.get('creatures.herds')?.snapshot(); return Array.isArray(saved) ? [] : (saved as { refill: { pending: unknown[] } }).refill.pending; };
+  // a herd body far from the players (a return never stands in front of one)
   const { x, y, z } = leadPlayer(room.host).position;
+  const herd = [...declaredHerds(room.host)].sort((a, b) => Math.hypot(b.cx - x, b.cz - z) - Math.hypot(a.cx - x, a.cz - z))[0];
+  const victim = herd?.members[0];
+  if (victim === undefined) throw new Error('Pine has no declared herd body');
+  const count = room.host.entities.size;
   room.host.addPlayer('bot', { x: x + 1, y: y + 2, z });
   const fell = (host: typeof solo.host): void => {
     const actor = host.entities.get(victim.entityId);
@@ -192,16 +196,16 @@ test.skip('a shipped room refills a fallen herd animal through a save, and its s
   };
   fell(solo.host); fell(room.host);
   for (let tick = 0; tick < 3; tick++) { solo.step([]); room.step([]); }
-  expect(rows(solo.host)).toEqual([]);
-  expect(rows(room.host).length).toBe(1);
+  expect(debt(solo.host)).toEqual([]);
+  expect(debt(room.host)).toHaveLength(1);
   const restored = await open(serializeSimSnapshot(snapshotSimHostBytes(room.host)));
   try {
-    expect(rows(restored.host)).toEqual(rows(room.host));
+    expect(debt(restored.host)).toEqual(debt(room.host));
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(room.host)));
     for (let tick = 0; tick < 60 * (REFILL_WAIT + 2); tick++) room.step([]);
-    expect(rows(room.host)).toEqual([]);
+    expect(debt(room.host)).toEqual([]);
     expect(room.host.entities.size).toBe(count);
-    expect(room.host.entities.has(victim.entityId)).toBe(false);
-    expect([...room.host.entities.values()].filter(actor => actor.alive).length).toBe([...solo.host.entities.values()].filter(actor => actor.alive).length + 1);
+    expect(room.host.entities.get(victim.entityId)?.alive).toBe(true);
+    expect(solo.host.entities.get(victim.entityId)?.alive).toBe(false);
   } finally { restored.dispose(); solo.dispose(); room.dispose(); }
-}, 180_000);
+}, 240_000);
