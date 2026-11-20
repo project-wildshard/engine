@@ -1,10 +1,25 @@
 // @vitest-environment happy-dom
 // QA 11-19 row 19: Cloudflare's Web Analytics beacon comes off the `load` path (the launch still waits for `load`): the
 // page adds it itself once interactive, on wildshard.io pages only, and never beside an injected one.
-import { afterEach, expect, test } from 'vitest';
-import { BEACON_SRC, beaconWanted, loadAnalyticsBeacon } from './analyticsBeacon';
+import { afterEach, expect, test, vi } from 'vitest';
+import { Scope } from '../../../shared/engine/app/scope';
+import { armAnalyticsBeacon, BEACON_SRC, beaconWanted, loadAnalyticsBeacon } from './analyticsBeacon';
 
-afterEach(() => { document.head.replaceChildren(); });
+afterEach(() => { document.head.replaceChildren(); vi.useRealTimers(); });
+
+test('armed, the beacon loads a second after the title or a world is first interactive, once', () => {
+  vi.useFakeTimers();
+  const scope = new Scope('entry'), loads: string[] = [];
+  armAnalyticsBeacon(scope, document, 'staging.wildshard.io', (_doc, host) => { loads.push(host); return true; });
+  document.dispatchEvent(new Event('ws:ready'));
+  vi.advanceTimersByTime(999);
+  expect(loads).toEqual([]);
+  vi.advanceTimersByTime(1);
+  document.dispatchEvent(new Event('ws:control-ready'));
+  vi.advanceTimersByTime(5000);
+  expect(loads).toEqual(['staging.wildshard.io']);
+  scope.dispose();
+});
 
 test('a wildshard.io page gets one deferred beacon carrying the site token', () => {
   expect(loadAnalyticsBeacon(document, 'staging.wildshard.io')).toBe(true);

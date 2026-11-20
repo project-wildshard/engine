@@ -7,6 +7,7 @@ import { findTitleManifest, installTitleManifests, listedArrival, readTitleRows,
 import { bareSlug, installedCatalogue, installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
 import { noteWorldBoot, noteWorldStep } from '@wildshard/engine/telemetry/runtime';
+import { armAnalyticsBeacon } from '@wildshard/engine/telemetry/analyticsBeacon';
 import { startPageServices } from './pageServices';
 import { persistHomeScreen, saves } from '@wildshard/engine/saves/runtime';
 import { definePageSaveKeys } from '@wildshard/engine/game/pageSaveKeys';
@@ -428,6 +429,9 @@ function showDrop(drop: ReturnType<typeof takeDrop>): void {
   })().catch(() => undefined);
 }
 
+// QA 11-19 row 19: the Web Analytics beacon loads a second after the title or a world is first interactive, never on the
+// `load` path. Armed here, as the page entry evaluates: a launch that stays on the title never runs start().
+armAnalyticsBeacon(entryScope);
 const clientVersion: unknown = Reflect.get(globalThis, '__WS_CLIENT_VERSION__');
 export const entered: Promise<unknown> = installForceUpdate(typeof clientVersion === 'string' ? clientVersion : '', entryScope).then(accepted => accepted ? enterPage() : undefined);
 guardBoot(entered);
@@ -444,10 +448,6 @@ export function start(): Promise<void> {
       try { await installInPageEntry(); } catch (error) { console.warn('[grid] the same-page entry was not installed at control', error); }
     })();
   }, { once: true });
-  // QA 11-19 row 19: the Web Analytics beacon loads once the title or a world is interactive, never on the `load` path
-  for (const ready of ['ws:ready', 'ws:control-ready']) entryScope.listen(document, ready, () => { entryScope.timeout(1000, () => {
-    void import('@wildshard/engine/telemetry/analyticsBeacon').then(({ loadAnalyticsBeacon }) => loadAnalyticsBeacon()).catch(() => false);
-  }); }, { once: true });
   const run = startPage();
   latestStart = run.catch(() => undefined);
   return run;

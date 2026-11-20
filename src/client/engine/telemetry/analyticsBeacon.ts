@@ -6,6 +6,7 @@
  * gets no second one.
  */
 import { harnessPins } from '../../../shared/engine/app/identity';
+import type { Scope } from '../../../shared/engine/app/scope';
 
 /** Cloudflare's beacon (the script the zone injects) */
 export const BEACON_SRC = 'https://static.cloudflareinsights.com/beacon.min.js';
@@ -27,4 +28,17 @@ export function loadAnalyticsBeacon(doc: Document = document, host: string = loc
   script.dataset['cfBeacon'] = JSON.stringify({ token: BEACON_SITE_ID, spa: true });
   doc.head.append(script);
   return true;
+}
+
+/** Load the beacon a second after the page is first interactive: the title (`ws:ready`) or a world (`ws:control-ready`),
+ *  whichever comes first, never on the `load` path. The page entry arms it once as it evaluates: a launch that stays on the
+ *  title never runs `start()` (entry.ts imports main.ts only on the way to a world), so arming it there sent no page view. */
+export function armAnalyticsBeacon(scope: Scope, doc: Document = document, host: string = location.hostname,
+  load: (doc: Document, host: string) => boolean = loadAnalyticsBeacon): void {
+  let armed = false;
+  for (const ready of ['ws:ready', 'ws:control-ready']) scope.listen(doc, ready, () => {
+    if (armed) return;
+    armed = true;
+    scope.timeout(1000, () => { load(doc, host); });
+  }, { once: true });
 }
