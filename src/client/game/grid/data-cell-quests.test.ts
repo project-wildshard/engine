@@ -62,6 +62,8 @@ test('a copy with quests follows the cell server for the stay, its chip only whi
   expect(shown.quest.current?.id).toBe('find');
   expect(chip()).toContain('Find oil');
   expect(hidden.options.chip?.()).toEqual({ label: '', count: '' }); // `track: false` keeps its chip blank
+  expect(hidden.options.worldPins).toBe(false); // MZ16: and pins nothing in the view; its markers stay on the full map
+  expect(shown.options.worldPins).toBeUndefined();
   // a gate the cell's server raises advances it
   wire.raised.add('lamp.oil'); wire.quests.set(lamp.id, { quest: lamp.id, started: true, step: 'light', n: 0 });
   frame();

@@ -17,11 +17,15 @@ export const BLANK_CHIP = (): { label: string; count: string } => ({ label: '', 
 /** Whether a source declares any quest. */
 export const hasQuests = (source: Pick<Shardfile, 'quests'>): boolean => source.quests.quests.length > 0;
 
+/** What an untracked quest (`track: false`) shows: no chip and no world pins, its markers on the full map only
+ *  (MOSSGATE-ZONE MZ16: Mossgate's twelve places are one untracked quest's markers, which would be twelve pins in the view). */
+export const UNTRACKED: Pick<QuestPresentationOptions, 'chip' | 'worldPins'> = { chip: BLANK_CHIP, worldPins: false };
+
 /** Build each declared quest's state over `flags` for `scope`'s life and hand it to `present`. */
 export function installDeclaredQuests(quests: Shardfile['quests'], flags: Flags, events: Events | undefined, scope: Scope, present: QuestPresenter): QuestState[] {
   return quests.quests.map((declaration) => {
     const quest = new QuestState(declaration, flags, events, scope);
-    present(quest, declaration.track === false ? { chip: BLANK_CHIP } : {});
+    present(quest, declaration.track === false ? UNTRACKED : {});
     return quest;
   });
 }
