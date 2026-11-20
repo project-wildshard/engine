@@ -38,3 +38,8 @@
 - mini-df11c: portable sin and cos returned a fresh heap number per call where not inlined (~12 KB a dock frame, mostly the ambient flyers and the posed draw's setFromEuler); sinTo/cosTo write the same bits into a typed slot. The far pose also computes three's box and sphere straight from the array.
 - mini-df11c: the page bundles portableMath twice, so sinTo's identity check fell back to Math.sin; a shared Symbol.for mark lets either copy use its slot kernel. The flock's scratch points are a class, not shared { x, y, z } literals.
 - mini-df11c: the rope chain's capture passes held targets to Rapier's translation and rotation (12 KB a dock frame of fresh vectors).
+
+- mini-df11d: the tile streamer's plan stops allocating. Some dock runs never settled the idle plan and replanned every
+  frame (+0.08 MB a frame). Replanning only on input changes would move the lease distances the allocator ranks by, so
+  the plan stays per step and reuses its rows, lists and sorts instead: 127 KB to 11 KB a replanning step in the node
+  bench, with the 115,894-line residency trace unchanged (pinned in tile-streamer.test.ts).

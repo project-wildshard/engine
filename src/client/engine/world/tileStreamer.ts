@@ -184,15 +184,88 @@ const LEVEL_RANK = { far: 0, l1: 1, l0: 2 } as const;
 const SIZE = { far: CHUNK_HALF * 2, l1: C.l1.size, l0: C.l0.size } as const;
 const L0_RADIUS = C.nearRadius, L1_RADIUS = 400, LOOKAHEAD_SLOTS = C.l0Count - 32;
 type State = 'fetching' | 'queued' | 'uploaded';
-/** sp-o105: `parent` is `parentOf(tile)`, kept on the slot: the step's scans compared a freshly built key per slot pair. */
+/** sp-o105: `parent` is the parent tile's key, kept on the slot: the step's scans compared a freshly built key per slot pair. */
 interface Slot<D> { tile: RingTile; readonly parent: string | null; state: State; lease: TileStreamLease; unholdParent: () => void; view: RingView | null; data: D | null; bytes: number; distance: number; masked: number; shadow: boolean }
 
 interface ReleaseRow<D> { slot: Slot<D> | undefined; distance: number }
+/** The release walk's scratch: the first `size` rows are this walk's (arrays keep their length between walks, DF11). */
+interface ReleaseWork<D> { readonly rows: ReleaseRow<D>[]; size: number; readonly count: Record<RingLevel, number>; farBytes: number }
 interface TileDistance { tile: RingTile; d: number }
-interface DesiredWork {
-  readonly l0Rows: TileDistance[]; readonly l1Rows: TileDistance[]; readonly l0: TileDistance[]; readonly l1: TileDistance[];
-  readonly cellRows: { cell: LayoutCell; d: number }[]; readonly ranked: { cell: LayoutCell; d: number }[]; readonly fine: TileDistance[];
-  readonly want: Map<string, { tile: RingTile; distance: number }>; readonly wantRows: { tile: RingTile; distance: number }[];
+interface CellDistance { cell: LayoutCell; d: number }
+interface WantRow { tile: RingTile; distance: number; epoch: number }
+/** One far charge of a plan, before it is compared with the published `FarPlan`. */
+interface FarRow { instance: string; bytes: number; visible: boolean; omitted: boolean }
+/** DF11: the wanted tiles of one plan, in the order they were added. A row stays with its key across plans and an epoch marks
+ *  the current plan's rows, so a replan reuses them instead of regrowing a cleared Map and a fresh row per tile each step. */
+class Wanted {
+  private readonly index = new Map<string, WantRow>();
+  readonly rows: WantRow[] = [];
+  size = 0;
+  private epoch = 0;
+  begin(): void { this.epoch++; this.size = 0; }
+  has(id: string): boolean { return this.index.get(id)?.epoch === this.epoch; }
+  get(id: string): WantRow | undefined { const row = this.index.get(id); return row !== undefined && row.epoch === this.epoch ? row : undefined; }
+  add(tile: RingTile, distance: number): void {
+    let row = this.index.get(tile.key);
+    if (row === undefined) { row = { tile, distance, epoch: this.epoch }; this.index.set(tile.key, row); }
+    else { row.tile = tile; row.distance = distance; row.epoch = this.epoch; }
+    this.rows[this.size++] = row;
+  }
+}
+/** One step's scratch (DF11: a replanning step allocates nothing it can reuse). A nested step takes another workspace. Lists
+ *  keep their length between steps (truncating one frees its store) and count their live prefix instead; `ranked` keeps last
+ *  step's order, which only makes its sort cheaper (its order is total). */
+interface DesiredWork<D> {
+  readonly l0Rows: TileDistance[]; readonly l1Rows: TileDistance[];
+  readonly cellRows: CellDistance[]; readonly ranked: CellDistance[]; readonly fine: TileDistance[]; readonly fineRows: TileDistance[];
+  readonly farRows: FarRow[]; readonly want: Wanted; readonly pending: WantRow[]; readonly queue: Slot<D>[];
+  readonly uploaded: Map<string, Children<D>>; readonly seen: Map<string, number>; seenMark: number;
+  readonly patch: { distance: number; needed: boolean };
+}
+function desiredWork<D>(): DesiredWork<D> {
+  return { l0Rows: [], l1Rows: [], cellRows: [], ranked: [], fine: [], fineRows: [], farRows: [], want: new Wanted(),
+    pending: [], queue: [], uploaded: new Map(), seen: new Map(), seenMark: 0, patch: { distance: 0, needed: false } };
+}
+const NO_SLOTS: readonly never[] = Object.freeze([]);
+/** A parent's uploaded children this step: the first `count` of `list` (a longer list keeps last step's tail unread). */
+interface Children<D> { count: number; readonly list: Slot<D>[] }
+function resetChildren(children: { count: number }): void { children.count = 0; }
+/** Nearest cell first, then by instance. */
+function byCellDistance(a: CellDistance, b: CellDistance): number { return byNumber(a.d, b.d) || a.cell.instance.localeCompare(b.cell.instance); }
+/** Nearest tile first, then by key. */
+function byTileDistance(a: TileDistance, b: TileDistance): number { return byNumber(a.d, b.d) || a.tile.key.localeCompare(b.tile.key); }
+/** Finer levels first, then farthest, then by key (the release walk). */
+function byReleaseOrder<D>(a: ReleaseRow<D>, b: ReleaseRow<D>): number {
+  const first = a.slot, second = b.slot;
+  if (first === undefined || second === undefined) throw new Error('Missing release work slot');
+  return LEVEL_RANK[second.tile.level] - LEVEL_RANK[first.tile.level] || byNumber(b.distance, a.distance) || first.tile.key.localeCompare(second.tile.key);
+}
+/** A full ring's centre tile on one axis, with 4 m hysteresis. */
+function followTile(previous: number | null, local: number, extent: number, count: number): number {
+  const next = Math.max(0, Math.min(count - 1, Math.floor((local + extent / 2) / C.l0.size)));
+  if (previous === null || next === previous) return next;
+  const min = -extent / 2 + previous * C.l0.size, max = Math.min(extent / 2, min + C.l0.size);
+  return local < min - 4 || local >= max + 4 ? next : previous;
+}
+function farRow(rows: FarRow[], index: number, instance: string, bytes: number, visible: boolean, omitted: boolean): void {
+  const row = rows[index];
+  if (row === undefined) rows.push({ instance, bytes, visible, omitted });
+  else { row.instance = instance; row.bytes = bytes; row.visible = visible; row.omitted = omitted; }
+}
+/** Array.prototype.sort's stable order, in place by binary insertion (DF11: the native sort allocates a work copy per call).
+ *  For a consistent comparator a stable sort has one result, so this equals the native one. */
+function sortInPlace<T>(list: T[], compare: (a: T, b: T) => number, length: number = list.length): void {
+  for (let i = 1; i < length; i++) {
+    const item = list[i] as T;
+    let lo = 0, hi = i;
+    while (lo < hi) { const mid = (lo + hi) >>> 1; if (compare(item, list[mid] as T) < 0) hi = mid; else lo = mid + 1; }
+    for (let j = i; j > lo; j--) list[j] = list[j - 1] as T;
+    list[lo] = item;
+  }
+}
+function hasFine(rows: readonly TileDistance[], count: number, id: string): boolean {
+  for (let i = 0; i < count; i++) if (rows[i]?.tile.key === id) return true;
+  return false;
 }
 function rankTile(rows: TileDistance[], index: number, tile: RingTile, distance: number): TileDistance {
   let row = rows[index];
@@ -211,11 +284,14 @@ function rectDistance(lx: number, lz: number, level: RingLevel, x: number, z: nu
   const sizeX = level === 'far' ? width : SIZE[level], sizeZ = level === 'far' ? depth : SIZE[level];
   const minX = -width / 2 + x * sizeX, minZ = -depth / 2 + z * sizeZ;
   const maxX = Math.min(width / 2, minX + sizeX), maxZ = Math.min(depth / 2, minZ + sizeZ);
-  return Math.hypot(Math.max(minX - lx, 0, lx - maxX), Math.max(minZ - lz, 0, lz - maxZ));
+  return hypot2(Math.max(minX - lx, 0, lx - maxX), Math.max(minZ - lz, 0, lz - maxZ));
 }
-function parentOf(tile: { instance: string; level: RingLevel; x: number; z: number }): string | null {
-  if (tile.level === 'far') return null;
-  return tile.level === 'l1' ? key(tile.instance, 'far', 0, 0) : key(tile.instance, 'l1', Math.floor(tile.x / 2), Math.floor(tile.z / 2));
+/** `Math.hypot(a, b)`, bit for bit, without the builtin's argument array when either side is zero (DF11: 13 KB a replanning
+ *  step). With one zero the builtin returns the other's magnitude exactly (sqrt(1) times it); NaN and Infinity reach it. */
+function hypot2(a: number, b: number): number {
+  if (a === 0) return Math.abs(b);
+  if (b === 0) return Math.abs(a);
+  return Math.hypot(a, b);
 }
 
 interface SettledMotion {
@@ -226,12 +302,23 @@ interface SettledMotion {
 /** The render rings of one grid session. Call `step` once per fixed step with the camera; `dispose` at session end. */
 export class TileStreamer<D> {
   private readonly slots = new Map<string, Slot<D>>();
+  /** `slots`' values in its order (DF11: the step's read-only scans walk this, not a Map iterator per scan). */
+  private readonly slotList: Slot<D>[] = [];
   private readonly refinements = new Map<string, Set<Slot<D>>>();
-  private readonly releaseWork: { rows: ReleaseRow<D>[]; order: ReleaseRow<D>[] }[] = [];
-  private readonly desiredWork: DesiredWork[] = [];
+  private readonly releaseWork: ReleaseWork<D>[] = [];
+  private readonly desiredWork: DesiredWork<D>[] = [];
   private readonly pins = new Map<string, { readonly tile: RingTile; refs: number }>();
+  /** The pins' keys and their parents', rebuilt only when a pin changes (`pinRevision`). */
+  private required: { readonly revision: number; readonly keys: ReadonlySet<string> } | null = null;
+  private pinRevision = 0;
+  /** `pins`' and `requirements`' values in their order and `fullRings`' values, rebuilt when they change (DF11: a step reads
+   *  them without a Map iterator). */
+  private pinLists: { readonly revision: number; readonly pins: readonly { readonly tile: RingTile }[]; readonly requirements: readonly Requirement[] } | null = null;
+  private fullList: readonly { readonly instance: string; radius: number; x: number | null; z: number | null }[] | null = null;
+  /** The required keys the current request or upload sort reads (set just before each sort). */
+  private sortRequired: ReadonlySet<string> = new Set();
   private readonly requirements = new Set<Requirement>();
-  private readonly fullRings = new Map<string, { radius: number; x: number | null; z: number | null }>();
+  private readonly fullRings = new Map<string, { readonly instance: string; radius: number; x: number | null; z: number | null }>();
   private readonly completed: { tile: RingTile; lease: TileStreamLease; result: D | Error }[] = [];
   private readonly retryAt = new Map<string, number>();
   private readonly cells: readonly LayoutCell[];
@@ -243,6 +330,8 @@ export class TileStreamer<D> {
   private readonly catalogue: RingCatalogue;
   private readonly ports: RingPorts<D>;
   private readonly options: Required<RingOptions>;
+  /** How far beyond its ring an unwanted uploaded tile is kept, per level. */
+  private readonly keep: Readonly<Record<RingLevel, number>>;
   private demandRevision = 0;
   private idlePlan: { x: number; z: number; vx: number; vz: number; cx: number; cz: number; catalogue: number; demand: number; wakeFrame: number; motion: SettledMotion | null } | null = null;
   private frame = 0;
@@ -252,6 +341,18 @@ export class TileStreamer<D> {
   private visibleCells: readonly LayoutCell[] = [];
   private farPlanned: FarPlan = { budget: 0, charged: 0, wanted: [], omitted: [] };
   private disposed = false;
+  /** Required tiles first, then coarse levels, nearest, by key (the request order). */
+  private readonly byRequest = (a: WantRow, b: WantRow): number => {
+    const required = this.sortRequired;
+    return Number(required.has(b.tile.key)) - Number(required.has(a.tile.key))
+      || LEVEL_RANK[a.tile.level] - LEVEL_RANK[b.tile.level] || byNumber(a.distance, b.distance) || a.tile.key.localeCompare(b.tile.key);
+  };
+  /** Required tiles first, then coarse levels, nearest, by key (the upload order). */
+  private readonly byUpload = (a: Slot<D>, b: Slot<D>): number => {
+    const required = this.sortRequired;
+    return Number(required.has(b.tile.key)) - Number(required.has(a.tile.key))
+      || LEVEL_RANK[a.tile.level] - LEVEL_RANK[b.tile.level] || a.distance - b.distance || a.tile.key.localeCompare(b.tile.key);
+  };
   private frameFaults: Set<string> | undefined;
 
   constructor(cells: readonly RingCell[], budget: TileStreamBudget, catalogue: RingCatalogue, ports: RingPorts<D>, options: RingOptions = {}) {
@@ -273,6 +374,7 @@ export class TileStreamer<D> {
     if (!Number.isFinite(this.options.uploadMsPerFrame) || this.options.uploadMsPerFrame <= 0) throw new RangeError('Invalid tile upload time budget');
     if (!Number.isInteger(this.options.farCount) || this.options.farCount < 1) throw new RangeError('Invalid far ring count');
     if (!(this.options.farRadius >= this.options.viewDistance)) throw new RangeError('Invalid far ring reach');
+    this.keep = { far: this.options.farRadius + C.pitch / 2, l1: L1_RADIUS + C.l1.size, l0: L0_RADIUS + C.l0.size };
   }
 
   /** Pin L0 keys (`z * 8 + x`), or L1 keys (`z * 4 + x`) with the optional level, and their parents.
@@ -294,6 +396,7 @@ export class TileStreamer<D> {
       const pin = this.pins.get(tile.key);
       if (pin === undefined) this.pins.set(tile.key, { tile, refs: 1 }); else pin.refs++;
     }
+    this.pinRevision++;
     this.requirements.add(requirement); this.demandRevision++;
     this.resolveRequirements();
     return { ready, release: () => { this.unpin(requirement, new Error('Tile requirement released')); } };
@@ -305,16 +408,16 @@ export class TileStreamer<D> {
   setFullRing(instance: string, radius: number | null): void {
     if (this.disposed) throw new Error('Tile streamer is disposed');
     this.cell(instance);
-    if (radius === null) { if (this.fullRings.delete(instance)) this.demandRevision++; return; }
+    if (radius === null) { if (this.fullRings.delete(instance)) { this.demandRevision++; this.fullList = null; } return; }
     if (!Number.isInteger(radius) || radius < 0 || radius > 8) throw new RangeError('Invalid full tile ring');
     const current = this.fullRings.get(instance);
-    if (current === undefined) { this.fullRings.set(instance, { radius, x: null, z: null }); this.demandRevision++; }
+    if (current === undefined) { this.fullRings.set(instance, { instance, radius, x: null, z: null }); this.demandRevision++; this.fullList = null; }
     else if (current.radius !== radius) { current.radius = radius; this.demandRevision++; }
   }
 
   private unpin(requirement: Requirement, error: Error): void {
     if (!this.requirements.delete(requirement)) return;
-    this.demandRevision++;
+    this.demandRevision++; this.pinRevision++;
     for (const tile of requirement.tiles) {
       const pin = this.pins.get(tile.key);
       if (pin !== undefined && --pin.refs === 0) this.pins.delete(tile.key);
@@ -323,11 +426,26 @@ export class TileStreamer<D> {
   }
 
   private resolveRequirements(): void {
-    for (const requirement of this.requirements) {
-      if (requirement.settled || !requirement.tiles.every(tile => this.bytes(tile.instance, tile.level, tile.x, tile.z) === null
-        || this.slots.get(tile.key)?.state === 'uploaded')) continue;
+    const requirements = this.pinned().requirements;
+    for (let i = 0; i < requirements.length; i++) {
+      const requirement = requirements[i];
+      if (requirement === undefined || requirement.settled || !this.published(requirement.tiles)) continue;
       requirement.settled = true; requirement.resolve();
     }
+  }
+  private pinned(): { readonly pins: readonly { readonly tile: RingTile }[]; readonly requirements: readonly Requirement[] } {
+    const cached = this.pinLists;
+    if (cached !== null && cached.revision === this.pinRevision) return cached;
+    const lists = { revision: this.pinRevision, pins: [...this.pins.values()], requirements: [...this.requirements] };
+    this.pinLists = lists; return lists;
+  }
+  /** Every tile is uploaded or has no catalogue entry (in order, stopping at the first that is neither). */
+  private published(tiles: readonly RingTile[]): boolean {
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i]; if (tile === undefined) continue;
+      if (!(this.bytes(tile.instance, tile.level, tile.x, tile.z) === null || this.slots.get(tile.key)?.state === 'uploaded')) return false;
+    }
+    return true;
   }
 
   private failRequirements(failed: RingTile, error: Error): void {
@@ -412,28 +530,35 @@ export class TileStreamer<D> {
     const demand = this.demandRevision;
     // Keep the desired map borrowed until every callback in this step has finished.
     // Nested catalogue, lease and disposal calls receive another workspace.
-    const work = this.desiredWork.pop() ?? { l0Rows: [], l1Rows: [], l0: [], l1: [], cellRows: [], ranked: [], fine: [], want: new Map(), wantRows: [] };
+    const work = this.desiredWork.pop() ?? desiredWork<D>();
     try {
       const want = this.planDesired(camera, fullCentre, work);
-      // refresh eviction inputs; anything not wanted is cache
-      for (const [id, slot] of this.slots) { const d = want.get(id); slot.distance = d?.distance ?? this.distance(slot.tile, camera); slot.lease.update({ distance: slot.distance, needed: d !== undefined }); }
+      // refresh eviction inputs; anything not wanted is cache. The patch is read during the call, never kept.
+      const patch = work.patch;
+      for (let i = 0; i < this.slotList.length; i++) {
+        const slot = this.slotList[i]; if (slot === undefined) continue;
+        const d = want.get(slot.tile.key); slot.distance = d?.distance ?? this.distance(slot.tile, camera);
+        patch.distance = slot.distance; patch.needed = d !== undefined; slot.lease.update(patch);
+      }
       this.release(want, camera);
-      this.request(want);
-      this.drain();
+      this.request(want, work);
+      this.drain(work);
       this.release(want, camera); // this step's uploads may have pushed a level over its resident cap
-      this.remaskAll(camera);
+      this.remaskAll(camera, work);
       this.resolveRequirements();
       if (revision !== undefined && this.frame === frame && demand === this.demandRevision && this.completed.length === 0) {
         let settled = true, inFlight = 0, wakeFrame = Infinity;
-        for (const slot of this.slots.values()) {
+        for (let i = 0; i < this.slotList.length; i++) {
+          const slot = this.slotList[i]; if (slot === undefined) continue;
           if (slot.state === 'queued') { settled = false; break; }
           if (slot.state === 'fetching') inFlight++;
         }
-        if (settled) for (const { tile } of want.values()) {
+        if (settled) for (let i = 0; i < want.size; i++) {
+          const tile = want.rows[i]?.tile; if (tile === undefined) continue;
           if (this.slots.has(tile.key)) continue;
           const retry = this.retryAt.get(tile.key);
           if (retry !== undefined && retry > frame) { wakeFrame = Math.min(wakeFrame, retry); continue; }
-          const parent = parentOf(tile);
+          const parent = this.parentKey(tile);
           // A blocked child wakes with its parent; an exhausted fetch queue
           // wakes with any completion. A newly uploaded parent with spare
           // capacity must request its child on the very next step.
@@ -445,7 +570,6 @@ export class TileStreamer<D> {
           motion: wakeFrame === Infinity ? this.settledMotion(camera, fullCentre, want) : null };
       }
     } finally {
-      work.l0.length = 0; work.l1.length = 0; work.ranked.length = 0; work.fine.length = 0; work.want.clear();
       if (!this.disposed) this.desiredWork.push(work);
     }
   }
@@ -457,7 +581,7 @@ export class TileStreamer<D> {
    * All leases here are needed: no distance participates in cache eviction.
    * Any demand change refreshes exact distances before a tile can be unneeded. */
   private settledMotion(camera: RingCamera, centre: { readonly x: number; readonly z: number },
-    want: ReadonlyMap<string, unknown>): SettledMotion | null {
+    want: Wanted): SettledMotion | null {
     if (this.slots.size !== want.size || this.farPlanned.omitted.length > 0) return null;
     for (const slot of this.slots.values()) if (slot.state !== 'uploaded' || !want.has(slot.tile.key)) return null;
     let radius = Infinity, minX = -Infinity, maxX = Infinity, minZ = -Infinity, maxZ = Infinity, coarse = 0, l1 = 0;
@@ -497,7 +621,7 @@ export class TileStreamer<D> {
   dispose(): void {
     if (this.disposed) return; this.disposed = true;
     for (const requirement of this.requirements) this.unpin(requirement, new Error('Tile streamer disposed'));
-    this.fullRings.clear();
+    this.fullRings.clear(); this.fullList = null;
     this.desiredWork.length = 0;
     for (const cell of this.cells) this.tilePlans.delete(cell);
     const order = [...this.slots.values()].sort((a, b) => LEVEL_RANK[b.tile.level] - LEVEL_RANK[a.tile.level]);
@@ -537,104 +661,166 @@ export class TileStreamer<D> {
   private bytes(instance: string, level: RingLevel, x: number, z: number): number | null {
     return this.catalogue(instance, level, x, z, this.cell(instance).type);
   }
+  /** The parent tile's key (an L1 tile's far proxy, an L0 tile's L1), read from the cached tiles (DF11: no string per call). */
+  private parentKey(tile: RingTile): string | null {
+    if (tile.level === 'far') return null;
+    return tile.level === 'l1' ? this.tile(tile.instance, 'far', 0, 0).key : this.tile(tile.instance, 'l1', Math.floor(tile.x / 2), Math.floor(tile.z / 2)).key;
+  }
+  /** `addWant` with the tile's distance from the camera, measured only when the tile is added (it is pure). */
+  private addWantAt(want: Wanted, tile: RingTile, camera: RingCamera): void {
+    if (this.bytes(tile.instance, tile.level, tile.x, tile.z) === null || want.has(tile.key)) return;
+    want.add(tile, this.distance(tile, camera));
+  }
+  /** Add a tile the catalogue offers to this plan, once. */
+  private addWant(want: Wanted, tile: RingTile, distance: number): void {
+    if (this.bytes(tile.instance, tile.level, tile.x, tile.z) === null || want.has(tile.key)) return;
+    want.add(tile, distance);
+  }
 
   /** The wanted tiles with their distances, parents included. */
-  private planDesired(camera: RingCamera, fullCentre: { readonly x: number; readonly z: number }, work: DesiredWork): Map<string, { tile: RingTile; distance: number }> {
-    const want = work.want; let wantedRows = 0;
-    const add = (tile: RingTile, distance: number): void => {
-      if (this.bytes(tile.instance, tile.level, tile.x, tile.z) === null || want.has(tile.key)) return;
-      let row = work.wantRows[wantedRows++];
-      if (row === undefined) { row = { tile, distance }; work.wantRows.push(row); }
-      else { row.tile = tile; row.distance = distance; }
-      want.set(tile.key, row);
-    };
-    const cellDistance = (cell: LayoutCell): number => rectDistance(camera.x - cell.origin.x, camera.z - cell.origin.z, 'far', 0, 0, cell);
+  private planDesired(camera: RingCamera, fullCentre: { readonly x: number; readonly z: number }, work: DesiredWork<D>): Wanted {
+    const want = work.want; want.begin();
     const ranked = work.ranked;
     for (let i = 0; i < this.cells.length; i++) {
       const cell = this.cells[i]; if (cell === undefined) throw new Error('Missing ring cell');
+      // rectDistance(lx, lz, 'far', 0, 0, cell), written out: a call boxes its doubles (DF11)
+      const lx = camera.x - cell.origin.x, lz = camera.z - cell.origin.z, width = cell.extent.width, depth = cell.extent.depth;
+      const minX = -width / 2 + 0 * width, minZ = -depth / 2 + 0 * depth;
+      const maxX = Math.min(width / 2, minX + width), maxZ = Math.min(depth / 2, minZ + depth);
+      const dx = Math.max(minX - lx, 0, lx - maxX), dz = Math.max(minZ - lz, 0, lz - maxZ);
+      const d = dx === 0 ? dz : dz === 0 ? dx : Math.hypot(dx, dz);
       let row = work.cellRows[i];
-      if (row === undefined) { row = { cell, d: cellDistance(cell) }; work.cellRows.push(row); }
-      else { row.cell = cell; row.d = cellDistance(cell); }
-      ranked.push(row);
+      if (row === undefined) { row = { cell, d }; work.cellRows.push(row); ranked.push(row); }
+      else { row.cell = cell; row.d = d; }
     }
-    ranked.sort((a, b) => byNumber(a.d, b.d) || a.cell.instance.localeCompare(b.cell.instance));
-    this.visibleCells = ranked.filter((r) => r.d <= this.options.viewDistance).map((r) => r.cell);
+    sortInPlace(ranked, byCellDistance);
+    this.publishVisible(ranked);
     // the far ring: nearest first while the proxies' own bytes fit its budget; a cell with no far proxy keeps the old
     // reach and slot count for its 16 L1 tiles (its coarse level), which the near L1 refinement shares
-    let farBytes = 0, coarse = 0;
-    const wanted: FarCharge[] = [], omitted: FarCharge[] = [];
-    for (const { cell, d } of ranked) {
+    let farBytes = 0, coarse = 0, charges = 0;
+    for (let i = 0; i < ranked.length; i++) {
+      const row = ranked[i]; if (row === undefined) continue;
+      const cell = row.cell, d = row.d;
       if (d > this.options.farRadius) break;
       const bytes = this.bytes(cell.instance, 'far', 0, 0);
       if (bytes !== null) {
-        if (farBytes + bytes > this.farBudget()) { omitted.push({ instance: cell.instance, bytes, visible: d <= this.options.viewDistance }); continue; }
-        farBytes += bytes; wanted.push({ instance: cell.instance, bytes, visible: d <= this.options.viewDistance }); add(this.tile(cell.instance, 'far', 0, 0), d); continue;
+        if (farBytes + bytes > this.farBudget()) { farRow(work.farRows, charges++, cell.instance, bytes, d <= this.options.viewDistance, true); continue; }
+        farBytes += bytes; farRow(work.farRows, charges++, cell.instance, bytes, d <= this.options.viewDistance, false);
+        this.addWant(want, this.tile(cell.instance, 'far', 0, 0), d); continue;
       }
       if (d > this.options.viewDistance + this.options.farPrefetch || ++coarse > this.options.farCount) continue;
-      for (let z = 0; z < cell.rows.l1; z++) for (let x = 0; x < cell.columns.l1; x++) add(this.tile(cell.instance, 'l1', x, z), rectDistance(camera.x - cell.origin.x, camera.z - cell.origin.z, 'l1', x, z, cell));
+      for (let z = 0; z < cell.rows.l1; z++) for (let x = 0; x < cell.columns.l1; x++) this.addWantAt(want, this.tile(cell.instance, 'l1', x, z), camera);
     }
-    this.farPlanned = { budget: this.farBudget(), charged: farBytes, wanted, omitted };
-    const { l1, l0 } = work;
-    for (const { cell, d } of ranked) {
-      if (d > L1_RADIUS) continue;
-      const lx = camera.x - cell.origin.x, lz = camera.z - cell.origin.z;
-      for (let z = 0; z < cell.rows.l1; z++) for (let x = 0; x < cell.columns.l1; x++) { const td = rectDistance(lx, lz, 'l1', x, z, cell); if (td <= L1_RADIUS) l1.push(rankTile(work.l1Rows, l1.length, this.tile(cell.instance, 'l1', x, z), td)); }
-      if (!this.fullRings.has(cell.instance)) for (let z = 0; z < cell.rows.l0; z++) for (let x = 0; x < cell.columns.l0; x++) { const td = rectDistance(lx, lz, 'l0', x, z, cell); if (td <= L0_RADIUS) l0.push(rankTile(work.l0Rows, l0.length, this.tile(cell.instance, 'l0', x, z), td)); }
+    this.publishFarPlan(work.farRows, charges, farBytes);
+    const l1 = work.l1Rows, l0 = work.l0Rows; let l1Count = 0, l0Count = 0;
+    for (let i = 0; i < ranked.length; i++) {
+      const row = ranked[i]; if (row === undefined) continue;
+      const cell = row.cell;
+      if (row.d > L1_RADIUS) continue;
+      const lx = camera.x - cell.origin.x, lz = camera.z - cell.origin.z, width = cell.extent.width, depth = cell.extent.depth;
+      // rectDistance written out (a call boxes its doubles). Its result is at least the larger axis gap, so a tile with a gap
+      // beyond the radius is out without it (DF11: Math.hypot allocates its argument list).
+      for (let z = 0; z < cell.rows.l1; z++) for (let x = 0; x < cell.columns.l1; x++) {
+        const minX = -width / 2 + x * SIZE.l1, minZ = -depth / 2 + z * SIZE.l1;
+        const maxX = Math.min(width / 2, minX + SIZE.l1), maxZ = Math.min(depth / 2, minZ + SIZE.l1);
+        const dx = Math.max(minX - lx, 0, lx - maxX), dz = Math.max(minZ - lz, 0, lz - maxZ);
+        if (dx > L1_RADIUS || dz > L1_RADIUS) continue;
+        const td = dx === 0 ? dz : dz === 0 ? dx : Math.hypot(dx, dz);
+        if (td <= L1_RADIUS) rankTile(l1, l1Count++, this.tile(cell.instance, 'l1', x, z), td);
+      }
+      if (!this.fullRings.has(cell.instance)) for (let z = 0; z < cell.rows.l0; z++) for (let x = 0; x < cell.columns.l0; x++) {
+        const minX = -width / 2 + x * SIZE.l0, minZ = -depth / 2 + z * SIZE.l0;
+        const maxX = Math.min(width / 2, minX + SIZE.l0), maxZ = Math.min(depth / 2, minZ + SIZE.l0);
+        const dx = Math.max(minX - lx, 0, lx - maxX), dz = Math.max(minZ - lz, 0, lz - maxZ);
+        if (dx > L0_RADIUS || dz > L0_RADIUS) continue;
+        const td = dx === 0 ? dz : dz === 0 ? dx : Math.hypot(dx, dz);
+        if (td <= L0_RADIUS) rankTile(l0, l0Count++, this.tile(cell.instance, 'l0', x, z), td);
+      }
     }
-    const order = (a: { tile: RingTile; d: number }, b: { tile: RingTile; d: number }): number => byNumber(a.d, b.d) || a.tile.key.localeCompare(b.tile.key);
-    l0.sort(order); l1.sort(order);
-    const fine = work.fine;
-    for (let i = 0; i < l0.length && i < C.l0Count; i++) { const row = l0[i]; if (row !== undefined) fine.push(row); }
+    sortInPlace(l0, byTileDistance, l0Count); sortInPlace(l1, byTileDistance, l1Count);
+    const fine = work.fine; let extra = 0, fineCount = 0;
+    for (let i = 0; i < l0Count && i < C.l0Count; i++) { const row = l0[i]; if (row !== undefined) fine[fineCount++] = row; }
     // lookahead along the heading, beyond the disc, until the L0 count cap
-    const speed = Math.hypot(camera.vx, camera.vz), reach = speed * this.options.readinessSeconds;
+    const speed = hypot2(camera.vx, camera.vz), reach = speed * this.options.readinessSeconds;
     if (reach > 0) {
-      const seen = new Set(fine.map((f) => f.tile.key)); let slots = Math.min(LOOKAHEAD_SLOTS, C.l0Count - fine.length);
+      const seen = work.seen, mark = ++work.seenMark;
+      for (let i = 0; i < fineCount; i++) { const row = fine[i]; if (row !== undefined) seen.set(row.tile.key, mark); }
+      let slots = Math.min(LOOKAHEAD_SLOTS, C.l0Count - fineCount);
       for (let s = L0_RADIUS; s <= L0_RADIUS + reach && slots > 0; s += C.l0.size / 4) {
         const px = camera.x + camera.vx / speed * s, pz = camera.z + camera.vz / speed * s;
-        for (const { cell } of ranked) {
+        for (let i = 0; i < ranked.length; i++) {
+          const cell = ranked[i]?.cell; if (cell === undefined) continue;
           if (this.fullRings.has(cell.instance)) continue;
           const lx = px - cell.origin.x, lz = pz - cell.origin.z;
           if (Math.abs(lx) >= cell.extent.width / 2 || Math.abs(lz) >= cell.extent.depth / 2) continue;
           const tile = this.tile(cell.instance, 'l0', Math.floor((lx + cell.extent.width / 2) / C.l0.size), Math.floor((lz + cell.extent.depth / 2) / C.l0.size));
-          if (!seen.has(tile.key) && slots > 0) { seen.add(tile.key); slots--; fine.push({ tile, d: this.distance(tile, camera) }); }
+          if (seen.get(tile.key) !== mark && slots > 0) { seen.set(tile.key, mark); slots--; fine[fineCount++] = rankTile(work.fineRows, extra++, tile, this.distance(tile, camera)); }
         }
       }
     }
     // Explicit full rings bypass the distance/count selection, but never native budget admission.
-    for (const [instance, full] of this.fullRings) {
-      const cell = this.cell(instance), width = cell.extent.width, depth = cell.extent.depth;
-      const follow = (previous: number | null, local: number, extent: number, count: number): number => {
-        const next = Math.max(0, Math.min(count - 1, Math.floor((local + extent / 2) / C.l0.size)));
-        if (previous === null || next === previous) return next;
-        const min = -extent / 2 + previous * C.l0.size, max = Math.min(extent / 2, min + C.l0.size);
-        return local < min - 4 || local >= max + 4 ? next : previous;
-      };
-      full.x = follow(full.x, fullCentre.x - cell.origin.x, width, cell.columns.l0);
-      full.z = follow(full.z, fullCentre.z - cell.origin.z, depth, cell.rows.l0);
+    const fullList = this.fullList ??= [...this.fullRings.values()];
+    for (let i = 0; i < fullList.length; i++) {
+      const full = fullList[i]; if (full === undefined) continue;
+      const instance = full.instance, cell = this.cell(instance), width = cell.extent.width, depth = cell.extent.depth;
+      full.x = followTile(full.x, fullCentre.x - cell.origin.x, width, cell.columns.l0);
+      full.z = followTile(full.z, fullCentre.z - cell.origin.z, depth, cell.rows.l0);
       for (let z = Math.max(0, full.z - full.radius); z <= Math.min(cell.rows.l0 - 1, full.z + full.radius); z++)
         for (let x = Math.max(0, full.x - full.radius); x <= Math.min(cell.columns.l0 - 1, full.x + full.radius); x++) {
           const tile = this.tile(instance, 'l0', x, z);
-          fine.push({ tile, d: this.distance(tile, camera) });
+          fine[fineCount++] = rankTile(work.fineRows, extra++, tile, this.distance(tile, camera));
         }
     }
     // Pins may exceed the ordinary view's count cap, but still require real budget admission.
-    for (const { tile } of this.pins.values()) if (this.bytes(tile.instance, tile.level, tile.x, tile.z) !== null) {
-      if (tile.level === 'l0') { if (!fine.some(row => row.tile.key === tile.key)) fine.push({ tile, d: this.distance(tile, camera) }); }
+    const pins = this.pinned().pins;
+    for (let i = 0; i < pins.length; i++) {
+      const tile = pins[i]?.tile; if (tile === undefined) continue;
+      if (this.bytes(tile.instance, tile.level, tile.x, tile.z) === null) continue;
+      if (tile.level === 'l0') { if (!hasFine(fine, fineCount, tile.key)) fine[fineCount++] = rankTile(work.fineRows, extra++, tile, this.distance(tile, camera)); }
       else {
-        const cell = this.cell(tile.instance);
-        add(this.tile(tile.instance, 'far', 0, 0), cellDistance(cell));
-        add(tile, this.distance(tile, camera));
+        this.addWantAt(want, this.tile(tile.instance, 'far', 0, 0), camera);
+        this.addWantAt(want, tile, camera);
       }
     }
-    for (let i = 0; i < l1.length && i < C.l1Count; i++) { const row = l1[i]; if (row !== undefined) add(row.tile, row.d); }
+    for (let i = 0; i < l1Count && i < C.l1Count; i++) { const row = l1[i]; if (row !== undefined) this.addWant(want, row.tile, row.d); }
     // a wanted child always wants its parents (the cap never strands an L0 tile without its L1)
-    for (const { tile, d } of fine) {
-      const cell = this.cell(tile.instance), x = Math.floor(tile.x / 2), z = Math.floor(tile.z / 2);
-      if (this.bytes(tile.instance, 'far', 0, 0) !== null && !want.has(key(tile.instance, 'far', 0, 0))) add(this.tile(tile.instance, 'far', 0, 0), cellDistance(cell));
-      add(this.tile(tile.instance, 'l1', x, z), rectDistance(camera.x - cell.origin.x, camera.z - cell.origin.z, 'l1', x, z, cell));
-      add(tile, d);
+    for (let i = 0; i < fineCount; i++) {
+      const row = fine[i]; if (row === undefined) continue;
+      const tile = row.tile, d = row.d, far = this.tile(tile.instance, 'far', 0, 0);
+      if (this.bytes(tile.instance, 'far', 0, 0) !== null && !want.has(far.key)) this.addWantAt(want, far, camera);
+      this.addWantAt(want, this.tile(tile.instance, 'l1', Math.floor(tile.x / 2), Math.floor(tile.z / 2)), camera);
+      this.addWant(want, tile, d);
     }
     return want;
+  }
+
+  /** `visible()` keeps its array while the same cells stay in view, in the same order; a change publishes a new one. */
+  private publishVisible(ranked: readonly CellDistance[]): void {
+    const current = this.visibleCells, view = this.options.viewDistance;
+    let count = 0, same = true;
+    for (let i = 0; i < ranked.length; i++) { const row = ranked[i]; if (row !== undefined && row.d <= view) { if (current[count] !== row.cell) same = false; count++; } }
+    if (same && count === current.length) return;
+    const next: LayoutCell[] = [];
+    for (let i = 0; i < ranked.length; i++) { const row = ranked[i]; if (row !== undefined && row.d <= view) next.push(row.cell); }
+    this.visibleCells = next;
+  }
+
+  /** `farPlan()` keeps its object while the plan's charges are unchanged; a change publishes a new one. */
+  private publishFarPlan(rows: readonly FarRow[], count: number, charged: number): void {
+    const prior = this.farPlanned, budget = this.farBudget();
+    let same = prior.budget === budget && prior.charged === charged, wanted = 0, omitted = 0;
+    for (let i = 0; i < count && same; i++) {
+      const row = rows[i]; if (row === undefined) { same = false; break; }
+      const was = row.omitted ? prior.omitted[omitted++] : prior.wanted[wanted++];
+      if (was === undefined || was.instance !== row.instance || was.bytes !== row.bytes || was.visible !== row.visible) same = false;
+    }
+    if (same && wanted === prior.wanted.length && omitted === prior.omitted.length) return;
+    const nextWanted: FarCharge[] = [], nextOmitted: FarCharge[] = [];
+    for (let i = 0; i < count; i++) {
+      const row = rows[i]; if (row === undefined) continue;
+      (row.omitted ? nextOmitted : nextWanted).push({ instance: row.instance, bytes: row.bytes, visible: row.visible });
+    }
+    this.farPlanned = { budget, charged, wanted: nextWanted, omitted: nextOmitted };
   }
 
   /**
@@ -642,46 +828,46 @@ export class TileStreamer<D> {
    * (farthest first). A dropped tile takes its cached children with it: the wanted set is closed under parents, so an
    * unwanted tile has no wanted descendant, and the children go first so a parent never leaves under one.
    */
-  private release(want: ReadonlyMap<string, unknown>, camera: RingCamera): void {
+  private release(want: Wanted, camera: RingCamera): void {
     // A nested step from disposal borrows another workspace. Retired slots never
     // remain in the idle scratch records after this pass completes or throws.
-    const work = this.releaseWork.pop() ?? { rows: [], order: [] }, order = work.order;
+    const work = this.releaseWork.pop() ?? { rows: [], size: 0, count: { far: 0, l1: 0, l0: 0 }, farBytes: 0 }, order = work.rows;
+    work.size = 0;
     try {
-      const keep = { far: this.options.farRadius + C.pitch / 2, l1: L1_RADIUS + C.l1.size, l0: L0_RADIUS + C.l0.size } as const;
-      const count = { far: 0, l1: 0, l0: 0 };
-      let farBytes = 0;
-      for (const slot of this.slots.values()) {
-        if (slot.state === 'uploaded') { count[slot.tile.level]++; if (slot.tile.level === 'far') farBytes += slot.bytes; }
+      const keep = this.keep;
+      const count = work.count; count.far = 0; count.l1 = 0; count.l0 = 0;
+      work.farBytes = 0;
+      for (let i = 0; i < this.slotList.length; i++) {
+        const slot = this.slotList[i]; if (slot === undefined) continue;
+        if (slot.state === 'uploaded') { count[slot.tile.level]++; if (slot.tile.level === 'far') work.farBytes += slot.bytes; }
         if (want.has(slot.tile.key)) continue;
         const distance = this.distance(slot.tile, camera);
-        let row = work.rows[order.length];
-        if (row === undefined) { row = { slot, distance }; work.rows.push(row); }
-        else { row.slot = slot; row.distance = distance; }
-        order.push(row);
+        const row = order[work.size];
+        if (row === undefined) order.push({ slot, distance }); else { row.slot = slot; row.distance = distance; }
+        work.size++;
       }
-      order.sort((a, b) => {
-        const first = a.slot, second = b.slot;
-        if (first === undefined || second === undefined) throw new Error('Missing release work slot');
-        return LEVEL_RANK[second.tile.level] - LEVEL_RANK[first.tile.level] || byNumber(b.distance, a.distance) || first.tile.key.localeCompare(second.tile.key);
-      });
-      const dropTree = (slot: Slot<D>): void => {
-        for (const child of this.slots.values()) if (child.parent === slot.tile.key) dropTree(child);
-        if (this.slots.get(slot.tile.key) !== slot) return;
-        if (slot.state === 'uploaded') { count[slot.tile.level]--; if (slot.tile.level === 'far') farBytes -= slot.bytes; }
-        this.drop(slot);
-      };
-      for (const row of order) {
+      sortInPlace(order, byReleaseOrder, work.size);
+      for (let i = 0; i < work.size; i++) {
+        const row = order[i]; if (row === undefined) continue;
         const slot = row.slot;
         if (slot === undefined || want.has(slot.tile.key) || this.slots.get(slot.tile.key) !== slot) continue;
         const level = slot.tile.level, cap = this.options.residentCaps[level] ?? Infinity;
-        const over = count[level] > cap || (level === 'far' && farBytes > this.farBudget());
+        const over = count[level] > cap || (level === 'far' && work.farBytes > this.farBudget());
         if (level === 'l0' && this.fullRings.has(slot.tile.instance)
-          || (slot.state !== 'uploaded' ? !this.hasChildren(slot.tile) : row.distance > keep[level] || over)) dropTree(slot);
+          || (slot.state !== 'uploaded' ? !this.hasChildren(slot.tile) : row.distance > keep[level] || over)) this.dropTree(slot, work);
       }
     } finally {
-      for (const row of order) row.slot = undefined;
-      order.length = 0; this.releaseWork.push(work);
+      for (let i = 0; i < work.size; i++) { const row = order[i]; if (row !== undefined) row.slot = undefined; }
+      work.size = 0; this.releaseWork.push(work);
     }
+  }
+
+  /** Drop a slot after its children, keeping the release walk's resident counts. */
+  private dropTree(slot: Slot<D>, work: ReleaseWork<D>): void {
+    for (const child of this.slots.values()) if (child.parent === slot.tile.key) this.dropTree(child, work);
+    if (this.slots.get(slot.tile.key) !== slot) return;
+    if (slot.state === 'uploaded') { work.count[slot.tile.level]--; if (slot.tile.level === 'far') work.farBytes -= slot.bytes; }
+    this.drop(slot);
   }
 
   /** The far ring's byte budget: `farCount` charges of `CONTENT_CAPS.far.resident`. */
@@ -694,30 +880,39 @@ export class TileStreamer<D> {
 
   private hasChildren(tile: RingTile): boolean {
     if (tile.level === 'l0') return false;
-    for (const slot of this.slots.values()) if (slot.parent === tile.key) return true;
+    for (let i = 0; i < this.slotList.length; i++) if (this.slotList[i]?.parent === tile.key) return true;
     return false;
   }
 
   /** Required entry tiles and their parents retain priority through publication. */
   private requiredKeys(): ReadonlySet<string> {
+    const cached = this.required;
+    if (cached !== null && cached.revision === this.pinRevision) return cached.keys;
     const required = new Set<string>();
     for (const { tile } of this.pins.values()) {
       required.add(tile.key);
       if (tile.level !== 'far') required.add(key(tile.instance, 'far', 0, 0));
       if (tile.level === 'l0') required.add(key(tile.instance, 'l1', Math.floor(tile.x / 2), Math.floor(tile.z / 2)));
     }
+    this.required = { revision: this.pinRevision, keys: required };
     return required;
   }
 
   /** Request wanted tiles parent-first, nearest first, within the in-flight cap; each is charged before it is fetched. */
-  private request(want: ReadonlyMap<string, { tile: RingTile; distance: number }>): void {
+  private request(want: Wanted, work: DesiredWork<D>): void {
     const required = this.requiredKeys();
-    const pending = [...want.values()].filter(({ tile }) => !this.slots.has(tile.key) && (this.retryAt.get(tile.key) ?? 0) <= this.frame)
-      .sort((a, b) => Number(required.has(b.tile.key)) - Number(required.has(a.tile.key))
-        || LEVEL_RANK[a.tile.level] - LEVEL_RANK[b.tile.level] || byNumber(a.distance, b.distance) || a.tile.key.localeCompare(b.tile.key));
-    let inFlight = [...this.slots.values()].filter((s) => s.state === 'fetching').length;
-    for (const { tile: plan, distance } of pending) {
-      const parentKey = parentOf(plan), parent = parentKey === null ? undefined : this.slots.get(parentKey);
+    const pending = work.pending; let count = 0;
+    for (let i = 0; i < want.size; i++) {
+      const row = want.rows[i]; if (row === undefined) continue;
+      if (!this.slots.has(row.tile.key) && (this.retryAt.get(row.tile.key) ?? 0) <= this.frame) pending[count++] = row;
+    }
+    this.sortRequired = required; sortInPlace(pending, this.byRequest, count);
+    let inFlight = 0;
+    for (let i = 0; i < this.slotList.length; i++) if (this.slotList[i]?.state === 'fetching') inFlight++;
+    for (let i = 0; i < count; i++) {
+      const row = pending[i]; if (row === undefined) continue;
+      const plan = row.tile, distance = row.distance;
+      const parentKey = this.parentKey(plan), parent = parentKey === null ? undefined : this.slots.get(parentKey);
       if (parentKey !== null && this.exists(plan) && parent?.state !== 'uploaded') continue;
       const bytes = this.bytes(plan.instance, plan.level, plan.x, plan.z); if (bytes === null) continue;
       if (inFlight >= this.options.maxInFlight) {
@@ -735,7 +930,7 @@ export class TileStreamer<D> {
       const lease = this.budget.reserve({ id: `render:${tile.key}`, category: tile.level, bytes, owner: tile.instance, distance, needed: true, evictSync: () => { this.evicted(tile.key); } });
       if (lease === null) { this.refused++; this.retryAt.set(tile.key, this.frame + 15); continue; }
       const slot: Slot<D> = { tile, parent: parentKey, state: 'fetching', lease, unholdParent: parent?.lease.hold() ?? ((): void => undefined), view: null, data: null, bytes, distance, masked: 0, shadow: false };
-      this.slots.set(tile.key, slot); inFlight++;
+      this.slots.set(tile.key, slot); this.slotList.push(slot); inFlight++;
       if (tile.level !== 'far') {
         let current = this.refinements.get(tile.instance);
         if (current === undefined) { current = new Set(); this.refinements.set(tile.instance, current); }
@@ -751,20 +946,21 @@ export class TileStreamer<D> {
   }
 
   /** Move finished fetches into the queue, then upload within this step's budget, coarse levels first. */
-  private drain(): void {
-    for (const done of this.completed.splice(0)) {
+  private drain(work: DesiredWork<D>): void {
+    if (this.completed.length > 0) for (const done of this.completed.splice(0)) {
       const slot = this.slots.get(done.tile.key);
       if (slot === undefined || slot.lease !== done.lease || slot.state !== 'fetching') { if (!(done.result instanceof Error)) this.ports.discard?.(done.tile, done.result); continue; } // dropped meanwhile
       if (done.result instanceof Error) { this.failRequirements(done.tile, done.result); this.drop(slot); this.retryAt.set(done.tile.key, this.frame + 30); continue; }
       slot.data = done.result; slot.state = 'queued';
     }
     const required = this.requiredKeys();
-    const queue = [...this.slots.values()].filter((s) => s.state === 'queued').sort((a, b) =>
-      Number(required.has(b.tile.key)) - Number(required.has(a.tile.key))
-      || LEVEL_RANK[a.tile.level] - LEVEL_RANK[b.tile.level] || a.distance - b.distance || a.tile.key.localeCompare(b.tile.key));
+    const queue = work.queue; let queued = 0;
+    for (let i = 0; i < this.slotList.length; i++) { const slot = this.slotList[i]; if (slot?.state === 'queued') queue[queued++] = slot; }
+    this.sortRequired = required; sortInPlace(queue, this.byUpload, queued);
     let count = 0, bytes = 0;
     const started = this.now();
-    for (const slot of queue) {
+    for (let i = 0; i < queued; i++) {
+      const slot = queue[i]; if (slot === undefined) continue;
       if (count >= this.options.uploadsPerFrame || (count > 0 && (bytes + slot.bytes > this.options.uploadBytesPerFrame
         || this.now() - started >= this.options.uploadMsPerFrame))) break;
       const data = slot.data; if (data === null) continue;
@@ -785,7 +981,7 @@ export class TileStreamer<D> {
   /** Dispose, unhold the parent, release the lease (a no-op once the allocator evicted it) and re-mask the parent. */
   private drop(slot: Slot<D>): void {
     if (this.slots.get(slot.tile.key) !== slot) return;
-    this.slots.delete(slot.tile.key); this.demandRevision++;
+    this.slots.delete(slot.tile.key); this.slotList.splice(this.slotList.indexOf(slot), 1); this.demandRevision++;
     if (slot.tile.level !== 'far') {
       const current = this.refinements.get(slot.tile.instance);
       current?.delete(slot);
@@ -805,33 +1001,40 @@ export class TileStreamer<D> {
   }
 
   /** A parent hides exactly the regions whose child is uploaded. */
-  private remask(parentKey: string, uploaded?: ReadonlyMap<string, readonly Slot<D>[]>): void {
+  private remask(parentKey: string, uploaded?: ReadonlyMap<string, Children<D>>): void {
     const parent = this.slots.get(parentKey); if (parent?.view === null || parent?.view === undefined) return;
     // Rectangles bound far masks to 16 regions and L1 masks to four. Changed masks still publish a fresh Set in slot order.
-    const children = uploaded === undefined ? this.slots.values() : uploaded.get(parentKey) ?? [];
+    const group = uploaded?.get(parentKey);
+    const children: readonly Slot<D>[] = uploaded === undefined ? this.slotList : group?.list ?? NO_SLOTS;
+    const count = uploaded === undefined ? this.slotList.length : group?.count ?? 0;
     let signature = 0;
-    for (const slot of children) {
-      if (slot.state !== 'uploaded' || slot.parent !== parentKey) continue;
+    for (let i = 0; i < count; i++) {
+      const slot = children[i];
+      if (slot === undefined || slot.state !== 'uploaded' || slot.parent !== parentKey) continue;
       const region = parent.tile.level === 'far' ? slot.tile.x + slot.tile.z * 4 : slot.tile.x % 2 + (slot.tile.z % 2) * 2;
       signature |= 1 << region;
     }
     if (signature === parent.masked) return;
     const excluded = new Set<number>();
-    for (const slot of uploaded === undefined ? this.slots.values() : uploaded.get(parentKey) ?? []) {
-      if (slot.state !== 'uploaded' || slot.parent !== parentKey) continue;
+    for (let i = 0; i < count; i++) {
+      const slot = children[i];
+      if (slot === undefined || slot.state !== 'uploaded' || slot.parent !== parentKey) continue;
       excluded.add(parent.tile.level === 'far' ? slot.tile.x + slot.tile.z * 4 : slot.tile.x % 2 + (slot.tile.z % 2) * 2);
     }
     parent.masked = signature; parent.view.mask(excluded);
   }
 
-  private remaskAll(camera: RingCamera): void {
+  private remaskAll(camera: RingCamera, work: DesiredWork<D>): void {
     // the uploaded children by parent, gathered once in slot order (each parent then reads the same children, in the same
-    // order, as a whole-slot scan would): the step stays linear in the resident tiles
-    const uploaded = new Map<string, Slot<D>[]>();
-    for (const slot of this.slots.values()) {
-      if (slot.state !== 'uploaded' || slot.parent === null) continue;
+    // order, as a whole-slot scan would): the step stays linear in the resident tiles. The lists are the workspace's, emptied
+    // here (a parent with none reads an empty list, as an absent one did).
+    const uploaded = work.uploaded;
+    uploaded.forEach(resetChildren);
+    for (let i = 0; i < this.slotList.length; i++) {
+      const slot = this.slotList[i];
+      if (slot === undefined || slot.state !== 'uploaded' || slot.parent === null) continue;
       const siblings = uploaded.get(slot.parent);
-      if (siblings === undefined) uploaded.set(slot.parent, [slot]); else siblings.push(slot);
+      if (siblings === undefined) uploaded.set(slot.parent, { count: 1, list: [slot] }); else siblings.list[siblings.count++] = slot;
     }
     for (const slot of this.slots.values()) {
       if (slot.view === null) continue;

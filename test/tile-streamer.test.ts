@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
-import { TileStreamer, type RingPorts, type RingTile, type RingLevel, type RingOptions, type TileStreamBudget } from '../src/client/engine/world/tileStreamer';
+import { TileStreamer, type RingPorts, type RingTile, type RingLevel, type RingOptions, type TileStreamBudget, type RingCell } from '../src/client/engine/world/tileStreamer';
+import { CONTENT_CAPS } from '../src/shared/engine/core/config';
 
 function drive(fullRing: number | null = null) {
   const cells = [{ instance: 'west', origin: { x: 0, z: 0 } }, { instance: 'east', origin: { x: 555, z: 0 } }];
@@ -371,4 +372,67 @@ test('published explicit rings tolerate motion only inside their exact geometric
     streamer.step({ ...still, x: -4.01 }); expect(reads).toBeGreaterThan(before);
     const moved = reads; streamer.setFullRing('home', 1); streamer.step(still); expect(reads).toBeGreaterThan(moved);
   } finally { streamer.dispose(); }
+});
+
+/** DF11 (mini-df11d): a dock stand whose pose drifts (every step replans), walks out and back, and a released pin, on a
+ * nine-cell grid and a road. The fingerprint covers every fetch, upload, mask, shadow, lease distance and release, and
+ * the readouts; it was taken from the streamer before its plan stopped allocating (engine e65a0f041). */
+function replanTrace(Streamer: typeof TileStreamer): { hash: string; lines: number } {
+  // two FNV-1a words over every line: the trace's fingerprint without a node module
+  let a = 0x811c9dc5, b = 0x01000193 ^ 0x5bd1e995, lines = 0;
+  const log = (s: string): void => {
+    for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); a = Math.imul(a ^ c, 0x01000193); b = Math.imul(b ^ c, 0x0100019d); }
+    a = Math.imul(a ^ 10, 0x01000193); b = Math.imul(b ^ 10, 0x0100019d); lines++;
+  };
+  const allocator = new ResidencyAllocator({ playing: 4e9 });
+  const budget: TileStreamBudget = { now: () => 0, reserve: claim => {
+    const lease = allocator.reserve(claim); if (lease === null) { log(`refuse:${claim.id}`); return null; }
+    return { id: lease.id, shrink: b => { log(`shrink:${lease.id}:${b}`); lease.shrink(b); },
+      update: p => { log(`u:${lease.id}:${String(p.distance)}:${String(p.needed)}`); lease.update(p); },
+      hold: () => lease.hold(), release: () => { log(`rel:${lease.id}`); lease.release(); } };
+  } };
+  const pending: { tile: RingTile; done: (v: string) => void; at: number }[] = [];
+  let now = 0;
+  const ports = (name: string): RingPorts<string> => ({
+    fetch: (tile, done) => { log(`${name}fetch:${tile.key}`); pending.push({ tile, done, at: now + 2 + (tile.x + tile.z) % 3 }); },
+    upload: tile => { log(`${name}up:${tile.key}`); return {
+      mask: ex => { log(`${name}mask:${tile.key}:${[...ex].join(',')}`); }, shadow: e => { log(`${name}sh:${tile.key}:${String(e)}`); },
+      dispose: () => { log(`${name}disp:${tile.key}`); } }; },
+    cancel: tile => { log(`${name}cancel:${tile.key}`); }, discard: tile => { log(`${name}discard:${tile.key}`); },
+  });
+  const cells: RingCell[] = [];
+  for (let z = -1; z <= 1; z++) for (let x = -1; x <= 1; x++) cells.push({ instance: `c${x + 1}${z + 1}`, origin: { x: x * 500, z: z * 500 } });
+  const levelBytes = (instance: string, level: RingLevel, x: number, z: number): number | null =>
+    level === 'far' ? (instance === 'c02' ? null : 240_000 + x) : (x + z + instance.length) % 7 === 0 ? null : level === 'l1' ? 300_000 : 120_000;
+  const rings = new Streamer(cells, budget, Object.assign(levelBytes, { revision: () => 1 }), ports('g'), { farRadius: 1400, uploadsPerFrame: 1, uploadBytesPerFrame: 4_000_000 });
+  rings.setFullRing('c11', 2);
+  const coarse = rings.require('c11', Array.from({ length: 16 }, (_, k) => k), 'l1');
+  const size = CONTENT_CAPS.l1.size, roadCells: RingCell[] = [];
+  for (let i = -12; i < 12; i++) {
+    roadCells.push({ instance: `r${i}`, type: 'road', origin: { x: (i + 0.5) * size, z: 0.5 * size }, extent: { width: size, depth: size } });
+    roadCells.push({ instance: `s${i}`, type: i === 0 ? 'junction' : 'road', origin: { x: 1.5 * size, z: (i + 0.5) * size }, extent: { width: size, depth: size } });
+  }
+  const roadBytes = (instance: string, level: RingLevel, x: number, z: number): number | null => level === 'far' ? null : level === 'l1' ? (x === 0 && z === 0 ? 50_000 : null) : (x + z + instance.length) % 3 === 0 ? null : 20_000;
+  const road = new Streamer(roadCells, budget, Object.assign(roadBytes, { revision: () => 0 }), ports('r'),
+    { viewDistance: CONTENT_CAPS.nearRadius, farPrefetch: 0, farRadius: CONTENT_CAPS.nearRadius });
+  const camera = { x: 0, z: 0, vx: 0, vz: 0 };
+  for (let frame = 0; frame < 1200; frame++) {
+    now = frame;
+    for (let i = 0; i < pending.length;) { const p = pending[i]; if (p !== undefined && p.at <= frame) { pending.splice(i, 1); p.done(p.tile.key); } else i++; }
+    // a dock stand with a drifting pose (every step replans), a walk out along x, a walk back, and the pins released late
+    const walk = frame % 600 > 400 ? (frame % 600 - 400) * 0.9 * (frame > 600 ? -1 : 1) : 0;
+    camera.x = 31.25 + walk + 1e-5 * Math.sin(frame * 0.37); camera.z = 40 + 1e-5 * Math.cos(frame * 0.21);
+    camera.vx = walk === 0 ? 0 : frame > 600 ? -27 : 27; camera.vz = 0;
+    if (frame === 900) coarse.release();
+    rings.step(camera); road.step(camera);
+    if (frame % 25 === 0) log(`vis:${rings.visible().map(c => c.instance).join(',')}|${JSON.stringify(rings.farPlan())}|${rings.resident().join(',')}|${road.resident().join(',')}|${String(rings.ready())}|${JSON.stringify(rings.stats())}|${JSON.stringify(road.stats())}`);
+  }
+  rings.dispose(); road.dispose();
+  for (const p of pending.splice(0)) p.done(p.tile.key);
+  void coarse.ready.catch(() => undefined);
+  return { hash: `${(a >>> 0).toString(16)}:${(b >>> 0).toString(16)}`, lines };
+}
+
+test('a replanning drive keeps the residency trace it had before its plan stopped allocating (DF11)', () => {
+  expect(replanTrace(TileStreamer)).toEqual({ hash: 'd57ab0b7:20247308', lines: 115894 });
 });
