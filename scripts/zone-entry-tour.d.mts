@@ -36,7 +36,7 @@ interface Point {x: number; z: number}
 type PortalPoint = readonly [number, number, number];
 export function portalExitPlan(entries: readonly {road: {at: PortalPoint}; route: readonly PortalPoint[]}[], center: Point, incoming: Point):
   {walk: Point[]; decks: (Point & {dx: number; dz: number})[]} | null;
-export function approachBudget(from: Point, points: readonly Point[]): number;
+export function approachBudget(from: Point, points: readonly (Point & {ride?: boolean})[]): number;
 export function unstick(attempt: number): {key: 'Space' | 'KeyD' | 'KeyA'; ms: number};
 export function spawnApproach(instance: string, at: Point, center: Point, dx: number, dz: number): (Point & {ride: boolean})[];
 export function walkZoneEntryTour(page: Page, origin: Point, result: Tour, save: () => void,
