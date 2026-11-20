@@ -6,7 +6,7 @@ import { parseQuestData, type QuestData } from '@wildshard/format/quests';
 import { questBooks, type QuestBook, type QuestBooks } from '@wildshard/engine/quest/players';
 import { FIXED_STEP } from '@wildshard/engine/core/fixedStep';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
-import { raceStartLine } from './raceWire';
+import { RACE_CHIP, raceStartLine } from './raceWire';
 
 /** Hooks read atomically published script fields or queue declared events for the next script tick. */
 export interface QuestScriptPorts {
@@ -41,12 +41,22 @@ export interface QuestDataPorts {
   script?: QuestScriptPorts;
   fact?: (name: string, entity: string) => void;
   coins?: (quantity: number, entity: string) => void;
+  /** MIRROR-SALT-ZONE MSZ31: how a player moves now, for a race that names its `ride`; without it every run is admitted. */
+  ride?: (player: string) => RaceRide;
 }
+/** How a player moves, as a race's `ride` reads it: seated in a vehicle, on the hoverboard, or on foot. */
+export type RaceRide = 'vehicle' | 'board' | 'foot';
 /** A live dialogue tree view; selection resolves declared flags and scenes without executing author closures. */
 export interface DialogueView { id: string; lines: readonly string[]; choices: readonly { id: string; label: string }[] }
-/** One player's timed run (SHARD-SOURCE SS-MS1a2): the tick its start flag rose while running, and its last and best times in seconds. */
-export interface RaceRun { running: number | null; last: number | null; best: number | null; runs: number }
-type Race = NonNullable<QuestData['races']>[number];
+/** One player's timed run (SHARD-SOURCE SS-MS1a2): the tick its start flag rose while running, and its last and best times in seconds.
+ *  MSZ31: a race of laps or checkpoints also keeps, while running, the laps done (`lap`), the next checkpoint (`next`), the tick
+ *  the lap began (`lapAt`) and the last lap's time in seconds (`split`); a plain race never has them, so its bytes stand. */
+export interface RaceRun { running: number | null; last: number | null; best: number | null; runs: number; lap?: number; next?: number; lapAt?: number; split?: number }
+/** MSZ31: a race row; `laps`, `checkpoints` and `ride` (format 0.57.0) read as optional so the row's older shape still types. */
+type Race = NonNullable<QuestData['races']>[number] & { readonly laps?: number; readonly checkpoints?: readonly string[]; readonly ride?: 'vehicle' | 'foot' | 'any' };
+/** MSZ31: a race counted by laps or checkpoints. */
+const lapped = (race: Race): boolean => (race.laps ?? 1) > 1 || (race.checkpoints ?? []).length > 0;
+
 const freshRun = (): RaceRun => ({ running: null, last: null, best: null, runs: 0 });
 /** The lead's runs' key in the step snapshot beside its dialogue nodes. */
 const LEAD_RACES = '#races';
@@ -60,6 +70,8 @@ export class DeclaredQuests {
   private readonly dialogues = new Map<string, Map<string, string | null>>();
   private readonly books: QuestBooks;
   private readonly races = new Map<string, Map<string, RaceRun>>();
+  /** MSZ31: per player and race, the last chip (a refused start, a void lap) and the tick it showed. */
+  private readonly chips = new Map<string, Map<string, { readonly chip: number; readonly at: number }>>();
   constructor(host: SimHost, input: QuestData, ports: QuestDataPorts = {}) {
     const data = parseQuestData(input), books = questBooks(host), lead = books.lead;
     if (data.quests.some((q) => host.quests.some((existing) => existing.def.id === q.id))) throw new Error('Quest already installed');
@@ -110,14 +122,19 @@ export class DeclaredQuests {
         if (!on || this.books.restoring) return;
         for (const race of races) {
           const run = runs.get(race.id); if (run === undefined) continue;
-          if (flag === race.start) { run.running = this.host.state.tick; for (const lowered of [race.stop, ...race.resets ?? []]) book.flags.set(lowered, false); } // a run counts only gates crossed in it
-          else if (flag === race.stop && run.running !== null) this.finishRace(book, race, run);
+          if (flag === race.start) this.startRace(book, race, run);
+          else if (flag === race.stop && run.running !== null) this.crossLine(book, race, run);
+          else if (run.running !== null && (race.checkpoints ?? []).includes(flag)) this.checkpoint(book, race, run, flag);
         }
       });
       // the part carries a running run's elapsed ticks, not this room's tick: an imported book lands in a room with its own count
       book.part(`races:${races[0]?.id ?? ''}`, {
-        read: () => JSON.stringify(Object.fromEntries([...runs].map(([id, run]) => [id, { ...run, running: run.running === null ? null : this.host.state.tick - run.running }]))),
-        write: saved => { restoreRuns(runs, races, JSON.parse(saved) as SimValue); for (const run of runs.values()) if (run.running !== null) run.running = this.host.state.tick - run.running; },
+        read: () => JSON.stringify(Object.fromEntries([...runs].map(([id, run]) => [id, { ...run, running: run.running === null ? null : this.host.state.tick - run.running,
+          ...(run.lapAt === undefined ? {} : { lapAt: this.host.state.tick - run.lapAt }) }]))),
+        write: saved => {
+          restoreRuns(runs, races, JSON.parse(saved) as SimValue);
+          for (const run of runs.values()) { if (run.running !== null) run.running = this.host.state.tick - run.running; if (run.lapAt !== undefined) run.lapAt = this.host.state.tick - run.lapAt; }
+        },
       });
     };
     bind(lead); this.books.install(bind);
@@ -127,12 +144,52 @@ export class DeclaredQuests {
         if (run.last !== null) out.set(`race:${id}.last`, Math.round(run.last * 1000));
         if (run.best !== null) out.set(`race:${id}.best`, Math.round(run.best * 1000));
         if (run.runs > 0) out.set(`race:${id}.runs`, run.runs);
+        if (run.running !== null && run.lap !== undefined) out.set(`race:${id}.lap`, run.lap + 1);
+        if (run.running !== null && run.split !== undefined) out.set(`race:${id}.split`, Math.round(run.split * 1000));
+        const chip = this.chips.get(player)?.get(id);
+        if (chip !== undefined) { out.set(`race:${id}.chip`, chip.chip); out.set(`race:${id}.chipAt`, raceStartLine(chip.at)); }
       }
     });
   }
+  /** The start flag rose: a run begun the wrong way (`ride`) is refused with a chip and its start lowered; else the clock starts
+   *  over and a run counts only the gates and checkpoints crossed in it. */
+  private startRace(book: QuestBook, race: Race, run: RaceRun): void {
+    const ride = race.ride ?? 'any', moving = ride === 'any' ? null : this.ports.ride?.(book.player) ?? null;
+    if (moving !== null && moving !== ride) {
+      this.chip(book.player, race, ride === 'vehicle' ? RACE_CHIP.vehicle : RACE_CHIP.foot);
+      run.running = null; clearLaps(run); lowerRun(book, race); return;
+    }
+    run.running = this.host.state.tick; clearLaps(run);
+    if (lapped(race)) Object.assign(run, { lap: 0, next: 0, lapAt: this.host.state.tick });
+    for (const lowered of [race.stop, ...race.resets ?? [], ...race.checkpoints ?? []]) book.flags.set(lowered, false);
+  }
+  /** MSZ31: a checkpoint crossed in order counts; out of order it is lowered again. The lap's first one lowers the line's stop,
+   *  which stays up from the lap before so standing on the line counts nothing. */
+  private checkpoint(book: QuestBook, race: Race, run: RaceRun, flag: string): void {
+    const checkpoints = race.checkpoints ?? [], at = checkpoints.indexOf(flag), next = run.next ?? 0;
+    if (at !== next) { book.flags.set(flag, false); return; }
+    run.next = next + 1;
+    if (at === 0) book.flags.set(race.stop, false);
+  }
+  /** The stop flag rose on a running run: a plain race finishes; a lapped one counts the lap if every checkpoint was crossed in
+   *  order, else voids it with a chip, and finishes after its last lap. */
+  private crossLine(book: QuestBook, race: Race, run: RaceRun): void {
+    if (!lapped(race)) { this.finishRace(book, race, run); return; }
+    const checkpoints = race.checkpoints ?? [], tick = this.host.state.tick;
+    for (const flag of checkpoints) book.flags.set(flag, false);
+    if ((run.next ?? 0) < checkpoints.length) { this.chip(book.player, race, RACE_CHIP.void); Object.assign(run, { next: 0, lapAt: tick }); return; }
+    const lap = (run.lap ?? 0) + 1;
+    Object.assign(run, { lap, next: 0, split: (tick - (run.lapAt ?? tick)) * FIXED_STEP, lapAt: tick });
+    if (lap >= (race.laps ?? 1)) this.finishRace(book, race, run);
+    else if (checkpoints.length === 0) book.flags.set(race.stop, false);
+  }
+  private chip(player: string, race: Race, chip: number): void {
+    const chips = this.chips.get(player) ?? new Map<string, { chip: number; at: number }>(); this.chips.set(player, chips);
+    chips.set(race.id, { chip, at: this.host.state.tick });
+  }
   private finishRace(book: QuestBook, race: Race, run: RaceRun): void {
     const seconds = (this.host.state.tick - (run.running ?? this.host.state.tick)) * FIXED_STEP;
-    run.running = null; run.last = seconds; run.best = run.best === null ? seconds : Math.min(run.best, seconds); run.runs++;
+    run.running = null; run.last = seconds; run.best = run.best === null ? seconds : Math.min(run.best, seconds); run.runs++; clearLaps(run);
     lowerRun(book, race);
     this.ports.fact?.(race.fact, book.player === this.books.lead.player ? race.id : `${book.player}:${race.id}`);
   }
@@ -142,7 +199,7 @@ export class DeclaredQuests {
     for (const race of this.data.races ?? []) {
       const run = runs.get(race.id);
       if (run === undefined || run.running === null || (this.host.state.tick - run.running) * FIXED_STEP <= race.cap) continue;
-      run.running = null; lowerRun(book, race);
+      run.running = null; clearLaps(run); lowerRun(book, race);
     }
   }
   /** One player's run of a race, or null for an unknown race or player. */
@@ -227,9 +284,22 @@ const timeOrNull = (value: SimValue | undefined): number | null => {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) throw new Error('Invalid race snapshot');
   return value;
 };
-/** A run's end lowers its start, its stop and its resets (a gate line's middle gates, SS-MS1c), so the next run counts them again. */
+/** A run's end lowers its start, its stop, its resets (a gate line's middle gates, SS-MS1c) and its checkpoints (MSZ31), so the
+ *  next run counts them again. */
 function lowerRun(book: QuestBook, race: Race): void {
-  for (const flag of [race.start, race.stop, ...(race.resets ?? [])]) book.flags.set(flag, false);
+  for (const flag of [race.start, race.stop, ...(race.resets ?? []), ...(race.checkpoints ?? [])]) book.flags.set(flag, false);
+}
+/** MSZ31: a run that is not running keeps no lap. */
+function clearLaps(run: RaceRun): void { delete run.lap; delete run.next; delete run.lapAt; delete run.split; }
+/** MSZ31: a saved lapped run's lap fields, each a whole count or a tick or time at or past zero. */
+function savedLaps(row: Readonly<Record<string, SimValue>>): Pick<RaceRun, 'lap' | 'next' | 'lapAt' | 'split'> {
+  const out: Pick<RaceRun, 'lap' | 'next' | 'lapAt' | 'split'> = {};
+  for (const key of ['lap', 'next', 'lapAt', 'split'] as const) {
+    const value = row[key]; if (value === undefined) continue;
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || (key !== 'split' && !Number.isSafeInteger(value))) throw new Error('Invalid race snapshot');
+    out[key] = value;
+  }
+  return out;
 }
 /** A saved book's runs; a race the save does not name starts fresh. */
 function restoreRuns(runs: Map<string, RaceRun>, races: readonly Race[], value: SimValue): void {
@@ -240,12 +310,12 @@ function restoreRuns(runs: Map<string, RaceRun>, races: readonly Race[], value: 
     if (row === null || typeof row !== 'object' || Array.isArray(row)) throw new Error('Invalid race snapshot');
     const finished = row['runs'] ?? 0;
     if (typeof finished !== 'number' || !Number.isSafeInteger(finished) || finished < 0) throw new Error('Invalid race snapshot');
-    runs.set(race.id, { running: timeOrNull(row['running']), last: timeOrNull(row['last']), best: timeOrNull(row['best']), runs: finished });
+    runs.set(race.id, { running: timeOrNull(row['running']), last: timeOrNull(row['last']), best: timeOrNull(row['best']), runs: finished, ...savedLaps(row) });
   }
 }
 
 /** Every flag a quest row raises on the player it runs for: each keeps its own. */
 function declaredFlags(data: QuestData): string[] {
-  return [...data.quests.map(q => q.completeFlag), ...data.triggers.map(t => t.flag), ...(data.races ?? []).flatMap(race => [race.start, race.stop]),
+  return [...data.quests.map(q => q.completeFlag), ...data.triggers.map(t => t.flag), ...(data.races ?? []).flatMap((race: Race) => [race.start, race.stop].concat(race.checkpoints ?? [])),
     ...data.dialogue.flatMap(d => d.nodes.flatMap(n => [...n.sets ?? [], ...n.choices.flatMap(c => c.sets ?? [])]))];
 }

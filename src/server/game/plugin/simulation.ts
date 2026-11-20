@@ -86,7 +86,7 @@ import { prepareDeclaredCrowds, type DeclaredCrowdPorts, type PreparedCrowds } f
 import { installLadders, type LadderClientPorts } from '../../../shared/game/shardfile/ladder';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
-import { installVehicles, type VehicleRuntime } from './vehicleRuntime';
+import { hostVehicles, installVehicles, type VehicleRuntime } from './vehicleRuntime';
 import { MoverScriptDriver, playerGrounds, verifiedMoverModules, proveTerrainEntries, type TerrainEntryWalk, type DeclaredMoverComposition, type MoverRuntime } from "./mover";
 import { socketLiftEntries } from "@wildshard/format/socketLiftAssets";
 import { createClientChannels } from "../../../shared/game/plugin/channels";
@@ -699,6 +699,8 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
       });
     }
     const quest = new DeclaredQuests(host, shard.quests, { ...ports.quest,
+      // MIRROR-SALT-ZONE MSZ31: a race's `ride` reads a seat in a vehicle, the hoverboard, or foot (the vehicles install below)
+      ride: player => hostVehicles(host)?.seatOf(player) !== undefined ? 'vehicle' : host.players.get(player)?.board.on === true ? 'board' : 'foot',
       ...(lane === undefined ? {} : { script: createQuestScriptPorts(lane, hooks, actors) }),
     });
     installDeclaredTalks(host, shard, quest); // TE-ENG3: a no-code quest-giver's answers and each player's node
