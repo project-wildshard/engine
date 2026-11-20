@@ -126,6 +126,7 @@ import { clientPreparationBatch } from '../shardfile/preparationTiming';
 import { admittedRuntimeFolder } from '../shardfile/runtimeFolder';
 import { gridArea } from './area';
 import { offerCellLook, type CellLook } from './dataCellLooks';
+import { NearColliders, outerCollidersNearOn } from './nearColliders';
 import type { ProbeArea } from '@wildshard/engine/debug/probe';
 
 /** D12: the A1 outer ring's share of a drawn frame (ms). On the phone tier its strips, colliders and road stop 4 ms after
@@ -693,7 +694,7 @@ export class GridSession {
     if (outer !== undefined) this.startOuterRoad = () => {
       const landOuter = async (): Promise<void> => {
         const timing = clientPreparationBatch('grid', 'outer-ring', ['strips', 'road']);
-        try { await this.prepareOuterStrips(); timing?.mark('strips'); const road = await outer(); timing?.mark('road'); if (!host.scope.disposed) take(road, true); }
+        try { await this.prepareOuterStrips(true); timing?.mark('strips'); const road = await outer(); timing?.mark('road'); if (!host.scope.disposed) take(road, true); }
         catch (error: unknown) {
           this.issues.set('road.outer', error instanceof Error ? error.message : String(error));
           console.warn('[grid] the outer road did not install:', error);
@@ -1026,8 +1027,19 @@ export class GridSession {
     this.refusals.set(cell.instance, refusal); this.issues.set(cell.instance, error instanceof Error ? error.message : String(error)); pageShardRefusals().note(cell.slug, refusal);
   }
 
-  /** Complete deferred native seams before a distant entry or road recovery. One page promise, no second scheduler. */
-  prepareOuterStrips(): Promise<void> {
+  /** DW3: the outer strips' colliders held until the player nears them (`debug.outerCollidersNear`), else null */
+  private nearColliders: NearColliders | null = null;
+
+  /** Complete deferred native seams before a distant entry or road recovery. One page promise, no second scheduler.
+   *  `near` (the outer road's own start): with `debug.outerCollidersNear` on, each strip's collider waits for the player
+   *  (nearColliders.ts); every other caller gets the whole ring's colliders. */
+  prepareOuterStrips(near = false): Promise<void> {
+    const ready = this.prepareOuterStripsOnce(near);
+    if (near) return ready;
+    return (async () => { await ready; this.nearColliders?.flush(); })();
+  }
+
+  private prepareOuterStripsOnce(near: boolean): Promise<void> {
     if (this.outerStripsReady !== undefined) return this.outerStripsReady;
     const build = this.outerStripBuild;
     if (build === undefined) return Promise.resolve();
@@ -1044,9 +1056,15 @@ export class GridSession {
           owner.onDispose(claim.release);
         }
         const slice = workSlice(OUTER_RING_SLICE_MS, owner);
+        const held = near && outerCollidersNearOn()
+          ? new NearColliders((mesh) => { if (!owner.disposed && !owner.disposing) installStripCollider(this.host.physics, mesh, owner); }) : null;
+        if (held !== null) { this.nearColliders = held; owner.onDispose(() => { if (this.nearColliders === held) this.nearColliders = null; }); }
         for (const { mesh } of generated) {
-          active(); installStripCollider(this.host.physics, mesh, owner); await slice.check();
+          active();
+          if (held !== null) { held.add(mesh); continue; }
+          installStripCollider(this.host.physics, mesh, owner); await slice.check();
         }
+        if (held !== null) { const feet = this.host.feet(); held.step(feet.x, feet.z, 0); }
         active();
         this.strips.push(...collisionStrips(generated));
         this.publishOuterStrips?.(generated); this.publishOuterStrips = undefined;
@@ -1140,6 +1158,7 @@ export class GridSession {
       const distance = Math.hypot(Math.max(0, Math.abs(at.x - cell.origin.x) - CHUNK_HALF), Math.max(0, Math.abs(at.z - cell.origin.z) - CHUNK_HALF));
       if (this.assembly.approaching(distance, 400 + Math.min(speed, 60) * 4)) void this.admitNeighbour?.(cell).catch(() => undefined);
     }
+    if (this.nearColliders !== null) { const feet = this.host.feet(); this.nearColliders.step(feet.x, feet.z, speed); }
     this.softWalls.step();
     this.stepGate(at);
     if (view) this.viewStep();

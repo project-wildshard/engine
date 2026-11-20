@@ -703,6 +703,7 @@
     "src/client/game/grid/dataCellRides.ts": "client",
     "src/client/game/grid/dataCellMovers.ts": "client",
     "src/client/game/grid/dataCellLooks.ts": "client",
+    "src/client/game/grid/nearColliders.ts": "client",
     "src/client/game/grid/edgeSources.ts": "client",
     "src/client/game/grid/enteredEquipment.ts": "client",
     "src/client/game/grid/enteredInteract.ts": "client",

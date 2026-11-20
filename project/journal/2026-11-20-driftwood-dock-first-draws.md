@@ -13,3 +13,8 @@ The dock leg stands still, so its frames over 50 ms on the iPhone 13 are things 
 - **The outer ring's strip colliders** (seconds 5 to 9): about 80 Rapier trimeshes of ~2,000 triangles, 0.7 ms each in
   Node, 3 to 28 ms in desktop Safari, more on the phone, and none can be sliced.
 - **Near placeholders and far proxies** being prepared beside them.
+
+**The strip colliders now wait for the player** (`nearColliders.ts`, device slot `debug.outerCollidersNear`). A strip's
+collider is built once the feet come within 120 m (plus four seconds of travel) of its bounds; a distant entry or a
+recovery still gets the whole ring at once. Three alternating cooled phone pairs at the dock: 9, 18 and 8 frames over
+50 ms with it on, 30, 43 and 11 off, and no outer collider build over 4 ms. Unset, it is on at phone Low.
