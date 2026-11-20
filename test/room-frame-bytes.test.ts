@@ -86,8 +86,10 @@ test('a Nalati cell room, its seats armed, sends the same bytes and keeps the sa
  *  CC11a2c (wire 1.4): every creature row carries its running ability and how far through, zero when none (old: cdbcfce3).
  *  Re-taken for NL14b1 (J280): `slideOffBank` measures the bank as the terrain's slope across the nearest point and drops
  *  the push into it on a ramp across the climb limit (old law: 388e1517). Re-taken for ONE-FORMAT CC18c (wire 1.5): the
- *  welcome's event table gains event 16 `flight` (old: 8e8f6a3a). */
-const EXPECTED = '1d8b8366acd146694ae368e4b6d410c7403e250b1d570c948b617bd715da69f0';
+ *  welcome's event table gains event 16 `flight` (old: 8e8f6a3a). Re-taken for bb47b6afb: a jump pressed on a grounded step
+ *  that names no ground collider (the motor's snap up a small lip) now asks the floor under the feet, so a bot's jump at a
+ *  lip is no longer eaten (old law: 1d8b8366). */
+const EXPECTED = 'd2074fab0ba6e12400d4437018b00ab8ed988ae1f239aba7aeb374c2b3eae792';
 /** Taken on engine main f03e8341, before the second change; re-taken for TE-ENG7 as above. Re-taken for SS4 (75a5d6ae):
  *  each seat now has a stealth seat whose state the digest hashes, and an arrow loosed from Hidden hits for x2. Re-taken
  *  for RP6 as above. Re-taken for GC36 and NL13 as above. Re-taken for Nalati continuation af0adf3f:
@@ -96,5 +98,6 @@ const EXPECTED = '1d8b8366acd146694ae368e4b6d410c7403e250b1d570c948b617bd715da69
  *  Re-taken for NL13b4 as above (old law: cd2d9048). Re-taken for CC28a as above (old: f231d52d). Re-taken for NL14b2 as
  *  above (old law: 9b5c9aad). Re-taken for MP1.5b as above (old: 620028c6), and for MP5.2b as above (old: 8dd4d5a6).
  *  Restored cell positions and distance tiers as above (old: 3c9036b7). Re-taken for CC11a2c as above (old: e8e25c9d).
- *  Re-taken for NL14b1 as above (old law: c1823a44), and for CC18c as above (old: 35acd7ed). */
-const EXPECTED_ROOM = '91d1e6cea259c73ea811658cf8a0a9f3d50dddc8a5d1bb12e6a85a2425056b09';
+ *  Re-taken for NL14b1 as above (old law: c1823a44), and for CC18c as above (old: 35acd7ed). Re-taken for bb47b6afb's
+ *  lip jump as above (old law: 91d1e6ce). */
+const EXPECTED_ROOM = '603a6bb5445ce3e7d029522b88c55a8f43ec7ab1c732f963bc738fda9661c7b3';
