@@ -4,7 +4,6 @@ import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { acceptPhoneMemoryWarning, deployFrameProblem, PHONE } from './journey-proof.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
@@ -91,13 +90,13 @@ function smokeEntries(route, proof) {
 
 /** @param {readonly Leg[]} route @param {unknown} report @param {string} build @param {number} seed */
 export function retrySmokeEntries(route, report, build, seed) {
-  const proof = /** @type {SmokeReport|null} */ (report);
+  const proof = /** @type {Partial<SmokeReport>|null} */ (report);
   if (proof?.mode !== 'smoke' || proof.build !== build || proof.engine !== 'webkit' || proof.profile !== 'phone' || proof.pass !== false)
     throw new Error('Retry needs a held phone WebKit smoke for the same staging build');
   if (proof.seed !== seed) throw new Error('Retry must use the saved seed');
   smokeEntries(route, proof);
-  if (proof.failures.length === 0) throw new Error('The held verdict has no failed pairs to retry');
-  return {arrivals:[...proof.arrivals], pending:proof.failures.map(row => row.index).sort((a,b) => a-b)};
+  if (proof.failures === undefined || proof.failures.length === 0) throw new Error('The held verdict has no failed pairs to retry');
+  return {arrivals:[...proof.arrivals ?? []], pending:proof.failures.map(row => row.index).sort((a,b) => a-b)};
 }
 
 /** @param {unknown} report */
@@ -106,7 +105,7 @@ export function smokeGap(report) {
   try {
     const route = featuredZoneEntry(proof.cells, proof.seed);
     smokeEntries(route, proof);
-    if (proof.pass === true && proof.failures.length === 0 && proof.arrivals.length === 16) return undefined;
+    if (proof.pass && proof.failures.length === 0 && proof.arrivals.length === 16) return undefined;
   } catch { /* Only a complete, matching smoke qualifies a release. */ }
   return 'J476 zone-entry smoke did not pass all 16 seeded crossings';
 }
@@ -429,7 +428,7 @@ export async function walkZoneEntryTour(page, origin, result, save, {restart, re
     return reopened;
   };
   /** @param {Page} crossingPage @param {Leg} leg @param {Cell | undefined} previous */
-  const cross = async (crossingPage, leg, previous) => {
+  const cross = (crossingPage, leg, previous) => {
     const {from} = leg;
     const center = {x: origin.x+(from.cell[0]-start.cell[0])*pitch, z: origin.z+(from.cell[1]-start.cell[1])*pitch};
     return crossZoneEntry(crossingPage, leg, center, pitch, previous);
@@ -543,18 +542,17 @@ async function runSmoke({build, out, seed, prior}) {
   // Three independent guest sessions share one admitted headless WebKit owner.
   const browser = await webkit.launch({headless:true});
   try {
-    const contexts = await Promise.all([0,1,2].map(async () => {
+    const newContext = async () => {
       const context = await browser.newContext({...PHONE,isMobile:true});
       await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
       await saveFixture(context, {scope:'device',key:'firstPlayDone',data:true});
       await saveFixture(context, {scope:'device',key:'devMode',data:true});
       await saveFixture(context, {scope:'global',key:'settings',merge:true,data:{volume:0}});
       return context;
-    }));
+    };
     /** @type {Cell[]} */ let cells;
     if (prior === undefined) {
-      const discovery = await contexts[0]?.newPage();
-      if (discovery === undefined) throw new Error('No phone smoke discovery session');
+      const context = await newContext(), discovery = await context.newPage();
       try {
         await bootSmokeSource(discovery, {instance:DRIFTWOOD,cell:[0,0]}, build, `ZE ${began.toString(36).slice(-5)} G`);
         ({cells} = await gridLayout(discovery));
@@ -562,7 +560,7 @@ async function runSmoke({build, out, seed, prior}) {
         const detail = await Promise.race([crossingDetail(discovery),delay(2000,'')]);
         throw new Error(`${error instanceof Error ? error.message : String(error)}${detail ? ` (${detail})` : ''}`, {cause:error});
       } finally {
-        await discovery.close();
+        await context.close();
       }
     } else {
       // New placement overlays can arrive between attempts. Keep the saved
@@ -593,15 +591,17 @@ async function runSmoke({build, out, seed, prior}) {
     const batches = smokeBatches(pending);
     console.log(`J476 batches ${batches.map(batch => batch.length).join('/')}`);
     await Promise.all(batches.map(async (batch,lane) => {
-      const context = contexts[lane];
-      if (context === undefined) throw new Error('Missing phone smoke session');
       for (const index of batch) {
         const leg = route[index];
         if (leg === undefined) throw new Error('Missing seeded crossing');
         const pair = {index,from:leg.from.instance,to:leg.to.instance};
         /** @type {Page | undefined} */ let page;
+        /** @type {import('playwright').BrowserContext | undefined} */ let context;
         console.log(`START ${index+1}/${route.length} lane ${lane+1} ${pair.from} -> ${pair.to}`);
         try {
+          // A new guest context prevents a failed source boot or its service
+          // worker from leaking into the next pair assigned to this worker.
+          context = await newContext();
           page = await context.newPage();
           await bootSmokeSource(page,leg.from,build,`ZE ${began.toString(36).slice(-5)} ${String(index+1)}`);
           const {center,pitch} = await smokePose(page,leg);
@@ -616,7 +616,7 @@ async function runSmoke({build, out, seed, prior}) {
           failed.set(index,failure);
           console.log(`FAIL ${index+1}/${route.length} ${pair.from} -> ${pair.to}: ${failure.reason}`);
         } finally {
-          await page?.close().catch(() => undefined);
+          await context?.close().catch(() => undefined);
           save();
         }
       }
@@ -638,7 +638,7 @@ export function stagedTourProof(value) {
 }
 
 /** @param {string[]} argv */
-async function main(argv) {
+function main(argv) {
   /** @type {Map<string,string>} */ const options = new Map();
   for (let i=0;i<argv.length;i++) {
     const [name, ...inline] = (argv[i] ?? '').split('=');
@@ -661,21 +661,21 @@ async function main(argv) {
     if (retry !== undefined || options.has('--seed')) throw new Error('The full route uses --zone-entry-resume and has no seed');
     const legacy = join(out,'held-full-route.json');
     if (prior !== undefined) writeFileSync(legacy,JSON.stringify(prior));
-    const child = spawnSync(process.execPath,[fileURLToPath(new URL('./zone-gate-proof.mjs',import.meta.url)),
+    const child = spawnSync(process.execPath,[join(import.meta.dirname,'zone-gate-proof.mjs'),
       `--base=${STAGING}`,`--out=${out}`,'--engine=webkit','--target=far-reach','--deploy','--walk-all',`--expected-build=${build}`,
       ...(prior === undefined ? [] : [`--resume=${legacy}`])], {stdio:'inherit'});
     if (child.error !== undefined) throw child.error;
     return child.status ?? 1;
   }
   const seedArg = options.get('--seed');
-  const seed = seedArg === undefined ? old?.seed ?? randomBytes(4).readUInt32LE(0) : /^\d+$/u.test(seedArg) ? Number(seedArg) : NaN;
+  const seed = seedArg === undefined ? old?.seed ?? randomBytes(4).readUInt32LE(0) : /^\d+$/u.test(seedArg) ? Number(seedArg) : Number.NaN;
   if (!validSeed(seed)) throw new Error('--seed must be an unsigned 32-bit integer');
   if (old !== undefined && (old?.mode !== 'smoke' || old.build !== build || old.engine !== 'webkit' || old.profile !== 'phone' ||
       old.pass !== false || old.seed !== seed)) throw new Error('Retry needs the saved seed and a held phone WebKit smoke for the same staging build');
   return runSmoke({build,out,seed,prior});
 }
 
-if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
   try { process.exitCode = await main(process.argv.slice(2)); }
   catch (error) { console.error(`HOLD zone-entry: ${error instanceof Error ? error.message : String(error)}`); process.exitCode = 1; }
 }
