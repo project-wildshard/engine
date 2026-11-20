@@ -47,7 +47,7 @@ try {
   const reload = page.waitForEvent('load', { timeout: 60_000 });
   // the restart GpuRecovery reads: its sentinel canvas reads back wiped, then the context goes
   await page.evaluate(() => {
-    CanvasRenderingContext2D.prototype.getImageData = function getImageData(_x, _y, w, h) { return new ImageData(Math.max(1, w), Math.max(1, h)); };
+    CanvasRenderingContext2D.prototype.getImageData = function getImageData(/** @type {number} */ _x, /** @type {number} */ _y, /** @type {number} */ w, /** @type {number} */ h) { return new ImageData(Math.max(1, w), Math.max(1, h)); };
     const canvas = document.querySelector('canvas');
     const gl = canvas?.getContext('webgl2') ?? null;
     gl?.getExtension('WEBGL_lose_context')?.loseContext();
