@@ -81,9 +81,9 @@ test('seated, the walk\'s discs give way to BRAKE, BOOST, HORN and LEAVE, and a 
   seat = { vehicle: 'yard.buggy:me', seat: 0 }; frame();
   expect(walkLive()).toEqual([false, false, false, false, false]); // ATTACK, JUMP, DODGE and the HOVER tab hide
   expect(app.input.allowed('use')).toBe(true); // E still gets out
-  expect(discs.shown()).toEqual([{ cls: 'ws-drive-brake', show: true }, { cls: 'ws-drive-boost', show: true }, { cls: 'ws-drive-horn', show: true }, { cls: 'ws-drive-leave', show: true }]);
-  expect(layer.classList.contains('ws-drive-seated')).toBe(true); // the USE band's *Get out* hides behind LEAVE
-  const brake = layer.querySelector('.ws-drive-brake'); if (brake === null) throw new Error('No BRAKE disc');
+  expect(discs.shown()).toEqual([{ cls: 'ws-touch-drive-brake', show: true }, { cls: 'ws-touch-drive-boost', show: true }, { cls: 'ws-touch-drive-horn', show: true }, { cls: 'ws-touch-drive-leave', show: true }]);
+  expect(layer.classList.contains('ws-touch-drive-seated')).toBe(true); // the USE band's *Get out* hides behind LEAVE
+  const brake = layer.querySelector('.ws-touch-drive-brake'); if (brake === null) throw new Error('No BRAKE disc');
   brake.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); frame();
   expect(player.seatButtons?.(0)).toBe(NET_BUTTONS.brake);
   for (let t = 0; t < HANDBRAKE_HOLD + 0.05; t += 1 / 60) frame();

@@ -180,22 +180,22 @@ export class DriveDiscs {
     const hold = (action: 'drive.brake' | 'drive.boost' | 'drive.horn'): { press: () => void; release: () => void } =>
       ({ press: () => { app.input.setHeld(action, true); }, release: () => { app.input.setHeld(action, false); } });
     this.discs = [
-      hudSlots.disc({ cls: 'ws-drive-brake', icon: DRIVE_GLYPHS.brake, label: engineString('s_drive_brake'), spot: 'r2', ...hold('drive.brake') }, scope),
-      hudSlots.disc({ cls: 'ws-drive-boost', icon: DRIVE_GLYPHS.boost, label: engineString('s_drive_boost'), spot: 'r0', ...hold('drive.boost') }, scope),
-      hudSlots.disc({ cls: 'ws-drive-horn', icon: DRIVE_GLYPHS.horn, label: engineString('s_drive_horn'), spot: 'r1', ...hold('drive.horn') }, scope),
-      hudSlots.disc({ cls: 'ws-drive-leave', icon: DRIVE_GLYPHS.leave, label: engineString('s_drive_leave'), spot: 'edge-l', press: () => { app.input.press('use'); } }, scope),
+      hudSlots.disc({ cls: 'ws-touch-drive-brake', icon: DRIVE_GLYPHS.brake, label: engineString('s_drive_brake'), spot: 'r2', ...hold('drive.brake') }, scope),
+      hudSlots.disc({ cls: 'ws-touch-drive-boost', icon: DRIVE_GLYPHS.boost, label: engineString('s_drive_boost'), spot: 'r0', ...hold('drive.boost') }, scope),
+      hudSlots.disc({ cls: 'ws-touch-drive-horn', icon: DRIVE_GLYPHS.horn, label: engineString('s_drive_horn'), spot: 'r1', ...hold('drive.horn') }, scope),
+      hudSlots.disc({ cls: 'ws-touch-drive-leave', icon: DRIVE_GLYPHS.leave, label: engineString('s_drive_leave'), spot: 'edge-l', press: () => { app.input.press('use'); } }, scope),
     ];
     scope.onDispose(hudSlots.onLayer(layer => { this.layer = layer; }));
   }
   /** The discs shown (seated) or hidden; hiding lets go of whatever they held. */
   show(on: boolean): void {
     for (const disc of this.discs) { hudSlots.show(disc, on); if (!on) disc.classList.remove('down'); }
-    this.layer?.classList.toggle('ws-drive-seated', on);
+    this.layer?.classList.toggle('ws-touch-drive-seated', on);
     if (!on) for (const action of ['drive.brake', 'drive.boost', 'drive.horn'] as const) app.input.setHeld(action, false);
   }
   /** Each disc's class and whether it shows, for a probe. */
   shown(): readonly { readonly cls: string; readonly show: boolean }[] {
-    return this.discs.map(disc => ({ cls: [...disc.classList].find(name => name.startsWith('ws-drive-')) ?? '', show: disc.classList.contains('show') }));
+    return this.discs.map(disc => ({ cls: [...disc.classList].find(name => name.startsWith('ws-touch-drive-')) ?? '', show: disc.classList.contains('show') }));
   }
 }
 

@@ -287,9 +287,9 @@ html[data-ws-keyboard] .ws-touch { visibility: hidden; pointer-events: none; }
 .ws-touch-disc.at:not(.show) { display: none; }
 /* MIRROR-SALT-ZONE MSZ12: a vehicle seat's discs (quest/view/ui.ts DriveDiscs). BRAKE takes ATTACK's place and size, LEAVE the
    HOVER tab's on the left edge; the USE band's *Get out* hides behind LEAVE */
-.ws-touch .ws-touch-disc.ws-drive-brake { left: var(--split); bottom: calc(var(--safe) + (var(--bar-in) - var(--atk)) / 2); width: var(--atk); height: var(--atk); }
-#hud .ws-touch .ws-touch-disc.ws-drive-leave { left: env(safe-area-inset-left, 0px); bottom: auto; top: 46%; transform: translateY(-50%); width: 38px; height: 62px; margin-left: 0; border-radius: 0 12px 12px 0; border-left: 0; font-size: 6.5px; letter-spacing: 0.16em; }
-.ws-touch.ws-drive-seated .ws-touch-use { visibility: hidden; }
+.ws-touch .ws-touch-disc.ws-touch-drive-brake { left: var(--split); bottom: calc(var(--safe) + (var(--bar-in) - var(--atk)) / 2); width: var(--atk); height: var(--atk); }
+#hud .ws-touch .ws-touch-disc.ws-touch-drive-leave { left: env(safe-area-inset-left, 0px); bottom: auto; top: 46%; transform: translateY(-50%); width: 38px; height: 62px; margin-left: 0; border-radius: 0 12px 12px 0; border-left: 0; font-size: 6.5px; letter-spacing: 0.16em; }
+.ws-touch.ws-touch-drive-seated .ws-touch-use { visibility: hidden; }
 .ws-touch-use { bottom: calc(var(--row) + var(--disc) + 14px); }
 .ws-touch:has(.ws-touch-disc.at-up0.show) .ws-touch-use { bottom: calc(var(--row) + var(--rslot) + var(--disc) + 14px); }
 /* A14: online, the chat row sits over MOVE (src/client/host/online/chatLines.ts): the band yields MOVE's column to it and stays over
