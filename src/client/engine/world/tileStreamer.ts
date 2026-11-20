@@ -223,6 +223,7 @@ interface SettledMotion {
 /** The render rings of one grid session. Call `step` once per fixed step with the camera; `dispose` at session end. */
 export class TileStreamer<D> {
   private readonly slots = new Map<string, Slot<D>>();
+  private readonly refinements = new Map<string, Set<Slot<D>>>();
   private readonly releaseWork: { rows: ReleaseRow<D>[]; order: ReleaseRow<D>[] }[] = [];
   private readonly desiredWork: DesiredWork[] = [];
   private readonly pins = new Map<string, { readonly tile: RingTile; refs: number }>();
@@ -362,8 +363,9 @@ export class TileStreamer<D> {
    * them again. The parents' masks follow on the next step's re-mask.
    */
   retireRefinement(instance: string): void {
-    const order = [...this.slots.values()].filter((slot) => slot.tile.instance === instance && slot.tile.level !== 'far')
-      .sort((a, b) => LEVEL_RANK[b.tile.level] - LEVEL_RANK[a.tile.level] || a.tile.key.localeCompare(b.tile.key));
+    const current = this.refinements.get(instance);
+    if (current === undefined) return;
+    const order = [...current].sort((a, b) => LEVEL_RANK[b.tile.level] - LEVEL_RANK[a.tile.level] || a.tile.key.localeCompare(b.tile.key));
     for (const slot of order) this.drop(slot);
   }
   /** Uploaded keys in key order (deterministic traces). */
@@ -731,6 +733,11 @@ export class TileStreamer<D> {
       if (lease === null) { this.refused++; this.retryAt.set(tile.key, this.frame + 15); continue; }
       const slot: Slot<D> = { tile, parent: parentKey, state: 'fetching', lease, unholdParent: parent?.lease.hold() ?? ((): void => undefined), view: null, data: null, bytes, distance, masked: 0, shadow: false };
       this.slots.set(tile.key, slot); inFlight++;
+      if (tile.level !== 'far') {
+        let current = this.refinements.get(tile.instance);
+        if (current === undefined) { current = new Set(); this.refinements.set(tile.instance, current); }
+        current.add(slot);
+      }
       try {
         this.ports.fetch(tile, (result) => {
           if (this.disposed) { if (!(result instanceof Error)) this.ports.discard?.(tile, result); return; }
@@ -776,6 +783,11 @@ export class TileStreamer<D> {
   private drop(slot: Slot<D>): void {
     if (this.slots.get(slot.tile.key) !== slot) return;
     this.slots.delete(slot.tile.key); this.demandRevision++;
+    if (slot.tile.level !== 'far') {
+      const current = this.refinements.get(slot.tile.instance);
+      current?.delete(slot);
+      if (current?.size === 0) this.refinements.delete(slot.tile.instance);
+    }
     const errors: unknown[] = [];
     const clean = (run: () => void): void => { try { run(); } catch (error) { errors.push(error); } };
     const view = slot.view, data = slot.data; slot.view = null; slot.data = null;
