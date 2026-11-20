@@ -2,6 +2,11 @@ import { Vector3, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { KinematicMover } from '@wildshard/engine/physics/mover';
 import { queryGroups } from '@wildshard/engine/physics/groups';
+import { floorBelow } from '@wildshard/engine/physics/query';
+import { STEER_PROBE } from '@wildshard/engine/sim/moverMotion';
+import type { VehicleWorld } from '@wildshard/engine/sim/vehicle';
+import { castVehicleHull, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullShapes } from '@wildshard/engine/sim/vehicleHull';
+import type { SimCommand } from '@wildshard/engine/sim';
 import { tagOf } from '@wildshard/engine/physics/surface';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
@@ -10,6 +15,7 @@ import type { VehicleDock, VehicleKind, Vehicles } from '@wildshard/format/vehic
 import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
 import { parseVehicleSeatRow, parseVehicleWornRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { vehiclePoint, type MoverView } from './followedMovers';
+import { rowState, statePose, VehiclePrediction, type VehicleRow } from './vehiclePrediction';
 
 /** m within which a seat's or a dock's prompt shows (the server's `SEAT_REACH`). */
 const SEAT_REACH = 2.5;
@@ -24,6 +30,14 @@ function followingPrompt(position: Vector3, label: string, radius: () => number,
 /** One vehicle this page follows: its collider in the page's physics, its drawn look, and its last row. */
 interface Followed { readonly id: string; readonly dock: VehicleDock; readonly kind: VehicleKind; readonly body: KinematicMover; readonly look: ((pose: MoverPose) => void) | null; pose: MoverPose; readonly view: MoverView }
 
+/** MSZ16: what the wire says of a driven vehicle as a command goes: its row in the newest frame (when that frame carried one),
+ *  and how many of the commands this page sent the server has not stepped yet, this one among them. */
+export interface VehicleWire { readonly row: (id: string) => VehicleRow | null; readonly behind: number }
+/** MSZ16: a page's driving as a proof reads it (`FollowedVehicles.report`). */
+export interface VehicleReport {
+  readonly driving: string | null; readonly corrections: number; readonly snaps: number; readonly worst: number;
+  readonly docks: readonly (readonly [string, number, number])[];
+}
 /** What a page lends the vehicles it follows. */
 export interface FollowedVehiclePorts {
   readonly physics: Physics; readonly scope: Scope;
@@ -40,6 +54,10 @@ export interface FollowedVehiclePorts {
  * Its prompts are a fixed few that follow the vehicles: for each kind's seat, the nearest free one of that kind (a per-player
  * vehicle's driver seat only for its owner); each player dock's while it stands clear and this player has no vehicle out;
  * and one leave prompt over this player's own seat. A press goes by wire id and the server decides.
+ *
+ * MSZ16: the one vehicle this page's player drives is predicted, not followed: each command the page sends steps it here
+ * (`VehiclePrediction`, through this page's world), its rows settle it, and its collider and look stand where the page has it.
+ * A passenger's vehicle, and everyone else's, follows its rows.
  */
 export class FollowedVehicles {
   readonly vehicles: Vehicles;
@@ -57,6 +75,9 @@ export class FollowedVehicles {
   /** This page's player's feet, as the last frame had them: a seat's prompt goes to the nearest free one. */
   private readonly feet = { x: 0, z: 0 };
   private readonly made: Interactable[];
+  /** MSZ16: the vehicle this page's player drives, stepped here on its commands. */
+  private predicted: { readonly id: string; readonly run: VehiclePrediction } | null = null;
+  private readonly shapes: HullShapes = new Map();
   constructor(vehicles: Vehicles, ports: FollowedVehiclePorts) {
     this.vehicles = vehicles; this.ports = ports;
     this.kinds = new Map(vehicles.kinds.map(kind => [kind.id, kind]));
@@ -106,8 +127,9 @@ export class FollowedVehicles {
     const known = this.live.get(id); if (known !== undefined) return known.view;
     return this.docks.has(vehicleDockOf(id)) ? { pose: pose => { this.follow(id, pose); } } : undefined;
   }
-  /** Pose a vehicle off its row: its collider and its look. */
+  /** Pose a vehicle off its row: its collider and its look. The vehicle this page drives stands where it predicts it. */
   follow(id: string, pose: MoverPose): void {
+    if (this.predicted?.id === id) return;
     const vehicle = this.live.get(id) ?? this.make(id, pose); if (vehicle === null) return;
     vehicle.pose = pose; vehicle.body.setPose(pose); vehicle.look?.(pose);
   }
@@ -129,12 +151,71 @@ export class FollowedVehicles {
     }
     // a vehicle whose row left is gone: a per-player one despawned, or any one wrecked (MSZ14)
     for (const [id, vehicle] of this.live) if (!out.has(id)) { vehicle.body.dispose(); this.live.delete(id); }
+    // MSZ16: out of the driver's seat (left, set down, wrecked), the vehicle follows its rows again
+    if (this.predicted !== null && !this.driving(this.predicted.id)) this.predicted = null;
   }
+  /**
+   * MSZ16: one command this page sent, as the server will read it: when this page's player drives a vehicle here, it steps the
+   * vehicle on it and settles on the newest row. The first command in the seat starts the prediction off that row.
+   */
+  command(command: SimCommand, wire: VehicleWire): void {
+    const held = this.seatOf(), vehicle = held === undefined ? undefined : this.live.get(held.vehicle);
+    if (held === undefined || vehicle === undefined || !this.driving(vehicle.id)) { this.predicted = null; return; }
+    if (this.predicted?.id !== vehicle.id) {
+      const row = wire.row(vehicle.id);
+      this.predicted = { id: vehicle.id, run: new VehiclePrediction(vehicle.kind.handling, this.worldOf(vehicle), rowState(row ?? { pose: vehicle.pose }, { forward: 0, slip: 0 })) };
+    }
+    const { run } = this.predicted;
+    run.step(vehicleCommandOf(command, run.state().yaw));
+    const row = wire.row(vehicle.id), snaps = run.snaps;
+    if (row !== null && run.settle(row, wire.behind)) { this.driven.corrections++; this.driven.snaps += run.snaps - snaps; this.driven.worst = Math.max(this.driven.worst, run.worst); }
+    this.place(vehicle, run);
+  }
+  /** MSZ16, a drawn frame of `dt` s: a correction eases out of the driven vehicle. */
+  frame(dt: number): void {
+    const predicted = this.predicted, vehicle = predicted === null ? undefined : this.live.get(predicted.id);
+    if (predicted === null || vehicle === undefined) return;
+    predicted.run.ease(dt); this.place(vehicle, predicted.run);
+  }
+  /** MSZ16, what a proof reads: the vehicle this page's player drives, every correction its rows made (and the snaps among
+   *  them, and the widest gap), and where each dock stands. */
+  report(): VehicleReport {
+    return { driving: this.predicted?.id ?? null, ...this.driven, docks: [...this.docks.values()].map(dock => [dock.id, dock.at[0], dock.at[2]] as const) };
+  }
+  private readonly driven = { corrections: 0, snaps: 0, worst: 0 };
+  /** MSZ16: the prediction of the vehicle this page's player drives, while it drives one. */
+  prediction(): VehiclePrediction | null { return this.predicted?.run ?? null; }
   /** MSZ14: whether a vehicle is worn enough to smoke (its look reads it, MSZ14b). */
   worn(id: string): boolean { return this.wornOut.has(id); }
   /** The prompts this page offers for its vehicles: the same objects every call, which follow the vehicles. */
   prompts(): Interactable[] { return this.made; }
 
+  /** Whether this page's player holds `id`'s driver seat. */
+  private driving(id: string): boolean {
+    const held = this.seatOf(), vehicle = this.live.get(id);
+    return held?.vehicle === id && vehicle?.kind.seats[held.seat]?.role === 'driver';
+  }
+  /** The driven vehicle's collider where the page has it, its look (and every seat's point) where it is drawn. */
+  private place(vehicle: Followed, run: VehiclePrediction): void {
+    vehicle.body.setPose(statePose(run.state()));
+    const drawn = statePose(run.drawnState()); vehicle.pose = drawn; vehicle.look?.(drawn);
+  }
+  /** MSZ16: the world a driven vehicle steps through on this page, as the server's (`VehicleRuntime.spawnAt`): the floor under
+   *  it through its own hull, and its hull's cast against what this page has (the world and the other vehicles; walkers and
+   *  creatures are the server's, and its rows bring their pushes). */
+  private worldOf(vehicle: Followed): VehicleWorld {
+    const physics = this.ports.physics, id = vehicle.id, reach = vehicleReach(this.hulls.get(vehicle.dock.id) ?? []), mine = (collider: Parameters<typeof tagOf>[0]): boolean => tagOf(collider)?.owner !== id;
+    return {
+      floor: (x, z, fromY) => floorBelow(physics, x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, mine), ...reach,
+      hit: (from, move, yaw) => {
+        const hit = castVehicleHull(physics, this.shapes, reach, from, move, yaw, queryGroups(['WORLD'], 'WORLD'), mine);
+        if (hit === null) return null;
+        const owner = tagOf(hit.collider)?.owner ?? null, other = typeof owner === 'string' ? this.live.get(owner) : undefined;
+        return other === undefined ? { at: hit.at, normal: hit.normal, owner, mass: Infinity, velocity: { x: 0, z: 0 }, restitution: VEHICLE_RESTITUTION.solid }
+          : { at: hit.at, normal: hit.normal, owner, mass: other.kind.handling.mass, velocity: { x: 0, z: 0 }, restitution: VEHICLE_RESTITUTION.vehicle };
+      },
+    };
+  }
   private make(id: string, pose: MoverPose): Followed | null {
     const dock = this.docks.get(vehicleDockOf(id)), kind = dock === undefined ? undefined : this.kinds.get(dock.kind), boxes = dock === undefined ? undefined : this.hulls.get(dock.id);
     if (dock === undefined || kind === undefined || boxes === undefined) return null;

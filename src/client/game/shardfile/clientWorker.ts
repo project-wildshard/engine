@@ -64,6 +64,7 @@ import { POSE_NAMES } from '@wildshard/engine/net/acts';
 import { poseInputNames } from '../../../shared/game/plugin/channelPrograms';
 import type { EncounterRow } from '../boss/barFeed';
 import { wirePage, type DayFollower } from './wirePage';
+import type { VehicleReport } from '../plugin/followedVehicles';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { declaredKitSlots } from '../../../shared/game/shardfile/items';
 import { MISSING_SERVER, pageServerRoute, serverStepLabel } from './serverRoute';
@@ -238,6 +239,8 @@ export interface WorkerClientReport {
   offstage: Readonly<Record<string, number>>;
   /** Movers this page holds, the poses rows have given them, and the highest drift rows have laid. */
   movers: number; posed: number; sand: number;
+  /** MIRROR-SALT-ZONE MSZ16: the page's driving (`FollowedVehicles.report`), or null with no vehicles. */
+  vehicle: VehicleReport | null;
   /** Bodies this page made and the rows put away, by kind: what its own sim still builds. */
   retired: Readonly<Record<string, number>>;
   /** The longest a row of each kind took to spawn, in ms: a model built late shows here. */
@@ -674,9 +677,9 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   };
   scope.onDispose(() => { clawed?.useClaw(null); clawed = null; });
   wirePage.bind(client, id => { net.wire.interact(id); }, stop, (handle, to) => headOf(bodies.get(handle)?.body, to), act => { client.act(act); });
-  wirePage.led = () => net.predictor.leading; wirePage.pending = () => net.predictor.pending; wirePage.rowBody = handle => bodies.get(handle)?.body ?? null;
+  wirePage.led = () => net.predictor.leading; wirePage.pending = () => net.predictor.pending; net.onCommand = command => { wirePage.command(command); }; wirePage.rowBody = handle => bodies.get(handle)?.body ?? null;
   wirePage.namedBody = id => { for (const [handle, { body }] of bodies) if (client.entities.get(handle)?.id === id) return body; return null; };
-  scope.onDispose(() => { wirePage.unbind(); wirePage.led = () => false; wirePage.pending = () => 0; wirePage.rowBody = () => null; wirePage.namedBody = () => null; });
+  scope.onDispose(() => { wirePage.unbind(); net.onCommand = null; wirePage.led = () => false; wirePage.pending = () => 0; wirePage.rowBody = () => null; wirePage.namedBody = () => null; });
   // SHARD-SOURCE AP24b: a look lamp that follows an actor rides its body, or one of its bones, by the server's name for it
   scope.onDispose(setLampFollow(ports.scene, (actor, bone) => { const body = wirePage.namedBody(actor); return body === null ? null : bone === undefined ? body.mesh : body.mesh.skeleton.getBoneByName(bone) ?? null; }));
   // J116: the lock's body by the server's name for it
@@ -731,7 +734,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   if (new URLSearchParams(location.search).has('bossGod')) shell.bossGod();
   bootMark('server:ready-send'); shell.ready();
   const heard: Record<string, number> = {};
-  const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, heard, offstage: wirePage.offstage, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, authoritative: net.predictor.authoritative, worstOffset: 0, queue: 0, replaysPerFrame: 0, resyncs: 0, delayMs: 0, jitterMs: 0, interpHeld: 0, interpStarved: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0 };
+  const started = diagnosticNow(), report: WorkerClientReport = { drawn: wirePage.drawn, heard, offstage: wirePage.offstage, frames: 0, framesPerSecond: 0, ticksPerSecond: 0, correctionsPerMinute: 0, corrections: 0, retired: {}, spawnMs: {}, missed: net.predictor.missed, misses: net.predictor.misses, authoritative: net.predictor.authoritative, worstOffset: 0, queue: 0, replaysPerFrame: 0, resyncs: 0, delayMs: 0, jitterMs: 0, interpHeld: 0, interpStarved: 0, mainMsP95: 0, workerTickMs: 0, rows: 0, attacks: 0, hits: 0, kills: 0, refused: 0, held: 0, dropped: 0, hp: 0, falls: 0, closed: null, x: 0, z: 0, cell: 0, serverX: 0, serverZ: 0, restored, savedTick: -1, savedOk: false, receipts: [], quests: {}, flags: [], paid: 0, fights: [], owned: {}, sky: null, day: null, clawed: false, own: null, movers: 0, posed: 0, sand: 0, vehicle: null };
   if (unseated) void shell.booted.then(answer => { report.restored = answer.restored; bootMark('server:seated-late'); return undefined; }, () => undefined);
   scope.onDispose(client.onLedger(receipt => { report.receipts.push(`${receipt.grant}:${receipt.name}`); }));
   scope.onDispose(client.onView(({ name }) => { heard[name] = (heard[name] ?? 0) + 1; }));
@@ -770,7 +773,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
   const sample = (now: number): void => {
     const { latest } = client;
     report.retired = Object.fromEntries(retired); report.spawnMs = Object.fromEntries(spawnMs); report.owned = Object.fromEntries(client.owned); report.sky = latest === null ? null : client.stateField(latest, 'weather.phase') ?? null; report.day = latest === null ? null : client.stateField(latest, DAY_ROW) ?? null;
-    report.movers = wirePage.movers.size; report.posed = wirePage.posed; report.sand = wirePage.sandPeak; report.clawed = clawed !== null; report.own = client.welcome?.player ?? null;
+    report.vehicle = wirePage.vehicleReport(); report.movers = wirePage.movers.size; report.posed = wirePage.posed; report.sand = wirePage.sandPeak; report.clawed = clawed !== null; report.own = client.welcome?.player ?? null;
     report.quests = Object.fromEntries([...client.quests].map(([id, quest]) => [id, quest.started ? quest.step : 'unstarted'])); report.flags = [...client.phased, ...client.flags()]; report.fights = wirePage.encounters().map(fight => `${fight.id}:${fight.state}:${fight.hp}`);
     report.framesPerSecond = (report.frames - framesAt) / (now - sampledAt) * 1000; framesAt = report.frames; sampledAt = now;
     report.mainMsP95 = [...costs].sort((a, b) => a - b)[Math.floor(Math.min(report.frames, costs.length) * 0.95) + Math.max(0, costs.length - report.frames)] ?? 0;
@@ -833,7 +836,7 @@ async function startWorkerClient(ports: WorkerClientPorts, card: ReturnType<type
       others.collide(self, dt, free);
     }
     wirePage.frame(here ? bookOf(client.latest?.cell) : null, here, ports.day());
-    if (here) wirePage.syncVehicles(player.position);
+    if (here) wirePage.syncVehicles(player.position, dt);
     decks.frame(renderTick);
     report.rows = animals === null ? animalRows(client) : shown; // a data cell's life draws them
     if (!quiet()) net.present(dt);

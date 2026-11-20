@@ -92,9 +92,13 @@ export function b3Verdict(delays, heldFrom, heldAfter, forcedEndMs = 0) {
 
 /** Correctness runs cannot certify frame, correction-rate or clock timings.
  * @param {Record<string, any>} row
- * @param {'correctness'|'timing'} mode
+ * @param {'correctness'|'timing'|'vehicle'} mode
  * @returns {Record<string, any>} */
 export function proofVerdict(row, mode) {
+  if (mode === 'vehicle') { // MSZ16: the vehicle run reports its corrections a minute; it passes when it boarded and drove
+    const { b1: _b1, b2: _b2, b3: _b3, ...result } = row;
+    return { ...result, measurement: mode, checked: ['vehicle'], ok: row.error === undefined && (row.errors?.length ?? 0) === 0 && row.vehicle?.ok === true };
+  }
   if (mode === 'correctness') {
     const { b1: _b1, b2: _b2, b3: _b3, ...result } = row;
     return { ...result, measurement: mode, checked: ['b4'], ok: row.error === undefined && (row.errors?.length ?? 0) === 0 && row.b4?.ok === true };

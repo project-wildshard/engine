@@ -19,8 +19,8 @@ export interface ProofRow extends Record<string, unknown> {
 }
 export function bridgeVerdict(sample: BridgeSample): BridgeSample & { ok: boolean; replayExercised: boolean };
 export function installBridgeCorrections(): void;
-export function proofVerdict(row: ProofRow, mode: 'correctness' | 'timing'): ProofRow & {
-  measurement: 'correctness' | 'timing';
+export function proofVerdict(row: ProofRow, mode: 'correctness' | 'timing' | 'vehicle'): ProofRow & {
+  measurement: 'correctness' | 'timing' | 'vehicle';
   checked: string[];
   ok: boolean;
 };

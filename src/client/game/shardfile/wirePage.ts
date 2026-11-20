@@ -27,6 +27,12 @@ import { netCreatureCount } from '../population/netCounts';
 import type { MoverView } from '../../../server/game/plugin/mover';
 import type { MoverPose } from '@wildshard/format/moverPose';
 import type { PageAbility } from './clientRecipes';
+import type { NetCommand } from '@wildshard/wire/netCommand';
+import { netSimCommand } from '@wildshard/engine/sim/netMotion';
+import type { SimCommand } from '@wildshard/engine/sim';
+import { vehicleMotionRow } from '../../../shared/game/shardfile/wirePrompts';
+import type { VehicleReport, VehicleWire } from '../plugin/followedVehicles';
+import type { VehicleRow } from '../plugin/vehiclePrediction';
 
 type Live = (client: NetClient) => (() => void) | undefined;
 /** MIRROR-SALT-ZONE MSZ9b: the vehicles a page follows off the wire (`FollowedVehicles`). */
@@ -41,6 +47,12 @@ export interface VehicleFollower {
   readonly kindOf: (id: string) => { readonly seats: readonly { readonly role: string }[]; readonly handling: { readonly speed: number; readonly boost: number } } | undefined;
   /** MSZ10: another player's seat, as its body is drawn: its vehicle's heading and the seat's pose. */
   readonly seated: (player: string) => { readonly yaw: number; readonly pose: 'sit' | 'stand' } | null;
+  /** MSZ16: a command this page sent, which steps the vehicle its player drives; and a drawn frame, which eases a correction. */
+  /** Where a seat stands as the page draws its vehicle. */
+  readonly seatPoint?: (vehicle: string, seat: number) => readonly [number, number, number] | undefined;
+  readonly command?: (command: SimCommand, wire: VehicleWire) => void;
+  readonly frame?: (dt: number) => void;
+  readonly report?: () => VehicleReport;
 }
 /** A mover's look in one grid cell, as `WirePage.moverLooks` keys it. */
 export const moverLookKey = (instance: string, id: string): string => `${instance}\n${id}`;
@@ -106,10 +118,28 @@ export class WirePage {
     return null;
   }
   /** MSZ9b, once a frame: the followers read the vehicles and seats the wire has now. */
-  syncVehicles(feet: { readonly x: number; readonly z: number }): void {
+  syncVehicles(feet: { readonly x: number; readonly z: number }, dt = 0): void {
     const client = this.client; if (client === null || this.vehicles.size === 0) return;
     const ids: string[] = []; for (const info of client.entities.values()) ids.push(info.id);
-    for (const follower of this.vehicles.values()) follower.sync(ids, client.welcome?.player ?? null, feet);
+    for (const follower of this.vehicles.values()) { follower.sync(ids, client.welcome?.player ?? null, feet); follower.frame?.(dt); }
+  }
+  /** MSZ16: each command the page sends, as it goes: the driven vehicle steps on it. */
+  command(command: NetCommand): void {
+    if (this.client === null || this.vehicles.size === 0) return;
+    const sim = netSimCommand(command), wire: VehicleWire = { row: id => this.vehicleRow(id), behind: this.pending() };
+    for (const follower of this.vehicles.values()) follower.command?.(sim, wire);
+  }
+  /** MSZ16: what a proof reads of the page's driving: the first follower that drives, else the first one. */
+  vehicleReport(): VehicleReport | null {
+    let first: VehicleReport | null = null;
+    for (const follower of this.vehicles.values()) { const report = follower.report?.() ?? null; if (report?.driving !== null && report !== null) return report; first ??= report; }
+    return first;
+  }
+  /** MSZ16: a driven vehicle's row in the newest frame, with its speeds when the frame carried them. */
+  vehicleRow(id: string): VehicleRow | null {
+    const row = this.moverRow(id), frame = this.client?.latest; if (row === null || frame === null || frame === undefined) return null;
+    const forward = this.client?.stateField(frame, vehicleMotionRow(id, 'forward')), slip = this.client?.stateField(frame, vehicleMotionRow(id, 'slip'));
+    return { ...row, ...(forward === undefined ? {} : { forward }), ...(slip === undefined ? {} : { slip }) };
   }
   moverRow(id: string): { readonly tick: number; readonly pose: MoverPose } | null {
     const client = this.client, frame = client?.latest;

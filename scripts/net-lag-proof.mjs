@@ -9,11 +9,14 @@
 //   B3  others: interpolation delay at most 120 ms from 10 s after entry (and after B4's forced frames), and no frame held past
 //       the buffer (`interpHeld`, from entry).
 //   B4  Driftwood only: the rope bridge crossed with forced 60 ms frames, the feet never under its planks, no fall.
+//   V   `--vehicle` (MIRROR-SALT-ZONE MSZ16): in place of the foot phases, walk to the shard's nearest vehicle dock, take the
+//       driver's seat (E), drive `--seconds` with W and a turn every 2 s, and print the driven vehicle's corrections a minute,
+//       its snaps and its widest row gap (`FollowedVehicles.report`); the run passes when it boarded and drove 20 m.
 // J205: staging, preview or a loopback page only, never production; the page's sockets are held to the one door.
 //   node scripts/net-lag-proof.mjs [--base=https://staging.wildshard.io] [--socket=wss://rooms-staging.wildshard.io]
 //     [--engines=chromium,webkit] [--layouts=desktop,phone] [--shards=driftwood-isle,...] [--seconds=20] [--out=<dir>]
 //     [--delay-ms=<one way>] [--rig=<app dist>,<work dir>,<key.json>] [--no-bridge]
-//     [--bridge-only] [--timeout-scale=3] (correctness only; no B1/B2/B3 verdict)
+//     [--bridge-only] [--timeout-scale=3] (correctness only; no B1/B2/B3 verdict) [--vehicle] (a shard with a vehicle dock)
 // `--rig` opens engine's loopback room (online-rig.mjs) per shard, with a dist stamped for http://127.0.0.1:18799/release.json;
 // `--delay-ms=90` holds every frame each way in the page for 90 ms: a 180 ms round trip on the loopback rig (NL12).
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -39,7 +42,7 @@ const rigArg = arg('rig', ''), base = arg('base', rigArg === '' ? 'https://stagi
 if (rigArg === '' && !/^https:\/\/(staging|preview)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base)) throw new Error('--base takes staging, preview or a loopback page only: never production (J205)');
 const engines = arg('engines', 'chromium,webkit').split(','), layouts = arg('layouts', 'desktop,phone').split(','), shards = arg('shards', DECK.join(',')).split(',');
 const SECONDS = Number(arg('seconds', '20')), DELAY_MS = Number(arg('delay-ms', '0')), out = absolute(arg('out', 'tmp/net-lag-proof')), bridge = !process.argv.includes('--no-bridge');
-const bridgeOnly = process.argv.includes('--bridge-only'), timeoutScale = Number(arg('timeout-scale', '1'));
+const bridgeOnly = process.argv.includes('--bridge-only'), vehicleRun = process.argv.includes('--vehicle'), timeoutScale = Number(arg('timeout-scale', '1'));
 if (!Number.isFinite(timeoutScale) || timeoutScale < 1 || timeoutScale > 10) throw new Error('--timeout-scale must be 1..10');
 if (bridgeOnly && (!bridge || shards.some(slug => slug !== 'driftwood-isle'))) throw new Error('--bridge-only needs Driftwood and the bridge enabled');
 const timeout = (/** @type {number} */ ms) => ms * timeoutScale;
@@ -144,6 +147,8 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
     if (bridgeOnly) {
       row.bridge = await crossBridge(page);
       row.b4 = bridgeVerdict(row.bridge);
+    } else if (vehicleRun) {
+      row.vehicle = await driveVehicle(page);
     } else {
       let stage = 'settle';
       const entered = Date.now(), delays = /** @type {{ t: number, delay: number, jitter: number, stage: string }[]} */ ([]), heldFrom = await page.evaluate(() => window.__workerClient?.().interpHeld ?? 0);
@@ -217,7 +222,7 @@ async function runOne(browser, engineName, layout, slug, site, socket) {
   await faults.settle();
   row.errors = errors.slice(0, 5);
   await context.close();
-  return proofVerdict(row, bridgeOnly ? 'correctness' : 'timing');
+  return proofVerdict(row, vehicleRun ? 'vehicle' : bridgeOnly ? 'correctness' : 'timing');
 }
 
 /** B4: walk Driftwood's pier to the rope bridge, then cross it with every drawn frame forced to 60 ms. @param {import('playwright').Page} page */
@@ -260,6 +265,42 @@ async function crossBridge(page) {
   const forcedFrames = await page.evaluate(() => /** @type {any} */ (window).__netLag.slowFrames) - framesBefore;
   const injections = await page.evaluate(() => { const F = /** @type {any} */ (window).__netLag.bridgeFault; F.cleanup(); return F.confirmed; });
   return { reached, under, falls, corrections: after.corrections - correctionsBefore, injections, injectedSinks: injections.map((/** @type {{sink:number}} */ row) => row.sink), forcedFrames, forcedFrameMs: 60, spanSamples, lowest: Number.isFinite(lowest) ? Number(lowest.toFixed(2)) : null };
+}
+
+/**
+ * V (MSZ16): to the nearest vehicle dock on foot, into the driver's seat, `SECONDS` of W with a turn every 2 s, and out. The
+ * corrections are the driven vehicle's (`VehiclePrediction`: a row that disagreed with what the page had after the same command).
+ * @param {import('playwright').Page} page
+ */
+async function driveVehicle(page) {
+  const report = () => page.evaluate(() => { const w = /** @type {any} */ (window).__workerClient?.(); return w === undefined ? null : { sampledAt: performance.now(), vehicle: w.vehicle }; });
+  const where = () => page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player.position; return { x: p.x, z: p.z }; });
+  const steer = (/** @type {number} */ x, /** @type {number} */ z) => page.evaluate(([toX, toZ]) => { const p = /** @type {any} */ (window).__wildshard.world.player; p.yaw = Math.atan2(-(toX - p.position.x), -(toZ - p.position.z)); p.touchMove.y = 1; p.touchMove.x = 0; }, [x, z]);
+  const stop = () => page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; p.touchMove.y = 0; });
+  const first = await report(), docks = /** @type {[string, number, number][]} */ (first?.vehicle?.docks ?? []), feet = await where();
+  const dock = docks.map(([id, x, z]) => ({ id, x, z, d: Math.hypot(x - feet.x, z - feet.z) })).sort((a, b) => a.d - b.d)[0];
+  if (dock === undefined) return { ok: false, boarded: false, why: 'no vehicle dock on this shard' };
+  for (const ends = Date.now() + timeout(60_000); Date.now() < ends;) {
+    const p = await where(); if (Math.hypot(p.x - dock.x, p.z - dock.z) < 1.5) break;
+    await steer(dock.x, dock.z); await sleep(50);
+  }
+  await stop(); await sleep(300);
+  let boarded = false;
+  for (let tries = 0; tries < 10 && !boarded; tries++) { await page.keyboard.press('KeyE'); await sleep(500); boarded = typeof (await report())?.vehicle?.driving === 'string'; }
+  if (!boarded) return { ok: false, boarded, dock: dock.id, why: 'the dock\'s prompt took no seat' };
+  const from = await report(), start = await where();
+  await page.keyboard.down('KeyW');
+  for (let second = 0; second < SECONDS; second++) {
+    await sleep(1000);
+    if (second % 2 === 1) { const side = second % 4 === 1 ? 'KeyA' : 'KeyD'; await page.keyboard.down(side); await sleep(600); await page.keyboard.up(side); }
+  }
+  await page.keyboard.up('KeyW');
+  const to = await report(), end = await where();
+  await page.keyboard.press('KeyE'); await sleep(500); // out again
+  const elapsed = ((to?.sampledAt ?? 0) - (from?.sampledAt ?? 0)) / 1000, corrections = (to?.vehicle?.corrections ?? 0) - (from?.vehicle?.corrections ?? 0);
+  const driven = Math.hypot(end.x - start.x, end.z - start.z);
+  return { ok: driven > 20, boarded, dock: dock.id, vehicle: to?.vehicle?.driving ?? null, driven: Number(driven.toFixed(1)), seconds: Number(elapsed.toFixed(1)), corrections,
+    perMinute: elapsed > 0 ? Number((corrections * 60 / elapsed).toFixed(1)) : null, snaps: (to?.vehicle?.snaps ?? 0) - (from?.vehicle?.snaps ?? 0), worst: Number((to?.vehicle?.worst ?? 0).toFixed(3)) };
 }
 
 const rows = /** @type {Record<string, any>[]} */ ([]);

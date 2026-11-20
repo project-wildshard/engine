@@ -130,6 +130,8 @@ export interface VehicleRidePort {
   readonly kindOf: (id: string) => { readonly seats: readonly VehicleRideSeat[]; readonly handling: { readonly speed: number; readonly boost: number } } | undefined;
   /** MSZ11: m clear from `from` toward `to` before a wall, `vehicle`'s own hull aside (the chase view's arm); none, the whole way. */
   readonly clear?: (vehicle: string, from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }) => number;
+  /** MSZ16: where a seat stands as the page draws its vehicle (the driver's, where the page predicts it): the seated body sits there. */
+  readonly seatPoint?: (vehicle: string, seat: number) => readonly [number, number, number] | undefined;
 }
 /** A kind's seat as a ride reads it: who sits there, and (MSZ11) where its base is and how it is sat, for the seat's eye. */
 export interface VehicleRideSeat { readonly role: string; readonly at?: readonly [number, number, number]; readonly pose?: 'sit' | 'stand' }
@@ -183,7 +185,9 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
       if (shown !== null) { shown = null; page.view.show(null); }
       return;
     }
-    const p = page.player;
+    const p = page.player, at = port.seatPoint?.(held.vehicle, held.seat);
+    // MSZ16: the led body sits where this page draws the seat (a frame's rows put it back where the server has it, a round trip behind)
+    if (at !== undefined) { p.position.x = at[0]; p.position.y = at[1]; p.position.z = at[2]; }
     if (seated?.vehicle !== held.vehicle || seated.seat !== held.seat) { // boarding faces the heading, the eye on the road ahead (MSZ11)
       if (seated === null) sit(true);
       seated = held; last = null; speed = 0; rolling = 0; p.yaw = angle(pose.euler.y); if (p.pitch !== undefined) p.pitch = SEAT_PITCH;

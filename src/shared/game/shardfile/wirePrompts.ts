@@ -18,6 +18,9 @@ export const vehicleSeatRow = (vehicle: string, seat: number, player: string): s
 const WORN_ROW = 'vehicle.worn|';
 /** MSZ14: a vehicle worn under `VEHICLE_SMOKE` of its health: a `state` row there while it smokes, its value 1. */
 export const vehicleWornRow = (vehicle: string): string => `${WORN_ROW}${vehicle}`;
+/** MSZ16: a driven vehicle's speed along (`forward`) or across (`slip`) its heading, m/s: a `state` row there while it has a
+ *  driver, which the driver's page replays its unanswered commands from. */
+export const vehicleMotionRow = (vehicle: string, motion: 'forward' | 'slip'): string => `vehicle.${motion}|${vehicle}`;
 /** A worn row's vehicle, or null for any other row. */
 export const parseVehicleWornRow = (name: string): string | null => name.startsWith(WORN_ROW) && name.length > WORN_ROW.length ? name.slice(WORN_ROW.length) : null;
 /** A seat row's vehicle, seat and rider, or null for any other row. */

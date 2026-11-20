@@ -42,6 +42,8 @@ const MOST_ASKS = 10;
 export class NetPlayer implements PlayerLink {
   readonly predictor: Predictor;
   readonly world: PredictionWorld;
+  /** MIRROR-SALT-ZONE MSZ16: each command sent, once the predictor has saved it (a driven vehicle steps on it). */
+  onCommand: ((command: NetCommand) => void) | null = null;
   /** Its swings and shots, until the server rules on them (J47). */
   readonly attacks: AttackPrediction = new AttackPrediction();
   /** Its weapons' line to the server: what the next command carries. */
@@ -228,7 +230,8 @@ export class NetPlayer implements PlayerLink {
       this.pressed = false; this.gust = false; this.pressStarted = false; this.heavyPress = false; this.launcher = null;
     }
     this.world.poseFor(seq, false);
-    const stepped = this.predictor.step(quantiseCommand({ ...input, seq, viewTick: 0 })), run = actions ? this.afterStep : null;
+    const command = quantiseCommand({ ...input, seq, viewTick: 0 }), stepped = this.predictor.step(command), run = actions ? this.afterStep : null;
+    if (stepped) this.onCommand?.(command); // MSZ16: a driven vehicle steps on it, counted in `predictor.pending` as it is
     if (actions) this.afterStep = null;
     run?.();
     return stepped;

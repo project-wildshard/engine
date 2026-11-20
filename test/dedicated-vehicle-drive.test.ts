@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
-import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatRow } from '../src/shared/game/shardfile/wirePrompts';
+import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleMotionRow, vehicleSeatRow } from '../src/shared/game/shardfile/wirePrompts';
 import { folderInput, roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot, type BotThumb } from './fixtures/dedicated/roomBot';
 import { vehiclesExampleFolder } from './fixtures/vehiclesExample';
@@ -29,10 +29,13 @@ test('a bot boards the example buggy at its dock, drives it 20 m and gets out', 
   // its prompt, over the reliable lane: the server spawns this player's buggy and seats them to drive
   bot.client.act({ kind: 'interact', seq: 0, id: vehicleDockPrompt(BUGGY) });
   await vi.waitFor(() => { expect(rows.bodies.has(`script:${buggy}`)).toBe(true); }, { timeout: 10_000, interval: 50 });
-  const seats = (): string[] => [...rows.world.get('vehicles')?.() ?? []].map(row => row.name);
+  const seats = (): string[] => [...rows.world.get('vehicles')?.() ?? []].map(row => row.name).filter(name => name.startsWith('vehicle.seat|'));
   await vi.waitFor(() => { expect(seats()).toEqual([vehicleSeatRow(buggy, 0, body.id)]); }, { timeout: 5_000, interval: 50 });
-  // the bot's own client hears both rows
-  await vi.waitFor(() => { expect(bot.client.handle(`script:${buggy}`)).toBeDefined(); expect(bot.client.handle(`state:${vehicleSeatRow(buggy, 0, body.id)}`)).toBeDefined(); }, { timeout: 5_000, interval: 50 });
+  // the bot's own client hears its rows: the pose, the seat and (MSZ16) the speeds its page replays from
+  await vi.waitFor(() => {
+    expect(bot.client.handle(`script:${buggy}`)).toBeDefined(); expect(bot.client.handle(`state:${vehicleSeatRow(buggy, 0, body.id)}`)).toBeDefined();
+    expect(bot.client.handle(`state:${vehicleMotionRow(buggy, 'forward')}`)).toBeDefined(); expect(bot.client.handle(`state:${vehicleMotionRow(buggy, 'slip')}`)).toBeDefined();
+  }, { timeout: 5_000, interval: 50 });
   const pose = (): { x: number; z: number } => { const read = rows.bodies.get(`script:${buggy}`); if (read === undefined) throw new Error('The buggy left'); const at = read().position; return { x: at.x, z: at.z }; };
   // MSZ12: the driver's stick is the vehicle's own (forward throttles, the side turns, whichever way the driver looks): forward
   // and a left turn until the buggy faces -x (yaw pi/2), then straight on until it stands 20 m from its dock (the slice's wall
