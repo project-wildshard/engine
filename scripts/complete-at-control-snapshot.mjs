@@ -174,7 +174,7 @@ export const NEIGHBOUR_WORK = [
   { file: 'src/client/game/grid/session.ts', what: 'outer-ring strips', from: /^\s*const outerStrips = async /u, to: /^\s*const roadInput = /u },
   { file: 'src/client/game/grid/session.ts', what: 'outer-ring road', from: /^\s*const outer = async \(\): Promise<PlatformRoad>/u, to: /^\s*const completed = await /u },
   { file: 'src/client/game/grid/session.ts', what: 'outer-ring start', from: /this\.startOuterRoad = \(\) => \{/u, to: /^\s*const given = preparedRoad/u },
-  { file: 'src/client/game/grid/session.ts', what: 'outer-ring platform', from: /^\s*prepareOuterStrips\(\): Promise<void> \{/u, to: /^\s*\/\*\* Step 2: the live crossing/u },
+  { file: 'src/client/game/grid/session.ts', what: 'outer-ring platform', from: /^\s*prepareOuterStrips\(near = false\): Promise<void> \{/u, to: /^\s*\/\*\* Step 2: the live crossing/u },
   // the cell the player is in admits no tile copy of itself (ce0ac0fa3c): these views are the cells round it
   { file: 'src/client/game/grid/session.ts', what: 'neighbour tile views', from: /^\s*private tileAdmission\(/u, to: /^\s*private refuse\(/u },
 ];
