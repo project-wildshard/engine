@@ -14,6 +14,10 @@ import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { ResidencyAllocator, ResidencyLease } from '../../../shared/game/grid/allocator';
 import { installFarProxy, type FarPrepared, type FarProxyView } from './farView';
 import { planNearPlaceholders } from './nearPlaceholderPlan';
+import { updateLeanOn } from '@wildshard/engine/core/updateLean';
+
+/** DF13 `debug.leanNearPlan`: the eye moves this far (m), or this many updates pass, before the near views are re-ranked */
+const LEAN_MOVE = 1, LEAN_UPDATES = 30;
 
 /** A legacy near view exists only when both files are in this build's asset inventory. */
 export function bakedNearFiles(slug: string, files: Readonly<Record<string, number>>): { readonly row: string; readonly mesh: string } | null {
@@ -67,6 +71,11 @@ export class NearPlaceholders {
   /** Re-plan around the eye (grid metres; the caller converts from its frame) and stream the difference. */
   update(eye: Readonly<{ x: number; z: number }>, entered: string | null): void {
     if (this.disposed || this.host.readyToRefine?.() === false) return;
+    // DF13: the ranking only moves with the eye (NEAR_HOLD_MARGIN is 15 m) or the cells' state; a standing or turning
+    // player re-ranked every cell each frame
+    const lean = updateLeanOn('nearPlan'), last = this.lastPlan;
+    if (lean && last !== null && last.entered === entered && ++last.updates < LEAN_UPDATES
+      && Math.hypot(eye.x - last.x, eye.z - last.z) < LEAN_MOVE && last.stamp === this.stamp()) return;
     const skip = new Set(this.missing);
     for (const cell of this.host.cells) if (this.host.root(cell.instance) === undefined) skip.add(cell.instance);
     const plan = planNearPlaceholders(this.host.cells, this.host.pitch, eye, entered, { held: new Set(this.slots.keys()), skip,
@@ -87,6 +96,15 @@ export class NearPlaceholders {
         if (this.deferred.get(instance) !== this.host.allocator.revision) this.start(instance, distance);
       } else slot.lease?.update({ distance });
     }
+    this.lastPlan = lean ? { x: eye.x, z: eye.z, entered, updates: 0, stamp: this.stamp() } : null;
+  }
+  private lastPlan: { x: number; z: number; entered: string | null; updates: number; stamp: string } | null = null;
+  /** What the plan reads besides the eye: the slots and their state, the missing and deferred cells, the roots, the allocator. */
+  private stamp(): string {
+    let ready = 0, owns = 0, roots = 0;
+    for (const slot of this.slots.values()) { if (slot.ready) ready++; if (slot.owns) owns++; }
+    for (const cell of this.host.cells) if (this.host.root(cell.instance) !== undefined) roots++;
+    return `${String(this.generation)}/${String(this.slots.size)}/${String(ready)}/${String(owns)}/${String(this.missing.size)}/${String(this.deferred.size)}/${String(roots)}/${String(this.host.allocator.revision)}`;
   }
 
   /** Mirror the rings' refinement onto a cell's near view (the regions its L1 / L0 tiles now draw). */

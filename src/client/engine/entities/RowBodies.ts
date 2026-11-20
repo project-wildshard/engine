@@ -1,10 +1,11 @@
-import { Vector3, type PerspectiveCamera } from 'three';
+import { Frustum, Matrix4, Sphere, Vector3, type PerspectiveCamera } from 'three';
 import type { App } from '../app/app';
 import { app } from '../app/runtime';
 import type { LevelFrameBinding } from '../level/frame';
 import type { AnimalFactory, AnimalKind, AnimalModel } from './AnimalFactory';
 import type { AnimalGroup } from './animalMatrices';
 import type { Animal } from './AnimalView';
+import { OFFSCREEN_PAD, OFFSCREEN_POSE_EVERY, updateLeanOn } from '../core/updateLean';
 import { fallbackSound, spawnRolls, type HuntHerd } from '../../../shared/engine/ai/huntPattern';
 import type { SpeciesFlight } from '../../../shared/engine/ai/flight';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
@@ -57,6 +58,8 @@ export type RowHerd = HuntHerd<Animal>;
 /** The far LOD distance of the per-frame animation (m). */
 const ANIM_LOD = 140;
 const _c = new Vector3(), _d = new Vector3(), _p = new Vector3(), _a = new Vector3(), _b = new Vector3();
+/** DF13 `debug.leanOffscreenPose`: last frame's view; an animal outside it poses at OFFSCREEN_POSE_EVERY (staggered by its seed) */
+const _view = new Frustum(), _viewMatrix = new Matrix4(), _sphere = new Sphere();
 /** Nothing here dozes: a body stands while the server sends its row. */
 const awake = (): boolean => false;
 
@@ -199,6 +202,9 @@ export class RowBodies {
     this.bodiesFor()?.sync(animals, playerPos, awake); // hitboxes posed from last frame's bones, handed out by distance
     draw.beginDraw(camera);
     const start = frameCost.on ? diagnosticNow() : 0;
+    // DF13: the camera still holds last frame's pose here (the late phase moves it); the pad covers a turn between frames
+    const lean = camera !== null && updateLeanOn('offscreenPose');
+    if (lean) _view.setFromProjectionMatrix(_viewMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     for (let i = 0; i < n; i++) {
       const a = animals[i];
       if (a === undefined) continue;
@@ -207,11 +213,19 @@ export class RowBodies {
       if (a.concealed) { draw.sleep(a); continue; }
       const d2 = a.position.distanceToSquared(viewPos);
       a.poseEvery = poseEvery(d2);
+      if (lean && a.alive && !a.drawPinned && !a.fading && !this.inView(a, d2)) a.poseEvery = OFFSCREEN_POSE_EVERY;
       if (!a.harnessHold && dt > 0) a.update(dt, t, d2 < ANIM_LOD * ANIM_LOD && (draw.posesLive?.(a, d2) ?? true));
       draw.draw(a, i, d2);
     }
     if (frameCost.on) frameCost.sub('pose', start);
     draw.endDraw(animals, n, dt);
+  }
+  /** Whether `a`'s body (padded for a turn) is inside last frame's view. */
+  private inView(a: Animal, d2: number): boolean {
+    const d = a.dims, s = a.scale;
+    _sphere.center.copy(a.position); _sphere.center.y += d.bodyY * s;
+    _sphere.radius = (d.bodyHalfLen + d.bodyRadius + d.headRadius + 0.5) * s + Math.sqrt(d2) * OFFSCREEN_PAD;
+    return _view.intersectsSphere(_sphere);
   }
   private bodiesFor(): CreatureBodies<Animal> | null {
     if (this.bodies === null) { const physics = this.physics ?? this.host.physics; if (physics !== null) this.bodies = new CreatureBodies<Animal>(physics); }

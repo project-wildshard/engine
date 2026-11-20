@@ -6,6 +6,7 @@ import { lowPolyLookMaterial } from '@wildshard/engine/world/lowpolyKit';
 import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import { KitFigureSchema, type KitFigureRows } from '@wildshard/format/kitFigure';
 import { FigureRowSchema } from '@wildshard/format/figures';
+import { OFFSCREEN_POSE_EVERY } from '@wildshard/engine/core/updateLean';
 import { playClips, type ClipCtx } from '../../../../shared/game/plugin/animation';
 import { installChannelPrograms } from '../../../../shared/game/plugin/channelPrograms';
 import { createClientScene, bindWorldSceneParts } from '../../plugin/scene';
@@ -97,7 +98,11 @@ export class KitFigure {
     }
   }
 
-  update(dt: number, t: number, player: THREE.Vector3): void {
+  /** DF13 `debug.leanOffscreenFigure`: time and updates held back from the pose programs while the figure is off-screen */
+  private heldDt = 0;
+  private heldUpdates = 0;
+  /** `offscreen`: outside last frame's view, so its pose programs may wait (OFFSCREEN_POSE_EVERY) and take the time between. */
+  update(dt: number, t: number, player: THREE.Vector3, offscreen = false): void {
     const view = this.presentation, rows = this.rows;
     if (!view.active) return;
     view.syncAnchors();
@@ -118,7 +123,11 @@ export class KitFigure {
     focus.playerY = player.y; focus.headY = gp.y + rows.neck + 0.1; focus.override = Number(playing?.look !== undefined);
     focus.overrideYaw = playing?.look?.yaw ?? 0; focus.overridePitch = playing?.look?.pitch ?? 0;
     focus.offsetYaw = offer === undefined ? 0 : offer.yaw * weight; focus.offsetPitch = offer === undefined ? 0 : offer.pitch * weight;
-    this.motion.evaluate({ time: t, delta: dt, values: {} });
+    this.heldDt += dt;
+    if (offscreen && ++this.heldUpdates < OFFSCREEN_POSE_EVERY) return;
+    const delta = this.heldDt;
+    this.heldDt = 0; this.heldUpdates = 0;
+    this.motion.evaluate({ time: t, delta, values: {} });
     const pose = this.pose, mem = pose.mem; pose.t = t; pose.phase = this.clock;
     mem['gesture'] = playing?.code ?? 0; mem['weight'] = weight; mem['turn'] = this.gaze.turn; mem['talking'] = Number(this.talking);
     mem['headPitch'] = this.gaze.headPitch; mem['headYaw'] = this.gaze.headYaw;

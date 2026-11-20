@@ -6,6 +6,7 @@ import { saveStorage } from '../saves/slots';
 import './styles/hints.css';
 import type { Player } from '../player/Player';
 import { lockOn } from '../player/AimTargets';
+import { updateLeanOn } from '../core/updateLean';
 import { foldKeys } from '../input/bindingTable';
 import { keycap } from '../input/keycap';
 import type { Action } from '../input/InputService';
@@ -95,6 +96,8 @@ const MIN_SHOWN = 0.8;
 const RING_PAD = 7, TAG_GAP = 12, MARGIN = 8;
 /** s between re-measurings of the anchor (layout reads are not free; the controls do not move while shown) */
 const MEASURE_EVERY = 0.25;
+/** DF13 `debug.leanHintMeasure`: once a second (each re-measure reads layout: the ring's control, every obstacle's box) */
+const LEAN_MEASURE_EVERY = 1;
 
 function loadSeen(): Set<HintControl> {
   try {
@@ -180,7 +183,8 @@ export class FirstHints {
   update(dt: number): void {
     if (this.opts.paused()) { this.show(null); return; }
     this.lookT -= dt;
-    if (this.lookT <= 0) { this.lookT = MEASURE_EVERY; this.anchors.clear(); }
+    const every = updateLeanOn('hintMeasure') ? LEAN_MEASURE_EVERY : MEASURE_EVERY;
+    if (this.lookT <= 0) { this.lookT = every; this.anchors.clear(); }
     this.track();
     if (lockOn.state === 'locked') this.used('lock'); // a tap-to-lock on the enemy itself counts too
     let pick: HintTrigger | null = null;
@@ -198,7 +202,7 @@ export class FirstHints {
     this.shownAll.set(c, all);
     if (all > MAX_SHOWN) { this.used(c); return; }
     this.measureT -= dt;
-    if (this.measureT <= 0) { this.measureT = MEASURE_EVERY; this.place(); }
+    if (this.measureT <= 0) { this.measureT = every; this.place(); }
   }
 
   /** the walked distance; MOVE counts as used after MOVED metres */

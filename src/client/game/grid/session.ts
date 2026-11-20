@@ -908,7 +908,16 @@ export class GridSession {
     };
     // the one late system (play.ts binds every onLate to game.grid.frame): the ring tiles' static-matrix checks run in it too
     let ringStep: (() => void) | undefined;
-    host.frame?.onLate((dt) => { this.lateFrames++; if (this.prelinkOwed && this.lateFrames > 2) { this.prelinkOwed = false; this.prelinkViews(); } this.viewStep(); this.life.late(dt); this.sceneLife.late(dt); this.panels.late(); bands(); frame?.frame(); ringStep?.(); });
+    // DF13 (mini-df13): the dev fps panel names each part of this late step (one boolean read while it is off)
+    host.frame?.onLate((dt) => {
+      const timed = frameCost.on;
+      let lapAt = timed ? diagnosticNow() : 0;
+      // a null label skips a stretch that names itself (the road tiles' own section)
+      const lap = (label: string | null): void => { if (!timed) return; const now = diagnosticNow(); if (label !== null) frameCost.sectionOther(label, now - lapAt); lapAt = now; };
+      this.lateFrames++; if (this.prelinkOwed && this.lateFrames > 2) { this.prelinkOwed = false; this.prelinkViews(); lap('grid.late prelink'); }
+      this.viewStep(lap); this.life.late(dt); lap('grid.late life'); this.sceneLife.late(dt); lap('grid.late scene life');
+      this.panels.late(); lap('grid.late panels'); bands(); lap('grid.late bands'); frame?.frame(); lap('grid.late frame'); ringStep?.(); lap('grid.late ring tiles');
+    });
     const tiles = neighbourTiles(host.scope, async (tile) => { await host.prepareTile?.(tile); },
       (tile, retiredRoots) => { this.tileGhosts.retired(tile.key, retiredRoots); }, host.frame === undefined ? undefined : step => { ringStep = step; }),
       tileCost = clientRingCatalogue(tiles.instances);
@@ -1291,22 +1300,28 @@ export class GridSession {
   }
 
   /** What only draws, from the last fixed step's pose and velocity: the rings, the screens, the shimmer, the near view. */
-  private viewStep(): void {
+  private viewStep(lap?: (label: string | null) => void): void {
     this.refreshCellCover();
     const at = this.last ?? this.world(), speed = Math.hypot(this.velocity.x, this.velocity.z), clamp = speed > 60 ? 60 / speed : 1; // a respawn's jump is not a velocity
+    lap?.('grid.view cover');
     this.rings.step({ x: at.x, z: at.z, vx: this.velocity.x * clamp, vz: this.velocity.z * clamp });
+    lap?.('grid.view rings');
     // Home readiness alone cannot release optional model work: its parser can
     // otherwise queue ahead of far files still arriving for the startup barrier.
     if (!this.initialFarReady && this.host.backgroundReady?.() !== false && this.rings.ready()) this.initialFarReady = true;
     if (this.initialFarReady) this.keepRoadSet();
+    lap?.('grid.view rings');
     this.roadTiles?.step({ x: at.x, z: at.z, vx: this.velocity.x * clamp, vz: this.velocity.z * clamp });
+    lap?.(null);
     for (const cell of this.neighbours) if (this.placeholderBlocksTiles(cell.instance)) this.rings.retireRefinement(cell.instance);
     if (this.host.heldFrame !== undefined) this.host.heldFrame.enabled = false;
     this.shimmer.step();
     this.drawGate();
+    lap?.('grid.view shimmer and gate');
     const active = this.live === null ? this.home.instance : this.live.live.current();
     const eye = this.host.eye?.();
     if (this.host.backgroundReady?.() !== false) this.near.update(eye === undefined || !Number.isFinite(eye.x) || !Number.isFinite(eye.z) ? at : { x: at.x + eye.x, z: at.z + eye.z }, active);
+    lap?.('grid.view near');
   }
 
   /** every visible neighbour is drawn now (the entry reveal's readiness, G98) */

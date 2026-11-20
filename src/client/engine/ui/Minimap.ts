@@ -51,6 +51,7 @@ import { onOwnerDispose } from '../../../shared/engine/app/ownership';
 import { ROOM_BG, arenaMap, fitRoom, paintRoom, type RoomMap } from './roomMap';
 import { drawOther, othersOnMap, type OtherMark } from '../net/othersOnMap';
 import type { MapGrid } from './mapView';
+import { updateLeanOn } from '../core/updateLean';
 
 /** the level's baked map while it loads (`image` null) and once decoded; `closed` once released */
 interface BakedGround { url: string; image: ImageBitmap | null; closed: boolean; ready: Promise<void> }
@@ -145,6 +146,8 @@ export interface MinimapPalette {
 const VIEW_RADIUS = 110;          // metres from the player to the rim
 /** BA-6: the minimap repaints at most this often, and only when what it shows changed */
 const PAINT_HZ = 30;
+/** DF13 `debug.leanMinimapPaint`: the repaint ceiling at phone Low when the slot is on */
+const LEAN_PAINT_HZ = 15;
 /** FNV-1a over 32-bit ints: the minimap's view digest (BA-6), no allocation */
 const FNV_SEED = 2166136261;
 const fold = (h: number, v: number): number => Math.imul(h ^ (v | 0), 16777619);
@@ -407,7 +410,7 @@ export class Minimap {
     const pulsing = this.hotInView;
     const same = hash === this.paintedHash && ground === this.paintedGround && overlay === this.paintedOverlay;
     if (same && !pulsing) return;
-    if (t - this.paintedAt < 1000 / PAINT_HZ) return;
+    if (t - this.paintedAt < 1000 / (updateLeanOn('minimapPaint') ? LEAN_PAINT_HZ : PAINT_HZ)) return;
     this.paintedHash = hash; this.paintedGround = ground; this.paintedOverlay = overlay; this.paintedAt = t;
 
     const ctx = this.ctx;

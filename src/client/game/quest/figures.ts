@@ -13,6 +13,7 @@ import * as v from 'valibot';
 import type { ColliderDesc, WorldRegistry } from '@wildshard/engine/world/registry';
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { TIER } from '@wildshard/engine/core/tier';
+import { inLastView, updateLeanOn } from '@wildshard/engine/core/updateLean';
 import { FigureRowSchema } from '@wildshard/format/figures';
 import { installChannelPrograms } from '../../../shared/game/plugin/channelPrograms';
 import { atlasFigureSkin, folderSkinUrl } from '../systems/npc/figureSkins';
@@ -152,8 +153,16 @@ export function installQuestFigures(ctx: ShardContext, input: unknown, ports?: Q
   }); } catch (error) { dispose(); throw error; }
   ctx.scope.onDispose(dispose);
   for (const { row, figure } of figures) ctx.system({ id: row.system.id, phase: 'update', before: [...row.system.before],
-    run: (dt, time) => { figure.update(dt, time, world.player.position); } });
+    run: (dt, time) => { figure.update(dt, time, world.player.position, offscreenFigure(world.game.camera, figure)); } });
   return figures.map(({ figure }) => figure);
+}
+
+const figureCentre = new THREE.Vector3(), figureEye = new THREE.Vector3();
+/** DF13 `debug.leanOffscreenFigure`: a figure (2.5 m of reach about its chest) outside last frame's view */
+function offscreenFigure(camera: THREE.Camera, figure: KitFigure): boolean {
+  if (!updateLeanOn('offscreenFigure')) return false;
+  figureCentre.copy(figure.position); figureCentre.y += 1;
+  return !inLastView(camera, figureCentre, 2.5, camera.getWorldPosition(figureEye));
 }
 
 type FigureGroupRows = NonNullable<QuestFiguresRows['group']>;
