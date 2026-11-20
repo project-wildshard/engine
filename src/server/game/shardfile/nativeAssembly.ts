@@ -123,11 +123,14 @@ function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan, field: Nat
 function assemblyFeatures(product: ShardFolder, plan: NativeAssemblyPlan): readonly NativeAssemblyFeature[] {
   let features = plan.features;
   const environment = features.findIndex(row => row.host === 'riding.environment');
+  const forest = 'world/forest-weather.json';
+  const legacy = product.hasFile('server/shelters.json') && product.hasFile('server/weather.json');
   if (environment !== -1 && !features.some(row => row.host === 'weather.native' || row.host === 'weather.program')
-    && product.hasFile('world/weather.json') && product.hasFile('server/shelters.json') && product.hasFile('server/weather.json')) {
+    && product.hasFile('world/weather.json') && (legacy || product.hasFile(forest))) {
     // Native storm reactions borrow the environment before groups and the arena use it.
     const weather: NativeAssemblyFeature = { host: 'weather.native', program: { file: 'world/weather.json' },
-      shelters: { file: 'server/shelters.json' }, rows: { file: 'server/weather.json' } };
+      shelters: legacy ? { file: 'server/shelters.json' } : { file: forest, path: ['storm', 'shelters'] },
+      rows: legacy ? { file: 'server/weather.json' } : { file: forest, path: ['storm', 'world'] } };
     features = [...features.slice(0, environment + 1), weather, ...features.slice(environment + 1)];
   }
   // Taming binds before the elite continuation reads the bonded mount.
