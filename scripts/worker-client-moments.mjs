@@ -38,7 +38,8 @@ async function open(slug, query = '') {
   return { context, page, errors };
 }
 const report = page => page.evaluate(() => window.__workerClient());
-const fight = (page, id) => page.evaluate(want => window.__workerClientFights().find(row => row.id === want) ?? null, id);
+/** A fight by its id, or the first of several ids the page has (Sky Reach's Roc: `far.roc.fight` since ONE-FORMAT OF20c). */
+const fight = (page, id) => page.evaluate(want => window.__workerClientFights().find(row => [want].flat().includes(row.id)) ?? null, id);
 const tape = page => page.evaluate(() => window.__tape);
 const score = page => page.evaluate(() => (window.__audioLog ?? []).filter(row => row.kind === 'music' && /^(?:scene|phase|sting):/u.test(row.name)).map(row => row.name));
 const place = (page, x, y, z) => page.evaluate(([px, py, pz]) => { window.__wildshard.world.player.link.place(px, py, pz, 0); }, [x, y, z]);
@@ -223,7 +224,7 @@ const nearly = (first, last) => first === undefined || last === undefined ? fals
 if (only.includes('roc')) {
   // Stand-in: `far.roc.down` raised by hand for the second run, because a server's win is final in a session. The fight, its blows and its row are real.
   for (const again of [false, true]) {
-    const shard = await open('far-reach', '&bossGod=1'), { page } = shard, id = 'far.roc.encounter', crown = [0, 45.5, -188];
+    const shard = await open('far-reach', '&bossGod=1'), { page } = shard, id = ['far.roc.fight', 'far.roc.encounter'], crown = [0, 45.5, -188];
     await page.evaluate(down => { window.__workerClientHits(40); if (down) window.__workerClientFlag('far.roc.down'); }, again);
     await page.waitForTimeout(2000);
     await page.evaluate(() => { window.__tape.length = 0; });

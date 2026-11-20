@@ -32,7 +32,10 @@ async function open(browser, phone, base, slug, query = '') {
 /** A fresh boot of the same shard by its own URL, as a player reopens it. A reload can't: a started page drops its query, so it lands on the title. */
 const reboot = (page, base, slug, query = '') => page.goto(new URL(`/?chunk=${slug}&mute=1&nolock=1${query}`, base).href, { waitUntil: 'load' });
 const report = page => page.evaluate(() => window.__workerClient());
-const fight = (page, id) => page.evaluate(want => window.__workerClientFights().find(row => row.id === want) ?? null, id);
+/** Sky Reach's Roc fight: the declared `boss` encounter's id since ONE-FORMAT OF20c, the held fight's before it (staging may serve either). */
+const FAR_ROC = ['far.roc.fight', 'far.roc.encounter'];
+/** A fight by its id, or the first of several ids the page has. */
+const fight = (page, id) => page.evaluate(want => window.__workerClientFights().find(row => [want].flat().includes(row.id)) ?? null, id);
 const place = (page, x, y, z) => page.evaluate(([px, py, pz]) => { window.__wildshard.world.player.link.place(px, py, pz, 0); }, [x, y, z]);
 /** `--second`: a second player stands in this fight from here on. It joins after the sky is set: a room shares one sky, and takes no player's word for it. */
 const joinSecond = page => (process.argv.includes('--second') ? page.evaluate(() => { const { x, y, z } = window.__wildshard.world.player.position; window.__secondClient = window.__workerClientBot('bot:2', x + 3, y, z + 3); }) : Promise.resolve());
@@ -230,8 +233,8 @@ export async function farJourney(browser, phone, base, step, prepare = () => Pro
   if (await winched(page)) { await sky.context.close(); return; }
   await step('far reach: the Roc falls to real blows and the sky is won', async () => {
     await place(page, 0, 45.5, -188);
-    const up = await until(page, async () => (await fight(page, 'far.roc.encounter'))?.state === 'fight', 20);
-    const shown = await bossBar(page), end = await fightTo(page, 'far.roc.encounter', 'victory', 100, 'far.gust');
+    const up = await until(page, async () => (await fight(page, FAR_ROC))?.state === 'fight', 20);
+    const shown = await bossBar(page), end = await fightTo(page, FAR_ROC, 'victory', 100, 'far.gust');
     await page.waitForTimeout(2500);
     const r = await report(page);
     return { ok: up === true && end?.state === 'victory' && r.flags.includes('far.roc.down'), state: end?.state, shown, quests: r.quests, paid: r.paid, coins: r.owned.coins, flags: await live() };
@@ -1083,7 +1086,7 @@ async function sweepJourney(browser, phone, base, step) {
   const far = await open(browser, phone, base, 'far-reach');
   await step('sweep: a body boss\'s row stays drawn at any distance', async () => {
     await place(far.page, 0, 45.5, -188);
-    const row = await until(far.page, async () => { const seen = await fight(far.page, 'far.roc.encounter'); return seen?.state === 'fight' && seen.at !== null ? seen : null; }, 25);
+    const row = await until(far.page, async () => { const seen = await fight(far.page, FAR_ROC); return seen?.state === 'fight' && seen.at !== null ? seen : null; }, 25);
     await far.page.waitForTimeout(800);
     const look = row === null ? null : await rowLook(far.page, row.at);
     return { ok: look?.pinned === true, look, state: row?.state };
@@ -1251,7 +1254,7 @@ export async function fights(browser, phone, base, only, step) {
   // A boss: its row draws the bar, leaving resets it, a fall comes back, and real blows end it and pay.
   if (runs('roc')) {
     const far = await open(browser, phone, base, 'far-reach');
-    const id = 'far.roc.encounter', crown = [0, 45.5, -188];
+    const id = FAR_ROC, crown = [0, 45.5, -188];
     await step('roc: walking in starts the fight, and the bar comes up off its row', async () => {
       await place(far.page, ...crown);
       const row = await until(far.page, async () => { const seen = await fight(far.page, id); return seen?.state === 'fight' ? seen : null; }, 20);
@@ -1287,7 +1290,7 @@ export async function fights(browser, phone, base, only, step) {
   // A fight pays for blows: a player off the crown, however far they fall, ends nothing and earns nothing.
   if (runs('rocfall')) {
     const far = await open(browser, phone, base, 'far-reach');
-    const id = 'far.roc.encounter', [cx, cy, cz] = [0, 45.5, -188], CROWN_REACH = 23;
+    const id = FAR_ROC, [cx, cy, cz] = [0, 45.5, -188], CROWN_REACH = 23;
     await step('roc: a player who falls off the crown ends nothing and earns nothing', async () => {
       await place(far.page, cx, cy, cz);
       await until(far.page, async () => (await fight(far.page, id))?.state === 'fight', 20);
@@ -1315,7 +1318,7 @@ export async function fights(browser, phone, base, only, step) {
   // Two real clients in one room: a boss resets when everyone has gone, and not before (J104).
   if (runs('rooms')) {
     const far = await open(browser, phone, base, 'far-reach');
-    const { page } = far, id = 'far.roc.encounter', [cx, cy, cz] = [0, 45.5, -188], state = async () => (await fight(page, id))?.state ?? null;
+    const { page } = far, id = FAR_ROC, [cx, cy, cz] = [0, 45.5, -188], state = async () => (await fight(page, id))?.state ?? null;
     await step('two clients: a second real client joins and fights in the room', async () => {
       await place(page, cx, cy, cz);
       await page.evaluate(([x, y, z]) => { window.__secondClient = window.__workerClientBot('bot:1', x + 3, y, z); }, [cx, cy, cz]);
