@@ -10,6 +10,7 @@ import { NET_BUTTONS } from '../src/shared/engine/input/netButtons';
 import { ANIMAL_CLASS } from '../src/shared/engine/net/netSchemas';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import type { SaveStorage } from '../src/shared/engine/saves/store';
+import { serializeSimSnapshot, type SimSnapshotBytes } from '../src/shared/engine/sim/snapshot';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { WorkerLoopback } from '../src/shared/host/standalone/workerLoopback';
 import { builtFolder } from './fixtures/engine-lift/folder';
@@ -33,9 +34,9 @@ async function sunscarInput(): Promise<HeadlessRuntimeInput> {
   const assets = runtimeAssets(product, directory);
   return { shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product };
 }
-function start(storage: SaveStorage, input: HeadlessRuntimeInput): { shell: StandaloneShell; stop: () => void } {
+function start(storage: SaveStorage, input: HeadlessRuntimeInput, encodeSave?: (snapshot: SimSnapshotBytes) => Promise<string>): { shell: StandaloneShell; stop: () => void } {
   const control = new MessageChannel(), game = new MessageChannel();
-  const server = runStandaloneServer({ control: control.port1, game: game.port1, load: () => Promise.resolve(input) });
+  const server = runStandaloneServer({ control: control.port1, game: game.port1, load: () => Promise.resolve(input), ...(encodeSave === undefined ? {} : { encodeSave }) });
   const shell = connectStandalone({ slug: 'sunscar-dunes', base: '/shards/sunscar-dunes/', build: 'test', savePrefix: 'wildshard.', storage }, control.port2, game.port2, () => { server.dispose(); });
   return { shell, stop: () => { shell.dispose(); } };
 }
@@ -90,6 +91,38 @@ test('a save made in the server survives a reload, and is durable only once the 
   second.shell.ready();
   await until(() => (second.shell.client.latest?.tick ?? 0) > saved.tick + 20);
   second.stop();
+});
+
+test('background encoding keeps the exact continuation documents and ticks while a save waits', async () => {
+  const input = await sunscarInput(), stock = new PageStorage(), deferred = new PageStorage();
+  const first = start(stock, input);
+  try {
+    await first.shell.booted;
+    expect(await first.shell.save()).toEqual({ tick: 0, ok: true });
+  } finally { first.stop(); }
+
+  let releaseEncoding = (): void => undefined;
+  const encoding = new Promise<void>(resolve => { releaseEncoding = resolve; });
+  let captured = false;
+  const second = start(deferred, input, async snapshot => {
+    const buffer = snapshot.physics.buffer;
+    if (!(buffer instanceof ArrayBuffer)) throw new Error('Expected detached Rapier bytes');
+    const owned = structuredClone(snapshot, { transfer: [buffer] });
+    captured = true;
+    await encoding;
+    return serializeSimSnapshot(owned);
+  });
+  try {
+    await second.shell.booted;
+    const saving = second.shell.save();
+    await until(() => captured);
+    second.shell.ready();
+    await until(() => (second.shell.client.latest?.tick ?? 0) > 4);
+    expect(deferred.getItem('wildshard.standalone-sunscar-dunes')).toBeNull();
+    releaseEncoding();
+    expect(await saving).toEqual({ tick: 0, ok: true });
+    expect([...deferred.items].filter(([key]) => key.includes('.standalone'))).toEqual([...stock.items].filter(([key]) => key.includes('.standalone')));
+  } finally { releaseEncoding(); second.stop(); }
 });
 
 test('the worker pauses with a hidden tab: paused time is never simulated', async () => {

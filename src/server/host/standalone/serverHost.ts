@@ -40,6 +40,7 @@ export interface StandaloneServerOptions {
   readonly harness?: MessagePort;
   /** Where chat reports go (J110). Where that ends up is still to be decided. */
   readonly reports?: ChatReports;
+  readonly encodeSave?: Parameters<typeof StandaloneGrid.boot>[0]['encodeSave'];
   /** A proof's ways in, which no product path passes: boot on the road at this world point, hold this many worlds, read each tick's cost and the running server. */
   readonly proof?: { readonly arrival?: Readonly<GridPoint>; readonly residents?: number; readonly ticked?: (ms: number) => void; readonly booted?: (server: StandaloneGrid) => void };
   /** J311: the grid cell (instance) a no-world build's Shard select chose; a grid session starts there. */
@@ -93,6 +94,7 @@ export function runStandaloneServer(options: StandaloneServerOptions): { dispose
   const gridOptions = (message: Boot, local: ForwardedStorage, patch?: (shard: Shardfile) => Shardfile): Parameters<typeof StandaloneGrid.boot>[0] => {
     const { arrival, residents } = options.proof ?? {}, watched = new Set([message.slug]);
     return { slug: message.slug, build: message.build, book, saves, storage: local, savePrefix: message.savePrefix, now: diagnosticNow, ...(message.lone === true ? { lone: true } : {}),
+      ...(options.encodeSave === undefined ? {} : { encodeSave: options.encodeSave }),
       load: slug => options.load(message, slug, watched.has(slug) ? patch : undefined), strips: () => options.strips?.(message) ?? Promise.resolve([]), stepped, ...(options.onSaveRefused === undefined ? {} : { refused: options.onSaveRefused }), ...(options.reports === undefined ? {} : { reports: options.reports }),
       ...(arrival === undefined ? {} : { arrival }), ...(residents === undefined ? {} : { residents }), ...(options.goto === undefined ? {} : { goto: options.goto }), ...(options.enter === undefined ? {} : { enter: options.enter }) };
   };

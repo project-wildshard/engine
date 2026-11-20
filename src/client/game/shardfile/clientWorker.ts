@@ -133,7 +133,7 @@ export interface WorkerClientPorts {
   /** NET-LAG NL15: link these roots' road (exterior) variants in play, paced (the other-player warm body's, once filled). */
   readonly warmRoad?: (roots: readonly Object3D[]) => void;
 }
-interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell;
+interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; backgroundSaves?: boolean; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell;
   readonly prespawnStandalone?: (held?: (url: string) => Promise<ArrayBuffer | null>) => void }
 /** What `stampBuildDocuments` writes into a build that has a world: its signed release file and the key that signed it. */
 interface BuildWorld { readonly release: string; readonly key: string; readonly recordTag?: string }
@@ -451,7 +451,8 @@ async function bootStandalone(slug: string, lone: boolean, held: () => void): Pr
   // ZE10b: a gate's zone entry also names where in that cell it arrives (its entryway, past the gate)
   const goto = lone ? null : chosenCell(), enter = goto === null ? null : chosenArrival();
   // NB19: the inline runtime candidate this page owns reads its own server files (inlineOwner.ts)
-  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...ownsInlineCandidate(slug) ? { ownServer: true as const } : {}, ...goto === null ? {} : { goto }, ...enter === null ? {} : { enter }, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
+  const backgroundSaves = jsonSlot('debug.backgroundStandaloneSaves', 'device').read() === true;
+  return startStandalone({ slug, base: contentURL(`/shardfiles/${slug}/`), build, savePrefix, backgroundSaves, ...name === null ? {} : { name }, ...lone ? { lone: true as const } : {}, ...ownsInlineCandidate(slug) ? { ownServer: true as const } : {}, ...goto === null ? {} : { goto }, ...enter === null ? {} : { enter }, held: url => { held(); return spawnHeldBytes(url); }, ...saves });
 }
 /** LD5 (J208): a standalone server started while the first frame builds. On Jake's iPhone its boot was the last 5.1 s of
  *  Load, after every frame step; it runs on its own thread, so it can boot beside them. Its reads before the server

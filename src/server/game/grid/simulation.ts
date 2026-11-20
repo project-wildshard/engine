@@ -104,7 +104,7 @@ export class GridSimulation {
   private readonly cancelFrames = new Set<() => void>();
   private readonly cleanupIssues: string[] = [];
   /** Worlds left with their `durable` capture not yet taken (ZE2): it is taken at their eviction. */
-  private readonly owed = new Set<string>();
+  private readonly owed = new Map<string, object>();
   private sequence: Promise<void> = Promise.resolve();
   private used = 0;
   private disposed = false;
@@ -239,12 +239,10 @@ export class GridSimulation {
   checkpoint(instance: string): boolean {
     const resident = this.residents.get(instance); if (resident === undefined || this.disposed) return false;
     if (this.ports.durable !== undefined) {
-      if (this.occupied(instance)) { this.owed.add(instance); return true; }
+      if (this.occupied(instance)) { this.owed.set(instance, {}); return true; }
       if (!this.owed.has(instance)) return true;
       // Nobody stands here, so the owner's seat holds no capsule; a capture reads one, as a parked seat holds.
-      const { host } = resident.value, parked = !this.seat(host, this.owner).hasMotor;
-      if (parked) this.parkOwner(host);
-      try { if (!this.ports.durable(instance, host)) return false; } finally { if (parked) this.unparkOwner(host); }
+      if (!this.captureParked(resident.value.host, host => this.ports.durable?.(instance, host) === true)) return false;
       this.owed.delete(instance); return true;
     }
     const snapshot = this.occupied(instance) ? snapshotSimHost(resident.value.host) : this.snapshots.read(instance);
@@ -257,8 +255,25 @@ export class GridSimulation {
    *  the world left behind). False when one fails; the rest are still tried, and a failed one stays owed. */
   flushOwed(): boolean {
     let ok = true;
-    for (const instance of this.owed) if (!this.occupied(instance) && !this.checkpoint(instance)) ok = false;
+    for (const instance of this.owed.keys()) if (!this.occupied(instance) && !this.checkpoint(instance)) ok = false;
     return ok;
+  }
+  /** Capture owed worlds during this turn. Encoding may finish after another crossing owes a newer capture. */
+  async flushOwedAsync(capture: (instance: string, host: SimHost) => Promise<boolean>): Promise<boolean> {
+    const writes = [...this.owed].map(async ([instance, debt]) => {
+      if (this.occupied(instance)) return true;
+      const resident = this.residents.get(instance);
+      if (resident === undefined || this.disposed) return false;
+      const ok = await this.captureParked(resident.value.host, host => capture(instance, host));
+      if (ok && this.owed.get(instance) === debt) this.owed.delete(instance);
+      return ok;
+    });
+    return (await Promise.all(writes)).every(Boolean);
+  }
+  private captureParked<T>(host: SimHost, capture: (host: SimHost) => T): T {
+    const parked = !this.seat(host, this.owner).hasMotor;
+    if (parked) this.parkOwner(host);
+    try { return capture(host); } finally { if (parked) this.unparkOwner(host); }
   }
   /** Readiness keeps a frozen destination resident; unneeded neighbours may be evicted by the shared allocator. */
   retain(instance: string, needed: boolean, distance: number): void {

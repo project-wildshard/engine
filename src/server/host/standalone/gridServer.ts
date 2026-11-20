@@ -17,7 +17,7 @@ import { createSimHost, type SimHost } from '@wildshard/engine/sim';
 import { bootTask, bootWork } from '@wildshard/engine/boot/timing';
 import { questBooks } from '@wildshard/engine/quest/players';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
-import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot } from '@wildshard/engine/sim/snapshot';
+import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHostBytes, type SimSnapshot, type SimSnapshotBytes } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 import type { ForwardedStorage } from '@wildshard/engine/saves/forwardedStorage';
 import type { SaveStore } from '@wildshard/engine/saves/store';
@@ -59,6 +59,8 @@ export interface GridServerOptions {
   /** A world's tick finished, in how many milliseconds. */
   readonly stepped: (host: SimHost, ms: number) => void;
   readonly now: () => number;
+  /** Encode a captured continuation off the simulation worker. */
+  readonly encodeSave?: (snapshot: SimSnapshotBytes) => Promise<string>;
   /** A one-shard page: this cell alone, with no crossing out of it, whether the grid places it or not. It has no walls (GC36, J322): past
    *  its edge a player falls and is set back on the ground they last stood on. */
   readonly lone?: boolean;
@@ -104,10 +106,10 @@ function sessionPlayer(host: SimHost): PlayerSim {
 function readableSnapshot(snapshot: string): SimSnapshot | undefined { try { return decodeSimSnapshot(snapshot); } catch { return undefined; } }
 
 /** A world's continuation. The solids held near its player are out of it while it is taken: they are in no save. */
-function capture(host: SimHost): string {
+function capture<T>(host: SimHost, encode: (snapshot: SimSnapshotBytes) => T): T {
   const { near } = host.physics, { position } = sessionPlayer(host);
   near?.suspend();
-  try { return serializeSimSnapshot(snapshotSimHostBytes(host)); } finally { near?.resume(position.x, position.z); }
+  try { return encode(snapshotSimHostBytes(host)); } finally { near?.resume(position.x, position.z); }
 }
 
 /** The worker's grid: the road, whichever cell its player is in, and the room each is on the wire through. */
@@ -186,7 +188,7 @@ export class StandaloneGrid {
         holdStrips(world.host, strips.flatMap(strip => strip.duplicates.filter(row => row.instance === cell.instance).map(row => row.mesh)));
         worlds.set(cell.instance, world); return { host: world.host, dispose: () => { worlds.delete(cell.instance); world.dispose(); } }; },
       durable: (instance, host) => {
-        const held = slots(instance), wrote = held.write({ tick: host.state.tick, snapshot: capture(host), ledger: options.book.snapshot() });
+        const held = slots(instance), wrote = held.write({ tick: host.state.tick, snapshot: capture(host, serializeSimSnapshot), ledger: options.book.snapshot() });
         settle(held);
         return wrote;
       } });
@@ -298,12 +300,25 @@ export class StandaloneGrid {
   }
   /** Save where the session stands. The document for that place first, then the site that names it. */
   async save(): Promise<{ readonly tick: number; readonly durable: boolean }> {
+    const encode = this.options.encodeSave;
     // a world left for the road owes its capture until evicted: a save takes it, so a reload on the road keeps it
-    const owed = this.grid.flushOwed();
-    const site = this.grid.current(), { host } = this, { tick } = host.state, wire = capture(host), ledger = this.options.book.snapshot();
-    const cell = site === null ? undefined : this.slots(site);
-    const wrote = (cell?.write({ tick, snapshot: wire, ledger }) ?? true) && this.sites.write({ tick: ++this.saved, site, ...(site === null ? { road: wire, ledger } : {}) });
-    return { tick, durable: await this.settle(cell === undefined ? [this.sites] : [cell, this.sites]) && wrote && owed };
+    const owed = encode === undefined ? this.grid.flushOwed() : this.grid.flushOwedAsync(async (instance, host) => {
+      const held = this.slots(instance), revision = held.revision, { tick } = host.state, ledger = this.options.book.snapshot();
+      const snapshot = await capture(host, encode);
+      if (this.disposed) return false;
+      if (held.revision !== revision) return true;
+      const wrote = held.write({ tick, snapshot, ledger });
+      return (await this.settle([held])) && wrote;
+    });
+    const site = this.grid.current(), { host } = this, { tick } = host.state;
+    const cell = site === null ? undefined : this.slots(site), revision = cell?.revision;
+    const encoding = capture<string | Promise<string>>(host, encode ?? serializeSimSnapshot), ledger = this.options.book.snapshot();
+    const [keptOwed, wire] = typeof encoding === 'string' ? [owed, encoding] : await Promise.all([owed, encoding]);
+    if (this.disposed) return { tick, durable: false };
+    const target = cell?.revision === revision ? cell : undefined;
+    const wrote = (target?.write({ tick, snapshot: wire, ledger }) ?? true) && this.sites.write({ tick: ++this.saved, site, ...(site === null ? { road: wire, ledger } : {}) });
+    return { tick, durable: await this.settle(target === undefined ? [this.sites] : [target, this.sites]) && wrote && keptOwed === true };
   }
-  dispose(): void { this.rooms.dispose(); this.room.dispose(); this.grid.dispose(); }
+  private disposed = false;
+  dispose(): void { this.disposed = true; this.rooms.dispose(); this.room.dispose(); this.grid.dispose(); }
 }

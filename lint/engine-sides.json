@@ -1551,6 +1551,7 @@
     "src/server/host/standalone/progressWatch.ts": "server",
     "src/server/host/standalone/serverHost.ts": "server",
     "src/server/host/standalone/serverRuntime.ts": "server",
+    "src/server/host/standalone/saveCodecWorker.ts": "server",
     "src/server/host/standalone/serverFolder.ts": "server",
     "src/server/host/standalone/serverWorker.ts": "server",
     "src/server/host/tapeKitCommand.ts": "server",

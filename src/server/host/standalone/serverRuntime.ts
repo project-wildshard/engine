@@ -10,6 +10,8 @@ import { fetchGridCollision, fetchServerFolder } from './serverFolder';
 import { bootMark, bootTask } from '@wildshard/engine/boot/timing';
 import { warmRapier } from '@wildshard/engine/physics/rapierWarm';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import type { SimSnapshotBytes } from '@wildshard/engine/sim/snapshot';
+import type { SaveCodecReply, SaveCodecRequest } from './saveCodecWorker';
 
 /** What a page hands its server's worker: what its document holds and a worker's realm has no way to read. */
 export interface ServerWorkerStart {
@@ -22,6 +24,39 @@ export interface ServerWorkerStart {
   readonly enter?: { readonly x: number; readonly z: number; readonly yaw: number } | null;
   /** NB19: the page's own inline candidate, whose server files are read beside it (shell.ts `ownServer`), or null. */
   readonly ownServer?: string | null;
+  readonly backgroundSaves?: boolean;
+}
+
+/** Launch only on the first save. Rapier's detached snapshot bytes cross the port by transfer. */
+function backgroundSaveEncoder(): (snapshot: SimSnapshotBytes) => Promise<string> {
+  const waiting = new Map<number, { resolve: (wire: string) => void; reject: (error: Error) => void }>();
+  let worker: Worker | undefined, next = 0;
+  const start = (): Worker => {
+    const codec = new Worker(new URL('saveCodecWorker.ts', import.meta.url), { type: 'module', name: 'standalone-save-codec' });
+    const fail = (message: string): void => {
+      if (worker !== codec) return;
+      codec.terminate();
+      worker = undefined;
+      for (const request of waiting.values()) request.reject(new Error(message));
+      waiting.clear();
+    };
+    codec.onmessage = (event: MessageEvent<SaveCodecReply>): void => {
+      const reply = event.data, request = waiting.get(reply.id);
+      if (request === undefined) return;
+      waiting.delete(reply.id);
+      if ('wire' in reply) request.resolve(reply.wire); else request.reject(new Error(reply.error));
+    };
+    codec.onerror = event => { event.preventDefault(); fail(event.message || 'Save codec worker failed'); };
+    codec.onmessageerror = () => { fail('Save codec reply could not be read'); };
+    return codec;
+  };
+  return snapshot => new Promise((resolve, reject) => {
+    const codec = worker ??= start(), id = ++next;
+    waiting.set(id, { resolve, reject });
+    const bytes = snapshot.physics.buffer;
+    try { codec.postMessage({ id, snapshot } satisfies SaveCodecRequest, bytes instanceof ArrayBuffer ? [bytes] : []); }
+    catch (error) { waiting.delete(id); reject(error instanceof Error ? error : new Error(String(error))); }
+  });
 }
 
 /** Physics, once: from the page's compiled module where it posted one (EM21), else from the page's own copy of the bytes
@@ -72,6 +107,7 @@ export function runServerWorker(event: MessageEvent<unknown>): void {
   if (control === undefined || game === undefined) return;
   const held = reads === undefined ? undefined : askHeldReads(reads);
   runStandaloneServer({ control, game, ...harness === undefined ? {} : { harness }, ...typeof start.goto === 'string' ? { goto: start.goto } : {}, ...typeof start.goto === 'string' && start.enter !== undefined && start.enter !== null ? { enter: start.enter } : {}, load: async (boot, slug, patch) => fetchServerFolder(new URL(`../${slug}/`, new URL(boot.base, globalThis.location.href)).href, await rapierOf(held, compiledOf(start)), held, patch, ownsServer(start, slug)),
+    ...start.backgroundSaves === true ? { encodeSave: backgroundSaveEncoder() } : {},
     strips: boot => fetchGridCollision(boot.base),
     onSaveRefused: error => { console.warn('Standalone save refused, falling back', error); } });
 }

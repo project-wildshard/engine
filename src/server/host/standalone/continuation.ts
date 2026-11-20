@@ -34,6 +34,7 @@ export class ContinuationSlots<T extends { readonly tick: number }> {
   private readonly prefix: string;
   private good: number | null = null;
   private writing = 0;
+  private writes = 0;
   constructor(slot: SaveSlot<T | null>, names: readonly [string, string], storage: SaveStorage, prefix: string) {
     this.slot = slot; this.names = names; this.storage = storage; this.prefix = prefix;
   }
@@ -51,8 +52,12 @@ export class ContinuationSlots<T extends { readonly tick: number }> {
   /** Write a save to the document that is not the last good one. */
   write(saved: T): boolean {
     this.writing = this.good === 0 ? 1 : 0;
-    return this.slot.write(saved, this.names[this.writing]);
+    const wrote = this.slot.write(saved, this.names[this.writing]);
+    if (wrote) this.writes++;
+    return wrote;
   }
+  /** Detect an eviction write that overtook a snapshot being encoded. */
+  get revision(): number { return this.writes; }
   /** The real storage answered for the last write: only a durable one replaces the last good save. */
   settled(durable: boolean): void { if (durable) this.good = this.writing; }
 }
