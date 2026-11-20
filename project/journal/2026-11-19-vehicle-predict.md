@@ -57,3 +57,15 @@
   pick (`VehicleRuntime.picked`, heard in `cellWorld`), since a dock names one kind until the garage offers a choice.
 - `test/dedicated-vehicle-save.test.ts`: a bot boards, is given a kind and a colour, drops while driving 20 m off, and comes
   back over a new socket on foot within 4 m of the dock with all of it kept.
+
+## MSZ20: budgets
+
+- Measured on a local `build:game` at ac8e123e7: `js/session` 4,485,462 raw and 1,391,246 gzip (+1.6% and +1.9% on the
+  4d573c83 baselines), `js/grid-session` +0.4% and +0.9%, title +2.8%; all under their hard caps. The vehicle modules in the
+  session closure come to about 45 KB raw and 13 KB gzip (type-stripped sources), so `js/session/{raw,gzip}` are declared
+  with MSZ20 beside EM17's note. Grid session is inside its line and stays undeclared.
+- Mirror Salt has no `download/phone`, `memory/playing` or ledger key yet: it is not pinned. Its first baseline records in
+  MSZ21's pin lane (`record --run`), which is how a new shard revision records its own.
+- Tick time and wire bytes get no CI budget key: a wall-clock line is not a CI assertion (the coordinator's call on red
+  44656140001). The cell bench is the record, with `WS_BENCH=1`: 17 vehicles, 16 readings, tick p95 2.73 ms, p50 2.07 ms,
+  106.9 MB of frames over the 16 s for 16 players, on the Mac mini at f05b7824f.

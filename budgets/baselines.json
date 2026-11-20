@@ -57,13 +57,13 @@
    "value": 4413316,
    "contentKey": "engine",
    "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
-   "declared": "EM17 verifies cooked document provenance before typed intake"
+   "declared": "EM17 verifies cooked document provenance before typed intake; MIRROR-SALT-ZONE MSZ20: vehicles (MSZ7 to MSZ19: handling step, hulls, prediction, seat view, followed vehicles, drive discs) add about 45 KB raw, 13 KB gzip to the session closure (measured ac8e123e7: 4,485,462 raw, 1,391,246 gzip)"
   },
   "js/session/gzip": {
    "value": 1365883,
    "contentKey": "engine",
    "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
-   "declared": "EM17 verifies cooked document provenance before typed intake"
+   "declared": "EM17 verifies cooked document provenance before typed intake; MIRROR-SALT-ZONE MSZ20: vehicles (MSZ7 to MSZ19: handling step, hulls, prediction, seat view, followed vehicles, drive discs) add about 45 KB raw, 13 KB gzip to the session closure (measured ac8e123e7: 4,485,462 raw, 1,391,246 gzip)"
   },
   "ledger/brasscap-mesa/control": {
    "value": 63331668,
