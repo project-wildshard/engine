@@ -11,4 +11,7 @@
     room do (`FallFloor`, SS6), as the native adapter lends the page's bounds. Nine's 19 legs pass, net-well-fall too.
   - held-slot-entered keeps r3's runtime and starter Jian and Fei Zhua rows, frozen from that pin (r5's Jian is kit.melee).
   - The v0.1.1 Nine save is refused whole on r5 (its level changed), like Brasscap's and Dunes'.
-- side-parity needs the page half re-recorded from an r5 page (scripts/side-parity.mjs --record). (opus-of21-drift3)
+- side-parity: the page half is re-recorded from main run 44705796865's measured r5 client (nine-ring1 booted it green). The
+  r5 page holds every room solid plus copies: its client/plan world.assembly still builds the solids the prop rows now carry
+  (owner@scene names and exact repeats). No room solid is missing from the page, so the lines are `known` under OF21; Nine
+  rev 6 drops the assembly collision and the stale entry, and the lines go. (opus-of21-drift3)
