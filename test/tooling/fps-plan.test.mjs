@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import { fpsPlan } from '../../scripts/fps/plan.mjs';
 import { routeFor } from '../../scripts/memory/iphone/route.mjs';
 
@@ -38,4 +39,13 @@ test('the command defaults to quick and explicitly selects full qualification', 
   expect(full).toMatchObject({mode:'qualify',count:3,warm:true});
   expect(full.plan).toHaveLength(9);
   expect(full.route).toHaveLength(5);
+});
+
+test('dry planning works without a Mac hardware model on non-macOS CI', () => {
+  const entry = resolve('scripts/fps/table.mjs');
+  const script = "Object.defineProperty(process,'platform',{value:'linux'});";
+  const plan = JSON.parse(execFileSync(process.execPath,
+    ['--import',`data:text/javascript,${encodeURIComponent(script)}`,entry,'--dry-run'],{encoding:'utf8'}));
+  expect(plan).toMatchObject({host:'dry-run',mode:'quick'});
+  expect(plan.plan).toHaveLength(5);
 });

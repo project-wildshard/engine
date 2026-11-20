@@ -123,7 +123,9 @@ async function main() {
   if (passBreakdown && !choices['dry-run']) requirePassBench(process.env.WS_BENCH);
   if (!Number.isSafeInteger(count)||count<1||new Set(selected).size!==selected.length||selected.some(p=>!keys.includes(p)))
     throw new Error('Use a positive run count and a unique list of known profiles');
-  const base = new URL(choices.base).href, host = model(), factors = calibration.hosts[host]?.factors ?? {};
+  const base = new URL(choices.base).href;
+  const host = choices['dry-run'] && process.platform !== 'darwin' ? 'dry-run' : model();
+  const factors = calibration.hosts[host]?.factors ?? {};
   const rates = choices['cpu-rates']?.split(',').map(Number);
   if (rates && (selected.length !== 1 || new Set(rates).size !== rates.length ||
     rates.some(rate => !Number.isFinite(rate) || rate < 1 || rate > 8))) throw new Error('Use unique CPU rates from 1 to 8 for one profile');
@@ -201,7 +203,7 @@ async function main() {
   const progress = {completed,total:groups.reduce((sum,group) => sum+group.length,0)};
   const scope = sampling.scope === 'dock' ? 'dock only' : sampling.mode === 'quick' ? 'quick: dock, beach, village' : 'qualification: full route';
   const markdown = [`## Driftwood FPS (${scope})`, '',table(measured),'',
-    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; three consecutive shorter legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
+    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; consecutive shorter legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
     'Phone GPU estimates await DF5.'].join('\n');
   writeFileSync(join(out,'table.md'),`${markdown}\n`);
   atomicJson(join(out,'table.json'),{schema:1,mode:sampling.mode,host,base,zone,scope:sampling.scope,
