@@ -22,6 +22,7 @@ import { mountedPlayerOf } from './native';
 import { nativeTamingOf } from './nativeTaming';
 import { installWildRefill } from './wildRefill';
 import { createNativeHunt } from '../plugin/brain';
+import type { NativeBakedActor, NativePhysicsBake } from '../population/nativeBake';
 import { NativePopulationField } from '../population/environment';
 import type { NativeEliteBindings } from '@wildshard/engine/ai/eliteRoster';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
@@ -30,6 +31,17 @@ import { NativeManager, NativePopulationDriver, NativeWildlifeFrame, type Native
 const finite = v.pipe(v.number(), v.finite());
 const SpawnTable = v.pick(SpeciesSchema, ['kind', 'variants', 'spawnOnly']);
 const Stream = v.strictObject({ version: v.literal(1), state: finite, initial: finite, scrambledFork: v.boolean() });
+const Adoption = v.strictObject({ stream: Stream, x: finite, z: finite });
+interface BakedRosterRows {
+  readonly layout: 'baked';
+  readonly adoption: { id: string; stream: RngState; x: number; z: number }[];
+  readonly centres: [number, number][];
+  readonly stream: RngState;
+  readonly wildStream: RngState;
+}
+const BakedRoster: v.GenericSchema<BakedRosterRows, BakedRosterRows> = v.strictObject({ layout: v.literal('baked'), adoption: v.pipe(v.array(v.strictObject({ id: v.string(), ...Adoption.entries })), v.maxLength(64)),
+  centres: v.pipe(v.array(v.tuple([finite, finite])), v.maxLength(64)), stream: Stream, wildStream: Stream });
+const RosterPositions = v.pipe(v.array(v.object({ id: v.string(), at: v.tuple([finite, finite, finite]), yaw: finite })), v.maxLength(64));
 const Memory = v.record(v.string(), v.union([finite, v.boolean(), v.array(v.tuple([finite, finite, finite]))]));
 const RaidBody = v.strictObject({ id: v.string(), variant: v.string(), seed: finite, scale: finite,
   at: v.tuple([finite, finite, finite]), yaw: finite, adopted: Stream });
@@ -68,21 +80,43 @@ export interface NativePopulationBootBody {
   readonly herd: number; readonly position: { readonly x: number; readonly z: number }; readonly yaw: number;
   readonly adopted: { readonly stream: RngState; readonly x: number; readonly z: number };
 }
-export interface NativePopulationBootHerd { readonly kind: string; readonly cx: number; readonly cz: number; readonly members: readonly NativePopulationBootBody[] }
+export interface NativePopulationBootHerd { readonly kind: string; readonly cx: number; readonly cz: number; readonly members: readonly Pick<NativePopulationBootBody, 'id'>[] }
 export interface NativePopulationBootRows extends NativePopulationBoot {
   readonly phases: readonly string[]; readonly hunt: Readonly<Record<string,unknown>>;
-  readonly roster: { readonly bodies: readonly NativePopulationBootBody[]; readonly herds: readonly NativePopulationBootHerd[]; readonly stream: RngState; readonly wildStream: RngState };
+  readonly roster: NativeBootRoster | BakedRosterRows;
 }
-interface BootBake {
-  readonly actors: readonly { readonly id: string; readonly kind: string; readonly variant: string; readonly seed: number; readonly scale: number; readonly herd: number; readonly spec: AnimalSimSpec; readonly scripted: boolean }[];
-  readonly herds: readonly { readonly kind: string; readonly members: readonly string[] }[];
+interface NativeBootRoster {
+  readonly bodies: readonly NativePopulationBootBody[]; readonly herds: readonly NativePopulationBootHerd[];
+  readonly stream: RngState; readonly wildStream: RngState;
+}
+type BootBake = Pick<NativePhysicsBake, 'actors' | 'herds'> & { readonly spawns?: unknown };
+
+/** Materialize the original roster order from one admitted physics bake and its adoption state. */
+export function resolveNativeBootRoster(input: NativePopulationBootRows['roster'], bake: BootBake): NativeBootRoster {
+  if (!('layout' in input)) return structuredClone(input);
+  const { adoption, centres, stream, wildStream } = v.parse(BakedRoster, input);
+  const positions = v.parse(RosterPositions, bake.spawns);
+  const adopted = new Map(adoption.map(({ id, ...row }) => [id, row]));
+  if (adopted.size !== adoption.length || adopted.size !== bake.actors.length || positions.length !== bake.actors.length ||
+    centres.length !== bake.herds.length) throw new Error('Baked roster does not cover every body and herd');
+  const bodies = bake.actors.map(({ id, kind, variant, seed, scale, herd }, index) => {
+    const placement = positions[index], memory = adopted.get(id);
+    if (placement?.id !== id || memory === undefined) throw new Error(`Baked roster placement or adoption missing for ${id}`);
+    return { id, kind, variant: { id: variant }, seed, scale, herd, position: { x: placement.at[0], z: placement.at[2] }, yaw: placement.yaw, adopted: memory };
+  });
+  const herds = bake.herds.map(({ kind, members }, index) => {
+    const centre = centres[index];
+    if (centre === undefined) throw new Error('Baked roster has no herd centre');
+    return { kind, cx: centre[0], cz: centre[1], members: members.map(id => ({ id })) };
+  });
+  return { bodies, herds, stream, wildStream };
 }
 /** Compare the exact admitted identity join before spawning on native floors. */
 export function installNativeBootRoster(host: SimHost, ports: { boot: NativePopulationBootRows; bake: BootBake; field: NativePopulationField; spawnY: number;
   clock: { readonly phase: string; readonly storm: boolean }; elites: NativeEliteBindings }): {
-  bodies: { boot: NativePopulationBootBody; baked: BootBake['actors'][number]; actor: AnimalSim }[]; herds: readonly NativePopulationBootHerd[]; stream: RngState; wildStream: RngState;
+  bodies: { boot: NativePopulationBootBody; baked: NativeBakedActor; actor: AnimalSim }[]; herds: readonly NativePopulationBootHerd[]; stream: RngState; wildStream: RngState;
 } {
-  const { bake,boot,field } = ports, roster = structuredClone(boot.roster);
+  const { bake,boot,field } = ports, roster = resolveNativeBootRoster(boot.roster, bake);
   if (!(field instanceof NativePopulationField) || !boot.phases.includes(ports.clock.phase) || ports.clock.storm) throw new Error('Native boot phase is not hosted');
   if (roster.bodies.length !== bake.actors.length || JSON.stringify(roster.herds.map(h => ({ kind: h.kind,members: h.members.map(m => m.id) }))) !== JSON.stringify(bake.herds)
     || roster.bodies.some((row,index) => { const body = bake.actors[index]; return body?.id !== row.id || body.kind !== row.kind || body.variant !== row.variant.id || body.seed !== row.seed || body.scale !== row.scale || body.herd !== row.herd; })) throw new Error('Native boot roster diverges from its admitted bake');

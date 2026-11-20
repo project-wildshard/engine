@@ -11,7 +11,7 @@ import { nativeEliteBindings as eliteBindings } from '../src/server/engine/ai/el
 import { createSimHost } from '../src/server/engine/sim';
 import { NativePopulationField } from '../src/server/game/population/environment';
 import { NativeWildEnvironment } from '../src/server/game/population/nativeManager';
-import { installNativeBootRoster } from '../src/server/game/riding/nativePopulation';
+import { installNativeBootRoster, resolveNativeBootRoster } from '../src/server/game/riding/nativePopulation';
 import { installWeatherContinuation } from '../src/server/game/weather/continuation';
 import { nativeWeatherBundle } from '../src/server/game/weather/reactions';
 import { Rng } from '@wildshard/format/seededRng';
@@ -53,4 +53,25 @@ test('orchard native boot joins its own bake, raster senses and weather continua
     const adapter = host.adapters.get('orchard.weather'); if (adapter === undefined) throw new Error('Missing weather continuation');
     const saved = adapter.snapshot(); host.step(leadCommands(host, { moveX: 0,moveZ: 0,yaw: 0 })); adapter.restore(saved); expect(adapter.snapshot()).toEqual(saved);
   } finally { host.dispose(); }
+});
+
+
+test('the baked roster keeps fractional seeds, ordered memberships and the adoption stream', () => {
+  const sample = SIM_LEVEL.entities[0];
+  if (sample === undefined) throw new Error('Missing orchard actor');
+  const stream = new Rng(9).snapshot();
+  const actor = { id: 'orchard.guard', kind: sample.spec.kind, variant: sample.spec.variant, seed: 0.51,
+    scale: 1, herd: 0, spec: sample.spec, scripted: false };
+  const adoption = { id: actor.id, stream, x: 1, z: 2 };
+  const bake = { actors: [actor], herds: [{ kind: actor.kind, members: [actor.id] }],
+    spawns: [{ id: actor.id, at: [3, 4, 5], yaw: 0.25 }] };
+  const input = { layout: 'baked' as const, adoption: [adoption], centres: [[0, 0] as [number, number]], stream, wildStream: stream };
+  expect(resolveNativeBootRoster(input, bake)).toEqual({
+    bodies: [{ id: actor.id, kind: actor.kind, variant: { id: actor.variant }, seed: 0.51, scale: 1, herd: 0,
+      position: { x: 3, z: 5 }, yaw: 0.25, adopted: { stream, x: 1, z: 2 } }],
+    herds: [{ kind: actor.kind, cx: 0, cz: 0, members: [{ id: actor.id }] }], stream, wildStream: stream,
+  });
+  expect(() => resolveNativeBootRoster({ ...input, adoption: [adoption, adoption] }, bake)).toThrow('cover every body');
+  expect(() => resolveNativeBootRoster(input, { ...bake, spawns: [{ ...bake.spawns[0], id: 'another.guard' }] }))
+    .toThrow('placement or adoption missing');
 });
