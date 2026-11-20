@@ -8,7 +8,8 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { CombatCues } from '@wildshard/engine/combat/cues';
 import type { AudioData } from '@wildshard/format/audio';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { cellDeclaredAudio, installCellAudio, type CellScore, type DataCellAudioPorts } from './dataCellAudio';
+import { cellDeclaredAudio, installCellAudio, type DataCellAudioPorts } from './dataCellAudio';
+import { pageScoreProfiles, type CellScore } from '../shardfile/declaredScore';
 
 // the Template's built `audio` section (sdk 0.4.8, `new`)
 const audio = { ambience: { bed: 'forest', winds: [{ frequency: 260, gain: 0.11, pan: -0.55, q: 0.5, rate: 0.07 }] },
@@ -87,4 +88,11 @@ test('MZ23: a copy\'s engine-slot score plays while entered, day or night by the
     const after = scenes.length; vi.advanceTimersByTime(2000);
     expect(scenes.length).toBe(after); // the driver left with the stay
   } finally { vi.useRealTimers(); }
+});
+
+test('MZ23: a one-shard page with no catalogue installer plays its own engine-slot score, and only that', () => {
+  const play = {} as unknown as Parameters<typeof pageScoreProfiles>[1];
+  expect(pageScoreProfiles({ music: score } as unknown as AudioData, play)?.music).toBeTypeOf('function');
+  expect(pageScoreProfiles({}, play)).toBeUndefined();
+  expect(pageScoreProfiles({ music: { ...score, source: { dir: '/assets/music/own/', manifestKey: 'own' } } } as unknown as AudioData, play)).toBeUndefined();
 });

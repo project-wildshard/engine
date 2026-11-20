@@ -989,6 +989,7 @@
     "src/client/game/shardfile/calibrationScripts.ts": "client",
     "src/client/game/shardfile/caveInterior.ts": "client",
     "src/client/game/shardfile/client.ts": "client",
+    "src/client/game/shardfile/declaredScore.ts": "client",
     "src/client/game/shardfile/dataPageMovers.ts": "client",
     "src/client/game/shardfile/declaredTalks.ts": "client",
     "src/client/game/shardfile/placementPageText.ts": "client",
