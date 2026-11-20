@@ -592,6 +592,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/LIT_REST_MERGE_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/LOAD_GC_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
@@ -627,12 +632,22 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/STATIC_MERGE_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/VERTEX_PACK_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
     "json:device/VIEW_PIECES_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/WARM_PACE_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
       "migrations": []
