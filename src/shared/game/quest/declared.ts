@@ -174,7 +174,8 @@ export class DeclaredQuests {
     run.running = this.host.state.tick; clearLaps(run);
     if (lapped(race)) Object.assign(run, { lap: 0, next: 0, lapAt: this.host.state.tick });
     for (const lowered of [race.stop, ...race.resets ?? [], ...race.checkpoints ?? []]) book.flags.set(lowered, false);
-    if (race.rival !== undefined) { this.chips.get(book.player)?.delete(race.id); this.ports.rival?.start(book.player, race); }
+    // the last run's won or lost chip stays to be shown (a lap race's finish line is also its start, so the next run begins on it)
+    if (race.rival !== undefined) this.ports.rival?.start(book.player, race);
   }
   /** MSZ31: a checkpoint crossed in order counts; out of order it is lowered again. The lap's first one lowers the line's stop,
    *  which stays up from the lap before so standing on the line counts nothing. */
@@ -219,8 +220,10 @@ export class DeclaredQuests {
   }
   /** MSZ33: a running race's rival crossed his line first: the player hears it once (their run goes on, for its time). */
   private rivalHome(book: QuestBook, race: Race): void {
-    const port = this.ports.rival; if (race.rival === undefined || port === undefined) return;
-    if (port.finished(book.player, race.id) && this.chips.get(book.player)?.get(race.id)?.chip !== RACE_CHIP.lost) this.chip(book.player, race, RACE_CHIP.lost);
+    const port = this.ports.rival; if (race.rival === undefined || port === undefined || !port.finished(book.player, race.id)) return;
+    // once a run: a lost chip stamped after this run began already said so
+    const chip = this.chips.get(book.player)?.get(race.id), since = this.races.get(book.player)?.get(race.id)?.running ?? 0;
+    if (chip === undefined || chip.chip !== RACE_CHIP.lost || chip.at <= since) this.chip(book.player, race, RACE_CHIP.lost);
   }
   /** MSZ33: a run with a rival ended: a finish ahead of him raises the race's `beat` flag, and says who won; he goes home. */
   private endRival(book: QuestBook, race: Race, finished: boolean): void {

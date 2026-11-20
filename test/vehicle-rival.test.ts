@@ -22,7 +22,7 @@ const DUEL = {
     rival: { name: 'Sorrel Vane', dock: 'line.sail', line: LINE, speed: 12, beat: 'duel.beat' } }],
 };
 
-async function duel(): Promise<{ host: ReturnType<typeof createSimHost>; runtime: VehicleRuntime; player: string; flags: ReturnType<typeof questBooks>['lead']['flags']; quests: DeclaredQuests; filed: string[]; steps: (n: number) => void; chip: () => number | undefined }> {
+async function duel(): Promise<{ host: ReturnType<typeof createSimHost>; runtime: VehicleRuntime; player: string; flags: ReturnType<typeof questBooks>['lead']['flags']; quests: DeclaredQuests; filed: string[]; steps: (n: number) => void; chip: () => number | undefined; chipAt: () => number }> {
   const vehicles = parseVehicles(JSON.parse(readFileSync(VEHICLES_EXAMPLE, 'utf8')));
   const level = { ...SIM_LEVEL, entities: [], ground: { size: 160, height: 0 }, player: { ...SIM_LEVEL.player, at: { x: -6, y: 0, z: 22 } } };
   const host = createSimHost(level, { rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) });
@@ -32,12 +32,12 @@ async function duel(): Promise<{ host: ReturnType<typeof createSimHost>; runtime
   const quests = new DeclaredQuests(host, DUEL, { fact: name => { filed.push(name); },
     rival: { start: (who, race) => { runtime.startRival(who, race); }, finished: (who, race) => runtime.rivalFinished(who, race), stop: (who, race) => { runtime.stopRival(who, race); } } });
   const { flags, player } = questBooks(host).lead;
-  const chip = (): number | undefined => { const out = new Map<string, number>(); shardRows(host).owned.get('quest.races')?.(player, out); return out.get('race:duel.chip'); };
-  return { host, runtime, player, flags, quests, filed, chip, steps: n => { for (let i = 0; i < n; i++) host.step(); } };
+  const line = (name: string): number | undefined => { const out = new Map<string, number>(); shardRows(host).owned.get('quest.races')?.(player, out); return out.get(`race:duel.${name}`); };
+  return { host, runtime, player, flags, quests, filed, chip: () => line('chip'), chipAt: () => line('chipAt') ?? 0, steps: n => { for (let i = 0; i < n; i++) host.step(); } };
 }
 
 test('an idle player loses: the rival drives his line to its end, the player hears it, and a late finish raises no beat flag', async () => {
-  const { host, runtime, player, flags, filed, chip, steps } = await duel();
+  const { host, runtime, player, flags, filed, chip, chipAt, steps } = await duel();
   try {
     flags.set('duel.go');
     const id = runtime.rivalOf(player, 'duel');
@@ -59,6 +59,13 @@ test('an idle player loses: the rival drives his line to its end, the player hea
     expect(flags.has('duel.beat')).toBe(false);
     expect(chip()).toBe(RACE_CHIP.lost);
     expect(runtime.rivalOf(player, 'duel')).toBeUndefined(); // home
+    // the next run he wins says so again, though the last run's chip said the same
+    const before = chipAt();
+    flags.set('duel.go'); tick = 0;
+    while (!runtime.rivalFinished(player, 'duel') && tick < 60 * 30) { steps(1); tick++; }
+    steps(2);
+    expect(chip()).toBe(RACE_CHIP.lost);
+    expect(chipAt()).toBeGreaterThan(before);
   } finally { host.dispose(); }
 });
 
@@ -71,8 +78,9 @@ test('a player who finishes first beats him: the beat flag rises, the chip says 
     expect(flags.has('duel.beat')).toBe(true);
     expect(chip()).toBe(RACE_CHIP.won);
     expect(runtime.rivalOf(player, 'duel')).toBeUndefined();
-    // a new run sends a fresh rival out from the start
+    // a new run sends a fresh rival out from the start, and the won chip stays to be shown (a lap race's line is both)
     flags.set('duel.go');
+    expect(chip()).toBe(RACE_CHIP.won);
     const id = runtime.rivalOf(player, 'duel'); if (id === undefined) throw new Error('No rival');
     expect(Math.hypot(runtime.pose(id).position.x - 17.5, runtime.pose(id).position.z)).toBeLessThan(0.5);
   } finally { host.dispose(); }
