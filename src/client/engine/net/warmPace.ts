@@ -13,8 +13,8 @@ import { graphicsMode } from '../core/graphicsMode';
 
 export const WARM_PACE_SLOT = 'debug.warmPace';
 export const WARM_PACE_DEFAULT = false;
-/** Unset at phone Low: off until a cooled phone pair and the look board decide. */
-export const WARM_PACE_PHONE_LOW = false;
+/** Unset at phone Low: on (DF10, mini-df10b: iPhone 13 route draws p95 about 93 -> 79, a matched 35 °C pair held its frames, the blind board passed). */
+export const WARM_PACE_PHONE_LOW = true;
 /** frames drawn every frame after the hand fills, before the pace starts */
 export const WARM_SETTLE = 900;
 /** once settled, the body draws one frame in this many */

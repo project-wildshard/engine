@@ -33,8 +33,8 @@ import { mergeView } from '../shardfile/groundMerge';
 export const NO_VIEW_MERGE = 'noViewMerge';
 export const STATIC_MERGE_SLOT = 'debug.staticMerge';
 export const STATIC_MERGE_DEFAULT = false;
-/** Unset at phone Low: off until a cooled phone pair and the look board decide. */
-export const STATIC_MERGE_PHONE_LOW = false;
+/** Unset at phone Low: on (DF10, mini-df10b: iPhone 13 route draws p95 about 93 -> 79, a matched 35 °C pair held its frames, the blind board passed). */
+export const STATIC_MERGE_PHONE_LOW = true;
 /** fixed steps between sweeps (and member checks) */
 export const SWEEP_STEPS = 60;
 /** a mesh this large (vertices) keeps its own draw: its merged copy would double too much vertex memory */

@@ -12,8 +12,8 @@ import { graphicsMode } from '../../core/graphicsMode';
 
 export const LIT_REST_MERGE_SLOT = 'debug.litRestMerge';
 export const LIT_REST_MERGE_DEFAULT = false;
-/** Unset at phone Low: off until a cooled phone pair and the look board decide. */
-export const LIT_REST_MERGE_PHONE_LOW = false;
+/** Unset at phone Low: on (DF10, mini-df10b: iPhone 13 route draws p95 about 93 -> 79, a matched 35 °C pair held its frames, the blind board passed). */
+export const LIT_REST_MERGE_PHONE_LOW = true;
 /** frames a moved part holds still before it rejoins the merge */
 export const REST_TICKS = 45;
 
