@@ -26,3 +26,5 @@
 - Generators: a loop that pauses inside a generator, or runs once a build, keeps its doubles boxed in V8 (measured in
   node: a resumed loop's running min/max boxes each step; a plain chunk function does not). cullPlanSteps' bin, bounds
   and radius loops and the seam merge's per-strip vertex loop now run in plain functions between the same pauses.
+- Parsed-page decode defined every key with a fresh descriptor object; a plain store makes the same own property,
+  so only `__proto__` is still defined. The road look's Mesher grows typed arrays instead of number lists.

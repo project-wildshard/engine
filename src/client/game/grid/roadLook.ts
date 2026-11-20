@@ -101,19 +101,41 @@ export interface RoadLookState { readonly segments: number; readonly junctions: 
 const LIFT = 0.02; // the overlay's height over the deck's road band (polygon offset does the rest)
 const KERB = new Color(0x9a9c98), ISLAND = new Color(0x4f6a35), SIGN_GREEN = '#0d6b3c';
 
-/** A tiny triangle builder: positions, normals, uvs, colours, one index buffer. */
+const MESHER = { owner: 'grid/road-look', asset: 'mesher', kind: 'scratch' } as const;
+/** A tiny triangle builder: positions, normals, uvs, colours, one index buffer. DF11: the lists are growing typed arrays
+ *  (doubles, so the same values the number lists held); `p`, `n`, `uv`, `c` and `i` are views of their filled parts.
+ *  As number lists each regrowth left its old backing store on the JS heap (~13 KB a dock frame at 3x). */
 class Mesher {
-  readonly p: number[] = []; readonly n: number[] = []; readonly uv: number[] = []; readonly c: number[] = []; readonly i: number[] = [];
+  private pa: Float64Array = ownedArray(Float64Array, 3 * 64, MESHER); private na: Float64Array = ownedArray(Float64Array, 3 * 64, MESHER);
+  private uva: Float64Array = ownedArray(Float64Array, 2 * 64, MESHER); private ca: Float64Array = ownedArray(Float64Array, 3 * 64, MESHER);
+  private ia: Uint32Array = ownedArray(Uint32Array, 3 * 64, MESHER);
+  private vertices = 0; private corners = 0;
+  get p(): Float64Array { return this.pa.subarray(0, this.vertices * 3); }
+  get n(): Float64Array { return this.na.subarray(0, this.vertices * 3); }
+  get uv(): Float64Array { return this.uva.subarray(0, this.vertices * 2); }
+  get c(): Float64Array { return this.ca.subarray(0, this.vertices * 3); }
+  get i(): Uint32Array { return this.ia.subarray(0, this.corners); }
   vertex(x: number, y: number, z: number, nx: number, ny: number, nz: number, u = 0, v = 0, colour?: Color): number {
-    this.p.push(x, y, z); this.n.push(nx, ny, nz); this.uv.push(u, v); this.c.push(colour?.r ?? 1, colour?.g ?? 1, colour?.b ?? 1);
-    return this.p.length / 3 - 1;
+    if (this.vertices * 3 === this.pa.length) {
+      const size = this.vertices * 2, grow = (old: Float64Array, width: number): Float64Array => { const next = ownedArray(Float64Array, size * width, MESHER); next.set(old); return next; };
+      this.pa = grow(this.pa, 3); this.na = grow(this.na, 3); this.uva = grow(this.uva, 2); this.ca = grow(this.ca, 3);
+    }
+    const k = this.vertices++, p = this.pa, n = this.na, t = this.uva, c = this.ca;
+    p[k * 3] = x; p[k * 3 + 1] = y; p[k * 3 + 2] = z; n[k * 3] = nx; n[k * 3 + 1] = ny; n[k * 3 + 2] = nz; t[k * 2] = u; t[k * 2 + 1] = v;
+    c[k * 3] = colour?.r ?? 1; c[k * 3 + 1] = colour?.g ?? 1; c[k * 3 + 2] = colour?.b ?? 1;
+    return k;
+  }
+  private corner(a: number, b: number, c: number): void {
+    if (this.corners + 3 > this.ia.length) { const next = ownedArray(Uint32Array, this.ia.length * 2, MESHER); next.set(this.ia); this.ia = next; }
+    const i = this.ia; i[this.corners] = a; i[this.corners + 1] = b; i[this.corners + 2] = c; this.corners += 3;
   }
   /** A triangle, wound so its face looks along vertex `a`'s normal (callers never think about winding). */
   tri(a: number, b: number, c: number): void {
-    const p = this.p, at = (k: number, o: number): number => p[k * 3 + o] ?? 0;
-    const ux = at(b, 0) - at(a, 0), uy = at(b, 1) - at(a, 1), uz = at(b, 2) - at(a, 2), vx = at(c, 0) - at(a, 0), vy = at(c, 1) - at(a, 1), vz = at(c, 2) - at(a, 2);
-    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, n = this.n;
-    if (nx * (n[a * 3] ?? 0) + ny * (n[a * 3 + 1] ?? 0) + nz * (n[a * 3 + 2] ?? 0) < 0) this.i.push(a, c, b); else this.i.push(a, b, c);
+    const p = this.pa;
+    const ax = p[a * 3] ?? 0, ay = p[a * 3 + 1] ?? 0, az = p[a * 3 + 2] ?? 0;
+    const ux = (p[b * 3] ?? 0) - ax, uy = (p[b * 3 + 1] ?? 0) - ay, uz = (p[b * 3 + 2] ?? 0) - az, vx = (p[c * 3] ?? 0) - ax, vy = (p[c * 3 + 1] ?? 0) - ay, vz = (p[c * 3 + 2] ?? 0) - az;
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, n = this.na;
+    if (nx * (n[a * 3] ?? 0) + ny * (n[a * 3 + 1] ?? 0) + nz * (n[a * 3 + 2] ?? 0) < 0) this.corner(a, c, b); else this.corner(a, b, c);
   }
   /** A quad a-b-c-d in order round its edge (either way round). */
   quad(a: number, b: number, c: number, d: number): void { this.tri(a, b, c); this.tri(a, c, d); }
@@ -274,7 +296,8 @@ function streetlights(layout: RoadLayout, home: GridCell): { poles: SolidPart; h
   // number[] lists grew and were copied out again: garbage while the road builds beside play); the same Float32 values
   const place = (template: Mesher, unlit: boolean): SolidPart => {
     const matrix = new Matrix4(), q = new Quaternion(), up = new Vector3(0, 1, 0), pos = new Vector3(), one = new Vector3(1, 1, 1), v = new Vector3(), n = new Vector3();
-    const verts = template.p.length / 3, corners = template.i.length, lights = layout.lights.length;
+    const tp = template.p, tn = template.n, tc = template.c, ti = template.i;
+    const verts = tp.length / 3, corners = ti.length, lights = layout.lights.length;
     const label = { owner: 'grid/road-look', asset: 'streetlights', kind: 'scratch' } as const;
     const positions = ownedArray(Float32Array, lights * verts * 3, label), normals = ownedArray(Float32Array, lights * verts * 3, label);
     const colours = ownedArray(Float32Array, lights * verts * 3, label), uvs = ownedArray(Float32Array, lights * verts * 2, label), indices = ownedArray(Uint32Array, lights * corners, label);
@@ -284,13 +307,13 @@ function streetlights(layout: RoadLayout, home: GridCell): { poles: SolidPart; h
       matrix.compose(pos.set(light.at.x - home.origin.x, 0, light.at.z - home.origin.z), q, one);
       const base = l * verts;
       for (let k = 0; k < verts; k++) {
-        v.set(template.p[k * 3] ?? 0, template.p[k * 3 + 1] ?? 0, template.p[k * 3 + 2] ?? 0).applyMatrix4(matrix);
-        n.set(template.n[k * 3] ?? 0, template.n[k * 3 + 1] ?? 0, template.n[k * 3 + 2] ?? 0).applyQuaternion(q);
+        v.set(tp[k * 3] ?? 0, tp[k * 3 + 1] ?? 0, tp[k * 3 + 2] ?? 0).applyMatrix4(matrix);
+        n.set(tn[k * 3] ?? 0, tn[k * 3 + 1] ?? 0, tn[k * 3 + 2] ?? 0).applyQuaternion(q);
         const o = (base + k) * 3;
         positions[o] = v.x; positions[o + 1] = v.y; positions[o + 2] = v.z; normals[o] = n.x; normals[o + 1] = n.y; normals[o + 2] = n.z;
-        colours[o] = template.c[k * 3] ?? 1; colours[o + 1] = template.c[k * 3 + 1] ?? 1; colours[o + 2] = template.c[k * 3 + 2] ?? 1;
+        colours[o] = tc[k * 3] ?? 1; colours[o + 1] = tc[k * 3 + 1] ?? 1; colours[o + 2] = tc[k * 3 + 2] ?? 1;
       }
-      for (let j = 0; j < corners; j++) indices[l * corners + j] = (template.i[j] ?? 0) + base;
+      for (let j = 0; j < corners; j++) indices[l * corners + j] = (ti[j] ?? 0) + base;
     }
     return uniformPart({ positions, normals, colours, uvs, indices }, 'white', unlit);
   };
@@ -373,7 +396,7 @@ function signMesher(signs: readonly RoadSign[], home: GridCell, atlas: SignAtlas
 /** Float32 values per textured road vertex (`position`, `normal`, `uv`; `Mesher.geometry()` without colours). */
 const ROAD_FLOATS = 8;
 /** A mesher's triangles as the cull count reads them (positions exactly as its Float32 geometry will store them). */
-function mesherSource(m: Mesher): CullSource { return { vertices: m.p.length / 3, position: (k) => Math.fround(m.p[k] ?? 0), float32: m.p, indices: m.i }; }
+function mesherSource(m: Mesher): CullSource { const p = m.p; return { vertices: p.length / 3, position: (k) => Math.fround(p[k] ?? 0), float32: p, indices: m.i }; }
 /** One textured road mesh before it is built: its triangles, its canvas's size and how to paint it. */
 interface TexturedSource {
   readonly id: string; readonly name: string; readonly mesher: Mesher; readonly width: number; readonly height: number; readonly paint: () => Generator<void, Texture>;

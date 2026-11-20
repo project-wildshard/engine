@@ -117,7 +117,10 @@ export async function decodeParsedPages(bytes: Uint8Array, pause: () => Promise<
         frame.key = value; return;
       }
       if (Object.hasOwn(frame.value, frame.key)) throw new Error('Duplicate parsed key');
-      Object.defineProperty(frame.value, frame.key, {value, writable: true, enumerable: true, configurable: true});
+      // DF11: a plain store makes the same own data property without a descriptor object per key; only `__proto__`
+      // would reach the prototype setter, so it alone is defined
+      if (frame.key === '__proto__') Object.defineProperty(frame.value, frame.key, {value, writable: true, enumerable: true, configurable: true});
+      else frame.value[frame.key] = value;
       frame.key = undefined; frame.remaining--;
     } else { frame.value[frame.next++] = value; frame.remaining--; }
   };
