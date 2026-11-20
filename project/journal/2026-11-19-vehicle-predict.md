@@ -40,3 +40,11 @@
 - The bench (`test/dedicated-vehicle-cell.test.ts`): 16 bots' buggies circling in one cell, 15 readings, tick p95 at most
   5.47 ms (p50 2.83 ms) against the box probe's 12 ms line, on the Mac mini. The door's 4 sockets an address needed
   `socketsPerIp: 32` for 16 bots. Frame bytes print with it for MSZ20's budget.
+
+## MSZ19, first half: a rider saves at the dock
+
+- Vehicles are not saved. `exportPlayer` asks `hostVehicles(host)?.docPlace(player)`: a seated rider's doc puts them on foot
+  beside the dock nearest their vehicle (past its hull's side, on `clearStand` ground, facing the dock's way), so a rider who
+  comes back after the hold, or into a fresh room, stands there. On foot the doc keeps their own place.
+- Still owed on the row: unlocked kinds and colours and the last kind picked at a dock, in the player's `SaveStore`, and the
+  unlock-reconnect save test.

@@ -11,6 +11,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import { exportSeats, importSeats } from '@wildshard/engine/game/plugin/playerSeats';
+import { hostVehicles } from '@wildshard/engine/game/plugin/vehicleRuntime';
 import type { RespawnRowFields } from '@wildshard/engine/sim/respawn';
 import { keepUnknown, known } from '@wildshard/engine/saves/shape';
 import { validPlayerStore } from './playerStore';
@@ -77,12 +78,13 @@ const NOW_MS = 1000;
 const PACK_CHARS = 1024, PACKED = 'z:';
 const packed = (book: QuestBookSaved): QuestBookSaved => ({ ...book, parts: Object.fromEntries(Object.entries(book.parts).map(([id, text]) => [id, text.length < PACK_CHARS ? text : `${PACKED}${deflateRawSync(text).toString('hex')}`])) });
 const unpacked = (book: QuestBookSaved): QuestBookSaved => ({ ...book, parts: Object.fromEntries(Object.entries(book.parts).map(([id, text]) => [id, text.startsWith(PACKED) ? inflateRawSync(Buffer.from(text.slice(PACKED.length), 'hex')).toString() : text])) });
-/** A player as a doc. A rider saves on foot. JSON has no Infinity, so a cap with no limit is left out, and reads back as the seat's own. */
+/** A player as a doc. A rider saves on foot; a vehicle's rider at the dock nearest it (MSZ19). JSON has no Infinity, so a cap with no limit is left out, and reads back as the seat's own. */
 export function exportPlayer(host: SimHost, player: PlayerSim, stores: DocStores): PlayerDoc {
   const mounted = mountedPlayerOf(host, player.id);
   const { x, y, z } = mounted?.mounted === true ? mounted.body.feet : player.position, { lastHurt, attributes, ...rest } = player.health.snapshot();
   const state = { ...rest, attributes: Object.fromEntries(Object.entries(attributes).filter(([, value]) => Number.isFinite(value))) as typeof attributes };
-  return { at: { x, y, z, yaw: player.yaw }, health: { state, sinceHurt: host.clock.now * NOW_MS - lastHurt }, book: packed(questBooks(host).exportOf(player.id)),
+  const docked = hostVehicles(host)?.docPlace(player.id);
+  return { at: docked ?? { x, y, z, yaw: player.yaw }, health: { state, sinceHurt: host.clock.now * NOW_MS - lastHurt }, book: packed(questBooks(host).exportOf(player.id)),
     respawn: host.respawn.rowOf(player.id), seats: exportSeats(host, player), store: stores.store, ledger: stores.ledger };
 }
 /** A doc onto a seat, in a world that has been running without them. Health's clock is the host's, so it is moved onto this one. */

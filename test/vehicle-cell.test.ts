@@ -11,6 +11,7 @@ import { vehicleAt } from '../src/shared/engine/sim/vehicle';
 import { edgeHit, VEHICLE_EDGE, VEHICLE_EDGE_OWNER } from '../src/shared/engine/sim/vehicleHull';
 import { VEHICLE_CAP, VehicleRuntime } from '../src/server/game/plugin/vehicleRuntime';
 import { VehiclePrediction } from '../src/client/game/plugin/vehiclePrediction';
+import { exportPlayer } from '../src/server/host/dedicated/playerDoc';
 import { playerVehicle, vehicleDockPrompt } from '../src/shared/game/shardfile/wirePrompts';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { VEHICLES_EXAMPLE } from './fixtures/vehiclesExample';
@@ -82,4 +83,27 @@ test('a cell runs at most VEHICLE_CAP vehicles, and a player keeps one of their 
   for (let i = 1; runtime.ids().length < VEHICLE_CAP; i++) runtime.spawn(i % 2 === 0 ? 'yard.buggy' : 'yard.second', `p${String(i)}`);
   expect(runtime.full(playerVehicle('yard.buggy', 'late'))).toBe(true);
   expect(runtime.full(other)).toBe(false); // a player's own, out already, is no new one
+});
+
+// MSZ19: vehicles are not saved for a player (a dock makes them): a rider's doc puts them on foot beside the dock nearest their
+// vehicle, so one who comes back after the hold stands there; on foot the doc keeps their own place.
+test('a rider\'s doc puts them on foot beside the nearest dock; on foot their own place', async () => {
+  const level = { ...SIM_LEVEL, entities: [], ground: { size: 160, height: 0 }, player: { ...SIM_LEVEL.player, at: { x: -6, y: 0, z: 22 } } };
+  const host = createSimHost(level, { rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) });
+  const lead = leadPlayer(host), buggy = playerVehicle('yard.buggy', lead.id);
+  let runtime: VehicleRuntime | null = null;
+  runtime = new VehicleRuntime(example(), { physics: () => host.physics, stick: () => {
+    const yaw = runtime?.pose(buggy).euler.y ?? 0; return { throttle: 1, turn: Math.max(-1, Math.min(1, -2 * (Math.PI / 2 - yaw))), boost: false };
+  } });
+  runtime.bind(host);
+  actRoutes(host).claims.get(vehicleDockPrompt('yard.buggy'))?.(lead.id);
+  for (let i = 0; i < 60 * 4; i++) host.step();
+  const out = runtime.pose(buggy).position;
+  expect(Math.hypot(out.x + 6, out.z - 20)).toBeGreaterThan(20); // driven well away from its dock
+  const stores = { store: {}, ledger: { serial: 0, rows: [] } }, seated = exportPlayer(host, lead, stores).at;
+  expect(Math.hypot(seated.x + 6, seated.z - 20)).toBeLessThan(4); // beside the buggy's dock (-6, 0, 20)
+  expect(Math.hypot(seated.x - out.x, seated.z - out.z)).toBeGreaterThan(15);
+  runtime.leave(lead.id);
+  const walking = exportPlayer(host, lead, stores).at;
+  expect(Math.hypot(walking.x - lead.position.x, walking.z - lead.position.z)).toBeLessThan(1e-6);
 });

@@ -234,6 +234,22 @@ export class VehicleRuntime {
       body.position.set(point.x, point.y, point.z); body.motor.resetAt(body.position); this.led.set(player, point);
     });
   }
+  /**
+   * MSZ19: where a seated rider's saves put them: vehicles are not saved for a player (a dock makes them), so a rider comes back
+   * on foot at the dock nearest their vehicle, on clear ground beside it, facing the dock's way. Undefined on foot.
+   */
+  docPlace(player: string): { x: number; y: number; z: number; yaw: number } | undefined {
+    const held = this.seatOf(player); if (held === undefined) return undefined;
+    const vehicle = this.get(held.vehicle), body = this.host?.players.get(player);
+    let near: VehicleDock | undefined, best = Infinity;
+    for (const dock of this.docks.values()) { const d = Math.hypot(dock.at[0] - vehicle.state.x, dock.at[2] - vehicle.state.z); if (d < best) { best = d; near = dock; } }
+    if (near === undefined) return undefined;
+    // beside the dock, past its hull's side: a vehicle parked on it stands clear
+    const side = vehicleReach(this.hulls.get(near.id) ?? []).side + 1.5, cos = Math.cos(near.yaw), sin = Math.sin(near.yaw);
+    const x = near.at[0] - side * cos, z = near.at[2] + side * sin, size = body?.motor.opts;
+    const feet = size === undefined ? undefined : clearStand(this.ports.physics(), x, z, near.at[1] + 2, size);
+    return { x, y: feet ?? near.at[1], z, yaw: near.yaw };
+  }
   /** Pose of a vehicle now. */
   pose(id: string): MoverPose { return poseOf(this.get(id).state); }
   /** How fast it goes along its heading (m/s). */
