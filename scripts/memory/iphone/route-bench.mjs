@@ -2,13 +2,14 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--route <name>] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--out <dir>] [--dry-run]
 //
 // --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
 // --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
 // --voices times every procedural voice render from the wake lock to the route's end (census.mjs), with the page clock.
 // --frames logs every frame over 45 ms from the wake lock to the route's end with the links, uploads and scene adds in it,
-// and on the phone JavaScriptCore's collections (the inspector's Heap agent), then names each frame over 50 ms's cause.
+// and on the phone JavaScriptCore's collections (the inspector's Heap agent), then names each frame over 50 ms's cause. --gpu-fence adds WebGL2 fences and a full-collection
+// sentinel (gpuFence.mjs): whether each long frame waited on the GPU or ran a full collection.
 // --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split). --legs n plays the first n segments only.
 //
 // Each run plays the route (route.mjs) once per cap, each from its own cold boot (fresh Safari on the phone, a fresh WebKit
@@ -25,6 +26,7 @@ import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone } from './safari.mjs';
+import { fenceFrames, fenceWaits, GPU_FENCE_READ, GPU_FENCE_START } from './gpuFence.mjs';
 import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, otherKind, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 
@@ -32,7 +34,7 @@ const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, route: { type: 'string' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
   slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, 'cool-outside': { type: 'boolean' }, cooled: { type: 'boolean' }, out: { type: 'string' }, udid: { type: 'string' },
-  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'cache-off': { type: 'boolean' }, frames: { type: 'boolean' }, 'with-locks': { type: 'boolean' },
+  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'cache-off': { type: 'boolean' }, frames: { type: 'boolean' }, 'gpu-fence': { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
 if (!Number.isSafeInteger(runs) || runs < 1 || caps.length === 0 || caps.some((cap) => cap !== 30 && cap !== 60)) throw new Error('--runs is a positive integer, --caps a list of 30 and 60');
@@ -82,6 +84,8 @@ async function bench() {
           if ('gesture' in driver && typeof driver.gesture === 'function') await driver.gesture(askWake).catch(() => undefined);
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
+          // --gpu-fence (DF8, mini-driftwood13n): WebGL2 fences and a full-collection sentinel beside the frame log (gpuFence.mjs)
+          if (values['gpu-fence'] === true) row.fenceLog = await driver.evaluate(GPU_FENCE_START).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           if (values.frames === true) row.frameLog = await driver.evaluate(FRAME_LOG_START).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           if (values.frames === true && 'heapStart' in driver && typeof driver.heapStart === 'function') row.heapLog = await driver.heapStart().then(() => 'logging', (/** @type {unknown} */ error) => `error: ${String(error)}`);
           if (values.voices === true) row.voiceLog = await driver.evaluate(VOICE_LOG_START).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
@@ -142,8 +146,16 @@ async function bench() {
               console.log(`  long frames by cause: ${JSON.stringify(byCause)}`);
               const gaps = gapWork(named, log ?? {});
               row.gaps = gaps;
-              named.forEach((n, i) => { const gap = gaps[i] ?? [];
-                console.log(`  long ${String(Math.round(n.ms))} ms at ${String(Math.round((n.at - (log?.from ?? 0)) / 100) / 10)} s: ${n.causes.join('; ') || 'other'}${gap.length === 0 ? '' : ` | ${gap.join(' | ')}`}`); });
+              /** @type {ReturnType<typeof fenceFrames>} */
+              let fenced = [];
+              if (values['gpu-fence'] === true) {
+                const fl = await driver.evaluate(GPU_FENCE_READ).catch(() => null);
+                row.fences = fl; fenced = fenceFrames(named, fl);
+                console.log(`  gpu fence: ${String(row.fenceLog)}; frames waited ${JSON.stringify(fenceWaits(fl))}; full collections ${String(fl?.full?.length ?? 0)} (${String(fl?.arms ?? 0)} sentinels armed)`);
+              }
+              named.forEach((n, i) => { const gap = gaps[i] ?? [], f = fenced[i];
+                const fence = f === undefined ? '' : ` | fence ${f.fences.map(([ms, waited, call]) => `${String(ms)}ms/${String(waited)}f/${String(call)}`).join(',') || 'none'}${f.gpu ? ' GPU' : ''}${f.full > 0 ? ` FULL-GC ${String(f.full)}` : ''}`;
+                console.log(`  long ${String(Math.round(n.ms))} ms at ${String(Math.round((n.at - (log?.from ?? 0)) / 100) / 10)} s: ${n.causes.join('; ') || 'other'}${gap.length === 0 ? '' : ` | ${gap.join(' | ')}`}${fence}`); });
               // mini-driftwood13i: the systems that ran over 15 ms at least once: runs, total ms, runs over 5 / 15 ms, longest
               for (const [id, n, sum, over5, over15, max] of log?.sys ?? []) console.log(`  system ${String(id)}: ${String(n)} runs, ${String(sum)} ms, >5 ${String(over5)}, >15 ${String(over15)}, max ${String(max)}`);
 

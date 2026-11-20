@@ -2,6 +2,7 @@
 // (meta project/evidence/iphone13-driftwood/).
 import { expect, test } from 'vitest';
 import { gapWork, nameLongFrames, otherKind, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
+import { fenceFrames, fenceWaits } from '../scripts/memory/iphone/gpuFence.mjs';
 import { linkStages, linkTable } from '../scripts/memory/iphone/link.mjs';
 import { legSummary, routeFor, routeTable, worstSegment, type LegSample } from '../scripts/memory/iphone/route.mjs';
 
@@ -133,4 +134,16 @@ test('DF8 (mini-driftwood13m): an other frame is a stamped callback, held by unw
   expect(otherKind(at(1500), { stamps })).toBe('held gc');
   expect(otherKind(at(1100), {})).toBeNull();
   expect(gapWork([at(1100)], { stamps })).toEqual([['event.Worker.message:onWorker:30', 'raf:tick:12', 'probe late max 0 sum 0']]);
+});
+
+// DF8 (mini-driftwood13n): a long frame's fences (issued in it or in the 40 ms before) and full collections
+test('a long frame reads its fences and full collections', () => {
+  const log = { fences: [[960, 1000, 2, 0], [1000, 1060, 2, 0], [1010, 1100, 3, 1], [1210, 1243, 2, 0]] as [number, number, number, number][],
+    full: [[1020, 1050], [3000, 3033]] as [number, number][] };
+  const [long, quiet] = fenceFrames([{ at: 1060, ms: 60 }, { at: 1300, ms: 55 }], log);
+  expect(long).toEqual({ at: 1060, fences: [[40, 2, 0], [60, 2, 0], [90, 3, 1]], full: 1, gpu: true });
+  expect(quiet).toEqual({ at: 1300, fences: [[33, 2, 0]], full: 0, gpu: false });
+  expect(fenceFrames([{ at: 1060, ms: 60 }], { fences: [[1000, 1040, 2, 9]] })[0]?.gpu).toBe(true); // a slow status call
+  expect(fenceWaits(log)).toEqual({ 2: 3, 3: 1 });
+  expect(fenceFrames([{ at: 10, ms: 60 }], null)).toEqual([{ at: 10, fences: [], full: 0, gpu: false }]);
 });
