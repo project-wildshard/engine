@@ -388,6 +388,12 @@ export class SimHost {
   private dying: readonly string[] | null = null;
   private readonly loose = new Set<string>();
   private crediting = false;
+  /** The authored deaths still waiting for the next fixed step to settle. */
+  pendingKillCredit(): string[] | undefined { return this.loose.size === 0 ? undefined : [...this.loose]; }
+  restorePendingKillCredit(saved: readonly string[] = []): void {
+    this.loose.clear();
+    for (const flag of saved) this.loose.add(flag);
+  }
   private give(players: readonly string[], flag: string): void {
     const books = questBooks(this);
     for (const player of players) if (this.players.has(player)) books.of(player).flags.set(flag);

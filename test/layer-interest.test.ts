@@ -11,7 +11,7 @@ import { SkirmisherBrain } from "../src/server/engine/ai/skirmisher";
 import { dataGroundBrains } from "../src/server/game/shardfile/dataGroundBrains";
 import { dataCreaturePorts } from "../src/shared/game/shardfile/dataCreaturePorts";
 import { loadRapier } from "../src/shared/engine/physics/rapier";
-import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from "../src/shared/engine/sim/snapshot";
+import { decodeSimSnapshot, serializeSimSnapshot, SIM_SNAPSHOT_VERSION, snapshotSimHost } from "../src/shared/engine/sim/snapshot";
 import { groundFixture } from "./fixtures/plain-ground";
 
 const rapier = loadRapier(readFileSync("public/assets/physics/rapier.wasm"));
@@ -140,12 +140,12 @@ test("the damage wake mark survives the save wire, and a version 4 save without 
     const text = serializeSimSnapshot(saved);
     expect(decodeSimSnapshot(text).bands).toEqual(saved.bands);
     const wire = JSON.parse(text) as { version: number; snapshot: { version: number; bands: { rows: { brain: Record<string, unknown> }[] } } };
-    expect(wire.version).toBe(5);
+    expect(wire.version).toBe(SIM_SNAPSHOT_VERSION);
     // what a version 4 writer left: the same clocks with no damage wake mark
     const old = { ...wire, version: 4, snapshot: { ...wire.snapshot, version: 4,
       bands: { ...wire.snapshot.bands, rows: wire.snapshot.bands.rows.map((row) => { const { damage: _, ...brain } = row.brain; return { ...row, brain }; }) } } };
     const read = decodeSimSnapshot(JSON.stringify(old));
-    expect(read.version).toBe(5);
+    expect(read.version).toBe(SIM_SNAPSHOT_VERSION);
     expect(read.bands?.rows.every((row) => row.brain.damage === undefined)).toBe(true);
     expect(() => decodeSimSnapshot(JSON.stringify({ ...old, snapshot: { ...old.snapshot, bands: wire.snapshot.bands } }))).toThrow();
   } finally {

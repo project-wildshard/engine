@@ -7,7 +7,7 @@ import { questBooks } from '../src/shared/engine/quest/players';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { createSimHost, type SimHost } from '../src/server/engine/sim';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
-import { decodeSimSnapshot, serializeSimSnapshot, snapshotSimHost } from '../src/shared/engine/sim/snapshot';
+import { decodeSimSnapshot, serializeSimSnapshot, SIM_SNAPSHOT_VERSION, snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { DeclaredQuests } from '../src/shared/game/quest/declared';
 import { InteractionRules, parseInteractionRows, playerInteractionRules } from '../src/shared/game/quest/interactionRows';
@@ -176,7 +176,7 @@ test('a version 3 save on the wire reads up: the lead\'s credit is the world\'s 
   const bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 });
   strike(host, bot.id, 1000);
   const wire = JSON.parse(serializeSimSnapshot(snapshotSimHost(host))) as { version: number; snapshot: Record<string, unknown> & { books?: Record<string, unknown>[] } };
-  expect(wire.version).toBe(5);
+  expect(wire.version).toBe(SIM_SNAPSHOT_VERSION);
   // what a version 3 writer left: no credit field, unmarked books holding no deaths, the world's flag for every one
   const { credit: _credit, ...rest } = wire.snapshot;
   const old = { ...wire, version: 3, snapshot: { ...rest, version: 3, books: wire.snapshot.books?.map(({ credited: _, ...book }) => ({ ...book, flags: [] })) } };
@@ -195,4 +195,35 @@ test('a death\'s other flags (a boss\'s deadFlag, a shard\'s death effect) are t
   expect(['dead:boar:1', 'dead:captain', 'dead:sailor'].map(flag => books.of(idle.id).flags.has(flag))).toEqual([false, false, false]);
   host.flags.set('dead:chapter'); host.step();
   expect([books.lead.player, bot.id, idle.id].map(id => books.of(id).flags.has('dead:chapter'))).toEqual([true, true, true]);
+});
+
+test('a scripted victory saved before its credit lands still pays each seat once', () => {
+  const host = createSimHost(SIM_LEVEL, { rapier });
+  const paid: string[] = [], restoredPaid: string[] = [];
+  new DeclaredQuests(host, CAMP, { coins: (_amount, entity) => { paid.push(entity); } });
+  const bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 });
+  let restored: SimHost | undefined;
+  try {
+    host.onStep('scripted-victory', (_dt, sim) => { sim.flags.set('dead:boar:1'); }, undefined, 'afterBodies');
+    host.step();
+    expect(host.flags.has('dead:boar:1')).toBe(true);
+    expect(host.questFlags.has('dead:boar:1')).toBe(false);
+    const json = serializeSimSnapshot(snapshotSimHost(host));
+    const saved = decodeSimSnapshot(json);
+    expect(saved.pendingKillCredit).toEqual(['dead:boar:1']);
+    const { snapshot } = JSON.parse(json) as { snapshot: Record<string, unknown> };
+    const { pendingKillCredit: _pendingKillCredit, ...legacy } = snapshot;
+    expect(decodeSimSnapshot({ format: 'sim.snapshot', version: 5, snapshot: { ...legacy, version: 5 } }).pendingKillCredit).toBeUndefined();
+    restored = restoreSimHost(SIM_LEVEL, { rapier }, saved, fresh => {
+      new DeclaredQuests(fresh, CAMP, { coins: (_amount, entity) => { restoredPaid.push(entity); } });
+    });
+    expect(restored.questFlags.has('dead:boar:1')).toBe(false);
+    expect(restoredPaid).toEqual([]);
+    for (let tick = 0; tick < 3; tick++) { host.step(); restored.step(); }
+    expect(restoredPaid).toEqual(paid);
+    expect([...restoredPaid].sort()).toEqual([leadPlayer(host).id, bot.id].sort());
+    expect(restored.questFlags.has('dead:boar:1')).toBe(true);
+    expect(questBooks(restored).of(bot.id).flags.has('dead:boar:1')).toBe(true);
+    expect(snapshotSimHost(restored).pendingKillCredit).toBeUndefined();
+  } finally { restored?.dispose(); host.dispose(); }
 });
