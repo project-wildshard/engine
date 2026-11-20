@@ -121,7 +121,9 @@ export class QuestRewardController {
     this.elapsed = saved.elapsed; this.carried = saved.carried;
     this.from.position.set(saved.from.x, saved.from.y, saved.from.z);
     this.from.yaw = saved.from.yaw; this.from.pitch = saved.from.pitch; this.from.phase = saved.from.phase;
-    if (this.posed) { this.player.pitch = saved.player.pitch; this.player.carried = saved.player.carried; }
+    // only a beat still running owns the carry: a finished one's save may hold the carry a room never gave back (meta
+    // QA-FEEDBACK-2026-11-20-mini row 8), and restoring it froze the player at the reward spot again after every restart
+    if (this.posed && saved.elapsed >= 0) { this.player.pitch = saved.player.pitch; this.player.carried = saved.player.carried; }
   }
   /** Only an active beat releases carry on teardown; a finished card keeps its own ownership. */
   dispose(): void {

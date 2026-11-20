@@ -182,7 +182,10 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
     at: new Vector3(need(spots.reward, 'reward pose').x, need(spots.reward, 'reward pose').y, need(spots.reward, 'reward pose').z),
     yaw: need(spots.reward, 'reward pose').yaw, pitch: need(spots.reward, 'reward pose').pitch, phase: need(spots.reward, 'reward pose').phase,
     when: () => channels?.[need(rows.reward, 'reward').field] === true || channels?.[need(rows.reward, 'reward').field] === 1,
-    finish: () => { const flag = need(rows.reward, 'reward').complete; if (book.has(flag)) return false; book.set(flag); return true; },
+    // The room has no completion card to hand the carry to, so the beat always gives the player back: `true` here kept the ride
+    // carried for good, and after QUEST COMPLETE the player (and every later one in the room) stood frozen at the reward spot
+    // (meta QA-FEEDBACK-2026-11-20-mini row 8). The completion flag is still filed once.
+    finish: () => { const flag = need(rows.reward, 'reward').complete; if (!book.has(flag)) book.set(flag); return false; },
   });
   if (rows.reward !== undefined) books.claim([rows.reward.complete]);
   const reward = rows.reward === undefined || rider === null ? null : rewardFor(rider, host.dayClock, flags);

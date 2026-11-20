@@ -21,3 +21,7 @@ QA-FEEDBACK-2026-11-20-mini rows 3 to 6, from IPHONE13-DRIFTWOOD DW8 and DW9.
   move that stalls under 2% while perched (grounded, no ground under the feet's centre) is tried again from as high as a step
   or the roof allows, and kept when it lands on walkable ground within a step, or crosses steep ground without climbing.
   Feet on ground keep their stall, so the bank and pocket prediction tests are unchanged.
+- Row 8 (mini-dw-report's recheck), frozen at the reward spot after QUEST COMPLETE: the room's reward beat (`nativeComposition`
+  `rewardFor`) said on finish that a completion card had taken the carry over, as a page's does. The room has no card, so the
+  ride stayed carried for good, through reloads and for every later player in the room. Its finish now always returns false
+  (the flag is still filed once), and a finished beat's save no longer restores the carry.
