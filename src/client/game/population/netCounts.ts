@@ -1,12 +1,16 @@
 import type { NetClient } from '@wildshard/engine/net/client';
 import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
 
-/** How many living creatures of `kind` a client's rows hold: what `PopulationProjection.placed` counts on a page. A row
- * beyond its relevance radius is not on this client, so this counts what is near the player. */
-export function netCreatureCount(client: NetClient, kind: string): number {
+/** Fill the projection's requested kinds in one pass over the rows near the player. */
+export function countNetCreatures(client: NetClient | null, counts: Map<string, number>): void {
+  for (const kind of counts.keys()) counts.set(kind, 0);
+  if (client === null || client.latest === null) return;
   const frame = client.latest;
-  let count = 0;
-  if (frame === null) return count;
-  for (const [handle, info] of client.entities) if (info.cls.cls === ANIMAL_CLASS.cls && info.initial['kind'] === kind && client.field(frame, handle, 'alive') === true) count++;
-  return count;
+  for (const info of client.entities.values()) {
+    if (info.cls.cls !== ANIMAL_CLASS.cls) continue;
+    const kind = info.initial['kind'];
+    if (typeof kind !== 'string') continue;
+    const count = counts.get(kind);
+    if (count !== undefined && client.field(frame, info.handle, 'alive') === true) counts.set(kind, count + 1);
+  }
 }

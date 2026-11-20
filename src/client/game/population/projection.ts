@@ -25,6 +25,8 @@ export class PopulationProjection {
   readonly group: THREE.Group = new THREE.Group();
   readonly placed: Record<string, number> = {};
   private readonly rows: PopulationProjectionRows;
+  private readonly countedRows: readonly (readonly [id: string, kind: string])[];
+  private readonly kindCounts = new Map<string, number>();
   private readonly rng: Rng;
   private readonly volley: RowBodySlots<Animal>;
   private readonly mesh: THREE.InstancedMesh;
@@ -41,6 +43,8 @@ export class PopulationProjection {
   constructor(private readonly animals: RowBodiesView, private readonly scene: THREE.Scene, sky: SkyRig, private readonly scope: Scope, input: unknown,
     private readonly lightScene: THREE.Scene = scene) {
     this.rows = v.parse(PopulationProjectionSchema, input); const row = this.rows;
+    this.countedRows = Object.entries(row.counts).map(([id, count]) => [id, count.kind]);
+    for (const [, kind] of this.countedRows) this.kindCounts.set(kind, 0);
     if (row.seed !== SEED) throw new Error('Population projection requires its authored seed');
     this.rng = new Rng(row.random);
     this.volley = new RowBodySlots(row.volley, app.bodies, { kind: row.id });
@@ -100,7 +104,8 @@ export class PopulationProjection {
     return this;
   }
   private counts(): void {
-    for (const [id, row] of Object.entries(this.rows.counts)) this.placed[id] = wirePage.creatures(row.kind) ?? 0;
+    wirePage.countCreatures(this.kindCounts);
+    for (const [id, kind] of this.countedRows) this.placed[id] = this.kindCounts.get(kind) ?? 0;
   }
   splash(at: THREE.Vector3, strength = 1): void {
     const row = this.rows.splash, n = Math.round(row.count * strength), rng = app.rng.stream('cosmetic');

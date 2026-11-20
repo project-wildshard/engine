@@ -5,7 +5,7 @@ import { beforeAll,expect,test } from 'vitest';
 import { NetClient } from '../src/client/engine/net/client';
 import { netNeighbourRegion } from '../src/client/game/grid/neighbourRows';
 import { NetMovers } from '../src/client/game/plugin/moverViews';
-import { netCreatureCount } from '../src/client/game/population/netCounts';
+import { countNetCreatures } from '../src/client/game/population/netCounts';
 import { NetRoom } from '../src/server/engine/net/room';
 import { SimNetWorld } from '../src/server/engine/net/simWorld';
 import { createSimHost,type SimHost } from '../src/server/engine/sim';
@@ -49,10 +49,15 @@ test('a population count off the rows is the server\'s, and a death leaves it', 
     for (const sim of bodies) { sim.harnessHold = true; sim.position.set(lead.position.x + 5, lead.position.y, lead.position.z); }
     run(30);
     const alive = (): number => bodies.filter(sim => sim.kind === kind && sim.alive).length, before = alive();
-    expect(netCreatureCount(client, kind)).toBe(before);
+    const counts = new Map([[kind, -1], ['absent', -1]]);
+    countNetCreatures(client, counts);
+    expect([...counts.values()]).toEqual([before, 0]);
     const first = bodies[0]; if (first === undefined) throw new Error('No creature on the level');
     first.alive = false; run(10);
-    expect(netCreatureCount(client, kind)).toBe(before - 1);
+    countNetCreatures(client, counts);
+    expect([...counts.values()]).toEqual([before - 1, 0]);
+    countNetCreatures(null, counts);
+    expect([...counts.values()]).toEqual([0, 0]);
   } finally { host.dispose(); }
 });
 

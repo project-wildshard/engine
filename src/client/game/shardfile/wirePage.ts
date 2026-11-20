@@ -23,7 +23,7 @@ import type { QuestProgress } from '@wildshard/engine/quest/progress';
 import { Flags } from '@wildshard/engine/world/interact/flags';
 import { netEncounterFeed, type EncounterRow } from '../boss/barFeed';
 import { netLootFeed, type LootFeed } from '../loot/feed';
-import { netCreatureCount } from '../population/netCounts';
+import { countNetCreatures } from '../population/netCounts';
 import type { MoverView } from '../../../server/game/plugin/mover';
 import type { MoverPose } from '@wildshard/format/moverPose';
 import type { PageAbility } from './clientRecipes';
@@ -351,8 +351,8 @@ export class WirePage {
   }
   /** The fights and lairs in this frame. */
   encounters(): readonly EncounterRow[] { return this.encounterRows?.() ?? NO_ROWS; }
-  /** How many living creatures of `kind` are near this player, or null with no wire. */
-  creatures(kind: string): number | null { return this.client === null ? null : netCreatureCount(this.client, kind); }
+  /** Fill the requested kinds from the living creature rows near this player. */
+  countCreatures(counts: Map<string, number>): void { countNetCreatures(this.client, counts); }
   /** What this frame's events changed: the server's flags and quest rows, then who they tell. `level` names the entered book, null any; `here` is false while a crossing is under way. */
   frame(level: string | null, here: boolean, clock: DayFollower | null = null): void {
     const { client } = this;
