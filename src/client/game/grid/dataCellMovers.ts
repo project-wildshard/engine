@@ -15,7 +15,17 @@ import { FollowedMovers, type MoverView } from '../plugin/followedMovers';
 import { moverLookKey, wirePage } from '../shardfile/wirePage';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
-import { FollowedVehicles } from '../plugin/followedVehicles';
+import { FollowedVehicles, type VehicleDress } from '../plugin/followedVehicles';
+
+/** MSZ14c: a cell's vehicles and the dress its drawn panels lend them, by instance. The two arrive in either order (the
+ *  session admits a cell's physics and draws its panels apart), so whichever comes second dresses the vehicles. */
+const cellVehicles = new Map<string, FollowedVehicles>(), cellDress = new Map<string, VehicleDress>();
+
+/** MSZ14c: a cell's drawn panels lend its vehicles their look and fx, now or once its physics admits them; until `scope` ends. */
+export function dressCellVehicles(instance: string, dress: VehicleDress, scope: Scope): void {
+  cellDress.set(instance, dress); cellVehicles.get(instance)?.dress(dress);
+  scope.onDispose(() => { if (cellDress.get(instance) === dress) cellDress.delete(instance); });
+}
 
 /** One cell's movers on this page. */
 export interface DataCellMovers {
@@ -47,7 +57,13 @@ export function installDataCellMovers(source: Pick<Shardfile, 'movers'> & Partia
     });
     return { id: row.id, view };
   });
-  if (vehicles !== null) region.scope.onDispose(() => { if (wirePage.vehicles.get('grid') === vehicles) wirePage.vehicles.delete('grid'); });
+  if (vehicles !== null) {
+    cellVehicles.set(instance, vehicles); const dress = cellDress.get(instance); if (dress !== undefined) vehicles.dress(dress);
+    region.scope.onDispose(() => {
+      if (wirePage.vehicles.get('grid') === vehicles) wirePage.vehicles.delete('grid');
+      if (cellVehicles.get(instance) === vehicles) cellVehicles.delete(instance);
+    });
+  }
   return { movers, vehicles, claim: () => {
     if (region.scope.disposed || region.scope.disposing) return;
     for (const { id, view } of views) wirePage.movers.set(id, view);

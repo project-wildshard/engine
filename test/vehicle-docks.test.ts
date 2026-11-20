@@ -20,14 +20,16 @@ import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { installDataPageMovers } from '../src/client/game/shardfile/dataPageMovers';
-import { installDataCellMovers } from '../src/client/game/grid/dataCellMovers';
+import { dressCellVehicles, installDataCellMovers } from '../src/client/game/grid/dataCellMovers';
+import { vehicleDress } from '../src/client/game/plugin/vehicleFx';
+import { Group, type Object3D } from 'three';
 import { cellRidePrompts } from '../src/client/game/grid/dataCellRides';
 import { installClientMoverOwners } from '../src/client/game/shardfile/clientMoverOwners';
 import { bindResidentWorldScope } from '../src/client/game/shardfile/runtimePagePresentation';
 import { wirePage } from '../src/client/game/shardfile/wirePage';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import type { installFollowedMovers } from '../src/client/game/plugin/followedMovers';
-import type { FollowedVehicles } from '../src/client/game/plugin/followedVehicles';
+import type { FollowedVehicles, VehicleDress } from '../src/client/game/plugin/followedVehicles';
 import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
 import { vehiclesExampleFolder } from './fixtures/vehiclesExample';
 
@@ -125,6 +127,34 @@ describe('each install path finds both docks\' vehicles', () => {
       vehicles.sync([`script:${SAIL}`], 'actor.player', { x: 6, z: 21 });
       expect(shown(cellRidePrompts(cell ?? null), { x: 6, z: 21 })).toEqual([[vehicleSeatPrompt(SAIL, 0), 'Board the land-sail']]);
     } finally { scope.dispose(); }
+  });
+
+  // MSZ14c: a grid cell admits its physics (its followed vehicles) and draws its panels apart, in either order; before this its
+  // vehicles had no look, so on the grid a vehicle was invisible. Whichever comes second dresses them, and a vehicle already
+  // out takes its panel copy where its row stands; a follower that goes hides its looks, and one back shows the same copy.
+  test('grid data cell: its vehicles take their look from its drawn panels, whichever arrives first', () => {
+    const kinds = shardVehicles(product.shardfile).kinds, page = new Scope('cell-panels');
+    const drawn = (root: Group): Object3D[] => root.children.filter(child => child.visible && !child.name.startsWith('vehicle-'));
+    const panelsIn = (root: Group): Map<string, Object3D> => new Map(kinds.map(kind => { const panel = new Group(); panel.visible = false; root.add(panel); return [kind.panel, panel] as const; }));
+    const dressed = (root: Group): VehicleDress => { const dress = vehicleDress(kinds, panelsIn(root), page); if (dress === null) throw new Error('No dress'); return dress; };
+    try {
+      const rootA = new Group(), first = new Scope('cell-a');
+      expect(installDataCellMovers(product.shardfile, { physics: new Physics(rapier), scope: first }, 'cell-a')?.vehicles?.ids()).toContain(SAIL);
+      dressCellVehicles('cell-a', dressed(rootA), page);
+      expect(drawn(rootA)).toHaveLength(1); // the shared sail, out from the start, shows once the panels come
+      first.dispose();
+      expect(drawn(rootA)).toHaveLength(0);
+      const again = new Scope('cell-a2');
+      installDataCellMovers(product.shardfile, { physics: new Physics(rapier), scope: again }, 'cell-a');
+      expect(drawn(rootA)).toHaveLength(1);
+      expect(rootA.children.filter(child => !child.name.startsWith('vehicle-'))).toHaveLength(kinds.length + 1); // no second copy
+      again.dispose();
+      const rootB = new Group(), second = new Scope('cell-b');
+      dressCellVehicles('cell-b', dressed(rootB), page);
+      installDataCellMovers(product.shardfile, { physics: new Physics(rapier), scope: second }, 'cell-b');
+      expect(drawn(rootB)).toHaveLength(1); // panels first: the follower takes them at once
+      second.dispose();
+    } finally { page.dispose(); }
   });
 
   test('dedicated cell server: the cell runs them and claims their prompts', async () => {

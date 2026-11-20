@@ -16,6 +16,9 @@ import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { ProbeAreaTarget } from '@wildshard/engine/debug/probe';
 import { moverLookKey, wirePage } from '../shardfile/wirePage';
 import { ownedLineFields } from '../shardfile/ownedLines';
+import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
+import { vehicleDress } from '../plugin/vehicleFx';
+import { dressCellVehicles } from './dataCellMovers';
 
 /** What the panels read of a cell the live host has admitted: the solids of its world, and a field's row where this page has one. */
 export interface PanelRegion {
@@ -116,6 +119,10 @@ export class NeighbourPanels {
         if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id);
       });
     }
+    // MIRROR-SALT-ZONE MSZ14c: its vehicles' look is a copy of their kind's panel, posed off their rows, with their smoke and
+    // break-apart beside it: before this a grid cell followed its vehicles with nothing drawn
+    const kinds = shardVehicles(source).kinds, dress = kinds.length === 0 ? null : vehicleDress(kinds, panels, this.ports.scope);
+    if (dress !== null) dressCellVehicles(cell.instance, dress, this.ports.scope);
     this.sync(cellPanels);
   }
 

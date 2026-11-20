@@ -40,7 +40,7 @@ export interface VehicleFxPort {
   readonly frame: (dt: number, smoking: ReadonlySet<string>) => void;
 }
 /** One vehicle this page follows: its collider in the page's physics, its drawn look, and its last row. */
-interface Followed { readonly id: string; readonly dock: VehicleDock; readonly kind: VehicleKind; readonly body: KinematicMover; readonly look: VehicleLook | null; pose: MoverPose; readonly view: MoverView }
+interface Followed { readonly id: string; readonly dock: VehicleDock; readonly kind: VehicleKind; readonly body: KinematicMover; look: VehicleLook | null; pose: MoverPose; readonly view: MoverView }
 
 /** MSZ16: what the wire says of a driven vehicle as a command goes: its row in the newest frame (when that frame carried one),
  *  and how many of the commands this page sent the server has not stepped yet, this one among them. */
@@ -59,6 +59,8 @@ export interface FollowedVehiclePorts {
   /** MSZ14b: a hurt vehicle's smoke and break-apart; none draws neither. */
   readonly fx?: VehicleFxPort;
 }
+/** MSZ14c: a page's look and fx for its vehicles, lent once its panels are drawn (a grid cell's load after its physics). */
+export interface VehicleDress { readonly look: (kind: VehicleKind, id: string) => VehicleLook | null; readonly fx?: VehicleFxPort }
 
 /**
  * MIRROR-SALT-ZONE MSZ9b: the vehicles on a page, as the server's `VehicleRuntime` puts them on the wire. Nothing steps here:
@@ -89,6 +91,8 @@ export class FollowedVehicles {
   private readonly wrecks = new Set<string>();
   /** MSZ14b: each vehicle's look, kept while it is gone so it shows again when it is back. */
   private readonly looks = new Map<string, VehicleLook | null>();
+  /** MSZ14c: the look and fx this page draws with: its ports', or the dress lent later (`dress`). */
+  private lookOf: FollowedVehiclePorts['look']; private fx: VehicleFxPort | undefined;
   /** This page's player, as its wire's welcome names it. */
   private me: string | null = null;
   /** This page's player's feet, as the last frame had them: a seat's prompt goes to the nearest free one. */
@@ -98,13 +102,20 @@ export class FollowedVehicles {
   private predicted: { readonly id: string; readonly run: VehiclePrediction } | null = null;
   private readonly shapes: HullShapes = new Map();
   constructor(vehicles: Vehicles, ports: FollowedVehiclePorts) {
-    this.vehicles = vehicles; this.ports = ports;
+    this.vehicles = vehicles; this.ports = ports; this.lookOf = ports.look; this.fx = ports.fx;
     this.kinds = new Map(vehicles.kinds.map(kind => [kind.id, kind]));
     this.docks = new Map(vehicles.docks.map(dock => [dock.id, dock]));
     this.hulls = dockHulls(vehicles);
     for (const dock of vehicles.docks) if (dock.per === 'shared') this.follow(dock.id, restPose(dock));
-    ports.scope.onDispose(() => { for (const vehicle of this.live.values()) vehicle.body.dispose(); this.live.clear(); });
+    // MSZ14c: a look outlives this follower (a grid cell's panels outlast its physics), so it hides as the follower goes
+    ports.scope.onDispose(() => { for (const vehicle of this.live.values()) vehicle.body.dispose(); this.live.clear(); for (const look of this.looks.values()) look?.hide(); });
     this.made = this.makePrompts();
+  }
+  /** MSZ14c: draw with `dress` from now on: a vehicle out with no look yet takes one where its row stands. */
+  dress(dress: VehicleDress): void {
+    this.lookOf = dress.look; this.fx = dress.fx;
+    for (const [id, look] of this.looks) if (look === null) this.looks.delete(id);
+    for (const vehicle of this.live.values()) if (vehicle.look === null) { vehicle.look = this.lookFor(vehicle.kind, vehicle.id); vehicle.look?.pose(vehicle.pose); }
   }
   /** Every vehicle this page has out now. */
   ids(): readonly string[] { return [...this.live.keys()]; }
@@ -173,7 +184,7 @@ export class FollowedVehicles {
     // one breaks apart where it stood (MSZ14b)
     for (const [id, vehicle] of this.live) if (!out.has(id)) {
       vehicle.body.dispose(); this.live.delete(id); vehicle.look?.hide();
-      if (this.wrecks.has(id)) this.ports.fx?.burst(vehicle.pose, vehicle.look?.colours?.() ?? []);
+      if (this.wrecks.has(id)) this.fx?.burst(vehicle.pose, vehicle.look?.colours?.() ?? []);
     }
     // MSZ16: out of the driver's seat (left, set down, wrecked), the vehicle follows its rows again
     if (this.predicted !== null && !this.driving(this.predicted.id)) this.predicted = null;
@@ -199,7 +210,7 @@ export class FollowedVehicles {
   frame(dt: number): void {
     const predicted = this.predicted, vehicle = predicted === null ? undefined : this.live.get(predicted.id);
     if (predicted !== null && vehicle !== undefined) { predicted.run.ease(dt); this.place(vehicle, predicted.run); }
-    const fx = this.ports.fx; if (fx === undefined) return;
+    const fx = this.fx; if (fx === undefined) return;
     for (const id of this.wornOut) { const worn = this.live.get(id); if (worn !== undefined) fx.smokeFrom(id, worn.pose, dt); }
     fx.frame(dt, this.wornOut);
   }
@@ -247,12 +258,15 @@ export class FollowedVehicles {
   private make(id: string, pose: MoverPose): Followed | null {
     const dock = this.docks.get(vehicleDockOf(id)), kind = dock === undefined ? undefined : this.kinds.get(dock.kind), boxes = dock === undefined ? undefined : this.hulls.get(dock.id);
     if (dock === undefined || kind === undefined || boxes === undefined) return null;
-    let look = this.looks.get(id);
-    if (look === undefined) { look = this.ports.look?.(kind, id) ?? null; this.looks.set(id, look); }
-    const vehicle: Followed = { id, dock, kind, body: new KinematicMover(this.ports.physics, boxes, pose, id), look, pose,
+    const vehicle: Followed = { id, dock, kind, body: new KinematicMover(this.ports.physics, boxes, pose, id), look: this.lookFor(kind, id), pose,
       view: { pose: next => { this.follow(id, next); } } };
     this.live.set(id, vehicle);
     return vehicle;
+  }
+  private lookFor(kind: VehicleKind, id: string): VehicleLook | null {
+    let look = this.looks.get(id);
+    if (look === undefined) { look = this.lookOf?.(kind, id) ?? null; this.looks.set(id, look); }
+    return look;
   }
   private makePrompts(): Interactable[] {
     const prompts: Interactable[] = [];
@@ -305,12 +319,14 @@ export class FollowedVehicles {
 /** A kind's look for one vehicle: a copy of its props panel (a library panel, drawn nowhere itself), hung beside it; hidden
  *  while the vehicle is gone (MSZ14b). */
 export function panelLook(panels: ReadonlyMap<string, Object3D> | undefined, scope: Scope): (kind: VehicleKind, id: string) => VehicleLook | null {
-  return kind => {
+  const made = new Map<string, VehicleLook>(); // one copy an id, however often a follower asks (MSZ14c: a cell re-admitted)
+  return (kind, id) => {
+    const known = made.get(id); if (known !== undefined) return known;
     const panel = panels?.get(kind.panel), parent = panel?.parent;
     if (panel === undefined || parent === null || parent === undefined) return null;
     const copy = panel.clone(); copy.visible = true; copy.matrixAutoUpdate = false; parent.add(copy);
     scope.onDispose(() => { copy.removeFromParent(); });
-    return {
+    const look: VehicleLook = {
       pose: pose => {
         copy.position.set(pose.position.x, pose.position.y, pose.position.z); copy.rotation.set(pose.euler.x, pose.euler.y, pose.euler.z, 'YXZ');
         copy.updateMatrix(); copy.visible = pose.enabled;
@@ -318,6 +334,8 @@ export function panelLook(panels: ReadonlyMap<string, Object3D> | undefined, sco
       hide: () => { copy.visible = false; },
       colours: () => panelColours(copy),
     };
+    made.set(id, look);
+    return look;
   };
 }
 

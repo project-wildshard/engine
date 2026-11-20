@@ -18,6 +18,8 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { ParticlePool } from '@wildshard/engine/fx/ParticlePool';
 import type { MoverPose } from '@wildshard/format/moverPose';
+import type { VehicleKind } from '@wildshard/format/vehicles';
+import { panelLook, type VehicleDress } from './followedVehicles';
 
 /** An RGB colour, 0 to 1 a channel. */
 export type FxColour = readonly [number, number, number];
@@ -203,4 +205,11 @@ export class VehicleFx {
   }
   /** The puffs and chunks alive after the last frame, for a probe or a test. */
   live(): { readonly puffs: number; readonly chunks: number } { return this.alive; }
+}
+
+/** MSZ14c: the look and fx a page's drawn panels lend its vehicles: a copy of each kind's panel, and the smoke and break-apart
+ *  beside them under the panels' own root. Null when no kind's panel is drawn. */
+export function vehicleDress(kinds: readonly VehicleKind[], panels: ReadonlyMap<string, THREE.Object3D> | undefined, scope: Scope): VehicleDress | null {
+  const root = kinds.map(kind => panels?.get(kind.panel)?.parent ?? null).find(parent => parent !== null) ?? null;
+  return root === null ? null : { look: panelLook(panels, scope), fx: new VehicleFx(root, scope) };
 }
