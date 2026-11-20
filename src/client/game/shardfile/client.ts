@@ -69,12 +69,12 @@ import type { GraphSources } from './clientGraphs';
 import { clientPostStack, type ClientPost } from './clientPost';
 import { loadScenePostGraphCompiler } from '@wildshard/engine/render/graphBackend';
 import { frameLookOf } from '../grid/frameLook';
-import { abilityRows, clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ClientRigLooks, type ShardViewRecipe } from './clientRecipes';
+import type { ClientRigLooks, ShardViewRecipe } from './clientRecipes';
 import { loadClientRigLooks } from './clientRigLooks';
 import { withoutRuntimeCreatures } from './runtimeCreatureOwner';
-import { clientNativeBook } from './clientNativeBook';
+import { declarePageCreatures, declarePageSpecies, type DeclaredCreatureModels } from './declaredCreatures';
 import { loadItemModels, loadStaticModels } from './itemModels';
-import { attachmentRefs, withAttachments } from './clientAttachments';
+import { attachmentRefs } from './clientAttachments';
 import { loadClientSkins, type ClientSkin } from './clientSkins';
 import { clientViews } from './clientViews';
 import { createShardfileClientScripts, captureClientScriptPosition } from './clientScripts';
@@ -453,32 +453,11 @@ export class ShardfileClient {
     await this.phase(ctx, 'kit');
   }
 
-  /** The declared species, their looks and swaps, and their models ready for the rows' bodies (the page draws the server's). */
-  private declareCreatures(ctx: ShardContext): void {
-    const runtime = ctx.game.runtime, presentation = this.presentation;
-    if (runtime === undefined || presentation === undefined) throw new Error('Declared creatures require the normal kit stage');
-    const source = this.source;
-    // TE-ENG7: two declared species on one native kind each register under a page kind of their own; rows find it by species id
-    const kinds = speciesViewKinds(source.rows), pageKind = (species: string, kind: string): string => kinds.get(species) ?? kind;
-    wirePage.declareSpecies(kinds, ctx.scope);
-    wirePage.declareAbilities(abilityRows(source.rows), ctx.scope);
-    const pageRows = source.rows.species.map((row) => ({ ...row, harvest: row.harvest ?? [], variants: row.variants.map((variant) => ({ ...variant, scale: [variant.scale[0], variant.scale[1]] as [number, number] })) }));
-    ctx.rows.species(pageSpecies(pageRows, kinds));
-    // CC28c: a body's swap look registers under its own page kind, with a copy of its species row, never its species' kind
-    const swaps = speciesSwaps(source.rows), swapped = new Map(swaps.map((swap) => [swap.look, swap])), looks = withAttachments(clientSpeciesLooks(source.rows, this.bindings.recipes, presentation.materials, this.skins, this.rigLooks), source.rows, this.attachmentModels, presentation.materials, TIER === 'phone');
-    ctx.rows.speciesLook(pageSpecies(looks.filter((look) => !swapped.has(look.id)), kinds));
-    for (const swap of swaps) {
-      const row = pageRows.find((entry) => entry.id === swap.species), look = looks.find((entry) => entry.id === swap.look);
-      if (row === undefined || look === undefined) throw new Error(`Missing swap look ${swap.look}`);
-      ctx.rows.species({ ...row, id: `${row.id}~swap`, kind: swap.kind }); ctx.rows.speciesLook({ ...look, kind: swap.kind });
-    }
-    wirePage.declareSwaps(new Map(swaps.map((swap) => [pageKind(swap.species, source.rows.species.find((row) => row.id === swap.species)?.kind ?? ''), swap])), ctx.scope);
-    runtime.hooks.animalsReady = (manager) => {
-      for (const spawn of source.creatures.spawns) {
-        const species = source.rows.species.find((row) => row.id === spawn.species); if (species === undefined) throw new Error('Missing authored creature species');
-        manager.factory.model(pageKind(species.id, species.kind), spawn.variant); continue;
-      }
-    };
+  /** What this page draws its declared bodies with (declaredCreatures.ts), loaded in its world stage. */
+  private creatureModels(): DeclaredCreatureModels {
+    const presentation = this.presentation;
+    if (presentation === undefined) throw new Error('Declared creatures require the normal kit stage');
+    return { materials: presentation.materials, skins: this.skins, rigLooks: this.rigLooks, attachmentModels: this.attachmentModels, recipes: this.bindings.recipes };
   }
 
   private kitData(ctx: ShardContext): void {
@@ -488,20 +467,13 @@ export class ShardfileClient {
     if (this.nativeFeatures) {
       if ((this.plan?.features ?? []).some(row => row.kind === 'species.program')) return;
       // OF19d2: with no `species.program` the page's species are its declared rows, registered here for `population.homes`
-      clientNativeBook(ctx).species = true;
-      if (this.source.creatures.spawns.length === 0) return;
-      this.declareCreatures(ctx);
-      // the plan's keeper boss, if it keeps one (OF19c0b): its fight's name, as the `species.program` feature registered it
-      if (ctx.product.has('sim/runtime-plan')) {
-        const owner = ctx.product.section('sim/runtime-plan').recipe.population.owner;
-        if (owner !== undefined) ctx.rows.encounter({ id: owner.actor, displayName: owner.definition.name });
-      }
+      declarePageSpecies(ctx, this.source, () => this.creatureModels());
       return;
     }
     const runtime = ctx.game.runtime, world = runtime?.world;
     if (runtime === undefined || world === null || world === undefined) throw new Error('Shardfile requires the normal kit stage');
     const source = this.source;
-    this.declareCreatures(ctx);
+    declarePageCreatures(ctx, this.source, this.creatureModels());
     const sketches = compendiumSketches(source.rows, this.assets.retained);
     for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredFolderCompendium(ctx.product, row.id, sketches) });
     ctx.rows.lootTable(source.rows.loot);

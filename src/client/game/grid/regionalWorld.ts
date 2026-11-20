@@ -90,6 +90,8 @@ import { buildRegionSky, type RegionBackdrop, type RegionSkyOutcome } from './re
 import { publishSkyClock } from '../session/clockSettings';
 import { imagesFirstPlayingBytes } from './runtimeCost';
 import { provideRuntimeFolder, runtimeFolder, shardFolderFromAdmission } from '../shardfile/runtimeFolder';
+import { loadDeclaredCreatureModels, type DeclaredCreatureModels } from '../shardfile/declaredCreatures';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { AdmittedFolder } from '../shardfile/folder';
 import { clientMaterials } from '../shardfile/clientMaterials';
 import { splatGroundDrawn } from '../shardfile/clientSplatTerrain';
@@ -355,6 +357,9 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
       const pendingPresentation = presentationReady;
       const [presentationInput] = await timeClientPreparation(identity, 'native.presentation-wait', () => pendingPresentation);
       if (presentationInput.status === 'rejected') throw presentationInput.reason;
+      // OF19d2 (K6): the declared page's own bodies draw with these materials; loaded once, on its first entered kit
+      const declaredPresentation = presentationInput.value?.presentation;
+      let declaredModels: Promise<DeclaredCreatureModels> | undefined;
       if (left() || resident.disposing) throw new Error('Regional world left before binding its presentation');
       const presented = await timeClientPreparation(identity, 'native.presentation', () => regionalPresentation(request.admitted, request.entryPoint ?? request.manifest.spawn, scene, game.renderer, resident, () => game.sky.dayNight?.hour ?? null, request.allocator, cell.instance, sky, presentationInput.value, ports.tiles));
       if (presented !== null) rendering = Promise.allSettled([presented.ready]);
@@ -394,6 +399,10 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
         region: { host, dispose: () => { resident.dispose(); }, retire: () => resident.disposeSteps(), ghostRoots: [resident] },
         ground,
         ...(presented === null ? {} : { renderReady: presented.ready }),
+        ...(declaredPresentation === undefined ? {} : { declaredCreatures: (folder: ShardFolder) => {
+          declaredModels ??= loadDeclaredCreatureModels(folder, request.admitted.source, runtimeFolder(request.admitted.source).assets.retained, declaredPresentation, resident);
+          return declaredModels;
+        } }),
         world: view => {
           if (world !== null) throw new Error('Regional world is already composed');
           if (resident.disposed) throw new Error('Regional world left before composition');

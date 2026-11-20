@@ -1027,6 +1027,7 @@
     "src/client/game/shardfile/clientModules.ts": "client",
     "src/client/game/shardfile/clientMoverOwners.ts": "client",
     "src/client/game/shardfile/clientNativeBook.ts": "client",
+    "src/client/game/shardfile/declaredCreatures.ts": "client",
     "src/client/game/shardfile/clientPlaceSets.ts": "client",
     "src/client/game/shardfile/clientPlan.ts": "client",
     "src/client/game/shardfile/cookedDocument.ts": "client",

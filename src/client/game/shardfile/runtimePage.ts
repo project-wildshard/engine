@@ -66,6 +66,8 @@ export interface RuntimePageResident {
     beforeWorld?: (context: ShardContext) => Promise<void> | void;
     /** Finish the regional shell's world stage, after native world and before its kit registration window. */
     afterWorld?: (context: ShardContext) => Promise<void> | void;
+    /** Register the page's own kit rows (OF19d2 declared species) before the plan's kit features, inside the kit window. */
+    kit?: (context: ShardContext) => Promise<void> | void;
     /** Create actual creature/equipment/play services from kit rows before native play. */
     afterKit?: (context: ShardContext) => Promise<void> | void;
     /** Apply continuation only after native play has created its complete authored encounter herd. */
@@ -505,7 +507,8 @@ export class RuntimePageSession {
       })); if (!live()) return false;
       installation.openKit();
       try { await this.stage(scope, cell.instance, 'kit', () => ownerTask(scope, async () => {
-        await enterDeclaredAudioPhase(context, 'kit'); await plugin.kit?.(context); await runtimeClientPhase(context, 'kit', resident.scope);
+        await enterDeclaredAudioPhase(context, 'kit'); await plugin.kit?.(context); await installation.kit?.(context);
+        await runtimeClientPhase(context, 'kit', resident.scope);
       })); } finally { installation.closeKit(); }
       if (!live()) return false;
       await this.stage(scope, cell.instance, 'afterKit', () => ownerTask(scope, () => installation.afterKit?.(context))); if (!live()) return false;

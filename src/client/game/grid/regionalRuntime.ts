@@ -26,6 +26,8 @@ import type { ShardWorld } from '../../../server/game/shard/world';
 import type { RuntimePageResident } from '../shardfile/runtimePage';
 import type { AdmittedFolder } from '../shardfile/folder';
 import { admittedRuntimeFolder, shardFolderFromAdmission } from '../shardfile/runtimeFolder';
+import { declarePageSpecies, pageDeclaresOwnSpecies, type DeclaredCreatureModels } from '../shardfile/declaredCreatures';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import { enteredFullMap, shiftedFullMap, shiftedMinimap } from './mapFrame';
 import type { ResidencyAllocator, ResidencyLease } from '../../../shared/game/grid/allocator';
@@ -161,6 +163,9 @@ export interface RegionalRuntimeFoundation {
   readonly afterKit: (context: ShardContext, world: ShardWorld) => Promise<{
     animals: RowBodies; wearSkin: (equipment: EquipmentService, skin: SkinDef) => void;
   }>;
+  /** OF19d2 (K6): what a declared data page draws its own declared bodies with, loaded once for the resident. Present for
+   *  every declared data page; the entered kit asks only when the page has no `species.program` (`pageDeclaresOwnSpecies`). */
+  readonly declaredCreatures?: (product: ShardFolder) => Promise<DeclaredCreatureModels>;
   /** Real runtime continuation, local purse/ownership and encounter writes; refusal keeps the source frame. */
   readonly checkpoint: () => boolean;
   /** Bring every material the entered hooks added to the program it will draw with (the region look's patches) before
@@ -352,6 +357,16 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
               }, arrivalAt());
               // Observe an early failure now; afterPlay still awaits the original rejection before readiness.
               void enteredWarm.catch(() => undefined);
+            },
+            // OF19d2 (K6, v0.1.56): a declared data page with no `species.program` registers its own declared species in its
+            // entered kit, as its standalone data client does, before the plan's kit and play features read them
+            kit: async entered => {
+              if (!pageDeclaresOwnSpecies(entered.product)) return;
+              const source = request.admitted.source, load = foundation.declaredCreatures;
+              if (load === undefined) throw new Error('Declared species page requires its regional presentation');
+              const models = source.creatures.spawns.length === 0 ? null : await load(entered.product);
+              if (owner.disposed) throw new Error('Regional runtime left while loading its declared creatures');
+              declarePageSpecies(entered, source, () => { if (models === null) throw new Error('Declared creatures were not loaded'); return models; });
             },
             afterKit: async entered => {
               const left = (): boolean => owner.disposed;
