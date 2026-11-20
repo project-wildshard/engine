@@ -16,6 +16,7 @@ import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { preloadModuleFiles, readModuleFiles } from '@wildshard/engine/boot/download';
 import { prepareBootImports, startTitleWarmup } from './bootDownloads';
 import { MISSING_SERVER, pageServerRoute } from '@wildshard/engine/game/shardfile/serverRoute';
+import { releaseInlineCandidate } from '@wildshard/engine/game/shardfile/preparedCandidate';
 /**
  * The page's module entry. Everything the game imports statically is evaluated in ONE task when a module graph
  * runs: three.js plus the ~150 game modules at once was a 115–157 ms long task at 4× CPU before the first boot step
@@ -276,7 +277,7 @@ async function enterPage(): Promise<unknown> {
       // for it: that shard's spawn set isn't its download (as startSelected's `authored`)
       const inlineShard = (menu.DEVSERVER || menu.PREPARATION_ONLY) && document.getElementById('ws-shardfile') !== null;
       // OF23a: the inline shard is admitted by its own index, never as a stale copy of a product this build pins
-      if (inlineShard) (await import('@wildshard/engine/game/shardfile/preparedCandidate')).releaseInlineCandidate(document.getElementById('ws-shardfile')?.textContent);
+      if (inlineShard) releaseInlineCandidate(document.getElementById('ws-shardfile')?.textContent);
       if (typeof slug === 'string' && !inlineShard) {
         const mode = menu.gridMode(menu.DEVSERVER), flow = pageGridRecovery() !== null || pendingGridEntry(slug) ? 'grid' : 'client';
         spawn.setSpawnPacks(runtimePacksOn());
@@ -620,7 +621,7 @@ async function startSelected(): Promise<void> {
   // SA15: `wildshard dev`'s page carries the author's shard inline; the catalogue shard's spawn set isn't its download.
   // SA43: so does `wildshard prepare`'s, a preparation-only production build; only those two builds own an inline shard
   const inlineOwner = DEVSERVER || PREPARATION_ONLY, authored = inlineOwner && document.getElementById('ws-shardfile') !== null;
-  if (authored) (await import('@wildshard/engine/game/shardfile/preparedCandidate')).releaseInlineCandidate(document.getElementById('ws-shardfile')?.textContent);
+  if (authored) releaseInlineCandidate(document.getElementById('ws-shardfile')?.textContent);
   const spawnMode = gridMode(DEVSERVER), spawnJob = authored ? null : startSpawnDownload(arrival.slug, earlyPath === 'grid' ? 'grid' : 'client', TIER,
     `${Number(spawnMode.developer)}${Number(spawnMode.devserver)}${Number(spawnMode.nineDragon)}`);
   if (spawnJob !== null) void loading.setDownloadSource(spawnJob);
