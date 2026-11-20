@@ -411,14 +411,22 @@ async function smokeApproach(page, leg, center, pitch, end) {
       .sort((a,b) => a.distance-b.distance)[0];
     if (nearest !== undefined) return roadApproach(await walkPortalExit(page,from,nearest.plan,end),leg,center,pitch);
   }
-  // Use the original gate proof's shore approaches from Driftwood's spawn.
-  /** @type {readonly (readonly [number,number])[]} */
-  let aroundHarbour = [];
-  if (from.instance === DRIFTWOOD) {
-    if (dx !== 0) aroundHarbour = [[dx*235,-194]];
-    else if (dz > 0) aroundHarbour = [[-235,-194],[-235,0],[-200,20],[-200,235]];
-  }
-  return [...aroundHarbour, /** @type {const} */ ([dx*(HALF-15),dz*(HALF-15)])]
+  return spawnApproach(from.instance, at ?? center, center, dx, dz);
+}
+
+/** A fresh guest's walk from its spawn to the gate approach, `dx`/`dz` the gate's side. Driftwood keeps the original gate
+ *  proof's shore route round its harbour. Elsewhere the walker reaches the gate's centre line first and walks along it: the
+ *  entryway's line is clear, and a straight line from the spawn can climb onto a ledge and meet a wall (mirror-salt's west).
+ * @param {string} instance @param {Point} at @param {Point} center @param {number} dx @param {number} dz @returns {ApproachPoint[]} */
+export function spawnApproach(instance, at, center, dx, dz) {
+  /** @type {(readonly [number,number])[]} */
+  let lead = [];
+  if (instance === DRIFTWOOD) {
+    if (dx !== 0) lead = [[dx*235,-194]];
+    else if (dz > 0) lead = [[-235,-194],[-235,0],[-200,20],[-200,235]];
+  } else if (dx !== 0 && Math.abs(at.z-center.z) > 3) lead = [[at.x-center.x, 0]];
+  else if (dz !== 0 && Math.abs(at.x-center.x) > 3) lead = [[0, at.z-center.z]];
+  return [...lead, /** @type {const} */ ([dx*(HALF-15),dz*(HALF-15)])]
     .map(([x,z]) => ({x:center.x+x,z:center.z+z,ride:false}));
 }
 

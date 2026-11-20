@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { approachBudget, featuredZoneEntry, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, zoneEntryCorridor, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
+import { approachBudget, featuredZoneEntry, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, zoneEntryCorridor, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
 import { zoneEntryGap } from '../scripts/page-release/flow.mjs';
 import curated from '../src/server/game/zoneSelect/featured.json';
 
@@ -155,4 +155,17 @@ test('steps round a pillar on the straight line: a hop, then side-steps that alt
   const reach = steps.map(step => { offset += (step.key === 'KeyD' ? 1 : -1)*step.ms; return Math.abs(offset); });
   expect(reach[2]).toBeGreaterThan(reach[0] ?? 0);
   expect(Math.max(...steps.map(step => step.ms))).toBeLessThanOrEqual(4000);
+});
+
+test("a fresh guest reaches the gate's centre line first, then walks along it to the approach", (): void => {
+  // mirror-salt's straight line from its spawn to the west approach climbs onto a ledge and meets a rock wall at
+  // (1455, 1717); the centre line from (1673, 1687.5) is clear (opus-gate-p0, staging 6bab8fcc)
+  const center = {x:1687.5, z:1687.5};
+  expect(spawnApproach('mirror-salt', {x:1673, z:1837.5}, center, -1, 0)).toEqual([
+    {x:1673, z:1687.5, ride:false}, {x:1452.5, z:1687.5, ride:false}]);
+  // already on the line: straight along it
+  expect(spawnApproach('open-plot-2-0', {x:-1, z:-1170}, {x:0, z:-1125}, 0, 1)).toEqual([{x:0, z:-890, ride:false}]);
+  // Driftwood keeps the shore route round its harbour
+  expect(spawnApproach('driftwood-isle', {x:-0.5, z:-194}, {x:0, z:0}, -1, 0)).toEqual([
+    {x:-235, z:-194, ride:false}, {x:-235, z:0, ride:false}]);
 });

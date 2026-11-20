@@ -15,3 +15,9 @@ The approach budget now follows the route's length at 2 m/s, with
 120 s as the floor. A walker that stalls hops once and then side-steps,
 alternating sides and stepping further each time, until it gains ground
 toward its point again.
+
+A third case came up on the rerun. mirror-salt's straight line from its
+spawn to the west approach climbs onto a ledge and runs into a rock
+wall, and side-steps don't clear it. A fresh guest away from Driftwood
+now walks to the gate's centre line first, then along that line to the
+approach. Driftwood keeps its shore route.
