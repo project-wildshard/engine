@@ -112,6 +112,15 @@ describe('the live proof refuses every socket but the staging door (J205)', () =
     expect(dial(staging, `${staging}/?chunk=driftwood-isle&at=spawn`)).toBe('opened');
     expect(dial(staging, `${staging}/?at=north_gate-2&chunk=far-reach`)).toBe('opened');
   });
+  it("admits an automated page's own agent marker (agent=<lane or 1>), bare or beside the chunk and arrival", () => {
+    for (const query of ['agent=1', 'chunk=driftwood-isle&agent=1', 'chunk=driftwood-isle&at=spawn&agent=1', 'agent=opus-gate-p0&chunk=far-reach', 'chunk=a&at=spawn&agent=lane.one'])
+      expect(dial(staging, `${staging}/?${query}`)).toBe('opened');
+  });
+  it('refuses an agent marker that is empty, repeated, not a lane name, or beside another key', () => {
+    for (const query of ['agent=', 'agent=a/b', 'agent=1&agent=2', 'agent=1&x=1', 'chunk=a&at=spawn&agent=1&extra=1', 'at=spawn&agent=1', 'agent=-x'])
+      expect(dial(staging, `${staging}/?${query}`)).toMatch(/J205 refused/u);
+    expect(dial(staging, 'wss://rooms.wildshard.io/?chunk=a&agent=1')).toMatch(/J205 refused/u);
+  });
   it('refuses production and every other host, with and without ?chunk=', () => {
     for (const host of ['wss://rooms.wildshard.io', 'wss://play.wildshard.io', 'wss://preview.wildshard.io', 'wss://staging.wildshard.io', 'ws://127.0.0.1:8787'])
       for (const suffix of ['', '/', '/?chunk=driftwood-isle']) expect(dial(staging, `${host}${suffix}`)).toMatch(/J205 refused/u);
