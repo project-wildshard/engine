@@ -1,4 +1,5 @@
 import type { Collider, Cuboid } from '@dimforge/rapier3d-simd';
+import { Euler, Quaternion, Vector3 } from 'three';
 import type { MoverBox } from '@wildshard/format/moverPose';
 import type { Physics } from '../physics/Physics';
 import type { SimCommand } from '../../../server/engine/sim';
@@ -13,7 +14,9 @@ import { CHUNK_HALF } from '../core/config';
  */
 
 /** The hull's cast box rides this far over the vehicle's base (m), clear of the ground's bumps, and is this tall: a kerb or a
- *  ramp is the floor probe's, a wall, a vehicle or a walker the cast's. */
+ *  ramp is the floor probe's, a wall, a vehicle or a walker the cast's. MSZ32: it rides the ground's pitch and roll too (the
+ *  vehicle's, from under its wheels), or on a grade past `HULL_LIFT` over its bow's reach its front edge sank into the ramp
+ *  ahead and the cast met the ground as a wall (Mirror Salt's rim road stalled a buggy at a grade of 0.22). */
 export const HULL_LIFT = 0.35, HULL_HEIGHT = 1.2;
 /** A ground normal shorter than this is a floor or a ramp, not a wall: the cast leaves it to the floor probe. */
 const WALL_NORMAL = 0.5;
@@ -54,20 +57,29 @@ export function vehicleReach(boxes: readonly MoverBox[]): VehicleReach {
  *  collider; the caller says what it was. */
 export interface HullContact { readonly at: number; readonly normal: { readonly x: number; readonly z: number }; readonly collider: Collider; readonly touching: boolean }
 
+/** Where a hull casts from: the vehicle's base, and the ground's pitch and roll under it (none: level). */
+export interface HullFrom { readonly x: number; readonly y: number; readonly z: number; readonly pitch?: number; readonly roll?: number }
+const _q = new Quaternion(), _e = new Euler(0, 0, 0, 'YXZ'), _v = new Vector3();
+
 /** One cast shape per reach, kept by whoever casts. */
 export type HullShapes = Map<string, Cuboid>;
 
 /** What a hull of `reach` meets moving by `move` from `from` at heading `yaw`, among `groups` (as `queryGroups` makes), for the
  *  colliders `keep` lets through; none, or a floor-like surface (the floor probe's), is null. */
-export function castVehicleHull(physics: Physics, shapes: HullShapes, reach: VehicleReach, from: { readonly x: number; readonly y: number; readonly z: number },
+export function castVehicleHull(physics: Physics, shapes: HullShapes, reach: VehicleReach, from: HullFrom,
   move: { readonly x: number; readonly z: number }, yaw: number, groups: number, keep: (collider: Collider) => boolean): HullContact | null {
-  const length = Math.hypot(move.x, move.z); if (length < 1e-6) return null;
-  const back = (reach.stern - reach.bow) / 2, sin = Math.sin(yaw), cos = Math.cos(yaw);
+  const flat = Math.hypot(move.x, move.z); if (flat < 1e-6) return null;
+  const back = (reach.stern - reach.bow) / 2, pitch = from.pitch ?? 0, roll = from.roll ?? 0;
   const key = `${String(reach.bow)}:${String(reach.stern)}:${String(reach.side)}`;
   let shape = shapes.get(key);
   if (shape === undefined) { shape = new physics.R.Cuboid(reach.side, HULL_HEIGHT / 2, (reach.bow + reach.stern) / 2); shapes.set(key, shape); }
-  const centre = { x: from.x + back * sin, y: from.y + HULL_LIFT + HULL_HEIGHT / 2, z: from.z + back * cos };
-  const hit = physics.world.castShape(centre, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, { x: move.x / length, y: 0, z: move.z / length }, shape, 0, length, false,
+  // the box in the vehicle's frame (as its pose: nose up, left side up), lifted off the ground under its wheels
+  const turn = _q.setFromEuler(_e.set(pitch, yaw, -roll, 'YXZ'));
+  const lift = _v.set(0, HULL_LIFT + HULL_HEIGHT / 2, back).applyQuaternion(turn), centre = { x: from.x + lift.x, y: from.y + lift.y, z: from.z + lift.z };
+  // and it moves along that ground: up the slope ahead (pitch) and across it (roll: the right side down)
+  const ahead = -Math.sin(yaw) * move.x - Math.cos(yaw) * move.z, aside = Math.cos(yaw) * move.x - Math.sin(yaw) * move.z;
+  const rise = Math.tan(pitch) * ahead - Math.tan(roll) * aside, length = Math.hypot(flat, rise);
+  const hit = physics.world.castShape(centre, turn, { x: move.x / length, y: rise / length, z: move.z / length }, shape, 0, length, false,
     physics.R.QueryFilterFlags.EXCLUDE_SENSORS, groups, undefined, undefined, keep);
   if (hit === null) return null;
   // the surface's normal, out of what was hit: against the move (a cast's two normals face each other)

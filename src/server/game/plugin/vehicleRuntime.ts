@@ -8,7 +8,7 @@ import { GROUP, queryGroups } from '@wildshard/engine/physics/groups';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { STEER_PROBE } from '@wildshard/engine/sim/moverMotion';
 import { publishScriptBody, publishWorldState, withdrawScriptBody, type StateNetRow } from '@wildshard/engine/sim/shardRows';
-import { castVehicleHull, edgeHit, firstHit, VEHICLE_EDGE_OWNER, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullShapes, type VehicleReach } from '@wildshard/engine/sim/vehicleHull';
+import { castVehicleHull, edgeHit, firstHit, VEHICLE_EDGE_OWNER, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullFrom, type HullShapes, type VehicleReach } from '@wildshard/engine/sim/vehicleHull';
 import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type VehicleImpact, type VehicleState, type VehicleStepOut, type VehicleWorld } from '@wildshard/engine/sim/vehicle';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
@@ -318,7 +318,7 @@ export class VehicleRuntime {
     walker.knockBack(walker.position.x - rx * side, walker.position.z - rz * side, Math.max(PUSH_ASIDE, impact.strength));
   }
   /** MSZ13: what vehicle `id`'s hull (its reach as one box, lifted clear of the ground) meets moving by `move` from `from`. */
-  private hullHit(id: string, reach: VehicleReach, from: { readonly x: number; readonly y: number; readonly z: number }, move: { readonly x: number; readonly z: number }, yaw: number): VehicleHit | null {
+  private hullHit(id: string, reach: VehicleReach, from: HullFrom, move: { readonly x: number; readonly z: number }, yaw: number): VehicleHit | null {
     const vehicle = this.live.get(id), riders = new Set(vehicle?.seats.filter((rider): rider is string => rider !== null));
     const hit = castVehicleHull(this.ports.physics(), this.shapes, reach, from, move, yaw, queryGroups(['WORLD', 'PLAYER', 'CREATURE'], 'WORLD'), collider => {
       const owner = tagOf(collider)?.owner; return owner !== id && !(typeof owner === 'string' && riders.has(owner));

@@ -52,8 +52,9 @@ export interface VehicleWorld {
   readonly floor: (x: number, z: number, fromY: number) => number | undefined;
   /** How far its bow and stern stand from its centre, and its half width (m): where its wheels read the ground. */
   readonly bow: number; readonly stern: number; readonly side: number;
-  /** MSZ13: the first thing its hull meets moving by (`x`, `z`) from `from` at heading `yaw`; none, only the floor probe stops it. */
-  readonly hit?: (from: { readonly x: number; readonly y: number; readonly z: number }, move: { readonly x: number; readonly z: number }, yaw: number) => VehicleHit | null;
+  /** MSZ13: the first thing its hull meets moving by (`x`, `z`) from `from` (MSZ32: on the ground's pitch and roll there) at
+   *  heading `yaw`; none, only the floor probe stops it. */
+  readonly hit?: (from: { readonly x: number; readonly y: number; readonly z: number; readonly pitch?: number; readonly roll?: number }, move: { readonly x: number; readonly z: number }, yaw: number) => VehicleHit | null;
 }
 /** MSZ13: a hit this step: how hard (the closing speed, m/s), on what, and the impulse (kg m/s, ground x and z) the other
  *  side takes; the runtime hands it on (another vehicle's velocity changes by it over its mass, a walker is pushed aside). */
