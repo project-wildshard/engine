@@ -1,6 +1,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13): the route bench's numbers. The device half runs on the iPhone 13
 // (meta project/evidence/iphone13-driftwood/).
 import { expect, test } from 'vitest';
+import { OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
 import { linkStages, linkTable } from '../scripts/memory/iphone/link.mjs';
 import { legSummary, routeFor, routeTable, worstSegment, type LegSample } from '../scripts/memory/iphone/route.mjs';
 
@@ -48,4 +49,28 @@ test('the link table times each stage from the last mark and names the biggest',
   const table = linkTable([{ kind: 'cold', at }, { kind: 'cold', at: { ...at, control: null }, error: 'never reached control in 300 s' }]);
   expect(table).toContain('Biggest stage, cold: **load**, median 30 s.');
   expect(table).toContain('**cold median** (1)');
+});
+
+test('the owner census sums each pass\'s draws by owner, per frame, and puts the renderer back', async () => {
+  const info = { render: { triangles: 0, calls: 0 } }, scene = { name: '', type: 'Scene', parent: null };
+  const palm = { name: 'palm', type: 'Mesh', parent: scene }, rock = { name: 'rock', type: 'Mesh', parent: scene };
+  const renderer = {
+    info,
+    renderBufferDirect(...args: unknown[]): void { info.render.calls += 1; info.render.triangles += args[4] === palm ? 300 : 100; },
+    shadowMap: { autoUpdate: true, render(): void { renderer.renderBufferDirect(0, 0, 0, 0, palm); } },
+  };
+  const draw = renderer.renderBufferDirect, game = { frameCount: 0, lastFrame: null, renderer };
+  const globals = globalThis as unknown as Record<string, unknown>;
+  globals['window'] = { __wildshard: { world: { game } } };
+  globals['requestAnimationFrame'] = (frame: () => void): void => {
+    setTimeout(() => { game.frameCount++; renderer.shadowMap.render(); renderer.renderBufferDirect(0, 0, 0, 0, palm); renderer.renderBufferDirect(0, 0, 0, 0, rock); frame(); }, 0);
+  };
+  try {
+    // oxlint-disable-next-line no-new-func -- the census is an in-page body, run here as the inspector runs it
+    const body = new Function(OWNER_CENSUS) as (...args: unknown[]) => void;
+    const result = await new Promise<{ frames: number; owners: [string, number, number][] }>((done) => { body(2, done); });
+    expect(result.frames).toBe(2);
+    expect(result.owners).toEqual([['shadow|Scene>palm', 1, 300], ['main|Scene>palm', 1, 300], ['main|Scene>rock', 1, 100]]);
+    expect(renderer.renderBufferDirect).toBe(draw);
+  } finally { delete globals['window']; delete globals['requestAnimationFrame']; }
 });

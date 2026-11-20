@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
-//   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C>] [--out <dir>] [--dry-run]
+//   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--route <name>] [--runs 3] [--caps 30,60] [--base <origin>]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C>] [--census] [--voices] [--out <dir>] [--dry-run]
 //
+// --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
+// --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
+// --voices times every procedural voice render from the wake lock to the route's end (census.mjs), with the page clock.
 // --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split). --legs n plays the first n segments only.
 //
 // Each run plays the route (route.mjs) once per cap, each from its own cold boot (fresh Safari on the phone, a fresh WebKit
@@ -20,18 +23,20 @@ import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone } from './safari.mjs';
+import { OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 
 const { values } = parseArgs({ options: {
-  zone: { type: 'string', default: 'driftwood-isle' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
+  zone: { type: 'string', default: 'driftwood-isle' }, route: { type: 'string' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
   slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, out: { type: 'string' }, udid: { type: 'string' },
-  'dry-run': { type: 'boolean' }, 'with-locks': { type: 'boolean' },
+  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
 if (!Number.isSafeInteger(runs) || runs < 1 || caps.length === 0 || caps.some((cap) => cap !== 30 && cap !== 60)) throw new Error('--runs is a positive integer, --caps a list of 30 and 60');
 if (!['inspector', 'webkit'].includes(values.driver)) throw new Error('--driver is inspector (the iPhone) or webkit (the desktop proxy)');
-routeFor(values.zone);
+const route = values.route ?? values.zone;
+routeFor(route);
 const base = new URL(values.base).href;
 const slots = Object.fromEntries(Object.entries(deviceSavePicks(values.slots ?? [])).map(([key, text]) => {
   try { return [key, JSON.parse(text)]; } catch { return [key, text]; }
@@ -45,7 +50,7 @@ async function bench() {
   const phone = values.driver === 'inspector';
   const tools = phone ? await phoneTools() : null;
   const environment = { zone: values.zone, base, driver: values.driver, runs, caps, slots, startedAt: new Date().toISOString(),
-    route: routeFor(values.zone), phone: tools?.facts ?? null, idleCelsius: tools?.idle ?? null };
+    routeName: route, route: routeFor(route), phone: tools?.facts ?? null, idleCelsius: tools?.idle ?? null };
   writeFileSync(join(out, 'environment.json'), JSON.stringify(environment, null, 2));
   try {
     // --ab <slot>: each run plays the slot off and on, in alternating order (ABBA), so the pairs share one idle reading
@@ -74,6 +79,7 @@ async function bench() {
           if ('gesture' in driver && typeof driver.gesture === 'function') await driver.gesture(askWake).catch(() => undefined);
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
+          if (values.voices === true) row.voiceLog = await driver.evaluate(VOICE_LOG_START).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           if ('gesture' in driver && typeof driver.gesture === 'function') row.audioUnlock = await driver.gesture(unlockAudio).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           // --profile <s>: WebKit's sampling profiler over the route's first seconds (DW2: what the long tasks are)
           if (values.profile !== undefined && 'profileStart' in driver && typeof driver.profileStart === 'function') {
@@ -93,7 +99,22 @@ async function bench() {
             })();
           }
           if ('quiet' in driver && typeof driver.quiet === 'function') await driver.quiet();
-          row.legs = await playRoute(driver, { slug: values.zone, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+          row.legs = await playRoute(driver, { slug: route, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+          if (values.voices === true) {
+            try {
+              const log = /** @type {[string, number, number, number, number][] | null} */ (await driver.evaluate(VOICE_LOG_READ));
+              row.voices = log;
+              const byFamily = new Map();
+              for (const row of log ?? []) { const family = row[0], ms = row[4], f = byFamily.get(family) ?? [0, 0, 0]; f[0]++; f[1] += ms; f[2] = Math.max(f[2], ms); byFamily.set(family, f); }
+              for (const [family, [count, ms, worst]] of [...byFamily].sort((a, b) => b[1][1] - a[1][1]).slice(0, 12)) console.log(`  voices ${family}: ${String(count)} renders, ${ms.toFixed(0)} ms, worst ${worst.toFixed(0)} ms`);
+            } catch (error) { row.voicesError = String(error); }
+          }
+          if (values.census === true) {
+            try {
+              row.census = await /** @type {any} */ (driver).evaluateAsync(OWNER_CENSUS, [10], 30_000);
+              for (const [owner, draws, triangles] of row.census?.owners?.slice(0, 12) ?? []) console.log(`  census ${String(triangles).padStart(8)} ${String(draws).padStart(5)}  ${String(owner)}`);
+            } catch (error) { row.censusError = String(error); console.log(`  census: ${row.censusError}`); }
+          }
         }
       } catch (error) { row.error = error instanceof Error ? error.message : String(error); console.log(`run ${String(run)}: ${row.error}`); }
       await profiling;
@@ -179,7 +200,7 @@ async function phoneTools() {
 }
 
 if (values['dry-run']) {
-  console.log(JSON.stringify({ zone: values.zone, runs, caps, base, driver: values.driver, slots, out, legs: routeFor(values.zone).map((leg) => `${leg.name} (${leg.kind} ${String(leg.seconds)} s)`) }, null, 2));
+  console.log(JSON.stringify({ zone: values.zone, runs, caps, base, driver: values.driver, slots, out, route, legs: routeFor(route).map((leg) => `${leg.name} (${leg.kind} ${String(leg.seconds)} s)`) }, null, 2));
 } else if (!values['with-locks']) {
   // the phone holds iphone13.lock then mini-measure.lock; the desktop proxy measures on the Mac, so mini-measure.lock only
   const root = join(homedir(), 'projects/games/wildshard/engine/tmp');
