@@ -1,5 +1,5 @@
 // ONE-FORMAT OF23c: an elite program's main is a declared body. Pine's four elites run as v1 fight programs over the native
-// roster's lair bodies; on the declared path each stands as a `creatures.spawns` row on an OF28 rank, in its program's
+// roster's lair bodies; on the declared path (Pine's own from r9) each stands as a `creatures.spawns` row on an OF28 rank, in its program's
 // spawn group (`pine.elite.<id>`), and the program drives that body: it adopts it at boot before any roster body, its own
 // hunt layer stands aside, its rank scales its health, size and blows, it dies to the lair's rules, and the lair's respawn
 // stands the same body again at the lair, whole, on its own id and rank. A save mid-fight restores it exactly.
@@ -8,9 +8,7 @@ import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
-import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
-import type { ShardRows } from '@wildshard/format/rows';
-import type { ShardCreatures } from '@wildshard/format/creatures';
+import type { Shardfile } from '@wildshard/format/shardSchema';
 import { creatureRank } from '@wildshard/format/creatureRanks';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import type { SimHost, SimValue } from '../src/server/engine/sim';
@@ -20,15 +18,11 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
-import { emptyShardfile } from '../src/shared/host/author';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
 
-const rows = JSON.parse(readFileSync('test/fixtures/pine-of23b-rows.json', 'utf8')) as {
-  rows: { species: ShardRows['species']; brains: ShardCreatures['brains']; strikes: ShardRows['strikes'] };
-};
-type Spawn = ShardCreatures['spawns'][number];
-const IRONHIDE = 'of23c.ironhide', LAIR = [-44, -76] as const, BASE_HP = 300;
+// Pine r9 declares Old Ironhide itself (OF23c) at r6's id; its variant row's 75 health, scaled by the elite rank, is r6's 300
+const IRONHIDE = 'creature:164', LAIR = [-44, -76] as const, BASE_HP = 75;
 const Value: v.GenericSchema<SimValue> = v.lazy(() => v.union([v.null(), v.boolean(), v.number(), v.string(), v.array(Value), v.record(v.string(), Value)]));
 
 async function shipped() {
@@ -41,22 +35,6 @@ async function shipped() {
   return { product, shard, assets, rapier };
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
-/** The shipped shard with Old Ironhide declared on Pine's boar row (parsed on an empty shard); its `files` stay the product's. */
-function declaring(source: Shardfile, spawns: readonly Spawn[]): Shardfile {
-  const base = emptyShardfile({ slug: 'of23c-elite', name: 'Elite', author: 'Test', revision: 1, seed: 7 });
-  const looks = rows.rows.species.map(row => ({ id: `pine.look.${row.kind}`, species: row.id, recipe: 'of23b.rig', material: null,
-    parameters: {}, animation: { recipe: 'of23b.clips', parameters: {} } }));
-  const parsed = parseShardfile({ ...base, rows: { ...base.rows, species: rows.rows.species, strikes: rows.rows.strikes, looks },
-    creatures: { ...base.creatures, brains: rows.rows.brains, spawns } });
-  // Pine r8 (pinned 4b49472a7) ships its own deer and boar rows and declares its herds: its rows stand, the fixture adds only
-  // the rows it lacks, and the test's spawns stand beside r8's
-  const own = new Set(source.rows.species.map(row => row.id)), added = parsed.rows.species.filter(row => !own.has(row.id));
-  return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...added], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
-    looks: [...source.rows.looks, ...parsed.rows.looks.filter(row => added.some(species => species.id === row.species))] },
-    creatures: { ...source.creatures, brains: [...source.creatures.brains, ...parsed.creatures.brains], spawns: [...source.creatures.spawns, ...parsed.creatures.spawns] } };
-}
-const ironhide: Spawn = { id: IRONHIDE, species: 'pine.creature.boar', variant: 'ironhide', brain: null, strike: null, seed: 5, scale: 1,
-  at: [LAIR[0], 0, LAIR[1]], yaw: 0, group: 'pine.elite.ironhide', rank: 'elite' } as Spawn;
 function resident(fixture: Shipped, shard: Shardfile, snapshot?: string): Promise<NativeHeadlessResident> {
   const product: ShardFolder = { ...fixture.product, shardfile: shard };
   return createNativeHeadlessResident({ shard, assets: fixture.assets, rapier: fixture.rapier, product }, snapshot);
@@ -70,7 +48,8 @@ function stand(host: SimHost, distance: number): void {
 }
 
 test("an elite program's main is a declared body: adopted, ranked, felled, stood again, saved", async () => {
-  const fixture = await shipped(), shard = declaring(fixture.shard, [ironhide]);
+  const fixture = await shipped(), shard = fixture.shard;
+  expect(shard.creatures.spawns.find(row => row.id === IRONHIDE)).toMatchObject({ variant: 'ironhide', group: 'pine.elite.ironhide', rank: 'elite' });
   const live = await resident(fixture, shard);
   let restored: NativeHeadlessResident | undefined;
   try {
@@ -113,23 +92,13 @@ test("an elite program's main is a declared body: adopted, ranked, felled, stood
 // OF23c (the night): a spawn script's own group lends it declared bodies too. Pine's night thralls stand as rows in
 // `pine.night`: out of the world at boot, and the night script's call stands one of them, never a roster body of theirs.
 test("a spawn script's group lends it declared bodies: absent until it spawns one", async () => {
-  const fixture = await shipped(), boar = rows.rows.species[1];
-  if (boar === undefined) throw new Error('Missing converted boar');
-  const thrallSpecies = { ...boar, id: 'of23c.boar.thrall', variants: [{ ...boar.variants[0], id: 'thrall' }], body: { ...boar.body, look: 'pine.look.thrall' } } as ShardRows['species'][number];
-  const thrall = (i: number): Spawn => ({ id: `of23c.night.${String(i)}`, species: thrallSpecies.id, variant: 'thrall', brain: null, strike: null, seed: 3 + i, scale: 1,
-    at: [-194, 0, -148], yaw: 0, group: 'pine.night' }) as Spawn;
-  const base = emptyShardfile({ slug: 'of23c-night', name: 'Night', author: 'Test', revision: 1, seed: 7 });
-  const parsed = parseShardfile({ ...base, rows: { ...base.rows, species: [thrallSpecies], strikes: rows.rows.strikes,
-    looks: [{ id: 'pine.look.thrall', species: thrallSpecies.id, recipe: 'of23b.rig', material: null, parameters: {}, animation: { recipe: 'of23b.clips', parameters: {} } }] },
-    creatures: { ...base.creatures, brains: rows.rows.brains, spawns: Array.from({ length: 6 }, (_, i) => thrall(i)) } });
-  const shard = { ...fixture.shard, rows: { ...fixture.shard.rows, species: [...fixture.shard.rows.species, ...parsed.rows.species],
-    strikes: [...fixture.shard.rows.strikes, ...parsed.rows.strikes], looks: [...fixture.shard.rows.looks, ...parsed.rows.looks] },
-    // Pine r8's own declared herds stand beside the night's group
-    creatures: { ...fixture.shard.creatures, brains: [...fixture.shard.creatures.brains, ...parsed.creatures.brains],
-      spawns: [...fixture.shard.creatures.spawns, ...parsed.creatures.spawns] } };
+  const fixture = await shipped(), shard = fixture.shard;
+  // Pine r9 declares the night's thralls itself (OF23c): its boar thralls are rows in `pine.night`
+  const night = shard.creatures.spawns.filter(row => row.group === 'pine.night' && row.variant === 'thrall' && row.species.includes('boar')).map(row => row.id);
+  expect(night.length).toBeGreaterThan(0);
   const live = await resident(fixture, shard);
   try {
-    const host = live.host, lent = Array.from({ length: 6 }, (_, i) => body(host, `of23c.night.${String(i)}`));
+    const host = live.host, lent = night.map(id => body(host, id));
     expect(lent.every(actor => !actor.alive)).toBe(true);
     // a save keeps them out of the world: the restored world's hunts leave them be too, and both worlds go on the same
     const twin = await resident(fixture, shard, serializeSimSnapshot(snapshotSimHostBytes(host)));
@@ -145,7 +114,7 @@ test("a spawn script's group lends it declared bodies: absent until it spawns on
       live.step([]);
     }
     expect(lent.some(actor => actor.alive)).toBe(true);
-    // a boar thrall the night calls is one of its lent bodies, never a new roster body (its elk still come from the roster here)
-    expect([...host.entities.values()].filter(actor => !before.has(actor.entityId) && actor.kind === 'boar' && actor.variant === 'thrall')).toEqual([]);
+    // a thrall the night calls is one of its lent bodies, never a new roster body
+    expect([...host.entities.values()].filter(actor => !before.has(actor.entityId) && actor.variant === 'thrall')).toEqual([]);
   } finally { live.dispose(); }
 }, 240_000);

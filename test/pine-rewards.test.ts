@@ -13,7 +13,7 @@ import { declaredFolderCompendium } from '../src/shared/game/shard/declaredRows'
 import { SkinLocker } from '../src/client/game/cosmetics/locker';
 import { WirePage } from '../src/client/game/shardfile/wirePage';
 import { compendiumSave, skinSave, finishPickupSave, creatureRewardSave, syncPageRewards } from '../src/shared/game/saves';
-import { encounterRows } from '../src/shared/engine/sim/encounterRows';
+import { declareOrdinaryGhosts, ordinaryGhost } from './fixtures/pine-ordinary-ghosts';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
@@ -43,23 +43,9 @@ beforeAll(async () => {
   const directory = process.env['PINE_PROOF_PRODUCT'] ?? builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory);
   const assets = runtimeAssets(product, directory);
   input = { product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
-  // ONE-FORMAT OF23c: from r9 Pine declares every body and its roster stands none. The roster has no ghost recipe,
-  // and the one standing ghost is the elite, whose finish comes from eliteDrops. These cases prove the ordinary
-  // death drop, so they declare two ordinary ghosts past Pine's own ids.
-  const spawns = product.shardfile.creatures.spawns, elite = spawns.find(row => row.variant === 'ghost');
-  const plain = spawns.find(row => row.species === elite?.species && row.rank === undefined);
-  if (elite === undefined || plain === undefined) throw new Error('Pine declares no ghost or plain deer');
-  const top = Math.max(...spawns.flatMap(row => /^creature:(\d+)$/u.exec(row.id)?.[1] ?? []).map(Number));
-  for (const at of [1, 2]) spawns.push({ ...plain, variant: elite.variant, seed: elite.seed, scale: elite.scale, id: `creature:${String(top + at)}`, at: [5 + at * 40, elite.at[1], -225] });
+  declareOrdinaryGhosts(product.shardfile);
 });
-/** An ordinary (not elite) standing ghost stag, moved to the reward spot. */
-function ghost(grid: StandaloneGrid) {
-  const elites = new Set([...encounterRows(grid.host).values()].map(read => read().body));
-  const body = [...grid.host.entities].find(([id, actor]) => actor.variant === 'ghost' && actor.alive && !elites.has(id))?.[1];
-  if (body === undefined) throw new Error('No ordinary ghost stag standing');
-  body.position.set(5, body.position.y, -225);
-  return body;
-}
+const ghost = (grid: StandaloneGrid) => ordinaryGhost(grid.host);
 // Every reward case stays inside Pine. The real standalone host permits no
 // road strips for cell-local proofs; road crossings retain their own bake.
 async function boot(storage: PageStorage, lone?: true, identity?: string, refused?: (error: unknown) => void) {

@@ -29,8 +29,11 @@ for (const [slug,kind] of [['pine-hollow','antler-king']] as readonly (readonly 
     const preparation={product,shard:product.shardfile,assets,rapier},resident=await createNativeProofResident(preparation,prepareFolderPlan);
     let resumed:Awaited<ReturnType<typeof createNativeProofResident>>|undefined;
     try {
-      const host=resident.host,spawn=product.shardfile.runtime?.spawns?.bosses.find(row=>row.kind===kind);
-      if(spawn===undefined)throw new Error('Missing retained boss row');
+      // Pine r9 (OF23d) declares the King in his fight's group, not as a retained boss row: either names where he stands
+      const host=resident.host,retained=product.shardfile.runtime?.spawns?.bosses.find(row=>row.kind===kind)?.at;
+      const declared=product.shardfile.creatures.spawns.find(row=>row.group==='pine.king'&&row.id==='pine.antler-king')?.at;
+      const spawn={at:retained??(declared===undefined?undefined:[declared[0],declared[2]] as const)};
+      if(spawn.at===undefined)throw new Error('Missing King row');
       const incoming: number[] = [];
       host.events.answer('damage.modify',request=>{
         if(request?.target!==leadPlayer(host).health)return request;

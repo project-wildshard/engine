@@ -10,10 +10,9 @@ import { parseDoc } from '../src/server/host/dedicated/playerDoc';
 import { validPlayerStore } from '../src/server/host/dedicated/playerStore';
 import type { SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import { serverInput } from './fixtures/dedicated/roomBench';
-import * as v from 'valibot';
 import { readReleaseFile } from '../src/server/host/dedicated/releaseFile';
 import { Vector3 } from 'three';
-import { populationRoster } from '../src/server/game/population/roster';
+import { declareOrdinaryGhosts, ordinaryGhost } from './fixtures/pine-ordinary-ghosts';
 import { mountedPlayerOf } from '../src/server/game/riding/native';
 import { exportPlayer, importPlayer } from '../src/server/host/dedicated/playerDoc';
 
@@ -32,6 +31,7 @@ test('reward documents are admitted only with valid reward data', () => {
 
 test('reward profiles checkpoint, restart on another seat, and release both identities', async () => {
   const input = await serverInput('pine-hollow'), writes: SaveWrite[] = [];
+  declareOrdinaryGhosts(input.shard);
   const boot = (): Promise<DedicatedRoom> => DedicatedRoom.boot({ slug: 'pine-hollow', build: '', bootId: 'rewards', input, now: () => 0, post: row => { if (row.kind === 'save') writes.push(row.write); if (row.kind === 'refused') throw new Error(row.reason); } });
   const enter = (room: DedicatedRoom, device: string, saved?: SaveWrite): ReturnType<typeof directLoopback> => {
     const link = directLoopback(), client = new NetClient(link.client);
@@ -46,9 +46,7 @@ test('reward profiles checkpoint, restart on another seat, and release both iden
     const goods = room.cell.owned.of('actor.player');
     goods.file({ grant: 'item', name: 'ghost-stag', amount: 1 });
     expect(goods.count('ghost-stag'), 'a finish is reward state, never inventory').toBe(0);
-    if (input.product === undefined) throw new Error('No product');
-    const { step } = v.parse(v.object({ step: v.string() }), await input.product.json('actors/roster.json'));
-    const deer = populationRoster(room.host, step).spawn('deer', 5, -225, 0, 'ghost'), player = room.bodyOf('a');
+    const deer = ordinaryGhost(room.host), player = room.bodyOf('a');
     if (player === undefined) throw new Error('No player');
     expect(room.host.combat.hit({ source: player.health, sourceTags: ['actor.player', 'cover.checked'], target: deer.combatActor(), amount: deer.maxHp * 10, point: deer.position.clone(), dir: new Vector3(0, 0, 1) })?.killed).toBe(true);
     room.tick(); room.tick();

@@ -1,7 +1,6 @@
 // ONE-FORMAT OF23e3: a native assembly with no `weather.*` host runs the program a `world/weather` row names, as the
-// `weather.program` host did. Pine's plan names that host over `world/weather.json`; its move drops it for a row. The proof
-// is the pinned Pine product run beside the same product with the host cut from its plan and the row declared: the whole
-// saved world matches tick for tick (the weather, its shelter and the herds that read it), and saves and restores exactly.
+// `weather.program` host did. Since r9 Pine's plan names no weather host and declares the row, so the pinned Pine product
+// is the proof: it runs its weather from the row and saves and restores exactly; with the row cut it does not stand.
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
@@ -27,15 +26,11 @@ async function shipped() {
   return { product, shard, assets, rapier };
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
-type Plan = { features: { host: string; program?: { file: string } }[] };
-/** The product with its weather host cut from its native plan and, when `row`, the program it read declared as a row. */
-async function cut(fixture: Shipped, row: boolean): Promise<ShardFolder> {
-  const plan = JSON.parse(new TextDecoder().decode(await fixture.product.file(NATIVE_ASSEMBLY_FILE))) as Plan;
-  const host = plan.features.find(feature => feature.host === 'weather.program');
-  if (host?.program === undefined) throw new Error('Pine names no weather program host to cut');
-  const bytes = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.filter(feature => feature !== host) }));
-  const shardfile = row ? { ...fixture.shard, rows: { ...fixture.shard.rows, weather: [...fixture.shard.rows.weather, { id: 'pine.weather', program: host.program.file }] } } : fixture.shard;
-  return { ...fixture.product, shardfile, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : fixture.product.file(name) };
+type Plan = { features: { host: string }[] };
+/** The product with its weather row cut. */
+function cut(fixture: Shipped): ShardFolder {
+  const shardfile = { ...fixture.shard, rows: { ...fixture.shard.rows, weather: [] } };
+  return { ...fixture.product, shardfile };
 }
 const open = (fixture: Shipped, product: ShardFolder, snapshot?: string): Promise<NativeHeadlessResident> =>
   createNativeHeadlessResident({ shard: product.shardfile, assets: fixture.assets, rapier: fixture.rapier, product }, snapshot);
@@ -48,18 +43,22 @@ function run(live: NativeHeadlessResident, ticks: number): string[] {
   return digests;
 }
 
-test('Pine with its weather program as a row and no weather host runs the same world, and saves and restores', async () => {
-  const fixture = await shipped(), whole = await open(fixture, fixture.product), rowed = await cut(fixture, true), bare = await open(fixture, rowed);
+test('Pine with its weather program as a row and no weather host runs its weather, and saves and restores', async () => {
+  const fixture = await shipped();
+  const plan = JSON.parse(new TextDecoder().decode(await fixture.product.file(NATIVE_ASSEMBLY_FILE))) as Plan;
+  expect(plan.features.filter(feature => feature.host.startsWith('weather.')), 'Pine r9 names no weather host').toEqual([]);
+  expect(fixture.shard.rows.weather.length, 'Pine r9 declares its weather row').toBeGreaterThan(0);
+  const live = await open(fixture, fixture.product);
   let restored: NativeHeadlessResident | undefined;
   try {
-    expect(run(bare, 1200)).toEqual(run(whole, 1200));
-    restored = await open(fixture, rowed, serializeSimSnapshot(snapshotSimHostBytes(bare.host)));
-    expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(bare.host)));
-    expect(run(restored, 300)).toEqual(run(bare, 300));
-  } finally { restored?.dispose(); bare.dispose(); whole.dispose(); }
+    run(live, 1200);
+    restored = await open(fixture, fixture.product, serializeSimSnapshot(snapshotSimHostBytes(live.host)));
+    expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));
+    expect(run(restored, 300)).toEqual(run(live, 300));
+  } finally { restored?.dispose(); live.dispose(); }
 }, 300_000);
 
-test('Pine with its weather host cut and no row does not stand its weather', async () => {
+test('Pine with its weather row cut does not stand its weather', async () => {
   const fixture = await shipped();
-  await expect(open(fixture, await cut(fixture, false)).then(live => { try { run(live, 120); } finally { live.dispose(); } })).rejects.toThrow();
+  await expect(open(fixture, cut(fixture)).then(live => { try { run(live, 120); } finally { live.dispose(); } })).rejects.toThrow();
 }, 120_000);
