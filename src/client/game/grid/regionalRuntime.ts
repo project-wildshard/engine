@@ -46,6 +46,8 @@ import { readOnlySave, wirePage } from '../shardfile/wirePage';
 import { Owned } from '../../../shared/game/loot/Owned';
 import type { EnteredEquipment } from './enteredEquipment';
 import { regionalKitOnWire } from './regionalKitWire';
+import { hasDeclaredHud } from '../shardfile/declaredHud';
+import { enterDataCellHud } from './dataCellHud';
 import { SkinLocker } from '../cosmetics/locker';
 import { coverRuntimeAssets } from './assetResidency';
 import { FrameCamera } from '@wildshard/engine/world/frameCamera';
@@ -449,6 +451,14 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
               // OF19d: a cell whose server runs its held weapon takes the road's wire, so the server hears its lash
               const wire = regionalKitOnWire(shardFolderFromAdmission(request.admitted, scope));
               if (equipment !== undefined) installEnteredRuntimeService(entered, entry => { equipment.bind(weapons, entry, { wire }); });
+              // OF22e2 audit: a declared page's `ui` rows and boss panels (Far Reach's Storm Roc, Sunscar's Dune Matriarch). The
+              // one-shard page draws them in ShardfileClient (nativeHud); nothing on the grid built that client, so the boss
+              // bar never showed from a grid entry. They mount on the entered cell as a data cell's do (dataCellHud.ts).
+              const declared = request.admitted.source;
+              if (hasDeclaredClientPage(declared) && hasDeclaredHud(declared)) {
+                const hudPlay = localPlay;
+                installEnteredRuntimeService(entered, entry => { enterDataCellHud(declared, { context: request.page.context, play: hudPlay }, entry, request.cell.instance, () => true); });
+              }
               for (const animal of localPlay.animals.animals) animal.motionConstraint = hostConstraint(host, animal.dims.bodyRadius * animal.scale);
               // G217 stays up until the actual page composer has warmed this newly entered world and kit.
               // Authored ctx.root is a sibling of the native scene under this view; its lights draw on entry too.
