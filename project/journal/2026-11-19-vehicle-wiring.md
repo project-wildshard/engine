@@ -58,3 +58,15 @@ That broke `dedicated-vehicle-drive`, whose bot steered by its view, so it now s
 shows R N D off the speed along the heading. The touch tape on local phone WebKit (`scripts/parity/vehicle-touch.mjs`)
 is split out as MSZ12b, because no local build carries a vehicle yet: sharddev's example is engine-test-only until it
 pins format 0.53.0, and Mirror Salt's vehicles come with MSZ22.
+
+## MSZ13: collisions bounce (opus-mirrorsalt-m4)
+
+A vehicle's hull now meets the world by its own shape cast (a box of its reach, lifted 0.35 m clear of the ground's
+bumps, cast as WORLD so it sees players and creatures), ahead of the old bow probe. `stepVehicle` stops the move at the
+hit and `bounce` reflects the velocity: the closing part comes back by the restitution, shared by the two masses (a
+static solid takes none), and a scrape costs speed along the surface, so a glancing hit keeps most of it. The other side
+takes the opposite impulse: another vehicle's velocity changes by it over its mass, a walker is knocked aside (no harm,
+restitution 0, the vehicle slows through). A creature has no push law yet: the hull bumps it once and rolls on through
+an overlap (MSZ14 brings its hit by speed). Each hit over 0.5 m/s is an impact with its strength (`runtime.impacts()`)
+for MSZ14 and MSZ15. The floor probe still stops a ledge the cast cannot see, but no longer zeroes a bounce. Two cast
+gotchas: query as WORLD (as PLAYER the filter skipped the wall), and read `normal1` (the hit collider's) facing the move.

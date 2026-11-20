@@ -4,10 +4,12 @@ import { KinematicMover } from '@wildshard/engine/physics/mover';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { clearStand, floorBelow } from '@wildshard/engine/physics/query';
 import { tagOf } from '@wildshard/engine/physics/surface';
+import { GROUP, queryGroups } from '@wildshard/engine/physics/groups';
+import type { Cuboid } from '@dimforge/rapier3d-simd';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { STEER_PROBE } from '@wildshard/engine/sim/moverMotion';
 import { publishScriptBody, publishWorldState, withdrawScriptBody, type StateNetRow } from '@wildshard/engine/sim/shardRows';
-import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleState, type VehicleWorld } from '@wildshard/engine/sim/vehicle';
+import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type VehicleImpact, type VehicleState, type VehicleStepOut, type VehicleWorld } from '@wildshard/engine/sim/vehicle';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
 import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
@@ -88,6 +90,19 @@ const Saved = v.strictObject({
 type SavedVehicles = v.InferOutput<typeof Saved>;
 
 const poseOf = (state: VehicleState): MoverPose => ({ position: { x: state.x, y: state.y, z: state.z }, euler: { x: state.pitch, y: state.yaw, z: -state.roll }, enabled: true });
+/** MSZ13: the hull's cast box rides this far over the vehicle's base (m), clear of the ground's bumps, and is this tall: a
+ *  kerb or a ramp is the floor probe's, a wall, a vehicle or a walker the cast's. */
+const HULL_LIFT = 0.35, HULL_HEIGHT = 1.2;
+/** A ground normal shorter than this is a floor or a ramp, not a wall: the cast leaves it to the floor probe. */
+const WALL_NORMAL = 0.5;
+/** What a vehicle's hull meets besides a static solid: another vehicle gives a little back; a walker or a creature (kg) is
+ *  pushed aside, so gives nothing back. */
+const VEHICLE_RESTITUTION = { solid: 0.35, vehicle: 0.3, walker: 0 } as const;
+const WALKER_MASS = 90, CREATURE_MASS = 150;
+/** m/s a walker in a vehicle's way is pushed aside at, at least: no harm (MSZ13), just out of the way. */
+const PUSH_ASIDE = 4;
+/** MSZ13: one hit this step, as the host's sounds and damage read it (MSZ14, MSZ15). */
+export interface VehicleImpactEvent { readonly vehicle: string; readonly strength: number; readonly owner: unknown }
 /** A point of the kind's frame (x right, y up, z back) in the cell, about its heading. */
 function worldPoint(state: VehicleState, local: readonly [number, number, number]): { x: number; y: number; z: number } {
   const cos = Math.cos(state.yaw), sin = Math.sin(state.yaw), [x, y, z] = local;
@@ -187,11 +202,18 @@ export class VehicleRuntime {
   pose(id: string): MoverPose { return poseOf(this.get(id).state); }
   /** How fast it goes along its heading (m/s). */
   speed(id: string): number { return this.get(id).state.forward; }
+  /** MSZ13: the hits of the last step, strongest first. */
+  impacts(): readonly VehicleImpactEvent[] { return this.lastImpacts; }
+  private lastImpacts: VehicleImpactEvent[] = [];
   /** One fixed step of every vehicle: drive, pose the body, then despawn or bring home the idle ones. */
   step(dt: number): void {
+    const out: VehicleStepOut = { blocked: false, sliding: 0, impact: null };
+    this.lastImpacts = [];
     for (const vehicle of this.live.values()) {
       const driver = this.driver(vehicle.id), command = driver === null ? NEUTRAL : this.ports.stick(driver, vehicle.state.yaw) ?? NEUTRAL;
-      vehicle.state = stepVehicle(vehicle.state, command, vehicle.kind.handling, vehicle.world, dt);
+      out.impact = null;
+      vehicle.state = stepVehicle(vehicle.state, command, vehicle.kind.handling, vehicle.world, dt, out);
+      if (out.impact !== null && out.impact !== undefined) this.hand(vehicle, out.impact);
       vehicle.body?.setPose(poseOf(vehicle.state));
       if (driver !== null) continue;
       vehicle.idle += dt;
@@ -200,6 +222,59 @@ export class VehicleRuntime {
       const [x, , z] = vehicle.dock.at;
       if (vehicle.idle >= vehicle.dock.respawn && Math.hypot(vehicle.state.x - x, vehicle.state.z - z) > HOME_RADIUS) this.home(vehicle);
     }
+  }
+  /** MSZ13: a hit's other side: another vehicle takes the impulse over its mass, a walker is pushed aside (no harm); the hit is
+   *  heard (`impacts`). */
+  private hand(vehicle: Live, impact: VehicleImpact): void {
+    this.lastImpacts.push({ vehicle: vehicle.id, strength: impact.strength, owner: impact.owner });
+    this.lastImpacts.sort((a, b) => b.strength - a.strength);
+    const other = typeof impact.owner === 'string' ? this.live.get(impact.owner) : undefined;
+    if (other !== undefined) {
+      const mass = other.kind.handling.mass, s = other.state, dx = impact.impulse.x / mass, dz = impact.impulse.z / mass;
+      const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw), rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
+      other.state = { ...s, forward: s.forward + dx * fx + dz * fz, slip: s.slip + dx * rx + dz * rz };
+      return;
+    }
+    const walker = typeof impact.owner === 'string' ? this.host?.players.get(impact.owner) : undefined;
+    if (walker === undefined || this.seatOf(walker.id) !== undefined) return;
+    // aside: away from the vehicle's line, on whichever side the walker stands
+    const s = vehicle.state, rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw), side = (walker.position.x - s.x) * rx + (walker.position.z - s.z) * rz >= 0 ? 1 : -1;
+    walker.knockBack(walker.position.x - rx * side, walker.position.z - rz * side, Math.max(PUSH_ASIDE, impact.strength));
+  }
+  /** MSZ13: what vehicle `id`'s hull (its reach as one box, lifted clear of the ground) meets moving by `move` from `from`. */
+  private hullHit(id: string, reach: { readonly bow: number; readonly stern: number; readonly side: number }, from: { readonly x: number; readonly y: number; readonly z: number }, move: { readonly x: number; readonly z: number }, yaw: number): VehicleHit | null {
+    const physics = this.ports.physics(), length = Math.hypot(move.x, move.z); if (length < 1e-6) return null;
+    const vehicle = this.live.get(id), riders = new Set(vehicle?.seats.filter((rider): rider is string => rider !== null));
+    const back = (reach.stern - reach.bow) / 2, sin = Math.sin(yaw), cos = Math.cos(yaw);
+    const shape = this.hullShape(physics, reach);
+    const centre = { x: from.x + back * sin, y: from.y + HULL_LIFT + HULL_HEIGHT / 2, z: from.z + back * cos };
+    const hit = physics.world.castShape(centre, { x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) }, { x: move.x / length, y: 0, z: move.z / length }, shape, 0, length, false,
+      physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(['WORLD', 'PLAYER', 'CREATURE'], 'WORLD'), undefined, undefined, collider => {
+        const owner = tagOf(collider)?.owner; return owner !== id && !(typeof owner === 'string' && riders.has(owner));
+      });
+    if (hit === null) return null;
+    // the surface's normal, out of what was hit: against the move (a cast's two normals face each other)
+    const ground = Math.hypot(hit.normal1.x, hit.normal1.z); if (ground < WALL_NORMAL) return null;
+    const facing = hit.normal1.x * move.x + hit.normal1.z * move.z > 0 ? -1 : 1;
+    const owner = tagOf(hit.collider)?.owner ?? null, normal = { x: facing * hit.normal1.x / ground, z: facing * hit.normal1.z / ground };
+    const other = typeof owner === 'string' ? this.live.get(owner) : undefined, walker = typeof owner === 'string' ? this.host?.players.get(owner) : undefined;
+    const at = hit.time_of_impact / length;
+    if (other !== undefined) {
+      const s = other.state, fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw), rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
+      return { at, normal, owner, mass: other.kind.handling.mass, velocity: { x: fx * s.forward + rx * s.slip, z: fz * s.forward + rz * s.slip }, restitution: VEHICLE_RESTITUTION.vehicle };
+    }
+    if (walker !== undefined) return { at, normal, owner, mass: WALKER_MASS, velocity: { x: walker.velocity.x, z: walker.velocity.z }, restitution: VEHICLE_RESTITUTION.walker };
+    const creature = ((hit.collider.collisionGroups() >>> 16) & GROUP.CREATURE) !== 0;
+    // a creature has no push law yet (MSZ14 brings its hit by speed): the hull bumps it, slowing, then rolls on through
+    if (creature) return hit.time_of_impact <= 1e-4 ? null : { at, normal, owner, mass: CREATURE_MASS, velocity: { x: 0, z: 0 }, restitution: VEHICLE_RESTITUTION.walker };
+    return { at, normal, owner, mass: Infinity, velocity: { x: 0, z: 0 }, restitution: VEHICLE_RESTITUTION.solid };
+  }
+  private readonly shapes = new Map<string, Cuboid>();
+  private hullShape(physics: Physics, reach: { readonly bow: number; readonly stern: number; readonly side: number }): Cuboid {
+    const key = `${String(reach.bow)}:${String(reach.stern)}:${String(reach.side)}`;
+    let shape = this.shapes.get(key);
+    if (shape === undefined) { shape = new physics.R.Cuboid(reach.side, HULL_HEIGHT / 2, (reach.bow + reach.stern) / 2); this.shapes.set(key, shape); }
+    return shape;
   }
   /** Lead each seated body onto its seat; a seat whose rider left the world, parked, died or was moved away empties. */
   seat(host: Pick<SimHost, 'players' | 'parked'>): void {
@@ -304,7 +379,8 @@ export class VehicleRuntime {
     // the floor under it, through its own hull (or it would climb onto itself)
     const floor = (x: number, z: number, fromY: number): number | undefined => floorBelow(this.ports.physics(), x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== id);
     const body = this.ports.restoring === true && handle === undefined && this.host === null ? null : new KinematicMover(this.ports.physics(), boxes, poseOf(state), id, false, handle);
-    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reachOf(boxes) }, state, seats: kind.seats.map(() => null), idle: 0 };
+    const reach = reachOf(boxes);
+    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, hit: (from, move, yaw) => this.hullHit(id, reach, from, move, yaw) }, state, seats: kind.seats.map(() => null), idle: 0 };
     this.live.set(id, vehicle); this.claim(vehicle);
     return id;
   }

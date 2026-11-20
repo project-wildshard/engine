@@ -34,18 +34,61 @@ export interface VehicleState {
   readonly pitch: number;
   readonly roll: number;
 }
+/**
+ * MIRROR-SALT-ZONE MSZ13: what the hull meets along a step's move: how far along it (0 to 1), the surface's ground normal
+ * (x, z, out of what was hit, toward the vehicle), what was hit (its owner) with its mass (kg; `Infinity` for a static solid)
+ * and ground velocity (m/s), and how much of the closing speed comes back (0 a walker, who is pushed aside instead).
+ */
+export interface VehicleHit {
+  readonly at: number;
+  readonly normal: { readonly x: number; readonly z: number };
+  readonly owner: unknown;
+  readonly mass: number;
+  readonly velocity: { readonly x: number; readonly z: number };
+  readonly restitution: number;
+}
 /** What the world lends a step: the floor probe (down from `fromY`, through its own hull) and the hull's reach. */
 export interface VehicleWorld {
   readonly floor: (x: number, z: number, fromY: number) => number | undefined;
   /** How far its bow and stern stand from its centre, and its half width (m): where its wheels read the ground. */
   readonly bow: number; readonly stern: number; readonly side: number;
+  /** MSZ13: the first thing its hull meets moving by (`x`, `z`) from `from` at heading `yaw`; none, only the floor probe stops it. */
+  readonly hit?: (from: { readonly x: number; readonly y: number; readonly z: number }, move: { readonly x: number; readonly z: number }, yaw: number) => VehicleHit | null;
 }
+/** MSZ13: a hit this step: how hard (the closing speed, m/s), on what, and the impulse (kg m/s, ground x and z) the other
+ *  side takes; the runtime hands it on (another vehicle's velocity changes by it over its mass, a walker is pushed aside). */
+export interface VehicleImpact { readonly strength: number; readonly owner: unknown; readonly impulse: { readonly x: number; readonly z: number } }
 /** What a step found besides the next state. */
 export interface VehicleStepOut {
   /** A wall stopped it this step. */
   blocked: boolean;
   /** The slide across its heading (m/s) after the tyres pulled: a skid sounds from it (MSZ15). */
   sliding: number;
+  /** MSZ13: what its hull hit this step, if anything. */
+  impact?: VehicleImpact | null;
+}
+
+/** MSZ13: how much of the closing speed a scrape along a hit surface costs per unit of the hit's impulse (kinetic friction):
+ *  a head-on hit stops along the normal, a glancing one keeps most of its speed along the wall. */
+export const VEHICLE_SCRAPE = 0.3;
+/** Closing speeds (m/s) under this are a touch, not a hit: the vehicle settles against what it leans on, with no impact. */
+export const VEHICLE_TOUCH = 0.5;
+
+/**
+ * MSZ13: the velocity `v` (ground x, z) after a hit: the closing part along the normal comes back by the restitution, shared
+ * by the two masses (an immovable solid takes none of it), and a scrape costs some of the speed along the surface. The other
+ * side takes the opposite impulse.
+ */
+export function bounce(v: { readonly x: number; readonly z: number }, mass: number, hit: VehicleHit): { readonly velocity: { readonly x: number; readonly z: number }; readonly impact: VehicleImpact | null } {
+  const n = hit.normal, rx = v.x - hit.velocity.x, rz = v.z - hit.velocity.z, closing = rx * n.x + rz * n.z;
+  if (closing >= 0) return { velocity: v, impact: null }; // parting: nothing to resolve
+  const share = 1 / mass + (Number.isFinite(hit.mass) && hit.mass > 0 ? 1 / hit.mass : 0);
+  const j = -(1 + Math.max(0, Math.min(1, hit.restitution))) * closing / share;
+  let x = v.x + n.x * j / mass, z = v.z + n.z * j / mass;
+  // the scrape: along the surface, at most what slides along it
+  const tx = rx - closing * n.x, tz = rz - closing * n.z, sliding = Math.hypot(tx, tz);
+  if (sliding > 1e-6) { const cut = Math.min(sliding, VEHICLE_SCRAPE * j / mass); x -= tx / sliding * cut; z -= tz / sliding * cut; }
+  return { velocity: { x, z }, impact: -closing < VEHICLE_TOUCH ? null : { strength: -closing, owner: hit.owner, impulse: { x: -n.x * j, z: -n.z * j } } };
 }
 
 /** m/s². */
@@ -123,14 +166,25 @@ export function stepVehicle(state: VehicleState, command: VehicleCommand, handli
   const forwardX = -Math.sin(yaw), forwardZ = -Math.cos(yaw), rightX = Math.cos(yaw), rightZ = -Math.sin(yaw);
   const dx = (forwardX * forward + rightX * slip) * dt, dz = (forwardZ * forward + rightZ * slip) * dt;
   const backing = forward < 0, facing = backing ? yaw + Math.PI : yaw, reach = backing ? world.stern : world.bow;
-  const probes = Math.max(1, Math.ceil(Math.hypot(dx, dz) / WALL_PROBE));
+  // MSZ13: the hull's own cast first: a hit stops the move there and bounces the velocity off what it met
+  const cast = world.hit?.(state, { x: dx, z: dz }, yaw) ?? null;
+  // a hull already touching something it is not driving into (parked against a wall, turning off it) moves on freely
+  const hit = cast !== null && cast.at <= 1e-4 && dx * cast.normal.x + dz * cast.normal.z >= 0 ? null : cast;
+  let impact: VehicleImpact | null = null, reach0 = 1;
+  if (hit !== null) {
+    reach0 = Math.max(0, Math.min(1, hit.at));
+    const after = bounce({ x: forwardX * forward + rightX * slip, z: forwardZ * forward + rightZ * slip }, handling.mass, hit);
+    impact = after.impact;
+    forward = after.velocity.x * forwardX + after.velocity.z * forwardZ; slip = after.velocity.x * rightX + after.velocity.z * rightZ;
+  }
+  const probes = Math.max(1, Math.ceil(Math.hypot(dx, dz) * reach0 / WALL_PROBE));
   let moved = 0, blocked = false;
   for (let i = 0; i < probes; i++) {
-    const at = { x: state.x + dx * i / probes, y: state.y, z: state.z + dz * i / probes };
+    const at = { x: state.x + dx * reach0 * i / probes, y: state.y, z: state.z + dz * reach0 * i / probes };
     if (steerGround(world.floor, at, facing, reach).blocked) { blocked = true; break; }
-    moved = (i + 1) / probes;
+    moved = reach0 * (i + 1) / probes;
   }
-  if (blocked) { forward = 0; slip = 0; }
+  if (blocked && hit === null) { forward = 0; slip = 0; } // the floor probe's wall: a ledge or a wall the hull's cast cannot see
   const x = clampCoord(state.x + dx * moved), z = clampCoord(state.z + dz * moved);
   let y = state.y, pitch = 0, tilt = 0;
   if (handling.ground) {
@@ -142,6 +196,6 @@ export function stepVehicle(state: VehicleState, command: VehicleCommand, handli
     pitch = Math.atan2(front - back, world.bow + world.stern);
     tilt = Math.atan2(left - right, 2 * world.side);
   }
-  if (out !== undefined) { out.blocked = blocked; out.sliding = slip; }
+  if (out !== undefined) { out.blocked = blocked; out.sliding = slip; out.impact = impact; }
   return { x, y, z, yaw, forward, slip, pitch, roll: tilt };
 }
