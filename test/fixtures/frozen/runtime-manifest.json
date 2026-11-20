@@ -189,6 +189,12 @@
         "format": "0.5.10",
         "node": "24.18.1"
       }
+    },
+    "nine-r3-held-items.json": {
+      "bytes": 3883,
+      "sha256": "4270addb230301e866e7c570ecc7c65360dcdfdbcdfc3dc542a50957d2e5d7d3",
+      "sourceRepository": "project-wildshard/engine",
+      "sourcePath": "test/pins nine-dragon-stack r3 afd68ee2: runtime and items.rows weapon.jian, tool.fei-zhua (Nine r5 moved its Jian to kit.melee and its grapple off the held claims)"
     }
   },
   "exportRecipes": {

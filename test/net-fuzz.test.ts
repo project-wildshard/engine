@@ -2,7 +2,12 @@ import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
 import { runtimeAssets } from './fixtures/engine-lift/folder';
 // oxlint-disable-next-line import/no-nodejs-modules -- The server half runs the shipped product bytes and physics module.
 import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
-import { createNativeHeadlessResident,type HeadlessRuntimeInput,type NativeHeadlessResident } from '@wildshard/engine/host/headlessRuntime';
+import { createNativeHeadlessResident,type HeadlessRuntimeInput } from '@wildshard/engine/host/headlessRuntime';
+import type { NetTickInput } from '@wildshard/engine/net/room';
+import type { SimHost } from '@wildshard/engine/sim';
+import { nativeCell,openCellWorld } from '../src/server/host/standalone/cellWorld';
+import { SaveStore } from '../src/shared/engine/saves/store';
+import type { HeadlessEffect } from '../src/shared/host/tickProtocol';
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import * as v from 'valibot';
@@ -50,8 +55,19 @@ beforeAll(async () => {
 });
 // Immutable products may be shared; each case retires its own native worlds,
 // including a construction that settles after the case has already failed.
-function resident(input: HeadlessRuntimeInput, snapshot?: string): Promise<NativeHeadlessResident> {
-  const setup = ownedSetup(() => createNativeHeadlessResident(input, snapshot, { room: true }), live => Promise.resolve(live.dispose()));
+/** A room's world: a native product's resident, or a declared product's data cell, opened as `StandaloneGrid` opens a room's
+ *  (openCellWorld, whole solids, no page). Nine rev 5 is declared: it has no sim/runtime-plan for a native resident. */
+interface Live { readonly host: SimHost; readonly effects: readonly HeadlessEffect[]; tick(lead: string, inputs: readonly NetTickInput[]): void; idle(): void; dispose(): void }
+async function openLive(input: HeadlessRuntimeInput, snapshot?: string): Promise<Live> {
+  if (nativeCell(input)) {
+    const live = await createNativeHeadlessResident(input, snapshot, { room: true });
+    return { host: live.host, effects: live.effects, tick: (lead, inputs) => { stepResident(live, lead, inputs); }, idle: () => { live.step([]); }, dispose: () => { live.dispose(); } };
+  }
+  const cell = await openCellWorld({ instance: input.shard.identity.slug }, input, snapshot, { saves: new SaveStore({ local: null, session: null }), lone: false, wholeSolids: true, pageless: true });
+  return { host: cell.host, effects: cell.effects(), tick: (_lead, inputs) => { cell.step(inputs); }, idle: () => { cell.step([]); }, dispose: () => { cell.dispose(); } };
+}
+function resident(input: HeadlessRuntimeInput, snapshot?: string): Promise<Live> {
+  const setup = ownedSetup(() => openLive(input, snapshot), live => Promise.resolve(live.dispose()));
   onTestFinished(() => setup.close());
   return setup.open();
 }
@@ -68,10 +84,10 @@ async function product(slug: string): Promise<HeadlessRuntimeInput> {
 
 interface Seat { readonly link: DirectLoopback; readonly net: NetClient; readonly id: number }
 /** A room as `StandaloneGrid` runs one, on a fresh resident. */
-async function roomOn(slug: string): Promise<{ live: NativeHeadlessResident; room: NetRoom; world: SimNetWorld; book: LedgerBook; seat: (player?: string, name?: string) => Seat }> {
+async function roomOn(slug: string): Promise<{ live: Live; room: NetRoom; world: SimNetWorld; book: LedgerBook; seat: (player?: string, name?: string) => Seat }> {
   const live = await resident(await product(slug)), { host } = live, lead = leadPlayer(host), book = new LedgerBook();
   host.respawn.served = true;
-  const world = new SimNetWorld(host, 0, () => ledgerFilings(host, lead.id, live.effects, null)), room = new NetRoom({ world, book, step: inputs => { stepResident(live, lead.id, inputs); } });
+  const world = new SimNetWorld(host, 0, () => ledgerFilings(host, lead.id, live.effects, null)), room = new NetRoom({ world, book, step: inputs => { live.tick(lead.id, inputs); } });
   room.open();
   return { live, room, world, book, seat: (player, name = 'Player') => {
     const link = directLoopback(), id = room.join(link.server, player === undefined ? world.player : world.playerOf(host.addPlayer(player, lead.position).id)), net = new NetClient(link.client, CLOCK);
@@ -79,7 +95,7 @@ async function roomOn(slug: string): Promise<{ live: NativeHeadlessResident; roo
     return { link, net, id };
   } };
 }
-const spots = (live: NativeHeadlessResident): readonly { readonly x: number; readonly z: number }[] => [...live.host.entities.values()].map(body => body.position).filter(at => Number.isFinite(at.x) && Number.isFinite(at.z));
+const spots = (live: Live): readonly { readonly x: number; readonly z: number }[] => [...live.host.entities.values()].map(body => body.position).filter(at => Number.isFinite(at.x) && Number.isFinite(at.z));
 
 test.each(FUZZED.flatMap(slug => SEEDS.map(seed => [slug, seed] as const)))('hostile clients on %s (seed %d) end nothing', { timeout: 10_000 }, async (slug, seed) => {
   const rewinds = vi.spyOn(HitHistory.prototype, 'at');
@@ -127,7 +143,7 @@ test.each(FUZZED.flatMap(slug => SEEDS.map(seed => [slug, seed] as const)))('hos
   const back = await resident(await product(slug), snapshot);
   expect(back.host.state.tick).toBe(TICKS);
   expect([...back.host.players.keys()]).toEqual([...host.players.keys()]);
-  back.step([]);
+  back.idle();
   const saved = v.parse(LedgerBookSchema, book.snapshot());
   for (const { serial, rows } of Object.values(saved)) {
     expect(new Set(rows.map(row => row.id)).size).toBe(rows.length);

@@ -26,7 +26,10 @@ export async function beginFolderSession(slug:string,variant?:FolderSessionVaria
   const descriptor=outputDescriptor(source);if(descriptor===undefined)throw new Error('Missing admitted headless inventory');
   const sections=folderHeadlessSections(product);
   const nativeKinds={'driftwood-isle':'driftwood','pine-hollow':'pine','nine-dragon-stack':'nine','nalati-grasslands':'nalati'} as const;
-  const nativeKind=variant??(!sections.has('sim/runtime-plan')&&(slug==='driftwood-isle'||slug==='pine-hollow'||slug==='nine-dragon-stack'||slug==='nalati-grasslands')?nativeKinds[slug]:undefined);
+  // A declared product (no runtime, no sim/runtime-plan; Nine from rev 5) runs on the data host, as its room does; only a
+  // client-plan runtime's product takes its fixed native adapter.
+  const declared=source.runtime===null&&!sections.has('sim/runtime-plan');
+  const nativeKind=variant??(!declared&&!sections.has('sim/runtime-plan')&&(slug==='driftwood-isle'||slug==='pine-hollow'||slug==='nine-dragon-stack'||slug==='nalati-grasslands')?nativeKinds[slug]:undefined);
   const pending=nativeKind===undefined?createWorker(source,assets,snapshot,{deadline:'advisory',sections})
     :createNativeProofWorker(source,assets,nativeKind,snapshot,sections,directory);
   // Observe failure immediately even while the caller is preparing its owner.

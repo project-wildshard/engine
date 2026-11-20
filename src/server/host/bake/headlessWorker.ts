@@ -15,6 +15,7 @@ import { loadRapier } from '@wildshard/engine/physics/rapier';
 import { proveAuthoredGrid, createShardfileSim, bindShardfileSim, type ShardfileSimulation } from '@wildshard/engine/game/plugin/simulation';
 import { installDeclaredKitItems, type DeclaredKitItems } from '@wildshard/engine/game/shardfile/declaredKitItems';
 import { tapeKitCommand } from '../tapeKitCommand';
+import { FallFloor, shardPlayArea } from '../standalone/fallFloor';
 import { createSimSnapshotSerializer, snapshotSimHostBytes, decodeSimSnapshot, checkSimSnapshotWire } from '@wildshard/engine/sim/snapshot';
 import { restoreSimHost } from '@wildshard/engine/sim/restore';
 
@@ -106,6 +107,18 @@ await runTickWorker(async raw => {
       if(script?.modules.some(module=>module.failures>0||module.disabled))throw new Error('Headless script call failed');
       if(sim.decisions?.host.metrics().some(row=>row.refusals>0||row.disabled))throw new Error('Headless decision call failed');
   };
+  // A walk proof (a journey from a start) catches a fall as a one-shard page and a lone room do (fallFloor.ts, SS6): under its play
+  // area's floor the player goes back to the last firm ground stood on. The native proof adapter lends the page's bounds owner the
+  // same way (installNativeWalkBounds); Nine's net-well-fall leg proves the catch (Nine is declared from rev 5).
+  let walkFloor = false;
+  const prepareWalk = (): void => {
+    if (walkFloor) return;
+    walkFloor = true;
+    const plan = clientPlan === undefined ? undefined : parseClientPlan(clientPlan);
+    const area = shardPlayArea(shard.manifest?.bounds, plan === undefined ? undefined : { has: name => name === 'client/plan', section: (() => plan) as never });
+    const fall = new FallFloor(area, true, sim.host.level.player.at);
+    sim.host.onStep('walk.fall-floor', () => { const player = sim.host.players.get(PLAYER); if (player !== undefined) fall.step(player, () => undefined); }, undefined, 'afterBodies');
+  };
   const serializer=createSimSnapshotSerializer();
   const tape=createNativeHeadlessTape(sim.host,step,()=>effects);
   return {
@@ -120,7 +133,7 @@ await runTickWorker(async raw => {
         ...(sim.decisions === undefined ? {} : { decisions: sim.decisions.publication() }) };
     },
     verbTape:tape,
-    journey: plan=>runHeadlessJourney(sim.host,step,plan),
+    journey: plan=>{ if (plan.start !== undefined) prepareWalk(); return runHeadlessJourney(sim.host,step,plan); },
     commit: () => {
       const script = sim.lane?.host.checkpoint();
       if (script?.modules.some(module => module.failures > 0 || module.disabled)) throw new Error('Headless script call failed');

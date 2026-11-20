@@ -369,6 +369,26 @@ test('a grid page\'s data home keeps its descriptor and leaves its home claim to
   } finally { setPageMode('shard'); residency.dispose(); installShards(previous); setActiveChunk(active.slug); }
 });
 
+test('a client-plan entry over a product with no runtime is admitted as data (Nine rev 5)', async () => {
+  const { source, wires } = fixture(false, 0, 1, 'pine-hollow');
+  expect(source.runtime).toBeNull();
+  const planEntry = () => Promise.reject(new Error('Client-plan entry requires its compiled runtime declaration'));
+  const manifest = { ...sourceManifest(source), load: planEntry, clientPlanRuntime: true as const, shardfile: `${base}shard.json` };
+  const previous = shards(), active = game.shard;
+  try {
+    installShards([manifest]);
+    const installed = await installManifestShardfile(manifest, options(wires), {
+      instance: 'pine-hollow', recipes: new Map(), items: new Map(), catalogue: [],
+      voices: () => new Map(), icon: () => { throw new Error('No fixture item'); },
+    });
+    expect(game.shard).toBe(installed);
+    expect(installed.load).not.toBe(planEntry);
+    expect(installed.clientPlanRuntime).toBeUndefined();
+    expect(installed.shardfile).toBe(manifest.shardfile);
+    expect(installed.ground.terrain?.heightAt(0, 0)).toBe(0);
+  } finally { installShards(previous); setActiveChunk(active.slug); }
+});
+
 test.each(['manifest', 'external'] as const)('%s admission finishes during kit imports but publishes only after them', async kind => {
   const { source, wires } = fixture(false, 0, 1, 'pine-hollow');
   const manifest = { ...sourceManifest(source), shardfile: `${base}shard.json` };

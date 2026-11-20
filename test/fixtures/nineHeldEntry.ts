@@ -15,7 +15,7 @@ import type { ShardRuntime } from '../../src/shared/game/shard/runtime';
 import { loadHeadlessFolder } from '../../src/server/host/headlessFolder';
 import { builtFolder } from '../../src/test/game/builtFolder';
 import { frozenRuntimeJson, frozenRuntimeBytes } from './frozen/snapshots';
-import { parse, object } from 'valibot';
+import { parse, object, array, unknown } from 'valibot';
 import { GrappleProfileSchema, GrappleHooksSchema } from '@wildshard/format/grapple';
 import { SHARDS } from './shardCatalogue';
 import { fixtureFolderFile, fixtureJsonCheck } from './folderFile';
@@ -33,7 +33,12 @@ const headlessConstants = parse(object({grappleProfile:GrappleProfileSchema,hook
 export const slottedEnteredRows = { grapple: { item: 'tool.fei-zhua', source: 'fixture/grapple-source.json', presentation: 'weapons/jian-row.json' } };
 export const enteredRows = { grapple: { item: 'tool.fei-zhua', profile: headlessConstants.grappleProfile, hooks: headlessConstants.hooks, presentation: 'weapons/jian-row.json' } };
 export async function heldEntry(prepare = true) {
-  const source = (await loadHeadlessFolder(builtFolder('nine-dragon-stack'))).shardfile;
+  // Nine r5 moved its Jian to a kit.melee row and its grapple off the held claims, with no runtime; the claims under test
+  // keep r3's runtime declaration and its starter Jian and Fei Zhua item rows, frozen from that pin.
+  const pinned = (await loadHeadlessFolder(builtFolder('nine-dragon-stack'))).shardfile;
+  const r3 = parse(object({ runtime: unknown(), rows: array(unknown()) }), frozenRuntimeJson('nine-r3-held-items.json'));
+  const held = r3.rows as typeof pinned.items.rows;
+  const source = { ...pinned, runtime: r3.runtime as typeof pinned.runtime, items: { ...pinned.items, rows: [...pinned.items.rows.filter(row => !held.some(kept => kept.id === row.id)), ...held] } };
   const app = new App(), parent = new Scope('held-parent'), scope = parent.child('held-entry');
   app.levelScope = scope;
   for (const input of INPUT_CONTEXTS.filter(row => row.id === 'weapon.melee')) app.input.register(input, scope);

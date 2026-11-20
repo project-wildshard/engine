@@ -205,7 +205,13 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     const source = await readFolderDescriptor({ ...options, base: new URL('.', url).href, descriptorPath: url.pathname });
     const { slug: authoredIdentity } = source.identity, expectedIdentity = manifest.slug.replace(/^_/u, '');
     if (authoredIdentity !== expectedIdentity) throw new Error('Manifest and shardfile identities differ');
-    if (!isBuildValidatedOutput(source) || source.runtime === null) return manifest;
+    // ONE-FORMAT OF21: a manifest entry that names the client-plan platform over a product that declares no runtime (Nine from
+    // rev 5, an ordinary upload) has no runtime to enter; the product is admitted as data, like every other upload's.
+    if (source.runtime === null) {
+      const { clientPlanRuntime: _entry, load: _planEntry, ...data } = manifest;
+      return installManifestShardfile(data, providedOptions, bindings, prepared);
+    }
+    if (!isBuildValidatedOutput(source)) return manifest;
     const ground = tiledBootstrapGround(manifest.ground, source.props, source.runtime.binds ?? []);
     return ground === manifest.ground ? manifest : selectSource({ ...manifest, ground });
   }
