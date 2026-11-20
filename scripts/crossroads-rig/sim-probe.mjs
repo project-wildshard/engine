@@ -10,6 +10,7 @@
 // title's ENTER WORLD stores it), settles, measures; the rig (stage.sh) follows window.__rig.phase.
 // Writes <out>/<label>.{native,inspector}.jsonl and <out>/summary.json (the medians per phase, decimal MB).
 // A REGRESSION / RELATIVE CHECK, NOT PHONE EVIDENCE: the Simulator runs on the Mac's memory and GPU (ios-simulator skill).
+import { agentUrl } from '../agent-marker.mjs';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, createWriteStream } from 'node:fs';
 import { resolve as resolvePath, join } from 'node:path';
@@ -78,7 +79,7 @@ async function oneRun(udid, run, opts) {
   writeFileSync(phaseFile, 'idle');
   spawnSync('xcrun', ['simctl', 'terminate', udid, 'com.apple.mobilesafari']);
   await sleep(3000);
-  execFileSync('xcrun', ['simctl', 'openurl', udid, `${base}version.json`]);
+  execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(`${base}version.json`)]);
   await sleep(6000);
   const sock = execFileSync('xcrun', ['simctl', 'getenv', udid, 'RWI_LISTEN_SOCKET'], { encoding: 'utf8' }).trim();
   const proxy = spawn('ios_webkit_debug_proxy', ['-s', `unix:${sock}`, '-c', 'null:9221,:9232-9240', '-F'], { stdio: 'ignore' });

@@ -21,6 +21,7 @@
 // end, the reveal's start and the controls (the reveal's end), and the worst frame in the 8 s after the controls. The
 // video is read only for the broken-frame check: between the loader's end and the reveal, a frame like neither the last
 // loader frame nor the first reveal frame (round 40's HUD over orange / blue triangles). Medians per mode at the end.
+import { agentUrl } from './agent-marker.mjs';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
@@ -200,7 +201,7 @@ async function runCoreMemory(mode, index, target) {
   const template = !calibration && target !== 'menu' && target !== 'select';
   try { execFileSync('xcrun', ['simctl', 'terminate', udid, 'com.apple.mobilesafari'], {stdio: 'ignore'}); } catch { /* Not running. */ }
   await sleep(2000);
-  execFileSync('xcrun', ['simctl', 'openurl', udid, `${BASE}/version.json`]);
+  execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(`${BASE}/version.json`)]);
   await connect(`${BASE}/version.json`);
   const version = await page.evaluate('document.body.innerText');
   const reset = await settle(`async () => {
@@ -275,7 +276,7 @@ async function run(mode, index, target) {
   rmSync(file, { force: true });
   try { execFileSync('xcrun', ['simctl', 'terminate', udid, 'com.apple.mobilesafari'], { stdio: 'ignore' }); } catch { /* not running */ }
   await sleep(2000);
-  execFileSync('xcrun', ['simctl', 'openurl', udid, `${BASE}/version.json`]);
+  execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(`${BASE}/version.json`)]);
   await connect(`${BASE}/version.json`);
   log(file, { ev: 'version', v: await page.evaluate('document.body.innerText') });
   if (mode === 'cold') log(file, { ev: 'cold-reset', r: await settle(`async () => {

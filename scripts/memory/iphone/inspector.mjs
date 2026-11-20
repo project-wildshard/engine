@@ -10,6 +10,7 @@
 // Caution, measured on the iPhone 13: overrides need the Network agent on, which keeps response bodies for the inspector.
 // Two Nine boots with a service-worker override lost their tab at texture upload, so a memory or frame comparison runs
 // without overrides; they are for functional checks. WS_INSPECTOR_DEBUG=1 prints target events.
+import { agentUrl } from '../../agent-marker.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { setTimeout as pause } from 'node:timers/promises';
 import { WebDriverError } from './safari.mjs';
@@ -221,7 +222,7 @@ async function attach(socketUrl, { overrides = [] }) {
     },
     /** @param {string} url */
     async navigate(url) {
-      const want = new URL(url).href;
+      const want = agentUrl(url);
       await run(`location.href = ${JSON.stringify(want)}; true`, false, 10_000);
       await settle((href) => href === want || (want !== 'about:blank' && href.startsWith(new URL(want).origin) && href !== 'about:blank'));
     },

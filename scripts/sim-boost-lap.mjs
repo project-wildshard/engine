@@ -12,6 +12,7 @@
 // --base is a served preview of --rev (scripts/serve-build.sh --rev): Safari's inspector cannot inject a script before
 // navigation, so the harness pins and the control-frame snapshot go in a copy of the served entry HTML (frame-floor's
 // method), dl17-sim.html; compiled JS and assets stay byte-identical. Exit 0 = 0 pops, 1 = pops, 2 = no reading.
+import { agentUrl } from './agent-marker.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
@@ -85,7 +86,7 @@ const read = async expression => JSON.parse(await page.evaluate(`JSON.stringify(
 try {
   try { execFileSync('xcrun', ['simctl', 'terminate', udid, 'com.apple.mobilesafari'], { stdio: 'ignore' }); } catch { /* not running */ }
   await sleep(2000);
-  execFileSync('xcrun', ['simctl', 'openurl', udid, `${base}/version.json`]);
+  execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(`${base}/version.json`)]);
   await connect(`${base}/version.json`);
   // a first visit: no worker, no caches, no saves
   await page.evaluate(`window.__dl17Reset = null; (async () => {

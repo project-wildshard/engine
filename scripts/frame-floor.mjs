@@ -23,6 +23,7 @@
 // after arrival, so a freeze that p95 never sees cannot pass.
 // Results: --output-dir=<scratch dir> (default progress/frame-floor)/<measured-short-sha>-<run-id>.json.
 // --desktop-dpr=<1..3>: the desktop surface's device scale factor (default 2) on its 1440x900 viewport.
+import { agentUrl } from './agent-marker.mjs';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
@@ -1094,7 +1095,7 @@ async function worker() {
         load: async (shard) => {
           inspector?.close(); inspector = undefined;
           try { xcrun(['terminate', udid, 'com.apple.mobilesafari']); } catch { /* Safari is not running on first boot. */ }
-          const preparationUrl = `${base}${wasmMemoryProbe ? 'version.json' : 'frame-floor-bootstrap.html'}`;
+          const preparationUrl = agentUrl(`${base}${wasmMemoryProbe ? 'version.json' : 'frame-floor-bootstrap.html'}`);
           xcrun(['openurl', udid, preparationUrl]);
           await connect(preparationUrl);
           if (!wasmMemoryProbe) await retryEvaluate(`(() => { ${fixtureCheck}; if(window.__frameFloorBootstrapReady!==true)throw new Error('Frame-floor preparation document did not finish'); return true; })()`);
@@ -1108,7 +1109,7 @@ async function worker() {
           }
           // Reconnect after navigation: an inspector evaluation envelope can disappear in a WebContent process swap.
           // The helper sets live pose pins before the clean build's modules boot.
-          const gameUrl = `${base}frame-floor-safari.html${query(shard)}`;
+          const gameUrl = agentUrl(`${base}frame-floor-safari.html${query(shard)}`);
           // Intentional preparation navigation has no measurement envelope to
           // preserve. Read its acknowledgement directly before reconnecting.
           if (!wasmMemoryProbe && await inspector.raw(frameFloorGameNavigationCode(gameUrl)) !== true)

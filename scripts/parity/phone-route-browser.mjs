@@ -1,3 +1,4 @@
+import { agentUrl } from '../agent-marker.mjs';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import sharp from 'sharp';
@@ -201,7 +202,7 @@ export async function openPhoneBrowser(engine, base, _out, native = {}) {
     async cold(url, paintScript) {
       // Preparation has already launched Safari and proved two real frames.
       // Keep that native process; coldness belongs to the cleared game origin.
-      const probe = new URL('/version.json',base).href;
+      const probe = agentUrl(new URL('/version.json',base).href);
       simctl(['openurl',udid,probe]); await connect(probe,undefined);
       await evaluate(`(async()=>{localStorage.clear();sessionStorage.clear();await Promise.all((await caches.keys()).map(key=>caches.delete(key)));await Promise.all((await navigator.serviceWorker.getRegistrations()).map(row=>row.unregister()));return true;})()`);
       if (inspector === null) throw new Error('Safari inspector unavailable');

@@ -151,6 +151,8 @@ def positive_number(value):
 
 
 def main():
+    from agent_marker import agent_url
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--device', required=True, help='Booted Simulator UDID (never a physical iPhone)')
     budget = parser.add_mutually_exclusive_group()
@@ -203,7 +205,7 @@ def main():
                     native.reset_interval(pid)
                     emit('interval-reset', phase='loading' if phase_budget else 'single', before=before)
             if args.url:
-                command(['xcrun', 'simctl', 'openurl', args.device, args.url])
+                command(['xcrun', 'simctl', 'openurl', args.device, agent_url(args.url)])
             while True:
                 tick = time.monotonic()
                 if native.sample(manager)['startAbstime'] != manager_identity:

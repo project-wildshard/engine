@@ -17,6 +17,7 @@
 //   --out=<file>        the table (default scripts/memory/calibration.json); --dry-run prints it instead
 //   --raw=<file>        every reading as JSON lines (default tmp/memory-calibration/<host>.jsonl)
 //   --from-raw          refit from --raw without running a browser
+import { agentUrl } from '../agent-marker.mjs';
 import { createServer } from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -111,7 +112,7 @@ if (argv.includes('--from-raw')) {
       quitSafari(udid);
       await sleep(3000);
       const held = new Promise((resolve, reject) => { waiting.set(n, resolve); setTimeout(() => { reject(new Error(`no report from the Simulator for ${n}`)); }, 240_000); });
-      execFileSync('xcrun', ['simctl', 'openurl', udid, url(kind, mb, n)]);
+      execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(url(kind, mb, n))]);
       const state = await held.finally(() => { waiting.delete(n); });
       await sleep(settle + 2000);
       Object.assign(reading, pageState(state));

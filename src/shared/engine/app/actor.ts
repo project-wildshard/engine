@@ -1,6 +1,8 @@
-export const AGENT_UA_TOKEN = 'WildshardAgent/1';
-export const AGENT_HEADER = 'x-wildshard-agent';
-export const AGENT_QUERY = 'agent';
+import markers from './actorMarkers.json' with { type: 'json' };
+
+export const AGENT_UA_TOKEN: string = markers.userAgent;
+export const AGENT_HEADER: string = markers.header;
+export const AGENT_QUERY: string = markers.query;
 
 export interface ActorTags { readonly actor: 'human' | 'agent'; readonly lane?: string }
 export interface ActorMark extends ActorTags {

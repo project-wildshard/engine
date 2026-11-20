@@ -1,4 +1,4 @@
-import { AGENT_QUERY, classifyActor, type ActorFacts, type ActorMark } from '../../../shared/engine/app/actor';
+import { classifyActor, type ActorFacts, type ActorMark } from '../../../shared/engine/app/actor';
 import { harnessPins } from '../../../shared/engine/app/identity';
 import { saveEnvironment } from '../../../shared/engine/saves/environment';
 import type { SaveStorage } from '../../../shared/engine/saves/store';
@@ -8,7 +8,7 @@ const key = 'ws-agent';
 const querySlot = Symbol.for('wildshard.page-agent-query');
 
 export function classifyActorTab(search: string, storage: Pick<SaveStorage, 'getItem' | 'setItem'> | null | undefined, facts: ActorFacts): ActorMark {
-  const query = new URLSearchParams(search).getAll(AGENT_QUERY).find(value => value.length > 0) ?? null;
+  const query = new URLSearchParams(search).getAll('agent').find(value => value.length > 0) ?? null;
   let stored = null;
   try {
     if (query !== null) storage?.setItem(key, classifyActor({ query }).lane ?? '1');

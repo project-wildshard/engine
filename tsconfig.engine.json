@@ -13,6 +13,7 @@
   "include": [
     "src/client/engine",
     "src/shared/engine",
+    "src/shared/engine/app/actorMarkers.json",
     "src/server/engine",
     "budgets/desktop-reference.json"
   ],

@@ -1,0 +1,5 @@
+{
+  "userAgent": "WildshardAgent/1",
+  "header": "x-wildshard-agent",
+  "query": "agent"
+}

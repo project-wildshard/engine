@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { agentUrl } from './agent-marker.mjs';
 import { deviceSavePicks, saveFixtureCode } from './debug-settings.mjs';
 // E357: per-shard cold Safari phases; the caller holds sim-lane.sh.
 // --locations=on additionally samples every real capture pose for 120 frames + three settled readings.
@@ -150,7 +151,7 @@ async function oneRun(udid, run, opts) {
   writeFileSync(phaseFile, 'idle');
   spawnSync('xcrun', ['simctl', 'terminate', udid, 'com.apple.mobilesafari']);
   await sleep(3000);
-  execFileSync('xcrun', ['simctl', 'openurl', udid, `${run.base}version.json`]);
+  execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(`${run.base}version.json`)]);
   await sleep(6000);
   const sock = execFileSync('xcrun', ['simctl', 'getenv', udid, 'RWI_LISTEN_SOCKET'], { encoding: 'utf8' }).trim();
   const proxy = spawn('ios_webkit_debug_proxy', ['-s', `unix:${sock}`, '-c', 'null:9221,:9232-9240', '-F'], { stdio: 'ignore' });

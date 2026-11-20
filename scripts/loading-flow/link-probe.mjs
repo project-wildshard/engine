@@ -8,6 +8,7 @@
 // process's cache). Runs inside scripts/sim-lane.sh run ($SIM_UDID), as drive.mjs:
 //   scripts/sim-lane.sh run --max 10 wildshard-loading node scripts/loading-flow/link-probe.mjs --base <preview URL> --out <file.json> <slug>...
 // Prints the costliest programs per shard; <file.json> keeps every row (ms cold / cached, shader names, bytes).
+import { agentUrl } from '../agent-marker.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -79,7 +80,7 @@ const PROBE = (slug) => `async () => {
 const report = {};
 for (const slug of slugs) {
   await coldSafari();
-  execFileSync('xcrun', ['simctl', 'openurl', udid, `${base}/version.json`]);
+  execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(`${base}/version.json`)]);
   const page = await connect(url => url.startsWith(`${base}/version.json`));
   await page.evaluate(`window.__probe = null; (${PROBE(slug)})().then(v => { window.__probe = { v }; }, e => { window.__probe = { v: 'ERR ' + String(e) }; }); 1`);
   let result = 'timeout';

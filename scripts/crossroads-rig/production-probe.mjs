@@ -2,6 +2,7 @@
 // Owns a pinned production preview and a dedicated Simulator lane. The browser posts over real HTTP to the pinned
 // production API handler; only its private Blob backend is an in-memory fixture. This is delivery/behavior evidence,
 // never a physical iPhone memory reading. node scripts/crossroads-rig/production-probe.mjs [--rev=HEAD] [--out=<json>]
+import { agentUrl } from '../agent-marker.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { registerHooks } from 'node:module';
@@ -70,10 +71,11 @@ async function safari() {
   };
   try {
     try { sim(['terminate', udid, 'com.apple.mobilesafari']); } catch { /* First launch. */ }
-    sim(['openurl', udid, `${base}version.json`]); await connect(`${base}version.json`);
-    await evaluate(`(()=>{${saveFixtureCode({ scope: 'device', key: 'devMode', data: true })}; return true;})()`, `${base}version.json`);
+    const versionUrl = agentUrl(`${base}version.json`);
+    sim(['openurl', udid, versionUrl]); await connect(versionUrl);
+    await evaluate(`(()=>{${saveFixtureCode({ scope: 'device', key: 'devMode', data: true })}; return true;})()`, versionUrl);
     connection.close(); connection = undefined;
-    const game = `${base}?chunk=brasscap-mesa&mute=1&skipintro=1&sw=0`;
+    const game = agentUrl(`${base}?chunk=brasscap-mesa&mute=1&skipintro=1&sw=0`);
     sim(['openurl', udid, game]); await connect(game);
     const start = Date.now();
     while (!(await evaluate('Boolean(document.querySelector(".ws-touch-pause") && !document.querySelector(".ws-load"))'))) {

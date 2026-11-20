@@ -9,6 +9,7 @@
 // phone on a new build). Its prep page navigation lets Safari check for the new worker, as opening the app does.
 // Writes <out>/<mode>-timeline.jsonl (events, card polls every ~200 ms, page frame stamps from a requestAnimationFrame
 // sampler), <out>/<mode>-perf.json (resources, marks, measures of the world page) and <out>/<mode>-raw.mp4.
+import { agentUrl } from '../agent-marker.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { appendFileSync, writeFileSync, rmSync, existsSync, readdirSync, mkdirSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
@@ -106,7 +107,7 @@ if (mode === 'cold') {
   }
   log({ ev: 'wiped', wiped });
 }
-execFileSync('xcrun', ['simctl', 'openurl', udid, `${BASE}/version.json`]);
+execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(`${BASE}/version.json`)]);
 await connect(u => u.startsWith(`${BASE}/version.json`));
 const version = await page.evaluate('document.body.innerText');
 if (mode === 'cold') {
@@ -149,7 +150,7 @@ if (!recStart) recStart = Date.now();
 log({ ev: 'recStart', recStart, pid: recorder.pid });
 await sleep(1500);
 const rel = () => ((Date.now() - recStart) / 1000).toFixed(1);
-execFileSync('xcrun', ['simctl', 'openurl', udid, `${BASE}/`]);
+execFileSync('xcrun', ['simctl', 'openurl', udid, agentUrl(`${BASE}/`)]);
 log({ ev: 'openurl', at: rel() });
 
 await connect(gamePage);

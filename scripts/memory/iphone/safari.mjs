@@ -4,6 +4,7 @@
 // A fresh session alone does not clear caches. Safari's HTTP cache can carry.
 // Build diagnostics and LAN reach are recorded per run, pending physical qualification.
 // Screenshots are taken out of process by devicectl (record.mjs).
+import { agentUrl } from '../../agent-marker.mjs';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createServer } from 'node:net';
@@ -51,7 +52,7 @@ function browser(request, sessionId, owned) {
   return {
     sessionId,
     getUrl: () => route('GET', '/url'),
-    navigate: (/** @type {string} */ url) => route('POST', '/url', { url }, 180_000),
+    navigate: (/** @type {string} */ url) => route('POST', '/url', { url: agentUrl(url) }, 180_000),
     reload: () => route('POST', '/refresh', {}, 180_000),
     async freshTab() {
       const handles = await route('GET', '/window/handles');
