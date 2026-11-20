@@ -1,9 +1,11 @@
+import type { SessionSummary } from './sessionVitals';
 import type { ActorTags } from '../../../shared/engine/app/actor';
 
 export type SessionEnd = 'clean' | 'crash' | 'context-loss' | 'likely-oom';
 export interface Heartbeat {
   session: string; build: string; level: string; stage: string; at: number; fps: number;
   clean: boolean; error: boolean; contextLost: boolean;
+  summary?: SessionSummary;
 }
 export function classifySession(value: Heartbeat): SessionEnd {
   if (value.clean) return 'clean';

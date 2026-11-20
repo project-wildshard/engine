@@ -2,10 +2,11 @@ import * as v from 'valibot';
 import { actorTags, type ActorTags } from '../../../shared/engine/app/actor';
 import type { SaveStore } from '../../../shared/engine/saves/store';
 import { classifySession, type Heartbeat, type SessionEnd } from './model';
+import { vitalsSchema, type SessionSummary } from './sessionVitals';
 
 const heartbeatSchema = v.object({ session: v.string(), build: v.string(), level: v.string(), stage: v.string(),
   at: v.number(), fps: v.number(), clean: v.boolean(), error: v.boolean(), contextLost: v.boolean(),
-  actor: v.exactOptional(v.picklist(['human', 'agent'])), lane: v.exactOptional(v.string()) });
+  summary: v.exactOptional(vitalsSchema), actor: v.exactOptional(v.picklist(['human', 'agent'])), lane: v.exactOptional(v.string()) });
 type TaggedHeartbeat = Heartbeat & Partial<ActorTags>;
 export interface HealthReport extends Partial<ActorTags> { kind: 'session'; install: string; heartbeat: Heartbeat; end: SessionEnd; build: string }
 export class SessionHealth {
@@ -19,7 +20,7 @@ export class SessionHealth {
   constructor(store: SaveStore, build: string, send: (report: HealthReport) => void, now: number = Date.now(),
     id: () => string = () => crypto.randomUUID(), actor?: ActorTags) {
     this.send = send;
-    const compatible = { key: 'telemetry.heartbeat', version: 2, schema: v.nullable(heartbeatSchema), initial: () => null, migrate: { 1: (old: unknown) => old } };
+    const compatible = { key: 'telemetry.heartbeat', version: 3, schema: v.nullable(heartbeatSchema), initial: () => null, migrate: { 1: (old: unknown) => old, 2: (old: unknown) => old } };
     this.local = store.define({ ...compatible, scope: 'device' });
     this.tab = store.define({ ...compatible, scope: 'session' });
     this.identity = store.define({ key: 'telemetry.install', scope: 'device', version: 1, schema: v.string(), initial: () => '' });
@@ -39,10 +40,15 @@ export class SessionHealth {
     this.write();
   }
   private write(): void { this.local.write(this.current); this.tab.write(this.current); }
-  beat(level: string, stage: string, fps: number, at: number = Date.now()): void {
-    this.current = { ...this.current, level, stage, fps, at, clean: false }; this.write();
+  beat(level: string, stage: string, fps: number, at: number = Date.now(), summary?: SessionSummary): void {
+    this.current = { ...this.current, level, stage, fps, at, clean: false, ...(summary === undefined ? {} : { summary }) }; this.write();
   }
+  capture(summary: SessionSummary): void { this.current.summary = summary; this.write(); }
   fault(): void { this.current.error = true; this.write(); }
   contextLoss(): void { this.current.contextLost = true; this.write(); }
-  exit(): void { this.current.clean = true; this.write(); }
+  exit(summary?: SessionSummary): void {
+    this.current.clean = true;
+    if (summary !== undefined) this.current.summary = summary;
+    this.write();
+  }
 }

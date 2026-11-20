@@ -28,7 +28,7 @@ import { withOwner } from '../../../shared/engine/app/ownership';
 import { holdLoadingSwitch } from './devSwitch';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
 import { leftByPlayer } from '../boot/dropNotice';
-import { showFailure, clearFailure } from '../telemetry/runtime';
+import { showFailure, clearFailure, noteWorldBoot } from '../telemetry/runtime';
 import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import { holdLoadingPassSplit } from '../render/passSplit';
 import { graphicsMode } from '../core/graphicsMode';
@@ -273,6 +273,7 @@ export class Loading {
     this.clockT0 = this.t0;
     const clockStartedAt = Number(this.root.dataset['clockStartedAt']);
     if (Number.isFinite(clockStartedAt) && clockStartedAt <= this.t0 && clockStartedAt >= this.t0 - 60000) this.clockT0 = clockStartedAt;
+    if (!this.scoped) noteWorldBoot(this.clockT0, TIER);
     this.timeline = new LoadingTimeline({ id: 'pending', steps: [{ key: 'modules', label: engineString('s_loading_modules'), weight: 1 }] }, this.t0,
       undefined, {readSetup: () => {
         // the whole percent the card publishes (data-setup); its text shows tenths (J204)

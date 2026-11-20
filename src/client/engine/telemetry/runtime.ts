@@ -1,4 +1,5 @@
 import { harnessPins } from '../../../shared/engine/app/identity';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { actorTags } from '../../../shared/engine/app/actor';
 import type { App } from '../app/app';
 import { apiUrl } from '../core/apiOrigin';
@@ -10,9 +11,21 @@ import { flushCrossroads } from './crossroads';
 import { FailureOutbox, failureOutcomeSave } from './failureEpisodes';
 import { FailureTelemetry } from './failureTelemetry';
 import { pageActor } from './pageActor';
+import { SessionVitals, sessionDevice, type SessionSummary } from './sessionVitals';
 
 declare const __BUILD_ID__: string;
+let vitals: SessionVitals | undefined;
 let health: SessionHealth | null = null;
+/** The primary load card adopts the navigation clock. Inset cell loads do not start a page boot. */
+export function noteWorldBoot(started: number, tier: NonNullable<SessionSummary['tier']>): void {
+  vitals?.begin(started, tier);
+}
+export function noteWorldFrame(): void { vitals?.frame(diagnosticNow()); }
+function noteWorldJoined(): void {
+  if (vitals === undefined) return;
+  vitals.joined(diagnosticNow());
+  health?.capture(vitals.reading());
+}
 let analytics: AnalyticsSink | null = null;
 let bound: App | null = null;
 let scope: Scope | null = null;
@@ -35,8 +48,10 @@ export function startTelemetry(): void {
   const build = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '';
   const actor = actorTags(pageActor());
   health = new SessionHealth(saves, build, send, undefined, undefined, actor);
-  analytics = new AnalyticsSink(build, health.install, sendFromPage);
+  vitals = new SessionVitals(sessionDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints));
   scope = new Scope('telemetry');
+  scope.listen(document, 'ws:control-ready', noteWorldJoined);
+  analytics = new AnalyticsSink(build, health.install, sendFromPage);
   if (harnessPins() === undefined) {
     const slot = saves.define(failureOutcomeSave);
     const outbox = new FailureOutbox({ getItem: () => slot.read(),
@@ -50,13 +65,18 @@ export function startTelemetry(): void {
     scope.listen(window, 'online', () => { void flushCrossroads(); });
   }
   const fps: number[] = [];
-  scope.interval(1000, () => { const value = bound?.render?.stats.fps; if (value !== undefined && value > 0) { fps.push(value); if (fps.length > 5) fps.shift(); } });
-  scope.interval(5000, () => { const sorted = [...fps].sort((a, b) => a - b); health?.beat(level, bound?.state ?? 'boot', sorted[Math.floor(sorted.length / 2)] ?? 0); });
+  scope.interval(1000, () => {
+    const value = bound?.render?.stats.fps;
+    if (value === undefined || value <= 0 || !Number.isFinite(value)) return;
+    fps.push(value); if (fps.length > 5) fps.shift();
+    if (bound?.state === 'play' && !document.hidden) vitals?.sample(value);
+  });
+  scope.interval(5000, () => { const sorted = [...fps].sort((a, b) => a - b); health?.beat(level, bound?.state ?? 'boot', sorted[Math.floor(sorted.length / 2)] ?? 0, Date.now(), vitals?.reading()); });
   scope.interval(30_000, () => { analytics?.flush(); });
   scope.listen(window, 'error', () => { health?.fault(); });
   scope.listen(window, 'unhandledrejection', () => { health?.fault(); });
   scope.listen(document, 'webglcontextlost', () => { health?.contextLoss(); }, { capture: true });
-  scope.listen(window, 'pagehide', () => { health?.exit(); recordTime(); analytics?.flush(); });
+  scope.listen(window, 'pagehide', () => { health?.exit(vitals?.reading()); recordTime(); analytics?.flush(); });
   scope.listen(window, 'pageshow', () => { health?.beat(level, bound?.state ?? 'boot', 0); });
   if (bound) subscribe(bound);
 }

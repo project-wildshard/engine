@@ -20,6 +20,7 @@ import { loadingStage, loadingUnits, waitFor } from '@wildshard/engine/boot/wait
 import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/loadingWaits';
 import { currentLoadingTimeline } from '@wildshard/engine/boot/timeline';
 import { startShardPrefetch } from '@wildshard/engine/boot/shardPrefetch';
+import { noteWorldFrame } from '@wildshard/engine/telemetry/runtime';
 import { afterControl, reachControl, whenControl } from '@wildshard/engine/boot/prefetch';
 import { idleTurn } from '@wildshard/engine/boot/idle';
 import { installGpuRecovery } from '@wildshard/engine/core/GpuRecovery';
@@ -295,6 +296,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     await precompileLevel(game, undefined, { sliceMs: BOOT_SHADER_SLICE_MS, ...wholeInventory ? {} : { drawnOnly: true }, turns: game.warmTurnYaws() });
     if (wholeInventory) await game.warmDeferredEntryRoots(() => !game.levelScope.disposed && !game.levelScope.disposing, undefined, true);
     game.hiddenFrame();
+    noteWorldFrame();
     bootMark('app:first-game-frame-submitted');
     game.levelScope.raf(() => { bootMark('app:first-game-frame-opportunity'); });
   });
