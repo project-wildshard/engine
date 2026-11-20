@@ -35,6 +35,7 @@ import { budgetCollection, budgetCollectionEnabled, collectBeforeShaders, releas
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { shardArea } from '../grid/area';
+import { primeStaticMerges } from '../grid/staticViewMerge';
 import { admittedRuntimeFolder, completeManifestCache, releaseManifestTransport } from '../shardfile/runtimeFolder';
 import { enterSkyClock } from './clockSettings';
 import { settleEntryPrograms } from './settlePrograms';
@@ -290,6 +291,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // frame.
   await loadingStage('worldFrame', async () => {
     game.start(); game.stepFrame();
+    // DF10 (mini-df10b): with `debug.staticMerge` on, the views' merged meshes exist before this precompile, so their own
+    // program variants link under the card (swept after control, an iPhone 13's first boot linked ~11 in play)
+    await primeStaticMerges();
     // DW3/DF8: with `debug.bootRoadPrograms` the whole inventory links here, under the card (undrawn materials, families and
     // the entered roots' road variants), so the first seconds of play link nothing
     const wholeInventory = bootRoadPrograms();

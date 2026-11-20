@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, ShaderMaterial, Texture } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import { SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
-import { installStaticViewMerge, mergeableMaterial, mergeableMesh, staticMerge, STATIC_MERGE_DEFAULT, STATIC_MERGE_PHONE_LOW, SWEEP_STEPS } from './staticViewMerge';
+import { installStaticViewMerge, primeStaticMerges, mergeableMaterial, mergeableMesh, staticMerge, STATIC_MERGE_DEFAULT, STATIC_MERGE_PHONE_LOW, SWEEP_STEPS } from './staticViewMerge';
 import { propMerge } from '../shardfile/groundMerge';
 
 const tri = (x: number): BufferGeometry => new BufferGeometry().setAttribute('position', new Float32BufferAttribute([x, 0, 0, x + 1, 0, 0, x, 0, 1], 3));
@@ -82,4 +82,26 @@ test('a member hidden under the root leaves its merge', () => {
     sweep();
     expect(census().members).toBe(0);
   } finally { scope.dispose(); }
+});
+
+test('the loading prime merges every mergeable mesh at once and builds the merged mesh; a primed mover leaves at its sweep', async () => {
+  const scope = new Scope('region'), root = new Group(), material = new MeshBasicMaterial();
+  const pieces = [0, 10, 20].map(x => { const mesh = new Mesh(tri(x), material); root.add(mesh); return mesh; });
+  const checks: (() => void)[] = [];
+  let on = false;
+  const census = installStaticViewMerge(root, scope, check => { checks.push(check); }, () => on);
+  const sweep = (): void => { for (let i = 0; i < SWEEP_STEPS; i++) for (const check of checks) check(); };
+  try {
+    expect(await primeStaticMerges()).toBe(0); // the slot off: nothing
+    on = true; document.dispatchEvent(new Event('ws:pixels'));
+    expect(await primeStaticMerges()).toBe(3);
+    expect(census().members).toBe(3);
+    expect(propMerge(root, material, { receive: false, order: 0, grouping: 'region', ignore: [] }).mesh?.geometry.getIndex()?.count).toBe(9);
+    const [moved] = pieces; if (moved === undefined) throw new Error('no piece');
+    moved.position.x = 5; moved.updateMatrixWorld(true);
+    sweep();
+    expect(census().members).toBe(2);
+    expect(moved.layers.mask).toBe(1);
+  } finally { scope.dispose(); }
+  expect(await primeStaticMerges()).toBe(0); // a disposed view leaves the prime
 });

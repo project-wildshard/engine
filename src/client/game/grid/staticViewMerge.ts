@@ -12,6 +12,12 @@
  *
  * A member that moves, hides (itself or an ancestor below the root), changes material or leaves the root leaves its merge
  * at the next check and draws on its own again for good. Leaving phone Low or the region ends every merge.
+ *
+ * DF10 (mini-df10b): a merged mesh links programs its members never did (a flat look's merge drops its normals, three's
+ * `vertexNormals` variant; a cell-wide merge draws materials whose members sat outside the spawn view). Swept after
+ * control, the iPhone 13's first boot linked ~11 of them in play (36 dock frames over 50 ms). `primeStaticMerges` merges
+ * every live view's mergeable meshes at once under the loading card, before the world frame's precompile draws them; a
+ * primed member that then moves leaves at the first sweep, as any member does.
  */
 import { Matrix4, Mesh, ShaderMaterial, Texture, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -98,6 +104,17 @@ function translationOnly(m: Float64Array): boolean {
   return near(m[0], 1) && near(m[1], 0) && near(m[2], 0) && near(m[4], 0) && near(m[5], 1) && near(m[6], 0) && near(m[8], 0) && near(m[9], 0) && near(m[10], 1);
 }
 
+/** each live view's eager sweep (the slot on), for the loading card's prime */
+const primes = new Set<() => number>();
+/** Merge every live view's mergeable meshes now, without the stillness sweep, and build the merged meshes, so the
+ *  boot's precompile links their programs before control. Returns how many meshes joined. */
+export async function primeStaticMerges(): Promise<number> {
+  let joined = 0;
+  for (const prime of Array.from(primes)) joined += prime();
+  await Promise.resolve(); // the merges rebuild on a microtask queued before this one
+  return joined;
+}
+
 interface Member { readonly mesh: Mesh; readonly material: Material; readonly at: Float64Array; readonly scope: Scope; readonly mask: number }
 /** the mesh's matrix in root space, or null when it has left the root or something below the root hides it */
 function rootPose(mesh: Mesh, root: Object3D, inverse: Matrix4, scratch: Matrix4, out: Float64Array): Float64Array | null {
@@ -133,8 +150,9 @@ export function installStaticViewMerge(root: Object3D, scope: Scope, frame: (che
   scope.listen(document, PIXELS_EVENT, refresh);
   scope.onDispose(end);
   refresh();
-  frame(() => {
-    if (live === undefined || ++steps < SWEEP_STEPS) return;
+  /** One sweep; `eager` takes every mergeable mesh as still (the loading card's prime). Returns how many joined. */
+  const sweep = (eager: boolean): number => {
+    if (live === undefined) return 0;
     steps = 0;
     root.updateWorldMatrix(true, false); inverse.copy(root.matrixWorld).invert();
     // members that moved, hid, changed material or left draw on their own again, for good
@@ -150,13 +168,14 @@ export function installStaticViewMerge(root: Object3D, scope: Scope, frame: (che
       const prior = seen.get(object);
       if (mergeableMaterial(object.material) === 'translation' && !translationOnly(at)) return;
       next.set(object, prior !== undefined && samePose(prior, at) ? prior : Float64Array.from(at));
-      if (prior !== undefined && samePose(prior, at)) candidates.push(object);
+      if (eager || (prior !== undefined && samePose(prior, at))) candidates.push(object);
     });
     seen.clear(); for (const [mesh, at] of next) seen.set(mesh, at);
     const users = new Map<Material, number>();
     for (const member of members.values()) users.set(member.material, (users.get(member.material) ?? 0) + 1);
     for (const mesh of candidates) users.set(mesh.material as Material, (users.get(mesh.material as Material) ?? 0) + 1);
     const owner = live;
+    let joined = 0;
     for (const mesh of candidates) {
       const material = mesh.material as Material, at = seen.get(mesh);
       if ((users.get(material) ?? 0) < 2 || at === undefined) continue;
@@ -164,8 +183,12 @@ export function installStaticViewMerge(root: Object3D, scope: Scope, frame: (che
       // the whole cell per layout (a set piece's block would draw it alone); a flat-shaded look reads no normals
       mergeView(root, mesh, material, memberScope, sharedHook(mesh), { grouping: 'region', ignore: readsNoNormals(material) ? ['normal'] : [] });
       members.set(mesh, { mesh, material, at, scope: memberScope, mask });
-      seen.delete(mesh);
+      seen.delete(mesh); joined++;
     }
-  });
+    return joined;
+  };
+  frame(() => { if (live !== undefined && ++steps >= SWEEP_STEPS) sweep(false); });
+  const prime = (): number => sweep(true);
+  primes.add(prime); scope.onDispose(() => { primes.delete(prime); });
   return () => ({ members: members.size, seen: seen.size });
 }
