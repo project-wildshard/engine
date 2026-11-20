@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.56 (2026-11-20)
+
+- Driftwood's declared boss restores its fight state and respawns correctly.
+- Pine Hollow's herds take shelter and its elite fights use their declared creatures.
+- The latest revisions of Nine Dragon Stack and Sunscar Dunes are ready to play.
+- Swords land hits in Driftwood, Pine Hollow and Nalati when you enter from the grid.
+- Voices no longer stutter on a cold first load on phones.
+
 ## v0.1.54 (2026-11-19)
 
 - The title Settings menu keeps its own layout when the Bag uses the new sheet.
