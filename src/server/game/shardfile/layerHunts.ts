@@ -15,6 +15,7 @@ const Saved = v.strictObject({ contract: v.string(), clock: finite, memory: v.un
   target: v.exactOptional(v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(128)))),
   noise: v.strictObject({ seen: v.boolean(), speed: finite, prev: v.tuple([finite, finite, finite]) }),
   sight: v.array(v.nullable(v.boolean())),
+  player: v.exactOptional(v.tuple([finite, finite, finite])),
 });
 
 /** Layer-owned hunts reuse the existing controller, cadence and memory codec over actual host bodies. */
@@ -103,7 +104,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       if (bodyDt > 0 && actor.alive && !actor.stunned && !actor.harnessHold && actor.state === 'charge') hunt.advanceCharge(actor, bodyDt, player);
     }, { snapshot: () => JSON.stringify({ contract, clock, memory: huntMemoryCodec.save(memory),
       ...(perception === undefined ? {} : { target: selected !== null && host.players.has(selected) ? selected : null }),
-      noise: { seen: noise.seen, speed: noise.speed, prev: noise.prev.toArray() }, sight }),
+      noise: { seen: noise.seen, speed: noise.speed, prev: noise.prev.toArray() }, sight, player: player.toArray() }),
     restore: saved => {
       if (typeof saved !== 'string') throw new Error('Invalid layer hunt continuation');
       const state = v.parse(Saved, JSON.parse(saved));
@@ -114,6 +115,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       hunt.beginTick(state.clock - clock); clock = state.clock;
       noise.seen = state.noise.seen; noise.speed = state.noise.speed; noise.prev.set(...state.noise.prev); sight[0] = state.sight[0] ?? null;
       selected = state.target ?? null;
+      if (state.player !== undefined) player.set(...state.player);
     } });
     host.onStep(`${id}.contact`, () => {
       if (host.bodyDt(actor.entityId) <= 0 || !actor.alive || actor.stunned || actor.harnessHold || actor.state !== 'charge') return;
