@@ -29,11 +29,13 @@ function picture(): { hash: string; name: string } {
 }
 const entry = { id: 'trophy', kind: 'species' as const, tab: 'beasts', name: 'Moon trophy', notes: '', plate: { sketch: '/plate.webp' }, match: { kind: 'own.label' } };
 test('the actual admitted product maps a custom icon hash to its logical image URL and keeps first-match selectors', () => {
-  const file = picture(), selected = product([{ matchKind: 'own.label', image: file.hash }, { icon: 'deer' }]);
+  // format 0.56 retired glyph selectors (codex-ci21): the fallback selector is an inert SVG of its own
+  const fallback = parseSketchSvg('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>').data;
+  const file = picture(), selected = product([{ matchKind: 'own.label', image: file.hash }, { image: fallback }]);
   expect(() => preflightAssetGraph(selected.shardfile)).not.toThrow();
   const journal = declaredFolderCompendium(selected, 'journal.custom');
   expect(journal.skin.icon?.(entry)).toEqual({ image: base.url(file.name) });
-  expect(journal.skin.icon?.({ ...entry, match: { kind: 'other.label' } })).toBe('deer');
+  expect(journal.skin.icon?.({ ...entry, match: { kind: 'other.label' } })).toEqual({ image: fallback });
 });
 test('a bounded inert SVG reaches the existing image resolver without an adjacent path guess', () => {
   const image = parseSketchSvg('<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 8 8"><path d="M1 1L7 7" stroke="currentColor"/></svg>').data;
