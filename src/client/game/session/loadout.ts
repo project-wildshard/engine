@@ -125,12 +125,14 @@ async function buildLoadout(ctx: Awaited<ReturnType<typeof worldStage>>) : Promi
   await macrotask();
   const hud = withOwner(game.engineScope, () => new HUD({ pointerLock: !nolock, weaponUi: weapons.current.row.ui, maxBolts: weapons.state.magazine, ...(chunk.status === 'hidden' ? { developerBanner: GAME_STRINGS.developer.banner(chunk.slug.replace(/^_/, '')) } : {}) }));
   // the title deck (E318): this level's card enters or explores here, another's opens in a fresh page (travel)
+  const selectSource = zoneSelectSource(document, (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__);
   hud.titleDeck = (here) => {
     const cards = titleCards(), own = cards[cards.map((card): string => card.slug).indexOf(chunk.slug)];
     return buildTitleMenu({
       cards, active: chunk.slug,
       // ZS10: pause ▸ EXIT TO MAIN's Zone Select tabs read the kept or baked room list, as the cold title's first paint does
-      zoneSelect: zoneSelectSource(document, (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__).initial(),
+      zoneSelect: selectSource.initial(),
+      onPress: selectSource.press,
       // this card enters here; another card is a fresh page
       onEnter: (c) => { if (c === own) here.enter(); else travel({ to: c.slug, mode: 'enter' }); },
       onGrid: () => { if (pageMode() === 'grid') here.enter(); else enterGrid(); }, // SF21a: the main menu's second entry

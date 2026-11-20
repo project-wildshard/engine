@@ -63,4 +63,90 @@ async function phoneJourneys(
   }
 }
 
-export { journey, phoneJourneys }
+async function markedZoneSelectPress(
+  browser: Browser,
+  baseURL: string | undefined,
+): Promise<void> {
+  if (baseURL === undefined) {
+    throw new Error('The T1 preview needs a base URL')
+  }
+  const origin = 'https://staging.wildshard.io'
+  const rooms = 'https://rooms-staging.wildshard.io'
+  const context = await browser.newContext({
+    ...PHONE,
+    isMobile: true,
+    serviceWorkers: 'block',
+  })
+  try {
+    await context.addInitScript((): void => {
+      Reflect.set(globalThis, '__WS_WORLD__', {
+        release: '/zone-select-test-release.json',
+        key: 'fixture',
+      })
+    })
+    // The real preview title uses staging's origin here. Both its assets and the door are owned fixtures.
+    await context.route(`${origin}/**`, async (route): Promise<void> => {
+      const { pathname, search } = new URL(route.request().url())
+      if (pathname.endsWith('/standalone/online.js')) {
+        await route.fulfill({
+          contentType: 'text/javascript',
+          body: `
+          export const zoneSelectLocation = async () => ({ url: "${rooms}/zone-select", channel: "staging" });
+          export const worldWord = async () => null;
+          export const titleEnter = async (_, go) => go();
+        `,
+        })
+        return
+      }
+      const reply = await route.fetch({
+        url: new URL(pathname + search, baseURL).href,
+      })
+      await route.fulfill({ response: reply })
+    })
+    let count = 0
+    await context.route(`${rooms}/**`, async (route): Promise<void> => {
+      const post = route.request().method() === 'POST'
+      if (post) {
+        count += 1
+      }
+      await route.fulfill({
+        status: post ? 204 : 503,
+        headers: { 'access-control-allow-origin': origin },
+      })
+    })
+    const page = await context.newPage()
+    await page.goto(`${origin}/?agent=zone-select-t1&mute=1&nolock=1`)
+    await page.locator('.ws-main-select').tap()
+    await page
+      .locator('#ws-name-box, .ws-title-stack[data-screen="select"]')
+      .first()
+      .waitFor({ timeout: 15_000 })
+    const skip = page.locator('#ws-name-box [data-name=skip]')
+    if (await skip.isVisible()) {
+      await skip.tap()
+    }
+    const card = page.locator('.ws-menu-card.selected')
+    const slug = await card.getAttribute('data-slug')
+    const sent = page.waitForRequest(
+      (req): boolean =>
+        req.method() === 'POST' &&
+        req.url().startsWith(`${rooms}/zone-select/enter?`),
+    )
+    await page.locator('.ws-menu-play').tap()
+    const press = await sent
+    expect(new URL(press.url()).searchParams.get('agent')).toBe(
+      'zone-select-t1',
+    )
+    expect(press.postDataJSON()).toEqual({
+      slug,
+      channel: 'staging',
+      audience: 'automation',
+    })
+    expect(press.headers()['x-wildshard-agent']).toBeUndefined()
+    await expect.poll((): number => count).toBe(1)
+  } finally {
+    await context.close()
+  }
+}
+
+export { journey, markedZoneSelectPress, phoneJourneys }

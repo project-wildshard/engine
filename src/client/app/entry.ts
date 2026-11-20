@@ -336,6 +336,7 @@ async function showPageTitle(refusal = ''): Promise<void> {
     menu = buildTitleMenu({
       active: null,
       zoneSelect: servedZones,
+      onPress: selectSource.press,
       onEnter: (card) => { travel({ to: card.slug, mode: 'enter' }); },
       onGrid: grid.onGrid,
       ...(gate === undefined ? {} : { gate }),

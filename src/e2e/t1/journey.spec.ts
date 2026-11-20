@@ -14,7 +14,7 @@ import {
 } from '../../../scripts/bugbash-probes.mjs'
 import { harnessPins, saveFixture } from '../../../scripts/debug-settings.mjs'
 import { PHONE } from '../../../scripts/journey-proof.mjs'
-import { journey, phoneJourneys } from './journey.ts'
+import { journey, markedZoneSelectPress, phoneJourneys } from './journey.ts'
 
 import type { Page } from '@playwright/test'
 
@@ -29,6 +29,13 @@ test('a tapped phone journey shows only menu, loading card and play, cold and wa
     await journey(page, 'cold')
     await journey(page, 'warm')
   })
+})
+
+test('a marked phone sends one funnel observation when it taps Enter Zone', async ({
+  browser,
+  baseURL,
+}): Promise<void> => {
+  await markedZoneSelectPress(browser, baseURL)
 })
 
 // STAGING-BUGBASH SB14 (Jake's 12:52 recording): mid-swipe on Shard Select two cards showed at once, the one off the middle

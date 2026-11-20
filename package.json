@@ -840,6 +840,7 @@
     "./world/tileStreamer": "./src/client/engine/world/tileStreamer.ts",
     "./ui/StartTitle": "./src/client/engine/ui/StartTitle.ts",
     "./telemetry/browserErrors": "./src/client/engine/telemetry/browserErrors.ts",
+    "./telemetry/pageActor": "./src/client/engine/telemetry/pageActor.ts",
     "./telemetry/runtime": "./src/client/engine/telemetry/runtime.ts",
     "./telemetry/model": "./src/client/engine/telemetry/model.ts",
     "./telemetry/deviceSnapshot": "./src/client/engine/telemetry/deviceSnapshot.ts",

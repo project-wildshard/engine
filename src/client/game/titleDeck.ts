@@ -133,6 +133,8 @@ export interface TitleDeckOptions {
   readonly active: string | null;
   /** ENTER WORLD on a card */
   readonly onEnter: (card: TitleCard) => void;
+  /** An optional observation of an enterable card's button press, before any world check. */
+  readonly onPress?: (slug: string) => void;
   /** a line under the wordmark (the cold launch's "returned to shard select" after an interrupted boot) */
   readonly notice?: string;
   /** what the menu may show and enter (default: Settings ▸ Developer and the DEVSERVER build, read live) */
@@ -480,7 +482,9 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const playButton = required(root, '.ws-menu-play');
   onTap(playButton, () => {
     const at = index;
-    if (opts.gate === undefined || entries[at]?.draft) { activate(at); return; }
+    const card = entries[at];
+    if (card !== undefined && card.shard !== null && canEnter(card, mode()) && opts.single?.closed === undefined) opts.onPress?.(card.slug);
+    if (opts.gate === undefined || card?.draft) { activate(at); return; }
     const asked = opts.gate(() => { activate(at); });
     if (!(asked instanceof Promise)) return;
     playButton.setAttribute('aria-busy', 'true'); gating++;

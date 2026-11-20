@@ -14,6 +14,41 @@ const page = (doc?: ZoneSelectDocument): Pick<Document, 'getElementById'> => ({
   getElementById: id => doc === undefined || id !== 'ws-zone-select' ? null : { textContent: JSON.stringify(doc) } as HTMLElement,
 });
 
+test('each press goes to its signed door without waiting for a reply, and double taps are merged per zone', async () => {
+  const read = vi.fn<typeof fetch>().mockRejectedValue(new Error('no connection'));
+  let now = 10;
+  const source = zoneSelectSource(page(), stamp, { fetch: read, locate: async () => door,
+    pressPage: () => ({ origin: 'https://play.wildshard.io', actor: { actor: 'agent', lane: 'phone-proof' }, now }) });
+  expect(source.press('pine-hollow')).toBeUndefined();
+  source.press('pine-hollow');
+  source.press('far-reach');
+  await vi.waitFor(() => { expect(read).toHaveBeenCalledTimes(2); });
+  now += 2000;
+  source.press('pine-hollow');
+  await vi.waitFor(() => { expect(read).toHaveBeenCalledTimes(3); });
+  expect(read.mock.calls.map(([at, init]) => [at, init?.keepalive, init?.credentials, init?.headers, init?.body]))
+    .toEqual(['pine-hollow', 'far-reach', 'pine-hollow'].map(slug => [
+      'https://rooms.example.test/zone-select/enter?agent=phone-proof', true, 'omit', undefined,
+      JSON.stringify({ slug, channel: 'production', audience: 'automation' }),
+    ]));
+});
+
+test('a local or preview page never looks up the funnel door and a foreign channel receives no press', async () => {
+  const locate = vi.fn(async () => door), fetchPress = vi.fn<typeof fetch>();
+  let origin = 'http://localhost:4402';
+  const source = zoneSelectSource(page(), stamp, { fetch: fetchPress, locate,
+    pressPage: () => ({ origin, actor: { actor: 'human' }, now: 0 }) });
+  source.press('pine-hollow');
+  origin = 'https://preview.wildshard.io';
+  source.press('pine-hollow');
+  await Promise.resolve();
+  expect(locate).not.toHaveBeenCalled();
+  origin = 'https://staging.wildshard.io';
+  source.press('pine-hollow');
+  await vi.waitFor(() => { expect(locate).toHaveBeenCalledTimes(1); });
+  expect(fetchPress).not.toHaveBeenCalled();
+});
+
 function device(): void {
   const values = new Map<string, string>();
   const storage = {
