@@ -29,7 +29,7 @@ import { LightPool } from '@wildshard/engine/fx/LightPool';
 import { platformInputs } from '../../../shared/game/grid/platformInputs';
 import { gridLevel as levelForGrid } from '../../../shared/game/grid/pageMode';
 import { cellClip } from './cellClip';
-import { BufferGeometry, Group, Mesh, Scene, Vector3, type Material, type Object3D } from 'three';
+import { BufferGeometry, Group, Mesh, Scene, Vector3, type DataTexture, type Material, type Object3D } from 'three';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import * as v from 'valibot';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
@@ -120,6 +120,7 @@ import { readGridSeamData, type GridSeamAddress } from '../../../shared/game/gri
 import { OUTER_BLOCK_READS, readGridStripsOrSeeds } from '../../../shared/game/grid/compiledStrips';
 import { startRoadGrain } from './roadGrainPreparation';
 import { roadSignWorkerSource, startRoadSigns } from './roadSignPreparation';
+import { stageRoadSignAtlas } from './roadSignUpload';
 import { RoadMapShare } from './roadResources';
 import { prepareRoadSurfaceMaps } from './roadCompressedSurfaces';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
@@ -576,9 +577,12 @@ export class GridSession {
         outerSigns = startRoadSigns(roadScope, allocator, instance, layout.signs.filter(sign => !ring(sign.at.x, sign.at.z)), 'outer', signWorker);
         if (outerSigns !== undefined) await waitFor('Grid outer road signs', outerSigns.ready, 'worker');
         if (roadScope.disposed || roadScope.disposing) throw new Error('Grid session left during outer road preparation');
-        const outerSlice = workSlice(OUTER_RING_SLICE_MS, roadScope);
+        const outerSlice = workSlice(OUTER_RING_SLICE_MS, roadScope), renderer = host.renderer;
+        const stageSigns = TIER === 'desktop' && renderer !== undefined
+          ? (atlas: DataTexture) => stageRoadSignAtlas(renderer, atlas, roadScope) : undefined;
         return await installPlatformRoadSliced({ ...roadInput, ...(outerSigns === undefined ? {} : { signs: outerSigns.get }),
-          allocationKey: 'road.outer', within: (x, z) => !ring(x, z), voidFloor: false }, async () => { await outerSlice.check(); }, { budgetMs: OUTER_RING_STRETCH_MS });
+          allocationKey: 'road.outer', within: (x, z) => !ring(x, z), voidFloor: false }, async () => { await outerSlice.check(); },
+        { budgetMs: OUTER_RING_STRETCH_MS, ...(stageSigns === undefined ? {} : { stageSigns }) });
       } finally { outerSigns?.release(); grain?.release(); strips.length = 0; } // Collision views retain positions/indices, never render-only colours.
     };
     road.catch(() => { grain?.release(); roadScope.dispose(); });

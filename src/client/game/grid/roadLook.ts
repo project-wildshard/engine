@@ -37,6 +37,8 @@ export interface RoadLookInput {
   readonly grain?: RoadGrainSource;
   /** Scoped initial-ring coverage; mismatched rows retain the original painter. */
   readonly signs?: RoadSignSource;
+  /** Complete the outer atlas before publishing its mesh. The inner signs keep drawing. */
+  readonly stageSigns?: (atlas: DataTexture) => void;
   /** the road system's one solid material takes the kerbs, islands and streetlights (SF17b per-view budget) */
   readonly solid: (part: SolidPart) => void;
   /** the per-view cull for each textured mesh (`roadCull.ts`); a bare hook is the pre-G144 call (no admission with it) */
@@ -409,6 +411,10 @@ export function* installRoadLookSteps(input: RoadLookInput): Generator<void, Roa
       mesh.name = source.name; if (source.overlay) { mesh.receiveShadow = true; input.overlayLight?.add(material, owner); }
       mesh.castShadow = false; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
       if (cull !== undefined) yield* cullIntoSteps(cull, mesh); else hook?.(mesh);
+      if (input.stageSigns !== undefined && source.id === 'road.signs' && map instanceof DataTexture) {
+        input.stageSigns(map);
+        yield; // the sliced road builder finishes the upload before advancing to publish
+      }
       group.add(mesh);
       if (admission !== undefined) gpuOnlyRoad(mesh, held === undefined ? [map] : []); // G144: admitted, its vertex arrays and canvas go on upload (nothing repaints it)
       return mesh;

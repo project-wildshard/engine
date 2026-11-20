@@ -14,7 +14,7 @@ import type { RoadSignSource } from './roadSignPaint';
  * before the deck's and the boulevard's claims and dropped after; the curtain's split arrays become its geometry without a
  * copy (they are counted in `road.curtain`).
  */
-import { DataArrayTexture, Mesh, type Camera, type Object3D } from 'three';
+import { DataArrayTexture, Mesh, type Camera, type DataTexture, type Object3D } from 'three';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { ownRoadMesh, type RoadMapShare } from './roadResources';
 import type { RoadTileBacking } from './roadTileBacking';
@@ -24,7 +24,7 @@ import { waitFor } from '@wildshard/engine/boot/waits';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { LookScope, RoadLayout } from '../../../shared/game/grid/roadLayout';
 import { allocateRenderSteps, type PlatformRenderAdmission } from './renderResidency';
-import { installRoadLookSteps, RoadOverlayLight, type RoadLookState } from './roadLook';
+import { installRoadLookSteps, RoadOverlayLight, type RoadLookInput, type RoadLookState } from './roadLook';
 import { installVoidLook } from './voidLook';
 import { CURTAIN_FLOATS, curtainGeometry, curtainMaterial, curtainSource, gravel, riprap, seamSolidSteps, stone, strata } from './seamLook';
 import type { SeamGeometryChannels, SeamLookState, SeamPiece } from '../../../shared/game/grid/seamGeometry';
@@ -85,10 +85,12 @@ export function installPlatformRoad(input: PlatformRoadInput): PlatformRoad {
  *  left spawn frames 50-80 ms apart on the Simulator (T10). Loading screens pause only after their own longer stretch. */
 const ROAD_SLICE_MS = 4;
 /** Paint between admission and cull batches; synchronous callers retain the identical ordered builder. */
-export async function installPlatformRoadSliced(input: PlatformRoadInput, pause: () => Promise<void>, options: { readonly budgetMs?: number; readonly now?: () => number } = {}): Promise<PlatformRoad> {
+export async function installPlatformRoadSliced(input: PlatformRoadInput, pause: () => Promise<void>, options: { readonly budgetMs?: number; readonly now?: () => number; readonly stageSigns?: (atlas: DataTexture) => Promise<void> } = {}): Promise<PlatformRoad> {
   const budget = options.budgetMs ?? ROAD_SLICE_MS, now = options.now ?? diagnosticNow;
   if (!Number.isFinite(budget) || budget < 0) throw new RangeError('Invalid road construction slice budget');
-  const steps = platformRoadSteps(input);
+  const staged: { atlas?: DataTexture } = {};
+  const stageSigns = options.stageSigns;
+  const steps = platformRoadSteps(input, stageSigns === undefined ? undefined : atlas => { staged.atlas = atlas; });
   let start = now(), completed = false;
   try {
     for (;;) {
@@ -100,6 +102,12 @@ export async function installPlatformRoadSliced(input: PlatformRoadInput, pause:
         // DL11: the road lands (and control waits for it) only once its worker-captured tiles are archived
         const capture = input.tileBacking?.joinCapture(); if (capture !== undefined) await waitFor('Road tile capture worker', capture, 'worker');
         completed = true; return next.value;
+      }
+      if (staged.atlas !== undefined && stageSigns !== undefined) {
+        const atlas = staged.atlas;
+        delete staged.atlas;
+        await stageSigns(atlas);
+        start = now();
       }
       if (now() - start >= budget) { await pause(); start = now(); }
     }
@@ -132,7 +140,7 @@ export function combinePlatformRoads(first: PlatformRoad, second: PlatformRoad):
   };
 }
 
-function* platformRoadSteps(input: PlatformRoadInput): Generator<void, PlatformRoad | undefined> {
+function* platformRoadSteps(input: PlatformRoadInput, stageSigns?: RoadLookInput['stageSigns']): Generator<void, PlatformRoad | undefined> {
   const { home, pitch, scene, scope, within } = input;
   const allocationKey = input.allocationKey;
   if (allocationKey !== undefined && !/^[a-z][a-z0-9.-]{0,39}$/u.test(allocationKey)) throw new Error('Invalid road allocation namespace');
@@ -155,6 +163,7 @@ function* platformRoadSteps(input: PlatformRoadInput): Generator<void, PlatformR
   const parts: SolidPart[] = [...seams.parts], solid = (part: SolidPart): void => { parts.push(part); };
   const overlayLight = new RoadOverlayLight();
   const road = yield* installRoadLookSteps({ layout, home, scene, scope, solid, cull: culler, admission, overlayLight, retireGeometry,
+    ...(stageSigns === undefined ? {} : { stageSigns }),
     ...(input.grain === undefined ? {} : { grain: input.grain }),
     ...(input.signs === undefined ? {} : { signs: input.signs }), ...(input.maps === undefined ? {} : { maps: input.maps }) });
   const voidLook = input.voidFloor === false ? null : installVoidLook({ rail: layout.rail, edge: layout.edge, holes: layout.holes, home, scene, scope, solid, admission });
