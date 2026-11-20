@@ -8,7 +8,7 @@ import type { DevBox, DevGround } from '@wildshard/engine/game/devColliders';
 import type { LiveGridWire } from '../grid/liveSession';
 import { chosenArrival, chosenCell, gotoHosted, pageGoto } from '../../../shared/game/grid/pageMode';
 import { GridAssembly } from '../../../shared/game/grid/assembly';
-import { speciesDef } from '@wildshard/engine/entities/species/registry';
+import { findSpecies, speciesDef } from '@wildshard/engine/entities/species/registry';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import type { Player } from '@wildshard/engine/player/Player';
 import { Scene, Vector3, type Object3D } from 'three';
@@ -280,7 +280,8 @@ function oneShardCells(): readonly string[] | undefined {
  *  on (Jake's duneRay, 2026-11-19: a Driftwood page given Signal Dunes' rows died on its first frame). */
 const foreignSaid = new Set<string>();
 function drawable(kind: string): boolean {
-  try { speciesDef(kind); return true; } catch (error) {
+  // DF11: answered without a throw; a refused kind builds speciesDef's error once, for the words it is said with
+  try { if (findSpecies(kind) !== undefined) return true; if (foreignSaid.has(kind)) return false; speciesDef(kind); return true; } catch (error) {
     if (!foreignSaid.has(kind)) { foreignSaid.add(kind); console.warn(`[worker client] a row of '${kind}' has no species on this page; not drawn`, error instanceof Error ? error.message : error); }
     return false;
   }
@@ -289,15 +290,16 @@ function syncCreatures(client: NetClient, animals: Creatures | null, bodies: Map
   if (animals === null) return;
   for (const [handle, info] of client.entities) {
     if (info.cls.cls !== ANIMAL_CLASS.cls || bodies.has(handle)) continue; // the shell's bundle has its own copy of the class
+    // DF11: the kind first, so a row this page cannot draw (another cell's creature) copies no fields every frame
+    const home = wirePage.rowKind(info.initial['species'], String(info.initial['kind']));
+    const kind = wirePage.lookKind(home, channelsOf(client.interpolator.sample(handle, Number.MAX_SAFE_INTEGER, SYNC_ROW) ? SYNC_ROW : SYNC_ROW.fill(0), SYNC_CHANNELS));
+    if (!drawable(kind)) continue;
     const { x: rowX = 0, y = 0, z: rowZ = 0, yaw = 0, roadX, roadZ } = client.interpolator.fields(handle, Number.MAX_SAFE_INTEGER) ?? {};
     if (typeof rowX !== 'number' || typeof y !== 'number' || typeof rowZ !== 'number' || typeof yaw !== 'number') continue;
     // MP5.2b: on the road only the home's creatures near its edge are drawn, in the home's metres
     const place = drawnPlace({ x: rowX, z: rowZ, ...(typeof roadX === 'number' && typeof roadZ === 'number' ? { roadX, roadZ } : {}) }, edgeHome);
     if (place === null) continue;
-    const { x, z } = place;
-    const home = wirePage.rowKind(info.initial['species'], String(info.initial['kind'])), at = diagnosticNow();
-    const kind = wirePage.lookKind(home, channelsOf(client.interpolator.sample(handle, Number.MAX_SAFE_INTEGER, SYNC_ROW) ? SYNC_ROW : SYNC_ROW.fill(0), SYNC_CHANNELS));
-    if (!drawable(kind)) continue;
+    const { x, z } = place, at = diagnosticNow();
     const body = animals.spawn(kind, x, z, yaw, String(info.initial['variant']), { y, body: { seed: Number(info.initial['seed']), scale: Number(info.initial['scale']) } });
     spawnMs.set(kind, Math.max(spawnMs.get(kind) ?? 0, diagnosticNow() - at));
     body.rowDriven = true;

@@ -349,6 +349,12 @@ export function speciesDef(kind: string): SpeciesDef {
   return resolveSpecies?.(kind) ?? registeredSpecies(kind);
 }
 
+/** `speciesDef` without the throw: undefined where it would refuse (DF11: an undrawable wire row asked every frame built an
+ *  Error and its message each time). */
+export function findSpecies(kind: string): SpeciesDef | undefined {
+  return resolveSpecies?.(kind) ?? SPECIES.get(kind);
+}
+
 export function registeredSpecies(kind: string): SpeciesDef {
   const d = SPECIES.get(kind);
   if (!d) throw new Error(`unknown animal kind '${kind}' (registered: ${[...SPECIES.keys()].join(', ') || 'none'})`);

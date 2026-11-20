@@ -32,3 +32,5 @@
   boxed every difference (the ring planner, 35 KB a frame); vertexPack's encode loop with a `continue` and nested
   ternary boxed 48 B a vertex even hot (node). hypot takes up to four plain arguments, comparators return -1/0/1, the
   encode loop is branch-light; all bit-equal.
+
+- mini-df11c: an undrawable wire row (another cell's creature) no longer throws and copies the species lists every frame; findSpecies and a per-scope miss cache answer it, and its fields are read only after its kind is drawable (~20 KB a dock frame).

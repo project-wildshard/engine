@@ -54,7 +54,9 @@ export class SpeciesService {
   private readonly looks: Scoped<SpeciesLook>[] = [];
   /** skin work still running (a coat painted in slices), under the level that made the hull */
   private readonly unsettled: Scoped<Promise<void>>[] = [];
-  private cache = new WeakMap<Scope, Map<string, SpeciesDef>>();
+  /** resolved kinds by active scope; null records a kind this scope has no row or look for (DF11: a foreign wire row asked
+   *  again every frame copied both lists twice). Every registration and disposal drops the whole cache. */
+  private cache = new WeakMap<Scope, Map<string, SpeciesDef | null>>();
   private readonly active: () => Scope | null;
   constructor(active: () => Scope | null) { this.active = active; }
   registerRow(value: SpeciesRow, scope: Scope): void { this.add(this.rows, value, scope); }
@@ -70,10 +72,13 @@ export class SpeciesService {
   }
   get(kind: string): SpeciesDef | undefined {
     const scope = this.active(); if (scope === null) return undefined;
-    const cached = this.cache.get(scope)?.get(kind); if (cached !== undefined) return cached;
+    const cached = this.cache.get(scope)?.get(kind); if (cached !== undefined) return cached ?? undefined;
     const row = this.rows.slice().reverse().find((entry) => entry.scope.belongsTo(scope) && entry.value.kind === kind)?.value;
     const look = this.looks.slice().reverse().find((entry) => entry.scope.belongsTo(scope) && entry.value.kind === kind)?.value;
-    if (row === undefined && look === undefined) return undefined;
+    if (row === undefined && look === undefined) {
+      const map = this.cache.get(scope) ?? new Map<string, SpeciesDef | null>(); map.set(kind, null); this.cache.set(scope, map);
+      return undefined;
+    }
     let resolved: SpeciesDef;
     if (row !== undefined && look !== undefined) resolved = speciesWithLook(row, look);
     else {
@@ -85,7 +90,7 @@ export class SpeciesService {
         }])) })
         : look !== undefined ? speciesWithLook({ ...base, id: kind }, look) : base;
     }
-    const map = this.cache.get(scope) ?? new Map<string, SpeciesDef>(); map.set(kind, resolved); this.cache.set(scope, map);
+    const map = this.cache.get(scope) ?? new Map<string, SpeciesDef | null>(); map.set(kind, resolved); this.cache.set(scope, map);
     return resolved;
   }
   /** The active page's admitted identity for a native kind; no fallback content or look id. */
