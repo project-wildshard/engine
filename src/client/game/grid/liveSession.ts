@@ -99,6 +99,7 @@ import { yieldGridAdmission, yieldGridConstruction } from './admissionYield';
 import { RuntimePageSession, type RuntimePageResident } from '../shardfile/runtimePage';
 
 import { enterDataCellKit, holdsItems } from './dataCellKit';
+import { dataCellPlanRows, enterDataCellPlan } from './dataCellPlan';
 import { enterPlotAudio, pagePlotAudioPorts, plotAudioScene, type PlotAudioPorts, type PlotAudioScene } from './plotAudio';
 import { shardFolderFromAdmission } from '../shardfile/runtimeFolder';
 import { createRegionalRuntimeFactory, regionalRuntimeAccountedBytes, type PreparedRegionalRuntime, type RegionalRuntimePage, type RegionalRuntimeTextures } from './regionalRuntime';
@@ -286,7 +287,9 @@ export class LiveGridSession {
     /** SS-GP4e: the copy's gear loot row and its folder when it pays coins, its purse and chip installed on entry */
     readonly loot: { readonly source: Shardfile; readonly row: string; readonly folder: ShardFolder } | null;
     /** SS-GP4d: the copy's compendium source, its sketches' assets and its folder, the journal installed on entry */
-    readonly compendium: { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array>; readonly folder: ShardFolder } | null }>();
+    readonly compendium: { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array>; readonly folder: ShardFolder } | null;
+    /** OF22e2: the copy's client plan when it declares features a data cell's own installs do not cover, entered as a one-shard page enters them */
+    readonly plan: { readonly folder: () => ShardFolder } | null }>();
   /** AU20: the entered data cell's own audio scene (an Open Plot's score, bed and loops), live while the feet are in it. */
   private plotAudio: { readonly instance: string; readonly scope: Scope } | null = null;
   /** TC-E1b: the entered data cell's held kit, disposed when the feet leave it */
@@ -806,7 +809,8 @@ export class LiveGridSession {
           audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(folder())) : null,
           completion: completionRows === null ? null : { source: copySource, rows: completionRows }, declaredAudio: cellDeclaredAudio(copySource), plumbing: hasPlumbing(copySource) ? copySource : null,
           loot: lootRow === null ? null : { source: copySource, row: lootRow, folder: folder() },
-          compendium: hasCompendium(copySource) ? { source: copySource, assets, folder: folder() } : null });
+          compendium: hasCompendium(copySource) ? { source: copySource, assets, folder: folder() } : null,
+          plan: dataCellPlanRows(folder()).length > 0 ? { folder } : null });
         this.respawnCells.set(cell.instance, { instance: cell.instance, origin: cell.origin, entryways: source.entryways });
         // TC-E1b: feet that entered before this admission finished get the cell's kit now
         if (gridCells.cell?.instance === cell.instance && this.dataKit === null) this.enterDataKit(cell.instance);
@@ -983,6 +987,9 @@ export class LiveGridSession {
     if (declaredAudio !== null) this.enterDataStay('audio', instance, (stay, here) => { enterDataCellAudio(declaredAudio, page, stay, here, play?.quests.races); });
     if (plumbing !== null) this.enterDataStay('plumbing', instance, (stay, here) => { enterDataCellPlumbing(plumbing, page, stay, instance, here); });
     if (loot !== null) this.enterDataStay('loot', instance, async (stay) => { await enterDataCellLoot(loot.source, loot.row, loot.folder, page, stay, instance); });
+    // OF22e2: the client plan features a data cell's own installs do not cover (Nine's city, sets, movers' views, portal veil),
+    // in the home cell only: the scene keeps the home's frame (C39), and the plan's features draw in the page context's frame
+    if (region.plan !== null && instance === this.ports.home.instance) { const { folder } = region.plan; this.enterDataStay('plan', instance, async (stay) => { await enterDataCellPlan(folder(), page, stay); }); }
     if (compendium !== null) this.enterDataStay('compendium', instance, async (stay) => { await enterDataCellCompendium(compendium.source, compendium.assets, compendium.folder, page, stay, instance); });
   }
   /** One play install of the entered cell, by kind: its stay scope ends when the feet leave. `here` says whether the wire is this cell's. */

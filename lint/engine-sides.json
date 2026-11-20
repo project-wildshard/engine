@@ -697,6 +697,7 @@
     "src/client/game/grid/dataCellAudio.ts": "client",
     "src/client/game/grid/dataCellPlumbing.ts": "client",
     "src/client/game/grid/dataCellLoot.ts": "client",
+    "src/client/game/grid/dataCellPlan.ts": "client",
     "src/client/game/grid/dataCellCompendium.ts": "client",
     "src/client/game/grid/dataCellQuests.ts": "client",
     "src/client/game/grid/dataCellHud.ts": "client",
