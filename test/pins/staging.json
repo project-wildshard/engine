@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "4369cb734c885f3509006cc419571fb87bebbf682ff63720e0cb445a36e3c2ad",
+  "catalogueHash": "fae50be2c4aa65e5f4fdd3ec73c7a1df11dd6d59f578508ced2c6aa99cc27427",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -684,8 +684,8 @@
       {
         "slug": "far-reach",
         "name": "Sky Reach",
-        "revision": 5,
-        "hash": "b8e14693e9ed2b0ae59e53c997717fd45f5aeaaa7b8c392680855cfd27fea132"
+        "revision": 6,
+        "hash": "15008d514ec0f693630ef4e83cc31e9d2c3346891f2bcf4e94afdc8cae352d5f"
       },
       {
         "slug": "glowfen",
@@ -708,8 +708,8 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "revision": 10,
-        "hash": "816964cd6d4c6af8824128fbc8dfdb773670b8a1d1efef29e9ef6d9720f87563"
+        "revision": 20,
+        "hash": "dc06fe5ea2562e0be199f8a2c85e522e57a101e27630d4687fb49e76549772a0"
       },
       {
         "slug": "nalati-grasslands",
@@ -720,8 +720,8 @@
       {
         "slug": "nine-dragon-stack",
         "name": "Nine Dragon Stack",
-        "revision": 3,
-        "hash": "afd68ee205f001779dcda7872cb8be483f723554c734d29b2356cca0d7acf9c3"
+        "revision": 5,
+        "hash": "d176378db6ee34a3b158a7f9735a4000727156f92b3cedba0affe6727abfcf3b"
       },
       {
         "slug": "open-plot-alien-plain",
@@ -861,9 +861,9 @@
     },
     {
       "slug": "far-reach",
-      "revision": 5,
-      "hash": "b8e14693e9ed2b0ae59e53c997717fd45f5aeaaa7b8c392680855cfd27fea132",
-      "bytes": 52606976
+      "revision": 6,
+      "hash": "15008d514ec0f693630ef4e83cc31e9d2c3346891f2bcf4e94afdc8cae352d5f",
+      "bytes": 52609024
     },
     {
       "slug": "glowfen",
@@ -885,9 +885,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 10,
-      "hash": "816964cd6d4c6af8824128fbc8dfdb773670b8a1d1efef29e9ef6d9720f87563",
-      "bytes": 20238336
+      "revision": 20,
+      "hash": "dc06fe5ea2562e0be199f8a2c85e522e57a101e27630d4687fb49e76549772a0",
+      "bytes": 35212800
     },
     {
       "slug": "nalati-grasslands",
@@ -897,9 +897,9 @@
     },
     {
       "slug": "nine-dragon-stack",
-      "revision": 3,
-      "hash": "afd68ee205f001779dcda7872cb8be483f723554c734d29b2356cca0d7acf9c3",
-      "bytes": 119739392
+      "revision": 5,
+      "hash": "d176378db6ee34a3b158a7f9735a4000727156f92b3cedba0affe6727abfcf3b",
+      "bytes": 118967808
     },
     {
       "slug": "open-plot-alien-plain",
