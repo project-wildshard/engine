@@ -31,7 +31,7 @@ import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { bootRoadPrograms, liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
 import { textureBytes } from '@wildshard/engine/render/textureBytes';
-import { budgetCollection, collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
+import { budgetCollection, budgetCollectionEnabled, collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { shardArea } from '../grid/area';
@@ -436,14 +436,18 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     ? { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch } : null);
   if (ctx.session.crashResume !== undefined || (ctx.continuingGridEntry && lastEnd().kind === 'unexpected')) hud.toast(GAME_STRINGS.grid.shardEnded(manifest.name));
   const useBanks = (banks: AudioBanks): void => {
-    if (game.levelScope.disposed) return;
+    if (levelScope.disposed || levelScope.disposing) return;
     if (banks.music) music.useBank(banks.music);
     if (banks.profile) audio.useLevelBank(banks.profile); else audio.useSamples(banks.sfx);
   };
   const decodeAfterBoot = async (): Promise<void> => {
     try {
       if (deferredAudio) useBanks(await deferredAudio.decode());
-      budgetCollection(); // IP30: the decode's garbage goes before play piles onto it
+      // DF11: give WebKit an idle turn for the hint and keep it ahead of the next decode.
+      const collect = budgetCollectionEnabled();
+      if (collect && !await idleTurn(levelScope)) return;
+      if (levelScope.disposed || levelScope.disposing) return;
+      if (collect) budgetCollection();
       const late = startLateAudio(files);
       if (late) useBanks(await late);
     } catch (error) {

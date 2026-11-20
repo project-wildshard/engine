@@ -73,9 +73,15 @@ async function readGridFolderIndex(url: string, identity: string, options: Folde
   if (index !== undefined) {if(native===undefined)await checkBuiltIndex(key, options);}
   else {
     const input = await readIndexBytes(bytes, options);
-    index = builtGridIndex(input, key, options) ? input : await readCheckedOutputIndex(input);
-    // The validated wire size weights object fields, strings and array entries.
-    keepGridDocument(parsedIndexes, key, index, bytes.byteLength * 4);
+    const validated = builtGridIndex(input, key, options) ? input : await readCheckedOutputIndex(input);
+    // Far, near and edge readers can validate the same immutable bytes together.
+    // Share the first published document so their file readers retain one copy.
+    index = parsedIndexes.get(key);
+    if (index === undefined) {
+      index = validated;
+      // The validated wire size weights object fields, strings and array entries.
+      keepGridDocument(parsedIndexes, key, index, bytes.byteLength * 4);
+    }
   }
   const { slug: declaredIdentity } = index.identity;
   if (declaredIdentity !== identity.replace(/^_/u, '')) throw new Error('Grid product index identity differs from its cell');

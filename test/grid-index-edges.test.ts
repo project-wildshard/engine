@@ -9,6 +9,7 @@ import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immutable';
 import { readGridFolderEdges, readGridFolderFar, readGridFolderNear, readGridShardfileFar, gridShardfileFarBytes } from '../src/client/game/grid/folders';
 import { loadShardfileFar } from '../src/client/game/grid/shardfileFar';
+import { memoryAttribution } from '../src/shared/engine/core/memoryAttribution';
 import type { FolderCache } from '../src/client/game/shardfile/folder';
 
 function fixture(slug = 'edge-fixture') {
@@ -76,6 +77,28 @@ test('grid edge preparation reads only the index and edge section, never the oth
   const f = fixture();
   expect(await readGridFolderEdges(f.url, f.source.identity.slug, f.options)).toEqual({ edge: f.source.edge, entryways: f.source.entryways });
   expect(f.fetch.mock.calls.map(([url]) => url)).toEqual([f.url, f.edgeUrl]);
+});
+
+test('concurrent grid index validation retains one cache document', async () => {
+  const f = fixture('coincident-edge-index');
+  let release = (): void => { throw new Error('Missing index gate'); };
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const parseJson = vi.fn(async (bytes: Uint8Array): Promise<unknown> => {
+    await gate;
+    return JSON.parse(new TextDecoder().decode(bytes));
+  });
+  const watched = vi.spyOn(memoryAttribution, 'allocation');
+  const options = { ...f.options, parseJson };
+  const reads = Promise.all([
+    readGridFolderEdges(f.url, f.source.identity.slug, options),
+    readGridFolderEdges(f.url, f.source.identity.slug, options),
+  ]);
+  try {
+    await vi.waitFor(() => { expect(parseJson).toHaveBeenCalledTimes(2); });
+    release();
+    expect(await reads).toEqual(Array.from({ length: 2 }, () => ({ edge: f.source.edge, entryways: f.source.entryways })));
+    expect(watched.mock.calls.filter(([, domain, kind]) => domain === 'ram' && kind === 'cache-document')).toHaveLength(1);
+  } finally { release(); await reads.catch(() => undefined); watched.mockRestore(); }
 });
 
 test('grid edge metadata keeps identity, byte count and immutable hash checks', async () => {

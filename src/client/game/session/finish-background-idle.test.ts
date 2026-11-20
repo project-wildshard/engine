@@ -100,3 +100,31 @@ test('native control and first-use audio remain immediate while speculative down
     publish(); expect(calls).toEqual(['ws:control-ready', 'sustained', 'refinements', 'audio', 'idle-downloads']);
   } finally {owner.dispose();}
 });
+
+test.each(['idle', 'disabled', 'retired'] as const)('late audio collection respects the %s level', async mode => {
+  const source = readFileSync(new URL('finish.ts', import.meta.url), 'utf8');
+  const start = source.indexOf('  const decodeAfterBoot ='), end = source.indexOf('\n  // E183', start);
+  if (start === -1 || end < start) throw new Error('Late audio continuation missing');
+  const owner = new Scope('late-audio'), turn = deferred(), queued = deferred(), calls: string[] = [];
+  const run: unknown = runInNewContext(stripTypeScriptTypes(`${source.slice(start, end)}\ndecodeAfterBoot`), {
+    levelScope: owner, files: {},
+    deferredAudio: {decode: () => Promise.resolve('first')},
+    useBanks: (bank: string): void => {calls.push(bank);},
+    budgetCollectionEnabled: () => mode !== 'disabled',
+    idleTurn: (scope: Scope): Promise<boolean> => {expect(scope).toBe(owner); queued.resolve(true); return turn.promise;},
+    budgetCollection: (): void => {calls.push('collect');},
+    startLateAudio: () => Promise.resolve('late'),
+  });
+  if (typeof run !== 'function') throw new Error('Late audio continuation is not callable');
+  const task: Promise<unknown> = Promise.resolve(Reflect.apply(run, undefined, []));
+  try {
+    if (mode !== 'disabled') {
+      await queued.promise;
+      expect(calls).toEqual(['first']);
+      if (mode === 'retired') owner.dispose();
+      turn.resolve(true);
+    }
+    await task;
+    expect(calls).toEqual(mode === 'retired' ? ['first'] : mode === 'disabled' ? ['first', 'late'] : ['first', 'collect', 'late']);
+  } finally {turn.resolve(false); owner.dispose(); await task;}
+});

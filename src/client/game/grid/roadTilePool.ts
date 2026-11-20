@@ -3,6 +3,7 @@
  * and drops its old native geometry synchronously before a tile lease retires. */
 import { BufferAttribute, BufferGeometry, Group, type Material, Mesh, type TypedArray } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import type { RingTile, RingView } from '@wildshard/engine/world/tileStreamer';
 import { finishRoadSteps, gpuOnlyRoad, publishRoadPlan, type CullPlan, type RoadCuller } from './roadCull';
 import type { RoadTileGeometry } from './roadTileGeometry';
@@ -35,11 +36,11 @@ export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibili
   const geometry = new BufferGeometry(); let completed = false;
   try {
     const first = tiles[0], names = first === undefined ? [] : Object.keys(first.geometry.attributes);
-    const offsets: number[] = []; let vertices = 0;
+    const offsets: number[] = []; let vertices = 0, indexCount = 0;
     for (const tile of tiles) {
       const position = tile.geometry.getAttribute('position');
       if (position === undefined || Object.keys(tile.geometry.attributes).length !== names.length) throw new Error('Incompatible resident road tile');
-      offsets.push(vertices); vertices += position.count;
+      offsets.push(vertices); vertices += position.count; indexCount += tile.plan.source.length;
     }
     for (const name of names) {
       const template = first?.geometry.getAttribute(name);
@@ -57,14 +58,18 @@ export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibili
       }
       geometry.setAttribute(name, new BufferAttribute(array, template.itemSize, template.normalized));
     }
-    const indices: number[] = [], bins: CullPlan['bins'][number][] = [];
+    // Every tile's exact index count is known. Fill the published backing
+    // directly so a synchronous rebuild has no second, boxed index list to collect.
+    const index = ownedArray(Uint32Array, indexCount, { owner: 'grid/road-tile-pool', asset: 'indices' });
+    const bins: CullPlan['bins'][number][] = [];
+    let base = 0;
     for (const [i, tile] of tiles.entries()) {
       const offset = offsets[i]; if (offset === undefined) throw new Error('Missing road tile vertex offset');
-      const base = indices.length;
-      for (let n = 0; n < tile.plan.source.length; n++) {
+      const source = tile.plan.source, count = tile.geometry.getAttribute('position').count;
+      for (let n = 0; n < source.length; n++) {
         if (n % 768 === 0) yield;
-        const vertex = tile.plan.source[n]; if (vertex === undefined || vertex >= tile.geometry.getAttribute('position').count) throw new Error('Invalid road tile vertex');
-        indices.push(vertex + offset);
+        const vertex = source[n]; if (vertex === undefined || vertex >= count) throw new Error('Invalid road tile vertex');
+        index[base + n] = vertex + offset;
       }
       for (const bin of tile.plan.bins) {
         const flag = visibility?.get(bin);
@@ -72,8 +77,8 @@ export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibili
           sphere: bin.sphere.clone(), start: base + bin.start,
           levels: bin.levels.map(run => ({ start: base + run.start, count: run.count })) });
       }
+      base += source.length;
     }
-    const index = Uint32Array.from(indices);
     geometry.setIndex(new BufferAttribute(index, 1));
     completed = true; return { geometry, plan: { source: index, bins, lod: [] } };
   } finally { if (!completed) geometry.dispose(); }

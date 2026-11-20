@@ -14,6 +14,7 @@
  */
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { gpuOnlyAttributes, gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { BufferAttribute, type BufferGeometry, type Camera, DoubleSide, DynamicDrawUsage, Frustum, InstancedMesh, type Material, Matrix4, Mesh, type Object3D, Sphere, type Texture, Vector3 } from 'three';
 import type { PlatformRenderBytePlan } from './renderResidency';
 
@@ -224,10 +225,12 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
   // A shared indexed vertex contributes once per bin to both bounds scans.
   // Keep triangle publication and LOD representative order unchanged.
   const boundedIn = new Uint32Array(position.count);
+  const unique = ownedArray(Uint32Array, position.count, { owner: 'grid/road-cull', asset: 'bin-vertices', kind: 'scratch' });
   let binId = 0;
   for (const { id, x: tileX, z: tileZ } of ordered) {
     const list = members.subarray(firsts[id] ?? 0, firsts[id + 1] ?? 0);
-    const start = out.length, unique: number[] = [];
+    const start = out.length;
+    let uniqueCount = 0;
     binId++;
     let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
     for (let i = 0; i < list.length; i++) {
@@ -236,7 +239,7 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
       for (let c = 0; c < 3; c++) {
         const n = index.getX(t * 3 + c); out.push(n);
         if (boundedIn[n] === binId) continue;
-        boundedIn[n] = binId; unique.push(n);
+        boundedIn[n] = binId; unique[uniqueCount++] = n;
         const x = position.getX(n), y = position.getY(n), z = position.getZ(n);
         minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
       }
@@ -247,7 +250,8 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
     sphere.center.set(minX + maxX, minY + maxY, minZ + maxZ).multiplyScalar(0.5);
     if (count === 0) sphere.center.set(0, 0, 0);
     let farthest = 0;
-    for (const n of unique) {
+    for (let i = 0; i < uniqueCount; i++) {
+      const n = unique[i] ?? 0;
       const dx = sphere.center.x - position.getX(n), dy = sphere.center.y - position.getY(n), dz = sphere.center.z - position.getZ(n);
       farthest = Math.max(farthest, dx * dx + dy * dy + dz * dz);
     }

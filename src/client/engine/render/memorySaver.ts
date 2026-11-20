@@ -256,10 +256,15 @@ export function collectBeforeShaders(userAgent: string = typeof navigator === 'u
   return bytes > 0 ? hintCollection(bytes) : 0;
 }
 
+/** The collection hint steers only WebKit on the phone's decode and upload budget. */
+export function budgetCollectionEnabled(): boolean {
+  return typeof navigator !== 'undefined' && webKitEngine(navigator.userAgent) && phoneBudget();
+}
+
 /** IP30: under the phone byte budget, WebKit's collection hint between upload batches, at most every 200 ms (0 when off). */
 let budgetCollected = -Infinity;
 export function budgetCollection(): number {
-  if (!phoneBudget() || diagnosticNow() - budgetCollected < 200) return 0;
+  if (!budgetCollectionEnabled() || diagnosticNow() - budgetCollected < 200) return 0;
   budgetCollected = diagnosticNow();
   return collectBeforeShaders();
 }
