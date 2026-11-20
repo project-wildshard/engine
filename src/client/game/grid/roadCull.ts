@@ -301,6 +301,60 @@ class LodFirsts {
   }
 }
 
+/** A bin row of the sort (`cullPlanSteps`). */
+interface BinRow { readonly key: string; readonly x: number; readonly z: number; readonly id: number; count: number }
+type Attribute = ReturnType<BufferGeometry['getAttribute']>;
+type Index = NonNullable<ReturnType<BufferGeometry['getIndex']>>;
+/* DF11: the plan's per-triangle and per-vertex loops run in these plain functions, one 256-step chunk a call, between the
+ * generator's pauses. A loop inside a generator resumed at each pause kept its numbers as heap objects (each running
+ * min, max and sum boxed a step, ~21 KB a dock frame at 3x); here V8 keeps them as plain doubles. Same operations, same
+ * order: `ix` and `pa` are the arrays while plain (refreshed after each pause), else three's getters. */
+function binChunk(from: number, to: number, ix: ArrayLike<number> | null, pa: ArrayLike<number>, ps: number, index: Index, position: Attribute,
+  size: number, offset: number, byBin: Map<number, Map<number, BinRow>>, binOf: Uint32Array, binCount: number): number {
+  let next = binCount;
+  for (let t = from; t < to; t++) {
+    let x = 0, z = 0;
+    if (ix !== null) for (let c = 0; c < 3; c++) { const n = ix[t * 3 + c] ?? 0; x += pa[n * ps] ?? 0; z += pa[n * ps + 2] ?? 0; }
+    else for (let c = 0; c < 3; c++) { const n = index.getX(t * 3 + c); x += position.getX(n); z += position.getZ(n); }
+    const bx = Math.floor(x / 3 / size + offset), bz = Math.floor(z / 3 / size + offset);
+    let row = byBin.get(bx); if (row === undefined) { row = new Map(); byBin.set(bx, row); }
+    let bin = row.get(bz);
+    if (bin === undefined) { bin = { key: `${String(bx)},${String(bz)}`, x: bx, z: bz, id: next++, count: 0 }; row.set(bz, bin); }
+    bin.count++; binOf[t] = bin.id;
+  }
+  return next;
+}
+/** One chunk of a bin's triangles: their corners onto `out`, each new vertex into `unique` and the running box `b`
+ *  (min xyz, max xyz). Returns the unique count. */
+function boundsChunk(list: Uint32Array, from: number, to: number, ix: ArrayLike<number> | null, pa: ArrayLike<number>, ps: number, index: Index, position: Attribute,
+  out: Grow<Uint32Array>, boundedIn: Uint32Array, binId: number, unique: Uint32Array, uniqueCount: number, b: Float64Array): number {
+  let count = uniqueCount;
+  let minX = b[0] ?? 0, minY = b[1] ?? 0, minZ = b[2] ?? 0, maxX = b[3] ?? 0, maxY = b[4] ?? 0, maxZ = b[5] ?? 0;
+  for (let i = from; i < to; i++) {
+    const t = list[i] ?? 0;
+    for (let c = 0; c < 3; c++) {
+      const n = ix !== null ? ix[t * 3 + c] ?? 0 : index.getX(t * 3 + c); out.push(n);
+      if (boundedIn[n] === binId) continue;
+      boundedIn[n] = binId; unique[count++] = n;
+      const x = ix !== null ? pa[n * ps] ?? 0 : position.getX(n), y = ix !== null ? pa[n * ps + 1] ?? 0 : position.getY(n), z = ix !== null ? pa[n * ps + 2] ?? 0 : position.getZ(n);
+      minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
+    }
+  }
+  b[0] = minX; b[1] = minY; b[2] = minZ; b[3] = maxX; b[4] = maxY; b[5] = maxZ;
+  return count;
+}
+/** The largest squared distance from `centre` to a bin's unique vertices. */
+function farthestFrom(centre: Vector3, unique: Uint32Array, uniqueCount: number, ix: ArrayLike<number> | null, pa: ArrayLike<number>, ps: number, position: Attribute): number {
+  let farthest = 0;
+  for (let i = 0; i < uniqueCount; i++) {
+    const n = unique[i] ?? 0;
+    const dx = centre.x - (ix !== null ? pa[n * ps] ?? 0 : position.getX(n)), dy = centre.y - (ix !== null ? pa[n * ps + 1] ?? 0 : position.getY(n)),
+      dz = centre.z - (ix !== null ? pa[n * ps + 2] ?? 0 : position.getZ(n));
+    farthest = Math.max(farthest, dx * dx + dy * dy + dz * dz);
+  }
+  return farthest;
+}
+
 /** Sort the identical bin/LOD runs with pauses inside triangle batches; no partial plan is published. */
 export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: readonly CullLod[] = [], tileSize?: number): Generator<void, CullPlan> {
   const index = geometry.getIndex(), position = geometry.getAttribute('position');
@@ -309,7 +363,6 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
   const { size, offset } = binGrid(pitch, tileSize);
   // Each triangle's bin id in one typed pass, then a counting sort keeps every bin's triangles in index order (IOSMEM:
   // no number[] list per bin on the JS heap).
-  interface BinRow { readonly key: string; readonly x: number; readonly z: number; readonly id: number; count: number }
   const triangles = index.count / 3, byBin = new Map<number, Map<number, BinRow>>(), binOf = new Uint32Array(triangles);
   // DF11: while the index, positions and grain are plain (`plainAttribute`, checked after every pause) the loops index
   // their arrays; otherwise they call three's getters exactly as before
@@ -320,16 +373,9 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
     ix = plain ? index.array : null; pa = plain ? position.array : []; ps = position.itemSize;
   };
   let binCount = 0;
-  for (let t = 0; t < triangles; t++) {
-    if (t % 256 === 0) { yield; refresh(); }
-    let x = 0, z = 0;
-    if (ix !== null) for (let c = 0; c < 3; c++) { const n = ix[t * 3 + c] ?? 0; x += pa[n * ps] ?? 0; z += pa[n * ps + 2] ?? 0; }
-    else for (let c = 0; c < 3; c++) { const n = index.getX(t * 3 + c); x += position.getX(n); z += position.getZ(n); }
-    const bx = Math.floor(x / 3 / size + offset), bz = Math.floor(z / 3 / size + offset);
-    let row = byBin.get(bx); if (row === undefined) { row = new Map(); byBin.set(bx, row); }
-    let bin = row.get(bz);
-    if (bin === undefined) { bin = { key: `${String(bx)},${String(bz)}`, x: bx, z: bz, id: binCount++, count: 0 }; row.set(bz, bin); }
-    bin.count++; binOf[t] = bin.id;
+  for (let t0 = 0; t0 < triangles; t0 += 256) {
+    yield; refresh();
+    binCount = binChunk(t0, Math.min(triangles, t0 + 256), ix, pa, ps, index, position, size, offset, byBin, binOf, binCount);
   }
   const firsts = new Uint32Array(binCount + 1), members = new Uint32Array(triangles);
   for (const row of byBin.values()) for (const bin of row.values()) firsts[bin.id + 1] = bin.count;
@@ -358,36 +404,23 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
   const boundedIn = new Uint32Array(position.count);
   const unique = ownedArray(Uint32Array, position.count, { owner: 'grid/road-cull', asset: 'bin-vertices', kind: 'scratch' });
   let binId = 0;
+  const bounds = ownedArray(Float64Array, 6, { owner: 'grid/road-cull', asset: 'bin-bounds', kind: 'scratch' });
   for (const { id, x: tileX, z: tileZ } of ordered) {
     const list = members.subarray(firsts[id] ?? 0, firsts[id + 1] ?? 0);
     const start = out.length;
     let uniqueCount = 0;
     binId++;
-    let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
-    for (let i = 0; i < list.length; i++) {
-      if (i % 256 === 0) { yield; refresh(); }
-      const t = list[i] ?? 0;
-      for (let c = 0; c < 3; c++) {
-        const n = ix !== null ? ix[t * 3 + c] ?? 0 : index.getX(t * 3 + c); out.push(n);
-        if (boundedIn[n] === binId) continue;
-        boundedIn[n] = binId; unique[uniqueCount++] = n;
-        const x = ix !== null ? pa[n * ps] ?? 0 : position.getX(n), y = ix !== null ? pa[n * ps + 1] ?? 0 : position.getY(n), z = ix !== null ? pa[n * ps + 2] ?? 0 : position.getZ(n);
-        minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
-      }
+    bounds[0] = Infinity; bounds[1] = Infinity; bounds[2] = Infinity; bounds[3] = -Infinity; bounds[4] = -Infinity; bounds[5] = -Infinity;
+    for (let i0 = 0; i0 < list.length; i0 += 256) {
+      yield; refresh();
+      uniqueCount = boundsChunk(list, i0, Math.min(list.length, i0 + 256), ix, pa, ps, index, position, out, boundedIn, binId, unique, uniqueCount, bounds);
     }
     const count = out.length - start, levels: { start: number; count: number }[] = [];
     // three's Sphere.setFromPoints over these vertices without a Vector3 each: the box centre, then the farthest vertex
     const sphere = new Sphere();
-    sphere.center.set(minX + maxX, minY + maxY, minZ + maxZ).multiplyScalar(0.5);
+    sphere.center.set((bounds[0] ?? 0) + (bounds[3] ?? 0), (bounds[1] ?? 0) + (bounds[4] ?? 0), (bounds[2] ?? 0) + (bounds[5] ?? 0)).multiplyScalar(0.5);
     if (count === 0) sphere.center.set(0, 0, 0);
-    let farthest = 0;
-    for (let i = 0; i < uniqueCount; i++) {
-      const n = unique[i] ?? 0;
-      const dx = sphere.center.x - (ix !== null ? pa[n * ps] ?? 0 : position.getX(n)), dy = sphere.center.y - (ix !== null ? pa[n * ps + 1] ?? 0 : position.getY(n)),
-        dz = sphere.center.z - (ix !== null ? pa[n * ps + 2] ?? 0 : position.getZ(n));
-      farthest = Math.max(farthest, dx * dx + dy * dy + dz * dz);
-    }
-    sphere.radius = Math.sqrt(farthest);
+    sphere.radius = Math.sqrt(farthestFrom(sphere.center, unique, uniqueCount, ix, pa, ps, position));
     for (const tier of clusters) {
       const from = out.length;
       for (let i = 0; i < list.length; i++) {
@@ -543,15 +576,46 @@ function attachRoadCull(mesh: Mesh, plan: CullPlan, main?: () => Camera | undefi
   let ids = plan.bins.map(() => 0), previous = ids.slice(), previousCount = 0;
   const update = { start: 0, count: 0 };
   let triangles = fine / 3, visible = plan.bins.length, rebuilds = 0;
+  // DF11: each bin's world sphere (centre xyz, radius), worked out as three's Sphere.applyMatrix4 does and kept while the
+  // mesh's world matrix holds; the draw tests it against the frustum's planes with plain numbers. Copying and moving a
+  // Sphere per bin per draw boxed its fields (~33 KB a dock frame at 3x).
+  const worldSpheres = ownedArray(Float64Array, plan.bins.length * 4, { owner: 'grid/road-cull', asset: 'world-spheres', kind: 'scratch' });
+  const sphereMatrix = ownedArray(Float64Array, 16, { owner: 'grid/road-cull', asset: 'world-spheres', kind: 'scratch' }).fill(Number.NaN);
+  const placeSpheres = (m: Matrix4): void => {
+    const e = m.elements;
+    let same = true;
+    for (let i = 0; i < 16; i++) if (sphereMatrix[i] !== e[i]) { same = false; break; }
+    if (same) return;
+    sphereMatrix.set(e);
+    for (let k = 0; k < plan.bins.length; k++) {
+      const bin = plan.bins[k]; if (bin === undefined) continue;
+      sphere.copy(bin.sphere).applyMatrix4(m);
+      worldSpheres[k * 4] = sphere.center.x; worldSpheres[k * 4 + 1] = sphere.center.y; worldSpheres[k * 4 + 2] = sphere.center.z;
+      worldSpheres[k * 4 + 3] = sphere.radius;
+    }
+  };
+  const planes = frustum.planes;
   mesh.onBeforeRender = (_renderer, _scene, camera) => {
     const view = main?.();
     if (view !== undefined && camera !== view) return;
     frustumOf(camera, frustum, matrix, true); eye.setFromMatrixPosition(camera.matrixWorld);
+    placeSpheres(mesh.matrixWorld);
+    const ex = eye.x, ey = eye.y, ez = eye.z;
     let count = 0, changed = false;
     for (let k = 0; k < plan.bins.length; k++) {
       const bin = plan.bins[k];
-      if (bin === undefined || bin.visibility?.visible === false || !frustum.intersectsSphere(sphere.copy(bin.sphere).applyMatrix4(mesh.matrixWorld))) continue;
-      const d = sphere.distanceToPoint(eye);
+      if (bin === undefined || bin.visibility?.visible === false) continue;
+      // three's Frustum.intersectsSphere and Sphere.distanceToPoint, on the kept world sphere
+      const cx = worldSpheres[k * 4] ?? 0, cy = worldSpheres[k * 4 + 1] ?? 0, cz = worldSpheres[k * 4 + 2] ?? 0, radius = worldSpheres[k * 4 + 3] ?? 0;
+      let inside = true;
+      for (let i = 0; i < 6; i++) {
+        const plane = planes[i]; if (plane === undefined) continue;
+        const n = plane.normal;
+        if (n.x * cx + n.y * cy + n.z * cz + plane.constant < -radius) { inside = false; break; }
+      }
+      if (!inside) continue;
+      const dx = ex - cx, dy = ey - cy, dz = ez - cz;
+      const d = Math.sqrt(dx * dx + dy * dy + dz * dz) - radius;
       const lod = bin.lod ?? plan.lod;
     let level = 0; while (level < lod.length && d > (lod[level] ?? Infinity)) level++;
       const run = choices[k]?.[level] ?? choices[k]?.[0];

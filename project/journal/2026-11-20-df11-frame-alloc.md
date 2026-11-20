@@ -21,3 +21,8 @@
   it, so its matrices are composed once at staging and its auto update is off (24 of the walk's 28 KB a call).
 - The portable sin/cos stored the reduction's hi/lo in two module `let`s: two heap numbers a call. A Float64Array
   slot now.
+- Road draw: the cull hook copied and moved a Sphere per bin per draw (33 KB a frame); it now keeps each bin's world
+  sphere while the mesh's matrix holds and tests the frustum planes with plain numbers (three's arithmetic).
+- Generators: a loop that pauses inside a generator, or runs once a build, keeps its doubles boxed in V8 (measured in
+  node: a resumed loop's running min/max boxes each step; a plain chunk function does not). cullPlanSteps' bin, bounds
+  and radius loops and the seam merge's per-strip vertex loop now run in plain functions between the same pauses.

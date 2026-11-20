@@ -49,6 +49,28 @@ const NEUTRAL = 0.25, VERGE = 0.45, BUFFER = 11.5;
 /** Distance from the nearest road centre line on one axis (centre lines at k·pitch + pitch/2, grid metres). */
 const fromRoad = (v: number, pitch: number): number => Math.abs(v - (Math.round((v - pitch / 2) / pitch) * pitch + pitch / 2));
 
+/** One strip's vertices into the merged arrays: translated positions and, unless baked, the verge-darkened colours.
+ *  DF11: a plain function, not the generator's own loop, so V8 optimizes it; a generator's first long loop ran
+ *  interpreted and boxed every double (~19 KB a dock frame at 3x). The same operations in the same order. */
+function placeStrip(mesh: SeamPiece['mesh'], dx: number, dz: number, base: number, count: number, position: Float32Array, colour: Float32Array | undefined, pitch: number): void {
+  let previousX = Number.NaN, previousZ = Number.NaN, roadX = Number.NaN, roadZ = Number.NaN;
+  for (let k = 0; k < count; k++) {
+    position[(base + k) * 3] = (mesh.positions[k * 3] ?? 0) + dx; position[(base + k) * 3 + 1] = mesh.positions[k * 3 + 1] ?? 0; position[(base + k) * 3 + 2] = (mesh.positions[k * 3 + 2] ?? 0) + dz;
+    if (colour === undefined) continue;
+    // the platform's neutral grey reads as a dark gravel verge; the shard's own colour at the gradient's far edge is kept
+    const r = mesh.colours[k * 3] ?? 0, g = mesh.colours[k * 3 + 1] ?? 0, b = mesh.colours[k * 3 + 2] ?? 0;
+    // only near the road: the darkening fades out across the gradient, so the cell edge keeps the shard's exact colour
+    const wx = (mesh.positions[k * 3] ?? 0) + mesh.origin.x, wz = (mesh.positions[k * 3 + 2] ?? 0) + mesh.origin.z;
+    // A lattice row repeats one coordinate. Reuse only that scalar result;
+    // arbitrary meshes and every change of coordinate take the same formula.
+    if (wx !== previousX) { roadX = fromRoad(wx, pitch); previousX = wx; }
+    if (wz !== previousZ) { roadZ = fromRoad(wz, pitch); previousZ = wz; }
+    const road = Math.max(0, Math.min(1, (GAP_HALF - Math.min(roadX, roadZ)) / (GAP_HALF - BUFFER)));
+    const shade = 1 - VERGE * road * Math.max(0, 1 - (Math.abs(r - NEUTRAL) + Math.abs(g - NEUTRAL) + Math.abs(b - NEUTRAL)) / 0.15);
+    colour[(base + k) * 3] = r * shade; colour[(base + k) * 3 + 1] = g * shade; colour[(base + k) * 3 + 2] = b * shade;
+  }
+}
+
 /**
  * Merge every strip into one home-frame geometry whose index buffer is grouped by material. Pure (no GPU): the vertices are
  * the generator's own, translated; `uv` is world-planar (top faces xz, walls along × height) so textures tile across strips.
@@ -66,22 +88,7 @@ export function* seamMeshSteps(pieces: readonly SeamPiece[], home: { readonly or
   let base = 0;
   for (const { mesh, features } of pieces) {
     const dx = mesh.origin.x - home.origin.x, dz = mesh.origin.z - home.origin.z, count = mesh.positions.length / 3;
-    let previousX = Number.NaN, previousZ = Number.NaN, roadX = Number.NaN, roadZ = Number.NaN;
-    for (let k = 0; k < count; k++) {
-      position[(base + k) * 3] = (mesh.positions[k * 3] ?? 0) + dx; position[(base + k) * 3 + 1] = mesh.positions[k * 3 + 1] ?? 0; position[(base + k) * 3 + 2] = (mesh.positions[k * 3 + 2] ?? 0) + dz;
-      if (bakedColours !== undefined) continue;
-      // the platform's neutral grey reads as a dark gravel verge; the shard's own colour at the gradient's far edge is kept
-      const r = mesh.colours[k * 3] ?? 0, g = mesh.colours[k * 3 + 1] ?? 0, b = mesh.colours[k * 3 + 2] ?? 0;
-      // only near the road: the darkening fades out across the gradient, so the cell edge keeps the shard's exact colour
-      const wx = (mesh.positions[k * 3] ?? 0) + mesh.origin.x, wz = (mesh.positions[k * 3 + 2] ?? 0) + mesh.origin.z;
-      // A lattice row repeats one coordinate. Reuse only that scalar result;
-      // arbitrary meshes and every change of coordinate take the same formula.
-      if (wx !== previousX) { roadX = fromRoad(wx, pitch); previousX = wx; }
-      if (wz !== previousZ) { roadZ = fromRoad(wz, pitch); previousZ = wz; }
-      const road = Math.max(0, Math.min(1, (GAP_HALF - Math.min(roadX, roadZ)) / (GAP_HALF - BUFFER)));
-      const shade = 1 - VERGE * road * Math.max(0, 1 - (Math.abs(r - NEUTRAL) + Math.abs(g - NEUTRAL) + Math.abs(b - NEUTRAL)) / 0.15);
-      colour[(base + k) * 3] = r * shade; colour[(base + k) * 3 + 1] = g * shade; colour[(base + k) * 3 + 2] = b * shade;
-    }
+    placeStrip(mesh, dx, dz, base, count, position, bakedColours === undefined ? colour : undefined, pitch);
     // every index in a feature range goes to its material's list; triangles no range names draw as ground
     const named = new Uint8Array(mesh.indices.length);
     const rockSurface = new Map<number, readonly [number, number, number] | undefined>();
