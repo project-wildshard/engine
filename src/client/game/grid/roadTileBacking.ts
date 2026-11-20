@@ -4,6 +4,7 @@ import { BufferAttribute, BufferGeometry, type Mesh } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { emitFault } from '@wildshard/engine/core/faults';
 import { frameCost } from '@wildshard/engine/core/frameCost';
 import { presenting } from '@wildshard/engine/core/framePacing';
 import type { RingCamera, TileRequirement, TileStreamBudget, TileStreamer } from '@wildshard/engine/world/tileStreamer';
@@ -67,6 +68,9 @@ export function retireWholeRoadMesh(mesh: Mesh): BufferGeometry {
   return previous;
 }
 
+/** How often the first road handoff asks again for tiles the archive could not read before it settles on the whole meshes. */
+export const ROAD_PRIME_TRIES = 8;
+
 export class RoadTileBacking {
   private readonly sources = new Map<Mesh, Source>();
   private readonly pending: PendingArchive[] = [];
@@ -81,7 +85,10 @@ export class RoadTileBacking {
   private committed = false;
   private primed = false;
   private priming = false;
-  private primeFailure: Error | null = null;
+  /** The first handoff's tiles (chosen once, at the first step) and how often reading them failed. */
+  private primeDemand: { readonly coarse: readonly string[]; readonly fine: ReadonlyMap<string, readonly number[]> } | null = null;
+  private primeFailures = 0;
+  private repin = false;
   private initialPins: TileRequirement[] = [];
   private initialFine: { instance: string; key: number; x: number; z: number }[] = [];
   private initialCoarse: { instance: string; x: number; z: number }[] = [];
@@ -290,9 +297,9 @@ export class RoadTileBacking {
   }
   step(camera: RingCamera): void {
     const stream = this.stream; if (stream === null) return;
-    if (this.primeFailure !== null) throw this.primeFailure;
     const timedAt = frameCost.on ? diagnosticNow() : undefined;
     if (!this.priming) this.prime(camera, stream);
+    else if (this.repin) { this.repin = false; this.requirePrime(stream); }
     stream.step(camera);
     if (!this.committed && this.primed && stream.ready()) {
       // Reveal first, so retiring a whole mesh cannot leave its ready children
@@ -320,15 +327,32 @@ export class RoadTileBacking {
     const near = this.initialCoarse.filter(at => distance(at, CONTENT_CAPS.l1.size) <= 400)
       .sort((a, b) => Number(keys.has(b.instance)) - Number(keys.has(a.instance)) || distance(a, CONTENT_CAPS.l1.size) - distance(b, CONTENT_CAPS.l1.size))
       .slice(0, CONTENT_CAPS.l1Count);
-    for (const row of near) this.initialPins.push(stream.require(row.instance, [0], 'l1'));
-    for (const [instance, values] of keys) this.initialPins.push(stream.require(instance, values));
+    this.primeDemand = { coarse: near.map(row => row.instance), fine: keys };
     this.initialFine = []; this.initialCoarse = [];
+    this.requirePrime(stream);
+  }
+  /**
+   * Pin the first handoff's tiles and commit once they are all published. A tile the archive cannot read (the store
+   * answered no bytes for a tile it had referenced: seen once on desktop WebKit with Settings open, meta
+   * QA-FEEDBACK-2026-11-20-mini row 6) used to fail the handoff for good, and every grid frame after it threw "Road tile
+   * archive unavailable" into the error modal. Now the pins go and are asked again (the streamer refetches a failed tile
+   * after its own back-off); after ROAD_PRIME_TRIES the backing stops asking and reports once, and the whole road meshes,
+   * never retired, keep drawing the road.
+   */
+  private requirePrime(stream: TileStreamer<PreparedRoadTile>): void {
+    const demand = this.primeDemand; if (demand === null) return;
+    const pins = [...demand.coarse.map(instance => stream.require(instance, [0], 'l1')), ...[...demand.fine].map(([instance, values]) => stream.require(instance, values))];
+    this.initialPins = pins;
     const finish = async (): Promise<void> => {
       try {
-        await Promise.all(this.initialPins.map(pin => pin.ready));
-        if (!this.scope.disposed && !this.scope.disposing) this.primed = true;
+        await Promise.all(pins.map(pin => pin.ready));
+        if (!this.scope.disposed && !this.scope.disposing && this.initialPins === pins) this.primed = true;
       } catch (error) {
-        if (!this.scope.disposed && !this.scope.disposing) this.primeFailure = error instanceof Error ? error : new Error('Road tile priming failed', { cause: error });
+        if (this.scope.disposed || this.scope.disposing || this.initialPins !== pins) return;
+        for (const pin of pins) pin.release();
+        this.initialPins = [];
+        if (++this.primeFailures < ROAD_PRIME_TRIES) { this.repin = true; return; }
+        emitFault({ system: 'grid.road-tiles', error: error instanceof Error ? error : new Error('Road tile priming failed', { cause: error }), verdict: 'retry' });
       }
     };
     void finish();

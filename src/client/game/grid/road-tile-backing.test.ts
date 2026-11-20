@@ -5,7 +5,7 @@ import { noteFrameDrawn } from '@wildshard/engine/core/framePacing';
 import { contentHash } from '../../../shared/game/shardfile/contentHash';
 import { finishRoadSteps, type CullPlan } from './roadCull';
 import { decodeRoadTile, encodeRoadTile, type RoadTileStore } from './roadTileArchive';
-import { RoadTileBacking, retireWholeRoadMesh } from './roadTileBacking';
+import { ROAD_PRIME_TRIES, RoadTileBacking, retireWholeRoadMesh } from './roadTileBacking';
 import { compactRoadTileSteps } from './roadTileGeometry';
 import { coarseRoadTileSteps } from './roadTileCoarse';
 
@@ -254,4 +254,46 @@ test('a retired whole-road mesh draws in no view, its tile pool still does (RP4)
   expect(child.layers.test(new PerspectiveCamera().layers)).toBe(true);
   expect(child.parent).toBe(f.mesh);
   previous.dispose(); f.close();
+});
+
+// meta QA-FEEDBACK-2026-11-20-mini row 6 (mini-dw-fix, IPHONE13-DRIFTWOOD DW9): with Settings open on desktop WebKit, the
+// archive answered no bytes for a tile it had referenced; the first handoff failed for good and every grid frame threw
+// "Road tile archive unavailable" into the error modal. Unreadable tiles are asked for again; past ROAD_PRIME_TRIES the
+// backing reports once and keeps the whole road meshes.
+async function startedBacking(name: string, unreadable: (reads: number) => boolean): Promise<{ backing: RoadTileBacking; scope: Scope; close: () => void; reads: () => number }> {
+  const f = fixture(4), scope = new Scope(name), bodies = new Map<string, Uint8Array>();
+  let sealed = false, reads = 0;
+  const backing = new RoadTileBacking(scope, {
+    get: hash => { if (sealed) { reads++; if (unreadable(reads)) return Promise.resolve(null); } return Promise.resolve(bodies.get(hash)?.slice() ?? null); },
+    put: (hash, bytes) => { bodies.set(hash, bytes.slice()); return Promise.resolve(true); },
+  }, { pitch: 125, plans: new Map() });
+  await capture(backing, f.mesh, f.plan);
+  backing.retirement(f.mesh, () => undefined);
+  const lease = { id: 'road', shrink: () => undefined, update: () => undefined, hold: () => () => undefined, release: () => undefined };
+  backing.start({ x: 0, z: 0 }, { junctions: [] }, { reserve: claim => ({ ...lease, id: claim.id }) }, 'proof');
+  sealed = true;
+  return { backing, scope, reads: () => reads, close: () => { scope.dispose(); f.close(); } };
+}
+async function frames(backing: RoadTileBacking, count: number, until: () => boolean = () => false): Promise<void> {
+  for (let frame = 0; frame < count && !until(); frame++) { backing.step({ x: 10, z: 10, vx: 0, vz: 0 }); await new Promise<void>(resolve => { setTimeout(resolve, 0); }); }
+}
+
+test('an unreadable road tile at the first handoff is asked for again, and the road commits once it reads', async () => {
+  const { backing, close, reads } = await startedBacking('road prime retry', n => n <= 2);
+  try {
+    await frames(backing, 400, () => backing.ready());
+    expect(reads()).toBeGreaterThan(2);
+    expect(backing.ready()).toBe(true);
+  } finally { close(); }
+});
+
+test('a road tile that never reads leaves the whole road drawn and reports once, and no frame throws', async () => {
+  const { onFault } = await import('@wildshard/engine/core/faults');
+  const faults: string[] = [], off = onFault(fault => { faults.push(fault.system); });
+  const { backing, close } = await startedBacking('road prime gives up', () => true);
+  try {
+    await frames(backing, 30 * (ROAD_PRIME_TRIES + 2));
+    expect(backing.ready()).toBe(false);
+    expect(faults.filter(system => system === 'grid.road-tiles')).toHaveLength(1);
+  } finally { off(); close(); }
 });

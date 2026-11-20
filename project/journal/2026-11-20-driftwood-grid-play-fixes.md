@@ -11,3 +11,7 @@ QA-FEEDBACK-2026-11-20-mini rows 3 to 6, from IPHONE13-DRIFTWOOD DW8 and DW9.
   every grid New Game was refused ("your save is unchanged"); like `prepareRecovery` it now saves only where the page
   stands there. The Saves cards also read the server's copy (read-only, the J130 database) and show it when it holds
   anything, so a mid-quest Driftwood card no longer reads "QUESTS 0 DONE · EMPTY".
+- Row 6, "Road tile archive unavailable" in the error modal: a tile the archive could not read failed the road's first
+  handoff for good (`primeFailure`), and `RoadTileBacking.step` threw it on every grid frame. Now the handoff's pins are
+  released and asked for again (the streamer's own back-off refetches); after `ROAD_PRIME_TRIES` it reports one
+  `grid.road-tiles` fault and keeps the whole road meshes, which were never retired.
