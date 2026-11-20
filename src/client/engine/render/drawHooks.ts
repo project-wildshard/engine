@@ -1,9 +1,10 @@
-import { BatchedMesh, type BufferAttribute, BufferGeometry, CompressedTexture, InstancedMesh, Material, Mesh, MeshDepthMaterial, MeshDistanceMaterial, RenderTarget, StaticDrawUsage, Texture } from 'three';
+import { BatchedMesh, type BufferAttribute, BufferGeometry, CompressedTexture, InstancedMesh, Material, Mesh, MeshDepthMaterial, MeshDistanceMaterial, RenderTarget, SkinnedMesh, StaticDrawUsage, Texture } from 'three';
 import type { Renderer } from './renderer';
 import { renderCounter } from './frameCounter';
 import { emitFault } from '../../../shared/engine/core/faults';
 import { LIGHT_UNIFORMS } from './lightUniforms';
 import { arrayReleased } from './releasedArrays';
+import { rebindCookedSkinUv } from './cookedSkinUv';
 
 type Draw = Renderer['renderBufferDirect'];
 type ShadowDraw = (draw: Draw, camera: Parameters<Draw>[0], scene: Parameters<Draw>[1], geometry: Parameters<Draw>[2],
@@ -29,6 +30,7 @@ interface DrawHooks {
   ownership?: (draw: Draw, ...args: Parameters<Draw>) => void;
   memory?: Draw;
   uploads?: (() => void) | undefined;
+  cookedSkinUv?: typeof rebindCookedSkinUv;
 }
 
 interface Pipeline { draw: DrawHooks | undefined; properties: PropertyHooks | undefined; epoch: number }
@@ -87,6 +89,7 @@ export function drawHooks(renderer: DrawTarget): DrawHooks {
           else hooks.ownership(draw, camera, scene, geometry, selected, object, group);
         }
         submitted = true;
+        if (object instanceof SkinnedMesh) hooks.cookedSkinUv?.(geometry, selected);
       }
       complete = true;
     } finally {
@@ -341,6 +344,10 @@ export function keepRotated(index: BufferAttribute): void { if (rotated.has(inde
 /** Whether `userAgent` is WebKit's engine (Safari, and every iOS browser: CriOS, FxiOS), not Blink's. */
 export function webKitEngine(userAgent: string): boolean {
   return /AppleWebKit\//u.test(userAgent) && !/(?:Chrome|Chromium|Edg|OPR|SamsungBrowser)\//u.test(userAgent);
+}
+
+export function installCookedSkinUvBinding(renderer: DrawTarget, userAgent: string = globalThis.navigator?.userAgent ?? ''): void {
+  if (webKitEngine(userAgent)) drawHooks(renderer).cookedSkinUv = rebindCookedSkinUv;
 }
 
 /** The renderer draws in the first-vertex convention wherever the rotation keeps the look (see the file comment). */

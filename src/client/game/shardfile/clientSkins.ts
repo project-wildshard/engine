@@ -22,6 +22,7 @@ import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
 import { BipedRigPose } from '@wildshard/engine/entities/animalRig';
 import type { AnimalSpecies, BoneDef, RigAnimCtx } from '@wildshard/engine/entities/species/registry';
 import { NO_FUR } from '@wildshard/engine/entities/species/rigs';
+import { prepareCookedSkinUv } from '@wildshard/engine/render/cookedSkinUv';
 import { Gunfire } from '@wildshard/engine/fx/gunfire';
 import { holdQuestRewards } from '../quest/reward';
 import { loadSkin } from './skinPlayback';
@@ -377,6 +378,10 @@ export class SerpentDeath {
 /** A custom-rig engine look over a loaded skin; the platform brain's state drives the clip choice per instance. */
 export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardRows['species'][number], skin: ClientSkin, lendCoat = false): SpeciesLook {
   const drivers = new WeakMap<Record<string, Bone>, SkinDriver>();
+  if (lendCoat) {
+    prepareCookedSkinUv(skin.geometry);
+    for (const variant of skin.variants?.values() ?? []) prepareCookedSkinUv(variant.geometry);
+  }
   // fresh joint and dims records per call: the factory owns what it is handed
   const select = (id: string): ClientSkin => clientVariantSkin(skin, id);
   const coats = lendCoat ? new Map<ClientSkin, ReturnType<ClientSkin['material']>['map']>() : null;
