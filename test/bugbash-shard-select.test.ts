@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // STAGING-BUGBASH (meta docs/plans/STAGING-BUGBASH-PLAN.md, opus-bugfix2): the Shard Select bugs Jake's 12:49 phone shot and the
 // 2026-11-16 staging bash found on v0.1.30, each read off the deck staging drew.
+import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { installCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { installTitleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
@@ -90,6 +91,17 @@ test('SB12: a grid cell whose shard this page has no data for keeps road-level e
   expect(edges.kind).toBe('declared');
   if (edges.kind === 'declared') expect([edges.observations.north.entryWidth, Math.max(...edges.profiles.east.heights)]).toEqual([0, 0]);
   expect(fetch).not.toHaveBeenCalled();
+});
+
+// mini-bugbash (2026-11-20, staging v0.1.55): Zone Select puts the pill's top on 68.5 px, and Chromium cut its label's digits in half:
+// the label's box is trimmed to cap height, so clipping both axes clips ink. The phone label ellipsises sideways and never clips up or down.
+test('SB15: the phone pill clips its label sideways only, never the digits', () => {
+  const css = readFileSync('src/client/engine/ui/styles/update.css', 'utf8');
+  const label: string[] = [];
+  for (const rule of css.matchAll(/\.ws-update \[data-el='text'\] \{([^}]*)\}/gu)) label.push(rule[1] ?? '');
+  expect(label.some(rule => /text-box:\s*trim-both cap alphabetic/u.test(rule))).toBe(true);
+  expect(label.find(rule => rule.includes('text-overflow'))).toMatch(/overflow:\s*clip visible;/u);
+  expect(label.some(rule => /overflow(-y)?:\s*hidden/u.test(rule))).toBe(false);
 });
 
 test('SB15: a phone pill shows the short describe, which fits beside SHARD SELECT', () => {

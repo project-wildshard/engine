@@ -12,7 +12,7 @@
 .ws-update::before { content: ''; position: absolute; inset: -13px -6px; }
 .ws-update[data-reloading] { color: var(--ws-cyan); border-color: var(--ws-cyan); cursor: default; }
 .ws-update [data-el='text'] { margin-right: -0.14em; text-box: trim-both cap alphabetic; }
-.ws-update .ws-update-dot { width: 4px; height: 4px; background: rgba(196, 220, 232, 0.35); }
+.ws-update .ws-update-dot { flex: none; width: 4px; height: 4px; background: rgba(196, 220, 232, 0.35); }
 .ws-update.newer { color: var(--ws-cyan); border-color: var(--ws-cyan); box-shadow: 0 0 18px rgba(143, 227, 255, 0.3); }
 .ws-update.newer .ws-update-dot { background: var(--ws-cyan); box-shadow: 0 0 8px var(--ws-cyan); animation: ws-update-pulse 1.2s ease-in-out infinite; }
 .ws-update.failed { color: var(--ws-amber); border-color: var(--ws-amber); }
@@ -22,7 +22,9 @@
   /* QA2 (2026-10-29): its own slot right of the fps chip, which ends by ~228 px even at "00 fps max 0000 ms"
      (perf.css: left 101 px); a longer word ellipsises instead of running under it */
   .ws-update { right: 16px; max-width: calc(100vw - 244px); }
-  .ws-update [data-el='text'] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* STAGING-BUGBASH SB15 (mini-bugbash, v0.1.55): clip the inline axis only. The label's box is trimmed to its cap height (above),
+     so `overflow: hidden` cut the digits' lower half wherever the pill lands on a half pixel (Zone Select's 68.5 px, Chromium) */
+  .ws-update [data-el='text'] { min-width: 0; overflow: clip visible; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 /* Renderer-free loading handoff; deliberately not .ws-load, which title-first hides. */
