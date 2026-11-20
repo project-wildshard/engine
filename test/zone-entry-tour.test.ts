@@ -10,8 +10,13 @@ const cells = [
   {instance:'south-west', cell:[-1, -1]},
 ] as const;
 
-const featuredCells = curated.map((slug, index) => ({instance:`cell-${index}`, slug,
-  cell: [index % 4, Math.floor(index / 4)] as const}));
+const featuredCells = [
+  ...curated.filter(slug => slug !== 'driftwood-isle' && slug !== 'far-reach')
+    .map((slug, index) => ({instance:slug === 'brasscap-mesa' ? 'blender-template' : slug, slug,
+      cell:[index % 3 + 1, -Math.floor(index / 3)] as const})),
+  {instance:'driftwood-isle', slug:'driftwood-isle', cell:[0,0] as const},
+  {instance:'far-reach', slug:'far-reach', cell:[0,-1] as const},
+];
 
 test('the smoke seeds two real entries per featured shard and assigns 5/5/6', () => {
   const route = featuredZoneEntry(featuredCells, 476);
@@ -20,7 +25,9 @@ test('the smoke seeds two real entries per featured shard and assigns 5/5/6', ()
   expect(featuredZoneEntry(featuredCells, 477)).not.toEqual(route);
   expect(smokeBatches(route.map((_, index) => index)).map(batch => batch.length)).toEqual([5,5,6]);
   for (const cell of featuredCells) expect(route.filter(leg => leg.to.instance === cell.instance)).toHaveLength(2);
-  for (const {from,to} of route) expect(Math.abs(from.cell[0]-to.cell[0])+Math.abs(from.cell[1]-to.cell[1])).toBe(1);
+  const full = zoneEntryTour(featuredCells);
+  for (const leg of route) expect(full).toContainEqual(leg);
+  expect(route.filter(({to}) => to.instance === 'blender-template').map(({to}) => to.slug)).toEqual(['brasscap-mesa','brasscap-mesa']);
   expect(() => featuredZoneEntry(featuredCells.slice(1), 476)).toThrow(/missing featured/u);
 });
 

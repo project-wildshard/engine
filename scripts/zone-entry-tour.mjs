@@ -49,18 +49,22 @@ export function featuredZoneEntry(cells, seed) {
     }
     return rows;
   };
-  const ids = new Set(cells.map(cell => cell.instance)), spots = new Map(cells.map(cell => [cell.cell.join(','), cell]));
+  const ids = new Set(cells.map(cell => cell.instance)), spots = new Set(cells.map(cell => cell.cell.join(',')));
   if (ids.size !== cells.length || spots.size !== cells.length ||
       cells.some(cell => typeof cell.instance !== 'string' || cell.cell.length !== 2 ||
         cell.cell.some(at => !Number.isInteger(at) || Math.abs(at) > 3))) throw new Error('Invalid live smoke grid');
   if (featured.length !== 8 || new Set(featured).size !== 8) throw new Error('Zone Select must name eight featured shards');
+  const edges = zoneEntryTour(cells);
   return shuffle(featured.flatMap(slug => {
     const matches = cells.filter(cell => (cell.slug ?? cell.instance) === slug), to = matches[0];
     if (to === undefined || matches.length !== 1) throw new Error(`Duplicate or missing featured shard in live grid: ${slug}`);
-    const neighbours = shuffle(SIDES.map(([dx,dz]) => spots.get(`${to.cell[0]+dx},${to.cell[1]+dz}`)).filter(from => from !== undefined));
-    const first = neighbours[0];
+    // Keep the side order stable for verdicts written before the smoke shared the full route.
+    const incoming = edges.filter(leg => leg.to === to);
+    const choices = shuffle(SIDES.flatMap(([dx,dz]) => incoming.filter(({from}) =>
+      from.cell[0] === to.cell[0]+dx && from.cell[1] === to.cell[1]+dz)));
+    const first = choices[0];
     if (first === undefined) throw new Error(`No live gate into featured shard ${slug}`);
-    return [{from:first,to}, {from:neighbours[1] ?? first,to}];
+    return [first, choices[1] ?? first];
   }));
 }
 
@@ -290,8 +294,8 @@ export function portalExitPlan(entries, center, incoming) {
 }
 
 /** The same content set the served page reads. Portal routes are optional product data.
- * @param {Page} page @param {string} slug @returns {Promise<PortalExit[]>} */
-async function portalExits(page, slug) {
+ * @param {Page} page @param {string} slug @param {boolean} [missingIsEmpty] @returns {Promise<PortalExit[]>} */
+async function portalExits(page, slug, missingIsEmpty = false) {
   const path = await page.evaluate(slug_ => {
     const bank = JSON.parse(document.getElementById('boot-module-files')?.textContent ?? '{}');
     const home = bank.spawnManifests?.home, baked = home?.shards?.includes(slug_);
@@ -305,19 +309,16 @@ async function portalExits(page, slug) {
   const address = new URL(path);
   if (!['https://packs.wildshard.io', 'https://staging.wildshard.io'].includes(address.origin)) throw new Error('Unexpected portal data origin');
   const response = await fetch(address, {signal: AbortSignal.timeout(10_000)});
+  if (missingIsEmpty && response.status === 404) return [];
   if (!response.ok) throw new Error(`Could not read the portal rows (HTTP ${response.status})`);
   const edge = /** @type {{entryways?: {portal?:PortalExit}[]}} */ (await response.json());
   return (edge.entryways ?? []).flatMap(row => row.portal === undefined ? [] : [row.portal]);
 }
 
-/** A portal can carry the walker inside immediately after a gate. Walk the declared exit first.
- * @param {Page} page @param {Cell} from @param {Cell} last @param {Point} center @param {number} end @returns {Promise<Cell>} */
-async function exitToRoad(page, from, last, center, end) {
-  const at = await feet(page);
-  if (at === null || Math.max(Math.abs(at.x-center.x), Math.abs(at.z-center.z)) >= HALF-30) return last;
-  const plan = portalExitPlan(await portalExits(page, from.slug ?? from.instance), center,
-    {x:last.cell[0]-from.cell[0], z:last.cell[1]-from.cell[1]});
-  if (plan === null || plan.walk.length === 0) throw new Error('The gate seated the walker inland without a declared portal exit');
+/** Walk the shard's declared inland route to its portal, and identify the road deck it leads to.
+ * @param {Page} page @param {Cell} from @param {NonNullable<ReturnType<typeof portalExitPlan>>} plan
+ * @param {number} end @returns {Promise<Cell>} */
+async function walkPortalExit(page, from, plan, end) {
   /** @param {Point} point */
   const onDeck = point => plan.decks.some(deck => Math.hypot(point.x-deck.x, point.z-deck.z) < 5);
   for (const point of plan.walk) await walk(page, point, end, {landed: onDeck});
@@ -329,6 +330,17 @@ async function exitToRoad(page, from, last, center, end) {
   const deck = out === null ? undefined : plan.decks.find(row => Math.hypot(out.x-row.x, out.z-row.z) < 5);
   if (deck === undefined) throw new Error('The portal did not leave the walker on a declared deck');
   return {instance:from.instance, cell:[from.cell[0]+deck.dx, from.cell[1]+deck.dz]};
+}
+
+/** A portal can carry the walker inside immediately after a gate. Walk the declared exit first.
+ * @param {Page} page @param {Cell} from @param {Cell} last @param {Point} center @param {number} end @returns {Promise<Cell>} */
+async function exitToRoad(page, from, last, center, end) {
+  const at = await feet(page);
+  if (at === null || Math.max(Math.abs(at.x-center.x), Math.abs(at.z-center.z)) >= HALF-30) return last;
+  const plan = portalExitPlan(await portalExits(page, from.slug ?? from.instance), center,
+    {x:last.cell[0]-from.cell[0], z:last.cell[1]-from.cell[1]});
+  if (plan === null || plan.walk.length === 0) throw new Error('The gate seated the walker inland without a declared portal exit');
+  return walkPortalExit(page, from, plan, end);
 }
 
 /** Stay on the public road around the current cell when changing exit sides.
@@ -352,6 +364,29 @@ export function roadApproach(last, leg, center, pitch) {
       {x: center.x+after.x, z: center.z+after.z, ride: true});
   }
   return points;
+}
+
+/** A fresh smoke guest starts at the shard's spawn. Use its actual portal route where one is declared.
+ * @param {Page} page @param {Leg} leg @param {Point} center @param {number} pitch @param {number} end */
+async function smokeApproach(page, leg, center, pitch, end) {
+  const {from,to} = leg, dx = to.cell[0]-from.cell[0], dz = to.cell[1]-from.cell[1];
+  const portals = await portalExits(page, from.slug ?? from.instance, true);
+  const plans = SIDES.map(([x,z]) => portalExitPlan(portals, center, {x,z})).filter(plan => plan !== null && plan.walk.length > 0);
+  const at = await feet(page);
+  if (at !== null) {
+    const nearest = plans.flatMap(plan => plan.walk.slice(0,1).map(first => ({plan,distance:Math.hypot(first.x-at.x,first.z-at.z)})))
+      .sort((a,b) => a.distance-b.distance)[0];
+    if (nearest !== undefined) return roadApproach(await walkPortalExit(page,from,nearest.plan,end),leg,center,pitch);
+  }
+  // Use the original gate proof's shore approaches from Driftwood's spawn.
+  /** @type {readonly (readonly [number,number])[]} */
+  let aroundHarbour = [];
+  if (from.instance === DRIFTWOOD) {
+    if (dx !== 0) aroundHarbour = [[dx*235,-194]];
+    else if (dz > 0) aroundHarbour = [[-235,-194],[-235,0],[-200,20],[-200,235]];
+  }
+  return [...aroundHarbour, /** @type {const} */ ([dx*(HALF-15),dz*(HALF-15)])]
+    .map(([x,z]) => ({x:center.x+x,z:center.z+z,ride:false}));
 }
 
 /** @param {Page} page @param {string} target @param {Point} center @param {number} end */
@@ -386,17 +421,17 @@ const gridLayout = page => page.evaluate(() => {
     return /** @type {{cells: Cell[],pitch:number}} */ (st);
 });
 
-/** @param {Page} page @param {Leg} leg @param {Point} center @param {number} pitch @param {Cell} [previous] */
-async function crossZoneEntry(page, leg, center, pitch, previous) {
+/** @param {Page} page @param {Leg} leg @param {Point} center @param {number} pitch @param {Cell} [previous] @param {boolean} [fresh] */
+async function crossZoneEntry(page, leg, center, pitch, previous, fresh = false) {
   const {from, to} = leg;
   const dx = to.cell[0]-from.cell[0], dz = to.cell[1]-from.cell[1];
   const gate = {x:center.x+dx*(pitch-HALF+2), z:center.z+dz*(pitch-HALF+2)};
   const targetCenter = {x:center.x+dx*pitch, z:center.z+dz*pitch};
   const approachEnd = Date.now()+APPROACH_MS;
   await bounded(APPROACH_MS, async () => {
-    const approach = previous === undefined
-      ? [{x:center.x+dx*(HALF-15), z:center.z+dz*(HALF-15), ride:false}]
-      : roadApproach(await exitToRoad(page, from, previous, center, approachEnd), leg, center, pitch);
+    const approach = fresh ? await smokeApproach(page,leg,center,pitch,approachEnd)
+      : previous === undefined ? [{x:center.x+dx*(HALF-15), z:center.z+dz*(HALF-15), ride:false}]
+        : roadApproach(await exitToRoad(page, from, previous, center, approachEnd), leg, center, pitch);
     for (const point of approach) await approachPoint(page, point, approachEnd);
   }, 'The walker timed out on the gate approach');
   const started = Date.now();
@@ -569,6 +604,7 @@ async function runSmoke({build, out, seed, prior}) {
     }
     cells = cells.map(({instance,slug,cell}) => ({instance,...(slug === undefined ? {} : {slug}),cell}));
     const route = featuredZoneEntry(cells,seed);
+    const fullRoute = zoneEntryTour(cells);
     const {arrivals,pending} = prior === undefined
       ? {arrivals:[],pending:route.map((_,index) => index)}
       : retrySmokeEntries(route,prior,build,seed);
@@ -603,9 +639,17 @@ async function runSmoke({build, out, seed, prior}) {
           // worker from leaking into the next pair assigned to this worker.
           context = await newContext();
           page = await context.newPage();
-          await bootSmokeSource(page,leg.from,build,`ZE ${began.toString(36).slice(-5)} ${String(index+1)}`);
+          // The full walk leaves Far Reach or Nalati from a road deck. Enter
+          // from Driftwood first to start at the same reachable approach.
+          const roadStart = leg.from.instance === SKY || leg.from.instance === 'nalati-grasslands';
+          const stagingLeg = roadStart ? fullRoute.find(edge => edge.from.instance === DRIFTWOOD && edge.to === leg.from) : undefined;
+          await bootSmokeSource(page,stagingLeg?.from ?? leg.from,build,`ZE ${began.toString(36).slice(-5)} ${String(index+1)}`);
+          if (stagingLeg !== undefined) {
+            const start = await smokePose(page,stagingLeg);
+            await crossZoneEntry(page,stagingLeg,start.center,start.pitch,undefined,true);
+          }
           const {center,pitch} = await smokePose(page,leg);
-          const ms = await crossZoneEntry(page,leg,center,pitch);
+          const ms = await crossZoneEntry(page,leg,center,pitch,stagingLeg?.from,stagingLeg === undefined);
           arrivals.push({...pair,ms});
           failed.delete(index);
           console.log(`PASS ${index+1}/${route.length} ${pair.from} -> ${pair.to} (${ms} ms)`);

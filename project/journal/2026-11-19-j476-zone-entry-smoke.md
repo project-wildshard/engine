@@ -12,3 +12,12 @@ It holds all failed pairs by index, and the release still requires
 every crossing on the exact build. `--retry-failed` and the release's
 `--zone-entry-resume` carry forward the passed pairs. The full legacy
 walk remains available with `--full-route`.
+
+The smoke now draws its directed pairs from the full tour. The featured
+lookup uses the shard slug, so the Brasscap card resolves to the
+`blender-template` cell on placements that keep that instance ID.
+The v0.1.53 full walk crossed Far Reach to Brasscap and Pastel Plain
+to Signal Dunes. A fresh guest still needs a way out from its spawn.
+The smoke walks declared portal exits to the road and uses Driftwood's
+harbour approaches. It reaches the Far Reach and Nalati road decks from
+Driftwood before timing a crossing from either of those cells.
