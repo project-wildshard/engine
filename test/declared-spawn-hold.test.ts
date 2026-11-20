@@ -7,6 +7,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { SPAWN_HOLD_STEP } from '../src/server/game/shardfile/declaredHolds';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
+import { questBooks } from '../src/shared/engine/quest/players';
 
 // ONE-FORMAT OF19b: a declared spawn's `hold` (Dunes' first ray, held until the scout). The memory field reads 1 until the
 // quest flag is set, then 0, before any brain steps; a shard with no hold registers no step.
@@ -34,6 +35,19 @@ test('OF19b: a held body reads its field 1 until the flag is set, then 0; its ne
     expect(held?.mem['held']).toBe(0);
     expect(free?.mem['held']).toBeUndefined();
     expect(sim.host.stepIds()).toContain(SPAWN_HOLD_STEP);
+  } finally { sim.dispose(); }
+});
+
+test('OF19d: in a room, a second player who has met the scout frees the body; the lead had not', () => {
+  const sim = createShardfileSim(shard([{ hold: { field: 'held', until: 'met' } }]), new Map(), { rapier });
+  try {
+    const held = sim.host.entities.get('wolf:1'), second = sim.host.addPlayer('p2', { x: 2, y: 0, z: 2 }), books = questBooks(sim.host);
+    books.claim(['met']); // a quest row's flag is its player's own, as the room's interaction rows claim it
+    sim.host.step();
+    expect(held?.mem['held']).toBe(1);
+    books.of(second.id).flags.set('met'); sim.host.step();
+    expect(sim.host.flags.has('met')).toBe(false);
+    expect(held?.mem['held']).toBe(0);
   } finally { sim.dispose(); }
 });
 
