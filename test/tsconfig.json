@@ -243,6 +243,7 @@
     "../scripts/app-build/catalogue.ts",
     "../scripts/pins-staging.ts",
     "../scripts/pin-shard.ts",
+    "../scripts/ring-step-paths.ts",
     "../scripts/app-build/bootFolderTiers.ts",
     "../scripts/app-build/bootExtras.ts",
     "../scripts/app-build/appCook.ts",
