@@ -82,7 +82,8 @@ export class ToastStack {
     el.className = said.tone === 'warn' ? 'ws-glass ws-game-toast ws-game-toast-warn' : 'ws-glass ws-game-toast';
     el.textContent = said.text;
     this.box.append(el);
-    const t = this.up = { el, timer: 0, text: said.text, at: said.at, tone: said.tone };
+    const t: NonNullable<ToastStack['up']> = { el, timer: 0, text: said.text, at: said.at, tone: said.tone };
+    this.up = t;
     this.live = [t];
     t.timer = this.scope.timeout(SLOT_LIFE, () => {
       el.classList.add('out');
