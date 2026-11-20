@@ -19,7 +19,7 @@ import type { NetClient, NetEntityInfo } from './client';
 import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
 import { SoftCollide, type SoftBody, type SoftSelf } from './softCollide';
-import { warmDrawn, warmPaceOn } from './warmPace';
+import { WARM_AFTER, WARM_SETTLE, warmDrawn, warmPaceOn, warmSettleOn } from './warmPace';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp'), SWIM = column('swim');
@@ -233,7 +233,7 @@ class WarmBody {
   private readonly hand: THREE.Object3D | null;
   private readonly items = new THREE.Group();
   private kit = -1;
-  constructor(onFilled?: (group: THREE.Group) => void) {
+  constructor(onFilled?: (group: THREE.Group) => Promise<void> | void) {
     this.onFilled = onFilled;
     this.group.name = 'other-player-warm'; this.group.position.y = WARM_DEPTH;
     const model = castawayBody(), board = new BoardUnder();
@@ -247,18 +247,28 @@ class WarmBody {
   /** DF10: drawn on a pace once settled (warmPace.ts); frames since its hand filled, -1 before */
   private readonly paced = warmPaceOn();
   private filled = -1;
+  /** DF10 (mini-df10c, `debug.warmSettle`): frames drawn every frame before the pace; set once the road warm-up is done */
+  private readonly early = this.paced && warmSettleOn();
+  private settle = WARM_SETTLE;
   /** NET-LAG NL15: asked for the body's road (exterior) variants once a kit's items are all in its hand. */
-  private readonly onFilled: ((group: THREE.Group) => void) | undefined;
+  private readonly onFilled: ((group: THREE.Group) => Promise<void> | void) | undefined;
   /** Each frame: a newly lent kit's items replace the last's, one slot a frame (each first copy clones a first-person model).
    *  Filled, the body asks for its road variants: the items came after the boot's road warm-up took its inventory, and on the
    *  road (no environment) the held sword linked its opaque program inside one frame (283 to 450 ms, Driftwood's boost). */
   frame(): void {
-    if (this.kit !== heldOnOthers.lent) { this.kit = heldOnOthers.lent; this.items.clear(); this.slot = 0; this.filled = -1; }
-    if (this.paced) { if (this.filled >= 0) this.filled++; this.group.visible = this.filled < 0 || warmDrawn(true, this.filled); }
+    if (this.kit !== heldOnOthers.lent) { this.kit = heldOnOthers.lent; this.items.clear(); this.slot = 0; this.filled = -1; this.settle = WARM_SETTLE; }
+    if (this.paced) { if (this.filled >= 0) this.filled++; this.group.visible = this.filled < 0 || warmDrawn(true, this.filled, this.settle); }
     if (this.slot >= WARM_SLOTS) return;
     const held = heldOnOthers.prop(this.slot++);
     if (held !== null) { const item = held.prop.clone(); item.traverse(node => { node.frustumCulled = false; }); this.items.add(item); }
-    if (this.slot === WARM_SLOTS) { this.filled = 0; this.onFilled?.(this.group); }
+    if (this.slot === WARM_SLOTS) { this.filled = 0; this.settleOn(this.onFilled?.(this.group), this.kit); }
+  }
+  /** `debug.warmSettle`: once the filled body's road warm-up is done (or failed), it settles WARM_AFTER frames later. */
+  private settleOn(warmed: Promise<void> | void, kit: number): void {
+    if (!this.early) return;
+    const settled = (): void => { if (this.kit === kit && this.filled >= 0) this.settle = Math.min(this.settle, this.filled + WARM_AFTER); };
+    if (warmed === undefined) { settled(); return; }
+    void warmed.catch(() => undefined).finally(settled);
   }
   /** Drawn wherever the camera looks, so the warm-up and every frame count its programs as used. */
   private unculled(): void { this.group.traverse(node => { node.frustumCulled = false; }); }
@@ -278,10 +288,10 @@ export class OtherPlayers {
   /** `warmRoad`: link these roots' road (exterior) variants in play, paced (Game.warmExteriorRoots); the warm body asks once
    *  its hand holds the lent kit. */
   constructor(client: NetClient, scene: THREE.Object3D, scope: Scope, me: Readonly<THREE.Vector3> | null = null,
-    warmRoad?: (roots: readonly THREE.Object3D[]) => void) {
+    warmRoad?: (roots: readonly THREE.Object3D[]) => Promise<void> | void) {
     this.client = client; this.scene = scene; this.me = me;
     scope.onDispose(() => { for (const handle of this.bodies.keys()) this.drop(handle); });
-    try { const warm = new WarmBody(warmRoad === undefined ? undefined : group => { warmRoad([group]); }); scene.add(warm.group); this.warm = warm; scope.onDispose(() => { warm.dispose(); }); }
+    try { const warm = new WarmBody(warmRoad === undefined ? undefined : group => warmRoad([group])); scene.add(warm.group); this.warm = warm; scope.onDispose(() => { warm.dispose(); }); }
     catch (error) { console.error('[other players] warm body', error); }
     if (me !== null) scope.onDispose(voiceNear.lend({ distanceTo: talker => this.distanceTo(talker) }));
   }

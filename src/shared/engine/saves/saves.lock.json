@@ -677,6 +677,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/WARM_SETTLE_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:session/'drop.expect'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

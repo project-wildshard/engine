@@ -131,7 +131,7 @@ export interface WorkerClientPorts {
   /** Link what the first rows' bodies draw, under the card. A page that reveals nothing yet has no such step. */
   readonly linkBodies?: () => Promise<void>;
   /** NET-LAG NL15: link these roots' road (exterior) variants in play, paced (the other-player warm body's, once filled). */
-  readonly warmRoad?: (roots: readonly Object3D[]) => void;
+  readonly warmRoad?: (roots: readonly Object3D[]) => Promise<void> | void;
 }
 interface ShellModule { readonly startStandalone: (config: { slug: string; base: string; build: string; savePrefix: string; name?: string; lone?: true; backgroundSaves?: boolean; held?: (url: string) => Promise<ArrayBuffer | null> } & IndexedSaves) => Shell;
   readonly prespawnStandalone?: (held?: (url: string) => Promise<ArrayBuffer | null>) => void }
