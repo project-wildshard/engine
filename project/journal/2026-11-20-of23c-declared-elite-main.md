@@ -16,3 +16,18 @@
   the roster's lair body); now Old Ironhide declared on rank elite is
   adopted, ranked (hp x4), fights, saves and restores exactly, falls, and
   stands again on the same id.
+
+## The roster's ids and the night (same day)
+
+- Declared elites take r6's creature:164 to 167, above the roster's
+  reserves (161 to 163). The roster used to start past the highest
+  declared id, so its reserves moved to 168 and refused the bake. It now
+  starts where its bake's first body is and skips every declared id.
+- A lent identity needs no roster recipe: Pine's roster has no deer or
+  bear left once its elites are declared rows.
+- A spawn script's own group (its step) lends it declared bodies too, out
+  of the world until it spawns one: Pine's night thralls.
+- Proven on Pine's OF23c build, packed: boot census equals r6 (164 ids,
+  kinds, variants, stand points), the four elites are scripted with r6's
+  health and size, Ironhide fights, a night call stands a declared
+  thrall and no roster body, and a save restores.

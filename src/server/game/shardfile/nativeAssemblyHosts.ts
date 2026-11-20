@@ -323,7 +323,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       return run => { installPopulationRoster(run.host, { population, bake: bake as Parameters<typeof installPopulationRoster>[1]['bake'], nav, spawnY: shard.spawn.y, saved: run.context.snapshot }, input); };
     }
     case 'population.elites': { const input = await readEliteFeature(product, row.file); return run => { run.elites = installNativeEliteFeature(run.host, dayOf(run), input, shard.creatures.spawns); }; }
-    case 'population.spawn-script': { const input = await readSpawnScript(product, row.id); return run => { installNativeSpawnScript(run.host, dayOf(run), input); }; }
+    case 'population.spawn-script': { const input = await readSpawnScript(product, row.id); return run => { installNativeSpawnScript(run.host, dayOf(run), input, undefined, undefined, undefined, { spawns: shard.creatures.spawns, restoring: run.context.restoring }); }; }
     case 'population.elites-ready': return run => { need(run.elites, 'Native elites are not installed').initialize(); };
     case 'population.mixed': return prepareMixed(row, at);
     case 'population.reactions': return run => {

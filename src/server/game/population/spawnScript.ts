@@ -191,9 +191,10 @@ export class SpawnScript {
   static native(host: SimHost, input: unknown,v2Owners?: SpawnV2Owners,worldActions?: readonly V2WorldActionLoan[],queries?: SpawnQueryLoansV2,declared: readonly string[] = []): SpawnScript {
     if (queries !== undefined && [...queries.worlds.values()].some(world => world.physics !== host.physics)) throw new Error('Foreign native query world');
     const rows = parseSpawnScript(input), roster = populationRoster(host, rows.roster);
-    for (const row of rows.species) roster.validateSpawn(row.kind, row.variant);
     const lent = declared.map(id => { const body = host.entities.get(id); if (body === undefined || roster.actor(id) !== null) throw new Error(`Declared script body ${id} names no declared body`); const lentBody: ControlledBody = body; return lentBody; });
     if (lent.some(body => !rows.species.some(row => row.kind === body.kind && row.variant === body.variant))) throw new Error('Declared script body has no species row in its script');
+    // a lent identity is never the roster's to make, so the roster needs no recipe for it
+    for (const row of rows.species) if (!lent.some(body => body.kind === row.kind && body.variant === row.variant)) roster.validateSpawn(row.kind, row.variant);
     const own = (id: string): ControlledBody | null => lent.find(body => body.entityId === id) ?? null;
     return new SpawnScript(rows, { spawn: (kind, x, z, yaw, variant) => {
       const body = lent.find(row => row.kind === kind && row.variant === variant && (row.hidden === true || !row.alive));
@@ -590,6 +591,11 @@ export class SpawnScript {
     const binding = value(this.bindings.get('spawnGroup' in this.rows.script.binding ? handle : 0), 'state binding');
     return value(this.host.snapshot().bindings.find(row => row.id === binding), 'binding state').slots;
   }
+  /** OF23c: take a lent declared body out of the world before the script first spawns it (its owner's retirement). */
+  release(id: string): void {
+    const body = this.bodies.actor(id); if (body === null || [...this.handles.values()].includes(body)) throw new Error('Unreleasable script body');
+    this.bodies.retire(body);
+  }
   /** Explicit adoption takes an id, never a body supplied by content or a reflected object path. */
   adopt(slot: string, id: string): void {
     const handle = value(this.rows.slots.find(row => row.id === slot), 'adopted slot').handle, body = this.bodies.actor(id);
@@ -788,8 +794,13 @@ export class SpawnScript {
 }
 
 /** Built-in native adapter: row ids resolve the already installed roster; its actor IDs, draw order and save owner stay authoritative. */
-export function installNativeSpawnScript(host: SimHost, day: Pick<DayCycleClock, 'night'>, input: unknown,v2Owners?: SpawnV2Owners,worldActions?: readonly V2WorldActionLoan[],queries?: SpawnQueryLoansV2): SpawnScript {
-  const rows = parseSpawnScript(input), runner = SpawnScript.native(host, rows,v2Owners,worldActions,queries);
+export function installNativeSpawnScript(host: SimHost, day: Pick<DayCycleClock, 'night'>, input: unknown,v2Owners?: SpawnV2Owners,worldActions?: readonly V2WorldActionLoan[],queries?: SpawnQueryLoansV2,
+  declared?: { readonly spawns: readonly { readonly id: string; readonly group?: string | undefined }[]; readonly restoring: boolean }): SpawnScript {
+  // ONE-FORMAT OF23c: the declared rows in this script's own group (its step) are its bodies: out of the world until it
+  // spawns one (a fresh world starts them absent; a restored one keeps where they were)
+  const rows = parseSpawnScript(input), lent = (declared?.spawns ?? []).filter(spawn => spawn.group === rows.step).map(spawn => spawn.id);
+  const runner = SpawnScript.native(host, rows,v2Owners,worldActions,queries,lent);
+  if (declared?.restoring !== true) for (const id of lent) runner.release(id);
   // A quiet re-save preserves the validated input wire until the first simulation step.
   let restored: SimValue | undefined;
   const word = spawnCueWord(rows.step);

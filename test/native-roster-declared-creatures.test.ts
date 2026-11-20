@@ -109,3 +109,16 @@ test("a declared creature id moves the roster's own ids past it; one the bake st
   const fixture = await shipped();
   await expect(resident(fixture, declaring(fixture.shard, spawnRows(['creature:7', BOAR])))).rejects.toThrow(/diverges from the page at creature:8/u);
 }, 120_000);
+
+// OF23c (elites): a declared id past the roster's own leaves the roster's ids where its page put them. Pine's elites stand
+// as declared creature:164 to 167 above the roster's reserves (161 to 163); the roster starts at its bake's first id and
+// skips every declared one, never past the highest.
+test("a declared creature id past the roster's own leaves the roster's ids where its page put them", async () => {
+  const fixture = await shipped(), bare = await resident(fixture, fixture.shard);
+  const roster = populationCensus(bare.host).alive; bare.dispose();
+  const live = await resident(fixture, declaring(fixture.shard, spawnRows(['creature:900', BOAR])));
+  try {
+    expect(live.host.entities.get('creature:900')?.species).toBe('pine.creature.deer');
+    expect(populationCensus(live.host).alive).toBe(roster + 2);
+  } finally { live.dispose(); }
+}, 120_000);

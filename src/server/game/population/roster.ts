@@ -109,10 +109,16 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
   const list: PopulationBody[] = [], parked: DormantPopulationActor[] = [];
   const baked = new Map(bake.actors.map(a => [a.id, a] as const)), bakedParked = new Map(bake.parked.map(a => [a.id, a] as const));
   let booted = false;
+  // OF23c: the level's declared creature:N ids (below, where the roster's own ids start)
+  const declaredIds = new Set([...host.entities.keys()].filter(id => /^creature:\d+$/u.test(id)));
+  const declaredTop = Math.max(-1, ...[...declaredIds].map(id => Number(id.slice('creature:'.length))));
+  const bakeFirst = Math.min(...[...bake.actors, ...bake.parked].map(row => Number(/^creature:(\d+)$/u.exec(row.id)?.[1] ?? Infinity)));
+  const first = Number.isFinite(bakeFirst) ? bakeFirst : declaredTop + 1;
   const rolls = (kind: string, variant: string | string[] | undefined): { id: string; spec: AnimalSimSpec; seed: number; scale: number; variant: string } => {
     const r = spawnRolls(rng, kind, variant, list.some(b => b.actor.kind === kind && b.actor.rarity === 'legendary' && b.actor.alive), known => {
       const row = species.get(known); if (row === undefined) throw new Error(`native population has no creature row '${known}'`); return row; });
-    const id = intake.identities.allocate();
+    let id = intake.identities.allocate();
+    while (declaredIds.has(id)) id = intake.identities.allocate(); // OF23c: a declared body's id is never the roster's
     // a live spawn takes the next id past the load-time list, with the recipe the bake read for its kind and variant
     if (booted) return { id, spec: intake.spec(kind, r.variant.id), seed: r.seed, scale: r.scale, variant: r.variant.id };
     const row = baked.get(id) ?? bakedParked.get(id);
@@ -156,10 +162,10 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
     if (body === undefined) { hunt.forget(a); host.retire(a.entityId); } else intake.retire(body);
   };
   // ONE-FORMAT OF23c: the level's declared bodies (the shard's `creatures.spawns`, standing before any host) keep their
-  // `creature:N` ids; the roster's own ids start past the highest of them, so a roster whose herds are declared rows hands
-  // its reserves and homes the ids they had when it stood the herds itself
-  const declaredTop = Math.max(-1, ...[...host.entities.keys()].map(id => Number(/^creature:(\d+)$/u.exec(id)?.[1] ?? -1)));
-  if (declaredTop >= 0) intake.identities.restoreAllocator({ next: declaredTop + 1, used: Array.from({ length: declaredTop + 1 }, (_, i) => `creature:${String(i)}`) });
+  // `creature:N` ids and the roster never takes one. Its own ids start where its page's bake puts its first body (its
+  // reserves, homes and night spawns keep the ids they had when it stood the herds and elites itself), else past the
+  // highest declared id, and skip every declared id after that.
+  if (declaredTop >= 0) intake.identities.restoreAllocator({ next: first, used: Array.from({ length: first }, (_, i) => `creature:${String(i)}`) });
   Array.from(hunt.placeHerds(rows.fauna, rows.spawn, spawn)); // every herd in one go
   // Retire every reserved identity rolled in a herd, then respawn its declared ordinary replacement in place.
   for (const a of list.map(body => body.actor).filter(actor => rows.identities.some(identity => identity.kind === actor.kind && identity.variant === actor.variant))) {

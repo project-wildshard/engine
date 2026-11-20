@@ -105,3 +105,34 @@ test("an elite program's main is a declared body: adopted, ranked, felled, stood
     expect(Math.hypot(boar.position.x - LAIR[0], boar.position.z - LAIR[1])).toBeLessThan(2);
   } finally { restored?.dispose(); live.dispose(); }
 }, 240_000);
+
+// OF23c (the night): a spawn script's own group lends it declared bodies too. Pine's night thralls stand as rows in
+// `pine.night`: out of the world at boot, and the night script's call stands one of them, never a roster body of theirs.
+test("a spawn script's group lends it declared bodies: absent until it spawns one", async () => {
+  const fixture = await shipped(), boar = rows.rows.species[1];
+  if (boar === undefined) throw new Error('Missing converted boar');
+  const thrallSpecies = { ...boar, id: 'of23c.boar.thrall', variants: [{ ...boar.variants[0], id: 'thrall' }], body: { ...boar.body, look: 'pine.look.thrall' } } as ShardRows['species'][number];
+  const thrall = (i: number): Spawn => ({ id: `of23c.night.${String(i)}`, species: thrallSpecies.id, variant: 'thrall', brain: null, strike: null, seed: 3 + i, scale: 1,
+    at: [-194, 0, -148], yaw: 0, group: 'pine.night' }) as Spawn;
+  const base = emptyShardfile({ slug: 'of23c-night', name: 'Night', author: 'Test', revision: 1, seed: 7 });
+  const parsed = parseShardfile({ ...base, rows: { ...base.rows, species: [thrallSpecies], strikes: rows.rows.strikes,
+    looks: [{ id: 'pine.look.thrall', species: thrallSpecies.id, recipe: 'of23b.rig', material: null, parameters: {}, animation: { recipe: 'of23b.clips', parameters: {} } }] },
+    creatures: { ...base.creatures, brains: rows.rows.brains, spawns: Array.from({ length: 6 }, (_, i) => thrall(i)) } });
+  const shard = { ...fixture.shard, rows: { ...fixture.shard.rows, species: [...fixture.shard.rows.species, ...parsed.rows.species],
+    strikes: [...fixture.shard.rows.strikes, ...parsed.rows.strikes], looks: [...fixture.shard.rows.looks, ...parsed.rows.looks] }, creatures: parsed.creatures };
+  const live = await resident(fixture, shard);
+  try {
+    const host = live.host, lent = Array.from({ length: 6 }, (_, i) => body(host, `of23c.night.${String(i)}`));
+    expect(lent.every(actor => !actor.alive)).toBe(true);
+    const before = new Set([...host.entities.keys()]), clock = host.dayClock; if (clock === undefined) throw new Error('Missing day clock');
+    await clock.set(0.95);
+    const player = leadPlayer(host);
+    for (let tick = 0; tick < 1200 && !lent.some(actor => actor.alive); tick++) {
+      player.position.set(114, host.groundHeightAt(114, -60), -60); player.motor.resetAt(player.position); player.health.attributes.health = player.health.attributes.maxHealth;
+      live.step([]);
+    }
+    expect(lent.some(actor => actor.alive)).toBe(true);
+    // a boar thrall the night calls is one of its lent bodies, never a new roster body (its elk still come from the roster here)
+    expect([...host.entities.values()].filter(actor => !before.has(actor.entityId) && actor.kind === 'boar' && actor.variant === 'thrall')).toEqual([]);
+  } finally { live.dispose(); }
+}, 240_000);
