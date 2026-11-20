@@ -19,8 +19,8 @@ test('the original boot and FPS buckets survive a reload in the one existing ses
   const reports: HealthReport[] = [], send = (report: HealthReport): void => { reports.push(report); };
   const health = new SessionHealth(save(), 'same-build', send, 100, () => 'first-session', { actor: 'agent', lane: 'fixture' });
   const vitals = new SessionVitals(sessionDevice('Mozilla iPad', 'iPad', 1));
-  vitals.begin(10, 'phone'); vitals.frame(110); vitals.joined(260);
-  vitals.begin(280, 'desktop'); vitals.frame(310); vitals.joined(350);
+  vitals.begin(10, 'phone', 'nine-dragon-stack'); vitals.frame(110); vitals.joined(260);
+  vitals.begin(280, 'desktop', 'brasscap-mesa'); vitals.frame(310); vitals.joined(350);
   for (const fps of [19, 20, 29, 30, 44, 45, 59, 60]) vitals.sample(fps);
   health.beat('nine-dragon-stack', 'play', 45, 400, vitals.reading());
   health.exit(vitals.reading());
@@ -32,4 +32,20 @@ test('the original boot and FPS buckets survive a reload in the one existing ses
     heartbeat: { level: 'nine-dragon-stack', fps: 45,
       summary: { device: 'tablet', tier: 'phone', firstFrameMs: 100, joinedMs: 250, fpsHistogram: [1, 2, 2, 2, 1] } },
   });
+});
+
+test('an interrupted download is held once until the next page can report it', () => {
+  const local = storage(), session = storage(), save = (): SaveStore => new SaveStore({ local, session });
+  const reports: HealthReport[] = [], send = (report: HealthReport): void => { reports.push(report); };
+  const health = new SessionHealth(save(), 'same-build', send, 100, () => 'downloading');
+  const vitals = new SessionVitals('phone');
+  vitals.begin(0, 'phone', 'nine-dragon-stack');
+  vitals.step('download');
+  health.capture(vitals.reading(), 'nine-dragon-stack');
+  // A killed page cannot dispatch its pagehide event.
+  new SessionHealth(save(), 'same-build', send, 200, () => 'reloaded');
+  expect(reports).toHaveLength(1);
+  expect(reports[0]?.heartbeat).toMatchObject({ session: 'downloading', level: 'nine-dragon-stack',
+    summary: { bootStep: 'download', device: 'phone', fpsHistogram: [0, 0, 0, 0, 0] } });
+  expect(reports[0]?.heartbeat.summary?.joinedMs).toBeUndefined();
 });

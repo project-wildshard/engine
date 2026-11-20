@@ -2,7 +2,9 @@ import * as v from 'valibot';
 import { mobileDevice } from '../boot/titleArrival';
 
 const duration = v.pipe(v.number(), v.safeInteger(), v.minValue(0));
+export type BootStep = 'start' | 'download' | 'load';
 export interface SessionSummary {
+  readonly bootStep?: BootStep;
   readonly device: 'phone' | 'tablet' | 'desktop';
   readonly tier?: 'phone' | 'desktop';
   readonly firstFrameMs?: number;
@@ -11,6 +13,7 @@ export interface SessionSummary {
 }
 export const vitalsSchema: v.GenericSchema<unknown, SessionSummary> = v.object({
   device: v.picklist(['phone', 'tablet', 'desktop']),
+  bootStep: v.exactOptional(v.picklist(['start', 'download', 'load'])),
   tier: v.exactOptional(v.picklist(['phone', 'desktop'])),
   firstFrameMs: v.exactOptional(duration),
   joinedMs: v.exactOptional(duration),
@@ -26,6 +29,8 @@ export function sessionDevice(ua: string, platform: string, touch: number): Devi
 
 /** Time the first world reached on a page. Later zone changes keep the original boot readings. */
 export class SessionVitals {
+  private bootStep: BootStep | undefined;
+  private zone: string | undefined;
   private started: number | undefined;
   private firstFrameMs: number | undefined;
   private joinedMs: number | undefined;
@@ -36,11 +41,20 @@ export class SessionVitals {
 
   constructor(device: DeviceClass) { this.device = device; }
 
-  begin(at: number, tier: Tier): void {
-    if (this.joinedMs !== undefined) return;
+  begin(at: number, tier: Tier, zone: string): boolean {
+    if (this.joinedMs !== undefined || (this.zone === zone && this.bootStep !== undefined)) return false;
     this.started = at;
     this.firstFrameMs = undefined;
     this.tier = tier;
+    this.zone = zone;
+    this.bootStep = 'start';
+    return true;
+  }
+
+  step(step: BootStep | undefined): boolean {
+    if (this.joinedMs !== undefined || this.zone === undefined || this.bootStep === step) return false;
+    this.bootStep = step;
+    return true;
   }
 
   frame(at: number): void {
@@ -58,6 +72,7 @@ export class SessionVitals {
 
   reading(): SessionSummary {
     return { device: this.device, fpsHistogram: [...this.buckets],
+      ...(this.bootStep === undefined ? {} : { bootStep: this.bootStep }),
       ...(this.tier === undefined ? {} : { tier: this.tier }),
       ...(this.firstFrameMs === undefined ? {} : { firstFrameMs: this.firstFrameMs }),
       ...(this.joinedMs === undefined ? {} : { joinedMs: this.joinedMs }),

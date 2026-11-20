@@ -11,14 +11,21 @@ import { flushCrossroads } from './crossroads';
 import { FailureOutbox, failureOutcomeSave } from './failureEpisodes';
 import { FailureTelemetry } from './failureTelemetry';
 import { pageActor } from './pageActor';
-import { SessionVitals, sessionDevice, type SessionSummary } from './sessionVitals';
+import { SessionVitals, sessionDevice, type BootStep, type SessionSummary } from './sessionVitals';
 
 declare const __BUILD_ID__: string;
 let vitals: SessionVitals | undefined;
 let health: SessionHealth | null = null;
+let level = '';
 /** The primary load card adopts the navigation clock. Inset cell loads do not start a page boot. */
-export function noteWorldBoot(started: number, tier: NonNullable<SessionSummary['tier']>): void {
-  vitals?.begin(started, tier);
+export function noteWorldBoot(started: number, tier: NonNullable<SessionSummary['tier']>, zone: string): void {
+  if (vitals?.begin(started, tier, zone) === true) {
+    level = zone;
+    health?.capture(vitals.reading(), zone);
+  }
+}
+export function noteWorldStep(step?: BootStep): void {
+  if (vitals?.step(step) === true) health?.capture(vitals.reading());
 }
 export function noteWorldFrame(): void { vitals?.frame(diagnosticNow()); }
 function noteWorldJoined(): void {
@@ -29,7 +36,6 @@ function noteWorldJoined(): void {
 let analytics: AnalyticsSink | null = null;
 let bound: App | null = null;
 let scope: Scope | null = null;
-let level = '';
 let failures: FailureTelemetry | null = null;
 /** Presentation observation is inert until the page composition root explicitly starts telemetry. */
 export function showFailure(owner: Scope, root: HTMLElement, ids: string): void { failures?.show(owner, root, ids); }

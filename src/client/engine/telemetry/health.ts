@@ -20,7 +20,7 @@ export class SessionHealth {
   constructor(store: SaveStore, build: string, send: (report: HealthReport) => void, now: number = Date.now(),
     id: () => string = () => crypto.randomUUID(), actor?: ActorTags) {
     this.send = send;
-    const compatible = { key: 'telemetry.heartbeat', version: 3, schema: v.nullable(heartbeatSchema), initial: () => null, migrate: { 1: (old: unknown) => old, 2: (old: unknown) => old } };
+    const compatible = { key: 'telemetry.heartbeat', version: 4, schema: v.nullable(heartbeatSchema), initial: () => null, migrate: { 1: (old: unknown) => old, 2: (old: unknown) => old, 3: (old: unknown) => old } };
     this.local = store.define({ ...compatible, scope: 'device' });
     this.tab = store.define({ ...compatible, scope: 'session' });
     this.identity = store.define({ key: 'telemetry.install', scope: 'device', version: 1, schema: v.string(), initial: () => '' });
@@ -43,7 +43,11 @@ export class SessionHealth {
   beat(level: string, stage: string, fps: number, at: number = Date.now(), summary?: SessionSummary): void {
     this.current = { ...this.current, level, stage, fps, at, clean: false, ...(summary === undefined ? {} : { summary }) }; this.write();
   }
-  capture(summary: SessionSummary): void { this.current.summary = summary; this.write(); }
+  capture(summary: SessionSummary, level?: string): void {
+    this.current.summary = summary;
+    if (level !== undefined) this.current.level = level;
+    this.write();
+  }
   fault(): void { this.current.error = true; this.write(); }
   contextLoss(): void { this.current.contextLost = true; this.write(); }
   exit(summary?: SessionSummary): void {

@@ -28,7 +28,7 @@ import { withOwner } from '../../../shared/engine/app/ownership';
 import { holdLoadingSwitch } from './devSwitch';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
 import { leftByPlayer } from '../boot/dropNotice';
-import { showFailure, clearFailure, noteWorldBoot } from '../telemetry/runtime';
+import { showFailure, clearFailure, noteWorldBoot, noteWorldStep } from '../telemetry/runtime';
 import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import { holdLoadingPassSplit } from '../render/passSplit';
 import { graphicsMode } from '../core/graphicsMode';
@@ -273,7 +273,7 @@ export class Loading {
     this.clockT0 = this.t0;
     const clockStartedAt = Number(this.root.dataset['clockStartedAt']);
     if (Number.isFinite(clockStartedAt) && clockStartedAt <= this.t0 && clockStartedAt >= this.t0 - 60000) this.clockT0 = clockStartedAt;
-    if (!this.scoped) noteWorldBoot(this.clockT0, TIER);
+    if (!this.scoped) noteWorldBoot(this.clockT0, TIER, chunk.id);
     this.timeline = new LoadingTimeline({ id: 'pending', steps: [{ key: 'modules', label: engineString('s_loading_modules'), weight: 1 }] }, this.t0,
       undefined, {readSetup: () => {
         // the whole percent the card publishes (data-setup); its text shows tenths (J204)
@@ -353,7 +353,7 @@ export class Loading {
     };
     const exit = button('exit', engineString('s_loading_exit'), () => {
       exit.disabled = true;
-      leaveSaved(() => { leftByPlayer(); markUnload('exit to title from the loading card'); location.replace(exitTitleUrl(location.href)); });
+      leaveSaved(() => { if (!this.scoped) noteWorldStep(); leftByPlayer(); markUnload('exit to title from the loading card'); location.replace(exitTitleUrl(location.href)); });
     });
     return row;
   }
@@ -367,6 +367,10 @@ export class Loading {
     this.root.querySelector<HTMLElement>('[data-phase="download"]')?.removeAttribute('hidden');
     this.stopDownloadSource?.();
     this.downloadSource = source;
+    if (!this.scoped) {
+      noteWorldStep('download');
+      void this.observeDownloadCompletion(source);
+    }
     // LS3: the card's one download painter from here (spawnDownload.ts paintSpawnDownload stops at this mark)
     if (!this.scoped) this.root.dataset['downloadPainter'] = 'loading';
     const timing=bootTiming();
@@ -380,6 +384,11 @@ export class Loading {
       this.dirty = true;
     });
     return source.ready;
+  }
+
+  private async observeDownloadCompletion(source: LoadingDownloadSource): Promise<void> {
+    try { await source.ready; } catch { return; }
+    if (!this.scope.disposed && this.downloadSource === source) noteWorldStep('load');
   }
 
   /** Show real pre-session work. Unknown totals stay explicit instead of inventing a percentage. */
@@ -444,6 +453,7 @@ export class Loading {
    * of a phone-tier load at 4× CPU (project/archive/2026-09-22-load-perf.md Status). Integers floor, so 100 means done.
    */
   paint(view: ProgressView): void {
+    if (!this.scoped && this.view === null && this.downloadSource === undefined) noteWorldStep('load');
     this.phase?.end(); this.phase = undefined;
     let v = view;
     v = { ...v, setup: this.setupProgress() };

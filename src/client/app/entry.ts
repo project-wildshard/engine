@@ -6,6 +6,7 @@ import { dataPointer } from '@wildshard/engine/game/shard/pointer';
 import { findTitleManifest, installTitleManifests, listedArrival, readTitleRows, titleManifests, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
 import { bareSlug, installedCatalogue, installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
+import { noteWorldBoot, noteWorldStep } from '@wildshard/engine/telemetry/runtime';
 import { startPageServices } from './pageServices';
 import { persistHomeScreen, saves } from '@wildshard/engine/saves/runtime';
 import { definePageSaveKeys } from '@wildshard/engine/game/pageSaveKeys';
@@ -279,6 +280,8 @@ async function enterPage(): Promise<unknown> {
         spawn.setSpawnPacks(runtimePacksOn());
         // LD2 (J208): a Start read this download holds (selected discovery behind the warm check) is named from the tap
         spawn.observeSpawnHolds((held, path) => waitFor('Spawn download', held, 'file', `spawn-download:${path}`));
+        noteWorldBoot(0, tier.TIER, slug);
+        noteWorldStep('download');
         const job = spawn.startSpawnDownload(slug, flow, tier.TIER, `${Number(mode.developer)}${Number(mode.devserver)}${Number(mode.nineDragon)}`);
         const card = document.querySelector<HTMLElement>('.ws-load');
         if (job !== null && card !== null) {
