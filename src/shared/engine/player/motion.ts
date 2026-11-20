@@ -227,6 +227,20 @@ function boardGroundSupportsJump(s: PlayerMotionState, w: MotionWorld, height: n
   return 1 / Math.hypot(1, dx, dz) >= WALKABLE_GROUND_Y;
 }
 
+/** Walkable ground at the feet: a collider floor with an upward walkable normal at most an auto-step under them (mid-step
+ *  onto a lip the feet ride up its edge; a ray starting inside a wall face hits at zero and is no floor), else the terrain
+ *  there with a walkable slope. */
+function footGroundSupportsJump(s: PlayerMotionState, w: MotionWorld): boolean {
+  const { x, y, z } = s.position, reach = PLAYER_CAPSULE.step + .05;
+  const floor = w.floor(x, z, y + .5, .5 + reach, WALKABLE_GROUND_Y);
+  if (floor !== undefined && floor >= y - reach) return true;
+  if (w.heightAt(x, z) < y - reach) return false;
+  const sample = .15;
+  const dx = (w.heightAt(x + sample, z) - w.heightAt(x - sample, z)) / (2 * sample);
+  const dz = (w.heightAt(x, z + sample) - w.heightAt(x, z - sample)) / (2 * sample);
+  return 1 / Math.hypot(1, dx, dz) >= WALKABLE_GROUND_Y;
+}
+
 /** Stop swimming (the swim law's `leave`, or the board): the dive and the haul-out let go. */
 export function leaveSwim(s: PlayerMotionState, w: MotionWorld): void {
   const { swim } = s;
@@ -340,7 +354,9 @@ function stepOnFoot(s: PlayerMotionState, cmd: MotionCommand | undefined, w: Mot
   steerFoot(s, w, run, mx, mz, wadeT, dt);
   // the jump on last step's ground, before the step's gravity
   const contact = w.motor.result;
-  const supported = fall.grounded && (footing.onPlatform || (contact.groundCollider !== null && contact.groundNormalY >= WALKABLE_GROUND_Y));
+  // a grounded step the motor names no ground collider for (its snap onto a small lip) asks the floor under the feet
+  const supported = fall.grounded && (footing.onPlatform || (contact.groundCollider !== null
+    ? contact.groundNormalY >= WALKABLE_GROUND_Y : footGroundSupportsJump(s, w)));
   jumpClock(s.jump, supported, dt);
   if (cmd?.jump === true && (!fall.grounded || supported)) {
     const vy = jumpLaw(s.jump, supported, velocity.y, foot.coyoteMs, foot.crouching || footing.sliding, jumpSpeed(wadeT));

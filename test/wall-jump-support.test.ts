@@ -60,3 +60,19 @@ test.each([false, true])('flat floor still gives a jump (hover: %s)', hover => {
     expect(jump.jumped).toBe(true);
   } finally { close(); }
 });
+
+// The motor can report a grounded step with no ground collider (its snap onto a small lip, as on Driftwood's creek lip at
+// (14.16, -11.6), where the shrine journey's one jump went unanswered after cfec551b5). Walkable ground under the feet
+// still gives that step its jump; a wall face (above) still does not.
+test.each([0, .3])('a grounded step whose motor names no ground collider still jumps from walkable ground (feet %f m up a lip)', lift => {
+  const { state, world, physics, motor, close } = room(8);
+  try {
+    state.position.set(-3, .03, 0); motor.resetAt(state.position);
+    for (let tick = 0; tick < 90; tick++) { physics.step(); stepPlayerMotion(state, undefined, world, DT); }
+    expect(state.fall.grounded).toBe(true);
+    // Driftwood's lip: the feet rode 0.3 m up its edge, the floor under them is still the lower ground
+    state.position.y += lift; motor.result.groundCollider = null;
+    const jump = stepPlayerMotion(state, { moveX: 0, moveZ: 0, yaw: 0, jump: true }, world, DT);
+    expect(jump.jumped).toBe(true);
+  } finally { close(); }
+});
