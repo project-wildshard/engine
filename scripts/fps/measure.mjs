@@ -6,7 +6,7 @@ import { fpsVerdict } from './verdict.mjs';
 import { observePasses, requirePassBench } from './passes.mjs';
 
 /** @typedef {{browser:'webkit'|'chromium', cpu:number, graphics:'low'|'high', tier:'phone'|'desktop',
- * width:number, height:number, dpr:1|2|3, cap:30|60|null, floor:number}} Profile */
+ * width:number, height:number, dpr:1|2|3, cap:30|60|null, floor:number, device?:Record<string,boolean|number|string>}} Profile */
 /** @typedef {import('../memory/iphone/route.mjs').RouteLeg} RouteLeg */
 
 /**
@@ -111,6 +111,8 @@ async function openContext(browser, profile) {
   if (profile.tier === 'phone' && profile.cap === null) await saveFixture(context, {
     scope: 'device', key: 'gfx.knob.density', data: profile.dpr,
   });
+  // DF10: an arm's device slots (`table.mjs --device key=value,...`), saved before the page boots
+  for (const [key, data] of Object.entries(profile.device ?? {})) await saveFixture(context, { scope: 'device', key, data });
   await saveFixture(context, NAME_ASKED);
   await harnessPins(context, { seed: 357 });
   return context;

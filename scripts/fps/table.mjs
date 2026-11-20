@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // DF6 / J464. One browser at a time on the mini.
 // node scripts/fps/table.mjs --zone driftwood-isle [--profiles NAME,...] [--runs 3] [--base ORIGIN]
+// --device key=value,... saves device slots for every profile (an A/B arm; true/false/numbers parsed).
 // --dock-only --cold-only is a short diagnostic. With WS_BENCH=1, add --pass-breakdown for CPU submit by pass.
 // The full matrix includes both desktop sizes and a warm repeat.
 import { execFileSync, spawn } from 'node:child_process';
@@ -42,7 +43,7 @@ const keys = Object.keys(profiles);
 const choices = parseArgs({ options: {
   zone: { type:'string', default:'driftwood-isle' }, profiles:{ type:'string', default:keys.join(',') },
   runs:{ type:'string', default:'3' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
-  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' },
+  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' }, device:{ type:'string' },
 } }).values;
 
 function gpuBusy() {
@@ -138,13 +139,21 @@ async function main() {
   if (rates && (selected.length !== 1 || new Set(rates).size !== rates.length ||
     rates.some(rate => !Number.isFinite(rate) || rate < 1 || rate > 8))) throw new Error('Use unique CPU rates from 1 to 8 for one profile');
   const caps = readCaps(root);
+  /** @type {Record<string,boolean|number|string>} */
+  const device = {};
+  for (const pair of choices.device?.split(',').filter(Boolean) ?? []) {
+    const at = pair.indexOf('='), raw = pair.slice(at + 1);
+    if (at < 1) throw new Error(`Use --device key=value,...: ${pair}`);
+    device[pair.slice(0, at)] = raw === 'true' ? true : raw === 'false' ? false : raw !== '' && Number.isFinite(Number(raw)) ? Number(raw) : raw;
+  }
   const plan = selected.flatMap(name => profiles[name].flatMap(spec => {
     const cap = capFor(caps, `fps/${name}/${zone}`), floor = cap?.hard;
     if (cap?.kind !== 'floor' || typeof floor !== 'number') throw new Error(`Missing FPS floor for ${name}`);
     const cpu = spec.factor === null ? 1 : factors[spec.factor]?.factor ?? (spec.factor === 'desktopTypical' ? 2 : 1);
     if (!Number.isFinite(cpu) || cpu < 1) throw new Error(`Invalid CPU factor for ${name}`);
     const calibrated = spec.factor===null || spec.factor==='desktopTypical' || factors[spec.factor]?.qualified===true;
-    return (rates ?? [cpu]).map(rate => ({ name, profile:{...spec,cpu:rate,floor,calibrated:rates===undefined && calibrated} }));
+    return (rates ?? [cpu]).map(rate => ({ name, profile:{...spec,cpu:rate,floor,calibrated:rates===undefined && calibrated,
+      ...(Object.keys(device).length > 0 ? {device} : {})} }));
   }));
   if (choices['dry-run']) { console.log(JSON.stringify({zone,base,host,count,plan,route},null,2)); return 0; }
   if (existsSync(marker)) throw new Error('Jake is playing');

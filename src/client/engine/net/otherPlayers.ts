@@ -19,6 +19,7 @@ import type { NetClient, NetEntityInfo } from './client';
 import { othersOnMap } from './othersOnMap';
 import { talkerKey, voiceNear, type Talker } from './voiceNear';
 import { SoftCollide, type SoftBody, type SoftSelf } from './softCollide';
+import { warmDrawn, warmPaceOn } from './warmPace';
 
 const column = (name: string): number => PLAYER_CLASS.row.findIndex(entry => entry.name === name);
 const X = column('x'), Y = column('y'), Z = column('z'), YAW = column('yaw'), BOARD = column('board'), HELD = column('held'), HP = column('hp'), SWIM = column('swim');
@@ -243,17 +244,21 @@ class WarmBody {
     this.unculled();
   }
   private slot = WARM_SLOTS;
+  /** DF10: drawn on a pace once settled (warmPace.ts); frames since its hand filled, -1 before */
+  private readonly paced = warmPaceOn();
+  private filled = -1;
   /** NET-LAG NL15: asked for the body's road (exterior) variants once a kit's items are all in its hand. */
   private readonly onFilled: ((group: THREE.Group) => void) | undefined;
   /** Each frame: a newly lent kit's items replace the last's, one slot a frame (each first copy clones a first-person model).
    *  Filled, the body asks for its road variants: the items came after the boot's road warm-up took its inventory, and on the
    *  road (no environment) the held sword linked its opaque program inside one frame (283 to 450 ms, Driftwood's boost). */
   frame(): void {
-    if (this.kit !== heldOnOthers.lent) { this.kit = heldOnOthers.lent; this.items.clear(); this.slot = 0; }
+    if (this.kit !== heldOnOthers.lent) { this.kit = heldOnOthers.lent; this.items.clear(); this.slot = 0; this.filled = -1; }
+    if (this.paced) { if (this.filled >= 0) this.filled++; this.group.visible = this.filled < 0 || warmDrawn(true, this.filled); }
     if (this.slot >= WARM_SLOTS) return;
     const held = heldOnOthers.prop(this.slot++);
     if (held !== null) { const item = held.prop.clone(); item.traverse(node => { node.frustumCulled = false; }); this.items.add(item); }
-    if (this.slot === WARM_SLOTS) this.onFilled?.(this.group);
+    if (this.slot === WARM_SLOTS) { this.filled = 0; this.onFilled?.(this.group); }
   }
   /** Drawn wherever the camera looks, so the warm-up and every frame count its programs as used. */
   private unculled(): void { this.group.traverse(node => { node.frustumCulled = false; }); }

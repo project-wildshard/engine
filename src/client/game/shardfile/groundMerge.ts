@@ -80,15 +80,17 @@ interface Member {
 interface Block { readonly members: Map<Mesh, Member>; merged: Mesh | null; queued: boolean }
 
 /** How members group into blocks: `quadrant` 250 m blocks (a ground's channels are those every member has), `cell` the
- *  500 m cell by vertex layout, `block` 250 m blocks by vertex layout (props: a member never loses a channel). */
-export type MergeGrouping = 'quadrant' | 'cell' | 'block';
+ *  500 m cell by vertex layout, `block` 250 m blocks by vertex layout (props: a member never loses a channel), `region`
+ *  (DF10) the 500 m cell by vertex layout, turned as props are. */
+export type MergeGrouping = 'quadrant' | 'cell' | 'block' | 'region';
 
 export class GroundMerge {
   private readonly blocks = new Map<string, Block>();
   private readonly cacheChannels = buildTier() !== 'phone';
   /** `onRebuild`: each new merged mesh, before it draws (its shadow flags, render order or a terrain's mesh slot) */
-  constructor(private readonly parent: Object3D, private readonly material: Material, private readonly name: string, private readonly onRebuild?: (mesh: Mesh) => void, readonly grouping: MergeGrouping = 'quadrant') {
-    if (grouping !== 'quadrant' && grouping !== 'cell' && grouping !== 'block') throw new Error('Unknown ground merge grouping');
+  /** `ignore`: channels the material never reads (DF10: a flat-shaded look's normals), left out of layouts and merges */
+  constructor(private readonly parent: Object3D, private readonly material: Material, private readonly name: string, private readonly onRebuild?: (mesh: Mesh) => void, readonly grouping: MergeGrouping = 'quadrant', private readonly ignore: ReadonlySet<string> = new Set()) {
+    if (grouping !== 'quadrant' && grouping !== 'cell' && grouping !== 'block' && grouping !== 'region') throw new Error('Unknown ground merge grouping');
   }
 
   /** The tile's ground `mesh` joins (hidden itself) until `scope` ends. Detached meshes are already parent-local;
@@ -145,11 +147,11 @@ export class GroundMerge {
       centre.applyMatrix4(member.mesh.parent === null ? member.mesh.matrix : new Matrix4().copy(this.parent.matrixWorld).invert().multiply(member.mesh.matrixWorld));
       x = centre.x; z = centre.z;
     }
-    const size = this.grouping === 'cell' ? HALF * 2 : BLOCK;
+    const size = this.grouping === 'cell' || this.grouping === 'region' ? HALF * 2 : BLOCK;
     const cell = `${String(Math.floor((x + HALF) / size))},${String(Math.floor((z + HALF) / size))}`;
     if (this.grouping === 'quadrant') return cell;
     // A cell (or block) merge never drops a channel supplied by another member.
-    const layout = Object.entries(member.mesh.geometry.attributes).map(([name, attribute]) => `${name}:${String(attribute.itemSize)}:${String(attribute.normalized)}`).sort().join('|');
+    const layout = Object.entries(member.mesh.geometry.attributes).filter(([name]) => !this.ignore.has(name)).map(([name, attribute]) => `${name}:${String(attribute.itemSize)}:${String(attribute.normalized)}`).sort().join('|');
     return `${cell}|${layout}`;
   }
 
@@ -168,7 +170,7 @@ export class GroundMerge {
     block.merged = null;
     if (old !== null) { old.removeFromParent(); old.geometry.dispose(); }
     const first = block.members.values().next().value; if (first === undefined) return;
-    const names = Object.keys(first.mesh.geometry.attributes).filter(name => [...block.members.values()].every(member => member.mesh.geometry.hasAttribute(name))), parentInverse = new Matrix4(), toParent = new Matrix4();
+    const names = Object.keys(first.mesh.geometry.attributes).filter(name => !this.ignore.has(name) && [...block.members.values()].every(member => member.mesh.geometry.hasAttribute(name))), parentInverse = new Matrix4(), toParent = new Matrix4();
     this.parent.updateWorldMatrix(true, false); parentInverse.copy(this.parent.matrixWorld).invert();
     // Size the output first. On phone, fill its channels directly: keeping
     // transformed member channels would retain another copy beside the draw.
@@ -192,7 +194,7 @@ export class GroundMerge {
       else toParent.multiplyMatrices(parentInverse, member.mesh.matrixWorld);
       const transform = toParent.elements.join(',');
       // AP8: a prop's normals and tangents turn with it (a ground's channels copy as they are).
-      const turned = this.grouping === 'block' && !isTranslation(toParent);
+      const turned = (this.grouping === 'block' || this.grouping === 'region') && !isTranslation(toParent);
       const normal = turned ? new Matrix3().getNormalMatrix(toParent) : null;
       const tangent = turned ? new Matrix3().setFromMatrix4(toParent) : null;
       for (const { name, values } of channels) {
@@ -285,8 +287,18 @@ export function groundMerge(parent: Object3D, material: Material, name: string, 
   return merge;
 }
 
-/** How a merged prop mesh draws: whether it receives shadow, and its render order (each its own merge). */
-export interface PropDraw { readonly receive: boolean; readonly order: number }
+/** How a merged prop mesh draws: whether it receives shadow, its render order and (DF10) the members' shared render hook
+ *  (each its own merge). */
+export interface PropDraw { readonly receive: boolean; readonly order: number; readonly hook?: Mesh['onBeforeRender'];
+  /** DF10: the whole 500 m cell per layout (`region`) instead of 250 m blocks, and channels its material never reads */
+  readonly grouping?: 'block' | 'region'; readonly ignore?: readonly string[] }
+const hookIds = new WeakMap<object, number>();
+let nextHook = 0;
+const hookKey = (hook: object | undefined): string => {
+  if (hook === undefined) return '';
+  let id = hookIds.get(hook); if (id === undefined) { id = ++nextHook; hookIds.set(hook, id); }
+  return `|h${String(id)}`;
+};
 const propMerges = new WeakMap<Object3D, Map<Material, Map<string, GroundMerge>>>();
 /** SHARD-SOURCE AP8: the one static prop merge of `material` drawn as `draw` under `parent`: 250 m blocks by vertex layout. */
 export function propMerge(parent: Object3D, material: Material, draw: PropDraw): GroundMerge {
@@ -294,19 +306,25 @@ export function propMerge(parent: Object3D, material: Material, draw: PropDraw):
   if (byMaterial === undefined) { byMaterial = new Map(); propMerges.set(parent, byMaterial); }
   let byDraw = byMaterial.get(material);
   if (byDraw === undefined) { byDraw = new Map(); byMaterial.set(material, byDraw); }
-  const key = `${String(draw.receive)}|${String(draw.order)}`;
+  const grouping = draw.grouping ?? 'block', ignore = [...draw.ignore ?? []].sort();
+  const key = `${String(draw.receive)}|${String(draw.order)}${hookKey(draw.hook)}|${grouping}|${ignore.join(',')}`, hook = draw.hook;
   let merge = byDraw.get(key);
   if (merge === undefined) {
-    merge = new GroundMerge(parent, material, MERGED_COPY, (mesh) => { mesh.castShadow = false; mesh.receiveShadow = draw.receive; mesh.renderOrder = draw.order; }, 'block');
+    merge = new GroundMerge(parent, material, MERGED_COPY, (mesh) => {
+      mesh.castShadow = false; mesh.receiveShadow = draw.receive; mesh.renderOrder = draw.order;
+      if (hook !== undefined) mesh.onBeforeRender = hook;
+    }, grouping, new Set(ignore));
     byDraw.set(key, merge);
   }
   return merge;
 }
 
-/** AP8: `mesh` joins its merge for the view; it keeps drawing only into the shadow maps (SHADOW_LAYER) while it may cast. */
-export function mergeView(parent: Object3D, mesh: Mesh, material: Material, scope: Scope): void {
+/** AP8: `mesh` joins its merge for the view; it keeps drawing only into the shadow maps (SHADOW_LAYER) while it may cast.
+ *  DF10: `hook`, a render hook that reads nothing of the mesh, is the merged mesh's too (members with another hook draw in
+ *  another merge). */
+export function mergeView(parent: Object3D, mesh: Mesh, material: Material, scope: Scope, hook?: Mesh['onBeforeRender'], region?: Pick<PropDraw, 'grouping' | 'ignore'>): void {
   if (mesh.material !== material) throw new Error('Prop merge member draws another material');
-  propMerge(parent, material, { receive: mesh.receiveShadow, order: mesh.renderOrder }).add(mesh, scope);
+  propMerge(parent, material, { receive: mesh.receiveShadow, order: mesh.renderOrder, ...(hook === undefined ? {} : { hook }), ...region }).add(mesh, scope);
   // SHARD-SOURCE ss4d: still the World Explorer's to pick (explore/pick.ts reads this mark), though it draws on SHADOW_LAYER
   mesh.visible = true; mesh.layers.set(SHADOW_LAYER); mesh.userData[MERGED_VIEW] = true;
   scope.onDispose(() => { mesh.userData[MERGED_VIEW] = false; });

@@ -67,3 +67,18 @@ test('copies named in except, and tinted copies, are not still', () => {
   expect(drawn(batch)).toEqual(['0x1', '1x1', 'stillx1']);
   batch.dispose(); expect(still(batch)).toBeUndefined();
 });
+
+test('DF10: with rest, a moved still copy rejoins the merge once it has held still; a tinted one does not', () => {
+  const { batch, ids } = kit(); const [a = -1, , c = -1] = ids;
+  batch.mergeStill().rest(3);
+  for (const x of [0.5, 0.75, 1]) batch.setMatrixAt(a, at(x, 0, 1));                   // a third move: its own mesh
+  expect(drawn(batch)).toEqual(['0x1', 'stillx1']);
+  batch.settle(); batch.setMatrixAt(a, at(1.5, 0, 1)); batch.settle(); batch.settle();   // still moving: stays out
+  expect(drawn(batch)).toEqual(['0x1', 'stillx1']);
+  batch.settle();                                                                        // three ticks at rest: back in
+  expect(drawn(batch)).toEqual(['stillx1']);
+  expect(still(batch)?.geometry.getAttribute('position').getX(0)).toBeCloseTo(2, 6);
+  batch.setColorAt(c, new Color(1, 0.5, 1));
+  for (let i = 0; i < 5; i++) batch.settle();
+  expect(drawn(batch)).toEqual(['2x1', 'stillx1']);
+});

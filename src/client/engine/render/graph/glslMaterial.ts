@@ -79,6 +79,16 @@ function readsObjectOrigin(nodes: Readonly<Record<string, GraphNode>>): boolean 
   return Object.values(nodes).some(node => node.op === 'objectOrigin' || (node.body !== undefined && readsObjectOrigin(node.body.nodes)));
 }
 
+/** DF10: model-space reads (its own space, not the world's): what a mesh merged into another space would change */
+const MODEL_SPACE_OPS: ReadonlySet<string> = new Set(['objectOrigin', 'positionLocal', 'positionGeometry', 'normalLocal']);
+function readsModelSpace(nodes: Readonly<Record<string, GraphNode>>): boolean {
+  return Object.values(nodes).some(node => MODEL_SPACE_OPS.has(node.op) || (node.body !== undefined && readsModelSpace(node.body.nodes)));
+}
+const NORMAL_OPS: ReadonlySet<string> = new Set(['normalLocal', 'normalWorld', 'normalView']);
+function readsNormals(nodes: Readonly<Record<string, GraphNode>>): boolean {
+  return Object.values(nodes).some(node => NORMAL_OPS.has(node.op) || (node.body !== undefined && readsNormals(node.body.nodes)));
+}
+
 /** the compiled materials that own their graph's shadow depth (their clones share it) */
 const depthOwners = new WeakSet<THREE.Material>();
 
@@ -90,6 +100,14 @@ export class GraphShaderMaterial extends THREE.ShaderMaterial {
   codec: ClassicCodec | null = null;
   /** The compiled graph can draw a mesh whose local transform decodes a static position grid. */
   positionGridCompatible = false;
+  /** DF10: the graph reads its mesh's own space (object origin, local position or normal): a merge into another space
+   *  changes what it draws */
+  readsModelSpace = true;
+  /** DF10: a graph node reads the surface normal (a flat-shaded graph that does not shades by derivatives alone) */
+  readsNormals = true;
+  /** DF10: the graph moves its vertices in its mesh's own axes (`vertex.position`, or a `vertex.offset` not turned out of
+   *  world axes by `worldToLocal`) */
+  movesVertices = true;
   /** a vertex-moving caster's shadow depth from the graph's own vertex stage (null: the stock depth), shared by its clones;
    *  each variant casts with its own copy (`classicShadowDepth`) */
   shadowDepth: GraphShaderMaterial | null = null;
@@ -189,6 +207,9 @@ export class GraphShaderMaterial extends THREE.ShaderMaterial {
     try { super.copy(source); } finally { source.uniforms = uniforms; }
     this.codec = source instanceof GraphShaderMaterial && source.codec !== null ? new ClassicCodec() : null;
     this.positionGridCompatible = source instanceof GraphShaderMaterial && source.positionGridCompatible;
+    this.readsModelSpace = !(source instanceof GraphShaderMaterial) || source.readsModelSpace;
+    this.movesVertices = !(source instanceof GraphShaderMaterial) || source.movesVertices;
+    this.readsNormals = !(source instanceof GraphShaderMaterial) || source.readsNormals;
     this.shadowDepth = source instanceof GraphShaderMaterial ? source.shadowDepth : null;
     this.instanceColour = source instanceof GraphShaderMaterial && source.instanceColour;
     this.readsVertexColour = source instanceof GraphShaderMaterial && source.readsVertexColour;
@@ -308,6 +329,11 @@ function shaderMaterial(glsl: GraphGlsl, opts: GraphShaderOptions): GraphShaderM
   // OF-EM28b3: a vertex position or object origin decodes through the codec too, but a normalized draw grid (the phone's
   // packed static parts) reads step 1 and origin 0 there, as before: only the other codec reads keep a graph off it
   m.positionGridCompatible = !readsCodec(shaders.vertexShader.replaceAll(POSITION_DECODE, '')) && !readsObjectOrigin(ir.nodes);
+  m.readsModelSpace = readsModelSpace(ir.nodes);
+  m.readsNormals = readsNormals(ir.nodes);
+  // an offset turned out of world axes (`worldToLocal`, Driftwood's swaying kit) moves the same way in any mesh's space
+  const offset = ir.stages['vertex.offset']?.offset;
+  m.movesVertices = ir.stages['vertex.position'] !== undefined || (offset !== undefined && !(typeof offset === 'string' && ir.nodes[offset]?.op === 'worldToLocal'));
   m.instanceColour = readsInstanceColour(ir.nodes);
   m.readsVertexColour = readsVertexColour(ir.nodes);
   m.defaultAttributeValues = attributeDefaults(glsl, m);

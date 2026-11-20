@@ -28,6 +28,7 @@ import { enteredOwner, withOwner } from '@wildshard/engine/app/ownership';
 import { ownSceneTree } from '@wildshard/engine/app/sceneOwnership';
 import { registerExteriorLighting } from '@wildshard/engine/render/precompile';
 import { holdStaticMatrices } from '@wildshard/engine/render/staticMatrices';
+import { installStaticViewMerge } from './staticViewMerge';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import { addPiece } from '@wildshard/engine/physics/pieces';
 import type { PlayerFrameQueries } from '@wildshard/engine/player/Player';
@@ -130,6 +131,8 @@ export function createRegionalView(request: RegionalViewRequest): RegionalView {
   const checks = new Set<() => void>();
   const checked = (owner: Scope) => (check: () => void): void => { checks.add(check); owner.onDispose(() => { checks.delete(check); }); };
   holdStaticMatrices(root, scope, checked(scope), { subtree: false });
+  // DF10: still set pieces drawn one view mesh per material at phone Low (`debug.staticMerge`, staticViewMerge.ts)
+  root.userData['staticMerge'] = installStaticViewMerge(root, scope, checked(scope));
   const sync = (): void => { if (scope.disposed) return; for (const move of movers) move(); for (const check of checks) check(); };
   if (request.fixedPre !== undefined) scope.onDispose(request.fixedPre(sync));
 

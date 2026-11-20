@@ -26,6 +26,7 @@ import * as THREE from 'three';
 import { ChangedBatchedMesh } from '../../render/changedTextureUploads';
 import { app } from '../../app/runtime';
 import { lowPolyLookMaterial } from '../lowpolyKit';
+import { litRestMergeOn, REST_TICKS } from './restMerge';
 import type { SkyRig as Sky } from '../skyRig';
 import type { BoxSpec as Collider } from '../../../../shared/engine/physics/box';
 import { boxInFrame } from '../../physics/boxFrame';
@@ -260,9 +261,11 @@ export class Interactables {
     for (const b of ['lit', 'glow'] as const) {
       const drawn = this.batches[b];
       if (!(drawn instanceof InstancedBatch)) continue;
-      const animated = new Set<number>();
-      for (const lv of this.lives) for (const part of lv.parts) if (part.batch === b && (part.animated || part.glow !== undefined)) animated.add(part.inst);
+      const animated = new Set<number>(), rest = litRestMergeOn();
+      // DF10 (`debug.litRestMerge`): a moving part rests in the merge between its moves; a glowing one keeps its own mesh
+      for (const lv of this.lives) for (const part of lv.parts) if (part.batch === b && ((part.animated && !rest) || part.glow !== undefined)) animated.add(part.inst);
       drawn.mergeStill(animated);
+      if (rest) drawn.rest(REST_TICKS);
     }
     return this;
   }
@@ -652,6 +655,7 @@ export class Interactables {
       if (!lv.dirty && lv.parts.some((p) => p.animated && p.glow !== undefined) && lv.position.distanceToSquared(pl) < 90 * 90) lv.dirty = true;
       if (lv.dirty) this.pose(lv, t);
     }
+    for (const drawn of [this.batches?.lit, this.batches?.glow]) if (drawn instanceof InstancedBatch) drawn.settle();
   }
 
   private pose(lv: Live, t: number): void {

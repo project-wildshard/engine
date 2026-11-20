@@ -17,6 +17,9 @@
 import * as THREE from 'three';
 import type { BatchSink } from './cull';
 import { cullCopiesPerCascade } from '../world/cascadeCull';
+import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
+/** DF10: the rest marks' ledger name */
+const REST_LABEL = { owner: 'engine/instanced-batch', asset: 'rest' } as const;
 
 
 interface Slot { readonly geometry: THREE.BufferGeometry; mesh: THREE.InstancedMesh | null; capacity: number; copies: Int32Array }
@@ -102,6 +105,14 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
   private still = new Uint8Array(16);
   /** per copy: the moves it made while still */
   private settles = new Uint8Array(16);
+  /** DF10 (`rest`): per copy, 1 while it is out of the merge only because it moved (it rejoins once at rest) */
+  private resting = ownedArray(Uint8Array, 16, REST_LABEL);
+  /** DF10: per copy, the `settle` tick of its last move */
+  private movedAt = ownedArray(Int32Array, 16, REST_LABEL);
+  /** DF10: `settle` ticks a moved copy holds still before it rejoins the merge (0: never, the FC16 rule) */
+  private restTicks = 0;
+  private ticks = 0;
+  private merging: string | null = null;
   private merged: THREE.InstancedMesh | null = null;
   private copies = 0;
   private readonly scratchMatrix = new THREE.Matrix4();
@@ -151,7 +162,9 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
       const settles = (this.settles[id] ?? 0) + 1; this.settles[id] = settles;
       if (settles <= STILL_SETTLES) { matrix.toArray(this.matrices, id * 16); if (this.held[id] === MERGED) this.bake(); return this; }
       this.unstill(id);
+      if (this.restTicks > 0) this.resting[id] = 1;
     }
+    if (this.resting[id] === 1) this.movedAt[id] = this.ticks;
     matrix.toArray(this.matrices, id * 16);
     const slot = this.slots[this.held[id] ?? -1];
     if (slot?.mesh) { slot.mesh.setMatrixAt(this.at[id] ?? 0, matrix); slot.mesh.instanceMatrix.needsUpdate = true; }
@@ -171,6 +184,7 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
       if (c[at] === Math.fround(color.r) && c[at + 1] === Math.fround(color.g) && c[at + 2] === Math.fround(color.b)) return this;
       this.unstill(id);
     }
+    if (this.resting[id] === 1 && (color.r !== 1 || color.g !== 1 || color.b !== 1)) this.resting[id] = 0;
     color.toArray(this.colors, id * 3);
     const slot = this.slots[this.held[id] ?? -1];
     if (slot?.mesh) { slot.mesh.setColorAt(this.at[id] ?? 0, color); if (slot.mesh.instanceColor) slot.mesh.instanceColor.needsUpdate = true; }
@@ -205,8 +219,32 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
       key = own; this.still[id] = 1;
       if ((this.held[id] ?? -1) >= 0) { this.hide(id); this.held[id] = MERGED; }
     }
+    this.merging = key;
     this.bake();
     return this;
+  }
+
+  /**
+   * DF10: from now on a still copy that moves out of the merge rejoins it once it has held its matrix for `ticks` calls
+   * of `settle` (a chest lid once open, a lever once thrown, a barrel come to rest), instead of drawing on its own for good.
+   */
+  rest(ticks: number): this { this.restTicks = Math.max(0, Math.floor(ticks)); return this; }
+
+  /** DF10: once a frame (with `rest`): moved copies at rest for `rest` ticks rejoin the merge, in one bake. */
+  settle(): void {
+    const tick = ++this.ticks;
+    if (this.restTicks === 0) return;
+    let joined = false;
+    for (let id = 0; id < this.copies; id++) {
+      if (this.resting[id] !== 1 || tick - (this.movedAt[id] ?? 0) < this.restTicks) continue;
+      const slot = this.slots[this.geometryOf[id] ?? -1], c = this.colors, at = id * 3;
+      this.resting[id] = 0;
+      if (slot === undefined || (c !== null && (c[at] !== 1 || c[at + 1] !== 1 || c[at + 2] !== 1))) continue;
+      const own = mergeKey(slot.geometry); if (own === null || (this.merging !== null && own !== this.merging)) continue;
+      this.merging = own; this.still[id] = 1; this.settles[id] = 0;
+      if ((this.held[id] ?? -1) >= 0) { this.hide(id); this.held[id] = MERGED; joined = true; }
+    }
+    if (joined) this.bake();
   }
 
   setGeometryIdAt(id: number, geometry: number): this {
@@ -214,6 +252,7 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
     if (this.slots[geometry] === undefined) throw new Error(`Instanced batch has no geometry ${geometry}`);
     if (this.geometryOf[id] === geometry) return this;
     if (this.still[id] === 1) this.unstill(id);
+    this.resting[id] = 0;
     const shown = (this.held[id] ?? -1) >= 0;
     this.hide(id); this.geometryOf[id] = geometry;
     if (shown) this.show(id);
@@ -239,6 +278,8 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
     this.at = widen(this.at, new Int32Array(size)); this.matrices = widen(this.matrices, new Float32Array(size * 16));
     const still = new Uint8Array(size); still.set(this.still); this.still = still;
     const settles = new Uint8Array(size); settles.set(this.settles); this.settles = settles;
+    const resting = ownedArray(Uint8Array, size, REST_LABEL); resting.set(this.resting); this.resting = resting;
+    this.movedAt = widen(this.movedAt, ownedArray(Int32Array, size, REST_LABEL));
     if (this.colors !== null) this.colors = widen(this.colors, new Float32Array(size * 3).fill(1));
   }
 
