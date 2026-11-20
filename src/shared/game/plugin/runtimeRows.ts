@@ -67,7 +67,11 @@ function withoutDrawnProps(props: Shardfile['props']): Shardfile['props'] {
 export function withoutRuntimeRows(source: Shardfile): Shardfile {
   const binds = runtimeBinds(source);
   if (binds.size === 0) return source;
-  if (binds.has('state') && (source.state.player.length > 0 || source.state.shared.some((field) => field.privacy !== 'host' && !(field.privacy === 'public' && field.type !== 'string' && (source.runtime?.spawns?.bosses.length ?? 0) > 0)))) {
+  // A retained actor is a runtime boss or (ONE-FORMAT OF22c2, format 0.55.2) the declared spawn a `boss` encounter names:
+  // Driftwood's Drowned Captain keeps his public decision fields on runtime-bound state with no runtime boss.
+  const spawned = new Set(source.creatures.spawns.map(spawn => spawn.id));
+  const retained = (source.runtime?.spawns?.bosses.length ?? 0) > 0 || source.encounters.some(encounter => encounter.kind === 'boss' && spawned.has(encounter.entity));
+  if (binds.has('state') && (source.state.player.length > 0 || source.state.shared.some((field) => field.privacy !== 'host' && !(field.privacy === 'public' && field.type !== 'string' && retained)))) {
     throw new Error('Runtime-bound state supports host fields and retained-actor numeric fields');
   }
   const world = runtimeBoundWorldFiles(source), keep = (ref: string): boolean => !world.has(ref);

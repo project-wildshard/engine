@@ -15,3 +15,7 @@
   r5 page holds every room solid plus copies: its client/plan world.assembly still builds the solids the prop rows now carry
   (owner@scene names and exact repeats). No room solid is missing from the page, so the lines are `known` under OF21; Nine
   rev 6 drops the assembly collision and the stale entry, and the lines go. (opus-of21-drift3)
+- Driftwood's staging prepare timed out on v0.1.55 too: the page refused it at level.world ("Runtime-bound state supports
+  host fields and retained-actor numeric fields"). The Drowned Captain is now a declared spawn a boss encounter names
+  (OF22c2), with no runtime boss; format 0.55.2 admits his public decision fields, the page's `withoutRuntimeRows` did
+  not. It reads format's rule now. Found by logging the prepare page's /api/errors post. (opus-of21-drift3)
