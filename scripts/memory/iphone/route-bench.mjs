@@ -24,14 +24,14 @@ import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone } from './safari.mjs';
-import { FRAME_LOG_READ, FRAME_LOG_START, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START } from './census.mjs';
+import { FRAME_LOG_READ, FRAME_LOG_START, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, route: { type: 'string' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
   slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, out: { type: 'string' }, udid: { type: 'string' },
-  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, frames: { type: 'boolean' }, 'with-locks': { type: 'boolean' },
+  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'cache-off': { type: 'boolean' }, frames: { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
 if (!Number.isSafeInteger(runs) || runs < 1 || caps.length === 0 || caps.some((cap) => cap !== 30 && cap !== 60)) throw new Error('--runs is a positive integer, --caps a list of 30 and 60');
@@ -71,7 +71,8 @@ async function bench() {
       const row = { run, cap, ab, temperature, boot: null, legs: [], error: null, screenshot: null };
       try {
         tools?.lockState(`run ${String(run)} cap ${String(cap)} before boot`);
-        const boot = await enterZone(/** @type {any} */ (driver), { base, slug: values.zone, slots: trialSlots });
+        // --cache-off (DF8): Safari's resource cache off for the boot, a first load of a new build (link-bench's cold runs)
+        const boot = await enterZone(/** @type {any} */ (driver), { base, slug: values.zone, slots: trialSlots, cacheOff: values['cache-off'] === true });
         row.boot = { outcome: boot.outcome, controlS: boot.controlAt !== null && boot.startedAt !== null ? (boot.controlAt - boot.startedAt) / 1000 : null,
           build: boot.state?.build ?? null, version: boot.state?.version ?? null, error: boot.state?.error ?? null };
         tools?.lockState(`run ${String(run)} cap ${String(cap)} after boot`);
@@ -109,6 +110,8 @@ async function bench() {
               const byFamily = new Map();
               for (const render of log ?? []) { const family = render[0], ms = render[4], f = byFamily.get(family) ?? [0, 0, 0]; f[0]++; f[1] += ms; f[2] = Math.max(f[2], ms); byFamily.set(family, f); }
               for (const [family, [count, ms, worst]] of [...byFamily].sort((a, b) => b[1][1] - a[1][1]).slice(0, 12)) console.log(`  voices ${family}: ${String(count)} renders, ${ms.toFixed(0)} ms, worst ${worst.toFixed(0)} ms`);
+              row.voiceWorker = await driver.evaluate(VOICE_WORKER_READ).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
+              console.log(`  voice worker: ${JSON.stringify(row.voiceWorker)}; page-thread renders over 30 ms: ${String((log ?? []).filter((render) => render[4] > 30).length)}`);
             } catch (error) { row.voicesError = String(error); }
           }
           if (values.frames === true) {

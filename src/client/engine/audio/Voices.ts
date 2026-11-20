@@ -3,6 +3,7 @@ import { audioMixValue } from '../../../shared/engine/audio/audioProfiles';
 import { resourceScope } from '../../../shared/engine/app/resources';
 import { ownAudioSource } from './ownership';
 import { tap } from '../../../shared/engine/core/harnessTap';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 import { observeAudioMemory } from '../../../shared/engine/core/memoryResources';
 import { panFromYaw, audioRandom } from './util';
 import type { Scope } from '../../../shared/engine/app/scope';
@@ -70,6 +71,19 @@ export function resetAudioWarmWorker(on?: boolean, port?: () => VoiceRenderPort 
 }
 /** a worker render that takes longer than this is given up and rendered on the main thread */
 const WORKER_RENDER_DEADLINE_MS = 5000;
+/** meta DRIFTWOOD-FPS DF8 (mini-driftwood13f): the render deadline runs only once the worker has said it is up. On a cold
+ *  first load the ENTER ZONE tap arms the hurt/death prewarm 1.5 s into the zone download, and the worker's own script
+ *  queued behind it: the first job passed 5 s before the worker ran, the pool dropped the worker for the page, and the
+ *  rest of the prewarm rendered on the page thread (iPhone 13, public build 522275ccb, cold boot: vocal-sailor 153 ms,
+ *  windup-sailor 169 ms at the pier's first turn). A boot gets this long; the prewarm waits for it meanwhile. */
+const WORKER_BOOT_DEADLINE_MS = 60_000;
+/** a worker that fails to boot (its script did not load, or the boot deadline passed) is started again this many times */
+const WORKER_RESPAWNS = 1;
+/** What the prewarm's worker is doing, for the bench's voice census. */
+export interface WarmWorkerState {
+  readonly on: boolean; readonly state: 'unstarted' | 'booting' | 'ready' | 'off';
+  readonly spawns: number; readonly bootMs: number | null; readonly renders: number; readonly reason: string | null;
+}
 
 interface Host { readonly ctx: BaseAudioContext; readonly sfx: GainNode; readonly ready: boolean }
 
@@ -114,8 +128,12 @@ export class VoicePool {
   private done = new Set<string>();
   /** DW3: the prewarm's render worker (undefined until first used, null when off or failed) and its one job in flight */
   private renderPort: VoiceRenderPort | null | undefined;
-  private inFlight: { id: number; name: string; family: Family; v: number; c: number; sr: number; deadline: ReturnType<Scope['timeout']> } | null = null;
+  private inFlight: { id: number; name: string; family: Family; v: number; c: number; sr: number; deadline: ReturnType<Scope['timeout']> | undefined } | null = null;
   private jobIds = 0;
+  /** DF8: the worker has spoken (its script ran); until then a job in flight has no render deadline, only the boot's */
+  private portReady = false;
+  private bootDeadline: ReturnType<Scope['timeout']> | undefined;
+  private spawnedAt = 0; private spawns = 0; private bootMs: number | null = null; private workerRenders = 0; private offReason: string | null = null;
 
   private readonly tables = new Map<string, Family | { clips: () => readonly SampleVoice[] | undefined; policy?: SamplePolicy }>();
   private readonly host: Host;
@@ -261,37 +279,61 @@ export class VoicePool {
     const port = this.port();
     if (port === null) return false;
     const id = ++this.jobIds, sr = f.half === true ? this.host.ctx.sampleRate / 2 : this.host.ctx.sampleRate;
-    const deadline = this.scope.timeout(WORKER_RENDER_DEADLINE_MS, () => { this.dropPort('deadline'); });
+    const deadline = this.portReady ? this.renderDeadline() : undefined;
     this.inFlight = { id, name, family: f, v, c, sr, deadline };
     try { port.postMessage({ id, work, sr, seed: v + 1, ch: c }); } catch (error) { this.dropPort(String(error)); }
     return true;
   }
+  private renderDeadline(): ReturnType<Scope['timeout']> { return this.scope.timeout(WORKER_RENDER_DEADLINE_MS, () => { this.dropPort('deadline'); }); }
   private port(): VoiceRenderPort | null {
     if (this.renderPort !== undefined) return this.renderPort;
-    try { this.renderPort = makeRenderPort(); } catch { this.renderPort = null; }
+    try { this.renderPort = makeRenderPort(); } catch (error) { this.renderPort = null; this.offReason = `no worker: ${String(error)}`; }
     const port = this.renderPort;
-    if (port === null) return null;
-    this.scope.listen(port, 'message', (event: Event) => { this.workerReply((event as MessageEvent<{ id?: unknown; data?: unknown; error?: unknown }>).data); });
-    this.scope.listen(port, 'error', (event: Event) => { event.preventDefault(); this.dropPort('worker failed'); });
+    if (port === null) { this.offReason ??= 'no worker'; return null; }
+    this.spawns++; this.portReady = false; this.spawnedAt = diagnosticNow();
+    this.bootDeadline = this.scope.timeout(WORKER_BOOT_DEADLINE_MS, () => { this.bootDeadline = undefined; if (this.renderPort === port) this.dropPort('boot timeout'); });
+    this.scope.listen(port, 'message', (event: Event) => {
+      if (this.renderPort !== port) return;
+      if (!this.portReady) this.workerUp();
+      this.workerReply((event as MessageEvent<{ id?: unknown; data?: unknown; error?: unknown }>).data);
+    });
+    this.scope.listen(port, 'error', (event: Event) => { event.preventDefault(); if (this.renderPort === port) this.dropPort('worker failed'); });
     return port;
+  }
+  /** DF8: the worker's first message (its ready line, or a reply): the boot is over and the job in flight gets its deadline */
+  private workerUp(): void {
+    this.portReady = true; this.bootMs = Math.round(diagnosticNow() - this.spawnedAt);
+    this.scope.cancelTimer(this.bootDeadline); this.bootDeadline = undefined;
+    if (this.inFlight !== null && this.inFlight.deadline === undefined) this.inFlight.deadline = this.renderDeadline();
+  }
+  /** the voice census's view of the prewarm worker (DF8) */
+  get warmWorker(): WarmWorkerState {
+    const on = warmWorkerPicked ?? false;
+    const state = this.renderPort === undefined ? 'unstarted' : this.renderPort === null ? 'off' : this.portReady ? 'ready' : 'booting';
+    return { on, state, spawns: this.spawns, bootMs: this.bootMs, renders: this.workerRenders, reason: this.offReason };
   }
   /** a worker reply: store the channel unless the family moved on or a play rendered it first, then the next slice */
   private workerReply(reply: { id?: unknown; data?: unknown; error?: unknown }): void {
     const job = this.inFlight;
     if (!this.live || job === null || reply.id !== job.id) return;
     if (!(reply.data instanceof Float32Array)) { this.dropPort(typeof reply.error === 'string' ? reply.error : 'malformed reply'); return; }
-    this.inFlight = null; this.scope.cancelTimer(job.deadline);
+    this.inFlight = null; this.scope.cancelTimer(job.deadline); this.workerRenders++;
     if (this.family(job.name) === job.family && !this.done.has(`${job.name}/${String(job.v)}/${String(job.c)}`)) this.store(job.name, job.family, job.v, job.c, reply.data, job.sr);
     this.next();
   }
-  /** the worker is gone for this page: the job in flight (if any) and the rest render here */
+  /** the worker is gone for this page: the job in flight (if any) and the rest render here. A worker that never came up
+   *  (its script failed to load, or the boot deadline passed) is started again first, WORKER_RESPAWNS times (DF8). */
   private dropPort(reason: string): void {
-    console.warn(`[audio] voice render worker off: ${reason}`);
-    const job = this.inFlight;
-    this.renderPort?.terminate(); this.renderPort = null;
+    const job = this.inFlight, respawn = !this.portReady && reason !== 'deadline' && this.spawns <= WORKER_RESPAWNS;
+    console.warn(`[audio] voice render worker ${respawn ? 'restarting' : 'off'}: ${reason}`);
+    this.renderPort?.terminate(); this.renderPort = respawn ? undefined : null;
+    this.offReason = reason; this.portReady = false;
+    this.scope.cancelTimer(this.bootDeadline); this.bootDeadline = undefined;
     this.inFlight = null;
     if (job !== null) this.scope.cancelTimer(job.deadline);
-    if (job !== null && this.live) { this.variant(job.name, job.v, job.c); this.next(); }
+    if (job === null || !this.live) return;
+    if (respawn && this.renderOff(job.name, job.v, job.c)) return;
+    this.variant(job.name, job.v, job.c); this.next();
   }
   /** one rendered channel into its variant's AudioBuffer (made by the first channel stored) */
   private store(name: string, f: Family, v: number, c: number, data: Float32Array, sr: number): void {

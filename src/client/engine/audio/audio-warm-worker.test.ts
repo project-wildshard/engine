@@ -1,5 +1,5 @@
 // meta IPHONE13-DRIFTWOOD DW3 (mini-driftwood13d): `debug.audioWarmWorker` moves the prewarm's renders off the main thread.
-import { afterAll, afterEach, beforeAll, expect, test } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { withOwner } from '../../../shared/engine/app/ownership';
 import { legacyDouble } from '../../../test/engine/FakeGame';
@@ -100,4 +100,78 @@ test('unset, phone Low renders in the worker and every other page does not; a sa
   expect(audioWarmWorker(false, true)).toBe(false);
   expect(audioWarmWorker(true, false)).toBe(true);
   expect(audioWarmWorker('on', true)).toBe(true);
+});
+
+/** a worker whose script has not run yet: jobs queue (as a real Worker queues messages) until `boot`, then each is answered */
+function slowPort() {
+  const jobs: Job[] = [], listeners = new Map<string, (event: unknown) => void>();
+  let up = false;
+  const answer = (job: Job): void => { listeners.get('message')?.({ data: { id: job.id, data: new Float32Array(8).fill(job.seed) } }); };
+  const port = {
+    postMessage: (job: Job) => { jobs.push(job); if (up) setTimeout(() => { answer(job); }, 0); },
+    terminate: () => undefined,
+    addEventListener: (type: string, listener: (event: unknown) => void) => { listeners.set(type, listener); },
+    removeEventListener: (type: string) => { listeners.delete(type); },
+  };
+  return { jobs, port: port as unknown as VoiceRenderPort,
+    boot: () => { up = true; listeners.get('message')?.({ data: { ready: true } }); for (const job of jobs) answer(job); },
+    fail: () => { listeners.get('error')?.({ preventDefault: () => undefined }); } };
+}
+
+test('a worker slow to boot (a cold first load) is waited for: no prewarm slice renders on the main thread past 5 s (DF8)', () => {
+  vi.useFakeTimers();
+  let mainRenders = 0;
+  const family: Family = { n: 2, ch: 1, gen: () => { mainRenders++; return new Float32Array(8); }, work: { kind: 'family', name: 'noise-white' } };
+  const slow = slowPort();
+  resetAudioWarmWorker(true, () => slow.port);
+  const f = pool();
+  try {
+    f.voices.register({ 'fixture-cold': family });
+    f.voices.prewarm(['fixture-cold']);
+    vi.advanceTimersByTime(20_000);
+    expect([mainRenders, slow.jobs.length, f.voices.warmWorker.state]).toEqual([0, 1, 'booting']);
+    slow.boot();
+    vi.advanceTimersByTime(1000);
+    expect([mainRenders, slow.jobs.length, f.voices.has('fixture-cold')]).toEqual([0, 2, true]);
+    expect(f.voices.warmWorker).toMatchObject({ on: true, state: 'ready', spawns: 1, renders: 2, reason: null });
+  } finally { f.owner.dispose(); vi.useRealTimers(); }
+});
+
+test('a worker whose script fails to load is started once more before the prewarm falls back to the main thread (DF8)', () => {
+  vi.useFakeTimers();
+  let mainRenders = 0;
+  const family: Family = { n: 2, ch: 1, gen: () => { mainRenders++; return new Float32Array(8); }, work: { kind: 'family', name: 'noise-white' } };
+  const first = slowPort(), second = slowPort(), ports = [first, second];
+  resetAudioWarmWorker(true, () => ports.shift()?.port ?? null);
+  const f = pool();
+  try {
+    f.voices.register({ 'fixture-retry': family });
+    f.voices.prewarm(['fixture-retry']);
+    vi.advanceTimersByTime(100);
+    first.fail();
+    expect([mainRenders, second.jobs.length]).toEqual([0, 1]);
+    second.boot();
+    vi.advanceTimersByTime(1000);
+    expect([mainRenders, f.voices.has('fixture-retry')]).toEqual([0, true]);
+    expect(f.voices.warmWorker).toMatchObject({ state: 'ready', spawns: 2, reason: 'worker failed' });
+  } finally { f.owner.dispose(); vi.useRealTimers(); }
+});
+
+test('a second boot failure leaves the prewarm on the main thread for the page (DF8)', () => {
+  vi.useFakeTimers();
+  let mainRenders = 0;
+  const family: Family = { n: 2, ch: 1, gen: () => { mainRenders++; return new Float32Array(8); }, work: { kind: 'family', name: 'noise-white' } };
+  const first = slowPort(), second = slowPort(), ports = [first, second];
+  resetAudioWarmWorker(true, () => ports.shift()?.port ?? null);
+  const f = pool();
+  try {
+    f.voices.register({ 'fixture-twice': family });
+    f.voices.prewarm(['fixture-twice']);
+    vi.advanceTimersByTime(100);
+    first.fail();
+    vi.advanceTimersByTime(61_000);
+    vi.advanceTimersByTime(1000);
+    expect([mainRenders, f.voices.has('fixture-twice')]).toEqual([2, true]);
+    expect(f.voices.warmWorker).toMatchObject({ state: 'off', spawns: 2, reason: 'boot timeout' });
+  } finally { f.owner.dispose(); vi.useRealTimers(); }
 });

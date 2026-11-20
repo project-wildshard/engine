@@ -16,3 +16,5 @@ self.onmessage = (event: MessageEvent<{ id: number; work: VoiceWork; sr: number;
     self.postMessage({ id, error: error instanceof Error ? error.message : String(error) }, { transfer: [] });
   }
 };
+// DF8 (mini-driftwood13f): the pool starts a job's render deadline only from here, so a slow cold script load is not a failed render
+self.postMessage({ ready: true }, { transfer: [] });

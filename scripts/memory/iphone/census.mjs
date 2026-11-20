@@ -54,6 +54,9 @@ return 'logging';
 /** In the page: the voice renders logged since VOICE_LOG_START: [family, variant, channel, page ms, render ms]. */
 export const VOICE_LOG_READ = `return window.__wsVoiceLog ?? null;`;
 
+/** In the page: the voice prewarm worker's state (on, booting/ready/off, spawns, boot ms, worker renders, drop reason), DF8. */
+export const VOICE_WORKER_READ = `return window.__wildshard?.world?.audio?.voices?.warmWorker ?? null;`;
+
 /** In the page (a WebDriver body): from now on, every frame's interval (rAF to rAF) with what the GL context did in it:
  * program links (and the new programs' names), every collider the page builds (its ms and triangles), renderer.render calls (more than one is an offscreen bake), texture uploads (count, texels), buffer bytes, triangles and geometry
  * count, and every object added to or removed from the scene graph (lights left out; removes start with '-'). DW3 (mini-driftwood13e): the dock stands still, so its frames over

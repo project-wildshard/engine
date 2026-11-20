@@ -336,9 +336,11 @@ export async function waitForControl(driver, startedAt, timeout, observe, reload
 
 /** @param {Safari} driver
  * @param {{base: string, slug: string, slots?: Record<string, unknown>, readyTimeout?: number, reloadAt?: number,
- * observe?: (state: PageState) => void}} options */
-export async function enterZone(driver, { base, slug, slots, readyTimeout = 240_000, reloadAt, observe = () => undefined }) {
+ * observe?: (state: PageState) => void, cacheOff?: boolean}} options */
+export async function enterZone(driver, { base, slug, slots, readyTimeout = 240_000, reloadAt, observe = () => undefined, cacheOff = false }) {
   const origin = await coldOrigin(driver, base, slots);
+  // DF8: a first load of a new build, as link-bench's cold runs boot (the inspector driver only)
+  if (cacheOff) { const off = Reflect.get(driver, 'cacheOff'); if (typeof off === 'function') await off(true); }
   await driver.navigate(new URL(`/slug/${encodeURIComponent(slug)}`, base).href);
   const before = /** @type {PageState} */ (await driver.evaluate(pageState));
   observe(before);
