@@ -12,16 +12,19 @@ import { EnteredEquipment } from './enteredEquipment';
 import { regionalKitOnWire } from './regionalKitWire';
 
 type Wire = Parameters<EquipmentService['bindWire']>[0];
-/** A pinned product's section index, as its folder's `has` reads it. */
-const product = (slug: string): { has: (name: string) => boolean } => {
-  const names = new Set((JSON.parse(readFileSync(`${builtFolder(slug)}/shard.json`, 'utf8')) as { sections: { name: string }[] }).sections.map(row => row.name));
-  return { has: name => names.has(name) };
+/** A pinned product's section index and bound runtime, as its folder's `has` and `shardfile` read them. */
+const product = (slug: string): Parameters<typeof regionalKitOnWire>[0] => {
+  const index = JSON.parse(readFileSync(`${builtFolder(slug)}/shard.json`, 'utf8')) as { sections: { name: string }[]; runtime: unknown };
+  const names = new Set(index.sections.map(row => row.name));
+  return { has: name => names.has(name), shardfile: { runtime: index.runtime ?? null } as Parameters<typeof regionalKitOnWire>[0]['shardfile'] };
 };
 
 test('a regional kit whose server runs its weapon takes the road\'s wire; one whose server holds none keeps its own contacts', () => {
   const dunes = product('sunscar-dunes'), brasscap = product('brasscap-mesa');
   expect(regionalKitOnWire(dunes), 'Dunes\' runtime plan holds the whip on the server').toBe(true);
   expect(regionalKitOnWire(brasscap)).toBe(false);
+  // mini-dw-play: a native-assembly cell's server swings its sword; off the wire no Driftwood crab ever took a hit on the grid
+  expect(regionalKitOnWire(product('driftwood-isle')), 'Driftwood\'s native assembly holds the sword on the server').toBe(true);
   const scope = new Scope('regional-kit-wire');
   try {
     const road = new EquipmentService(new EmptyEquipment(), { scope }), wire = { equip: () => undefined } as unknown as Wire;
