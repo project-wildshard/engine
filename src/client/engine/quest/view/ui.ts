@@ -319,11 +319,15 @@ export class DialogueBox {
   /** Lend the panel's actual clock to a reading opened by its NPC owner. */
   get readingClock():DialogueClock {return this.clock;}
 
-  open(name: string, lines: string[], onDone: () => void, choices: readonly DialogueChoice[] = []): void {
+  open(name: string, lines: string[], onDone: () => void, choices: readonly DialogueChoice[] = [], presentation?: 'readout'): void {
     if (lines.length === 0) { onDone(); return; }
     this.name.textContent = name;
     this.setChoices(choices);
-    this.clock.open(this.paged(lines)); this.finish_ = onDone; this.layer?.dispose();
+    const readout = presentation === 'readout';
+    this.root.classList.toggle('readout', readout);
+    this.clock.open(readout ? [lines.join('\n')] : this.paged(lines));
+    if (readout && this.clock.line.length > 0) this.clock.advance();
+    this.finish_ = onDone; this.layer?.dispose();
     this.layer = app.ui.push('modal', { root: this.root, presentation: 'world', order: -42, yieldsToMenu: true, back: () => { this.close(false); } }, this.scope); this.openT = app.clock.real * 1000;
     this.root.classList.add('show');
     this.render();

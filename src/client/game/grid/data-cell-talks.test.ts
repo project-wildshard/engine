@@ -27,8 +27,11 @@ const source = { targets: { panels: [], interactions: [door], talks: [talk, name
 
 class Box implements TalkBox {
   shown: { lines: string[]; choices: readonly DialogueChoice[] } | null = null;
+  presentation: 'readout' | undefined;
   get isOpen(): boolean { return this.shown !== null; }
-  open(_name: string, lines: string[], _done: () => void, choices: readonly DialogueChoice[] = []): void { this.shown = { lines, choices }; }
+  open(_name: string, lines: string[], _done: () => void, choices: readonly DialogueChoice[] = [], presentation?: 'readout'): void {
+    this.shown = { lines, choices }; this.presentation = presentation;
+  }
   close(): void { this.shown = null; }
   update(): void { /* shown whole */ }
   offer(choices: readonly DialogueChoice[]): void { if (this.shown !== null) this.shown = { ...this.shown, choices }; }
@@ -71,6 +74,32 @@ test('a copy with talks joins them to its prompts for the stay, on the cell serv
   expect(box.isOpen).toBe(false);
   scope.dispose();
   expect(prompts.map((row) => row.label)).toEqual([door.label]); // the stay is over: only the copy's own prompts remain
+});
+
+test('the race board reads each declared best for the visiting player when opened', () => {
+  const ids = ['arches', 'rim', 'slalom', 'canyon'];
+  const races = ids.map(id => ({ id, start: `${id}.go`, stop: `${id}.end`, fact: id, cap: 120 }));
+  const binding = (id: string): string => `${id} · {{race:${id}.best}}`;
+  const first = dialogue.nodes[0];
+  if (first === undefined) throw new Error('Missing test talk node');
+  const board = { ...dialogue, nodes: [{ ...first, lines: [...ids.map(binding), binding('foreign')], choices: [] }] };
+  const world = { ...source, targets: { ...source.targets, talks: [talk] }, quests: { ...source.quests, dialogue: [board], races } };
+  const lines = new Map([[talkLine(board.id), 1], ['race:foreign.best', 900]]);
+  const line = vi.spyOn(wirePage, 'line').mockImplementation(name => lines.get(name) ?? 0);
+  const prompts: Interactable[] = [], systems: SystemSpec[] = [], box = new Box(), scope = new Scope('grid.race-board');
+  installPlay(world, cellPlayPort(scope, () => true, { prompts, system: spec => { systems.push(spec); }, views: { talkBox: () => box } }), PLAY_INSTALLS.filter(entry => entry.id === 'talks'));
+  prompts[0]?.onInteract();
+  expect(box.presentation).toBe('readout');
+  expect(box.shown?.lines).toEqual([...ids, 'foreign'].map(id => `${id} · --:--`));
+  expect(line).not.toHaveBeenCalledWith('race:foreign.best');
+  box.close();
+  lines.set('race:arches.best', 65_450);
+  lines.set('race:arches.last', 79_100);
+  // A frame sees the prior box close before the player reads the board again.
+  for (const spec of systems) spec.run(1 / 60, 0);
+  prompts[0]?.onInteract();
+  expect(box.shown?.lines).toEqual(['arches · 1:05.4', 'rim · --:--', 'slalom · --:--', 'canyon · --:--', 'foreign · --:--']);
+  scope.dispose();
 });
 
 test('a cell\'s figure-less talks stand in its render root once each; a named figure is the cell\'s own', () => {

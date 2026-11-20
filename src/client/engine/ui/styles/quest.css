@@ -87,6 +87,7 @@
 .ws-quest-talk::before { content: ''; position: absolute; left: -1px; top: -1px; width: 18px; height: 18px; border-left: 1px solid var(--ws-cyan); border-top: 1px solid var(--ws-cyan); }
 .ws-quest-talk-name { font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-cyan); margin-bottom: 6px; }
 .ws-quest-talk-text { font-family: var(--ws-display); font-weight: 500; font-size: 18px; line-height: 1.3; color: var(--ws-text); min-height: 2.6em; }
+.ws-quest-talk.readout .ws-quest-talk-text { white-space: pre-line; }
 .ws-quest-talk-foot { display: flex; justify-content: space-between; margin-top: 8px; font-family: var(--ws-mono); font-size: 9px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); }
 .ws-quest-talk-foot b { color: var(--ws-cyan); font-weight: 400; }
 #hud.touch .ws-quest-talk-foot b { padding: 4px 10px; margin: -4px -6px -4px 0; border: 1px solid var(--ws-cyan-line); background: rgba(143, 227, 255, 0.08); }

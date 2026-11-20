@@ -9,11 +9,12 @@ import type { Interactable } from '@wildshard/engine/world/interact/types';
 import { test } from '@wildshard/engine/world/interact/flags';
 import type { DialogueChoice } from '@wildshard/engine/quest/view/ui';
 import { TALK_HEIGHT, talkChoice, talkFinish, talkLine, talkNode, talkStart, type TalkRow } from '../../../shared/game/shardfile/talks';
+import { raceTime } from './raceClock';
 
 /** The dialogue box a talk opens: the HUD's, or a test's. */
 export interface TalkBox {
   readonly isOpen: boolean;
-  open: (name: string, lines: string[], onDone: () => void, choices?: readonly DialogueChoice[]) => void;
+  open: (name: string, lines: string[], onDone: () => void, choices?: readonly DialogueChoice[], presentation?: 'readout') => void;
   close: (finished?: boolean) => void;
   update: (dt: number) => void;
   /** Replace the open node's choices, its lines kept. */
@@ -59,10 +60,13 @@ export function talkStandIns(source: Pick<Shardfile, 'targets'>, root: Object3D,
 
 /** How long an answer waits for the server's next node before the page stops waiting (a refused answer moves nothing). */
 const ANSWER_WAIT = 3;
+/** MSZ26b: a race's best may be shown inline, using the admitting player's owned milliseconds. */
+const RACE_BEST = /\{\{race:([^{}]+)\.best\}\}/gu;
 
 /** Install every talk a shard declares; the returned talks are what a proof reads. */
 export function installDeclaredTalks(source: Pick<Shardfile, 'targets' | 'quests'>, ports: TalkPorts): { readonly id: string; readonly prompt: Interactable; readonly node: () => string | null | undefined }[] {
   const talks = source.targets.talks ?? [];
+  const races = new Set(source.quests.races?.map(race => race.id));
   type Tree = Shardfile['quests']['dialogue'][number];
   type Node = Tree['nodes'][number];
   interface Open { readonly talk: TalkRow; readonly index: number; readonly tree: Tree; readonly node: Node; shown: string }
@@ -79,9 +83,14 @@ export function installDeclaredTalks(source: Pick<Shardfile, 'targets' | 'quests
   } }));
   const show = (talk: TalkRow, index: number, tree: Tree, node: Node): void => {
     const choices = choicesOf(index, tree, node, talk);
+    const lines = node.lines.map(line => line.replaceAll(RACE_BEST, (_binding: string, id: string) => {
+      const best = races.has(id) ? ports.line(`race:${id}.best`) : 0;
+      return best > 0 ? raceTime(best / 1000) : '--:--';
+    }));
+    const readout = lines.some((line, at) => line !== node.lines[at]);
     open = { talk, index, tree, node, shown: offered(node).map(choice => choice.id).join('\n') };
     // A node with no choices at all ends the talk once read; one whose choices all wait on a flag just closes, and stays.
-    ports.box().open(tree.name, [...node.lines], () => { open = null; if (node.choices.length === 0) ports.send(talkFinish(index)); }, choices);
+    ports.box().open(tree.name, lines, () => { open = null; if (node.choices.length === 0) ports.send(talkFinish(index)); }, choices, readout ? 'readout' : undefined);
   };
   const installed = talks.map((talk, index) => {
     const tree = source.quests.dialogue.find(row => row.id === talk.dialogue);
