@@ -48,3 +48,12 @@
   comes back after the hold, or into a fresh room, stands there. On foot the doc keeps their own place.
 - Still owed on the row: unlocked kinds and colours and the last kind picked at a dock, in the player's `SaveStore`, and the
   unlock-reconnect save test.
+
+## MSZ19, second half: what a player keeps of vehicles
+
+- A `vehicles` slot in the player's shard document (`vehicleGarageSave`, admitted by `validPlayerStore`) keeps the kinds and
+  colours unlocked and the last kind picked, through `VehicleGarage` (`PlayerOwned.garage`). Nothing unlocks yet: the garage
+  (MSZ26) and quest grants will call `unlock` and `unlockColour`. Call made with Jake away: taking any driver's seat is the
+  pick (`VehicleRuntime.picked`, heard in `cellWorld`), since a dock names one kind until the garage offers a choice.
+- `test/dedicated-vehicle-save.test.ts`: a bot boards, is given a kind and a colour, drops while driving 20 m off, and comes
+  back over a new socket on foot within 4 m of the dock with all of it kept.

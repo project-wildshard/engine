@@ -141,6 +141,8 @@ export class VehicleRuntime {
   /** MSZ14: each wrecked vehicle's id, its dock, and the s left before the dock has it back. */
   private readonly wrecked = new Map<string, { readonly dock: VehicleDock; left: number }>();
   private lastWrecks: VehicleWreckEvent[] = [];
+  /** MSZ19: hears each player who takes a driver's seat, with the kind: the kind they last picked, which their save keeps. */
+  readonly picked: ((player: string, kind: string) => void)[] = [];
   constructor(vehicles: Vehicles, ports: VehicleRuntimePorts) {
     this.ports = ports;
     this.kinds = new Map(vehicles.kinds.map(kind => [kind.id, kind]));
@@ -208,7 +210,8 @@ export class VehicleRuntime {
     const index = seat ?? vehicle.seats.findIndex((rider, at) => rider === null && (vehicle.kind.seats[at]?.role !== 'driver' || vehicle.owner === null || vehicle.owner === player));
     const row = vehicle.kind.seats[index];
     if (row === undefined || vehicle.seats[index] !== null || (row.role === 'driver' && vehicle.owner !== null && vehicle.owner !== player)) return false;
-    vehicle.seats[index] = player; if (row.role === 'driver') vehicle.idle = 0;
+    vehicle.seats[index] = player;
+    if (row.role === 'driver') { vehicle.idle = 0; for (const heard of this.picked) heard(player, vehicle.kind.id); }
     return true;
   }
   /** A player gets out (the leave press, a gate): set down at the seat's leave point, or the nearest clear ground. */

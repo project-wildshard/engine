@@ -16,6 +16,7 @@ import { carryRefusedSave, importPageProgress } from '@wildshard/engine/game/gri
 import { regionalRuntimeCheckpoint } from '@wildshard/engine/game/grid/runtimeCheckpoint';
 import type { GridResident } from '@wildshard/engine/game/grid/simulation';
 import { bindShardfileSim, createShardfileSim, type ShardfileSimPorts, type ShardfileSimulation } from '@wildshard/engine/game/plugin/simulation';
+import { hostVehicles } from '@wildshard/engine/game/plugin/vehicleRuntime';
 import { installRoomRespawn } from '@wildshard/engine/game/roomRespawn';
 import { hasNativeAssembly } from '@wildshard/engine/game/shardfile/nativeAssembly';
 import { installDeclaredClimate } from '@wildshard/engine/game/shardfile/declaredClimate';
@@ -151,7 +152,10 @@ function bindDiscovery(host: SimHost, places: readonly { readonly id: string; re
 /** What each player holds in a cell. A shard with goods sells them here. */
 function ownedOf(host: SimHost, input: HeadlessRuntimeInput, stores: OwnedStores | undefined, profiles?: CreatureRewardStore, shard: string = input.shard.identity.slug): OwnedBook {
   const economy = input.shard.rows.loot.find(row => row.economy !== undefined)?.economy, sold = economy !== undefined && 'exchange' in economy ? economy.exchange : undefined;
-  return installPlayerOwned(host, shard, sold ?? null, !shardRows(host).owned.has(QUEST_OWNED), stores, input.shard, profiles);
+  const book = installPlayerOwned(host, shard, sold ?? null, !shardRows(host).owned.has(QUEST_OWNED), stores, input.shard, profiles);
+  // MSZ19: the kind a player takes the wheel of is the one their save says they last picked
+  hostVehicles(host)?.picked.push((player, kind) => { book.of(player).garage.pick(kind); });
+  return book;
 }
 
 /** The radius a data cell's place takes when its manifest POI names none. */

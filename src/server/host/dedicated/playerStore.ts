@@ -21,7 +21,7 @@ export function validPlayerStore(seed: Readonly<Record<string, string>>, shard?:
       const document = v.parse(StoredDocument, JSON.parse(text));
       if (['device', 'session', 'global'].includes(namespace)) { if (Object.keys(document.keys).length > 0) return false; normalized[`${prefix}${namespace}`] = text; continue; }
       if (!profile && (!/^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(namespace) || (shard !== undefined && namespace !== shard))) return false;
-      const allowed = profile ? ['platform.ledger'] : ['purse', 'inventory', 'owned', 'creature-rewards'];
+      const allowed = profile ? ['platform.ledger'] : ['purse', 'inventory', 'owned', 'creature-rewards', 'vehicles'];
       if (Object.keys(document.keys).some(key => !allowed.includes(key)) || normalized[`${prefix}${namespace}`] !== undefined) return false;
       normalized[`${prefix}${namespace}`] = text;
       if (!profile) namespaces.add(namespace);

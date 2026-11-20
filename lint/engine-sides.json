@@ -1878,6 +1878,7 @@
     "src/shared/game/loot/platformCatalogue.ts": "shared",
     "src/shared/game/loot/Purse.ts": "shared",
     "src/shared/game/loot/tableRows.ts": "shared",
+    "src/shared/game/loot/vehicleGarage.ts": "shared",
     "src/shared/game/newGame.ts": "shared",
     "src/shared/game/plugin/animation.ts": "shared",
     "src/shared/game/plugin/bodyBoss.ts": "shared",

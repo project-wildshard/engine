@@ -11,10 +11,11 @@ import { heldAmmunition } from '../loadout/nativeAmmunition';
 import { Exchange } from '../../../shared/game/loot/exchange';
 import { isCosmetic, isOwnedId, Owned } from '../../../shared/game/loot/Owned';
 import { Purse } from '../../../shared/game/loot/Purse';
+import { VehicleGarage } from '../../../shared/game/loot/vehicleGarage';
 import { installOwnedEffects } from '../loadout/ownedEffects';
 import { installKeepsakeProgression } from './keepsakeProgression';
 import { OWNED_ROW, WORN_LINE } from '../../../shared/game/loot/ownedRows';
-import { inventorySave, ownedSave, purseSave, skinSave, compendiumSave, finishPickupSave, saveSlug, CreatureRewardSchema, creatureRewardSave, type CreatureRewardState } from '../../../shared/game/saves';
+import { inventorySave, ownedSave, purseSave, vehicleGarageSave, skinSave, compendiumSave, finishPickupSave, saveSlug, CreatureRewardSchema, creatureRewardSave, type CreatureRewardState } from '../../../shared/game/saves';
 
 /**
  * Creature rewards are persistent player data, independent of a world continuation. E7 supplies this from each
@@ -47,8 +48,10 @@ export interface OwnedSlots {
   readonly purse: Pick<typeof purseSave, 'read' | 'write'>;
   readonly owned: Pick<typeof ownedSave, 'read' | 'write'>;
   readonly inventory: Pick<typeof inventorySave, 'read' | 'write'>;
+  /** MSZ19: their vehicle kinds, colours and last pick; the page's own save without one. */
+  readonly vehicles?: Pick<typeof vehicleGarageSave, 'read' | 'write'>;
 }
-const SESSION_SLOTS: OwnedSlots = { purse: purseSave, owned: ownedSave, inventory: inventorySave };
+const SESSION_SLOTS: OwnedSlots = { purse: purseSave, owned: ownedSave, inventory: inventorySave, vehicles: vehicleGarageSave };
 /** Each player's slots, where players keep their own (E7.4): */
 export type OwnedStores = (player: string) => OwnedSlots;
 
@@ -59,6 +62,8 @@ export type OwnedStores = (player: string) => OwnedSlots;
  */
 export class PlayerOwned {
   readonly purse: Purse; readonly owned: Owned;
+  /** MSZ19: the vehicle kinds and colours they unlocked and the kind they last picked at a dock. */
+  readonly garage: VehicleGarage;
   private readonly slot: string;
   private readonly counts: Record<string, number>;
   private readonly order: string[];
@@ -67,7 +72,7 @@ export class PlayerOwned {
   private readonly purchases = new Map<number, number>();
   private readonly inventory: OwnedSlots['inventory'];
   constructor(readonly shard: string, slots: OwnedSlots = SESSION_SLOTS, finishes: readonly string[] = []) {
-    this.purse = new Purse(shard, slots.purse); this.owned = new Owned(shard, slots.owned); this.slot = saveSlug(shard); this.inventory = slots.inventory;
+    this.purse = new Purse(shard, slots.purse); this.owned = new Owned(shard, slots.owned); this.garage = new VehicleGarage(shard, slots.vehicles ?? vehicleGarageSave); this.slot = saveSlug(shard); this.inventory = slots.inventory;
     const saved = slots.inventory.read(this.slot);
     this.counts = { ...saved.counts }; this.order = [...saved.order];
     for (const id of finishes) this.finishIds.add(id);

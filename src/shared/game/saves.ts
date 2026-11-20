@@ -13,6 +13,11 @@ export const purseSave: SaveSlot<number> = saves.define(purseKey);
 const OwnedSchema = v.object({ owned: strings, worn: strings });
 const ownedKey: SaveKeyDef<{ owned: string[]; worn: string[]; }> = { key: 'owned', scope: 'shard', version: 1, schema: OwnedSchema, initial: () => ({ owned: [], worn: [] }) };
 export const ownedSave: SaveSlot<{ owned: string[]; worn: string[]; }> = saves.define(ownedKey);
+/** MIRROR-SALT-ZONE MSZ19: a player's vehicles on one shard. A vehicle itself is never saved (a dock makes it): the kinds and
+ *  colours a player has unlocked, colours by kind id, and the kind they last picked at a dock. */
+export interface VehicleGarageState { kinds: string[]; colours: Record<string, string[]>; last: string | null }
+const vehicleGarageKey: SaveKeyDef<VehicleGarageState> = { key: 'vehicles', scope: 'shard', version: 1, schema: v.object({ kinds: strings, colours: v.record(v.string(), strings), last: v.nullable(v.string()) }), initial: () => ({ kinds: [], colours: {}, last: null }) };
+export const vehicleGarageSave: SaveSlot<VehicleGarageState> = saves.define(vehicleGarageKey);
 export const bountySave: SaveSlot<Record<string, number>> = define('bounty', numbers, () => ({}));
 export const compendiumSave: SaveSlot<Record<string, { s: number; n: number; t: number; b: number; }>> = define('compendium', v.record(v.string(), v.object({ s: finite, n: finite, t: finite, b: finite })), () => ({}));
 export const bossesSave: SaveSlot<Record<string, { defeated: boolean; rewardTaken: boolean; kills: number; }>> = define('bosses', v.record(v.string(), v.object({ defeated: v.boolean(), rewardTaken: v.boolean(), kills: finite })), () => ({}));
@@ -40,8 +45,8 @@ const creatureRewardsKey: SaveKeyDef<{ legacyOwner: string | null; players: Reco
 export const creatureRewardSave: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> = saves.define(creatureRewardsKey);
 
 /** What a player holds in their own store, including authoritative creature rewards. */
-export function playerSlots(store: SaveStore): { purse: SaveSlot<number>; inventory: SaveSlot<{ counts: Record<string, number>; order: string[]; }>; owned: SaveSlot<{ owned: string[]; worn: string[]; }>; rewards: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }> } {
-  return { purse: store.define(purseKey), inventory: store.define(inventoryKey), owned: store.define(ownedKey), rewards: store.define(creatureRewardsKey) };
+export function playerSlots(store: SaveStore): { purse: SaveSlot<number>; inventory: SaveSlot<{ counts: Record<string, number>; order: string[]; }>; owned: SaveSlot<{ owned: string[]; worn: string[]; }>; rewards: SaveSlot<{ legacyOwner: string | null; players: Record<string, CreatureRewardState> }>; vehicles: SaveSlot<VehicleGarageState> } {
+  return { purse: store.define(purseKey), inventory: store.define(inventoryKey), owned: store.define(ownedKey), rewards: store.define(creatureRewardsKey), vehicles: store.define(vehicleGarageKey) };
 }
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
