@@ -16,22 +16,23 @@ export function observePasses(composer, renderer) {
     rows.push(row);
     const original = owner.render;
     /** @type {(this:typeof owner, ...args:unknown[])=>void} */
-    const timed = function (...args) {
-      if (!active) return original.apply(this, args);
+    const timedPass = function timedPass(...args) {
+      if (!active) { original.apply(this, args); return; }
       const before = performance.now(), children = elapsed;
-      try { return original.apply(this, args); }
+      try { original.apply(this, args); }
       finally {
         const ms = performance.now() - before;
         row.current += Math.max(0, ms - (elapsed - children));
         elapsed = children + ms;
       }
     };
-    owner.render = timed;
+    owner.render = timedPass;
     undo.push(() => { owner.render = original; });
   };
   for (const [index, pass] of composer.passes.entries()) {
     const effects = pass.effects?.map(effect => effect.name).join('+');
-    attach(pass, String(index + 1) + ' ' + (effects || pass.name || 'unnamed pass'));
+    const name = effects === undefined || effects === '' ? pass.name ?? 'unnamed pass' : effects;
+    attach(pass, `${index + 1} ${name}`);
   }
   attach(renderer.shadowMap, 'shadows');
   const render = composer.render;
@@ -41,10 +42,10 @@ export function observePasses(composer, renderer) {
   const total = [];
   const start = performance.now();
   /** @type {(this:typeof composer, ...args:unknown[])=>void} */
-  const timed = function (...args) {
+  const timedComposer = function timedComposer(...args) {
     elapsed = 0; active = true;
     const frameStart = performance.now();
-    try { return render.apply(this, args); }
+    try { render.apply(this, args); }
     finally {
       const ms = performance.now() - frameStart;
       active = false;
@@ -56,7 +57,7 @@ export function observePasses(composer, renderer) {
       for (const row of rows) { row.frames.push(row.current); row.current = 0; }
     }
   };
-  composer.render = timed;
+  composer.render = timedComposer;
   /** @param {number[]} frames */
   const summary = frames => {
     frames.sort((a, b) => a - b);
@@ -66,6 +67,8 @@ export function observePasses(composer, renderer) {
   return () => {
     composer.render = render;
     for (const close of undo) close();
-    return { total: summary(total), passes: rows.map(row => ({ name: row.name, ...summary(row.frames) })), slow };
+    const passes = [];
+    for (const row of rows) passes.push({ name: row.name, ...summary(row.frames) });
+    return { total: summary(total), passes, slow };
   };
 }
