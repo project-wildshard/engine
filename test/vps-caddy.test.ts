@@ -84,7 +84,7 @@ test('ZONE-SELECT-SERVED ZS14: both sites pass exactly GET /zone-select and POST
     expect(block, host).toContain('\t@zone_select_enter {\n\t\tmethod POST OPTIONS\n\t\tpath /zone-select/enter\n\t}\n');
     const start = block.indexOf('\thandle @zone_select_enter {\n');
     const body = block.slice(start, block.indexOf('\n\t}\n', start) + 3);
-    expect(body, 'another site\'s page is refused first').toMatch(/^\thandle @zone_select_enter \{\n\t\trespond @foreign 403\n\t\theader Cache-Control no-store\n/u);
+    expect(body, 'another site\'s page is refused first').toMatch(/^\thandle @zone_select_enter \{\n\t\trespond @foreign 403\n\t\theader >Cache-Control no-store\n/u);
     expect(body).toContain(`reverse_proxy 127.0.0.1:${String(port)} {`);
     expect(block.match(/path \/zone-select\S*/gu), 'no wildcard under /zone-select').toEqual(['path /zone-select', 'path /zone-select/enter']);
   }

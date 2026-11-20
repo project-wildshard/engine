@@ -80,7 +80,7 @@ https://$host {
 	}
 	handle @zone_select_enter {
 		respond @foreign 403
-		header Cache-Control no-store
+		header >Cache-Control no-store
 		reverse_proxy 127.0.0.1:$port {
 			header_up X-Forwarded-For {client_ip}
 			header_up -CF-Connecting-IP
