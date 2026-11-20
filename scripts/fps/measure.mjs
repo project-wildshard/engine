@@ -4,6 +4,7 @@ import { developerSettings, harnessPins, saveFixture, NAME_ASKED } from '../debu
 import { loadingCardIndex } from '../loading-benchmark/catalogue.mjs';
 import { legSummary, routeLegOnPage } from '../memory/iphone/route.mjs';
 import { fpsVerdict } from './verdict.mjs';
+import { observePasses } from './passes.mjs';
 
 /** @typedef {{browser:'webkit'|'chromium', cpu:number, graphics:'low'|'high', tier:'phone'|'desktop',
  * width:number, height:number, dpr:1|2|3, cap:30|60|null, floor:number}} Profile */
@@ -53,13 +54,14 @@ function observeMetal(composer, gl) {
 }
 
 /** Attach the first measurement before the boot can give control to the player.
- * @param {RouteLeg[]} route @param {Profile} profile @param {RouteLeg[]} approach */
-function routeScript(route, profile, approach) {
+ * @param {RouteLeg[]} route @param {Profile} profile @param {RouteLeg[]} approach @param {boolean} passBreakdown */
+export function routeScript(route, profile, approach, passBreakdown) {
   const cap = profile.cap ?? (profile.tier === 'phone' ? 0 : null);
   return `(() => {
     const runLeg = (${routeLegOnPage.toString()});
     const route = ${JSON.stringify(route)}, approach = ${JSON.stringify(approach)};
     const observeMetal = (${observeMetal.toString()});
+    const observePasses = ${passBreakdown ? `(${observePasses.toString()})` : 'null'};
     document.addEventListener('ws:control-ready', () => {
       window.__dfRoute = (async () => {
         const game = window.__wildshard.world.game, renderer = game.renderer;
@@ -75,10 +77,11 @@ function routeScript(route, profile, approach) {
         }
         for (const leg of route) {
           const startPrograms = renderer.info.programs?.length ?? null;
-          const stopMetal = observeMetal(game.composer, gl);
-          const result = await runLeg({...leg, cap: ${JSON.stringify(cap)}});
-          const metal = stopMetal();
-          legs.push({ name: leg.name, ...result, metal, startPrograms });
+          const stop = observePasses === null ? observeMetal(game.composer, gl) : observePasses(game.composer, renderer);
+          let measured, result;
+          try { result = await runLeg({...leg, cap: ${JSON.stringify(cap)}}); }
+          finally { measured = stop(); }
+          legs.push({ name: leg.name, ...result, ...(observePasses === null ? { metal: measured } : { passBreakdown: measured }), startPrograms });
           if (result.error) break;
         }
         return { witness, legs };
@@ -127,9 +130,12 @@ async function enterGrid(page, base, zone) {
 }
 
 /** @param {import('playwright').BrowserContext} context @param {Profile} profile
- * @param {{base:string, zone:string, route:RouteLeg[], approach?:RouteLeg[], signal:AbortSignal}} options */
-async function capture(context, profile, { base, zone, route, approach = [], signal }) {
+ * @param {{base:string, zone:string, route:RouteLeg[], approach?:RouteLeg[], passBreakdown?:boolean, signal:AbortSignal}} options */
+async function capture(context, profile, { base, zone, route, approach = [], passBreakdown = false, signal }) {
   const page = await context.newPage();
+  /** @type {string[]} */
+  const faults = [];
+  page.on('pageerror', error => { if (faults.length < 8) faults.push(error.message.slice(0, 400)); });
   const stop = () => { void page.close().catch(() => undefined); };
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(240_000)]);
   deadline.addEventListener('abort', stop, { once: true });
@@ -139,7 +145,7 @@ async function capture(context, profile, { base, zone, route, approach = [], sig
       const cdp = await context.newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: profile.cpu });
     }
-    await page.addInitScript({ content: routeScript(route, profile, approach) });
+    await page.addInitScript({ content: routeScript(route, profile, approach, passBreakdown) });
     const version = await page.request.get(new URL('/version.json', base).href, {timeout:10_000}).then(response => response.json());
     await enterGrid(page, base, zone);
     await page.waitForFunction('window.__dfRoute !== undefined', undefined, { timeout: 90_000 });
@@ -153,7 +159,13 @@ async function capture(context, profile, { base, zone, route, approach = [], sig
       raw.witness.build !== version.build ? 'game build differs from version.json' : null);
     return { version, ...raw, ...check, costs, ...(error === null ? {} : { verdict: 'incomplete', error }) };
   } catch (error) {
-    return { ...fpsVerdict([], route, profile.floor), error: deadline.aborted ? String(deadline.reason) : String(error) };
+    const boot = await page.evaluate(() => ({
+      path: location.pathname,
+      loading: document.querySelector('.ws-load')?.textContent?.trim().slice(0, 600) ?? null,
+      title: document.querySelector('.ws-main-select') !== null,
+      routeStarted: Object.hasOwn(window, '__dfRoute'),
+    })).catch(() => null);
+    return { ...fpsVerdict([], route, profile.floor), boot, faults, error: deadline.aborted ? String(deadline.reason) : String(error) };
   } finally {
     deadline.removeEventListener('abort', stop);
     await page.close().catch(() => undefined);
@@ -161,7 +173,7 @@ async function capture(context, profile, { base, zone, route, approach = [], sig
 }
 
 /** One cold capture per fresh browser context. Its optional warm repeat keeps the actual HTTP and SW caches.
- * @param {Profile} profile @param {{base:string,zone:string,route:RouteLeg[],approach?:RouteLeg[],signal:AbortSignal,warm?:boolean}} options */
+ * @param {Profile} profile @param {{base:string,zone:string,route:RouteLeg[],approach?:RouteLeg[],passBreakdown?:boolean,signal:AbortSignal,warm?:boolean}} options */
 export async function measureFps(profile, options) {
   const browser = await openProfile(profile);
   try {

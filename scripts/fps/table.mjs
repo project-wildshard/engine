@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // DF6 / J464. One browser at a time on the mini.
 // node scripts/fps/table.mjs --zone driftwood-isle [--profiles NAME,...] [--runs 3] [--base ORIGIN]
-// --dock-only --cold-only is a short diagnostic. The full matrix includes both desktop sizes and a warm repeat.
+// --dock-only --cold-only is a short diagnostic. Add --pass-breakdown for CPU submit by pass.
+// The full matrix includes both desktop sizes and a warm repeat.
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { once } from 'node:events';
@@ -40,7 +41,7 @@ const keys = Object.keys(profiles);
 const choices = parseArgs({ options: {
   zone: { type:'string', default:'driftwood-isle' }, profiles:{ type:'string', default:keys.join(',') },
   runs:{ type:'string', default:'3' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
-  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' },
+  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' },
 } }).values;
 
 function gpuBusy() {
@@ -75,7 +76,7 @@ function table(runs) {
 
 /** @typedef {import('../memory/iphone/route.mjs').RouteLeg} RouteLeg */
 /** @typedef {{profile:ProfileSpec & {cpu:number, floor:number}, base:string, zone:string, build:string,
- * fingerprint:string, output:string, id:string, interval:RouteLeg, approach:RouteLeg[], warm:boolean}} Job */
+ * fingerprint:string, output:string, id:string, interval:RouteLeg, approach:RouteLeg[], warm:boolean, passBreakdown?:boolean}} Job */
 
 /** @param {Job} job */
 async function worker(job) {
@@ -89,7 +90,7 @@ async function worker(job) {
   try {
     const {measureFps} = await import('./measure.mjs');
     const report = await measureFps(job.profile, {base:job.base, zone:job.zone, route:[job.interval],
-      approach:job.approach, signal:AbortSignal.any([stop.signal, AbortSignal.timeout(240_000)]), warm:job.warm});
+      approach:job.approach, passBreakdown:job.passBreakdown===true, signal:AbortSignal.any([stop.signal, AbortSignal.timeout(240_000)]), warm:job.warm});
     if (stop.signal.aborted) return 3;
     atomicJson(job.output, {fingerprint:job.fingerprint, id:job.id, report});
     if (readCell(job.output, job.fingerprint, job.build, { ...job, floor:job.profile.floor }) !== null) return 0;
@@ -123,6 +124,10 @@ async function main() {
   const zone = choices.zone;
   if (zone !== 'driftwood-isle') throw new Error('DF2 defines a route for driftwood-isle');
   const selected = choices.profiles.split(',');
+  const passBreakdown = choices['pass-breakdown'] === true;
+  if (passBreakdown && (!choices['dock-only'] || !choices['cold-only'] || selected.some(name => !name.startsWith('desktop-')))) {
+    throw new Error('Pass breakdown needs desktop profiles with --dock-only --cold-only');
+  }
   const count = Number(choices.runs);
   if (!Number.isSafeInteger(count)||count<1||new Set(selected).size!==selected.length||selected.some(p=>!keys.includes(p)))
     throw new Error('Use a positive run count and a unique list of known profiles');
@@ -144,9 +149,9 @@ async function main() {
   const version = await agentFetch(new URL('/version.json',base),{signal:AbortSignal.timeout(10_000)});
   const {build} = await version.json();
   if (!version.ok || typeof build !== 'string' || build === '') throw new Error('The served build could not be pinned');
-  const source = ['fps/table.mjs','fps/matrix.mjs','fps/measure.mjs','fps/verdict.mjs','memory/iphone/route.mjs']
+  const source = ['fps/table.mjs','fps/matrix.mjs','fps/measure.mjs',...(passBreakdown?['fps/passes.mjs']:[]),'fps/verdict.mjs','memory/iphone/route.mjs']
     .map(file => readFileSync(join(root,'scripts',file),'utf8'));
-  const config = {build,host,base,zone,count,plan,route,warm:!choices['cold-only'],method:signature(source)};
+  const config = {build,host,base,zone,count,plan,route,warm:!choices['cold-only'],...(passBreakdown?{passBreakdown}:{}),method:signature(source)};
   const fingerprint = signature(config);
   const out = resolve(choices.out ?? join(root,'tmp/driftwood-fps',fingerprint.slice(0,16)));
   mkdirSync(out,{recursive:true}); mkdirSync(resolve(lock,'..'),{recursive:true});
@@ -163,7 +168,7 @@ async function main() {
     const id = `${run.i+1}-${run.rep}-${j+1}`;
     // Get to the same starting waypoint on foot. Sample only the assigned leg.
     const approach = route.slice(0,j).filter(leg => leg.kind === 'walk').map(({dwell:_dwell,...leg}) => leg);
-    return { id, interval, approach, profile:run.profile, floor:run.profile.floor, warm:run.warm,
+    return { id, interval, approach, profile:run.profile, floor:run.profile.floor, warm:run.warm, passBreakdown,
       output:cellPath(out,id), build, base, zone, fingerprint };
   }));
   try {
