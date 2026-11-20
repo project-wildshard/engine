@@ -5,6 +5,8 @@ import { ownedSave } from '../../../shared/game/saves';
 import type { GridSession as DeclarationGridSession } from '../grid/session';
 import { exitSessionToTitle } from './exitToTitle';
 import { initialHomeMetadataRequired } from '../grid/homeMetadata';
+import { DEVSERVER } from '../grid/menu';
+import { devCookedMap } from '../boot/placedSpawn';
 import { enterZone } from '../grid/pageEntry';
 import { timeClientPreparation } from '../shardfile/preparationTiming';
 import type { Physics } from '@wildshard/engine/physics/Physics';
@@ -662,6 +664,12 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     game.levelScope.onDispose(gridCells.onEnter(() => { budget.crossed(); }));
     game.levelScope.onDispose(app.debug.scopedExpose('gridBudget', budget));
     game.levelScope.onDispose(app.debug.scopedExpose('gridHud', { state: gridHud, minimap: () => { const o = blend(); return { baseAlpha: o.baseAlpha ?? 1, images: o.images.map((m) => ({ x: m.x, z: m.z, alpha: m.alpha })), labels: o.labels.map((l) => l.text) }; } }));
+  } else if (DEVSERVER) {
+    const authorMap = devCookedMap(manifest.slug, 'full', (globalThis as { __WS_DEV_COOKED_MAP__?: unknown }).__WS_DEV_COOKED_MAP__);
+    if (authorMap !== undefined) {
+      const { installAuthorMap } = await import('../grid/minimapBlend');
+      if (!game.levelScope.disposed) installAuthorMap(minimap, fullMap, game.levelScope, authorMap);
+    }
   }
   // ?explore=hub|world|model|sets[&cam=x,y,z,yaw,pitch][&model=id] — straight into the viewer (a shard with ShardManifest.explore — D4, E66; a note's "go there")
   let startExplore: (() => void) | undefined;

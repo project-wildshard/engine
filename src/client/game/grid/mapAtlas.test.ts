@@ -4,11 +4,33 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { loadGridMapAtlas } from './mapAtlas';
 import { GridAssembly } from '../../../shared/game/grid/assembly';
-import { CellMinimaps, fullMapOverlay, minimapOverlay } from './minimapBlend';
+import { CellMinimaps, fullMapOverlay, installAuthorMap, minimapOverlay } from './minimapBlend';
+import type { MapExtras } from '@wildshard/engine/ui/Minimap';
 import { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 
 const spec = { url: '/atlas.webp', compressed: 99, width: 512, height: 256, tileSize: 256, slugs: ['a', 'b'] };
+test('a standalone author page shares one cook tile between the minimap and Bag map', async () => {
+  const scope = new Scope('author-map');
+  const bitmap = { width: 1024, height: 1024, close: vi.fn() };
+  const fetch = vi.fn(() => Promise.resolve(new Response(new Blob())));
+  vi.stubGlobal('fetch', fetch);
+  vi.stubGlobal('createImageBitmap', vi.fn(() => Promise.resolve(bitmap)));
+  const minimap = vi.fn<(source: (() => MapExtras | null) | null) => void>();
+  const fullMap = vi.fn<(source: (() => MapExtras | null) | null) => void>();
+  try {
+    installAuthorMap({ setExtras: minimap }, { setExtras: fullMap }, scope, '/cooked-map-v1.png');
+    const extras = fullMap.mock.calls[0]?.[0];
+    expect(minimap.mock.calls[0]?.[0]).toBe(extras);
+    await vi.waitFor(() => {
+      expect(extras?.()).toMatchObject({ baseAlpha: 0, images: [{ image: bitmap, x: 0, z: 0, alpha: 1 }] });
+    });
+    expect(fetch).toHaveBeenCalledExactlyOnceWith('/cooked-map-v1.png');
+  } finally { scope.dispose(); vi.unstubAllGlobals(); }
+  expect(bitmap.close).toHaveBeenCalledTimes(1);
+  expect(minimap).toHaveBeenLastCalledWith(null);
+  expect(fullMap).toHaveBeenLastCalledWith(null);
+});
 test('one charged decode supplies crops until its owner retires', async () => {
   const scope = new Scope('atlas'), allocator = new ResidencyAllocator(); let reads = 0, closed = 0;
   const image = document.createElement('canvas');

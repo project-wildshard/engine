@@ -250,6 +250,17 @@ export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
 }
 
 interface ExtrasSink { setExtras: (source: (() => MapExtras | null) | null) => void }
+/** An inline author product plays on its own map rather than the grid's overlays. */
+export function installAuthorMap(minimap: ExtrasSink, fullMap: ExtrasSink, scope: Scope, url: string): void {
+  const map = new CellMinimaps(scope, () => Promise.resolve(url), () => true);
+  const extras = (): MapExtras | null => {
+    const image = map.image(url);
+    return image === null ? null : { baseAlpha: 0, rects: [], labels: [], images: [{ image, x: 0, z: 0, size: CHUNK_HALF * 2, alpha: 1 }] };
+  };
+  minimap.setExtras(extras);
+  fullMap.setExtras(extras);
+  scope.onDispose(() => { minimap.setExtras(null); fullMap.setExtras(null); });
+}
 /** Feed the page's minimap (and its full map) while the grid runs; the overlays leave with the scope. */
 export function installMinimapBlend(minimap: ExtrasSink, host: MinimapBlendHost, scope: Scope, fullMap?: ExtrasSink, atlas?: AtlasTile): () => MapExtras {
   const rects = roadRects(host.assembly, host.home);
