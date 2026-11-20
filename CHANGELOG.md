@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.55 (2026-11-20)
+
+- Pine Hollow's creatures draw their skins.
+- Sunscar Dunes' Matriarch fight summons properly.
+- Zone Select opens from rooms servers and shows new shards.
+- Staging checks can connect and test the game again.
+
 ## v0.1.53 (2026-11-19)
 
 - Brasscap rev 12 brings tracers, muzzle flash, impact dust, reload animation and updated Wyrm timing.
