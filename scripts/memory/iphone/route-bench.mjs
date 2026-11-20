@@ -237,7 +237,9 @@ async function phoneTools() {
       // mini-driftwood13m: the last boot's game page kept running (and its wake lock held), so the phone never cooled
       // between benches (39.7 °C for 10 min under the lock); park Safari on about:blank before the locks go
       lockState('before park');
-      command('xcrun', ['devicectl', 'device', 'process', 'launch', '--device', facts.udid, '--terminate-existing', 'com.apple.mobilesafari', 'about:blank']);
+      const parked = command('xcrun', ['devicectl', 'device', 'process', 'launch', '--device', facts.udid,
+        '--terminate-existing', '--payload-url', 'about:blank', 'com.apple.mobilesafari']);
+      if (!parked.ok) throw new Error(`Safari blank parking failed: ${parked.output}`);
       lockState('before proxy stop');
       await inspector.stop();
       lockState('after proxy stop');
