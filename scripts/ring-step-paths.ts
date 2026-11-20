@@ -8,12 +8,12 @@ import { loadRapier } from '../src/shared/engine/physics/rapier.ts';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder.ts';
 import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime.ts';
 import { HeadlessSimulation } from '../src/server/host/headless.ts';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor.ts';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor.ts';
 import { serializeSimSnapshot, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot.ts';
 import { createShardfileSim } from '../src/server/game/plugin/simulation.ts';
 import { installDeclaredKitItems } from '../src/server/game/shardfile/declaredKitItems.ts';
 import { planPortalRide } from '../src/server/game/shardfile/declaredPortalRide.ts';
-import { serverSkinRigs } from '../src/shared/game/shardfile/serverSkinRigs.ts';
+import { serverInputFiles, serverSkinRigs } from '../src/shared/game/shardfile/serverSkinRigs.ts';
 import { folderClosureFile } from '../src/shared/game/shardfile/shardFolder.ts';
 import { folderHeadlessSections } from '../src/shared/host/headlessSections.ts';
 import { tapeKitCommand } from '../src/server/host/tapeKitCommand.ts';
@@ -82,8 +82,11 @@ export async function stepRingFolder(folder: string, slice: boolean, options: Ri
   const started = performance.now(), product = await loadHeadlessFolder(folder), shard = product.shardfile, descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error(`${folder}: no verified index`);
   const declared = shard.runtime === null && !product.has('sim/runtime-plan'), assets = new Map<string, Uint8Array>();
+  // a server's reads, a declared spawn's skin rig too (a native assembly's declared herds, Pine's since OF23a), as the cook's
+  // server pack carries them (`serverRows`)
+  const read = new Set(serverInputFiles(descriptor.index.files, shard));
   for (const file of descriptor.index.files) {
-    if ((!declared || slice) && !(serverReadsFile(file, shard.terrain?.collider) && (file.name === undefined || file.kind === 'wasm' || file.kind === 'tile'))) continue;
+    if ((!declared || slice) && !read.has(file)) continue;
     assets.set(file.commons === true ? `commons:${file.hash}` : file.hash, readFileSync(join(folder, file.path)));
   }
   const chain = declared ? slice ? await stepDeclaredSlice({ shard, assets, product }, options) : await stepDeclared(shard, assets, options) : await stepResident({ shard, assets, product }, options);
