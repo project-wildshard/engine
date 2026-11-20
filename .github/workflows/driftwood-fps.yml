@@ -1,0 +1,76 @@
+# DF7 / J464. Report only until DF15, on a calibrated Metal host.
+name: Driftwood FPS
+on:
+  schedule:
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: driftwood-fps
+  cancel-in-progress: false
+jobs:
+  runner-pending:
+    if: vars.DRIFTWOOD_FPS_GPU_RUNNER == ''
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo 'DF7 awaits a Metal runner and its calibration. Set DRIFTWOOD_FPS_GPU_RUNNER to its unique label.' >> "$GITHUB_STEP_SUMMARY"
+  measure:
+    if: vars.DRIFTWOOD_FPS_GPU_RUNNER != ''
+    runs-on: [self-hosted, macOS, "${{ vars.DRIFTWOOD_FPS_GPU_RUNNER }}"]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: driftwood-fps
+      - run: bash scripts/ci-playwright-install.sh chromium
+      - name: Measure the exact checkout
+        env:
+          WS_BUILD_ID: ${{ github.sha }}
+        run: |
+          out=tmp/df7
+          mkdir -p "$out"
+          node scripts/dev.mjs --staging --shard driftwood-isle --port 0 --saves memory --no-watch --work "$out/world" > "$out/dev.log" 2>&1 &
+          dev=$!
+          trap 'kill "$dev" 2>/dev/null || true; wait "$dev" 2>/dev/null || true' EXIT
+          base=
+          for ((n=0; n<900; n++)); do
+            base=$(awk '/^engine dev on / { print $4; exit }' "$out/dev.log")
+            if [ -n "$base" ]; then break; fi
+            if ! kill -0 "$dev" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          if [ -z "$base" ]; then tail -80 "$out/dev.log"; exit 1; fi
+          status=0
+          node scripts/fps/table.mjs --base "$base" --out "$out/table" || status=$?
+          if [ "$status" -ne 0 ] && [ "$status" -ne 2 ] && [ "$status" -ne 3 ]; then exit "$status"; fi
+          test -f "$out/table/table.json"
+      - name: Report floors and p95 gaps
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          out=tmp/df7
+          previous=()
+          while IFS= read -r id; do
+            if gh run download "$id" --name driftwood-fps --dir "$out/previous" >/dev/null 2>&1 &&
+                node -e 'process.exit(require("./tmp/df7/previous/night.json").qualifies ? 0 : 1)' 2>/dev/null; then
+              previous=(--previous "$out/previous/night.json")
+              break
+            fi
+            rm -f "$out/previous/night.json"
+          done < <(gh run list --workflow driftwood-fps.yml --branch main --status success --limit 14 --json databaseId --jq '.[].databaseId')
+          node scripts/fps/nightly.mjs --table "$out/table/table.json" --build "$GITHUB_SHA" --out "$out/night.json" "${previous[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: driftwood-fps
+          path: |
+            tmp/df7/night.json
+            tmp/df7/dev.log
+            tmp/df7/table/table.*
+          if-no-files-found: warn
+          retention-days: 14

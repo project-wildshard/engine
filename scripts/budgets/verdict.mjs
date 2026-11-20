@@ -13,12 +13,12 @@
 export const SOFT_RATIO = 0.1;
 
 /** The number a measure is judged on: an exact measure as it is, a noisy one as the median of three reads.
- * @param {'exact' | 'noisy'} kind @param {number | readonly number[]} measure @returns {number} */
+ * @param {'exact' | 'noisy' | 'floor'} kind @param {number | readonly number[]} measure @returns {number} */
 export function judgedValue(kind, measure) {
   const reads = typeof measure === 'number' ? [measure] : [...measure];
   if (reads.length === 0 || reads.some(value => !Number.isFinite(value) || value < 0)) throw new Error(`budget: invalid measure ${JSON.stringify(measure)}`);
-  if (kind === 'exact') {
-    if (reads.length !== 1) throw new Error('budget: an exact measure takes one read');
+  if (kind !== 'noisy') {
+    if (reads.length !== 1) throw new Error(`budget: a ${kind} measure takes one read`);
     return reads[0];
   }
   if (reads.length === 1) return reads[0];
@@ -26,13 +26,16 @@ export function judgedValue(kind, measure) {
   return reads.sort((a, b) => a - b)[1];
 }
 
+/** @param {import('./verdict.mjs').BudgetKind} kind @param {number} value @param {number} hard */
+export const missesHardLimit = (kind, value, hard) => kind === 'floor' ? value < hard : value > hard;
+
 /** The soft line for a baseline: baseline plus 10%, or plus the floor when that is larger.
  * @param {number} baseline @param {number} [floor] */
 export const softLine = (baseline, floor = 0) => baseline + Math.max(baseline * SOFT_RATIO, floor);
 
 /**
  * @param {{ measure: number | readonly number[], baseline: { value: number, contentKey: string } | null | undefined,
- *   hard: number | null | undefined, contentKey: string, declared?: boolean, kind: 'exact' | 'noisy', floor?: number, confirm?: boolean }} input
+ *   hard: number | null | undefined, contentKey: string, declared?: boolean, kind: 'exact' | 'noisy' | 'floor', floor?: number, confirm?: boolean }} input
  * @returns {{ status: 'ok' | 'raised' | 'regressed' | 'over-hard' | 'warning' | 'confirm', value: number, line: number | null,
  *   delta: number | null, ratio: number | null }}
  */
@@ -42,9 +45,10 @@ export function verdict({ measure, baseline, hard, contentKey, declared = false,
   const delta = recorded === null ? null : value - recorded.value;
   const ratio = recorded === null || recorded.value === 0 ? null : (value - recorded.value) / recorded.value;
   const fresh = recorded === null || declared || recorded.contentKey !== contentKey;
-  const line = fresh ? null : softLine(recorded.value, floor);
-  if (hard !== null && hard !== undefined && value > hard) return { status: 'over-hard', value, line, delta, ratio };
+  const line = fresh || kind === 'floor' ? null : softLine(recorded.value, floor);
+  if (hard !== null && hard !== undefined && missesHardLimit(kind, value, hard)) return { status: 'over-hard', value, line, delta, ratio };
   if (fresh) return { status: 'raised', value, line, delta, ratio };
+  if (kind === 'floor') return { status: 'ok', value, line, delta, ratio };
   // Integer bytes: compare the rise against 10% without the float error of baseline * 1.1.
   const rise = value - recorded.value;
   const regressed = rise * 10 >= recorded.value && rise >= floor;

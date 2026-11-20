@@ -8,11 +8,12 @@ import { once } from 'node:events';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { capFor, readCaps } from '../budgets/files.mjs';
 import { routeFor } from '../memory/iphone/route.mjs';
 
-/** @typedef {Omit<Parameters<typeof import('./measure.mjs').measureFps>[0], 'cpu'> & {factor:string|null}} ProfileSpec */
+/** @typedef {Omit<Parameters<typeof import('./measure.mjs').measureFps>[0], 'cpu' | 'floor'> & {factor:string|null}} ProfileSpec */
 const PHONE = /** @type {const} */ ({ browser: 'chromium', tier: 'phone', width: 402, height: 812, dpr: 3 });
-const DESKTOP = /** @type {const} */ ({ browser: 'chromium', tier: 'desktop', cap: null, floor: 120 });
+const DESKTOP = /** @type {const} */ ({ browser: 'chromium', tier: 'desktop', cap: null });
 const displays = /** @type {const} */ ([{ width: 1496, height: 717, dpr: 2 }, { width: 1920, height: 1080, dpr: 1 }]);
 /** @param {(typeof displays)[number]} display @param {'low'|'high'} graphics @param {string|null} factor
  * @returns {ProfileSpec} */
@@ -21,9 +22,9 @@ function desktop(display, graphics, factor) {
 }
 /** @type {Record<string, ProfileSpec[]>} */
 const profiles = {
-  'phone-lpm-low': [{ ...PHONE, graphics: 'low', floor: 30, cap: 30, factor: 'phoneLpm' }],
-  'phone-high': [{ ...PHONE, graphics: 'high', floor: 30, cap: 60, factor: 'phoneNormal' }],
-  'phone-low': [{ ...PHONE, graphics: 'low', floor: 60, cap: 60, factor: 'phoneNormal' }],
+  'phone-lpm-low': [{ ...PHONE, graphics: 'low', cap: 30, factor: 'phoneLpm' }],
+  'phone-high': [{ ...PHONE, graphics: 'high', cap: 60, factor: 'phoneNormal' }],
+  'phone-low': [{ ...PHONE, graphics: 'low', cap: 60, factor: 'phoneNormal' }],
   'desktop-high': displays.map(display => desktop(display, 'high', 'desktopTypical')),
   'desktop-native': displays.flatMap(display => [desktop(display, 'high', null), desktop(display, 'low', null)]),
 };
@@ -94,10 +95,13 @@ async function main() {
     throw new Error('Use a positive run count and a unique list of known profiles');
   const base = new URL(choices.base).href, host = model(), factors = calibration.hosts[host]?.factors ?? {};
   const out = resolve(choices.out ?? join('tmp/driftwood-fps',String(Date.now())));
+  const caps = readCaps(root);
   const plan = selected.flatMap(name => profiles[name].map(spec => {
+    const floor = capFor(caps, `fps/${name}/${zone}`);
+    if (floor?.kind !== 'floor' || floor.hard === null) throw new Error(`Missing FPS floor for ${name}`);
     const cpu = spec.factor === null ? 1 : factors[spec.factor]?.factor ?? (spec.factor === 'desktopTypical' ? 2 : 1);
     if (!Number.isFinite(cpu) || cpu < 1) throw new Error(`Invalid CPU factor for ${name}`);
-    return { name, profile:{...spec,cpu,calibrated:spec.factor===null || spec.factor==='desktopTypical' || factors[spec.factor]?.qualified===true} };
+    return { name, profile:{...spec,cpu,floor:floor.hard,calibrated:spec.factor===null || spec.factor==='desktopTypical' || factors[spec.factor]?.qualified===true} };
   }));
   if (choices['dry-run']) { console.log(JSON.stringify({zone,base,out,host,count,plan,route},null,2)); return 0; }
   if (existsSync(marker)) throw new Error('Jake is playing');

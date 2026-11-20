@@ -19,8 +19,11 @@ function routeScript(route, profile) {
     document.addEventListener('ws:control-ready', () => {
       window.__dfRoute = (async () => {
         const game = window.__wildshard.world.game, renderer = game.renderer;
+        const gl = renderer.getContext();
+        const debug = gl.getExtension('WEBGL_debug_renderer_info');
+        const gpu = debug === null ? null : gl.getParameter(debug.UNMASKED_RENDERER_WEBGL);
         const witness = { build: window.__WS_BUILD_ID__ ?? null, dpr: renderer.getPixelRatio(), css: [innerWidth, innerHeight],
-          level: game.level.id, phoneGraphics: game.phoneGraphics, programs: renderer.info.programs?.length ?? null };
+          gpu, level: game.level.id, phoneGraphics: game.phoneGraphics, programs: renderer.info.programs?.length ?? null };
         const legs = [];
         for (const leg of route) {
           const result = await runLeg({...leg, cap: ${JSON.stringify(cap)}});

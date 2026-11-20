@@ -56,3 +56,10 @@ test('a bad measure is an error, never a pass', () => {
   expect(() => verdict({ ...base, measure: -1 })).toThrow(/measure/);
   expect(() => verdict({ ...base, measure: Number.NaN })).toThrow(/measure/);
 });
+
+test('a frame-rate floor accepts equality and improvement without a soft ceiling', () => {
+  const floor = { ...base, kind: 'floor' as const, hard: 60, baseline: { ...base.baseline, value: 60 } };
+  expect(verdict({ ...floor, measure: 59.99 }).status).toBe('over-hard');
+  expect(verdict({ ...floor, measure: 60 })).toMatchObject({ status: 'ok', line: null });
+  expect(verdict({ ...floor, measure: 120 })).toMatchObject({ status: 'ok', line: null });
+});

@@ -21,7 +21,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { capFor, readBaselines, readCaps, writeBaselines } from './files.mjs';
-import { judgedValue, verdict } from './verdict.mjs';
+import { judgedValue, missesHardLimit, verdict } from './verdict.mjs';
 import { budgetResultLine } from './watch.mjs';
 
 const STATUS = { ok: 'ok', raised: 'raised', regressed: 'REGRESSED', 'over-hard': 'OVER HARD', warning: 'WARNING', confirm: 'WARNING' };
@@ -55,18 +55,18 @@ export function judgeAll(caps, baselines, measures) {
 /** One table, one line a budget. Nothing else is printed: no ::warning (BC7).
  * @param {ReturnType<typeof judgeAll>} rows */
 export function budgetTable(rows) {
-  const lines = ['| Budget | Status | Measure | Baseline | Soft line | Hard cap | Change | Note |', '|---|---|---|---|---|---|---|---|'];
+  const lines = ['| Budget | Status | Measure | Baseline | Soft line | Hard limit | Change | Note |', '|---|---|---|---|---|---|---|---|'];
   for (const row of rows) {
     const notes = [];
     if (row.status === 'unknown') notes.push('no cap entry in budgets/caps.json');
     if (row.status === 'warning') notes.push('within J431 noise margin');
     if (row.status === 'confirm') notes.push('unconfirmed: needs three fresh reads');
     if (row.status === 'raised') notes.push(row.previousKey === null ? `new: record ${row.contentKey}` : row.previousKey === row.contentKey ? 'declared: record it' : `${row.previousKey} → ${row.contentKey}: record it`);
-    if (row.ratio !== null && row.ratio < 0 && row.status === 'ok') notes.push(`${Math.round(-row.ratio * 100)}% under baseline`);
+    if (row.unit !== 'fps' && row.ratio !== null && row.ratio < 0 && row.status === 'ok') notes.push(`${Math.round(-row.ratio * 100)}% under baseline`);
     if (row.target !== null && row.value !== null && row.value > row.target) notes.push(`past the ${show(row.target, row.unit)} target`);
     if (row.detail !== undefined) notes.push(Object.entries(row.detail).map(([part, bytes]) => `${part} ${show(bytes, row.unit)}`).join(', '));
     const change = row.ratio === null ? '-' : `${row.ratio >= 0 ? '+' : ''}${(row.ratio * 100).toFixed(1)}%`;
-    lines.push(`| ${row.key} | ${row.status === 'unknown' ? 'UNKNOWN' : STATUS[row.status]} | ${show(row.value, row.unit)} | ${show(row.baseline, row.unit)} | ${show(row.line, row.unit)} | ${show(row.hard, row.unit)} | ${change} | ${notes.join('; ')} |`);
+    lines.push(`| ${row.key} | ${row.status === 'unknown' ? 'UNKNOWN' : row.status === 'over-hard' && row.unit === 'fps' ? 'BELOW FLOOR' : STATUS[row.status]} | ${show(row.value, row.unit)} | ${show(row.baseline, row.unit)} | ${show(row.line, row.unit)} | ${show(row.hard, row.unit)} | ${change} | ${notes.join('; ')} |`);
   }
   return `${lines.join('\n')}\n`;
 }
@@ -86,7 +86,7 @@ export function recordAll(caps, baselines, measures, { why, commit } = {}) {
     const cap = capFor(caps, key);
     if (cap === undefined) { errors.push(`budget: ${key} has no cap entry in budgets/caps.json`); continue; }
     const value = judgedValue(cap.kind, measure.reads ?? /** @type {number} */ (measure.value));
-    if (cap.hard !== null && value > cap.hard) { errors.push(`budget: ${key} measures ${show(value, cap.unit)}, over its ${show(cap.hard, cap.unit)} hard cap (${cap.decision}); a hard cap moves only on Jake's word`); continue; }
+    if (cap.hard !== null && missesHardLimit(cap.kind, value, cap.hard)) { errors.push(`budget: ${key} measures ${show(value, cap.unit)}, misses its ${show(cap.hard, cap.unit)} hard ${cap.kind === 'floor' ? 'floor' : 'cap'} (${cap.decision}); a hard cap moves only on Jake's word`); continue; }
     const sha = commit ?? measures.commit;
     next[key] = { value, contentKey: measure.contentKey, ...(sha === undefined ? {} : { commit: sha }), ...(why === undefined ? {} : { why }), ...(measure.detail === undefined ? {} : { detail: measure.detail }) };
   }
