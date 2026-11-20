@@ -8,7 +8,7 @@ import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { ShardContext } from '@wildshard/engine/game/plugin/context';
 import { emptyShardfile } from '../src/shared/host/author';
 import { declaredGrappleProfile, declaredGrappleRow } from '../src/shared/game/grapple/declared';
-import { declaredGrapplePresentation, declaredGrappleTool, installDeclaredGrapplePage } from '../src/client/game/grapple/declaredGrapple';
+import { declaredGrapplePageOwns, declaredGrapplePresentation, declaredGrappleTool, installDeclaredGrapplePage } from '../src/client/game/grapple/declaredGrapple';
 import { GrappleTool, grappleGuard, pageGrappleFacts } from '../src/client/game/grapple/tool';
 import { Filament } from '../src/client/game/grapple/ribbon';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
@@ -85,4 +85,18 @@ test('OF41c page: a plain upload binds no page ledger for its fact; a native run
   expect(plain.runtime).toBeNull();
   expect(pageGrappleFacts(ctx(plain), tool)).toBeUndefined();
   expect(() => pageGrappleFacts(ctx({ ...plain, runtime: legacyDouble<NonNullable<Shardfile['runtime']>>({ binds: [] }) }), tool)).toThrow('not bound by its runtime');
+});
+
+// P1 OF21 (2026-11-20): Nine r6 is a client-plan page (portal ride, practice course) with a declared grapple mode, its held
+// grapple item still in items, and no held play entry; v0.1.57 skipped the page claw on any client-plan page, so Nine lost it.
+test('OF21 page: a client-plan page with a declared grapple and no held claw entry draws the declared claw', () => {
+  const nine = { ...shard([{ id: 'fei-zhua', ...timings, profile: tool, hooks: HOOKS }]),
+    items: { version: 1, rows: [{ id: 'weapon.jian', kind: 'weapon' }, { id: 'tool.fei-zhua', kind: 'tool' }] } } as unknown as Shardfile;
+  const plan = [{ kind: 'world.sets' }, { kind: 'practice.course' }, { kind: 'portal.ride' }];
+  expect(declaredGrapplePageOwns(nine, plan)).toBe(true);
+  expect(declaredGrapplePageOwns(nine, [])).toBe(true);
+  // a held play entry that carries the claw keeps it: the page never builds a second grapple
+  expect(declaredGrapplePageOwns(nine, [...plan, { kind: 'held.claims.enter', grapple: { item: 'tool.fei-zhua' } }])).toBe(false);
+  expect(declaredGrapplePageOwns(nine, [...plan, { kind: 'held.claims.enter' }])).toBe(true);
+  expect(declaredGrapplePageOwns(shard([{ id: 'hook', ...timings }]), plan)).toBe(false);
 });

@@ -522,11 +522,12 @@ export class ShardfileClient {
       await macrotask();
       if (ctx.scope.disposed) throw new Error('Shardfile left during play installation');
     }
-    // ONE-FORMAT OF41c: a plain upload's grapple mode draws its claw, rope, hook marks and lock as the native host's does
-    if (this.mode === 'full' && !this.nativeFeatures && this.source.modes?.grapple?.some(row => row.profile !== undefined) === true) {
-      const { installDeclaredGrapplePage } = await import('../grapple/declaredGrapple');
+    // ONE-FORMAT OF41c: a plain upload's grapple mode draws its claw, rope, hook marks and lock as the native host's does;
+    // a client-plan page draws it too unless its held play entry builds the claw (P1 OF21: Nine r6 lost it on v0.1.57)
+    if (this.mode === 'full' && this.source.modes?.grapple?.some(row => row.profile !== undefined) === true) {
+      const { declaredGrapplePageOwns, installDeclaredGrapplePage } = await import('../grapple/declaredGrapple');
       if (ctx.scope !== scope || ctx.product !== product || scope.disposed || scope.disposing) throw new Error('Shardfile left during grapple import');
-      await installDeclaredGrapplePage(ctx, this.source);
+      if (declaredGrapplePageOwns(this.source, this.plan?.features ?? [])) await installDeclaredGrapplePage(ctx, this.source);
     }
     // ONE-FORMAT OF20c / OF19c1: a runtime-plan page's declared boss (its owner row on a declared spawn) has no page feature:
     // the page draws its declared `ui` rows, boss panels among them, off the wire as an ordinary page does

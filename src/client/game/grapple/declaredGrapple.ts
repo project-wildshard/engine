@@ -88,6 +88,14 @@ export function declaredGrappleTool(shard: ShardContext, source: Pick<Shardfile,
   return { tool, looks: [...new Set(Object.values(profile.looks))] };
 }
 
+/** Whether the page draws the declared grapple claw (OF41c; P1 OF21): a grapple mode row with a profile, unless a held play
+ *  entry (`held.claims.enter` with its `grapple`) already builds the claw. A client-plan page (Nine's portal ride and
+ *  course) draws it as well: v0.1.57 skipped it there, and Nine r6, which has no held entry, lost its Fei Zhua. */
+export function declaredGrapplePageOwns(source: Pick<Shardfile, 'modes'>, features: readonly { readonly kind: string; readonly grapple?: unknown }[]): boolean {
+  if (source.modes?.grapple?.some(row => row.profile !== undefined) !== true) return false;
+  return !features.some(row => row.kind === 'held.claims.enter' && row.grapple !== undefined);
+}
+
 /** Install a plain upload's grapple on the page (OF41c): its looks compiled and lent from the shard's `look.materials`, the
  *  tool bound to its guard and added to the loadout, where the wire's claw (`clientWorker` `bindClaw`) picks it up. */
 export async function installDeclaredGrapplePage(ctx: ShardContext, source: Shardfile): Promise<GrappleTool | null> {
