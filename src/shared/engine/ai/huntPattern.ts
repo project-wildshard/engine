@@ -261,6 +261,9 @@ export interface HuntPorts<A extends AnimalSim> {
   reach: (a: A, player: Vector3) => boolean;
   /** where a wander walks to instead of a random point (within r m), or null */
   wanderGoal: (a: A) => { x: number; z: number; r: number } | null;
+  /** ONE-FORMAT OF23c: the herd of a body this brain keeps no herd for (`a.herd` < 0): a declared herd, its spawns sharing a
+   *  group, whose centre its wanders keep to and its flight leans toward, as a roster herd's do */
+  herdOf?: (a: A) => HuntHerd<A> | null;
   /** the player is not among them (calm, a practice room) */
   unaware: () => boolean;
   /** a millisecond clock for the idle glances (cosmetic: look weight only) */
@@ -525,7 +528,7 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
       if (caller && dPlayer < 80 && a.state !== 'flee' && a.state !== 'charge') this.ports.sound(sp.sounds?.call ?? fallbackSound(charger, 'call'), a);
     }
 
-    const herd = a.herd >= 0 ? this.herds[a.herd] ?? null : null;
+    const herd = this.herdFor(a);
     // the player is inside the charge distance: chargers charge (hunters stalk while the charge cools down), the rest bolt
     const engage = (): void => { if (charger && br.chargeCd <= 0) this.enter(a, br, 'charge'); else if (T.stalk !== undefined) this.enter(a, br, 'stalk'); else { br.spooked = true; this.enter(a, br, 'flee'); } };
 
@@ -749,13 +752,20 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
       case 'idle': br.timer = rng.range(3, 7); a.setMotion(a.desiredYaw, 0, 1.5); break;
       case 'graze': br.timer = rng.range(6, 14); a.setMotion(a.desiredYaw, 0, 1.5); break;
       case 'wander': {
-        const herd = a.herd >= 0 ? this.herds[a.herd] ?? null : null;
+        const herd = this.herdFor(a);
         let ok = false;
         const nav = this.ports.nav();
         const goal = this.ports.wanderGoal(a);
         if (goal !== null && nav !== null) {
           const t = nav.randomPointNear(_navFrom.set(goal.x, g.heightAt(goal.x, goal.z), goal.z), goal.r, this.agentRadius(a), () => rng.next(), _navTo);
           if (t !== null && g.inChunk(t.x, t.z, 20)) { br.tx = t.x; br.tz = t.z; ok = true; }
+        }
+        // ONE-FORMAT OF23c: a goal with no navmesh (a declared herd's rain shelter): an open, dry point within its radius. The
+        // shelter picked its tree inside the world, so only a 2 m edge holds it (a wander's own 20 m would refuse edge trees)
+        if (goal !== null && nav === null) for (let i = 0; i < 12 && !ok; i++) {
+          const ang = rng.range(0, Math.PI * 2), r = rng.range(0, goal.r), tx = goal.x + Math.cos(ang) * r, tz = goal.z + Math.sin(ang) * r;
+          if (!g.inChunk(tx, tz, 2) || g.normalY(tx, tz) < 0.78 || g.cabinMask(tx, tz) > 0 || !this.isDry(tx, tz)) continue;
+          br.tx = tx; br.tz = tz; ok = true;
         }
         if (nav !== null && !ok) {
           // a reachable point 5–25 m away on the navmesh; a straggler > 15 m from its herd wanders back toward the centre
@@ -812,10 +822,14 @@ export class HuntingStalkerCore<A extends AnimalSim> extends GroupBrain<A> {
    * later; otherwise (a head came up) they only get a nudge of awareness — a sentry freezing must not empty the
    * clearing, or there is never a shot.
    */
+  /** A body's herd: the roster's by `a.herd`, else a declared one (`HuntPorts.herdOf`), else none. */
+  private herdFor(a: A): HuntHerd<A> | null {
+    return a.herd >= 0 ? this.herds[a.herd] ?? null : this.ports.herdOf?.(a) ?? null;
+  }
+
   private alertHerd(a: A, bolt: boolean): void {
-    if (a.herd < 0) return;
-    const herd = this.herds[a.herd];
-    if (herd === undefined) return;
+    const herd = this.herdFor(a);
+    if (herd === null) return;
     const T = this.tuningFor(a);
     const r2 = T.herdAlertRadius * T.herdAlertRadius;
     for (const m of herd.members) {

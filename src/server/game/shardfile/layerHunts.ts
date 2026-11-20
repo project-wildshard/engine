@@ -9,6 +9,7 @@ import type { ShardRows } from '@wildshard/format/rows';
 import type { ShardCreatures } from '@wildshard/format/creatures';
 import { resolveCreatureLayers } from './creatureLayers';
 import { bindCreatureSenses } from './creatureSenses';
+import { declaredHerdGoal, declaredHerdOf, installDeclaredHerdSave, joinDeclaredGroup } from './declaredHerds';
 
 const finite = v.pipe(v.number(), v.finite());
 const Saved = v.strictObject({ contract: v.string(), clock: finite, memory: v.unknown(),
@@ -79,7 +80,9 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     const hunt = new StalkerBrain<AnimalSim>({ pattern: 'hunt', config: { rng: host.rng.stream('ai'),
       fight: {}, faunaTuning: () => undefined, species: () => species }, player, sampleTerrain: () => undefined,
       ports: { ground, nav: () => null, reach: (body, target) => canReach(body, target, host.physics),
-        wanderGoal: () => null, unaware: () => {
+        // OF23c: a body in a declared herd wanders to the goal the rain shelter gives its herd
+        wanderGoal: () => spawn.group === undefined ? null : declaredHerdGoal(host, actor),
+        herdOf: () => spawn.group === undefined ? null : declaredHerdOf(host, actor), unaware: () => {
           if (perception === undefined) return !host.nearestPlayer(actor.position).health.alive;
           return observed === undefined || !observed.health.alive || host.parked.has(observed.id);
         },
@@ -90,6 +93,7 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
             amount: damage, point: body.position.clone(), dir: new Vector3().subVectors(target.position, body.position).normalize(), cause: { kind: body.kind, label: body.label } }); },
       } });
     hunt.adopt(actor, spawn.at[0], spawn.at[2]);
+    if (spawn.group !== undefined) joinDeclaredGroup(host, spawn.group, actor, spawn.at[0], spawn.at[2]);
     const memory = hunt.memory(actor);
     if (memory === undefined) throw new Error(`species \`${spawn.species}\`: missing hunt memory`);
     let clock = 0;
@@ -142,4 +146,5 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       cadence.damaged(req.target, killed);
     }, host.scope);
   }
+  installDeclaredHerdSave(host); // OF23c: a declared herd's centre is saved
 }

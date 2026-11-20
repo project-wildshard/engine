@@ -124,6 +124,12 @@ test("a spawn script's group lends it declared bodies: absent until it spawns on
   try {
     const host = live.host, lent = Array.from({ length: 6 }, (_, i) => body(host, `of23c.night.${String(i)}`));
     expect(lent.every(actor => !actor.alive)).toBe(true);
+    // a save keeps them out of the world: the restored world's hunts leave them be too, and both worlds go on the same
+    const twin = await resident(fixture, shard, serializeSimSnapshot(snapshotSimHostBytes(host)));
+    try {
+      for (let tick = 0; tick < 60; tick++) { live.step([]); twin.step([]); }
+      expect(canonicalSimDigest(snapshotSimHost(twin.host))).toBe(canonicalSimDigest(snapshotSimHost(host)));
+    } finally { twin.dispose(); }
     const before = new Set([...host.entities.keys()]), clock = host.dayClock; if (clock === undefined) throw new Error('Missing day clock');
     await clock.set(0.95);
     const player = leadPlayer(host);

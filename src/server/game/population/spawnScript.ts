@@ -37,6 +37,7 @@ import { ANIMAL_STATES } from '@wildshard/engine/entities/animalStates';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { RowBodiesView } from '@wildshard/engine/entities/RowBodies';
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
+import { lendDeclaredBodies } from '../shardfile/declaredHerds';
 
 /** Entered concrete service loans only; no shard callback or reflected name resolver. */
 export type SpawnV2Owners = Omit<V2ColumnOwners,'self' | 'player' | 'observed' | 't' | 'dt'> & { readonly module?: Uint8Array };
@@ -193,6 +194,7 @@ export class SpawnScript {
     const rows = parseSpawnScript(input), roster = populationRoster(host, rows.roster);
     const lent = declared.map(id => { const body = host.entities.get(id); if (body === undefined || roster.actor(id) !== null) throw new Error(`Declared script body ${id} names no declared body`); const lentBody: ControlledBody = body; return lentBody; });
     if (lent.some(body => !rows.species.some(row => row.kind === body.kind && row.variant === body.variant))) throw new Error('Declared script body has no species row in its script');
+    lendDeclaredBodies(host, declared); // OF23c: a group a script borrows is never a herd
     // a lent identity is never the roster's to make, so the roster needs no recipe for it
     for (const row of rows.species) if (!lent.some(body => body.kind === row.kind && body.variant === row.variant)) roster.validateSpawn(row.kind, row.variant);
     const own = (id: string): ControlledBody | null => lent.find(body => body.entityId === id) ?? null;
@@ -810,7 +812,11 @@ export function installNativeSpawnScript(host: SimHost, day: Pick<DayCycleClock,
     for (const flag of rows.flags) if (runner.hasFlag(flag) !== host.flags.has(flag)) host.flags.set(flag, runner.hasFlag(flag));
     // A page plays these: a thrall's call and its puff are this script's only voice.
     for (const effect of runner.drainEffects()) if (effect.kind === 'cue') sayFightView(host, word, [effect.id, effect.at.x, effect.at.y, effect.at.z]);
-  }, { snapshot: () => restored ?? runner.snapshot(), restore: saved => { runner.restore(saved); restored = structuredClone(saved); } });
+  }, { snapshot: () => restored ?? runner.snapshot(), restore: saved => {
+    runner.restore(saved); restored = structuredClone(saved);
+    // OF23c: a lent body the script holds out of the world was saved dead at the absent height; it stays absent (hidden)
+    for (const id of lent) { const body = host.entities.get(id); if (body !== undefined) Object.assign(body, { hidden: !body.alive && body.position.y <= ABSENT_Y + 1 }); }
+  } });
   return runner;
 }
 

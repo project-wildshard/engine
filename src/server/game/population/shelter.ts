@@ -3,6 +3,7 @@ import { projectedSite } from './projectedSites';
 import type { SimHost } from '@wildshard/engine/sim';
 import { populationRoster } from './roster';
 import { populationEnvironment } from './environment';
+import { declaredHerds } from '../shardfile/declaredHerds';
 import { parsePopulationShelter, type HerdShelterRows } from '@wildshard/format/herdShelter';
 import * as v from 'valibot';
 
@@ -155,10 +156,17 @@ export type NativeShelterTree = readonly [x: number, z: number, radius: number, 
 export function installNativeHerdShelter(host: SimHost, trees: readonly NativeShelterTree[], input: unknown): HerdShelter<{ x: number; z: number; r: number; height: number; cover: number }> {
   const rows = parsePopulationShelter(input), environment = populationEnvironment(host, rows.environment);
   if (trees.length > 16384) throw new Error('Shelter tree bound exceeded');
+  // OF23c: the roster's herds, then the declared herds (declared spawns sharing a group, `declaredHerds`), in that order
+  let joined: { roster: readonly Herd[]; length: number; herds: readonly Herd[] } | undefined;
   const source = { get herds() {
-    const current = populationRoster(host, rows.roster).hunt.herds;
-    if (current.length > rows.herdLimit) throw new Error('Shelter herd bound exceeded');
-    return current;
+    const roster = populationRoster(host, rows.roster).hunt.herds, declared = declaredHerds(host);
+    if (declared.length === 0) { if (roster.length > rows.herdLimit) throw new Error('Shelter herd bound exceeded'); return roster; }
+    if (joined?.roster !== roster || joined.length !== roster.length) {
+      const herds = [...roster, ...declared];
+      if (herds.length > rows.herdLimit) throw new Error('Shelter herd bound exceeded');
+      joined = { roster, length: roster.length, herds };
+    }
+    return joined.herds;
   } };
   const shelter = new HerdShelter(source, trees.map(([x, z, r, height, cover]) => ({ x, z, r, height, cover })), rows.look, ReturnProgram.native(host, rows.program));
   const rainNow = (): number => {
@@ -170,6 +178,8 @@ export function installNativeHerdShelter(host: SimHost, trees: readonly NativeSh
     const rain = rainNow(), goals = environment.wanderGoals;
     goals.length = source.herds.length;
     for (let i = 0; i < goals.length; i++) goals[i] = shelter.wanderGoal(i, rain);
+    const declared = declaredHerds(host), first = goals.length - declared.length;
+    for (let i = 0; i < declared.length; i++) { const herd = declared[i]; if (herd !== undefined) herd.goal = goals[first + i] ?? null; }
   };
   host.onStep(rows.step, dt => { shelter.update(dt, rainNow()); publish(); }, {
     snapshot: () => shelter.snapshot(), restore: value => { shelter.restore(value); publish(); },

@@ -1440,6 +1440,7 @@
     "src/server/game/shardfile/declaredRiding.ts": "server",
     "src/server/game/shardfile/declaredSpawnCount.ts": "server",
     "src/server/game/shardfile/declaredSpawnWhen.ts": "server",
+    "src/server/game/shardfile/declaredHerds.ts": "server",
     "src/server/game/shardfile/declaredHolds.ts": "server",
     "src/server/game/shardfile/declaredTalks.ts": "server",
     "src/server/game/shardfile/encounterAdds.ts": "server",
