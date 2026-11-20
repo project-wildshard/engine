@@ -21,6 +21,7 @@
  * unpacked at the end of that task. The device slot `debug.vertexPack` set to false turns it off.
  */
 import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
+import { diagnosticNow } from '../../../shared/engine/core/clock';
 
 const ARRAY_BUFFER = 0x8892, STATIC_DRAW = 0x88e4;
 const BYTE = 0x1400, UNSIGNED_BYTE = 0x1401, SHORT = 0x1402, UNSIGNED_SHORT = 0x1403, FLOAT = 0x1406;
@@ -49,8 +50,11 @@ function format(type: PackFormat['type'], size: number): PackFormat {
 /** The packed layout for a Float32 channel `name` of `size` components, or null where it stays Float32. */
 export function packFormat(name: string, data: Float32Array, size: number): PackFormat | null {
   if (size < 2 || size > 4 || data.length === 0 || data.length % size !== 0 || /position/iu.test(name) || name.startsWith('instance')) return null;
+  // DW3 (mini-driftwood13e): an indexed loop, not `for…of`: on the iPhone the array iterator made this scan most of the
+  // Driftwood road deck's 250 ms first draw (24.5 MB of channels, packed in one task)
   let min = Infinity, max = -Infinity;
-  for (const value of data) {
+  for (let i = 0, n = data.length; i < n; i++) {
+    const value = data[i] ?? Number.NaN;
     if (!Number.isFinite(value)) return null;
     if (value < min) min = value;
     if (value > max) max = value;
@@ -65,33 +69,44 @@ export function packFormat(name: string, data: Float32Array, size: number): Pack
   return null;
 }
 
-/** Whether `value` fits `f` (a normal's rounding slack included). */
-function fits(f: PackFormat, value: number): boolean {
-  const slack = f.type === BYTE ? 0.0001 : 0;
-  return Number.isFinite(value) && value <= 1 + slack && value >= (signed(f.type) ? -1 - slack : 0);
-}
-
 /** One staging array the packed uploads share (GL copies it at once), let go when the task's uploads end. */
 let staging: Uint8Array | null = null;
 function stagingBytes(bytes: number): Uint8Array {
   if (staging === null || staging.byteLength < bytes) staging = ownedArray(Uint8Array, Math.max(bytes, 2 * (staging?.byteLength ?? 0)), PACKED);
   const out = staging.subarray(0, bytes); out.fill(0); return out;
 }
+/** `count` zeroed Int32 words, from one array shared like the staging bytes. */
+let wordStaging: Int32Array | null = null;
+function stagingWords(count: number): Int32Array {
+  if (wordStaging === null || wordStaging.length < count) wordStaging = ownedArray(Int32Array, Math.max(count, 2 * (wordStaging?.length ?? 0)), PACKED);
+  const out = wordStaging.subarray(0, count); out.fill(0); return out;
+}
 /** The shared staging goes (the end of a task's uploads). */
-export function releasePackStaging(): void { staging = null; }
+export function releasePackStaging(): void { staging = null; wordStaging = null; }
 
-/** Vertices `[from, to)` in `f`'s layout, in the shared staging array: upload it before the next `encode`. */
-export function encode(f: PackFormat, from: number, to: number, read: (element: number) => number): { bytes: Uint8Array; fits: boolean } {
-  const vertices = Math.max(0, to - from), out = stagingBytes(vertices * f.stride), view = new DataView(out.buffer, out.byteOffset, out.byteLength);
-  const scale = SCALE[f.type], lo = signed(f.type) ? -1 : 0, wide = BYTES[f.type] === 2;
+/** Vertices `[from, to)` in `f`'s layout, in the shared staging array: upload it before the next `encode`. Element `e`
+ * (vertex `e / f.size`, component `e % f.size`) is read from `source[e + shift]`; a missing or non-finite one writes 0 and
+ * does not fit. DW3 (mini-driftwood13e): one typed-array loop per lane type, no per-element closure, DataView or lookups:
+ * this runs inside a first draw (a 470k-vertex road deck on the phone). */
+export function encode(f: PackFormat, from: number, to: number, source: ArrayLike<number>, shift = 0): { bytes: Uint8Array; fits: boolean } {
+  const vertices = Math.max(0, to - from), out = stagingBytes(vertices * f.stride);
+  const scale = SCALE[f.type], isSigned = signed(f.type), lo = isSigned ? -1 : 0, hi = 1 + (f.type === BYTE ? 0.0001 : 0);
+  const floor = isSigned ? -hi : 0, size = f.size, lanes = f.lanes, length = source.length;
+  // one monomorphic loop into Int32 words, then one native conversion into the lane type (a loop storing into four
+  // typed-array kinds stays slow on JavaScriptCore)
+  const words = stagingWords(vertices * lanes);
   let ok = true;
-  for (let v = 0; v < vertices; v++) for (let c = 0; c < f.size; c++) {
-    const value = read((from + v) * f.size + c);
-    if (!fits(f, value)) ok = false;
-    const word = Math.round(Math.min(1, Math.max(lo, Number.isFinite(value) ? value : 0)) * scale), at = v * f.stride + c * BYTES[f.type];
-    if (wide) { if (signed(f.type)) view.setInt16(at, word, true); else view.setUint16(at, word, true); }
-    else if (signed(f.type)) view.setInt8(at, word); else view.setUint8(at, word);
+  for (let v = 0; v < vertices; v++) {
+    const at = v * lanes, base = (from + v) * size + shift;
+    for (let c = 0; c < size; c++) {
+      const i = base + c, value = i >= 0 && i < length ? source[i] ?? Number.NaN : Number.NaN;
+      if (!(value <= hi && value >= floor)) { ok = false; if (!Number.isFinite(value)) { words[at + c] = 0; continue; } }
+      words[at + c] = Math.round((value > 1 ? 1 : value < lo ? lo : value) * scale);
+    }
   }
+  const n = vertices * lanes;
+  if (BYTES[f.type] === 2) (isSigned ? new Int16Array(out.buffer, out.byteOffset, n) : new Uint16Array(out.buffer, out.byteOffset, n)).set(words);
+  else (isSigned ? new Int8Array(out.buffer, out.byteOffset, n) : out).set(words);
   return { bytes: out, fits: ok };
 }
 
@@ -128,8 +143,10 @@ interface Pending { readonly data: Float32Array; readonly usage: number }
 interface Packed { readonly format: PackFormat; readonly vertices: number; readonly arrays: Map<unknown, Set<number>> }
 
 /** What the pack did this page (the census and the tests read it). */
-export interface VertexPackStats { buffers: number; floatBytes: number; packedBytes: number; reverted: number; unpacked: number }
-export const vertexPackStats: VertexPackStats = { buffers: 0, floatBytes: 0, packedBytes: 0, reverted: 0, unpacked: 0 };
+export interface VertexPackStats { buffers: number; floatBytes: number; packedBytes: number; reverted: number; unpacked: number;
+  /** DW3: ms spent packing (scan and encode) and uploading at first draws, and the slowest single first-draw upload */
+  scanMs: number; packMs: number; uploadMs: number; worst: { ms: number; bytes: number; name: string } }
+export const vertexPackStats: VertexPackStats = { buffers: 0, floatBytes: 0, packedBytes: 0, reverted: 0, unpacked: 0, scanMs: 0, packMs: 0, uploadMs: 0, worst: { ms: 0, bytes: 0, name: '' } };
 if (typeof window !== "undefined") Reflect.set(window, "__vertexPackStats", vertexPackStats);
 
 /** Wrap `gl` so static Float32 vertex channels go up packed. `enabled` is read at each upload. False: not installed. */
@@ -210,7 +227,7 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
       const was = packed.get(buffer);
       if (was !== undefined && data instanceof Float32Array && data.length === was.vertices * was.format.size) {
         // a whole new copy into a packed buffer: vertex arrays already read it packed
-        const out = encode(was.format, 0, was.vertices, e => data[e] ?? Number.NaN);
+        const out = encode(was.format, 0, was.vertices, data);
         if (out.fits) { later(); return bufferData(target, out.bytes, usage); }
         revert(buffer, was, floats => { floats.set(data); });
         return undefined;
@@ -232,15 +249,22 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
     if (waiting !== undefined) {
       const name = typeof index === 'number' ? nameOf(index) : undefined;
       const plain = type === FLOAT && normalized === false && offset === 0 && typeof size === 'number' && (stride === 0 || stride === size * 4);
+      const started = diagnosticNow();
       const f = plain && name !== undefined && enabled() ? packFormat(name, waiting.data, size) : null;
       pending.delete(buffer);
-      if (f === null) bufferData(ARRAY_BUFFER, waiting.data, waiting.usage);
+      const scanned = diagnosticNow();
+      let packedAt = started, bytes = waiting.data.byteLength;
+      if (f === null) { packedAt = diagnosticNow(); bufferData(ARRAY_BUFFER, waiting.data, waiting.usage); }
       else {
-        const vertices = waiting.data.length / f.size, out = encode(f, 0, vertices, e => waiting.data[e] ?? Number.NaN);
+        const vertices = waiting.data.length / f.size, out = encode(f, 0, vertices, waiting.data);
+        packedAt = diagnosticNow(); bytes = out.bytes.byteLength;
         bufferData(ARRAY_BUFFER, out.bytes, waiting.usage); later();
         packed.set(buffer, { format: f, vertices, arrays: new Map() });
         vertexPackStats.buffers++; vertexPackStats.floatBytes += waiting.data.byteLength; vertexPackStats.packedBytes += out.bytes.byteLength;
       }
+      const ended = diagnosticNow();
+      vertexPackStats.scanMs += scanned - started; vertexPackStats.packMs += packedAt - started; vertexPackStats.uploadMs += ended - packedAt;
+      if (ended - started > vertexPackStats.worst.ms) vertexPackStats.worst = { ms: ended - started, bytes, name: name ?? '?' };
     }
     const entry = packed.get(buffer);
     if (entry !== undefined && typeof index === 'number') {
@@ -271,7 +295,7 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
     const read = (e: number): number => data[from + e - first] ?? Number.NaN;
     const v0 = Math.floor(first / f.size), v1 = Math.min(entry.vertices, Math.ceil((first + count) / f.size));
     const covered = from - (first - v0 * f.size) >= 0 && from + (v1 * f.size - first) <= data.length;
-    const out = covered ? encode(f, v0, v1, read) : { bytes: new Uint8Array(0), fits: false };
+    const out = covered ? encode(f, v0, v1, data, from - first) : { bytes: new Uint8Array(0), fits: false };
     if (out.fits) { later(); return bufferSubData(target, v0 * f.stride, out.bytes); }
     revert(buffer, entry, floats => { for (let e = first; e < first + count; e++) floats[e] = read(e); });
     return undefined;

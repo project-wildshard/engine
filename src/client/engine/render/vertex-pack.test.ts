@@ -59,13 +59,13 @@ test('the layout follows the channel name and its range; positions, instances an
 test('packed values read back within the format step', () => {
   const source = [0, 1, -1, 0.5, -0.25, 0.123], f = packFormat('normal', floats(source), 3);
   if (f === null) throw new Error('no format');
-  const { bytes, fits } = encode(f, 0, 2, e => source[e] ?? 0);
+  const { bytes, fits } = encode(f, 0, 2, source);
   expect(fits).toBe(true);
   expect(bytes.byteLength).toBe(8);
   const back: number[] = [];
   decode(f, bytes, 0, (e, value) => { back[e] = value; });
   back.forEach((value, i) => { expect(Math.abs(value - (source[i] ?? 0))).toBeLessThanOrEqual(0.5 / 127 + 1e-7); });
-  expect(encode(f, 0, 1, () => 1.5).fits).toBe(false);
+  expect(encode(f, 0, 1, [1.5, 1.5, 1.5]).fits).toBe(false);
 });
 
 test('a static channel uploads once, packed, when a draw names it; the position and an unread channel stay Float32', () => {
@@ -141,4 +141,30 @@ test('the switch is the phone tier unless debug.vertexPack holds false', () => {
   expect(vertexPackWanted(true, false)).toBe(false);
   expect(vertexPackWanted(true, 'off')).toBe(false);
   expect(vertexPackWanted(false, true)).toBe(false);
+});
+
+test('the typed encode writes what the per-element DataView encode wrote, for every lane type and a shifted source', () => {
+  // DW3 (mini-driftwood13e): the reference is the old closure and DataView loop
+  const reference = (f: NonNullable<ReturnType<typeof packFormat>>, from: number, to: number, read: (e: number) => number): number[] => {
+    const scale = { 0x1400: 127, 0x1401: 255, 0x1402: 32767, 0x1403: 65535 }[f.type], lo = f.type === 0x1400 || f.type === 0x1402 ? -1 : 0, out: number[] = [];
+    for (let v = 0; v < to - from; v++) for (let c = 0; c < f.lanes; c++) {
+      const value = c < f.size ? read((from + v) * f.size + c) : 0;
+      out.push(Math.round(Math.min(1, Math.max(lo, Number.isFinite(value) ? value : 0)) * scale));
+    }
+    return out;
+  };
+  let seed = 7; const random = (): number => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const cases: [string, number, (x: number) => number][] = [['normal', 3, x => x * 2 - 1], ['color', 3, x => x], ['uv', 2, x => x], ['aSigned', 4, x => x * 2 - 1]];
+  for (const [name, size, map] of cases) {
+    const source = floats(Array.from({ length: size * 50 }, () => map(random())));
+    const f = packFormat(name, source, size);
+    if (f === null) throw new Error(`no format for ${name}`);
+    const { bytes, fits } = encode(f, 3, 40, source);
+    expect(fits).toBe(true);
+    const words = f.stride / f.lanes === 2 ? (f.type === 0x1402 ? new Int16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2) : new Uint16Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 2))
+      : (f.type === 0x1400 ? new Int8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength) : bytes);
+    expect(Array.from(words)).toEqual(reference(f, 3, 40, e => source[e] ?? Number.NaN));
+    const shifted = floats([9, 9, ...source]);
+    expect(Array.from(encode(f, 3, 40, shifted, 2).bytes)).toEqual(Array.from(encode(f, 3, 40, source).bytes));
+  }
 });

@@ -2,11 +2,12 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--route <name>] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C>] [--census] [--voices] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C>] [--census] [--voices] [--frames] [--out <dir>] [--dry-run]
 //
 // --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
 // --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
 // --voices times every procedural voice render from the wake lock to the route's end (census.mjs), with the page clock.
+// --frames logs every frame over 45 ms from the wake lock to the route's end with the links, uploads and scene adds in it.
 // --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split). --legs n plays the first n segments only.
 //
 // Each run plays the route (route.mjs) once per cap, each from its own cold boot (fresh Safari on the phone, a fresh WebKit
@@ -23,14 +24,14 @@ import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone } from './safari.mjs';
-import { OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START } from './census.mjs';
+import { FRAME_LOG_READ, FRAME_LOG_START, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, route: { type: 'string' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
   slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, out: { type: 'string' }, udid: { type: 'string' },
-  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'with-locks': { type: 'boolean' },
+  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, frames: { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
 if (!Number.isSafeInteger(runs) || runs < 1 || caps.length === 0 || caps.some((cap) => cap !== 30 && cap !== 60)) throw new Error('--runs is a positive integer, --caps a list of 30 and 60');
@@ -79,6 +80,7 @@ async function bench() {
           if ('gesture' in driver && typeof driver.gesture === 'function') await driver.gesture(askWake).catch(() => undefined);
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
+          if (values.frames === true) row.frameLog = await driver.evaluate(FRAME_LOG_START).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           if (values.voices === true) row.voiceLog = await driver.evaluate(VOICE_LOG_START).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           if ('gesture' in driver && typeof driver.gesture === 'function') row.audioUnlock = await driver.gesture(unlockAudio).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           // --profile <s>: WebKit's sampling profiler over the route's first seconds (DW2: what the long tasks are)
@@ -109,9 +111,19 @@ async function bench() {
               for (const [family, [count, ms, worst]] of [...byFamily].sort((a, b) => b[1][1] - a[1][1]).slice(0, 12)) console.log(`  voices ${family}: ${String(count)} renders, ${ms.toFixed(0)} ms, worst ${worst.toFixed(0)} ms`);
             } catch (error) { row.voicesError = String(error); }
           }
+          if (values.frames === true) {
+            try {
+              const log = await driver.evaluate(FRAME_LOG_READ);
+              row.frames = log;
+              const long = (log?.frames ?? []).filter((/** @type {any[]} */ f) => f[1] > 50);
+              console.log(`  frames: ${String(log?.count ?? 0)} logged, ${String(long.length)} over 50 ms, ${String(long.filter((/** @type {any[]} */ f) => f[2] > 0 || f[4] > 65536 || f[5] > 65536).length)} of them with links or big uploads, ${String(log?.adds?.length ?? 0)} scene adds`);
+            } catch (error) { row.framesError = String(error); }
+          }
           if (values.census === true) {
             try {
               row.census = await /** @type {any} */ (driver).evaluateAsync(OWNER_CENSUS, [10], 30_000);
+              console.log(`  census quality: ${JSON.stringify(row.census?.quality ?? null)}`);
+              console.log(`  census vertex pack: ${JSON.stringify(row.census?.pack ?? null)}`);
               for (const [owner, draws, triangles] of row.census?.owners?.slice(0, 12) ?? []) console.log(`  census ${String(triangles).padStart(8)} ${String(draws).padStart(5)}  ${String(owner)}`);
             } catch (error) { row.censusError = String(error); console.log(`  census: ${row.censusError}`); }
           }
