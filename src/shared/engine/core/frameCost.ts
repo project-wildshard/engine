@@ -13,7 +13,8 @@
  *            the 30 fps cap — the GPU, iOS's compositor, a missed vsync. WebKit cannot time the GPU, so it is inferred.
  *   idle     the cap's interval − the work, when the work fits in it: the headroom
  * and inside update, by BUCKET (each registered system by its label's prefix, Game.onUpdate / onFixed; plus `section`s
- * inside main.ts's big updater): physics · animals · elites · player · hud · audio · world · quest; `other` = the rest.
+ * inside the session's updaters): physics · animals · elites · player · hud · audio · world · quest.
+ * The remaining update time is split by system name, frame preparation, phase scheduling and event delivery.
  * SUBS break a bucket down further (not summed): the animals' think (10 Hz AI), pose (gait + bones per animal), motor
  * (their Rapier character controllers), nav (navmesh path / probe queries, also counted).
  *
@@ -45,6 +46,7 @@ export interface FrameCostSnapshot {
   frame: [number, number]; update: [number, number]; render: [number, number]; gpu: [number, number]; idle: number;
   /** means, ms per frame */
   buckets: Record<Bucket | 'other', number>;
+  otherParts: ReadonlyMap<string, number>;
   subs: Record<Sub, number>;
   /** navmesh queries per frame (mean) */
   navQueries: number;
@@ -61,6 +63,7 @@ class FrameCost {
   on = false;
   // ── this frame ──
   private readonly cur = new Float64Array(NB);
+  private splitMs = 0;
   private readonly curSub = new Float64Array(NS);
   private curNav = 0;
   private topMs = 0; private topLabel = '';
@@ -72,6 +75,8 @@ class FrameCost {
   private readonly renderR = new Float32Array(RING);
   private readonly gpuR = new Float32Array(RING);
   private readonly idleR = new Float32Array(RING);
+  // Only allocated as diagnostic frames are collected. Each slot is reused on the next turn of the ring.
+  private readonly partsR: Map<string, number>[] = [];
   private readonly bucketR = new Float32Array(RING * NB);
   private readonly subR = new Float32Array(RING * NS);
   private readonly navR = new Uint16Array(RING);
@@ -84,7 +89,7 @@ class FrameCost {
   private longTaskT: Float64Array | null = null; private ltn = 0;
   /** a per-frame listener (the panel's recorder) */
   onFrame: ((f: FrameRecord) => void) | null = null;
-  private readonly rec: FrameRecord = { t: 0, frame: 0, update: 0, render: 0, gpu: 0, idle: 0, buckets: new Float32Array(NB), subs: new Float32Array(NS), nav: 0, top: '', topMs: 0 };
+  private readonly rec: FrameRecord = { t: 0, frame: 0, update: 0, render: 0, gpu: 0, idle: 0, buckets: new Float32Array(NB), subs: new Float32Array(NS), nav: 0, top: '', topMs: 0, otherParts: new Map() };
 
   constructor() {
     try {
@@ -96,25 +101,34 @@ class FrameCost {
   }
 
   /** start of a drawn frame */
-  begin(): void { this.cur.fill(0); this.curSub.fill(0); this.curNav = 0; this.topMs = 0; this.topLabel = ''; }
+  begin(): void {
+    this.cur.fill(0); this.curSub.fill(0); this.curNav = 0; this.topMs = 0; this.topLabel = ''; this.splitMs = 0;
+    (this.partsR[this.n % RING] ??= new Map()).clear();
+  }
+
+  /** Unbucketed update work, measured while the diagnostics are on. */
+  other(label: string, ms: number): void {
+    const parts = this.partsR[this.n % RING];
+    if (parts === undefined || ms <= 0) return;
+    accumulateFramePart(parts, label, ms);
+  }
 
   /** one Game system ran for `ms` (Game.ts, while `on`) */
   system(label: string, ms: number): void {
     let b = this.labels.get(label);
     if (b === undefined) { b = bucketOfLabel(label); this.labels.set(label, b); }
-    if (b >= 0) this.cur[b] = (this.cur[b] ?? 0) + ms;
-    // a system split into sections (main.ts's) is not a cause itself: its sections are
-    if (!this.split && ms > this.topMs) { this.topMs = ms; this.topLabel = label; }
-    this.split = false;
+    const remaining = Math.max(0, ms - this.splitMs);
+    if (b >= 0) this.cur[b] = (this.cur[b] ?? 0) + remaining;
+    else this.other(label, remaining);
+    if (remaining > this.topMs) { this.topMs = remaining; this.topLabel = label; }
+    this.splitMs = 0;
   }
   private readonly labels = new Map<string, number>();
-  private split = false;
 
-  /** a stretch of an unclaimed system (main.ts's big updater) that belongs to `bucket`, begun at `t0` = performance.now() */
-  section(bucket: Bucket, t0: number): void {
-    const ms = performance.now() - t0;
+  /** A stretch within the currently measured system that belongs to a bucket. */
+  section(bucket: Bucket, ms: number): void {
     this.cur[BI[bucket]] = (this.cur[BI[bucket]] ?? 0) + ms;
-    this.split = true;
+    this.splitMs += ms;
     if (ms > this.topMs) { this.topMs = ms; this.topLabel = `main:${bucket}`; }
   }
   /** a breakdown inside a bucket (not summed into it again) */
@@ -151,6 +165,7 @@ class FrameCost {
       const r = this.rec;
       r.t = now; r.frame = frameMs; r.update = updateMs; r.render = renderMs; r.gpu = gpu; r.idle = idle; r.nav = this.curNav;
       r.buckets.set(this.cur); r.subs.set(this.curSub); r.top = this.topLabel; r.topMs = this.topMs;
+      r.otherParts = this.partsR[i] ?? r.otherParts;
       this.onFrame(r);
     }
   }
@@ -181,6 +196,8 @@ class FrameCost {
     let claimed = 0;
     for (const [b, name] of BUCKETS.entries()) { const v = mean((i) => this.bucketR[i * NB + b] ?? 0); buckets[name] = v; claimed += v; }
     buckets.other = Math.max(0, mean((i) => this.updateR[i] ?? 0) - claimed);
+    const otherParts = new Map<string, number>();
+    for (const i of w) for (const [name, ms] of this.partsR[i] ?? []) accumulateFramePart(otherParts, name, ms / m);
     const subs = {} as Record<Sub, number>;
     for (const [s, name] of SUBS.entries()) subs[name] = mean((i) => this.subR[i * NS + s] ?? 0);
     // the last 30 s
@@ -201,7 +218,7 @@ class FrameCost {
     if (lt !== null) { longTasks = 0; for (let j = 1; j <= Math.min(this.ltn, lt.length); j++) if (now - (lt[(this.ltn - j) % lt.length] ?? 0) < 30_000) longTasks++; }
     return {
       frames: w.length, frame: pct(this.frameR), update: pct(this.updateR), render: pct(this.renderR), gpu: pct(this.gpuR), idle: mean((i) => this.idleR[i] ?? 0),
-      buckets, subs, navQueries: mean((i) => this.navR[i] ?? 0), over50, over100,
+      buckets, otherParts, subs, navQueries: mean((i) => this.navR[i] ?? 0), over50, over100,
       worst: worst < 0 ? null : { ms: this.lms[worst] ?? 0, cause: this.lcause[worst] ?? '', ago: (now - (this.lt[worst] ?? now)) / 1000 },
       jumps, lastJump: this.jumpLabel, longTasks,
     };
@@ -222,6 +239,11 @@ class FrameCost {
 export interface FrameRecord {
   t: number; frame: number; update: number; render: number; gpu: number; idle: number;
   buckets: Float32Array; subs: Float32Array; nav: number; top: string; topMs: number;
+  otherParts: ReadonlyMap<string, number>;
+}
+
+export function accumulateFramePart(parts: Map<string, number>, label: string, ms: number): void {
+  parts.set(label, (parts.get(label) ?? 0) + ms);
 }
 
 export const frameCost: FrameCost = new FrameCost();

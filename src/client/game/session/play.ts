@@ -719,9 +719,9 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   let musicPoll = 0;
   const alertOnlyHostile = manifest.audio?.alertOnlyHostile === true;
   // the dev fps panel's split of this updater (src/shared/engine/core/frameCost.ts; free while the panel is closed): `mark(b)` books the
-  // time since the last mark to bucket b, `unmark()` leaves it in 'other'
+  // time since the last mark to bucket b; begin each marked system at its own timestamp
   let markT = 0;
-  const mark = (b: Bucket): void => { if (frameCost.on) { const now = performance.now(); frameCost.section(b, markT); markT = now; } };
+  const mark = (b: Bucket): void => { if (frameCost.on) { const now = performance.now(); frameCost.section(b, now - markT); markT = now; } };
   const unmark = (): void => { if (frameCost.on) markT = performance.now(); };
   game.onUpdate((dt, t) => {
     unmark();
@@ -745,7 +745,6 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     mark('world');
     // swimming holsters the weapon (hands only; Hands.ts follows)
     if (player.swimming !== swimHold) { swimHold = player.swimming; weapons.visible = !swimHold; weapons.setEnabled(!swimHold); }
-    unmark();
   }, 'main.world');
   app.addSystem({ id: 'engine.creatures.update', phase: 'update', after: ['main.world'], before: ['main.equipment'], run: (dt, t) => {
     const homeActive = grid === null || gridLive === null;
@@ -758,8 +757,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     }
   } }, game.levelScope);
   app.addSystem({ id: 'main.equipment', phase: 'update', after: ['engine.creatures.update'], before: ['engine.audio.listener'], run: (dt, t) => {
-    mark('animals');
     if (exploreApp) return;
+    unmark();
     weapons.update(dt, t); // every weapon ticks (bolts in flight keep flying while the rifle is out)
     boot.runtime.hooks.equipmentUpdate?.(dt); weaponStrip.update();
     boot.runtime.hooks.updatePickups?.(dt, t);
@@ -770,6 +769,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     audio.listenerYaw = player.yaw;
   } }, game.levelScope);
   app.addSystem({ id: 'main.frame', phase: 'update', after: ['engine.audio.listener'], before: ['engine.player.hud'], run: (dt) => {
+    unmark();
     boot.runtime.hooks.audioUpdate?.(dt);
     mark('audio');
 

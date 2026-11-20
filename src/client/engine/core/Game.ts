@@ -983,6 +983,8 @@ export class Game {
   private runPhase(phase: Phase, dt = FIXED_STEP, t = this.clock.elapsedTime): void {
     if (this.app.state === 'paused') return;
     const on = frameCost.on; // the dev fps panel's timing rows (src/shared/engine/core/frameCost.ts): one boolean read while it is closed
+    const phaseAt = on ? diagnosticNow() : undefined;
+    let systemMs = 0;
     for (const spec of this.app.systemsByPhase()[phase]) {
       let s = this.faultSystems.get(spec);
       if (!s) { s = makeSystem(spec.run, spec.id, spec.core ?? false, spec.id); this.faultSystems.set(spec, s); }
@@ -997,9 +999,17 @@ export class Game {
         if (on) t0 = diagnosticNow();
         spec.run(scheduledDt, t);
       } catch (e) { this.fault(s, e); }
-      if (t0 !== undefined) frameCost.system(s.label, diagnosticNow() - t0);
+      if (t0 !== undefined) {
+        const ms = diagnosticNow() - t0;
+        systemMs += ms;
+        frameCost.system(s.label, ms);
+      }
     }
+    if (phaseAt === undefined) { this.flushEvents(phase); return; }
+    const eventsAt = diagnosticNow();
     this.flushEvents(phase);
+    frameCost.other('event delivery', diagnosticNow() - eventsAt);
+    frameCost.other('phase scheduling', eventsAt - phaseAt - systemMs);
   }
   private readonly eventSystem = makeSystem(null, 'engine.events', false, 'engine.events');
   private flushEvents(phase: Phase): void {
@@ -1865,7 +1875,11 @@ export class Game {
       this.app.scheduler.beginFrame(this.app.clock.paused ? 0 : dt, this.app.equipmentHost?.player.position);
       // the dev fps panel's timing rows (src/shared/engine/core/frameCost.ts): each system timed by its label only while the panel is open
       const on = frameCost.on;
-      if (on) frameCost.begin();
+      if (on) {
+        const updateAt = diagnosticNow();
+        frameCost.begin();
+        frameCost.other('frame preparation', updateAt - lastRun);
+      }
       this.app.cpu.begin();
       // each system in its own try/catch (faults.ts): one that throws is counted, reported and, if it keeps at it, switched off
       this.runPhase('input', dt, t);

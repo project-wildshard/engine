@@ -25,7 +25,7 @@ import { saveStorage } from '../saves/slots';
  */
 import type { Game } from '../core/Game';
 import { TIER, frameCapFps } from '../core/tier';
-import { frameCost, BUCKETS, SUBS, type FrameRecord } from '../../../shared/engine/core/frameCost';
+import { accumulateFramePart, frameCost, BUCKETS, SUBS, type FrameRecord } from '../../../shared/engine/core/frameCost';
 import { textureReport } from '../boot/gpuFiles';
 import { ktx2ProbeLine } from '../render/ktx2Probe';
 import { isDev } from '../core/devMode';
@@ -122,7 +122,7 @@ export class PerfHud {
   private readonly sparkKind = new Uint8Array(120);
   private startedLast = 0; private startedAt = performance.now(); private startRate = 0;
   // recording
-  private rec: { t0: number; frames: RecFrame[]; maxCounts: Counts; samples: number } | null = null;
+  private rec: { t0: number; frames: RecFrame[]; otherParts: Map<string, number>; maxCounts: Counts; samples: number } | null = null;
   lastRecText = '';
   onRecDone: ((text: string) => void) | null = null;
 
@@ -180,11 +180,12 @@ export class PerfHud {
   startRec(): void {
     if (this.rec !== null) return;
     hookAudio();
-    this.rec = { t0: performance.now(), frames: [], maxCounts: {}, samples: 0 };
+    this.rec = { t0: performance.now(), frames: [], otherParts: new Map(), maxCounts: {}, samples: 0 };
     frameCost.on = true; this.dom.set(true);
     frameCost.onFrame = (f: FrameRecord) => {
       const r = this.rec;
       if (r === null) return;
+      for (const [name, ms] of f.otherParts) accumulateFramePart(r.otherParts, name, ms);
       r.frames.push({ t: f.t - r.t0, frame: f.frame, update: f.update, render: f.render, gpu: f.gpu, buckets: Array.from(f.buckets), subs: Array.from(f.subs), nav: f.nav, top: f.top, topMs: f.topMs });
     };
   }
@@ -232,6 +233,8 @@ export class PerfHud {
     L.push(`physics ${f1(b.physics)} · animals ${f1(b.animals)} · elites ${f1(b.elites)}`);
     L.push(`player ${f1(b.player)} · hud ${f1(b.hud)} · audio ${f1(b.audio)}`);
     L.push(`world ${f1(b.world)} · quest ${f1(b.quest)} · other ${f1(b.other)}`);
+    const other = namedUpdateParts(s.otherParts, 1);
+    if (other.length > 0) L.push(` other: ${other}`);
     L.push(` animals: think ${f1(u.think)} pose ${f1(u.pose)} motor ${f1(u.motor)}`);
     L.push(` nav ${f1(u.nav)} ms · ${f1(s.navQueries)} queries/frame`);
     L.push(`SPIKES 30 s  >50ms ${s.over50} · >100ms ${s.over100}`);
@@ -281,7 +284,7 @@ export class PerfHud {
     frameCost.onFrame = null;
     frameCost.on = this.open;
     this.dom.set(this.open);
-    const text = recSummary(r.frames, r.maxCounts, this.game, this.abLabel);
+    const text = recSummary(r.frames, r.otherParts, r.maxCounts, this.game, this.abLabel);
     this.lastRecText = text;
     try { savedStorage.setItem(STORE, text); } catch { /* not kept this session */ }
     this.onRecDone?.(text);
@@ -304,7 +307,12 @@ function textureLine(): string {
 function pct(v: number[], p: number): number { const s = [...v].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(s.length * p))] ?? 0; }
 
 /** the recording's summary: what Jake pastes back */
-function recSummary(frames: readonly RecFrame[], max: Counts, game: Game, abOff: string): string {
+function namedUpdateParts(parts: ReadonlyMap<string, number>, frames: number): string {
+  return [...parts].filter(([, ms]) => ms / frames >= 0.3).sort((a, b) => b[1] - a[1])
+    .map(([name, ms]) => `${name} ${f1(ms / frames)}`).join(' · ');
+}
+
+function recSummary(frames: readonly RecFrame[], otherParts: ReadonlyMap<string, number>, max: Counts, game: Game, abOff: string): string {
   const L: string[] = [];
   const secs = frames.length > 0 ? ((frames[frames.length - 1]?.t ?? 0) / 1000) : 0;
   L.push(`${appIdentity().name.toUpperCase()} PERF REC · build ${buildId() || '?'} · ${new Date().toISOString().slice(0, 16)}`);
@@ -321,6 +329,8 @@ function recSummary(frames: readonly RecFrame[], max: Counts, game: Game, abOff:
   const parts = BUCKETS.map((name, i) => `${name} ${f1(mean((f) => f.buckets[i] ?? 0))}`);
   const other = mean((f) => Math.max(0, f.update - f.buckets.reduce((s, x) => s + x, 0)));
   L.push(`update mean: ${parts.join(' · ')} · other ${f1(other)}`);
+  const named = namedUpdateParts(otherParts, m);
+  if (named.length > 0) L.push(`other: ${named}`);
   L.push(`animals: ${SUBS.map((name, i) => `${name} ${f1(mean((f) => f.subs[i] ?? 0))}`).join(' · ')} · nav ${f1(mean((f) => f.nav))} q/frame`);
   L.push(`frames > 50 ms: ${frames.filter((f) => f.frame > 50).length} · > 100 ms: ${frames.filter((f) => f.frame > 100).length}`);
   L.push('top 5 frames:');
