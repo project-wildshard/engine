@@ -11,7 +11,7 @@ import {titanPrograms as programs} from './fixtures/frozen/titan';
 function fixture(){
   const row=structuredClone(programs.attack),artifact=parseReturnProjectionV2(row.v2).artifact;
   const bytes=Uint8Array.from(atob(row.v2.bytes),value=>value.codePointAt(0)??0);
-  const assets=new Map([[artifact.hash,bytes]]);
+  const assets=new Map<string,Uint8Array>([[artifact.hash,bytes]]);
   const contract={id:'fixture.projection',module:`blobs/wasm/${artifact.hash}.wasm`,side:'sim' as const,abi:2 as const,
     lane:'project' as const,pages:artifact.pages,ioBytes:artifact.ioBytes,compilerRevision:artifact.compilerRevision,admissionRevision:artifact.admissionRevision};
   row.v2.bytes='';
@@ -64,6 +64,27 @@ test('raw lookup uses the original concrete map without invoking an overridden g
     f.assets.set(f.row.v2.artifact.hash,new Uint8Array([0]));
     expect(()=>ReturnProgram.page(f.row,owner)).toThrow('hash mismatch');
   }finally{get.mockRestore();owner.dispose();}
+});
+
+test('same-owner loans keep earlier modules and refuse conflicting alias contracts atomically',()=>{
+  const f=fixture(),owner=new Scope('raw.composed'),fresh=new Scope('raw.unlent');
+  const weatherHash=weatherRaw.script.module.slice('blobs/wasm/'.length,-'.wasm'.length);
+  const weather={script:weatherRaw.script,bytes:weatherRaw.bytes};
+  f.assets.set(weatherHash,weatherModuleBytes);
+  try{
+    ReturnProgram.lendModules(owner,f.assets,[f.contract]);
+    const first=ReturnProgram.page(f.row,owner);
+    const conflict={...f.contract,id:'other.projection',ioBytes:f.contract.ioBytes+64};
+    expect(()=>ReturnProgram.lendModules(owner,f.assets,[weatherRaw.script,conflict]))
+      .toThrow(/fixture\.projection.*other\.projection.*ioBytes/u);
+    expect(()=>ReturnProgram.page(weather,owner)).toThrow('raw return module loan');
+    ReturnProgram.lendModules(owner,f.assets,[weatherRaw.script,{...f.contract,id:'other.projection'}]);
+    expect(ReturnProgram.page(f.row,owner)).toBe(first);
+    expect(ReturnProgram.page(weather,owner).project('lineStart',{...nightParameters,at:-1,px:0,pz:24},new Rng(503)))
+      .toEqual(ReturnProgram.page({script:weatherWitness.script,bytes:weatherWitness.bytes})
+        .project('lineStart',{...nightParameters,at:-1,px:0,pz:24},new Rng(503)));
+    expect(()=>ReturnProgram.page(weather,fresh)).toThrow('raw return module loan');
+  }finally{owner.dispose();fresh.dispose();}
 });
 
 test('inline descriptors keep their original admission and owner cache',()=>{

@@ -9,18 +9,21 @@ import {
   createShardfileSim,
   prepareShardfileSimRestore,
 } from '../src/server/game/plugin/simulation'
-import { preflightPlainPerches } from '../src/server/game/shardfile/dataPerchBrains'
+import { dataPerchBrains, preflightPlainPerches } from '../src/server/game/shardfile/dataPerchBrains'
+import { prepareReturns } from '../src/server/game/shardfile/nativeRuntimeLoans'
 import { Scope } from '../src/shared/engine/app/scope'
 import { Rng } from '@wildshard/format/seededRng'
 import { loadRapier } from '../src/shared/engine/physics/rapier'
 import { sha256 } from '../src/shared/game/plugin/moduleHash'
 import { ReturnProgram } from '../src/shared/game/population/returnProgram'
+import { createShardFolder } from '../src/shared/game/shardfile/shardFolder'
 import {
   lendFrozenReturns,
   frozenReturnInline,
 } from './fixtures/frozen/returns'
 import { frozenTitanInline } from './fixtures/frozen/runtimePrograms'
 import { perchFixture } from './fixtures/plain-perch'
+import { groundFixture } from './fixtures/plain-ground'
 
 const assets = () => new Map<string, Uint8Array>()
 
@@ -309,6 +312,36 @@ test('canonical perch inventory rows and an identical actual return consumer sha
   } finally {
     project.mockRestore()
     random.mockRestore()
+  }
+})
+
+test('a declared perch borrows the module already lent by the native return inventory', async () => {
+  const shard = perchFixture(), body = shard.creatures.perchBodies?.[0]
+  if (body === undefined) throw Error('Missing fixture perch')
+  const hash = body.program.script.module.slice('blobs/wasm/'.length, -'.wasm'.length)
+  const table = new Map([[hash, Uint8Array.from(Buffer.from(body.program.bytes, 'base64'))]])
+  body.program.bytes = ''
+  const [alias] = creaturePerchAdmissionRows([body])
+  expect(alias?.module).toBe(body.program.script.module)
+  expect(alias?.id).not.toBe(body.program.script.id)
+  const product = createShardFolder({
+    slug: shard.identity.slug, revision: 1, shardfile: shard,
+    sections: new Map([['actors/return-scripts', [body.program.script]]]),
+    files: new Map(), read: () => Promise.reject(new Error('Unexpected asset read')),
+  })
+  const lend = await prepareReturns({ product, assets: table })
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'))
+  const sim = createShardfileSim(groundFixture(), assets(), { rapier, ground: false })
+  try {
+    lend(sim.host)
+    const native = ReturnProgram.native(sim.host, body.program)
+    const actor = sim.host.entities.get('fixture.actor')
+    const { perchHunter } = dataPerchBrains(sim.host, shard, table)
+    if (actor === undefined || perchHunter === undefined) throw Error('Missing perch actor or port')
+    expect(() => perchHunter(actor, sim.host).observe(1 / 60)).not.toThrow()
+    expect(ReturnProgram.native(sim.host, body.program)).toBe(native)
+  } finally {
+    sim.dispose()
   }
 })
 

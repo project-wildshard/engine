@@ -109,12 +109,23 @@ function returnIdentity(row: ReturnType<typeof readProgram>) {
  *  entry lent the same modules to its entry scope and then its level, hashing and admitting each twice in one 183 ms
  *  frame); a replaced array is verified again, and every program hashes and admits its bytes again when it is built */
 const lentBytes = new WeakMap<Uint8Array, string>();
+function rawAdmission(row:ReturnModuleRow) {
+  return row.abi===2
+    ? {abi:2 as const,lane:row.lane,pages:row.pages,ioBytes:row.ioBytes,compilerRevision:row.compilerRevision,admissionRevision:row.admissionRevision}
+    : {abi:1 as const,pages:row.pages};
+}
+/** Row ids and projection bindings belong to consumers. The loan covers byte admission. */
+function incompatibleRawField(previous:ReturnModuleRow,row:ReturnModuleRow):string|undefined {
+  const expected:Readonly<Record<string,string|number>>={side:row.side,...rawAdmission(row)};
+  return Object.entries({side:previous.side,...rawAdmission(previous)})
+    .find(([field,value])=>expected[field]!==value)?.[0];
+}
 /** Hash and contract-admit one raw module's bytes for its declaration, once per bytes and declaration. */
 function admitRawModule(bytes:Uint8Array,hash:string,row:ReturnModuleRow):void {
-  const declared=JSON.stringify(row);
+  const contract=rawAdmission(row),declared=`${hash}:${JSON.stringify(contract)}`;
   if(lentBytes.get(bytes)===declared)return;
   if(sha256(bytes)!==hash)throw new Error('Raw return module hash mismatch');
-  admitScriptContract(bytes,row.abi===2?{abi:2,lane:row.lane,pages:row.pages,ioBytes:row.ioBytes,compilerRevision:row.compilerRevision,admissionRevision:row.admissionRevision}:{abi:1,pages:row.pages});lentBytes.set(bytes,declared);
+  admitScriptContract(bytes,contract);lentBytes.set(bytes,declared);
 }
 /** A plain record's own field names, or null when a field could change unseen by them (an inherited field, an accessor). */
 function plainFields(record: Readonly<Record<string, number>>): string[] | null {
@@ -270,22 +281,27 @@ export class ReturnProgram {
     }
   }
   /** Lend the original admitted asset map to its actual runtime scope. Child
-   * scopes borrow it; unrelated scopes cannot. No byte or state copy is kept. */
+   * scopes borrow it; unrelated scopes cannot. Compatible module loans share
+   * one inventory per scope. Each consumer still admits its own declaration. */
   static lendModules(owner:Scope,assets:ReadonlyMap<string,Uint8Array>,input:readonly ReturnModuleRow[]):void {
     if(!(assets instanceof Map))throw new Error('Return modules require the original asset map');
-    const rows=v.parse(ReturnModulesSchema,input),selected=new Map<string,RawReturnRow>();
+    const rows=v.parse(ReturnModulesSchema,input),loan=scoped.get(owner)?.loan;
+    if(loan!==undefined&&loan.assets!==assets)throw new Error('Raw return module loan changed asset maps in the same scope');
+    const selected=new Map(loan?.rows);
     for(const row of rows){
       const hash=row.module.slice('blobs/wasm/'.length,-'.wasm'.length),previous=selected.get(hash);
       if(row.abi!==2&&!Map.prototype.has.call(assets,hash))continue;
-      if(previous!==undefined&&JSON.stringify(previous)!==JSON.stringify(row))throw new Error('Conflicting raw return module declarations');
+      if(previous!==undefined){
+        const field=incompatibleRawField(previous,row);
+        if(field!==undefined)throw new Error(`Conflicting raw return module contracts for ${row.module}: rows ${previous.id} and ${row.id} disagree on ${field}`);
+      }
       const bytes:unknown=Map.prototype.get.call(assets,hash);
       if(!(bytes instanceof Uint8Array))throw new Error('Raw return module hash mismatch');
       admitRawModule(bytes,hash,row);
-      selected.set(hash,row);
+      if(previous===undefined)selected.set(hash,row);
     }
-    const book=ownerBook(owner),previous=book.loan;
-    if(previous!==undefined&&(previous.assets!==assets||JSON.stringify([...previous.rows])!==JSON.stringify([...selected])))throw new Error('Raw return module loan changed');
-    book.loan={assets,rows:selected};
+    if(selected.size>SCRIPT_LIMITS.instances)throw new Error('Raw return module loan exceeds the native instance limit');
+    ownerBook(owner).loan={assets,rows:selected};
   }
   /** Detached declared names for resource preflight before allocating a module. */
   static projectionBindings(input:unknown):{readonly script:Pick<DecisionScriptRow,'fields'|'signals'|'channels'>} { const row=readProgram(input);return {script:row.v2===undefined?row.script:{fields:Object.fromEntries(row.v2.fields.map(name=>[name,name])),signals:Object.fromEntries(row.v2.signals.map(name=>[name,name])),channels:Object.fromEntries(row.v2.channels.map(name=>[name,name]))}}; }
