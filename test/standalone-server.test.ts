@@ -55,7 +55,7 @@ test('the server ticks on its own clock, frames arrive at 30 Hz, and rows match 
   await until(() => client.frame(probe.tick) !== null);
   const frame = client.frame(probe.tick), step = ANIMAL_CLASS.row[0]?.step ?? 0;
   if (frame === null) throw new Error('Probed frame missing');
-  expect(probe.rows).toHaveLength(13);
+  expect(probe.rows).toHaveLength(14); // 13 creatures and r5's Matriarch, waiting out of the world (past the near band below)
   const { px, py, pz } = client.owner(frame);
   for (const row of probe.rows) {
     const handle = [...client.entities.values()].find(entity => entity.id === row.id)?.handle ?? -1, fields = client.fields(frame, handle);

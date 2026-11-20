@@ -50,6 +50,8 @@ const creatureCount = (client: NetClient): number => [...client.entities.keys()]
 /** A row past the near band is on its tier (§3.3): it may be the frame before, and only the frame before. */
 const NEAR_BAND = 60;
 type Positions = ReadonlyMap<string, Vector3>;
+/** The creatures standing in the world: a spawned boss waits out of it, unreplicated, until its summon (Dunes r5's Matriarch). */
+const standing = (host: NativeHeadlessResident['host']): string[] => [...host.entities].filter(([, sim]) => !('hidden' in sim && sim.hidden === true)).map(([id]) => id);
 const positions = (resident: NativeHeadlessResident): Positions => new Map([...resident.host.entities].map(([id, sim]) => [id, sim.position.clone()]));
 const within = (fields: Readonly<Record<string, unknown>>, at: Vector3 | undefined, step: number): boolean => at !== undefined && (['x', 'y', 'z'] as const).every(axis => Math.abs(Number(fields[axis]) - at[axis]) <= step);
 function checkRows(resident: NativeHeadlessResident, client: NetClient, before: Positions): number {
@@ -80,14 +82,14 @@ test('frames carry every creature within one quantisation step, and the owner bl
   room.open(); link.pump();
   expect(client.welcome).toMatchObject({ schemaHash: SERVER_TABLES.hash, simHz: 60, frameHz: 30 });
   expect(client.latest?.baselineTick).toBe(0xffffffff);
-  expect(creatureCount(client)).toBe(resident.host.entities.size);
+  expect(creatureCount(client)).toBe(standing(resident.host).length);
   let frames = 0, seq = 0, before = positions(resident);
   client.onFrame(() => { frames++; });
   for (let tick = 0; tick < 600; tick++) {
     seq = client.command(walk(0.4)); client.flush(); link.pump();
     room.tick(); link.pump();
     if (resident.host.state.tick % 2 === 0) {
-      expect(checkRows(resident, client, before)).toBe(resident.host.entities.size);
+      expect(checkRows(resident, client, before)).toBe(standing(resident.host).length);
       before = positions(resident);
       const player = leadPlayer(resident.host), owner = client.latest === null ? null : client.owner(client.latest);
       for (const [field, axis] of [['px', 'x'], ['py', 'y'], ['pz', 'z']] as const) expect(owner?.[field]).toBe(player.position[axis]);
@@ -201,7 +203,7 @@ test('hello: v0.1.x and older reload, newer retries, another build of this wire 
 
 test('relevance and handles: entities come and go with their spawn, and a retired slot returns under a new generation', async () => {
   const resident = await sunscar(), { host } = resident, inner = new SimNetWorld(host), hidden = new Set<string>();
-  const ids = [...host.entities.keys()], last = ids[ids.length - 1] ?? '', other = ids[0] ?? '';
+  const ids = standing(host), last = ids[ids.length - 1] ?? '', other = ids[0] ?? '';
   hidden.add(last);
   const world: NetWorld = { tick: () => inner.tick(), cell: () => inner.cell(), player: inner.player,
     visit: (visitor: NetVisitor) => { inner.visit({ entity: (id, cls, view) => { if (!hidden.has(id)) visitor.entity(id, cls, view); } }); } };

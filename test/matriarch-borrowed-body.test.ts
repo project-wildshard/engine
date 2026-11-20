@@ -1,27 +1,18 @@
-import { runtimeAssets } from './fixtures/engine-lift/folder';
-// oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads official immutable output bytes.
-import { loadHeadlessFolder } from '@wildshard/engine/host/headlessFolder';
+import { dunesKeeper } from './fixtures/dunes-r3-keeper';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
-import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
-import { readFileSync } from 'node:fs';
 import * as v from 'valibot';
 import { expect,test } from 'vitest';
 import { createSimHost } from '../src/server/engine/sim';
 import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { prepareRuntimeWorld } from '../src/server/game/plugin/simulation';
-import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
-import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
-import { builtFolder } from './fixtures/engine-lift/folder';
 
 const savedPolicy = v.object({ phase: v.number(), fighting: v.boolean(), decision: v.string() });
 const logical = v.object({ decision: v.object({ bindings: v.array(v.object({ failures: v.number(), slots: v.record(v.string(), v.union([v.number(), v.boolean()])) })) }) });
 test('the Matriarch guest borrows each encounter body and resumes its grounded continuation', async () => {
-  const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), declaration = parseNativeRuntimePlan(product.section('sim/runtime-plan'));
-  const descriptor = outputDescriptor(product.shardfile); if (descriptor === undefined) throw new Error('Missing verified product');
-  const assets = runtimeAssets(product, directory);
-  const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
-  const world = await prepareRuntimeWorld(product.shardfile, assets, declaration.baked, declaration.recipe, descriptor.sections);
+  // Dunes r5 moved her to a declared encounter; the keeper-era guest stays under test on the frozen r3 keeper (r4's decision row).
+  const { shard, assets, sections, plan: declaration, rapier } = await dunesKeeper();
+  const world = await prepareRuntimeWorld(shard, assets, declaration.baked, declaration.recipe, sections);
   const host = createSimHost(world.level, { ...world.ports, rapier });
   let restored: ReturnType<typeof restoreSimHost> | undefined;
   const policy = (owner: typeof host) => {

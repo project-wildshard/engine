@@ -10,7 +10,7 @@ test.each([
   'mover-carry',
 ])('%s consumes an existing product without building an app or starting a server', name => {
   const source = readFileSync(`test/${name}.test.ts`, 'utf8');
-  expect(source).toContain('builtFolder(');
+  expect(source).toMatch(/builtFolder\(|dunesKeeper\(/u); // dunesKeeper reads the built Dunes folder with a frozen keeper
   expect(source).not.toMatch(/node:child_process|scripts\/build-shardfiles|createServer\(|localhost:3000/u);
 });
 

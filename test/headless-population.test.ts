@@ -62,8 +62,10 @@ test('Sunscar spawns, moves, kills and refills its creatures headless, and its c
     const born = populationCensus(live.host);
     expect(born.homes).toEqual([]);
     expect(born.bodies.map(body => body.id).sort()).toEqual(spawns.map(row => row.id).sort());
-    expect(born.kinds).toEqual({ duneRay: { alive: 1, fallen: 0 }, sandSkitterer: { alive: 10, fallen: 0 }, duneStrider: { alive: 2, fallen: 0 } });
-    expect(born.bodies.every(row => row.alive)).toBe(true);
+    // r5's Matriarch is a declared boss spawn that waits out of the world, down, until the signal fire summons her
+    expect(born.kinds).toEqual({ duneRay: { alive: 1, fallen: 0 }, sandSkitterer: { alive: 10, fallen: 0 }, duneStrider: { alive: 2, fallen: 0 },
+      duneMatriarch: { alive: 0, fallen: 1 } });
+    expect(born.bodies.filter(row => !row.alive).map(row => row.id)).toEqual(['sunscar.matriarch']);
     const wire = JSON.stringify(born); // plain JSON: no live body, vector or clock
     expect(JSON.parse(wire)).toEqual(born);
 

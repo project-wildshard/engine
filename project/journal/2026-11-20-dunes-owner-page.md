@@ -20,3 +20,15 @@ the Matriarch inside her arena, but every fall put the player at the shard's spa
 rim the encounter declares. A declared encounter (`PhaseEncounter`) placed the fallen on `actor.died` but never answered
 `death.checkpoint`, so the room's J107 respawn moved them first. It now answers it while engaged in a room, as a boss
 row does; `test/encounter-room-respawn.test.ts` failed first (the bot stood at the spawn, 5.7 m off).
+
+## Main red after the r5 pin (opus-of19-dunes3)
+
+The r5 pin (`04855fb7de`) turned main red in nine tests across nine files. Rev 5's Matriarch is a declared boss spawn that waits out of the world, unreplicated and down, until the signal fire summons her, and the keeper stands no boss. The fixes:
+
+- net-room counts the standing creatures, and standalone-server expects 14 probe rows.
+- The census expects her down at birth.
+- The released v0.1.1 save is refused on r5's level.
+- runtime-declared-encounters binds to r5's own encounter id, and its refusal case freezes r4's keeper boss row.
+- The keeper-era tests (runtime-declared-creatures, matriarch-borrowed-body) run on the frozen r3 keeper with r4's Matriarch decision row and module (`test/fixtures/frozen/dunes-r4-matriarch-decision.*`).
+
+The crank guard's tap from the 88.1 stand met a well skitterer in the lash's lane on r5's tick, so the page cracks again, up to four times.

@@ -31,7 +31,13 @@ test.each([{stand:[81.5,-5],hold:60},{stand:[88.1,-3.6],hold:1},{stand:[84.8,-4.
     const yaw=Math.atan2(-dx,-dz),pitch=Math.atan2(CRANK.y-y-1.68,Math.hypot(dx,dz));
     const held:HeadlessCommand={kind:'player',moveX:0,moveZ:0,yaw,pitch,heavy:{},swing:true};
     const free:HeadlessCommand={kind:'player',moveX:0,moveZ:0,yaw,pitch};
-    const hold=await part({id:'hold-heavy',ticks:holdTicks,commands:[held]}),go=await part({id:'let-go',ticks:90,commands:[free]});
+    // The well's skitterer pack stands about the crank stands; a lash that meets one of them strikes it, not the crank (Dunes r5's
+    // pack sits in the 88.1 stand's lane on the tap's tick), so the page cracks again, as a player would, up to four times.
+    const raised=(observation:{adapters:{id:string;state:string}[]})=>observation.adapters.some(row=>row.state.includes('"raised":true'));
+    let hold=await part({id:'hold-heavy-0',ticks:holdTicks,commands:[held]}),go=await part({id:'let-go-0',ticks:90,commands:[free]});
+    for(let attempt=1;attempt<4&&!raised(go);attempt++){
+      hold=await part({id:`hold-heavy-${attempt}`,ticks:holdTicks,commands:[held]});go=await part({id:`let-go-${attempt}`,ticks:90,commands:[free]});
+    }
     await part(walk('back-to-the-well',[[stand[0],stand[2]],[81.5,-5]]));
     const oil=await part(use('take-oil','well'));
     expect(oil.flags,JSON.stringify({stand,yaw,pitch,hold:hold.adapters,go:go.adapters})).toContain('sunscar.oil');

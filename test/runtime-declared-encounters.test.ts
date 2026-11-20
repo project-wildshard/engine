@@ -1,7 +1,7 @@
 // ONE-FORMAT OF19c0: declared encounters run beside a native runtime plan. Sunscar Dunes keeps its runtime plan for its
 // quest page and held melee (J367 (7)) while its boss moves to a declared `boss` encounter (OF19c1), so the plan's
 // keeper may stand nothing (no boss, no owner row) and the quest page's summon (`{ spawn }` on the signal fire) arms the
-// declared encounter on that spawn. The fixture is the shipped Dunes product with its keeper emptied and one declared
+// declared encounter on that spawn. The fixture is the shipped Dunes product (r5, which ships this shape) with its keeper emptied and one declared
 // boss spawn at the Matriarch's arena: the signal fire's summon binds to it; summoned, a player in the arena starts the
 // fight, and the host saves and restores it exactly. A declared encounter on a keeper body, and a keeper boss with no owner row, refuse.
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
@@ -29,8 +29,10 @@ const rows = JSON.parse(readFileSync('test/fixtures/dunes-of11b-rows.json', 'utf
   rows: { species: ShardRows['species']; brains: ShardCreatures['brains']; strikes: ShardRows['strikes'] };
 };
 type Plan = ReturnType<typeof parseNativeRuntimePlan>;
-const BOSS = 'sunscar.matriarch', FIGHT = 'of19c0.fight', ARENA: readonly [number, number] = [-14, -141];
+const BOSS = 'sunscar.matriarch', FIGHT = BOSS, ARENA: readonly [number, number] = [-14, -141];
 
+/** Dunes r4's keeper boss row, frozen from that pin: r5's keeper stands no boss (its Matriarch is the declared encounter). */
+const KEEPER_BOSS = { at: [-14, -150], id: BOSS, kind: 'duneMatriarch', look: 'matriarch', yaw: 0 };
 interface Dunes { shard: Shardfile; assets: Map<string, Uint8Array>; sections: ReadonlyMap<string, unknown>; plan: Plan; rapier: Rapier }
 async function dunes(): Promise<Dunes> {
   const directory = builtFolder('sunscar-dunes'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
@@ -136,7 +138,7 @@ test('a declared encounter on a keeper body, and a keeper boss with no owner row
   const shard = declaring(fixture.shard, probe.ports.heightAt(ARENA[0], ARENA[1]));
   // the keeper's own boss (and its owner) beside a declared spawn of the same id: one body, one owner
   const { holds: _holds, ...kept } = fixture.plan.recipe.population.rows;
-  const keeper = { ...fixture.plan.recipe, population: { ...fixture.plan.recipe.population, rows: { ...kept, homes: [] } } } as unknown as NativeRuntimeRecipe;
+  const keeper = { ...fixture.plan.recipe, population: { ...fixture.plan.recipe.population, rows: { ...kept, homes: [], boss: KEEPER_BOSS } } } as unknown as NativeRuntimeRecipe;
   await expect(prepareRuntimePlan(shard, fixture.assets, fixture.plan.baked, keeper, fixture.sections)).rejects.toThrow(/one body, one owner/u);
   // a keeper that stands a boss needs the owner row that fights it
   const { owner: _owner, ...population } = keeper.population;
