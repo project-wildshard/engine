@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.53 (2026-11-19)
+
+- Brasscap rev 12 brings tracers, muzzle flash, impact dust, reload animation and updated Wyrm timing.
+- Dunes can load the new shard format. Runtime plans support declared owner bosses.
+- The launch screen shows slow startup, and returning to the app gets a brief quiet reconnect window.
+- Zone Select enters at the spawn, the Bag map opens on the player's zone, and players make soft contact when they run into each other.
+- Returning to Sky Reach works after saving at its grid exit.
+
 ## v0.1.50 (2026-11-19)
 
 - Brasscap Mesa uses revision 9, with the current Dust Wyrm.
