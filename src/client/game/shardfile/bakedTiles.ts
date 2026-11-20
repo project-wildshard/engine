@@ -16,6 +16,8 @@ import { slicer } from '@wildshard/engine/boot/plan';
 import { ktx2File, ktx2Texture } from '@wildshard/engine/core/ktx2';
 import { TIER } from '@wildshard/engine/core/tier';
 import { gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
+import { graphicsMode, PIXELS_EVENT } from '@wildshard/engine/core/graphicsMode';
+import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { defineGeometryModel, modelContext } from '@wildshard/engine/models/model';
 import { placeSliced } from '@wildshard/engine/models/place';
 import type { CullOptions } from '@wildshard/engine/models/cull';
@@ -36,6 +38,7 @@ import { colliderTileKeys, type TileContent } from './tileContent';
 import { tiledMesh } from './tiledMesh';
 import { bakedPlacementPoses } from '../../../shared/game/shardfile/bakedPlacementPoses';
 import { readContent } from '@wildshard/engine/boot/contentRead';
+import { mergeView } from './groundMerge';
 
 /** What a row is drawn into: the product its files resolve against, the live world, and the scope its pieces leave with
  *  (absent: the ambient owner, as a resident world's build). */
@@ -135,6 +138,8 @@ async function placeFamilies(owner: BakedTilesOwner, row: BakedTilesRow, instanc
   protos.traverse(o => { if (isMesh(o)) geometry.set(o.name, o.geometry); });
   const materials = Object.fromEntries(Object.entries(instances.looks).map(([slot, entry]) => [slot, lentLook(entry.look)]));
   const ctx = modelContext(owner.sky), slice = slicer();
+  const batch = owner.scope !== undefined && TIER === 'phone' && bakedPropBatchEnabled(row.id);
+  const batchMeshes: THREE.Mesh[] = [];
   for (const family of plan.families) {
     const declared = instances.families.find(entry => entry.key === family.key); if (declared === undefined) throw new Error('Missing baked family');
     const model = defineGeometryModel(declared.model, 'proto', { category: declared.model.category, pipeline: declared.model.pipeline }, { geometry, materials });
@@ -142,10 +147,12 @@ async function placeFamilies(owner: BakedTilesOwner, row: BakedTilesRow, instanc
     const slot = instances.looks[declared.look]; if (slot === undefined) throw new Error('Missing baked family look');
     const cull: CullOptions = slot.cull[TIER];
     // FC12: a merged family is one mesh per material (its tints baked into its vertex colours); the rest instanced
-    await owned(owner, () => placeSliced(model, placements, { ctx, registry: owner.registry, parent: group, cull,
+    const placed = await owned(owner, () => placeSliced(model, placements, { ctx, registry: owner.registry, parent: group, cull,
       ...(declared.merge === true ? { draw: 'merged' as const, mergedTint: true, shadowWhole: true } : { draw: 'instanced' as const }),
       piece: { id: `${row.id}-${family.key}`, ...(family.colliders.length > 0 ? { colliders: family.colliders.map(c => boxDesc(c, instances.surface)) } : {}) } }, slice.due));
+    if (batch && declared.merge === true && isMesh(placed.object)) batchMeshes.push(placed.object);
   }
+  if (batch) installBakedPropBatch(group, batchMeshes, owner.scope);
   const piece = { name: instances.unclaimed, category: 'nature' as const, file: 'src/client/game/shardfile/bakedTiles.ts', surface: instances.surface, solidFloor: false };
   const colliders = plan.unclaimed.map(c => boxDesc(c, instances.surface)), id = `${row.id}-unclaimed`;
   if (owner.scope === undefined) { owned(owner, () => owner.registry.add({ ...piece, id, colliders })); return undefined; }
@@ -153,6 +160,33 @@ async function placeFamilies(owner: BakedTilesOwner, row: BakedTilesRow, instanc
   const whole = owner.scope.child(`baked.${row.id}.unclaimed`);
   withOwner(whole, () => owner.registry.add({ ...piece, id, colliders }));
   return { piece, id, colliders, whole, registry: owner.registry };
+}
+
+const batchSlot = jsonSlot('debug.bakedPropBatch', 'device');
+
+export function bakedPropBatchEnabled(row: string): boolean {
+  try { return batchSlot.read() === row; } catch { return false; }
+}
+
+/** Only whole, already merged baked props enter the trial. Each family
+ * still owns its own pick surface, shadows and colliders. */
+export function installBakedPropBatch(group: THREE.Group, meshes: readonly THREE.Mesh[], resident: Scope): void {
+  if (meshes.length < 2) return;
+  let low: Scope | undefined;
+  const refresh = (): void => {
+    if (resident.disposed || resident.disposing) return;
+    if (graphicsMode() !== 'low') { low?.dispose(); low = undefined; return; }
+    if (low !== undefined) return;
+    low = resident.child('baked-prop-batch');
+    for (const mesh of meshes) {
+      if (Array.isArray(mesh.material) || mesh.material.transparent || mesh.layers.mask !== 1) continue;
+      const mask = mesh.layers.mask;
+      mergeView(group, mesh, mesh.material, low);
+      low.onDispose(() => { mesh.layers.mask = mask; });
+    }
+  };
+  resident.listen(document, PIXELS_EVENT, refresh);
+  refresh();
 }
 
 /** baked sets already tiled (a set is shared by its shard's residents: it is tiled once) */
