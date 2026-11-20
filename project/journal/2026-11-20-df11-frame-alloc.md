@@ -37,3 +37,4 @@
 - mini-df11c: road tile decode checks positions with an indexed loop (a for-of over the Float32Array boxed every component), and a far proxy poses its positions and normals straight from their arrays with three's arithmetic in three's order (test/far-pose-bits.test.ts holds it bit-equal to applyMatrix4).
 - mini-df11c: portable sin and cos returned a fresh heap number per call where not inlined (~12 KB a dock frame, mostly the ambient flyers and the posed draw's setFromEuler); sinTo/cosTo write the same bits into a typed slot. The far pose also computes three's box and sphere straight from the array.
 - mini-df11c: the page bundles portableMath twice, so sinTo's identity check fell back to Math.sin; a shared Symbol.for mark lets either copy use its slot kernel. The flock's scratch points are a class, not shared { x, y, z } literals.
+- mini-df11c: the rope chain's capture passes held targets to Rapier's translation and rotation (12 KB a dock frame of fresh vectors).

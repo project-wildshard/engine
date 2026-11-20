@@ -18,9 +18,13 @@
  */
 import type { RigidBody } from '@dimforge/rapier3d-simd';
 import type { Physics } from './Physics';
+
 import { GROUP } from './groups';
 import { tagCollider } from './surface';
 import { rideable } from './CharacterMotor';
+
+/** DF11: `capture`'s held pose targets (one chain captures at a time; the values are copied out at once). */
+const CAPTURE_P = { x: 0, y: 0, z: 0 }, CAPTURE_Q = { x: 0, y: 0, z: 0, w: 1 };
 
 interface Vec3 { x: number; y: number; z: number }
 interface Quat { x: number; y: number; z: number; w: number }
@@ -92,10 +96,13 @@ export class RopeChain {
   /** read the bodies' poses after a world step (the fixed step's `post` slot) */
   capture(): void {
     const t = this.prev; this.prev = this.cur; this.cur = t;
-    this.bodies.forEach((b, i) => {
-      const p = b.translation(), q = b.rotation(), o = i * 7;
+    // DF11: Rapier writes each pose into a held target (its own copy out of the same scratch buffer), not a fresh vector
+    const p = CAPTURE_P, q = CAPTURE_Q;
+    for (let i = 0; i < this.bodies.length; i++) {
+      const b = this.bodies[i]; if (b === undefined) continue;
+      b.translation(p); b.rotation(q); const o = i * 7;
       t[o] = p.x; t[o + 1] = p.y; t[o + 2] = p.z; t[o + 3] = q.x; t[o + 4] = q.y; t[o + 5] = q.z; t[o + 6] = q.w;
-    });
+    }
   }
 
   /** segment `i`'s pose between the last two steps (`alpha` 0 → 1): position into `p`, rotation into `q` */

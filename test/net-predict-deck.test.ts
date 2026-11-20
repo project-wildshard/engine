@@ -132,3 +132,14 @@ test.each([false, true])('60 ms owner-frame batches stay above the live deck, sp
     expect(run.endX, label).toBeGreaterThan(B.x - 1);
   }
 });
+
+// DF11 (mini-df11c): capture reads each body into held targets; the captured slots are the bodies' own pose bits.
+test('the chain captures each body pose bit for bit', () => {
+  const scenario: MotionScenario = { id: 'rope-deck', start: { x: A.x + 0.6, z: A.z, y: ANCHOR_Y + 0.03, yaw: EAST }, ticks: 0, intent: () => ({}) };
+  const page = new PageSide(R, scenario), chain = new RopeChain(page.physics, span());
+  for (let i = 0; i < 40; i++) { page.stepWorld(); chain.capture(); }
+  const want = chain.bodies.flatMap(body => { const p = body.translation(), q = body.rotation(); return [p.x, p.y, p.z, q.x, q.y, q.z, q.w]; });
+  const cur = Reflect.get(chain, 'cur') as Float32Array;
+  expect(Buffer.from(Float64Array.from(cur.subarray(0, want.length)).buffer).equals(Buffer.from(Float64Array.from(want).buffer))).toBe(true);
+  expect(new Set(want.filter((_, i) => i % 7 === 1)).size).toBeGreaterThan(1);
+});
