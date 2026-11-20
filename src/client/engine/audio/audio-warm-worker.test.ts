@@ -93,7 +93,7 @@ test('the worker renders the same samples as the main thread', () => {
   expect(() => renderVoiceWork({ kind: 'family', name: 'no-such' }, 48000, 1, 0)).toThrow('No voice family no-such');
 });
 
-test('unset, phone Low renders in the worker and every other page does not; a saved pick wins (DW3)', () => {
+test('unset, a phone renders in the worker (any graphics, DF8) and a desktop does not; a saved pick wins (DW3)', () => {
   expect(audioWarmWorker(null, true)).toBe(true);
   expect(audioWarmWorker(undefined, false)).toBe(false);
   expect(audioWarmWorker(null)).toBe(AUDIO_WARM_WORKER_DEFAULT);

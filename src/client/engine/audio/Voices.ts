@@ -43,23 +43,30 @@ function audioWarmPaceMs(): number {
  *  slot `debug.audioWarmWorker` is true; a play that finds its family unrendered still renders on the main thread. Unset,
  *  it is on at phone Low and off elsewhere: in three alternating cooled iPhone 13 pairs on Driftwood at the 30 cap
  *  (engine 951d19829 plus this slot, 2026-11-19) the pier leg had 4, 3 and 5 frames over 50 ms with it on against 18, 23
- *  and 13 off (29.4 to 29.8 fps against 28.2 to 28.9), and the dock was unchanged. It changes no samples. */
+ *  and 13 off (29.4 to 29.8 fps against 28.2 to 28.9), and the dock was unchanged. It changes no samples.
+ *  DF8 (mini-driftwood13f): unset, it is on for every phone, not only phone Low. The pick is read once, at the first
+ *  prewarm slice, and on the first load of a new build the graphics pick there was not yet Low (iPhone 13, engine
+ *  fdfaf77a5): the worker stayed off for the page and the pier rendered windup-sailor (164 ms) on the page thread. */
 export const AUDIO_WARM_WORKER_SLOT = 'debug.audioWarmWorker';
 export const AUDIO_WARM_WORKER_DEFAULT = false;
 let warmWorkerPicked: boolean | undefined;
+/** DF8: what the pick read, and when (page ms), for the bench's voice census */
+let warmWorkerPick: { saved: unknown; tier: string; graphics: string; at: number } | null = null;
 /** Whether the prewarm renders off the main thread; read once per page. */
 export function audioWarmWorkerOn(): boolean {
   if (warmWorkerPicked !== undefined) return warmWorkerPicked;
-  let saved: unknown = null, phoneLow = false;
+  let saved: unknown = null, phone = false, graphics = '?';
   try { saved = jsonSlot(AUDIO_WARM_WORKER_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
-  warmWorkerPicked = audioWarmWorker(saved, phoneLow);
+  phone = TIER === 'phone';
+  try { graphics = graphicsMode(); } catch { /* no settings */ }
+  warmWorkerPick = { saved, tier: TIER, graphics, at: Math.round(diagnosticNow()) };
+  warmWorkerPicked = audioWarmWorker(saved, phone);
   return warmWorkerPicked;
 }
-/** The slot's value: a boolean wins; unset, on at phone Low (`phoneLow`), else AUDIO_WARM_WORKER_DEFAULT. */
-export function audioWarmWorker(saved: unknown, phoneLow = false): boolean {
+/** The slot's value: a boolean wins; unset, on for a phone (`phone`), else AUDIO_WARM_WORKER_DEFAULT. */
+export function audioWarmWorker(saved: unknown, phone = false): boolean {
   if (typeof saved === 'boolean') return saved;
-  return phoneLow ? true : AUDIO_WARM_WORKER_DEFAULT;
+  return phone ? true : AUDIO_WARM_WORKER_DEFAULT;
 }
 /** The render worker's port, as the pool uses it (a real Worker, or a test's). */
 export type VoiceRenderPort = Pick<Worker, 'postMessage' | 'terminate'> & EventTarget;
@@ -67,7 +74,7 @@ let makeRenderPort = (): VoiceRenderPort | null => typeof Worker === 'function'
   ? new Worker(new URL('voiceRender.worker.ts', import.meta.url), { type: 'module', name: 'voice-render' }) : null;
 /** Tests only: read the slot again (or force it), and swap the worker. */
 export function resetAudioWarmWorker(on?: boolean, port?: () => VoiceRenderPort | null): void {
-  warmWorkerPicked = on; if (port !== undefined) makeRenderPort = port;
+  warmWorkerPicked = on; warmWorkerPick = null; if (port !== undefined) makeRenderPort = port;
 }
 /** a worker render that takes longer than this is given up and rendered on the main thread */
 const WORKER_RENDER_DEADLINE_MS = 5000;
@@ -83,6 +90,7 @@ const WORKER_RESPAWNS = 1;
 export interface WarmWorkerState {
   readonly on: boolean; readonly state: 'unstarted' | 'booting' | 'ready' | 'off';
   readonly spawns: number; readonly bootMs: number | null; readonly renders: number; readonly reason: string | null;
+  readonly picked: { saved: unknown; tier: string; graphics: string; at: number } | null;
 }
 
 interface Host { readonly ctx: BaseAudioContext; readonly sfx: GainNode; readonly ready: boolean }
@@ -310,7 +318,7 @@ export class VoicePool {
   get warmWorker(): WarmWorkerState {
     const on = warmWorkerPicked ?? false;
     const state = this.renderPort === undefined ? 'unstarted' : this.renderPort === null ? 'off' : this.portReady ? 'ready' : 'booting';
-    return { on, state, spawns: this.spawns, bootMs: this.bootMs, renders: this.workerRenders, reason: this.offReason };
+    return { on, state, spawns: this.spawns, bootMs: this.bootMs, renders: this.workerRenders, reason: this.offReason, picked: warmWorkerPick };
   }
   /** a worker reply: store the channel unless the family moved on or a play rendered it first, then the next slice */
   private workerReply(reply: { id?: unknown; data?: unknown; error?: unknown }): void {
