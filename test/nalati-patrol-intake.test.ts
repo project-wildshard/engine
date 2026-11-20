@@ -17,6 +17,13 @@ import {Vector3} from 'three';
 import * as v from 'valibot';
 import {TimedEncountersSchema} from '@wildshard/format/encounterRows';
 
+import { NATIVE_ASSEMBLY_FILE, parseNativeAssembly } from '@wildshard/format/nativeAssembly';
+import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
+import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
+import { admittedResidents, step } from './fixtures/engine-lift/residents';
+
+const { input: residentInput } = admittedResidents(['nalati-grasslands']);
+
 test('admitting conditional patrol recipes preserves the complete page-joined initial population and every RNG draw',async()=>{
   const directory=builtFolder('nalati-grasslands'),product=await loadHeadlessFolder(directory),shard=product.shardfile;
   const descriptor=outputDescriptor(shard);if(descriptor===undefined)throw new Error('Missing admitted native inventory');
@@ -85,3 +92,25 @@ test('patrol contact seats use admitted moving joints and preserve their quiet c
   }
   expect(JSON.stringify(poses.rows)).toBe(original);
 });
+
+test('Nalati installs the patrol and its elite owners in a room without an open arena', async () => {
+  const preparation = residentInput('nalati-grasslands'), product = preparation.product;
+  if (product === undefined) throw new Error('Missing admitted Nalati product');
+  const plan = parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE));
+  const patrol = plan.features.find(row => row.host === 'encounter.patrol');
+  expect(patrol).toBeDefined();
+  if (patrol === undefined) throw new Error('Missing admitted Nalati patrol');
+  expect(plan.features.some(row => row.host === 'boss.open-arena')).toBe(true);
+  const features = plan.features.filter(row => row.host !== 'boss.open-arena');
+  const bytes = new TextEncoder().encode(JSON.stringify({ ...plan, features }));
+  const withoutArena: ShardFolder = {
+    ...product, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : product.file(name),
+  };
+  const live = await createNativeHeadlessResident({ ...preparation, product: withoutArena }, undefined, { room: true });
+  try {
+    step(live, 5);
+    for (const id of [patrol.step, `${patrol.step}.captain`, `${patrol.step}.wind`]) {
+      expect(live.host.adapters.has(id), id).toBe(true);
+    }
+  } finally { live.dispose(); }
+}, 10_000);

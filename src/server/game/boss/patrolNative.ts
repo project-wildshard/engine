@@ -5,7 +5,6 @@ import { Vector3, Ray } from 'three';
 import { SpeciesActorsFileSchema } from '@wildshard/format/speciesBookRows';
 import { parseExternalElite } from '@wildshard/format/eliteFeature';
 import { TimedEncountersSchema } from '@wildshard/format/encounterRows';
-import { nativeBodySchema } from '@wildshard/format/nativePhysics';
 import { parsePackedCreatureLooks } from '@wildshard/format/speciesLooks';
 import { CHUNK_HALF } from '@wildshard/format/contentBounds';
 import type { DamageRequest } from '@wildshard/engine/combat/pipeline';
@@ -21,7 +20,6 @@ import { floorBelow, worldHit } from '@wildshard/engine/physics/query';
 import { CharacterMotor } from '@wildshard/engine/physics/CharacterMotor';
 import { withOwner } from '@wildshard/engine/app/ownership';
 import { pinBrain } from '@wildshard/engine/ai/pinning';
-import { variantMods } from '@wildshard/engine/entities/species/registry';
 import { sayFightView } from '@wildshard/engine/sim/shardRows';
 import { nearestJointHit, type JointPorts } from '../../../shared/game/boss/jointTargets';
 import { PatrolLaw } from '../../../shared/game/boss/patrolLaw';
@@ -33,6 +31,7 @@ import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { PATROL_SHOT, PATROL_TEAR } from '../../../shared/game/shardfile/wirePrompts';
 import type { nativeRangedHit } from '../plugin/nativeItems';
 import type { EncounterIntake } from '../population/encounterIntake';
+import { readEncounterIntake } from '../population/encounterBook';
 import { DirectedLaw } from '../population/directedLaw';
 import { nativePopulationOf } from '../riding/nativePopulation';
 import { nativeHerdCollection } from '../shardfile/groupRuntime';
@@ -79,30 +78,14 @@ export interface PatrolLoans {
 /** Conditional riders borrow the page's exact metadata and packed skeleton
  * dimensions. No body, random draw, model build or generated output is made. */
 export async function readPatrolIntake(product:Pick<ShardFolder,'json'>,files:Pick<PatrolRow,'rows'|'actors'>):Promise<EncounterIntake> {
-  const [actors,timed]=await Promise.all([
-    product.json<unknown>(files.actors).then(value=>v.parse(SpeciesActorsFileSchema,value)),
-    product.json<unknown>(files.rows).then(value=>v.parse(TimedEncountersSchema,value)),
-  ]);
-  const declaration=timed.patrol.actors;if(declaration===undefined)throw new Error('Patrol has no admitted rider declarations');
-  const entry=actors.species.lookBook.rows.find(row=>row.metadata.kind===declaration.kind);
-  if(entry===undefined)throw new Error('Patrol has no admitted species metadata');
-  const species=entry.metadata;
-  if(species.flight!==undefined)throw new Error('Patrol requires its original grounded body law');
-  const recipes=[...species.variants,...species.spawnOnly??[]].map(variant=>{
-    const selected=entry.variants[variant.id];
-    if(selected===undefined)throw new Error('Patrol variant lacks its declared page body mapping');
-    const body=actors.species.packedBodies.rows.find(row=>row.kind===entry.family&&row.variant===selected.body);
-    const skeleton=body===undefined?undefined:actors.species.packedBodies.skeletons[body.skeleton];
-    if(skeleton===undefined)throw new Error('Patrol variant lacks its original body dimensions');
-    return v.parse(nativeBodySchema('axis'),{
-      kind:species.kind,label:variant.label||species.label,variant:variant.id,rarity:variant.rarity,
-      hp:variant.hp??species.tuning?.hp??(species.aggressive===true?100:60),
-      aggressive:species.aggressive??false,dims:structuredClone(skeleton.dims),mods:variantMods(species,variant),
-      ...(species.lockable===undefined?{}:{lockable:species.lockable}),
-    });
-  });
-  for(const variant of [declaration.variant,declaration.leader])if(!recipes.some(row=>row.variant===variant))throw new Error('Patrol is missing an admitted variant recipe');
-  return {species:[species],recipes};
+  const timed = v.parse(TimedEncountersSchema, await product.json(files.rows));
+  const riders = timed.patrol.actors;
+  if (riders === undefined) throw new Error('Patrol has no admitted rider declarations');
+  const intake = await readEncounterIntake(product, [riders.kind], files.actors);
+  for (const variant of [riders.variant, riders.leader]) {
+    if (!intake.recipes.some(row => row.variant === variant)) throw new Error('Patrol is missing an admitted variant recipe');
+  }
+  return intake;
 }
 
 /** The real patrol's contact joints and horse overlay, from the same admitted

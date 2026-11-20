@@ -79,7 +79,7 @@ export interface AssemblyRun<C extends NativeAssemblyContext> {
   day: DayCycleClock | null; boss?: ReturnType<typeof installGroundBoss>; quest?: ReturnType<typeof installNativeQuestComposition>;
   ammunition?: ReturnType<typeof installNativeHeldAmmunition>; elites?: ReturnType<typeof installNativeEliteFeature>;
   island?: ReturnType<typeof installMixedPopulation>; bindings?: NativeEliteBindings; roster?: ReturnType<typeof installNativeBootRoster>;
-  weather?: { readonly wind: Wind; readonly storm: WeatherReactions }; patrol?: () => void; arena?: OpenArenaRuntime;
+  weather?: { readonly wind: Wind; readonly storm: WeatherReactions }; finishPatrol?: () => void; arena?: OpenArenaRuntime;
   wild?: NativeWildEnvironment; groups?: ReturnType<typeof installNativeGroupRows>; nativeElites?: NativeEliteRoster; eliteCore?: ReturnType<typeof nativeEliteCore>; creatures?: ReturnType<typeof installNativePopulationHunt>; taming?: ReturnType<typeof installNativeTaming>;
   /** OF22c1: the declared encounters by their spawn, once the declared creature host stands (after every host). */
   declared?: ReadonlyMap<string, RuntimeEncounter>;
@@ -215,7 +215,8 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       return run => {
         let captain: NativeCaptain | null = null, windElite: NativeWindElite | null = null;
         const finish = patrol.begin(run.host, { eliteDamage: (_host, actor, request) => captain?.scale(actor, request.point) ?? run.arena?.eliteDamage(actor, request) ?? 1, beforePatrol: (host, dt) => { slots?.advance(host, dt); captain?.advance(dt); windElite?.advance(dt); }, afterPatrol: (_host, dt) => { run.arena?.advance(dt); } });
-        run.patrol = () => {
+        run.finishPatrol = () => {
+          delete run.finishPatrol;
           finish();
           if (slots !== null) { slots.install(run.host, need(run.bindings, 'Slots need their bindings'), run.context.restoring); registerInstalled(run.host, 'slots'); registerInstalled(run.host, 'poseViews'); }
           if (ride !== null && elites !== undefined) { captain = ride(run.host, decisions => nativeEliteCore(run.host, elites.conditions, decisions, dayOf(run), need(run.wild, 'A captain needs his environment')), `${row.step}.captain`); if (captain.lair.record !== undefined) need(run.eliteCore, 'A captain needs the world\'s lairs').share(captain.lair.id, captain.lair.record); }
@@ -233,7 +234,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       const bind = await prepareOpenArenaHost(product, row);
       return run => {
         const { host, context } = run, arena = bind(host); run.arena = arena;
-        arena.observeWeather(need(run.weather, 'An open arena needs its weather')); arena.cover(); need(run.patrol, 'An open arena needs its patrol')();
+        arena.observeWeather(need(run.weather, 'An open arena needs its weather')); arena.cover(); need(run.finishPatrol, 'An open arena needs its patrol')();
         arena.install({ presentation: need(at.ports.arena, 'An open arena needs its presentation'), commands: at.ports.heldTick(context).commands, ledger: at.ports.ledger(context), restoring: context.restoring, grantItem: at.ports.grantItem(context) });
         registerInstalled(host, 'poseViews');
       };

@@ -173,6 +173,8 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     if (ownSolids) installAssemblySolids(host, shard, assets, ownGround, context.restoring);
     melee?.(run); // OF22d2: the held/melee section's sword, where a plan names no item.swept host
     for (const step of steps) step(run);
+    // The arena finishes a borrowed patrol before installing the fight. A patrol can also own its room alone.
+    run.finishPatrol?.();
     run.declared = installRuntimeCreatures(host, counted, assets, sections, { restoring: context.restoring, keeper, summoned,
       fact: (name, actor) => { need(run.input, 'A declared decision grant needs the commands host').ledger.fact(name, actor); } });
     installNativeHarvest(host, harvest);
