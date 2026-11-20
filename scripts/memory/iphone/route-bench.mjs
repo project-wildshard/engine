@@ -105,7 +105,7 @@ async function bench() {
               const log = /** @type {[string, number, number, number, number][] | null} */ (await driver.evaluate(VOICE_LOG_READ));
               row.voices = log;
               const byFamily = new Map();
-              for (const row of log ?? []) { const family = row[0], ms = row[4], f = byFamily.get(family) ?? [0, 0, 0]; f[0]++; f[1] += ms; f[2] = Math.max(f[2], ms); byFamily.set(family, f); }
+              for (const render of log ?? []) { const family = render[0], ms = render[4], f = byFamily.get(family) ?? [0, 0, 0]; f[0]++; f[1] += ms; f[2] = Math.max(f[2], ms); byFamily.set(family, f); }
               for (const [family, [count, ms, worst]] of [...byFamily].sort((a, b) => b[1][1] - a[1][1]).slice(0, 12)) console.log(`  voices ${family}: ${String(count)} renders, ${ms.toFixed(0)} ms, worst ${worst.toFixed(0)} ms`);
             } catch (error) { row.voicesError = String(error); }
           }
