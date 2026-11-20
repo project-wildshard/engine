@@ -155,6 +155,11 @@ export function installPopulationRoster(host: SimHost, ports: PopulationRosterPo
     const body = intake.byId.get(a.entityId);
     if (body === undefined) { hunt.forget(a); host.retire(a.entityId); } else intake.retire(body);
   };
+  // ONE-FORMAT OF23c: the level's declared bodies (the shard's `creatures.spawns`, standing before any host) keep their
+  // `creature:N` ids; the roster's own ids start past the highest of them, so a roster whose herds are declared rows hands
+  // its reserves and homes the ids they had when it stood the herds itself
+  const declaredTop = Math.max(-1, ...[...host.entities.keys()].map(id => Number(/^creature:(\d+)$/u.exec(id)?.[1] ?? -1)));
+  if (declaredTop >= 0) intake.identities.restoreAllocator({ next: declaredTop + 1, used: Array.from({ length: declaredTop + 1 }, (_, i) => `creature:${String(i)}`) });
   Array.from(hunt.placeHerds(rows.fauna, rows.spawn, spawn)); // every herd in one go
   // Retire every reserved identity rolled in a herd, then respawn its declared ordinary replacement in place.
   for (const a of list.map(body => body.actor).filter(actor => rows.identities.some(identity => identity.kind === actor.kind && identity.variant === actor.variant))) {

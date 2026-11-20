@@ -3,7 +3,7 @@
 // Driftwood's mixed population. This proves it on Pine's roster with Pine's own species as rows (shard-pine-hollow OF23a,
 // `fixtures/pine-of23b-rows.json`): a deer that hunts with only the motion numbers it authors (walk and trample; the
 // charge, windup and ring stay the hunt's own) and a boar with all five stand from the level beside the roster's bodies,
-// tick, and save and restore exactly; a declared id the roster already stands refuses.
+// tick, and save and restore exactly; a declared `creature:N` moves the roster's own ids past it (OF23c).
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
@@ -102,7 +102,10 @@ test("Pine's native roster stands declared spawns beside its bodies, ticks them,
   } finally { restored?.dispose(); live.dispose(); }
 }, 240_000);
 
-test('a declared spawn on a body the roster stands refuses: one body, one owner', async () => {
+// OF23c: a declared `creature:N` keeps its id and the roster's own ids start past it (a roster whose herds are declared rows
+// gives its reserves and homes the ids they had before). Against r6's bake, whose herds the roster still rolls, that refuses
+// as a roster diverging from its page, never as two owners of one body.
+test("a declared creature id moves the roster's own ids past it; one the bake still rolls refuses", async () => {
   const fixture = await shipped();
-  await expect(resident(fixture, declaring(fixture.shard, spawnRows(['creature:7', BOAR])))).rejects.toThrow(/one body, one owner/u);
+  await expect(resident(fixture, declaring(fixture.shard, spawnRows(['creature:7', BOAR])))).rejects.toThrow(/diverges from the page at creature:8/u);
 }, 120_000);
