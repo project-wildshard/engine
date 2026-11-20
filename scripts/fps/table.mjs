@@ -17,6 +17,7 @@ import { agentFetch } from '../agent-requests.mjs';
 import { capFor, readCaps } from '../budgets/files.mjs';
 import { routeFor } from '../memory/iphone/route.mjs';
 import { passBreakdownAllowed, requirePassBench } from './passes.mjs';
+import { workloadCounts } from './workload.mjs';
 
 /** @typedef {Omit<Parameters<typeof import('./measure.mjs').measureFps>[0], 'cpu' | 'floor'> & {factor:string|null}} ProfileSpec */
 const PHONE = /** @type {const} */ ({ browser: 'chromium', tier: 'phone', width: 402, height: 812, dpr: 3 });
@@ -64,16 +65,17 @@ const show = (/** @type {number|null|undefined} */ x) => x === null || x === und
 
 /** @param {any[]} runs */
 function table(runs) {
-  const heading = '| Profile | Floor | fps | p50 ms | p95 ms | max ms | >50/min | Phone GPU ms | Worst segment | Verdict |';
+  const heading = '| Profile | Floor | fps | p50 ms | p95 ms | max ms | >50/min | Phone GPU ms | Tris p95 | Draws p95 | Programs | Links after control | Worst segment | Verdict |';
   const rows = keys.filter(key => runs.some(run=>run.name===key)).map(name => {
     const set = runs.filter(run=>run.name===name);
     const worst = set.reduce((a,b) => (order.get(b.cold.verdict)??3) > (order.get(a.cold.verdict)??3) ||
       b.cold.verdict===a.cold.verdict && (b.cold.overall?.worst??Infinity)>(a.cold.overall?.worst??Infinity) ? b : a);
     const data = worst.cold, m = data.overall?.metrics;
+    const counts = workloadCounts(set.flatMap(run => [run.cold,run.warm]));
     const calibrationStatus = worst.profile.calibrated ? '' : ' (CPU provisional)';
-    return `| ${name} | ${worst.profile.floor} | ${show(m?.fps)} | ${show(m?.p50)} | ${show(m?.p95)} | ${show(m?.max)} | ${show(m?.spikesPerMinute)} | — | ${data.worstSegment ?? '—'} | ${data.verdict}${calibrationStatus} |`;
+    return `| ${name} | ${worst.profile.floor} | ${show(m?.fps)} | ${show(m?.p50)} | ${show(m?.p95)} | ${show(m?.max)} | ${show(m?.spikesPerMinute)} | — | ${show(counts.trianglesP95)} | ${show(counts.drawsP95)} | ${show(counts.programsMax)} | ${show(counts.linksAfterControl)} | ${data.worstSegment ?? '—'} | ${data.verdict}${calibrationStatus} |`;
   });
-  return [heading,'|---|---:|---:|---:|---:|---:|---:|---:|---|---|',...rows].join('\n');
+  return [heading,'|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|---|',...rows].join('\n');
 }
 
 /** @typedef {import('../memory/iphone/route.mjs').RouteLeg} RouteLeg */
@@ -160,7 +162,7 @@ async function main() {
   const version = await agentFetch(new URL('/version.json',base),{signal:AbortSignal.timeout(10_000)});
   const {build} = await version.json();
   if (!version.ok || typeof build !== 'string' || build === '') throw new Error('The served build could not be pinned');
-  const source = ['fps/table.mjs','fps/matrix.mjs','fps/measure.mjs',...(passBreakdown?['fps/passes.mjs']:[]),'fps/verdict.mjs','memory/iphone/route.mjs']
+  const source = ['fps/table.mjs','fps/matrix.mjs','fps/measure.mjs','fps/workload.mjs',...(passBreakdown?['fps/passes.mjs']:[]),'fps/verdict.mjs','memory/iphone/route.mjs']
     .map(file => readFileSync(join(root,'scripts',file),'utf8'));
   const config = {build,host,base,zone,count,plan,route,warm:!choices['cold-only'],...(passBreakdown?{passBreakdown}:{}),method:signature(source)};
   const fingerprint = signature(config);

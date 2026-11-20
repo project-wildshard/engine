@@ -4,6 +4,7 @@ import { loadingCardIndex } from '../loading-benchmark/catalogue.mjs';
 import { legSummary, routeLegOnPage } from '../memory/iphone/route.mjs';
 import { fpsVerdict } from './verdict.mjs';
 import { observePasses, requirePassBench } from './passes.mjs';
+import { observeProgramLinks } from './workload.mjs';
 
 /** @typedef {{browser:'webkit'|'chromium', cpu:number, graphics:'low'|'high', tier:'phone'|'desktop',
  * width:number, height:number, dpr:1|2|3, cap:30|60|null, floor:number, device?:Record<string,boolean|number|string>}} Profile */
@@ -60,6 +61,7 @@ export function routeScript(route, profile, approach, passBreakdown) {
     const runLeg = (${routeLegOnPage.toString()});
     const route = ${JSON.stringify(route)}, approach = ${JSON.stringify(approach)};
     const observeMetal = (${observeMetal.toString()});
+    const observeProgramLinks = (${observeProgramLinks.toString()});
     const observePasses = ${passBreakdown ? `(${observePasses.toString()})` : 'null'};
     document.addEventListener('ws:control-ready', () => {
       window.__dfRoute = (async () => {
@@ -69,7 +71,8 @@ export function routeScript(route, profile, approach, passBreakdown) {
         const gpu = debug === null ? null : gl.getParameter(debug.UNMASKED_RENDERER_WEBGL);
         const witness = { build: window.__WS_BUILD_ID__ ?? null, dpr: renderer.getPixelRatio(), css: [innerWidth, innerHeight],
           gpu, level: game.level.id, phoneGraphics: game.phoneGraphics, programs: renderer.info.programs?.length ?? null };
-        const legs = [];
+        const legs = [], links = observeProgramLinks(gl);
+        try {
         for (const leg of approach) {
           const result = await runLeg({...leg, approach: true, cap: ${JSON.stringify(cap)}});
           if (result.error) return {witness, legs, error: leg.name + ': ' + result.error};
@@ -80,10 +83,12 @@ export function routeScript(route, profile, approach, passBreakdown) {
           let measured, result;
           try { result = await runLeg({...leg, cap: ${JSON.stringify(cap)}}); }
           finally { measured = stop(); }
-          legs.push({ name: leg.name, ...result, ...(observePasses === null ? { metal: measured } : { passBreakdown: measured }), startPrograms });
+          legs.push({ name: leg.name, ...result, ...(observePasses === null ? { metal: measured } : { passBreakdown: measured }),
+            startPrograms, programLinksAfterControl: links.count() });
           if (result.error) break;
         }
         return { witness, legs };
+        } finally { links.stop(); }
       })();
     }, { once: true });
   })()`;
