@@ -111,9 +111,13 @@ function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan): (host: Si
 function withSectionWeather(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
   const environment = features.findIndex(row => row.host === 'riding.environment');
   if (environment === -1 || features.some(row => row.host === 'weather.native' || row.host === 'weather.program')
-    || !product.hasFile('world/weather.json') || !product.hasFile('server/shelters.json') || !product.hasFile('server/weather.json')) return features;
+    || !product.hasFile('world/weather.json')) return features;
+  const forest = 'world/forest-weather.json';
+  const legacy = product.hasFile('server/shelters.json') && product.hasFile('server/weather.json');
+  if (!legacy && !product.hasFile(forest)) return features;
   const weather: NativeAssemblyFeature = { host: 'weather.native', program: { file: 'world/weather.json' },
-    shelters: { file: 'server/shelters.json' }, rows: { file: 'server/weather.json' } };
+    shelters: legacy ? { file: 'server/shelters.json' } : { file: forest, path: ['storm', 'shelters'] },
+    rows: legacy ? { file: 'server/weather.json' } : { file: forest, path: ['storm', 'world'] } };
   return [...features.slice(0, environment + 1), weather, ...features.slice(environment + 1)];
 }
 /** True when this product ships a native-assembly plan. */
