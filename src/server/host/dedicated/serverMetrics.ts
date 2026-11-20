@@ -10,6 +10,8 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { Counter, Gauge, Histogram, Registry, collectDefaultMetrics } from '@prometheus-io/client';
 import type { WorkerReading } from './cellProtocol';
 import { loopLag, type LoopLag } from './loopLag';
+import type { ActorTags } from '@wildshard/engine/app/actor';
+import type { World } from './world';
 
 /** Only loopback: the box's Prometheus scrapes it there (SC2), and nothing else may. */
 const HOST = '127.0.0.1';
@@ -26,7 +28,7 @@ export function metricsPort(env: Readonly<Record<string, string | undefined>>): 
 }
 
 /** What `/metrics` reads of the world when scraped: `/health`'s table, each open cell and the worker it runs on. */
-export interface MetricsWorld { health: () => { readonly table: Readonly<Record<string, number>> } }
+type MetricsWorld = Pick<World, 'health' | 'livePlayers'>;
 
 /** The server's metrics: fed by the door's callbacks, served on loopback once `listen` is called. */
 export class ServerMetrics {
@@ -48,10 +50,11 @@ export class ServerMetrics {
   private readonly awake: Gauge<'worker'>;
   private readonly players: Gauge<'worker'>;
   private readonly held: Gauge<'worker'>;
+  private readonly entries: Counter<'channel' | 'slug' | 'actor'>;
   private readonly boots: Histogram;
   private readonly crossings: Histogram<'moved'>;
 
-  constructor(log: (line: Record<string, unknown>) => void) {
+  constructor(log: (line: Record<string, unknown>) => void, private readonly channel: string) {
     this.log = log;
     const registers = [this.registry], readLag = loopLag();
     this.scope.interval(LAG_MS, () => { this.mainLag = readLag(); });
@@ -76,6 +79,16 @@ export class ServerMetrics {
     this.awake = new Gauge({ name: 'wildshard_cells_awake', help: 'Cells with someone in them, ticking, per worker.', labelNames: ['worker'], registers });
     this.players = new Gauge({ name: 'wildshard_players', help: 'Players seated, per worker.', labelNames: ['worker'], registers });
     this.held = new Gauge({ name: 'wildshard_players_held', help: 'Bodies held for a dropped player, per worker.', labelNames: ['worker'], registers });
+    const zones = (): ReturnType<World['livePlayers']>['zones'] => this.world?.livePlayers().zones ?? {};
+    this.registry.registerMetric(new Gauge({ name: 'wildshard_zone_players', help: 'Connected players in confirmed seats, by channel, zone and actor.', labelNames: ['channel', 'slug', 'actor'], registers: [],
+      collect() {
+        this.reset();
+        for (const [slug, row] of Object.entries(zones())) {
+          this.set({ channel, slug, actor: 'human' }, row.human);
+          this.set({ channel, slug, actor: 'agent' }, row.agent);
+        }
+      } }));
+    this.entries = new Counter({ name: 'wildshard_zone_entries_total', help: 'Confirmed zone arrivals since process start, by channel, zone and actor.', labelNames: ['channel', 'slug', 'actor'], registers });
     this.boots = new Histogram({ name: 'wildshard_cell_boot_seconds', help: 'How long a cell (or a worker\'s road) took to open: each `cell.booted`.', buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 4, 8, 16], registers });
     this.crossings = new Histogram({ name: 'wildshard_crossing_seconds', help: 'A crossing, from the source\'s ask to the worker\'s answer, by whether the seat moved.', labelNames: ['moved'], buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2], registers });
   }
@@ -106,6 +119,7 @@ export class ServerMetrics {
   booted(ms: number): void { this.boots.observe(ms / 1000); }
   /** A crossing took `ms`, and the seat moved or stayed. */
   crossed(ms: number, moved: boolean): void { this.crossings.observe({ moved: String(moved) }, ms / 1000); }
+  entered(slug: string, actor: ActorTags['actor']): void { this.entries.inc({ channel: this.channel, slug, actor }); }
   /** The scrape. */
   text(): Promise<string> { return this.registry.metrics(); }
   /** One `/metrics` answer: a scrape that fails says why, and the game never hears of it. */

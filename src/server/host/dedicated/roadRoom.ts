@@ -144,7 +144,7 @@ export class RoadRoom implements CrossTarget {
     old?.close('replaced');
     this.bind(seat, transport, this.net.join(transport, this.sim.playerOf(seat.body)));
     hello();
-    this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size });
+    this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size, ...(entry.admission === undefined ? {} : { admission: entry.admission }) });
   }
   /** GC15 (3): cells on other workers whose entryways stand: their walls on this road come down and a walker crosses into them. */
   open(cells: readonly string[]): void {

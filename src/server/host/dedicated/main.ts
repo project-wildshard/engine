@@ -95,7 +95,7 @@ const crossing = authorProduct === undefined;
 const placementAt = setting('PLACEMENT_URL'), placementKey = setting('PLACEMENT_PUBLIC_KEY');
 if ((placementAt === undefined) !== (placementKey === undefined)) throw new Error('PLACEMENT_URL and PLACEMENT_PUBLIC_KEY go together');
 // SERVER-CELLS SC1: `/metrics` on 127.0.0.1:METRICS_PORT, unset off. Made before the world opens, so every cell's boot is counted.
-const metricsAt = metricsPort(process.env), metrics = metricsAt === undefined ? undefined : new ServerMetrics(log);
+const metricsAt = metricsPort(process.env), metrics = metricsAt === undefined ? undefined : new ServerMetrics(log, release.channel);
 const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;
 
 /** One row of the table is one worker thread, started once (J182). */
@@ -126,7 +126,7 @@ const trust = doorTrust(process.env);
 const ticketKey = setting('PLAYER_TICKET_PUBLIC_KEY');
 if (ticketKey !== undefined) log({ at: 'tickets.key', pinned: false, key: ticketKey.slice(-16) });
 const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, ...(ticketKey === undefined ? {} : { ticketKey }), secret: seatSecret, saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
-  ...(arrivals === undefined ? {} : { entered: (seat, slug, actor) => { arrivals.entered(seat, slug, actor); } }),
+  ...(arrivals === undefined ? {} : { entered: (seat, slug, actor) => { if (arrivals.entered(seat, slug, actor)) metrics?.entered(slug, actor.actor); } }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
   crashed: failed, reading: (index, row) => { reports.heard(index, row); metrics?.reading(index, row); },
   ...(metrics === undefined ? {} : { booted: (_index: number, _slug: string, ms: number) => { metrics.booted(ms); }, crossed: (ms: number, moved: boolean) => { metrics.crossed(ms, moved); } }),
@@ -180,6 +180,7 @@ log({ at: 'guests.expiry', days: expiryDays ?? 'off' });
 if (expiryDays !== undefined && saves.expire !== undefined) startGuestExpiry(new Scope('guest-expiry'), { days: expiryDays, sweep: saves.expire, log });
 if (process.connected && process.send !== undefined) process.send({ kind: 'world-ready', pid: process.pid, port: address.port });
 metrics?.watch(world);
+reports.watch(world);
 // A metrics port already taken never stops the game: the line says so, and the alarms see no scrape (SC3).
 const metricsListening = metrics === undefined || metricsAt === undefined ? undefined : await metrics.listen(metricsAt).catch((error: unknown) => { log({ at: 'metrics.refused', port: metricsAt, error: String(error) }); return undefined; });
 log({ at: 'server.listening', ...(metricsListening === undefined ? {} : { metrics: metricsListening }), host, port: address.port, build, cells, crossing, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });

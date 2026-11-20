@@ -201,7 +201,7 @@ export class DedicatedRoom implements CrossTarget {
   /** Take a seat the door cleared, or give back the one this device holds. The room hears the `hello` the door read, and answers `welcome` as it would on any link. */
   seat(entry: SeatEntry, transport: Transport, hello: () => void): void {
     const held = this.seats.get(entry.device);
-    if (held !== undefined) { this.rejoin(held, transport, hello); return; }
+    if (held !== undefined) { this.rejoin(held, transport, hello, entry.admission); return; }
     if (entry.held === true) { transport.close('stalled'); return; } // its hold ended on the way here, and its save is what it comes back to
     const placed = this.place(entry, transport, entry.arrival);
     if (typeof placed === 'string') { this.refused(entry, transport, hello, placed); return; }
@@ -350,13 +350,13 @@ export class DedicatedRoom implements CrossTarget {
     seat.receipted = ledger.serial; seat.seq++; seat.dirtyAt = null; seat.savedAt = options.now();
     options.post({ kind: 'save', write: { player: seat.device, name: seat.name, shard: options.slug, cell: this.name, build: options.build, saveVersion: PLAYER_DOC_VERSION, seq: seat.seq, reason, receipts, doc: carryDoc(seat.read, exportPlayer(this.host, player, { store: seat.store.documents(), ledger })) } });
   }
-  private rejoin(seat: Seat, transport: Transport, hello: () => void): void {
+  private rejoin(seat: Seat, transport: Transport, hello: () => void, admission: number | undefined): void {
     const old = seat.transport;
     seat.transport = transport; seat.holdEnds = null;
     old?.close('replaced');
     this.link(seat, transport, hello);
     this.flushRefusals();
-    if (this.seats.get(seat.device) === seat) this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size });
+    if (this.seats.get(seat.device) === seat) this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size, ...(admission === undefined ? {} : { admission }) });
   }
   private link(seat: Seat, transport: Transport, hello: () => void): void {
     this.bind(seat, transport, this.net.join(transport, this.sim.playerOf(seat.body)));

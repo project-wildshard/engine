@@ -42,6 +42,12 @@ import { persistenceEnvelope } from '@wildshard/engine/net/persistenceWord';
 import { SeatQueue } from './seatQueue';
 import type { ZoneEntryStore } from './saves/zoneEntries';
 
+export interface LivePlayers {
+  readonly humans: number;
+  readonly agents: number;
+  readonly zones: Readonly<Record<string, Readonly<Record<ActorTags['actor'], number>>>>;
+}
+
 /** J174: what a deploy gives everyone before they move together. */
 export const GRACE_MS = 60_000;
 /** E7.7: what one address may hold and open. */
@@ -240,7 +246,7 @@ export class World {
   /** GC15: devices whose crossing the door is reading a save for, or whose `cross` order a worker has not answered, and when it began (SC1). */
   private readonly crossings = new Map<string, number>();
   /** GC15 (3): each seated device's socket and a copy of the hello it was seated with, so a crossing onto another worker can move both. */
-  private readonly seatSockets = new Map<string, { readonly end: SocketTransport; readonly hello: ArrayBuffer; readonly admission: number; entering: boolean }>();
+  private readonly seatSockets = new Map<string, { readonly end: SocketTransport; readonly hello: ArrayBuffer; readonly admission: number; entering: boolean; confirmed: boolean }>();
   private admission=0;
   /** GC15 (3): a crossing onto another worker, between the source's `handOut` and the socket's `out`: where it arrives and with what save. */
   private readonly outs = new Map<string, { readonly from: string; readonly to: string; readonly at: ResumeAt; readonly entry: SeatEntry }>();
@@ -403,9 +409,12 @@ export class World {
       if(this.seated.get(device)===from){
         this.voiceBodies.get(device)?.(body);
         const socket=this.seatSockets.get(device);
-        if (socket?.entering === true && socket.admission === news.admission) {
-          socket.entering = false;
-          this.countEntry(device, from);
+        if (socket !== undefined && socket.admission === news.admission) {
+          socket.confirmed = true;
+          if (socket.entering) {
+            socket.entering = false;
+            this.countEntry(device, from);
+          }
         }
         if(news.checkpoint!==undefined&&socket!==undefined&&socket.admission===news.admission){
           const bytes=checkpointWord(this.discovery(),news.checkpoint);
@@ -890,7 +899,7 @@ export class World {
       end.onClose(off);end.control('playtest');
     }
     const admission=++this.admission;
-    this.seatSockets.set(entry.device, { end, hello: hello.slice(0), admission, entering });
+    this.seatSockets.set(entry.device, { end, hello: hello.slice(0), admission, entering, confirmed: false });
     // Only a road can admit an enter. A cell must answer instead of leaving
     // the page waiting for its ten-second silent-peer fallback.
     const refusedEnter = end.onControl((control, bytes) => {
@@ -934,15 +943,32 @@ export class World {
     for (const end of this.ends) this.sayCountdown(end);
     this.scope.timeout(ms, () => { this.options.restart(); });
   }
+  /** A confirmed live link counts until the socket leaves, even while it is on the road. */
+  livePlayers(): LivePlayers {
+    const zones = new Map<string, Record<ActorTags['actor'], number>>();
+    const total = { human: 0, agent: 0 };
+    for (const [device, socket] of this.seatSockets) {
+      const cell = this.seated.get(device), actor = this.seatActors.get(device)?.mark.actor;
+      if (!socket.confirmed || cell === undefined || actor === undefined) continue;
+      const slug = roadHome(cell) === null ? cellShard(cell) : '_road';
+      const count = zones.get(slug) ?? { human: 0, agent: 0 };
+      count[actor]++;
+      total[actor]++;
+      zones.set(slug, count);
+    }
+    return { humans: total.human, agents: total.agent, zones: Object.fromEntries(zones) };
+  }
+
   /**
    * What `/health` says: no player data. `table` is each open cell and the worker it runs on (GO3, MP1.4). `resident` (ROAD-RESIDENT RR2) is
    * what the booted workers say they hold: cells open in memory, roads open, and the strips those roads stand on.
    */
-  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number; readonly table: Readonly<Record<string, number>>; readonly resident: { readonly cells: number; readonly roads: number; readonly strips: number } } {
+  health(): { readonly build: string; readonly cells: number; readonly workers: number; readonly awake: number; readonly players: number; readonly humans: number; readonly agents: number; readonly table: Readonly<Record<string, number>>; readonly resident: { readonly cells: number; readonly roads: number; readonly strips: number } } {
     const table = Object.fromEntries([...this.links].map(([cell, link]) => [cell, this.workers.indexOf(link)]));
     const rows = [...this.resident.values()];
     const resident = { cells: rows.reduce((sum, row) => sum + row.cells, 0), roads: rows.filter(row => row.road).length, strips: rows.reduce((sum, row) => sum + row.strips, 0) };
-    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size, table, resident };
+    const { humans, agents } = this.livePlayers();
+    return { build: this.options.build, cells: this.links.size, workers: this.workers.length, awake: new Set(this.seated.values()).size, players: this.seated.size, humans, agents, table, resident };
   }
   /** Stop: everyone is saved and told `restart`, and the queue gets its time. */
   async drain(): Promise<boolean> {

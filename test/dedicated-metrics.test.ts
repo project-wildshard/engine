@@ -1,6 +1,10 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { CHUNK_HALF } from '../src/shared/engine/core/config';
 import { roadName } from '../src/server/host/dedicated/gridCells';
+import { ServerReports } from '../src/server/host/dedicated/serverReports';
+import { ZoneEntries } from '../src/server/host/dedicated/zoneEntries';
+import { memoryZoneEntryStore } from '../src/server/host/dedicated/saves/zoneEntries';
+import { gatewayDoor } from './fixtures/dedicated/gatewayDoor';
 import { ServerMetrics, metricsPort } from '../src/server/host/dedicated/serverMetrics';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
@@ -40,7 +44,7 @@ test('METRICS_PORT: unset or blank is off, a port is a port, anything else refus
 });
 
 test('a two-cell world serves every family on 127.0.0.1 only, from boot to a crossing', { timeout: 120_000 }, async () => {
-  const port = metricsPort({ METRICS_PORT: '0' }) ?? -1, served = new ServerMetrics(line => { lines.push(line); });
+  const port = metricsPort({ METRICS_PORT: '0' }) ?? -1, served = new ServerMetrics(line => { lines.push(line); }, 'staging');
   metrics = served;
   bench = await roomBench({ cells: [HOME, SOUTH], workers: 1, crossing: true, readingMs: 250,
     reading: (index, row) => { served.reading(index, row); }, booted: (_index, _slug, ms) => { served.booted(ms); }, crossed: (ms, moved) => { served.crossed(ms, moved); } });
@@ -76,15 +80,80 @@ test('a two-cell world serves every family on 127.0.0.1 only, from boot to a cro
   // Only `/metrics`, only GET.
   expect((await fetch(`http://127.0.0.1:${String(at)}/health`)).status).toBe(404);
   expect((await fetch(`http://127.0.0.1:${String(at)}/metrics`, { method: 'POST' })).status).toBe(404);
+  a.drop();
+  await vi.waitFor(() => { expect(bench?.world.health()).toMatchObject({ players: 1, humans: 0, agents: 0 }); });
+  const back = new RoomBot(`${bench.url}?agent=metrics-proof`, 'bench', 'device:a', 'A');
+  bots.push(back);
+  expect(await back.arrived()).toBe(true);
+  await vi.waitFor(() => { expect(bench?.world.livePlayers()).toEqual({ humans: 0, agents: 1, zones: { _road: { human: 0, agent: 1 } } }); });
   expect(bench.crashes).toEqual([]);
   expect(lines, 'no metrics.error').toEqual([]);
 });
 
 test('it listens on loopback only', async () => {
-  const served = new ServerMetrics(line => { lines.push(line); });
+  const served = new ServerMetrics(line => { lines.push(line); }, 'staging');
   metrics = served;
   const at = await served.listen(0), { networkInterfaces } = await import('node:os');
   const outside = Object.values(networkInterfaces()).flat().find(row => row !== undefined && row.family === 'IPv4' && !row.internal)?.address;
   if (outside !== undefined) await expect(fetch(`http://${outside}:${String(at)}/metrics`)).rejects.toThrow();
   expect((await fetch(`http://127.0.0.1:${String(at)}/metrics`)).status).toBe(200);
+});
+
+test('the scrape and health count confirmed linked humans and agents by zone', async () => {
+  const served = new ServerMetrics(() => undefined, 'staging');
+  metrics = served;
+  const arrivals = new ZoneEntries(memoryZoneEntryStore(), 'staging', 'test', () => undefined);
+  const door = await gatewayDoor({ cells: [HOME, SOUTH], entered(seat, slug, actor) {
+    if (arrivals.entered(seat, slug, actor)) served.entered(slug, actor.actor);
+  } });
+  try {
+    served.watch(door.world);
+    const port = await served.listen(0);
+    expect(await door.admit('203.0.113.1', 'device:person', { 'user-agent': 'Mozilla/5.0 iPhone Safari/604.1' }, `?chunk=${HOME}&at=spawn`)).toBe(true);
+    expect(await door.admit('203.0.113.2', 'device:bot', {}, `?chunk=${SOUTH}&at=spawn&agent=metrics-proof`)).toBe(true);
+    expect(door.world.health()).toMatchObject({ players: 2, humans: 0, agents: 0 });
+    for (const { device, slug, body, admission } of door.seats) {
+      if (admission === undefined) throw new Error('Seat has no admission');
+      door.heard({ kind: 'seated', slug, device, body, admission, seats: 2 });
+    }
+    expect(door.world.health()).toMatchObject({ players: 2, humans: 1, agents: 1 });
+    const { rows } = await scrape(port);
+    for (const [slug, actor] of [[HOME, 'human'], [SOUTH, 'agent']]) {
+      const labels = `{channel="staging",slug="${slug}",actor="${actor}"}`;
+      expect(rows.get(`wildshard_zone_players${labels}`)).toBe(1);
+      expect(rows.get(`wildshard_zone_entries_total${labels}`)).toBe(1);
+    }
+    door.heard({ kind: 'left', device: 'device:person', slug: HOME, seats: 1 });
+    expect((await scrape(port)).rows.has(`wildshard_zone_players{channel="staging",slug="${HOME}",actor="human"}`)).toBe(false);
+    expect(door.world.health()).toMatchObject({ humans: 0, agents: 1 });
+  } finally { await door.close(); }
+});
+
+test('the room minute sends zone counts and clears the last occupied minute', async () => {
+  vi.useFakeTimers();
+  const posts: unknown[] = [];
+  vi.stubGlobal('fetch', vi.fn((_url: string, options: RequestInit) => {
+    posts.push(JSON.parse(String(options.body)) as unknown);
+    return Promise.resolve(new Response());
+  }));
+  const reports = new ServerReports({
+    build: 'test', channel: 'staging', telemetryUrl: 'http://127.0.0.1/telemetry', errorsUrl: undefined, tag: undefined,
+    log: () => undefined, everyMs: 1000,
+  });
+  let occupied = true;
+  reports.watch({ livePlayers: () => occupied ? { humans: 1, agents: 1, zones: { [HOME]: { human: 1, agent: 0 }, [SOUTH]: { human: 0, agent: 1 } } } : { humans: 0, agents: 0, zones: {} } });
+  try {
+    await vi.advanceTimersByTimeAsync(1000);
+    occupied = false;
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(posts).toEqual([
+      expect.objectContaining({ kind: 'room', zones: { [HOME]: { human: 1, agent: 0 }, [SOUTH]: { human: 0, agent: 1 } } }),
+      expect.objectContaining({ kind: 'room', zones: {}, ticksPerSecond: 0 }),
+    ]);
+  } finally {
+    reports.dispose();
+    await reports.settled();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  }
 });

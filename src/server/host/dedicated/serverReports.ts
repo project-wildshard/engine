@@ -3,6 +3,7 @@
 import { Scope } from '@wildshard/engine/app/scope';
 import type { WorkerReading } from './cellProtocol';
 import type { ServerSentry } from './serverSentry';
+import type { World } from './world';
 
 /** How often a record goes, in ms. */
 const RECORD_MS = 60_000;
@@ -32,12 +33,15 @@ export class ServerReports {
   /** Each worker's newest reading: `refused`, `dropped` and the byte counts in it are running totals. */
   private readonly latest = new Map<number, WorkerReading>();
   private readonly flying = new Set<Promise<void>>();
+  private world: Pick<World, 'livePlayers'> | undefined;
+  private lastActive = false;
   private players = 0;
   private held = 0;
   constructor(options: ServerReportsOptions) {
     this.options = options;
     if (options.telemetryUrl !== undefined) this.scope.interval(options.everyMs ?? RECORD_MS, () => { this.record(); });
   }
+  watch(world: Pick<World, 'livePlayers'>): void { this.world = world; }
   /** One worker's 10 s reading. */
   heard(index: number, reading: WorkerReading): void {
     this.rows.push(reading); this.latest.set(index, reading);
@@ -62,9 +66,13 @@ export class ServerReports {
   private record(): void {
     const { build, channel, tag, telemetryUrl } = this.options, rows = this.rows.splice(0), { players, held } = this, latest = [...this.latest.values()];
     this.players = 0; this.held = 0;
-    if (telemetryUrl === undefined || players + held === 0) return;
-    this.post(telemetryUrl, { kind: 'room', build, install: `server-${channel}`, ...(tag === undefined ? {} : { tag }), readings: rows.length, players, held, awake: total(latest, row => row.awake), cells: total(latest, row => row.cells),
-      ticks: total(rows, row => row.ticks), ticksPerSecond: rows.reduce((low, row) => Math.min(low, row.ticksPerSecond), Number.POSITIVE_INFINITY), p50: peak(rows, row => row.p50), p95: peak(rows, row => row.p95), p99: peak(rows, row => row.p99), max: peak(rows, row => row.max),
+    const live = this.world?.livePlayers();
+    const active = players + held + (live?.humans ?? 0) + (live?.agents ?? 0) > 0;
+    const due = active || this.lastActive;
+    this.lastActive = active;
+    if (telemetryUrl === undefined || !due) return;
+    this.post(telemetryUrl, { kind: 'room', build, install: `server-${channel}`, ...(tag === undefined ? {} : { tag }), readings: rows.length, players, held, ...(live === undefined ? {} : { zones: live.zones }), awake: total(latest, row => row.awake), cells: total(latest, row => row.cells),
+      ticks: total(rows, row => row.ticks), ticksPerSecond: rows.length === 0 ? 0 : rows.reduce((low, row) => Math.min(low, row.ticksPerSecond), Number.POSITIVE_INFINITY), p50: peak(rows, row => row.p50), p95: peak(rows, row => row.p95), p99: peak(rows, row => row.p99), max: peak(rows, row => row.max),
       drops: total(rows, row => row.drops), rss: peak(rows, row => row.rss), heap: peak(rows, row => row.heap), refused: total(latest, row => row.refused), dropped: total(latest, row => row.dropped),
       frameBytes: total(latest, row => row.frameBytes), eventBytes: total(latest, row => row.eventBytes) });
   }

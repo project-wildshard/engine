@@ -19,15 +19,15 @@ export class ZoneEntries {
   constructor(private readonly store: ZoneEntryStore, private readonly channel: string, private readonly secret: string,
     private readonly log: (line: Record<string, unknown>) => void, private readonly now: () => number = Date.now) {}
 
-  entered(seat: string, slug: string, { actor }: ActorTags): void {
+  entered(seat: string, slug: string, { actor }: ActorTags): boolean {
     const now = this.now(), day = new Date(now).toISOString().slice(0, 10);
     const player = createHmac('sha256', this.secret).update('metrics\0').update(seat).digest('hex');
     const key = `${player}/${slug}`;
-    if (now - (this.recent.get(key) ?? -Infinity) < ZONE_ENTRY_MINUTE_MS) return;
+    if (now - (this.recent.get(key) ?? -Infinity) < ZONE_ENTRY_MINUTE_MS) return false;
     if (this.visits >= MAX_MINUTE_ARRIVALS) {
       if (this.visits === MAX_MINUTE_ARRIVALS) this.log({ at: 'zone-entries.backlog', channel: this.channel });
       this.visits++;
-      return;
+      return false;
     }
     this.recent.set(key, now);
     this.visits++;
@@ -38,6 +38,7 @@ export class ZoneEntries {
       this.players.set(`${dateKey}/${player}`, { day, slug, player_key: player });
     }
     this.counts.set(dateKey, row);
+    return true;
   }
 
   totals(days = 30): Promise<readonly ZoneEntryTotal[]> {
