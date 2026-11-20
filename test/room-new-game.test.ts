@@ -5,6 +5,7 @@ import { questBooks } from '../src/shared/engine/quest/players';
 import { memoryPlayerSaves } from '../src/server/host/dedicated/playerSaves';
 import { PLAYER_DOC_VERSION } from '../src/server/host/dedicated/playerDoc';
 import { roomPreview } from '../src/shared/game/newGame';
+import { cardLines } from '../src/client/game/savesSettings';
 import { migrate } from '../src/server/host/dedicated/saves/migrate';
 import { readSave, recoveryReceipts, resetSave, writeSave, type SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import { openPglite } from './fixtures/pgliteDatabase';
@@ -51,6 +52,7 @@ test('New Game through the room: the card reads the room\'s save, the reset forg
   const card = roomPreview({ id: HOME, shard: HOME }, read.read[HOME] ?? { flags: [], quests: [], keys: {} });
   expect(card.before.flags).toEqual(expect.arrayContaining([QUEST_FLAG, CREDIT]));
   expect(card.before.quests.saved, 'the card no longer reads EMPTY').toBe(true);
+  expect(cardLines(card)[1], 'a save mid-quest with an empty pack reads as one in progress').toBe('IN PROGRESS');
   // another player's save on the same shard, which this reset must not touch
   const mine = await saves.read(DEVICE, HOME);
   saves.write({ player: OTHER, name: 'Other', shard: HOME, build: 'bench', saveVersion: PLAYER_DOC_VERSION, seq: 1, reason: 'test', doc: mine.doc, receipts: [] });

@@ -38,6 +38,7 @@ export const SAVES_STRINGS = {
   items: (n: number): string => `${n} ${n === 1 ? 'ITEM' : 'ITEMS'}`,
   coins: (n: number): string => `${n} ${n === 1 ? 'COIN' : 'COINS'}`,
   empty: 'EMPTY',
+  inProgress: 'IN PROGRESS',
   reset: 'RESET',
   none: 'NONE',
   arrow: (before: string, after: string): string => `${before} → ${after}`,
@@ -59,7 +60,9 @@ const inventory = (p: NewGameProgress): string => {
 };
 /** A card's two lines ("QUESTS 2 / 5", "12 ITEMS" / "EMPTY"). `total` is the shard's quest count when it is declared. */
 export function cardLines(summary: NewGameSummary, total: number | null = null): [string, string] {
-  return [SAVES_STRINGS.questsLine(quests(summary.before, total)), inventory(summary.before)];
+  // meta QA-FEEDBACK-2026-11-20-mini row 9: a save mid-quest with nothing in its pack is not an empty one (Driftwood's progress is flags)
+  const held = inventory(summary.before), progress = held === SAVES_STRINGS.empty && summary.before.quests.saved;
+  return [SAVES_STRINGS.questsLine(quests(summary.before, total)), progress ? SAVES_STRINGS.inProgress : held];
 }
 /** The sheet's before → after rows: quests, inventory, flags. */
 export function sheetRows(summary: NewGameSummary, total: number | null = null): { label: string; value: string }[] {
