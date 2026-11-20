@@ -11,8 +11,9 @@
 // descendant of it. A cancelled run is superseded when a later main run exists, never red; with no later run,
 // the watcher dispatches `ci` on main once. A started run cancelled with a blocking job failed, timed out or
 // cancelled is red, not superseded: main cancels a started run only for a timeout (J422) or when it is red already (FS24). Each red run gives one `MAIN RED <range>` receipt naming the landers
-// of the commits in its range (from their `landed` receipts) and a message to each lander's herdr pane. State
-// (~/.cache/wildshard/main-watch.json) keeps the judged run ids, so a run is reported once however often this runs.
+// of the commits in its range (from their landed receipts). Later prompts in the same red span require a new commit
+// from the recipient or a newly failing test attributed to them. State (~/.cache/wildshard/main-watch.json) keeps the
+// judged run ids and span history.
 // A green run that carries AMBER files (J295: a test file over its time budget, scripts/test-amber.mjs) also gives
 // one `main AMBER <sha> <file> <ms>/<budget>` receipt per file: the coordinator hands each out as a queue-skipping
 // fix row the same day (meta HOW-WE-BUILD-PLAN.md). AUDIO AU6 (J303): a shard whose audio is over 6 MB gives the same
@@ -69,9 +70,9 @@ export const failedNames=jobs=>failedJobs(jobs).map(job=>job.name);
 
 /** @typedef {{id:number,head_sha:string,status:string,conclusion:string|null,created_at:string,event:string,display_title?:string,run_attempt?:number,blockingChecked?:boolean,advisoryVersion?:number,started?:boolean,blockingFailed?:boolean,nativeInfra?:string}} Run */
 /** @typedef {{id:number,sha:string,created:string,warnings?:ReturnType<typeof parseMemoryWarnings>,pusher?:string,results?:ReturnType<typeof parseBudgetResults>}} MemoryQa */
-/** A red span main-watch has reported: the first red run, when it was reported (ms), its alert, and whether the keeper
- * (buddy-engine, FS22) already has it.
- * @typedef {{run:number,at:number,text:string,keeper:boolean}} RedSpan */
+/** @typedef {{commits:string[],files:string[],jobs:string[]}} RedHistory */
+/** The first red run, its alert and keeper, plus the range of each attempted prompt and the failures seen in the span.
+ * @typedef {{run:number,at:number,text:string,keeper:boolean,history?:RedHistory}} RedSpan */
 /** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[],red?:RedSpan,notified?:Record<string,string[]>}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
@@ -233,16 +234,21 @@ export function redMessage(recipient,{range,url,failed,named,suspect}){
   return `main-watch: MAIN RED.${lead} Engine main ${range} (${url}); failed: ${failed}.${recipient.commits.size===0?` Landers: ${named}.`:owned}${why}`;
 }
 
+/** @param {unknown} value @returns {value is string} */
+const isString=value=>typeof value==='string';
+
 /** @param {string} file @returns {State|null} */
 export function readState(file){
   if(!existsSync(file))return null;
   try{
     const value=JSON.parse(readFileSync(file,'utf8'));
-    const red=value.red,notified=value.notified;
+    const red=value.red,notified=value.notified,history=red?.history;
+    const kept=history!==null&&history!==undefined&&Array.isArray(history.commits)&&Array.isArray(history.files)&&Array.isArray(history.jobs)
+      ?{commits:history.commits.filter(isString),files:history.files.filter(isString),jobs:history.jobs.filter(isString)}:undefined;
     return {judged:Array.isArray(value.judged)?value.judged.filter(Number.isSafeInteger):[],dispatched:Array.isArray(value.dispatched)?value.dispatched.filter(row=>typeof row==='string'):[],
       ...(Array.isArray(value.memoryQa)?{memoryQa:value.memoryQa}:{}),
       ...(notified!==null&&typeof notified==='object'&&!Array.isArray(notified)?{notified}:{}),
-      ...(red!==null&&typeof red==='object'&&Number.isSafeInteger(red.run)&&typeof red.at==='number'&&typeof red.text==='string'?{red:{run:red.run,at:red.at,text:red.text,keeper:red.keeper===true}}:{})};
+      ...(red!==null&&typeof red==='object'&&Number.isSafeInteger(red.run)&&typeof red.at==='number'&&typeof red.text==='string'?{red:{run:red.run,at:red.at,text:red.text,keeper:red.keeper===true,...(kept===undefined?{}:{history:kept})}}:{})};
   }catch{return null;}
 }
 
@@ -255,8 +261,8 @@ function writeState(file,state){
 
 /** Save the address before submitting: an interrupted transport might already have delivered the prompt.
  * @param {Pick<ReturnType<typeof liveIo>,'state'|'send'|'prompt'>} io @param {State} state
- * @param {number} run @param {RedRecipient} recipient @param {string} text */
-function notifyRed(io,state,run,recipient,text){
+ * @param {number} run @param {RedRecipient} recipient @param {string} text @param {readonly string[]} [commits] */
+function notifyRed(io,state,run,recipient,text,commits=[]){
   const seen=state.notified??={};
   const previous=Array.isArray(seen[run])?seen[run]:[];
   const pane=recipient.key.startsWith('pane:'),aliases=[...recipient.lanes].map(lane=>`agent:${lane}`);
@@ -264,9 +270,38 @@ function notifyRed(io,state,run,recipient,text){
     ||(!pane&&previous.some(key=>key.startsWith(`${alias}@pane:`)))))return null;
   const keys=[recipient.key,...pane?aliases.map(alias=>`${alias}@${recipient.key}`):[]];
   seen[run]=[...new Set([...previous,...keys])];
+  const history=state.red?.history;
+  if(history!==undefined&&commits.length>0)history.commits=[...new Set([...history.commits,...commits])];
   writeState(io.state,state);
   if(recipient.sendPane!==undefined)return io.send(recipient.sendPane,text)?`sent to pane ${recipient.sendPane}`:'';
   return io.prompt(recipient.lane,text)?`prompted herdr agent ${recipient.lane}`:'';
+}
+
+/** @param {readonly string[]} files */
+function failedTestFiles(files){
+  return [...new Set(files.filter(file=>/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file))
+    .map(file=>file.replace(/^.*\/engine\/engine\//u,'')))];
+}
+
+/** Recover a span written by the previous watcher from the reported runs still in the CI window.
+ * @param {Pick<ReturnType<typeof liveIo>,'commits'|'failed'>} io @param {State} state @param {readonly Run[]} runs
+ * @returns {RedHistory} */
+function restoreRedHistory(io,state,runs){
+  const start=runs.find(run=>run.id===state.red?.run);
+  const commits=new Set(),files=new Set(),jobs=new Set();
+  if(start!==undefined){
+    const judged=new Set(state.judged);
+    for(const {run,kind,from} of judge(runs,{judged:[],dispatched:[]},null)){
+      if(kind!=='red'||byCreated(run,start)<0||!judged.has(run.id))continue;
+      if(state.notified?.[run.id]?.length)for(const sha of io.commits(from??null,run.head_sha))commits.add(sha);
+      try{
+        const failure=io.failed(run.id);
+        for(const file of failedTestFiles(failurePaths(failure.logs)))files.add(file);
+        for(const job of failure.names)jobs.add(job);
+      }catch{/* Old logs may have expired. */}
+    }
+  }
+  return {commits:[...commits],files:[...files],jobs:[...jobs]};
 }
 
 /** One watcher at a time judges, so two never report the same run. The lock file holds its owner's pid; only a
@@ -470,6 +505,8 @@ export function sweep(io,hint={}){
       /** @type {{recipient:RedRecipient,text:string}[]} */const messages=[];
       /** @type {RedRecipient|undefined} */let buddy;
       /** @type {string|undefined} */let buddyAlert;
+      /** @type {string[]} */let redCommits=[];
+      let firstRed=false;
       if(run.nativeInfra!==undefined)lines.push(`main advisory ${short(run.head_sha)} ${NATIVE_FOOTPRINT}: ${run.nativeInfra} (run ${run.id})`);
       if(verdict.kind==='superseded')lines.push(run.started===false
         ?`main ${short(run.head_sha)} skipped (pending, replaced) by ${short(verdict.by)} (run ${run.id}; never started; never red)`
@@ -492,34 +529,53 @@ export function sweep(io,hint={}){
           for(const row of audio)lines.push(`main AMBER ${short(run.head_sha)} audio ${row.shard} ${row.tier} ${mb(row.bytes)} MB/${mb(row.budget)} MB (run ${run.id}; J303${row.level==='red'?`, over the ${mb(row.red)} MB red line`:''}: its AUDIO-PLAN source pass; never a red main)`);
         }
         else{
-          const jobs=io.failed(run.id),files=failurePaths(jobs.logs);
+          const jobs=io.failed(run.id),files=failurePaths(jobs.logs),tests=failedTestFiles(files);
           const failed=jobs.names.join(' | ')||'see the run',url=`https://github.com/${io.repo}/actions/runs/${run.id}`;
-          const suspect=files.length===0?undefined:redSuspect(commits,files,io.changes(verdict.from??null,run.head_sha));
-          const details={range,url,failed,named,suspect},agents=io.agents();
+          const changes=files.length===0?new Map():io.changes(verdict.from??null,run.head_sha);
+          const suspect=redSuspect(commits,files,changes);
+          const details={range,url,failed:tests.length===0?failed:`${failed} (${tests.join(', ')})`,named,suspect},agents=io.agents();
           lines.push(`MAIN RED ${range} run ${run.id}: landers ${named}; failed: ${failed}`);
-          for(const recipient of redRecipients(found,io.panes(),agents,io.fixers()))
-            messages.push({recipient,text:redMessage(recipient,details)});
           buddy=redRecipients([],[],agents,['buddy-engine'])[0];
           if(buddy!==undefined)buddyAlert=redMessage({...buddy,fixer:false},details);
+          firstRed=state.red===undefined;
+          const history=firstRed?{commits:[],files:[],jobs:[]}:state.red?.history??restoreRedHistory(io,state,runs);
+          const prompted=new Set(history.commits),seenFiles=new Set(history.files),seenJobs=new Set(history.jobs);
+          const newFiles=tests.filter(file=>!seenFiles.has(file));
+          const newJobs=jobs.names.filter(job=>!seenJobs.has(job));
+          const newFailures=(tests.length===0?newJobs:newFiles).join(' | ')||'no new failures reported';
+          const newSuspects=newFiles.map(file=>redSuspect(commits,[file],changes)).filter(candidate=>candidate!==undefined);
+          // The failing test can point to a change in its source. Only use the run-wide suspect if every failed test is new.
+          if(newFiles.length>0&&newFiles.length===tests.length&&suspect!==undefined)newSuspects.push(suspect);
+          for(const recipient of redRecipients(found,io.panes(),agents,io.fixers())){
+            const ownsNewFailure=newSuspects.find(candidate=>recipient.commits.has(candidate.sha));
+            const ownsNewCommits=new Set([...recipient.commits].filter(sha=>!prompted.has(sha)||sha===ownsNewFailure?.sha));
+            if(firstRed)messages.push({recipient,text:redMessage(recipient,details)});
+            else if(ownsNewCommits.size>0){
+              const target={...recipient,commits:ownsNewCommits};
+              messages.push({recipient:target,text:redMessage(target,{...details,failed:newFailures,suspect:ownsNewFailure??newSuspects[0]})});
+            }
+          }
+          // FS22: the keeper's clock starts at the first reported red.
+          state.red??={run:run.id,at:now,text:buddyAlert??failed,keeper:false};
+          state.red.history={commits:history.commits,files:[...seenFiles,...newFiles],jobs:[...seenJobs,...newJobs]};
+          redCommits=commits;
         }
         memoryWarnings(run,annotations,lines);
       }
       if(verdict.kind==='green')delete state.red;
-      // FS22: a red span starts at its first reported red; the keeper's 20-minute clock runs from there.
-      if(verdict.kind==='red'&&buddyAlert!==undefined&&state.red===undefined)state.red={run:run.id,at:now,text:buddyAlert,keeper:false};
       state.judged.push(run.id);if(verdict.kind==='dispatch')state.dispatched.push(run.head_sha);writeState(io.state,state);
       if(verdict.kind==='dispatch')io.dispatch();
       for(const line of lines)io.receipt(line);
       let needsBuddy=!messages.some(message=>message.recipient.commits.size>0);
       let buddyAttempted=false;
       for(const {recipient,text} of messages){
-        const how=notifyRed(io,state,run.id,recipient,text);
+        const how=notifyRed(io,state,run.id,recipient,text,redCommits);
         if(recipient.commits.size>0&&how==='')needsBuddy=true;
         if(recipient.key===buddy?.key||recipient.lanes.has('buddy-engine'))buddyAttempted=true;
         if(how!==null)io.receipt(`MAIN RED message to ${[...recipient.lanes].join(', ')} ${how===''?'not delivered (no reachable pane or herdr agent)':how}`);
       }
-      if(needsBuddy&&!buddyAttempted&&buddyAlert!==undefined&&buddy!==undefined){
-        const how=notifyRed(io,state,run.id,buddy,buddyAlert);
+      if(firstRed&&needsBuddy&&!buddyAttempted&&buddyAlert!==undefined&&buddy!==undefined){
+        const how=notifyRed(io,state,run.id,buddy,buddyAlert,redCommits);
         if(how!==null)io.receipt(`main red fallback to buddy-engine ${how||'not delivered (herdr agent unreachable)'}`);
         buddyAttempted=true;
       }
