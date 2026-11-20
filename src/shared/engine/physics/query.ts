@@ -5,7 +5,7 @@
  * sounds and dust by material) and its owner (the piece, door or animal behind the collider).
  */
 import { RawVector } from '@dimforge/rapier3d-simd/raw.js';
-import type { Ball, Collider, Ray } from '@dimforge/rapier3d-simd';
+import type { Ball, Collider, Ray, Shape } from '@dimforge/rapier3d-simd';
 import type { Physics } from './Physics';
 import { GROUP, queryGroups, type GroupName } from './groups';
 import { tagOf, type Material } from './surface';
@@ -143,6 +143,30 @@ export function canStandAt(physics: Physics, feet: Vec3, dimensions: { radius: n
   return admitted.clear && admitted.floor;
 }
 
+/** A collider's reach from its own position: a sphere about it its shape never leaves, or Infinity for a shape with no cheap bound
+ *  (a mesh, a heightfield, a compound), which every query then tests. Kept per shape object: Rapier's `setShape` and its shape
+ *  edits replace or drop the collider's cached shape, so a changed collider is measured afresh. */
+const REACH = new WeakMap<Shape, number>();
+function reachOf(R: Physics['R'], collider: Collider): number {
+  const shape = collider.shape, known = REACH.get(shape);
+  if (known !== undefined) return known;
+  let reach = Infinity;
+  if (shape instanceof R.Ball) reach = shape.radius;
+  else if (shape instanceof R.Cuboid) reach = Math.hypot(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z);
+  else if (shape instanceof R.RoundCuboid) reach = Math.hypot(shape.halfExtents.x, shape.halfExtents.y, shape.halfExtents.z) + shape.borderRadius;
+  else if (shape instanceof R.Capsule) reach = shape.halfHeight + shape.radius;
+  else if (shape instanceof R.Cylinder || shape instanceof R.Cone) reach = Math.hypot(shape.halfHeight, shape.radius);
+  else if (shape instanceof R.ConvexPolyhedron || shape instanceof R.RoundConvexPolyhedron) {
+    const v = shape.vertices;
+    let far = 0;
+    for (let i = 0; i + 2 < v.length; i += 3) far = Math.max(far, Math.hypot(v[i] ?? 0, v[i + 1] ?? 0, v[i + 2] ?? 0));
+    reach = shape instanceof R.RoundConvexPolyhedron ? far + shape.borderRadius : far;
+  }
+  if (!Number.isFinite(reach)) reach = Infinity;
+  REACH.set(shape, reach);
+  return reach;
+}
+
 /** NL13b5: how far above a stand's height a floor may rise, how far below it may fall, and the skin feet keep above the highest. */
 export const CLEAR_STAND = { lift: 0.5, drop: 1.5, skin: 0.05 } as const;
 /**
@@ -155,15 +179,26 @@ export const CLEAR_STAND = { lift: 0.5, drop: 1.5, skin: 0.05 } as const;
 export function clearStand(physics: Physics, x: number, z: number, fromY: number, dimensions: { readonly radius: number; readonly height: number }, exclude?: Collider): number | undefined {
   const { radius, height } = dimensions, { lift, drop, skin } = CLEAR_STAND;
   if (![x, z, fromY, radius, height].every(Number.isFinite) || radius <= 0 || height < radius * 2) return undefined;
+  const { R } = physics, { raw } = physics.world.colliders;
+  // Only a collider that can reach the column the footprint rays and the standing capsule fill can answer either; a room's world
+  // has thousands (Nalati 2,687), so the rest are passed over by their bounding sphere, not cast at one by one. The column runs
+  // from the rays' lowest reach to the top of a capsule standing on the highest floor they may find.
+  const low = fromY - drop, top = fromY + lift + skin + height + 0.03;
   const world: Collider[] = [];
   physics.world.forEachCollider(collider => {
-    if (collider.isEnabled() && !collider.isSensor() && collider.handle !== exclude?.handle && ((collider.collisionGroups() >>> 16) & GROUP.WORLD) !== 0) world.push(collider);
+    if (!collider.isEnabled() || collider.isSensor() || collider.handle === exclude?.handle || ((collider.collisionGroups() >>> 16) & GROUP.WORLD) === 0) return;
+    const reach = reachOf(R, collider);
+    if (reach !== Infinity) {
+      const at = collider.translation();
+      const dx = Math.max(0, Math.abs(at.x - x) - radius), dz = Math.max(0, Math.abs(at.z - z) - radius), dy = at.y < low ? low - at.y : at.y > top ? at.y - top : 0;
+      if (dx * dx + dy * dy + dz * dz > (reach + 0.01) ** 2) return;
+    }
+    world.push(collider);
   });
-  const { R } = physics, { raw } = physics.world.colliders;
   // Each footprint ray goes through the same set of colliders. Reuse the
   // native inputs that Collider.castRay would allocate for every collider.
   const down = new RawVector(0, -1, 0);
-  let low = Infinity, high = -Infinity;
+  let lowest = Infinity, high = -Infinity;
   try {
     const origin = new RawVector(x, fromY + lift, z);
     try {
@@ -178,11 +213,11 @@ export function clearStand(physics: Physics, x: number, z: number, fromY: number
         }
         if (near === Infinity) return undefined;
         const floor = fromY + lift - near;
-        low = Math.min(low, floor); high = Math.max(high, floor);
+        lowest = Math.min(lowest, floor); high = Math.max(high, floor);
       }
     } finally { origin.free(); }
   } finally { down.free(); }
-  if (high - low > lift) return undefined;
+  if (high - lowest > lift) return undefined;
   const feet = high > fromY ? high + skin : fromY, shape = new R.Capsule(Math.max(0.01, height / 2 - radius), radius);
   const centre = { x, y: feet + height / 2 + 0.03, z }, rotation = { x: 0, y: 0, z: 0, w: 1 };
   return world.some(collider => collider.intersectsShape(shape, centre, rotation)) ? undefined : feet;
