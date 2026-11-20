@@ -1,6 +1,7 @@
 import type { VehicleHandling } from '@wildshard/format/vehicles';
 import { expect, test } from 'vitest';
 import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleState, type VehicleStepOut, type VehicleWorld } from '../src/shared/engine/sim/vehicle';
+import { vehicleGrip, vehiclesSection } from '../src/shared/game/shardfile/shardVehicles';
 
 // MIRROR-SALT-ZONE MSZ7: the handling step, with the vehicles example's salt buggy (sharddev c4b321f6): 22 m/s, reverse 6,
 // accel 9, brake 18, turn 1.6, grip 0.8, drift 0.4, boost 1.5, on its 3.4 m tub (bow and stern 1.7 m, half width 0.95 m).
@@ -58,6 +59,25 @@ test('a hard turn at speed slides; a slide runs further at low grip; a gentle tu
   let gentle = 0;
   drive(drive(rest(), stick(0.3), 3), stick(0.3, 0.2), 2, world(), BUGGY, (_state, out) => { gentle = Math.max(gentle, Math.abs(out.sliding)); });
   expect(gentle).toBeLessThan(0.5);
+});
+
+test('the same turn holds on the road and slides on the flooded salt', () => {
+  const surface = vehicleGrip(vehiclesSection({ kinds: [], docks: [], surfaceGrip: {
+    base: 0.8,
+    patches: [
+      { shape: 'circle', at: [0, 0], radius: 178, grip: 0.35 },
+      { shape: 'road', line: [[0, -30], [0, 30], [30, 30]], width: 10, grip: 1 },
+    ],
+  } }));
+  expect(surface.gripAt?.(0, 0)).toBe(1);
+  expect(surface.gripAt?.(5.01, 0)).toBe(0.35);
+  expect(surface.gripAt?.(35, 30)).toBe(1);
+  expect(surface.gripAt?.(35.01, 30)).toBe(0.35);
+  expect(surface.gripAt?.(178.01, 0)).toBe(0.8);
+  const sameTurn = (x: number): VehicleState =>
+    drive({ ...rest(), x, forward: 10 }, stick(10 / BUGGY.speed, 0.35), 0.5, { ...world(), ...surface });
+  expect(sameTurn(0).slip).toBe(0);
+  expect(Math.abs(sameTurn(20).slip)).toBeGreaterThan(0.5);
 });
 
 test('a 15 degree climb is slower than the flat, and pitches the nose up', () => {

@@ -12,7 +12,7 @@ import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, Vehicles } from '@wildshard/format/vehicles';
-import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
+import { dockHulls, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
 import { parseVehicleSeatRow, parseVehicleWornRow, parseVehicleWreckRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { vehiclePoint, type MoverView } from './followedMovers';
 import { rowState, statePose, VehiclePrediction, type VehicleRow } from './vehiclePrediction';
@@ -81,6 +81,7 @@ export class FollowedVehicles {
   private readonly kinds: ReadonlyMap<string, VehicleKind>;
   private readonly docks: ReadonlyMap<string, VehicleDock>;
   private readonly hulls: ReadonlyMap<string, readonly MoverBox[]>;
+  private readonly grip: Pick<VehicleWorld, 'gripAt'>;
   private readonly ports: FollowedVehiclePorts;
   private readonly live = new Map<string, Followed>();
   /** Who sits in each seat, by vehicle, as the newest rows say. */
@@ -106,6 +107,7 @@ export class FollowedVehicles {
     this.kinds = new Map(vehicles.kinds.map(kind => [kind.id, kind]));
     this.docks = new Map(vehicles.docks.map(dock => [dock.id, dock]));
     this.hulls = dockHulls(vehicles);
+    this.grip = vehicleGrip(vehicles);
     for (const dock of vehicles.docks) if (dock.per === 'shared') this.follow(dock.id, restPose(dock));
     // MSZ14c: a look outlives this follower (a grid cell's panels outlast its physics), so it hides as the follower goes
     ports.scope.onDispose(() => { for (const vehicle of this.live.values()) vehicle.body.dispose(); this.live.clear(); for (const look of this.looks.values()) look?.hide(); });
@@ -245,7 +247,7 @@ export class FollowedVehicles {
   private worldOf(vehicle: Followed): VehicleWorld {
     const physics = this.ports.physics, id = vehicle.id, reach = vehicleReach(this.hulls.get(vehicle.dock.id) ?? []), mine = (collider: Parameters<typeof tagOf>[0]): boolean => tagOf(collider)?.owner !== id;
     return {
-      floor: (x, z, fromY) => floorBelow(physics, x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, mine), ...reach,
+      floor: (x, z, fromY) => floorBelow(physics, x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, mine), ...reach, ...this.grip,
       hit: (from, move, yaw) => {
         const hit = castVehicleHull(physics, this.shapes, reach, from, move, yaw, queryGroups(['WORLD'], 'WORLD'), mine), edge = edgeHit(from, move);
         if (hit === null || (edge !== null && edge.at < hit.at)) return edge; // MSZ18: the cell's edge, as the server has it

@@ -1,6 +1,7 @@
 import type { MoverBox } from '@wildshard/format/moverPose';
 import { vehicleCarryHulls } from '@wildshard/format/vehicle-lift';
 import { parseVehicles, type Vehicles } from '@wildshard/format/vehicles';
+import type { VehicleWorld } from '@wildshard/engine/sim/vehicle';
 import { outputDescriptor } from './outputDescriptor';
 import type { ShardFolder } from './shardFolder';
 
@@ -37,4 +38,32 @@ export function folderVehicles(product: Pick<ShardFolder, 'has' | 'section'>): V
 /** Each dock's hull in its own frame, by dock id (as `vehicleHulls` gives a steer carry's). */
 export function dockHulls(vehicles: Vehicles): ReadonlyMap<string, readonly MoverBox[]> {
   return vehicles.docks.length === 0 ? new Map() : vehicleCarryHulls(vehicles);
+}
+
+/** Compile the cell's surface once for the server and page's vehicle steps. Later patches cover earlier ones. */
+export function vehicleGrip(vehicles: Vehicles): Pick<VehicleWorld, 'gripAt'> {
+  const surface = vehicles.surfaceGrip;
+  if (surface === undefined) return {};
+  const patches = surface.patches.map(patch => {
+    if (patch.shape === 'circle') {
+      const [cx, cz] = patch.at, squared = patch.radius ** 2;
+      return { grip: patch.grip, covers: (x: number, z: number) => (x - cx) ** 2 + (z - cz) ** 2 <= squared };
+    }
+    const squared = (patch.width / 2) ** 2;
+    const legs = patch.line.slice(1).map(([bx, bz], i) => {
+      const [ax, az] = patch.line[i] ?? [bx, bz], dx = bx - ax, dz = bz - az;
+      return { ax, az, dx, dz, inverseLengthSquared: 1 / (dx ** 2 + dz ** 2 || 1) };
+    });
+    return { grip: patch.grip, covers: (x: number, z: number) => {
+      for (const { ax, az, dx, dz, inverseLengthSquared } of legs) {
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) * inverseLengthSquared));
+        if ((x - ax - t * dx) ** 2 + (z - az - t * dz) ** 2 <= squared) return true;
+      }
+      return false;
+    } };
+  }).reverse();
+  return { gripAt: (x, z) => {
+    for (const patch of patches) if (patch.covers(x, z)) return patch.grip;
+    return surface.base;
+  } };
 }

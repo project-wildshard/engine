@@ -50,6 +50,8 @@ export interface VehicleHit {
 /** What the world lends a step: the floor probe (down from `fromY`, through its own hull) and the hull's reach. */
 export interface VehicleWorld {
   readonly floor: (x: number, z: number, fromY: number) => number | undefined;
+  /** The cell's multiplier on the kind's tyre grip under the vehicle's centre. */
+  readonly gripAt?: (x: number, z: number) => number;
   /** How far its bow and stern stand from its centre, and its half width (m): where its wheels read the ground. */
   readonly bow: number; readonly stern: number; readonly side: number;
   /** MSZ13: the first thing its hull meets moving by (`x`, `z`) from `from` (MSZ32: on the ground's pitch and roll there) at
@@ -150,8 +152,9 @@ export function stepVehicle(state: VehicleState, command: VehicleCommand, handli
   forward = toward(forward, target, rate * dt);
   // the heading turns with the stick, in proportion below VEHICLE_TURN_SPEED and the other way reversing
   // and at speed no faster than its front tyres can swing it: past its grip it slides (`OVERSTEER` lets the tail out)
+  const tyreGrip = handling.grip * (world.gripAt?.(state.x, state.z) ?? 1);
   const steer = Math.min(1, Math.abs(forward) / VEHICLE_TURN_SPEED) * Math.sign(forward);
-  const most = Math.abs(forward) > 0 ? OVERSTEER * handling.grip * VEHICLE_GRAVITY / Math.abs(forward) : Infinity;
+  const most = Math.abs(forward) > 0 ? OVERSTEER * tyreGrip * VEHICLE_GRAVITY / Math.abs(forward) : Infinity;
   const yawRate = Math.max(-most, Math.min(most, signed(command.turn) * handling.turn * steer));
   const yaw = wrap(state.yaw - yawRate * dt), turned = yaw - state.yaw;
   // the old velocity, seen from the new heading: what the turn left sideways is slip
@@ -159,7 +162,7 @@ export function stepVehicle(state: VehicleState, command: VehicleCommand, handli
   const along = forward * cos - state.slip * sin;
   let slip = forward * sin + state.slip * cos;
   // the tyres pull the slip back under the vehicle, at most their grip; a slide keeps less of it, the more it drifts
-  const grip = handling.grip * VEHICLE_GRAVITY * (command.handbrake === true ? HANDBRAKE_GRIP : 1);
+  const grip = tyreGrip * VEHICLE_GRAVITY * (command.handbrake === true ? HANDBRAKE_GRIP : 1);
   const held = Math.abs(slip) > SLIDE_START ? grip * (1 - (1 - SLIDE_GRIP) * handling.drift) : grip;
   slip = toward(slip, 0, held * dt);
   forward = along;

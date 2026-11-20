@@ -14,7 +14,7 @@ import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type Vehi
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
 import type { Race } from '../../../shared/game/quest/declared';
-import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
+import { dockHulls, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
 import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow, vehicleWreckRow } from '../../../shared/game/shardfile/wirePrompts';
 
 /**
@@ -153,6 +153,7 @@ export class VehicleRuntime {
   private readonly hulls: ReadonlyMap<string, readonly MoverBox[]>;
   private readonly live = new Map<string, Live>();
   private readonly ports: VehicleRuntimePorts;
+  private readonly grip: Pick<VehicleWorld, 'gripAt'>;
   /** Where each seated player was led last step. */
   private readonly led = new Map<string, { x: number; y: number; z: number }>();
   /** The bound host: its players, and its prompts claimed by wire id. */
@@ -167,6 +168,7 @@ export class VehicleRuntime {
   readonly picked: ((player: string, kind: string) => void)[] = [];
   constructor(vehicles: Vehicles, ports: VehicleRuntimePorts) {
     this.ports = ports;
+    this.grip = vehicleGrip(vehicles);
     this.kinds = new Map(vehicles.kinds.map(kind => [kind.id, kind]));
     this.docks = new Map(vehicles.docks.map(dock => [dock.id, dock]));
     this.hulls = dockHulls(vehicles);
@@ -521,7 +523,7 @@ export class VehicleRuntime {
     const floor = (x: number, z: number, fromY: number): number | undefined => floorBelow(this.ports.physics(), x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== id);
     const body = this.ports.restoring === true && handle === undefined && this.host === null ? null : new KinematicMover(this.ports.physics(), boxes, poseOf(state), id, false, handle);
     const reach = vehicleReach(boxes);
-    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, hit: (from, move, yaw) => firstHit(this.hullHit(id, reach, from, move, yaw), edgeHit(from, move)) }, state, seats: kind.seats.map(() => null), idle: 0, health: kind.health ?? VEHICLE_HEALTH, ...(rival === undefined ? {} : { rival }) };
+    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, ...this.grip, hit: (from, move, yaw) => firstHit(this.hullHit(id, reach, from, move, yaw), edgeHit(from, move)) }, state, seats: kind.seats.map(() => null), idle: 0, health: kind.health ?? VEHICLE_HEALTH, ...(rival === undefined ? {} : { rival }) };
     this.live.set(id, vehicle); this.claim(vehicle);
     return id;
   }
