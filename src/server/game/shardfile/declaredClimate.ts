@@ -18,7 +18,8 @@ export function hostDay(host: SimHost): Pick<ReturnType<typeof declaredDay>, 'da
 export function installDeclaredClimate(host: SimHost, rows: Pick<ShardRows, 'days' | 'weather'>): void {
   const borrowed = host.dayClock, authored = rows.days[0], own = borrowed === undefined && authored !== undefined ? declaredDay(authored) : undefined, day = borrowed ?? own ?? null;
   if (own !== undefined) climateDays.set(host, own);
-  const weathers = rows.weather.map(row => declaredWeather(row, new Rng(fnv1a32(`${String(host.level.seed)}:${row.id}`))));
+  // OF23e3: a row that names its program runs in its native assembly (`withProgramWeather`), not here
+  const weathers = rows.weather.flatMap(row => 'program' in row ? [] : [declaredWeather(row, new Rng(fnv1a32(`${String(host.level.seed)}:${row.id}`)))]);
   if (own !== undefined) { publishDay(host, own); actRoutes(host).day = phase => { if (host.players.size === 1 && !own.paused) own.phase = phase; }; }
   const [sky] = weathers;
   if (sky !== undefined) publishWeather(host, sky);

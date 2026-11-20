@@ -12,8 +12,10 @@ import type { LootPresentation } from '../../../client/game/loot/runtime';
 import type { ShardRows } from '@wildshard/format/rows';
 import { sketchReference, type CompendiumSketch } from '@wildshard/format/sketch';
 
+/** A plain chain row (OF23e3: a row that names its program is not one; its native assembly runs it). */
+export type PlainWeatherRow = Exclude<ShardRows['weather'][number], { readonly program: string }>;
 /** Expand a table of authored outputs into the existing seeded weather mechanism. */
-export function declaredWeather(row: ShardRows['weather'][number], rng: Rng): Weather {
+export function declaredWeather(row: PlainWeatherRow, rng: Rng): Weather {
   const states = new Map(row.states.map((state) => [state.id, state]));
   const profile: WeatherProfile = { states: row.states.map((state) => state.id), next: Object.fromEntries(row.states.map((state) => [state.id, state.next])),
     length: Object.fromEntries(row.states.map((state) => [state.id, state.length])), soak: row.soak, dry: row.dry,

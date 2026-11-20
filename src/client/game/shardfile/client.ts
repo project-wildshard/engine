@@ -638,7 +638,8 @@ export class ShardfileClient {
     const authoredDay = source.rows.days[0], day = borrowed ?? (authoredDay === undefined ? null : declaredDay(authoredDay));
     const ownsDay = borrowed === null && day !== null;
     if (ownsDay) { ctx.app.registerDayCycle(day, ctx.scope); runtimeDays.add(day); }
-    const weather = new Map(source.rows.weather.map((row) => [row.id, declaredWeather(row, ctx.app.rng.stream('cosmetic').fork(row.id))]));
+    // OF23e3: a row that names its program runs on the server; the page draws it through its own weather feature
+    const weather = new Map(source.rows.weather.flatMap((row) => 'program' in row ? [] : [[row.id, declaredWeather(row, ctx.app.rng.stream('cosmetic').fork(row.id))] as const]));
     // SF25 / G66: presentation-only client scripts; live creatures keep their sim pose and clips, a frozen home (the
     // traveller in another frame) breathes and grazes on top of it. The lane sees copies; its sim is never stepped here.
     if (source.clientScripts.bindings.length > 0) {

@@ -146,6 +146,16 @@ function withSectionWeather(product: ShardFolder, features: readonly NativeAssem
     rows: legacy ? { file: 'server/weather.json' } : { file: forest, path: ['storm', 'world'] } };
   return [...features.slice(0, environment + 1), weather, ...features.slice(environment + 1)];
 }
+/** OF23e3: a `world/weather` row that names its program runs as the `weather.program` host would, when the plan names no
+ *  `weather.*` host: before the first population host (shelter reads the weather), else last. */
+function withProgramWeather(shard: ShardFolder['shardfile'], features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
+  const programs = shard.rows.weather.flatMap(row => 'program' in row ? [row.program] : []);
+  if (programs.length === 0 || features.some(row => row.host.startsWith('weather.'))) return features;
+  if (programs.length > 1) throw new Error('A native assembly runs one weather program');
+  const weather: NativeAssemblyFeature = { host: 'weather.program', program: { file: programs[0] ?? '' } };
+  const at = features.findIndex(row => row.host.startsWith('population.'));
+  return at === -1 ? [...features, weather] : [...features.slice(0, at), weather, ...features.slice(at)];
+}
 /** Put cooked taming at the same installation point as its explicit predecessor. */
 function withSectionTaming(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
   if (!product.hasFile(TAMING_FILE) || !features.some(row => row.host === 'riding.mounted') ||
@@ -173,7 +183,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const declaredRoster = declaredBootSpawns(plan.features.some(row => row.host === 'riding.roster') ? boot : null, shard);
   const meadow = plan.field === undefined && plan.features.some(row => row.host === 'riding.roster') && product.hasFile(MEADOW_FILE);
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake, meadow), product, assets, ports, plan, bake, nav, boot, declaredRoster };
-  const features = withSectionTaming(product, withSectionWeather(product, plan.features));
+  const features = withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, plan.features)));
   const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
   const harvest = species === undefined ? [] : [...species.native, ...species.program?.species ?? []];
