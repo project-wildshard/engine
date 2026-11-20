@@ -110,6 +110,8 @@ try {
   const there = { x: back.x - origin.x, z: back.z - origin.z }, fromSpawn = Math.hypot(there.x - spawn.x, there.z - spawn.z);
   // row 55: the app coming back resizes the drawing buffer, so the composer allocates again (it threw every frame on v0.1.52)
   await page.setViewportSize({ width: 874, height: 402 }); await sleep(1500); await page.setViewportSize(PHONE.viewport); await sleep(1500);
+  // E38 (RotateGate.ts): a phone turned to landscape pauses into the menu, so back in portrait the player taps RESUME first
+  await page.locator('.ws-gmenu-close').click({ timeout: 5000 }).catch(() => undefined); await sleep(500);
   // 5: not stuck: 3 s of W moves the walker, still inside Driftwood
   const before = back;
   await page.keyboard.down('KeyW'); await sleep(3000); await page.keyboard.up('KeyW'); await sleep(500);
