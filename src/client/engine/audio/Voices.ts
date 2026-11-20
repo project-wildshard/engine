@@ -7,6 +7,8 @@ import { observeAudioMemory } from '../../../shared/engine/core/memoryResources'
 import { panFromYaw, audioRandom } from './util';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { jsonSlot } from '../saves/slots';
+import { TIER } from '../core/tier';
+import { graphicsMode } from '../core/graphicsMode';
 /**
  * Voices — the procedural sound bank (src/client/engine/audio/gen.ts) as AudioBuffers, and a one-node-chain player for them.
  *
@@ -37,17 +39,26 @@ function audioWarmPaceMs(): number {
 }
 
 /** meta IPHONE13-DRIFTWOOD DW3 (mini-driftwood13d): the prewarm renders in a worker (voiceRender.worker.ts) when the device
- *  slot `debug.audioWarmWorker` is true; a play that finds its family unrendered still renders on the main thread. */
+ *  slot `debug.audioWarmWorker` is true; a play that finds its family unrendered still renders on the main thread. Unset,
+ *  it is on at phone Low and off elsewhere: in three alternating cooled iPhone 13 pairs on Driftwood at the 30 cap
+ *  (engine 951d19829 plus this slot, 2026-11-19) the pier leg had 4, 3 and 5 frames over 50 ms with it on against 18, 23
+ *  and 13 off (29.4 to 29.8 fps against 28.2 to 28.9), and the dock was unchanged. It changes no samples. */
 export const AUDIO_WARM_WORKER_SLOT = 'debug.audioWarmWorker';
 export const AUDIO_WARM_WORKER_DEFAULT = false;
 let warmWorkerPicked: boolean | undefined;
 /** Whether the prewarm renders off the main thread; read once per page. */
 export function audioWarmWorkerOn(): boolean {
   if (warmWorkerPicked !== undefined) return warmWorkerPicked;
-  let saved: unknown = null;
+  let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(AUDIO_WARM_WORKER_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  warmWorkerPicked = typeof saved === 'boolean' ? saved : AUDIO_WARM_WORKER_DEFAULT;
+  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  warmWorkerPicked = audioWarmWorker(saved, phoneLow);
   return warmWorkerPicked;
+}
+/** The slot's value: a boolean wins; unset, on at phone Low (`phoneLow`), else AUDIO_WARM_WORKER_DEFAULT. */
+export function audioWarmWorker(saved: unknown, phoneLow = false): boolean {
+  if (typeof saved === 'boolean') return saved;
+  return phoneLow ? true : AUDIO_WARM_WORKER_DEFAULT;
 }
 /** The render worker's port, as the pool uses it (a real Worker, or a test's). */
 export type VoiceRenderPort = Pick<Worker, 'postMessage' | 'terminate'> & EventTarget;

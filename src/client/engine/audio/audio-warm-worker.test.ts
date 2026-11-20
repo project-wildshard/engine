@@ -4,7 +4,7 @@ import { Scope } from '../../../shared/engine/app/scope';
 import { withOwner } from '../../../shared/engine/app/ownership';
 import { legacyDouble } from '../../../test/engine/FakeGame';
 import { renderVoiceWork, type Family } from './voiceFamilies';
-import { AUDIO_WARM_WORKER_DEFAULT, resetAudioWarmWorker, VoicePool, type VoiceRenderPort } from './Voices';
+import { AUDIO_WARM_WORKER_DEFAULT, audioWarmWorker, resetAudioWarmWorker, VoicePool, type VoiceRenderPort } from './Voices';
 
 class Pcm {
   readonly length: number; readonly sampleRate: number; readonly numberOfChannels: number; readonly duration: number;
@@ -91,4 +91,13 @@ test('the worker renders the same samples as the main thread', () => {
     .toEqual([...renderVoiceWork({ kind: 'impact', material: 'wood' }, 24000, 2, 0).subarray(0, 64)]);
   expect(renderVoiceWork({ kind: 'family', name: 'ir-cave' }, 48000, 1, 1).length).toBeGreaterThan(0);
   expect(() => renderVoiceWork({ kind: 'family', name: 'no-such' }, 48000, 1, 0)).toThrow('No voice family no-such');
+});
+
+test('unset, phone Low renders in the worker and every other page does not; a saved pick wins (DW3)', () => {
+  expect(audioWarmWorker(null, true)).toBe(true);
+  expect(audioWarmWorker(undefined, false)).toBe(false);
+  expect(audioWarmWorker(null)).toBe(AUDIO_WARM_WORKER_DEFAULT);
+  expect(audioWarmWorker(false, true)).toBe(false);
+  expect(audioWarmWorker(true, false)).toBe(true);
+  expect(audioWarmWorker('on', true)).toBe(true);
 });

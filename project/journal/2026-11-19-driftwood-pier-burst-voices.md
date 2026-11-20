@@ -18,3 +18,7 @@ moved to `voiceFamilies.ts` so the worker imports no DOM; a declared family carr
 impact material or a PCM program). One job is in flight at a time; a failed or late (5 s) reply turns the worker off for
 the page and renders that job and the rest on the main thread. A play that finds its family unrendered still renders on
 the spot, as before. Off by default until the cooled phone pairs decide.
+
+Three alternating cooled pairs on the phone decided it: with the worker the pier leg had 4, 3 and 5 frames over 50 ms
+against 18, 23 and 13 without (29.4 to 29.8 fps against 28.2 to 28.9); the dock did not move, and the long vocal renders
+left the main thread's log. Unset, the slot is now on at phone Low; other tiers stay off until they are paired.
