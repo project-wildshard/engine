@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.54 (2026-11-19)
+
+- The title Settings menu keeps its own layout when the Bag uses the new sheet.
+- Phone dialogue sits above the controls. A normal reconnect after switching apps stays quiet.
+- The Bag and minimap use the same zone map, with clearer overview labels and zoom centred on the player.
+- Brasscap Mesa rev 13 adds the arena ammo cache. Vibrato ends with its note. Players can no longer push through each other head-on.
+- Driftwood preserves a jump pressed while stepping onto the shrine ledge. Format 0.55.2 keeps the Captain's declared encounter fields.
+
 ## v0.1.53 (2026-11-19)
 
 - Brasscap rev 12 brings tracers, muzzle flash, impact dust, reload animation and updated Wyrm timing.
