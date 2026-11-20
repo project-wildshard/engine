@@ -143,11 +143,34 @@ export interface TitleDeckOptions {
   /** runs on ENTER WORLD's tap before the entry (the slug page's first-play name ask, a world build's FM4 title hold); `go` enters the
    *  card tapped. A returned promise keeps ENTER WORLD busy until it settles. */
   readonly gate?: (go: () => void) => void | Promise<void>;
+  /** ZS10 (J461): Zone Select's tabs, each its own cards in its own order; `cards` is ignored when they are given */
+  readonly tabs?: readonly DeckTab[];
+  /** the tab to open on (default: the first) */
+  readonly tab?: string;
+  /** a tab press, after the deck shows it (the menu keeps it across rebuilds) */
+  readonly onTab?: (id: string) => void;
+  /** J468 (Jake's look): the dots are a row of this many mini heroes, a window that slides with the selection
+   *  ([0] 1 2 3, 0 [1] 2 3, 1 [2] 3 4), a pager of stripes with "1 / 8", and each card's line carries its feats; no summary */
+  readonly strip?: number;
+}
+
+/** ZS10: one Zone Select tab. `list` (J469, Developer's ALL) lays it out as a hero over a list you scroll and tap */
+export interface DeckTab {
+  readonly id: string;
+  readonly label: string;
+  readonly cards: readonly TitleCard[];
+  readonly list?: true;
 }
 
 export interface TitleDeck {
   readonly root: HTMLElement;
+  /** the tab on show's cards */
   readonly cards: readonly TitleCard[];
+  /** ZS10: the tab bar, for the menu to place beside BACK (null with no tabs) */
+  readonly tabBar: HTMLElement | null;
+  /** ZS10: the tab on show ('' with no tabs) */
+  readonly tab: string;
+  readonly showTab: (id: string) => void;
   readonly index: number;
   readonly select: (i: number, smooth?: boolean) => void;
   /** ENTER WORLD on the selected card */
@@ -223,45 +246,28 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const mode = opts.mode ?? menuMode;
   const scope = pageScope.child('title-deck');
   const onTap = (el: HTMLElement, fn: () => void): void => { listenTap(scope, el, fn); };
-  const { cards } = opts;
-  // J313: a draft's card (Thin Ice, off the grid by J305) never loads, so only Developer sees it
-  // SA36: the slug page holds exactly its one card, Developer or not
-  // STAGING-BUGBASH SB11: a draft whose world is now a carded shard (Thin Ice's open plot, `open-plot-thin-ice`) has one card,
-  // the shard's, never a second DRAFT MODE card beside it
-  const drafts = opts.single === undefined && (mode().developer || mode().devserver) ? DRAFT_TITLES.filter(d => !cards.some(c => draftCarded(d, c))) : [];
-  const entries: readonly DeckEntry[] = [...cards.map(fromShard), ...drafts.map(fromDraft)];
-  const activeIndex = entries.map((card): string => card.slug).indexOf(opts.active ?? '');
+  const tabs = opts.tabs ?? [];
+  let tab: DeckTab | undefined = tabs.find(t => t.id === opts.tab) ?? tabs[0];
+  let cards: readonly TitleCard[] = tab?.cards ?? opts.cards;
+  const strip = opts.strip;
   const root = document.createElement('div');
   root.className = 'ws-menu';
+  // J468: the caption names the selected zone over the hero when a tab is a list (J469); the pager is the carousel's place
+  const pager = strip === undefined ? '' : `<div class="ws-menu-pager"><span class="ws-menu-stripes" aria-hidden="true"></span><span class="ws-menu-count"></span></div>`;
+  const caption = strip === undefined ? '' : `<div class="ws-menu-caption"><b></b><small></small></div>`;
   root.innerHTML = `
     <div class="ws-menu-hero"></div>
     <div class="ws-menu-head"><div class="ws-wordmark">Project <b>Wildshard</b></div>
 </div>
-    <div class="ws-menu-deck">
+    <div class="ws-menu-deck">${caption}
       <div class="ws-menu-cards"><div class="ws-menu-deck-track"></div></div>
-      <div class="ws-menu-dots"></div>
+      <div class="ws-menu-dots"></div>${pager}
       <div class="ws-menu-modes"><button class="ws-menu-mode ws-menu-play" type="button"><span class="ws-menu-mode-glyph">${SWORD}</span><b>${GAME_STRINGS.mainMenu.enterZone}</b><small></small></button></div>
     </div>`;
   const words = (tag: string, cls: string, text: string): HTMLElement => { const node = document.createElement(tag); node.className = cls; node.textContent = text; return node; };
   const cardTrack = required(root, '.ws-menu-deck-track'), dotTrack = required(root, '.ws-menu-dots');
-  entries.forEach((card, index) => {
-    const active = index === activeIndex, button = document.createElement('button'); button.type = 'button'; button.dataset['i'] = String(index);
-    const dimmed = card.upgrade !== undefined || card.unavailable !== undefined || card.closed === true, amber = card.unavailable !== undefined || card.closed === true;
-    button.className = `ws-menu-card${active ? ' active' : ''}${dimmed ? ' ws-menu-card-upgrade' : ''}${amber ? ' ws-menu-card-unavailable' : ''}`;
-    const image = document.createElement('span'); image.className = 'ws-menu-card-img'; image.style.backgroundImage = `url('${titleAssetURL(card.thumbnail)}')`;
-    if (card.upgrade !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.upgrade.badge));
-    else if (card.unavailable !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.unavailable.badge));
-    // STAGING-BUGBASH SB17 (Jake's recommended pick): no LOAD / LOADED tag on the picture; it read as a button that does nothing.
-    // ENTER WORLD's line under it says what a tap loads; the card keeps the fact for tests and styles
-    if (canEnter(card, mode()) && opts.single?.closed === undefined) button.dataset['enters'] = '1';
-    // G238: the port badge, Developer on only (the public card is unchanged)
-    const ribbon = ribbonFor(card, mode());
-    const tone = !canEnter(card, mode()) ? '' : card.badge === 'Early access' ? ' ws-menu-card-ea' : card.badge === 'Partial' ? ' ws-menu-card-partial' : '';
-    if (ribbon !== '') image.append(words('i', `ws-menu-card-exp${tone}`, ribbon));
-    const sub = card.upgrade !== undefined ? GAME_STRINGS.upgrade.built(card.upgrade.built) : card.closed === true ? GAME_STRINGS.notInWorld.badge : card.unavailable !== undefined ? refusalReason(card.unavailable) : canEnter(card, mode()) ? enterableLabel(card.label) : card.label;
-    button.append(image, words('b', '', card.name), words('small', amber ? 'ws-menu-card-reason' : '', sub)); cardTrack.append(button);
-    const dot = document.createElement('i'); dot.dataset['i'] = String(index); dot.dataset['tag'] = dotTag(card, mode()); dot.style.setProperty('--thumb', `url('${titleAssetURL(card.thumbnail)}')`); dotTrack.append(dot);
-  });
+  const stripeTrack = root.querySelector<HTMLElement>('.ws-menu-stripes'), count = root.querySelector<HTMLElement>('.ws-menu-count');
+  const captionEl = root.querySelector<HTMLElement>('.ws-menu-caption');
   if (opts.notice) {
     const notice = document.createElement('div');
     notice.className = 'ws-menu-recovery';
@@ -270,6 +276,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     required(root, '.ws-menu-head').append(notice);
   }
 
+  // J468: the strip's look carries each zone's feats on its line, so the old two-line summary goes
   const summary = document.createElement('div');
   summary.className = 'ws-title-summary';
   summary.setAttribute('aria-label', GAME_STRINGS.summary.label);
@@ -283,7 +290,11 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     total.textContent = GAME_STRINGS.summary.total(view.earned);
     summary.replaceChildren(selected, total);
   };
-  required(root, '.ws-menu-dots').after(summary);
+  if (strip === undefined) required(root, '.ws-menu-dots').after(summary);
+  const featsLine = (): ((slug: string) => string) => {
+    const lines = new Map(summaryView(readSummary(), titleManifests()).lines.map((entry) => [entry.slug, entry] as const));
+    return (slug) => GAME_STRINGS.summary.feats(lines.get(slug)?.earned ?? 0);
+  };
 
   const hero = required(root, '.ws-menu-hero');
   const list = required(root, '.ws-menu-cards');
@@ -291,18 +302,69 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   const hint = required(root, '.ws-menu-play small');
   const play = root.querySelector<HTMLButtonElement>('.ws-menu-play');
   if (play === null) throw new Error('Title deck: missing ENTER ZONE');
-  const cardEls = Array.from(root.querySelectorAll<HTMLElement>('.ws-menu-card'));
-  const dots = Array.from(root.querySelectorAll<HTMLElement>('.ws-menu-dots i'));
   const portrait = (): boolean => innerWidth < innerHeight;
   const heroUrl = (c: DeckEntry): string => titleAssetURL(portrait() ? c.heroPortrait : c.heroLandscape);
-  let index = Math.max(0, activeIndex);
+  const listMode = (): boolean => tab?.list === true;
+
+  // ZS10: a tab's cards fill the track and the dots; the deck's own listeners (swipe, ENTER ZONE) outlive a tab switch
+  let entries: readonly DeckEntry[] = [];
+  let activeIndex = -1;
+  let cardEls: HTMLElement[] = [];
+  let dots: HTMLElement[] = [];
+  let stripes: HTMLElement[] = [];
+  let cardScope = scope.child('title-deck-cards');
+  let index = 0;
+  let swipedAt = 0; // a swipe's trailing click must not re-select the card under the finger
+  const fill = (): void => {
+    cardScope.dispose(); cardScope = scope.child('title-deck-cards');
+    // J313: a draft's card (Thin Ice, off the grid by J305) never loads, so only Developer sees it
+    // SA36: the slug page holds exactly its one card, Developer or not
+    // STAGING-BUGBASH SB11: a draft whose world is now a carded shard (Thin Ice's open plot, `open-plot-thin-ice`) has one card,
+    // the shard's, never a second DRAFT MODE card beside it. ZS10: on Zone Select only the Developer's ALL list carries drafts
+    const draftsHere = opts.single === undefined && (tab === undefined || tab.list === true) && (mode().developer || mode().devserver);
+    const drafts = draftsHere ? DRAFT_TITLES.filter(d => !cards.some(c => draftCarded(d, c))) : [];
+    entries = [...cards.map(fromShard), ...drafts.map(fromDraft)];
+    activeIndex = entries.map((card): string => card.slug).indexOf(opts.active ?? '');
+    const feats = strip === undefined ? null : featsLine();
+    cardTrack.replaceChildren(); dotTrack.replaceChildren(); stripeTrack?.replaceChildren();
+    if (entries.length === 0) cardTrack.append(words('p', 'ws-menu-empty', GAME_STRINGS.mainMenu.tabs.empty));
+    entries.forEach((card, at) => {
+      const active = at === activeIndex, button = document.createElement('button'); button.type = 'button'; button.dataset['i'] = String(at); button.dataset['slug'] = card.slug;
+      const dimmed = card.upgrade !== undefined || card.unavailable !== undefined || card.closed === true, amber = card.unavailable !== undefined || card.closed === true;
+      button.className = `ws-menu-card${active ? ' active' : ''}${dimmed ? ' ws-menu-card-upgrade' : ''}${amber ? ' ws-menu-card-unavailable' : ''}`;
+      const image = document.createElement('span'); image.className = 'ws-menu-card-img'; image.style.backgroundImage = `url('${titleAssetURL(card.thumbnail)}')`;
+      if (card.upgrade !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.upgrade.badge));
+      else if (card.unavailable !== undefined) image.append(words('i', 'ws-menu-card-tag ws-menu-card-needs', GAME_STRINGS.unavailable.badge));
+      // STAGING-BUGBASH SB17 (Jake's recommended pick): no LOAD / LOADED tag on the picture; it read as a button that does nothing.
+      // ENTER WORLD's line under it says what a tap loads; the card keeps the fact for tests and styles
+      const open = canEnter(card, mode());
+      if (open && opts.single?.closed === undefined) button.dataset['enters'] = '1';
+      // G238: the port badge, Developer on only (the public card is unchanged)
+      const ribbon = ribbonFor(card, mode());
+      const tone = !open ? '' : card.badge === 'Early access' ? ' ws-menu-card-ea' : card.badge === 'Partial' ? ' ws-menu-card-partial' : '';
+      if (ribbon !== '') image.append(words('i', `ws-menu-card-exp${tone}`, ribbon));
+      const line = open ? enterableLabel(card.label) : card.label;
+      // J468: the strip's card line is the zone's one line and its feats ("We want to count feats still")
+      const withFeats = feats !== null && open && card.shard !== null ? `${line} · ${feats(card.slug)}` : line;
+      const sub = card.upgrade !== undefined ? GAME_STRINGS.upgrade.built(card.upgrade.built) : card.closed === true ? GAME_STRINGS.notInWorld.badge : card.unavailable !== undefined ? refusalReason(card.unavailable) : withFeats;
+      button.append(image, words('b', '', card.name), words('small', amber ? 'ws-menu-card-reason' : '', sub)); cardTrack.append(button);
+      const dot = document.createElement('i'); dot.dataset['i'] = String(at); dot.dataset['tag'] = dotTag(card, mode()); dot.style.setProperty('--thumb', `url('${titleAssetURL(card.thumbnail)}')`); dotTrack.append(dot);
+      if (stripeTrack !== null) stripeTrack.append(document.createElement('i'));
+    });
+    cardEls = Array.from(root.querySelectorAll<HTMLElement>('.ws-menu-card'));
+    dots = Array.from(root.querySelectorAll<HTMLElement>('.ws-menu-dots i'));
+    stripes = stripeTrack === null ? [] : Array.from(stripeTrack.children).filter((e): e is HTMLElement => e instanceof HTMLElement);
+    index = Math.max(0, activeIndex);
+  };
 
   // STAGING-BUGBASH SB14: exactly one card is lit at any moment (menu.css dims the rest, never see-through)
   const light = (lit: number): void => { cardEls.forEach((e, n) => { e.classList.toggle('selected', n === lit); }); };
-  // paginated track: one card per swipe, always centred — no native scroll, so it can't rest between cards
+  // paginated track: one card per swipe, always centred — no native scroll, so it can't rest between cards. J469's list
+  // tab scrolls natively and only lights its row
   const place = (i: number, extra = 0, animate = true): void => {
     const card = cardEls[i];
     if (card === undefined) return;
+    if (listMode()) { track.style.transition = 'none'; track.style.transform = 'none'; light(i); return; }
     // layout reads first, then the one style write (no forced recalc per pointermove)
     const shift = list.clientWidth / 2 - (card.offsetLeft + card.offsetWidth / 2) + extra;
     // under a dragging finger the lit card is the one nearest the middle: the lit card hands over once, mid-drag
@@ -316,11 +378,33 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     track.style.transform = `translateX(${shift}px)`;
     light(near);
   };
-  const apply = (): void => {
+  /** J468: the mini heroes are a window of `strip` that slides once the selection is past the second: [0] 1 2 3, 0 [1] 2 3,
+   *  1 [2] 3 4. Every dot stays in the row (a proof script's `.ws-menu-dots i` nth click scrolls it into view); the row scrolls */
+  const slideStrip = (smooth: boolean): void => {
+    if (strip === undefined) return;
+    const start = Math.max(0, Math.min(index - 1, entries.length - strip));
+    const first = dots[start];
+    if (first === undefined || typeof dotTrack.scrollTo !== 'function') return;
+    dotTrack.scrollTo({ left: first.offsetLeft, behavior: smooth ? 'smooth' : 'instant' });
+  };
+  const apply = (smooth = true): void => {
     const c = entries[index];
-    if (c === undefined) return;
+    if (c === undefined) {
+      hero.classList.remove('show'); hint.textContent = ''; play.disabled = true;
+      if (count !== null) count.textContent = '';
+      if (captionEl !== null) captionEl.hidden = true;
+      return;
+    }
     light(index);
     dots.forEach((d, i) => { d.classList.toggle('on', i === index); });
+    stripes.forEach((s, i) => { s.classList.toggle('on', i === index); });
+    if (count !== null) count.textContent = GAME_STRINGS.mainMenu.count(index + 1, entries.length);
+    if (captionEl !== null) {
+      captionEl.hidden = false;
+      required(captionEl, 'b').textContent = c.name;
+      required(captionEl, 'small').textContent = cardEls[index]?.querySelector('small')?.textContent ?? c.label;
+    }
+    slideStrip(smooth);
     // the card's own thumbnail (already on screen in the card) under the hero: until the hero's bytes arrive and decode
     // (a phone network, a busy page), the backdrop is the card's picture, never black (Jake's Pine Hollow, ab93dccfe)
     hero.style.backgroundImage = `url('${heroUrl(c)}'), url('${titleAssetURL(c.thumbnail)}')`;
@@ -329,12 +413,19 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     hint.textContent = single?.closed ?? (single === undefined || !open ? hintFor(c, index === activeIndex, mode()) : single.hint);
     play.disabled = (!open && c.draft === null) || single?.closed !== undefined;
     required(play, 'b').textContent = c.draft ? (isDev() ? GAME_STRINGS.drafts.draftMode : GAME_STRINGS.drafts.followBuild) : c.upgrade !== undefined ? GAME_STRINGS.upgrade.badge : c.unavailable !== undefined ? GAME_STRINGS.unavailable.badge : c.closed === true ? GAME_STRINGS.notInWorld.badge : open ? single?.play ?? GAME_STRINGS.mainMenu.enterZone : 'Coming soon';
-    paintSummary(c);
+    if (strip === undefined) paintSummary(c);
   };
   const select = (raw: number, smooth = true): void => {
     const i = Math.max(0, Math.min(entries.length - 1, raw));
     place(i, 0, smooth);
-    if (i !== index) { index = i; apply(); }
+    if (i !== index) { index = i; apply(smooth); }
+  };
+  /** the tab's cards and dots, wired in the tab's own scope */
+  const bind = (): void => {
+    // a click that only follows the title's SHARD SELECT tap lands where that tap was, not on a card or dot (QC2)
+    cardEls.forEach((e, i) => { listenDom(cardScope, e, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev) && i !== index && performance.now() - swipedAt > 400) select(i); }); });
+    dots.forEach((d, i) => { listenDom(cardScope, d, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev)) select(i); }); });
+    dots.forEach((d, i) => { listenDom(cardScope, d, 'pointerdown', () => { warm(i); }); });
   };
   // the card is entered through its shardfile, whose download starts first
   let entering = false;
@@ -364,7 +455,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   // swipe → the track follows the finger (rubber-banded at the ends), release = one page in the swipe direction
   let drag: { id: number; x0: number; t0: number; dx: number } | null = null;
   listenDom(scope, list, 'pointerdown', (e) => {
-    if (drag) return;
+    if (drag || listMode()) return;
     drag = { id: e.pointerId, x0: e.clientX, t0: performance.now(), dx: 0 };
     capturePointer(list, e.pointerId);
   });
@@ -374,7 +465,6 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     const atEnd = (drag.dx > 0 && index === 0) || (drag.dx < 0 && index === entries.length - 1);
     place(index, atEnd ? drag.dx * 0.3 : drag.dx, false);
   });
-  let swipedAt = 0; // a swipe's trailing click must not re-select the card under the finger
   const endDrag = (e: PointerEvent): void => {
     if (!drag || e.pointerId !== drag.id) return;
     const { dx, t0 } = drag; drag = null;
@@ -383,9 +473,6 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     else place(index);
   };
   listenDom(scope, list, 'pointerup', endDrag); listenDom(scope, list, 'pointercancel', endDrag);
-  // a click that only follows the title's SHARD SELECT tap lands where that tap was, not on a card or dot (QC2)
-  cardEls.forEach((e, i) => { listenDom(scope, e, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev) && i !== index && performance.now() - swipedAt > 400) select(i); }); });
-  dots.forEach((d, i) => { listenDom(scope, d, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev)) select(i); }); });
   // a draft opens its tab in the tap's own turn (a popup blocker drops a late one); a gated entry enters the card tapped, even if the
   // deck moved while the gate asked, and ENTER WORLD stays busy meanwhile
   const playButton = required(root, '.ws-menu-play');
@@ -405,9 +492,40 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   // orientation on screen, loads with the deck. A neighbour's loads when a swipe or a dot press starts toward it, so the
   // crossfade on release is usually instant (LOAD-PERF, first-launch transfer)
   const warmed = new Set<string>();
-  const warm = (i: number): void => { const c = entries[i]; const u = c ? heroUrl(c) : ''; if (u && !warmed.has(u)) { warmed.add(u); new Image().src = u; } };
+  function warm(i: number): void { const c = entries[i]; const u = c ? heroUrl(c) : ''; if (u && !warmed.has(u)) { warmed.add(u); new Image().src = u; } }
   listenDom(scope, list, 'pointerdown', () => { warm(index - 1); warm(index + 1); });
-  dots.forEach((d, i) => { listenDom(scope, d, 'pointerdown', () => { warm(i); }); });
+
+  // ZS10 (J461): FEATURED, POPULAR, NEW (and Developer's ALL, J469); a press shows that tab's first card
+  let tabBar: HTMLElement | null = null;
+  const tabButtons: HTMLButtonElement[] = [];
+  const markTab = (): void => {
+    root.classList.toggle('ws-menu-list', listMode());
+    root.dataset['tab'] = tab?.id ?? '';
+    tabButtons.forEach((b) => { const on = b.dataset['tab'] === tab?.id; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
+  };
+  const showTab = (id: string): void => {
+    const next = tabs.find(t => t.id === id);
+    if (next === undefined || next === tab) return;
+    tab = next; cards = next.cards;
+    fill(); bind(); markTab();
+    list.scrollTop = 0;
+    place(index, 0, false); apply(false);
+    opts.onTab?.(next.id);
+  };
+  if (tabs.length > 0) {
+    tabBar = document.createElement('div');
+    tabBar.className = 'ws-menu-tabs';
+    tabBar.setAttribute('role', 'tablist');
+    tabBar.setAttribute('aria-label', GAME_STRINGS.mainMenu.tabs.label);
+    tabBar.dataset['count'] = String(tabs.length);
+    for (const t of tabs) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'ws-menu-tab'; b.dataset['tab'] = t.id; b.setAttribute('role', 'tab'); b.textContent = t.label;
+      onTap(b, () => { showTab(t.id); });
+      tabButtons.push(b);
+      tabBar.append(b);
+    }
+  }
 
   // orientation flips swap the hero file and re-centre the selected card (card width is viewport-relative). iOS (E131): a
   // rotation can fire `resize` before the new layout settles, and may leave the strip natively scrolled — so re-centre
@@ -415,19 +533,25 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   let wasPortrait = portrait();
   const onResize = (): void => {
     place(index, 0, false);
-    if (portrait() !== wasPortrait) { wasPortrait = portrait(); apply(); }
+    if (portrait() !== wasPortrait) { wasPortrait = portrait(); apply(false); }
+    slideStrip(false);
   };
   scope.listen(window, 'resize', onResize);
-  const strip = new ResizeObserver(() => { list.scrollLeft = 0; if (!drag) place(index, 0, false); });
-  strip.observe(list);
-  scope.onDispose(() => { strip.disconnect(); });
+  const observed = new ResizeObserver(() => { if (!listMode()) list.scrollLeft = 0; if (!drag) place(index, 0, false); slideStrip(false); });
+  observed.observe(list);
+  scope.onDispose(() => { observed.disconnect(); });
 
-  apply();
+  fill(); bind(); markTab();
+  apply(false);
   return {
-    root, cards,
+    root,
+    get cards() { return cards; },
+    tabBar,
+    get tab() { return tab?.id ?? ''; },
+    showTab,
     get index() { return index; },
     select, activate,
-    start: () => { place(index, 0, false); scope.raf(() => { place(index, 0, false); }); },
+    start: () => { place(index, 0, false); slideStrip(false); scope.raf(() => { place(index, 0, false); slideStrip(false); }); },
     dispose: () => { scope.dispose(); },
     onTap,
     busy,

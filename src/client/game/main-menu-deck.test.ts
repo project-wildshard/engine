@@ -8,6 +8,7 @@ import { pageGridIntents } from './grid/intent';
 import type { TitleCard } from './titleDeck';
 import { GAME_STRINGS } from '../../shared/game/strings';
 import { saveStorage } from '@wildshard/engine/saves/slots';
+import type { ZoneSelectCard, ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 
 /** Jake, 2026-11-12 09:03 Cancún ("That shard select insta loads driftwood bug is still here"): on a phone, SHARD SELECT
  *  went straight to "Loading Driftwood Isle". The MG5 first-play skip entered deck card 0 on every tap until the in-world
@@ -142,7 +143,9 @@ for (const developer of [false, true]) {
     expect(mmo[0]?.classList.contains('ws-main-grid')).toBe(true);
     expect(mmo[0]?.querySelector('b')?.textContent).toBe('ENTER THE MMO');
     expect(zone[0]?.querySelector('b')?.textContent).toBe('ZONE SELECT');
-    expect(view.root.querySelector('.ws-menu-title')?.textContent).toBe('ZONE SELECT');
+    // ZS10 (J468): the tabs are Zone Select's header; Developer adds ALL (J469)
+    expect(view.root.querySelector('.ws-menu-title')).toBeNull();
+    expect([...view.root.querySelectorAll('.ws-menu-tab')].map(t => t.textContent)).toEqual(developer ? ['FEATURED', 'POPULAR', 'NEW', 'ALL'] : ['FEATURED', 'POPULAR', 'NEW']);
     expect(view.root.textContent).not.toMatch(/infinite wildshard|experimental|shard select/iu);
     mmo[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await frames();
@@ -237,3 +240,80 @@ for (const [name, mode] of [['player', { developer: false, devserver: false }], 
     expect(view.root.querySelector('.ws-main-settings:not(.ws-main-signin)')?.textContent).toBe(GAME_STRINGS.mainMenu.settings);
   });
 }
+
+/** ZS10 (J461, J468, J469; Jake's look on board https://claude.ai/artifact/FDzM6sgRKvnRnx9xCcV2c9): Zone Select's tabs read the room
+ *  list's orders; FEATURED opens; 4 mini heroes slide as a window; the stripe pager and "1 / 8"; Developer's ALL is a list. */
+const zone = (slug: string): ZoneSelectCard => ({ slug, name: slug, status: null, heroHash: null, firstUploadedAt: null, enters: 0 });
+const SIX = ['a-one', 'b-two', 'c-three', 'd-four', 'e-five', 'f-six'].map(slug => card(slug, slug.toUpperCase()));
+const served = (featured: string[], popular: string[], fresh: string[], all: string[]): ZoneSelectDocument =>
+  ({ channel: 'staging', serial: 1, featured: featured.map(zone), popular: popular.map(zone), new: fresh.map(zone), all: all.map(zone) });
+const DOC = served(['c-three', 'a-one', 'b-two', 'd-four', 'e-five', 'f-six'], ['f-six', 'a-one'], ['e-five'], ['b-two', 'a-one', 'zz-missing']);
+const zoneMenu = (developer: boolean, zoneSelect: ZoneSelectDocument | null = DOC) => {
+  const view = buildTitleMenu({ cards: SIX, zoneSelect, active: null, onEnter: () => undefined, onSettings: () => undefined, onGrid: () => undefined,
+    mode: () => ({ developer, devserver: false }) });
+  document.body.append(view.root); views.push(view);
+  view.show('select');
+  return view;
+};
+const names = (root: ParentNode): string[] => [...root.querySelectorAll('.ws-menu-card b')].map(b => b.textContent ?? '');
+const pressTab = (root: ParentNode, id: string): void => { tap(root.querySelector(`.ws-menu-tab[data-tab="${id}"]`)); };
+
+test('ZS10: Zone Select opens on FEATURED in its served order; each tab shows its own cards', () => {
+  const view = zoneMenu(false);
+  expect(view.root.querySelector('.ws-menu-tab[aria-selected="true"]')?.textContent).toBe('FEATURED');
+  expect(names(view.root)).toEqual(['C-THREE', 'A-ONE', 'B-TWO', 'D-FOUR', 'E-FIVE', 'F-SIX']);
+  pressTab(view.root, 'popular');
+  expect(names(view.root)).toEqual(['F-SIX', 'A-ONE']);
+  expect(view.cards.map(c => c.slug)).toEqual(['f-six', 'a-one']);
+  pressTab(view.root, 'new');
+  expect(names(view.root)).toEqual(['E-FIVE']);
+  expect(view.root.querySelector('.ws-menu-tab[data-tab="all"]')).toBeNull();
+});
+
+test('ZS10: an empty tab says so and ENTER ZONE is off; FEATURED with no room list holds the build\'s cards', () => {
+  const view = zoneMenu(false, served(['c-three'], [], [], []));
+  pressTab(view.root, 'new');
+  expect(view.root.querySelector('.ws-menu-empty')?.textContent).toBe(GAME_STRINGS.mainMenu.tabs.empty);
+  expect(view.root.querySelector<HTMLButtonElement>('.ws-menu-play')?.disabled).toBe(true);
+  const bare = zoneMenu(false, null);
+  pressTab(bare.root, 'featured');
+  expect(names(bare.root)).toEqual(SIX.map(c => c.name));
+});
+
+test('ZS10: J468\'s 4 mini heroes slide as a window, with the stripe pager and "1 / 6"', () => {
+  const view = zoneMenu(false);
+  pressTab(view.root, 'featured'); // the page keeps the last tab (a rebuild comes back to it)
+  const count = (): string | null | undefined => view.root.querySelector('.ws-menu-count')?.textContent;
+  const lit = (sel: string): number => [...view.root.querySelectorAll(sel)].findIndex(e => e.classList.contains('on'));
+  const windows: number[] = [];
+  const strip = view.root.querySelector<HTMLElement>('.ws-menu-dots');
+  if (strip === null) throw new Error('no strip');
+  strip.scrollTo = ((opts: ScrollToOptions): void => { windows.push(opts.left ?? -1); }) as typeof strip.scrollTo;
+  view.root.querySelectorAll<HTMLElement>('.ws-menu-dots i').forEach((dot, i) => { Object.defineProperty(dot, 'offsetLeft', { get: () => i * 100 }); });
+  expect(count()).toBe('1 / 6');
+  expect(view.root.querySelectorAll('.ws-menu-stripes i')).toHaveLength(6);
+  for (const i of [1, 2, 3, 5, 0]) view.select(i, false);
+  expect(windows).toEqual([0, 100, 200, 200, 0]); // [0] 1 2 3 · 0 [1] 2 3 · 1 [2] 3 4 · 2 [3] 4 5 · 2 3 4 [5] · [0] 1 2 3
+  expect([count(), lit('.ws-menu-stripes i'), lit('.ws-menu-dots i')]).toEqual(['1 / 6', 0, 0]);
+  view.select(3, false);
+  expect([count(), lit('.ws-menu-stripes i'), lit('.ws-menu-dots i')]).toEqual(['4 / 6', 3, 3]);
+  // no live badge and no summary block: the zone's line carries its feats
+  expect(view.root.querySelector('.ws-title-summary')).toBeNull();
+  expect(view.root.querySelector('.ws-menu-card.selected small')?.textContent).toBe('D-FOUR · 0 FEATS');
+});
+
+test('ZS10: Developer\'s ALL (J469) is a list of every zone, served order first, then the build\'s others; the tab survives a rebuild', () => {
+  const view = zoneMenu(true);
+  pressTab(view.root, 'all');
+  expect(view.root.querySelector('.ws-menu-list')).not.toBeNull();
+  // a draft (Thin Ice) follows, as on today's Developer deck
+  expect(names(view.root).slice(0, 6)).toEqual(['B-TWO', 'A-ONE', 'C-THREE', 'D-FOUR', 'E-FIVE', 'F-SIX']);
+  tap(view.root.querySelector('.ws-menu-card[data-i="4"]'));
+  expect(view.index).toBe(4);
+  expect(view.root.querySelector('.ws-menu-caption b')?.textContent).toBe('E-FIVE');
+  const again = zoneMenu(true);
+  expect(again.root.querySelector('.ws-menu-tab[aria-selected="true"]')?.textContent).toBe('ALL');
+  const player = zoneMenu(false);
+  expect(player.root.querySelector('.ws-menu-tab[aria-selected="true"]')?.textContent).toBe('FEATURED');
+  pressTab(player.root, 'featured');
+});

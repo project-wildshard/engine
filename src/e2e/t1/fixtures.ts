@@ -85,10 +85,13 @@ async function enterBrasscap(page: Page, name?: string): Promise<void> {
   if (typeof row !== 'object' || row === null || !('name' in row)) {
     throw new Error('The build has no Brasscap')
   }
+  // ZS10: Brasscap is a preview zone outside FEATURED; Developer's ALL lists every zone
+  await page.locator('.ws-menu-tab[data-tab="all"]').click()
   const cards = await page.locator('.ws-menu-card b').allTextContents()
   const index = cards.indexOf(String(row.name))
   expect(index).toBeGreaterThanOrEqual(0)
-  await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).click()
+  // ALL (J469) is a list: its rows are tapped
+  await page.locator(`.ws-menu-card[data-i="${String(index)}"]`).click()
   await page
     .locator(`.ws-menu-card.selected[data-i="${String(index)}"]`)
     .waitFor()

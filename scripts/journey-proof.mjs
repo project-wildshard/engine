@@ -291,6 +291,12 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
     names = await page.locator('.ws-menu-card b').allTextContents();
     index = titleCardIndex(rows, names, card);
     if (index !== -1 || Date.now() >= until) break;
+    // ZS10 (J461): Zone Select opens on FEATURED; a card outside it is found as a player would, in Developer's ALL, else the next tab
+    const tabs = await page.locator('.ws-menu-tab').evaluateAll((els) => els.map((el) => [el instanceof HTMLElement ? el.dataset.tab ?? '' : '', el.getAttribute('aria-selected') === 'true']));
+    const on = tabs.find(([, selected]) => selected)?.[0] ?? '';
+    const ids = tabs.map(([id]) => String(id));
+    const next = ids.includes('all') ? 'all' : ids[(ids.indexOf(String(on)) + 1) % Math.max(1, ids.length)];
+    if (next !== undefined && next !== on) await page.locator(`.ws-menu-tab[data-tab="${next}"]`).tap();
     await page.waitForTimeout(250);
   }
   if (index === -1) throw new Error(`No Shard Select card for ${card} after ${String(CARD_WAIT_MS / 1000)} s (cards: ${names.join(', ')})`);
@@ -300,7 +306,9 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
   const want = names[index]?.trim().toLowerCase() ?? '';
   for (let tries = 0; ; tries++) {
     await clear();
-    await page.locator(`.ws-menu-dots i[data-i="${String(index)}"]`).tap();
+    // ZS10: ALL (J469) is a list whose rows are tapped; the other tabs pick by their mini heroes
+    const pick = (await page.locator('.ws-menu-list').count()) > 0 ? '.ws-menu-card' : '.ws-menu-dots i';
+    await page.locator(`${pick}[data-i="${String(index)}"]`).tap();
     await page.locator(`.ws-menu-card.selected[data-i="${String(index)}"]`).waitFor({ timeout: 10_000 });
     await page.waitForTimeout(400);
     const lit = (await page.locator('.ws-menu-card.selected b').first().textContent())?.trim().toLowerCase() ?? '';

@@ -21,7 +21,7 @@ import { openSignIn, saveFile, takeLinkOutcome, titleLogin, titleSignedIn, type 
 import { engineString } from '@wildshard/engine/strings';
 import { lastEnd, type LastEnd } from '@wildshard/engine/boot/lastEnd';
 import { setDev } from '@wildshard/engine/core/devMode';
-import { buildTitleDeck, titleCards, type TitleDeck, type TitleDeckOptions } from './titleDeck';
+import { buildTitleDeck, titleCards, type DeckTab, type TitleDeck, type TitleDeckOptions } from './titleDeck';
 import { menuMode, gridMode } from './grid/menu';
 import { dropGridIntent, enterGrid, gridRecoveryLoop } from './grid/pageEntry';
 import { pageScope } from '@wildshard/engine/app/resources';
@@ -55,6 +55,8 @@ const CARDS_ICON = '<svg viewBox="0 0 64 48" aria-hidden="true"><g fill="none" s
 export type MainMenuScreen = 'main' | 'select';
 /** the screen this page's title is on: a rebuild (Developer flipped in Settings) comes back to it */
 let screen: MainMenuScreen = 'main';
+/** ZS10: the Zone Select tab this page was last on; a rebuild (Developer flipped, the late room list) comes back to it */
+let zoneTab = 'featured';
 
 /** Caller-owned title deck and navigation options. */
 export interface TitleMenuOptions extends Omit<TitleDeckOptions, 'cards'> {
@@ -103,13 +105,31 @@ function required<T extends HTMLElement>(root: ParentNode, selector: string, typ
 function orderTitleCards(cards: TitleDeck['cards'], served: readonly { readonly slug: string }[] | undefined): TitleDeck['cards'] {
   if (served === undefined) return cards;
   const bySlug = new Map(cards.map(card => [card.slug, card]));
-  const ordered = served.flatMap(({ slug }) => {
+  return served.flatMap(({ slug }) => {
     const card = bySlug.get(slug);
     if (card === undefined) return [];
     bySlug.delete(slug);
     return [card];
   });
-  return ordered.length === 0 ? cards : ordered;
+}
+
+/** ZS10 (J461, J469): Zone Select's tabs in the room list's orders, over the build's cards. FEATURED, the tab Zone Select opens
+ *  on, is never empty: with no list (no baked or kept room list, pause ▸ EXIT TO MAIN) or none of its zones in this build it
+ *  holds the build's cards. POPULAR and NEW may be empty. Developer mode adds ALL: the room list's every zone, then this
+ *  build's cards it does not name (hidden ones too), laid out as a list. */
+export function zoneTabs(cards: TitleDeck['cards'], served: ZoneSelectDocument | null | undefined, developer: boolean): DeckTab[] {
+  const s = GAME_STRINGS.mainMenu.tabs;
+  const featured = orderTitleCards(cards, served?.featured);
+  const tabs: DeckTab[] = [
+    { id: 'featured', label: s.featured, cards: featured.length === 0 ? cards : featured },
+    { id: 'popular', label: s.popular, cards: orderTitleCards(cards, served?.popular) },
+    { id: 'new', label: s.new, cards: orderTitleCards(cards, served?.new) },
+  ];
+  if (developer) {
+    const all = orderTitleCards(cards, served?.all), named = new Set(all.map(card => card.slug));
+    tabs.push({ id: 'all', label: s.all, cards: [...all, ...cards.filter(card => !named.has(card.slug))], list: true });
+  }
+  return tabs;
 }
 
 /** Build the shared title menu from its supplied deck and callbacks. */
@@ -121,12 +141,13 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const mode = opts.mode ?? menuMode;
   const { notice, onGrid, screen: first, zoneSelect, whatsNew = WHATS_NEW, whatsNewStore, ...deckOpts } = opts;
   const dev = mode().developer;
-  const cards = opts.cards ?? orderTitleCards(titleCards(dev), dev ? zoneSelect?.all : zoneSelect?.popular);
+  const tabs = zoneTabs(opts.cards ?? titleCards(dev), zoneSelect, dev);
   let viewScreen = first ?? screen;
   // leaving the title for a world resets it: pause ▸ EXIT TO MAIN opens on the main menu again
   // MG4 / MG5: a phone, by the rule the tier uses (core/tier.ts), read here without the tier's render tables (the title's graph)
   const phone = mobileDevice(navigator.userAgent, navigator.platform, navigator.maxTouchPoints);
-  const deck = buildTitleDeck({ ...deckOpts, cards,
+  // J468 (Jake's look): a full-bleed swipe, 4 mini heroes in a sliding window, the stripe pager and "1 / 8"
+  const deck = buildTitleDeck({ ...deckOpts, cards: tabs[0]?.cards ?? [], tabs, tab: zoneTab, strip: 4, onTab: (id) => { zoneTab = id; },
     // MG5: a phone with no first-play mark arms its first play for the card the player picked from the deck (the intent is a
     // session save, so it survives the hand-over); any other entry drops a first play armed and never reached
     onEnter: (card) => { if (!(phone && !firstPlayDone() && startFirstPlay(card.slug))) dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(card); } });
@@ -176,17 +197,22 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   // G106 (Jake: "A Carousel restyled"): ZONE SELECT (J387, was SHARD SELECT) is today's deck, same path and behaviour (G64), restyled to the menu:
   // BACK and the SHARD SELECT title on top, the crossroads hero dimmed behind, one big card, a thumbnail strip for the dots
   // (DEVELOPER tags, a COMING SOON lock) and a wide ENTER WORLD (src/client/game/mainMenu.css `.ws-menu-carousel`)
-  deck.root.classList.add('ws-menu-carousel');
+  // ZS10 (J468, Jake's look; board https://claude.ai/artifact/FDzM6sgRKvnRnx9xCcV2c9, 04 with 09's mini heroes): the tabs are the
+  // header beside a square BACK, the zone's hero fills the screen, its name and one line over the hero's foot
+  deck.root.classList.add('ws-menu-carousel', 'ws-menu-swipe');
   const bar = document.createElement('div');
   bar.className = 'ws-menu-bar';
   const back = document.createElement('button');
   back.type = 'button';
   back.className = 'ws-menu-back';
   back.textContent = s.back;
-  const title = document.createElement('div');
-  title.className = 'ws-menu-title';
-  title.textContent = s.zoneSelect;
-  bar.append(back, title);
+  back.setAttribute('aria-label', s.back);
+  if (deck.tabBar === null) {
+    const title = document.createElement('div');
+    title.className = 'ws-menu-title';
+    title.textContent = s.zoneSelect;
+    bar.append(back, title);
+  } else bar.append(back, deck.tabBar);
   deck.root.querySelector('.ws-menu-head')?.prepend(bar);
   root.append(deck.root, main);
 
@@ -304,7 +330,8 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   if (opts.active === null) armTitleHandover(owner, () => viewScreen === 'main' && !naming && !entering && !leavingTitle);
 
   return {
-    root, cards: deck.cards,
+    root,
+    get cards() { return deck.cards; },
     get index() { return deck.index; },
     get screen() { return viewScreen; },
     show,

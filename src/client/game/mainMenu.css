@@ -176,3 +176,81 @@
 }
 /* MP2.2e2: SIGN IN, beside SETTINGS; one line on a phone */
 .ws-main .ws-main-signin { min-width: 0; padding: 10px 14px; white-space: nowrap; letter-spacing: 0.16em; text-indent: 0.16em; }
+
+/* ─── ZONE SELECT, Jake's look (ZS10, J468; board https://claude.ai/artifact/FDzM6sgRKvnRnx9xCcV2c9, src/client/game/titleDeck.ts
+   `strip`) ─── Jake: "a combo of full screen full bleed swipe. and today cleaned ... name and one line description ... count
+   feats still ... 4 hero images the small ones at the bottom like 09 ... Like 04 we want 1/8 and the little blue thing with the
+   gray little stripes". The tabs are the header beside a square BACK; the selected zone's hero fills the screen, undimmed; its
+   name and one line (with its feats) sit over the hero's foot and follow the finger; 4 mini heroes slide as a window; the stripe
+   pager and "1 / 8"; one filled ice-cyan ENTER ZONE (J387's ENTER THE MMO). No card frame, no ribbon tape, no live badge. */
+.ws-menu.ws-menu-swipe .ws-menu-hero { filter: none; }
+.ws-menu.ws-menu-swipe::before { background: linear-gradient(180deg, rgba(6, 10, 18, 0.5) 0%, rgba(6, 10, 18, 0) 16%, rgba(6, 10, 18, 0) 40%, rgba(6, 10, 18, 0.62) 58%, rgba(6, 10, 18, 0.95) 100%); }
+.ws-menu.ws-menu-swipe .ws-menu-head { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
+.ws-menu.ws-menu-swipe .ws-menu-bar { gap: 10px; flex: 1 1 100%; min-width: 0; }
+.ws-menu.ws-menu-swipe .ws-menu-back { display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; font-size: 0; letter-spacing: 0; }
+.ws-menu.ws-menu-swipe .ws-menu-back::before { margin: 0 0 3px; font-size: 30px; line-height: 1; }
+.ws-menu.ws-menu-swipe .ws-menu-tabs { flex: 1 1 auto; min-width: 0; display: flex; gap: 4px; height: 44px; box-sizing: border-box; padding: 4px; background: rgba(9, 22, 36, 0.86); border: 1px solid var(--ws-cyan-line); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.ws-menu.ws-menu-swipe .ws-menu-tab { flex: 1 1 0; min-width: 0; padding: 0 2px; appearance: none; -webkit-appearance: none; background: none; border: 0; font-family: var(--ws-display); font-weight: 700; font-size: 16px; letter-spacing: 0.16em; text-indent: 0.16em; text-transform: uppercase; color: rgba(189, 238, 255, 0.55); white-space: nowrap; overflow: hidden; cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent; transition: background 0.15s, color 0.15s; }
+.ws-menu.ws-menu-swipe .ws-menu-tab[aria-selected='true'] { background: linear-gradient(180deg, #c8f2ff 0%, #9be6ff 100%); color: #071420; box-shadow: 0 0 14px rgba(143, 227, 255, 0.35); }
+.ws-menu.ws-menu-swipe .ws-menu-tab:focus-visible { outline: 1px solid var(--ws-cyan); outline-offset: -3px; }
+.ws-menu.ws-menu-swipe .ws-menu-tabs[data-count='4'] .ws-menu-tab { font-size: 13px; letter-spacing: 0.1em; text-indent: 0.1em; }
+.ws-menu.ws-menu-swipe .ws-menu-deck { align-self: flex-start; width: min(100%, 640px); --card-w: 100%; --card-gap: 24px; align-items: stretch; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 28px); }
+/* the swipe surface: one transparent card a screen wide, the zone's name and line over the hero; the hero is the picture */
+.ws-menu.ws-menu-swipe .ws-menu-cards { padding: 0; }
+.ws-menu.ws-menu-swipe .ws-menu-card { flex: 0 0 100%; width: 100%; box-sizing: border-box; padding: 0 20px; text-align: left; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; transform: none; }
+.ws-menu.ws-menu-swipe .ws-menu-card::before { display: none; }
+.ws-menu.ws-menu-swipe .ws-menu-card:not(.selected) > * { filter: none; }
+.ws-menu.ws-menu-swipe .ws-menu-card .ws-menu-card-img { display: none; }
+.ws-menu.ws-menu-swipe .ws-menu-card b { padding: 0; font-size: 40px; line-height: 1.02; letter-spacing: 0.08em; color: #fff; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6); white-space: normal; overflow-wrap: anywhere; }
+.ws-menu.ws-menu-swipe .ws-menu-card small { padding: 12px 0 0; font-size: 11px; letter-spacing: 0.12em; color: var(--ws-cyan); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7); }
+.ws-menu.ws-menu-swipe .ws-menu-card small.ws-menu-card-reason { color: var(--ws-amber); }
+.ws-menu.ws-menu-swipe .ws-menu-empty { flex: 0 0 100%; box-sizing: border-box; margin: 0; padding: 0 20px; font: 700 28px/1.1 var(--ws-display); letter-spacing: 0.12em; text-transform: uppercase; color: rgba(189, 238, 255, 0.7); }
+/* the 4 mini heroes: every dot stays in the row, which scrolls so the window shows ([0] 1 2 3, 0 [1] 2 3, 1 [2] 3 4) */
+.ws-menu.ws-menu-swipe .ws-menu-dots { position: relative; display: flex; gap: 8px; width: auto; margin: 18px 20px 0; overflow: hidden; justify-content: flex-start; scrollbar-width: none; }
+.ws-menu.ws-menu-swipe .ws-menu-dots::-webkit-scrollbar { display: none; }
+.ws-menu.ws-menu-swipe .ws-menu-dots i { flex: 0 0 calc((100% - 24px) / 4); aspect-ratio: 16 / 10; box-sizing: border-box; border: 1px solid rgba(143, 227, 255, 0.28); opacity: 0.78; }
+.ws-menu.ws-menu-swipe .ws-menu-dots i.on { border: 2px solid var(--ws-cyan); box-shadow: inset 0 0 0 1px rgba(6, 10, 18, 0.6), 0 0 12px rgba(143, 227, 255, 0.45); opacity: 1; }
+/* 04's pager: grey stripes, the place a longer blue one, and "1 / 8" at the right */
+.ws-menu.ws-menu-swipe .ws-menu-pager { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 18px 20px 0; }
+.ws-menu.ws-menu-swipe .ws-menu-stripes { display: flex; flex: 1 1 auto; min-width: 0; gap: 6px; }
+.ws-menu.ws-menu-swipe .ws-menu-stripes i { flex: 0 1 18px; min-width: 3px; height: 3px; background: rgba(196, 220, 232, 0.35); transition: flex-basis 0.2s, background 0.2s; }
+.ws-menu.ws-menu-swipe .ws-menu-stripes i.on { flex-basis: 34px; flex-shrink: 0; background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.6); }
+.ws-menu.ws-menu-swipe .ws-menu-count { flex: none; font: 500 13px/1 var(--ws-mono); letter-spacing: 0.2em; color: rgba(196, 220, 232, 0.72); }
+.ws-menu.ws-menu-swipe .ws-menu-caption { display: none; }
+.ws-menu.ws-menu-swipe .ws-menu-modes { width: auto; margin: 20px 20px 0; }
+.ws-menu.ws-menu-swipe .ws-menu-play { min-height: 80px; gap: 8px; background: linear-gradient(180deg, #c8f2ff 0%, #9be6ff 100%); border-color: #eaf8ff; color: #071420; box-shadow: 0 0 26px rgba(143, 227, 255, 0.42), 0 12px 40px rgba(0, 0, 0, 0.45); }
+.ws-menu.ws-menu-swipe .ws-menu-play .ws-menu-mode-glyph { display: none; }
+.ws-menu.ws-menu-swipe .ws-menu-play b { font-size: 30px; letter-spacing: 0.2em; text-indent: 0.2em; color: #071420; }
+.ws-menu.ws-menu-swipe .ws-menu-play small { font-size: 11px; letter-spacing: 0.24em; text-indent: 0.24em; color: rgba(7, 20, 32, 0.75); }
+.ws-menu.ws-menu-swipe .ws-menu-play:hover, .ws-menu.ws-menu-swipe .ws-menu-play:focus-visible { background: linear-gradient(180deg, #dcf7ff 0%, #b0ecff 100%); border-color: #fff; }
+.ws-menu.ws-menu-swipe .ws-menu-play:disabled { cursor: default; background: rgba(9, 22, 36, 0.86); border-color: rgba(143, 227, 255, 0.3); box-shadow: none; }
+.ws-menu.ws-menu-swipe .ws-menu-play:disabled b { color: rgba(189, 238, 255, 0.5); }
+.ws-menu.ws-menu-swipe .ws-menu-play:disabled small { color: var(--ws-amber); }
+@media (max-width: 380px) {
+  .ws-menu.ws-menu-swipe .ws-menu-card b { font-size: 34px; }
+  .ws-menu.ws-menu-swipe .ws-menu-tab { font-size: 14px; letter-spacing: 0.1em; text-indent: 0.1em; }
+}
+/* J469 (Jake: "so i can infinitely scroll and click to find it without swiping for days"): Developer's ALL is board 03, the
+   selected zone's hero over the top third with its name, and every zone in a list under it that scrolls; a tap selects */
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-hero { bottom: auto; height: 34%; }
+.ws-menu.ws-menu-swipe.ws-menu-list::before { bottom: auto; height: 34%; background: linear-gradient(180deg, rgba(6, 10, 18, 0.5) 0%, rgba(6, 10, 18, 0) 30%, rgba(6, 10, 18, 0) 55%, rgba(11, 22, 34, 0.95) 100%); }
+.ws-menu.ws-menu-swipe.ws-menu-list { background: #0b1622; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-deck { position: absolute; left: 0; right: 0; top: 34%; bottom: 0; width: auto; align-self: stretch; justify-self: stretch; padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-caption { display: block; position: absolute; left: 20px; right: 20px; bottom: 100%; padding-bottom: 14px; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-caption[hidden] { display: none; }
+.ws-menu.ws-menu-swipe .ws-menu-caption b { display: block; font: 700 34px/1 var(--ws-display); letter-spacing: 0.1em; text-transform: uppercase; color: #fff; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ws-menu.ws-menu-swipe .ws-menu-caption small { display: block; margin-top: 8px; font: 11px/1.3 var(--ws-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-cards { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; touch-action: pan-y; cursor: default; overscroll-behavior: contain; border-top: 1px solid var(--ws-cyan-line); }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-deck-track { flex-direction: column; gap: 0; transform: none; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-card { flex: none; display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: 16px; align-items: center; padding: 10px 20px; border-bottom: 1px solid rgba(143, 227, 255, 0.14); border-left: 3px solid transparent; cursor: pointer; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-card.selected { background: rgba(143, 227, 255, 0.08); border-left-color: var(--ws-cyan); }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-card .ws-menu-card-img { display: block; grid-row: 1 / 3; margin: 0; width: 96px; aspect-ratio: 16 / 10; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-card .ws-menu-card-exp { left: 3px; top: 3px; padding: 2px 4px; font-size: 7px; letter-spacing: 0.08em; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-card b { align-self: end; font-size: 20px; letter-spacing: 0.12em; text-shadow: none; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-card.selected b { color: #bdeeff; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-card small { align-self: start; padding-top: 6px; font-size: 10px; color: var(--ws-text-dim); text-shadow: none; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-dots, .ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-pager { display: none; }
+.ws-menu.ws-menu-swipe.ws-menu-list .ws-menu-modes { flex: none; margin-top: 16px; }
+/* the build pill (Developer, or a waiting update) leaves the tabs' row for the band just under it */
+:root:has(.ws-title-stack:not(.hide) > .ws-menu-carousel.ws-menu-swipe:not(.hide)):not(:has(.ws-gmenu.show)) { --ws-pill-line: calc(14px + env(safe-area-inset-top, 0px) + 44px + 20px); }
+:root:has(.ws-title-stack:not(.hide) > .ws-menu-carousel.ws-menu-swipe:not(.hide)):not(:has(.ws-gmenu.show)) .ws-update { max-width: calc(100vw - 60px); right: 16px; }

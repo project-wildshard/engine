@@ -25,6 +25,10 @@ export const GAME_STRINGS = {
     enterZone: 'Enter zone',
     settings: 'SETTINGS',
     back: 'BACK',
+    /** ZS10 (J461, J469): Zone Select's lists across its top; ALL is Developer mode's every-zone list */
+    tabs: { label: 'Zone lists', featured: 'FEATURED', popular: 'POPULAR', new: 'NEW', all: 'ALL', empty: 'Nothing here yet' },
+    /** J468: the carousel's place, "1 / 8" */
+    count: (at: number, of: number): string => `${String(at)} / ${String(of)}`,
     /** E483 (E140 again): the compact Developer switch beside SETTINGS, the same switch as Settings ▸ Developer */
     developer: 'DEV',
     developerLabel: 'Developer mode',
@@ -104,5 +108,7 @@ export const GAME_STRINGS = {
     label: 'Wildshard progress',
     selected: (name: string, earned: number | null): string => `${name.toUpperCase()} · ${earned === null ? 'NOT VISITED' : `${earned} FEATS`}`,
     total: (earned: number): string => `WILDSHARD · ${earned} FEATS`,
+    /** J468 ("We want to count feats still"): the zone's count on Zone Select's one line under its name */
+    feats: (earned: number): string => `${String(earned)} FEATS`,
   },
 } as const;

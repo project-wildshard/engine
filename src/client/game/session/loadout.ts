@@ -35,6 +35,7 @@ import type { DiscSpot } from '@wildshard/engine/ui/hudSlots';
 import { GAME_STRINGS } from '../../../shared/game/strings';
 import { titleCards } from '../titleDeck';
 import { buildTitleMenu } from '../mainMenu';
+import { zoneSelectSource } from '../zoneSelect/served';
 import { pageMode } from '../plugin/context';
 import { enterGrid } from '../grid/pageEntry';
 import { travel } from '../travel/travel';
@@ -128,6 +129,8 @@ async function buildLoadout(ctx: Awaited<ReturnType<typeof worldStage>>) : Promi
     const cards = titleCards(), own = cards[cards.map((card): string => card.slug).indexOf(chunk.slug)];
     return buildTitleMenu({
       cards, active: chunk.slug,
+      // ZS10: pause ▸ EXIT TO MAIN's Zone Select tabs read the kept or baked room list, as the cold title's first paint does
+      zoneSelect: zoneSelectSource(document, (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__).initial(),
       // this card enters here; another card is a fresh page
       onEnter: (c) => { if (c === own) here.enter(); else travel({ to: c.slug, mode: 'enter' }); },
       onGrid: () => { if (pageMode() === 'grid') here.enter(); else enterGrid(); }, // SF21a: the main menu's second entry
