@@ -11,7 +11,8 @@ import { installDeclaredAudio, type DeclaredAudioPorts } from '@wildshard/engine
 import type { AudioData } from '@wildshard/format/audio';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { declaredWeaponVoices } from '../plugin/audio';
-import { cellScore, pageScore, scoreProfile, type CellScorePorts } from '../shardfile/declaredScore';
+import { sceneZoneProfile } from '@wildshard/engine/audio/declaredAmbience';
+import { cellScore, pageScoreProfiles, scoreProfile, type CellScorePorts } from '../shardfile/declaredScore';
 import type { RegionalRuntimePage } from './regionalRuntime';
 
 /** The declared audio a copy's stay installs, or null: a cell with an `audio.scene` (the plot's, AU20) owns all of its
@@ -20,22 +21,23 @@ import type { RegionalRuntimePage } from './regionalRuntime';
 export function cellDeclaredAudio(source: Pick<Shardfile, 'runtime' | 'audio'>): AudioData | null {
   const audio = source.audio;
   if (source.runtime !== null || audio.scene !== undefined) return null;
-  if ((audio.music !== undefined && !cellScore(audio.music)) || audio.samples !== undefined || audio.zones !== undefined || audio.ambience?.gust !== undefined) return null;
-  return audio.cues.length > 0 || audio.routing.length > 0 || audio.ambience !== null || audio.score === 'silent' || audio.music !== undefined ? audio : null;
+  if ((audio.music !== undefined && !cellScore(audio.music)) || audio.samples !== undefined
+    || (audio.zones !== undefined && !sceneZoneProfile(audio.zones)) || audio.ambience?.gust !== undefined) return null;
+  return audio.cues.length > 0 || audio.routing.length > 0 || audio.ambience !== null || audio.score === 'silent' || audio.music !== undefined || audio.zones !== undefined ? audio : null;
 }
 
 /** The page's mixer, cues, voices and music, or a test's; with a score, its install and what picks its scene. */
-export type DataCellAudioPorts = Omit<DeclaredAudioPorts, 'scope' | 'profiles'> & { readonly score?: CellScorePorts };
+export type DataCellAudioPorts = Omit<DeclaredAudioPorts, 'scope'> & { readonly score?: CellScorePorts };
 
 /** Install a copy's declared audio for one stay in it. */
 export function installCellAudio(audio: AudioData, stay: Scope, ports: DataCellAudioPorts): void {
-  const { score, ...rest } = ports;
-  installDeclaredAudio(audio, { ...rest, scope: stay, ...(score === undefined ? {} : { profiles: { music: scoreProfile(score) } }) });
+  const { score, profiles, ...rest } = ports;
+  installDeclaredAudio(audio, { ...rest, scope: stay, profiles: score === undefined ? profiles : { ...profiles, music: scoreProfile(score) } });
 }
 
 /** The page's install: the page's own mixer and cue router, the catalogue's weapon voices, and the page's music for a
  *  copy's score (its night from the page's clock, its boss from the wire's encounter rows while the wire is the copy's). */
-export function enterDataCellAudio(audio: AudioData, page: Pick<RegionalRuntimePage, 'play'>, stay: Scope, here: () => boolean = () => true): void {
+export function enterDataCellAudio(audio: AudioData, page: Pick<RegionalRuntimePage, 'play'>, stay: Scope, here: () => boolean = () => true, races: Shardfile['quests']['races'] = []): void {
   const play = page.play;
-  installCellAudio(audio, stay, { audio: play.audio, cues: play.cues, voices: declaredWeaponVoices(play.audio), music: play.music, score: pageScore(play, here) });
+  installCellAudio(audio, stay, { audio: play.audio, cues: play.cues, voices: declaredWeaponVoices(play.audio), music: play.music, profiles: pageScoreProfiles(audio, play, races, here) });
 }

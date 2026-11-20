@@ -3,7 +3,7 @@ import { Scope } from '../../../shared/engine/app/scope';
 import { resourceScope } from '../../../shared/engine/app/resources';
 import type { AudioData } from '@wildshard/format/audio';
 import type { Audio } from './Audio';
-import { AmbienceMix, type AmbienceMixPorts } from './ambience';
+import { AmbienceMix, AmbienceZones, type AmbienceMixPorts } from './ambience';
 import { audioMixValue, requireAudioProfile, type AudioZoneProfile } from '../../../shared/engine/audio/audioProfiles';
 import { DeclaredSoundBank } from './declaredBank';
 import { audioLog } from './audioLog';
@@ -11,6 +11,68 @@ import { AudioSurfaceMap, GROUND_SURFACES, type StepSurface } from './surface';
 import { terrainHeight } from '../../../shared/engine/world/terrainHeight';
 import { floorAtRects, type FloorRect } from '../../../shared/engine/physics/box';
 import { audioRandom } from './util';
+
+/** A scene cell's self-contained synth beds. One bed has no rectangle and covers open ground. */
+export function sceneZoneProfile(profile: AudioZoneProfile | undefined): boolean {
+  return profile?.graph !== undefined && profile.rectangles !== undefined && profile.beds !== undefined
+    && profile.blendMetres !== undefined && profile.lifecycle === undefined && profile.sampleMix === undefined
+    && profile.routing === undefined && profile.nodes === undefined && profile.schedules === undefined && profile.positional === undefined;
+}
+
+/** Blend rectangle edges, with any remaining weight going to open ground. */
+export function sceneZoneWeights(profile: AudioZoneProfile, at: { readonly x: number; readonly z: number }): ReadonlyMap<string, number> {
+  const weights = new Map<string, number>();
+  let strongest = 0;
+  for (const box of profile.rectangles ?? []) {
+    const dx = Math.max(box.x0 - at.x, 0, at.x - box.x1), dz = Math.max(box.z0 - at.z, 0, at.z - box.z1);
+    const weight = Math.max(0, 1 - Math.hypot(dx, dz) / (profile.blendMetres ?? 1));
+    weights.set(box.zone, Math.max(weights.get(box.zone) ?? 0, weight));
+    strongest = Math.max(strongest, weight);
+  }
+  const total = Math.max(1, [...weights.values()].reduce((sum, weight) => sum + weight, 1 - strongest));
+  return new Map((profile.beds ?? []).map(row => [row.id, (weights.get(row.zone) ?? 1 - strongest) / total]));
+}
+
+/** A short reflection on declared wet beds. The feedback gain stays below one even at full send. */
+function sceneEcho(audio: Audio, source: GainNode, level: number, scope: Scope): void {
+  const delay = audio.ctx.createDelay(), reflection = audio.ctx.createGain();
+  delay.delayTime.value = 0.17; reflection.gain.value = level * 0.6;
+  source.connect(delay).connect(reflection);
+  reflection.connect(audio.bus('ambience')); reflection.connect(delay);
+  scope.onDispose(() => { delay.disconnect(); reflection.disconnect(); });
+}
+
+/** The graph and its interval belong to the entered scene, and first allocate after audio unlock. */
+export function installSceneZones(audio: Audio, scope: Scope, profile: AudioZoneProfile, feet: () => { readonly x: number; readonly z: number } | null): void {
+  if (!sceneZoneProfile(profile)) throw new Error('Scene audio requires a rectangular synth profile');
+  const graph = requireAudioProfile(profile.graph, 'scene synth graph'), beds = requireAudioProfile(profile.beds, 'scene synth beds');
+  const names = new Set(beds.map(row => row.id)), regions = new Set(profile.rectangles?.map(row => row.zone));
+  if (beds.filter(row => !regions.has(row.zone)).length !== 1 || graph.beds.length !== beds.length
+    || graph.beds.some(row => !names.has(row.id)) || beds.some(row => profile.levels[row.id] === undefined)) {
+    throw new Error('Scene audio needs one open-ground bed and a level for every synth bed');
+  }
+  const zones = new AmbienceZones(audio, audioRandom, scope);
+  let gains: ReadonlyMap<string, GainNode> | undefined, selected: string | undefined;
+  scope.interval(1000 / profile.tickHz, () => {
+    const at = feet();
+    if (at === null || !audio.ready) return;
+    if (gains === undefined) {
+      gains = audio.createSynthBeds(zones, audioRandom).assemble(graph, { ambient: audio.bus('ambience') }).beds;
+      for (const [id, gain] of gains) {
+        const wet = profile.wet[id] ?? 0;
+        if (wet > 0) sceneEcho(audio, gain, wet, scope);
+      }
+    }
+    const weights = sceneZoneWeights(profile, at);
+    let dominant: string | undefined, strongest = 0;
+    for (const [id, gain] of gains) {
+      const weight = weights.get(id) ?? 0;
+      gain.gain.setTargetAtTime(weight * (profile.levels[id] ?? 0), audio.ctx.currentTime, profile.smoothSeconds);
+      if (weight > strongest) { dominant = id; strongest = weight; }
+    }
+    if (dominant !== undefined && dominant !== selected) { selected = dominant; audioLog('zone', dominant); }
+  });
+}
 
 /** Audio content required by the native ambience phase. */
 export type DeclaredAmbienceData=Pick<AudioData,'bank'|'playback'|'pcm'|'synth'|'ambience'|'surfaces'>&{zones?:AudioZoneProfile|undefined};

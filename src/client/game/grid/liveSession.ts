@@ -975,7 +975,7 @@ export class LiveGridSession {
     if (facts !== null) this.enterDataStay('facts', instance, (stay, here) => { enterDataCellFacts(facts, { saves: this.page.saves, catalogue: this.page.catalogue, progress: () => page.play.progress }, stay, instance, here); });
     if (hud !== null) this.enterDataStay('hud', instance, (stay, here) => { enterDataCellHud(hud, page, stay, instance, here); });
     if (completion !== null) this.enterDataStay('completion', instance, (stay, here) => { enterDataCellCompletion(completion.source, completion.rows, page, stay, instance, here); });
-    if (declaredAudio !== null) this.enterDataStay('audio', instance, (stay, here) => { enterDataCellAudio(declaredAudio, page, stay, here); });
+    if (declaredAudio !== null) this.enterDataStay('audio', instance, (stay, here) => { enterDataCellAudio(declaredAudio, page, stay, here, play?.quests.races); });
     if (plumbing !== null) this.enterDataStay('plumbing', instance, (stay, here) => { enterDataCellPlumbing(plumbing, page, stay, instance, here); });
     if (loot !== null) this.enterDataStay('loot', instance, async (stay) => { await enterDataCellLoot(loot.source, loot.row, loot.folder, page, stay, instance); });
     if (compendium !== null) this.enterDataStay('compendium', instance, async (stay) => { await enterDataCellCompendium(compendium.source, compendium.assets, compendium.folder, page, stay, instance); });

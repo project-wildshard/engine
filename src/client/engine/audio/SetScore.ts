@@ -23,6 +23,8 @@ export interface ScoreSource {
   readonly minFade?: number;
   readonly phase?: BossPhase;
   readonly sceneName?: string;
+  /** A slot that starts on a gameplay cue instead of waiting for the outgoing bar. */
+  readonly cueSlot?: string | undefined;
   readonly failures?: Iterable<string>;
   sting?: (name: StemSting) => AudioBuffer | undefined | Promise<AudioBuffer | undefined>;
   onDeck?: (slot: string) => void;
@@ -217,6 +219,11 @@ export class CatalogueScore implements ScoreSource {
   get synthLead():AudioMusicProfile['synthLead'] { return this.profile.synthLead; }
   get minFade():number { return this.profile.minFade; }
   get pending():boolean { return this.decoding.size>0 || this.bankDecoding!==undefined; }
+  private raceSlot(): string | undefined {
+    const slot = selectScoreSlots(this.profile.selection, this.profile.selectMode, { scene: 'race' })[0];
+    return slot !== undefined && slot !== this.base && this.profile.bootSlots.includes(slot) ? slot : undefined;
+  }
+  get cueSlot(): string | undefined { return this.sceneName === 'race' ? this.raceSlot() : undefined; }
   target(_state:MusicState):string { return selectScoreSlots(this.profile.selection,this.profile.selectMode,{scene:this.sceneName})[0]??this.base; }
   bindProfile(profile:AudioMusicProfile):void {
     if(JSON.stringify(profile)===JSON.stringify(this.profile)) return;
@@ -244,7 +251,11 @@ export class CatalogueScore implements ScoreSource {
     const want=this.target(this.music.state);
     if(genre!==this.genre){this.genre=genre;this.failures.clear();}
     if(want!==this.base){const slot=this.extra?.genre===genre?this.extra.slot:undefined;if(slot?.slot===want)return slot;this.prepare(genre,want);}
-    if(this.theme?.genre===genre)return this.theme;
+    if(this.theme?.genre===genre){
+      const race = want === this.base ? this.raceSlot() : undefined;
+      if (race !== undefined && (this.extra?.genre !== genre || this.extra.slot?.slot !== race)) this.prepare(genre,race);
+      return this.theme;
+    }
     this.prepare(genre,this.base);return undefined;
   }
   private async prepareBank(genre:MusicStyle):Promise<void> {
@@ -263,7 +274,9 @@ export class CatalogueScore implements ScoreSource {
       let bank:StyleBank|undefined;
       try {
         const [{decodeStyle},{cachedBytes,decodeBytes}]=await Promise.all([import('./Stems'),import('./preload')]);
-        bank=await decodeStyle(genre,[slot],cachedBytes,decodeBytes,undefined,profile.sets[slot]??'base',slot===this.base?undefined:profile.catalogue?.extraStings);
+        const decode = () => decodeStyle(genre,[slot],cachedBytes,decodeBytes,undefined,profile.sets[slot]??'base',slot===this.base?undefined:profile.catalogue?.extraStings);
+        if (owner?.disposed) return;
+        bank=await (owner === undefined ? decode() : owner.run(decode));
       } catch(error){console.info(`[music] ${profile.id} ${key}: ${error instanceof Error?error.message:String(error)} — the theme plays`);}
       finally{this.decoding.delete(key);}
       if(owner?.disposed||this.scope!==owner||this.profile!==profile)return;

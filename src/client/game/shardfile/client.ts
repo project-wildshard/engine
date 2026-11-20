@@ -800,7 +800,7 @@ export class ShardfileClient {
     if (ctx.product.has('ui/completion') && ctx.product.section('ui/completion').trigger === 'quest') installCompletion(ctx, flags, play.progress);
     runtime.hooks.questFlags = () => flags.all; runtime.hooks.adventureFlags = () => flags.all;
     // An admitted scene installs its own declared profiles once in the play phase.
-    if (this.bindings.audioOwner !== 'runtime' && !this.plan?.features.some(row => row.kind === 'audio.scene')) installDeclaredAudio(source.audio, { audio: play.audio, cues: play.cues, voices: this.bindings.voices(play.audio), music: play.music, scope: ctx.scope, profiles: this.bindings.audioProfiles?.(play, { source: source.audio, read: this.assets.audioRead() }) ?? pageScoreProfiles(source.audio, play) });
+    if (this.bindings.audioOwner !== 'runtime' && !this.plan?.features.some(row => row.kind === 'audio.scene')) installDeclaredAudio(source.audio, { audio: play.audio, cues: play.cues, voices: this.bindings.voices(play.audio), music: play.music, scope: ctx.scope, profiles: this.bindings.audioProfiles?.(play, { source: source.audio, read: this.assets.audioRead() }) ?? pageScoreProfiles(source.audio, play, source.quests.races) });
     ctx.debug.expose('shardfile', { source, items: items.runtimes, colliders, fine: tiles.fine, weather,
       // What a panel's field has drawn here: its look, and whether it stands in this page's world.
       targets: () => source.targets.panels.map(row => ({ panel: row.panel, visible: tiles.props?.panels.get(row.panel)?.visible ?? false, solid: row.colliders.every(id => colliders.get(id)?.active() ?? false) })),

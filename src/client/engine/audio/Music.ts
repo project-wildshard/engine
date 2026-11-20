@@ -757,7 +757,7 @@ export class Music {
       if (a === undefined) { if (!source.pending || !this.deck) this.toSynth(now); return; }
       if (this.failedSlots.has(a)) { this.toSynth(now); return; }
       if (this.deck?.slot === a.slot && this.deck.genre === a.genre) { this.deck.setPhase(source.phase ?? 1, now); return; }
-      this.startDeck(a, playing === undefined ? 0 : source.minFade ?? 6);
+      this.startDeck(a, playing === undefined ? 0 : source.minFade ?? 6, source.cueSlot === a.slot);
       return;
     }
     const bank = this.bank;
@@ -810,7 +810,7 @@ export class Music {
       this.sync();
     } finally { this.resolvingTracks.delete(track); }
   }
-  private startDeck(a: SlotAudio, minFade = 0): void {
+  private startDeck(a: SlotAudio, minFade = 0, onCue = false): void {
     const rig = this.rig;
     if (!rig) return;
     // The device context is created only by a gesture. Unsupported rates keep the original decoder;
@@ -829,7 +829,10 @@ export class Music {
     const now = rig.ctx.currentTime, old = this.deck;
     const bar = (60 / a.spec.bpm) * a.spec.beatsPerBar;
     let t: number, fade: number;
-    if (old) {
+    if (onCue) {
+      t = now + 0.05; fade = 0.3;
+      old?.fadeOut(t, fade);
+    } else if (old) {
       t = old.nextBar(now + 0.05); fade = Math.max(bar, old.bar, 2, minFade);
       old.fadeOut(t, fade);
     } else if (this.synthOn) {
