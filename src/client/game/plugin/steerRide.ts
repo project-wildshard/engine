@@ -4,6 +4,7 @@ import { app } from '@wildshard/engine/app/runtime';
 import { playerModes, type ModePlayer } from '@wildshard/engine/player/modes';
 import type { MoverPose } from '@wildshard/format/moverPose';
 import { steerStick } from '@wildshard/engine/sim/moverMotion';
+import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 import type { PlayerEye } from '@wildshard/engine/player/Player';
 import type { FollowedMovers } from './followedMovers';
 import { SEAT_PITCH, SeatEye, type SeatNow } from './seatView';
@@ -11,16 +12,23 @@ import type { SteerRow } from './steerPrediction';
 
 /** What the page shows a steer ride in: its speed (a share of the boosted top speed) and whether it boosts, or nothing. */
 export interface SteerRideView {
-  show: (ride: { readonly speed: number; readonly boosting: boolean } | null) => void;
+  show: (ride: SteerRideShown | null) => void;
   /** MSZ11: a tap on the gauge runs `run` (a seat swaps its view by it). */
   readonly tap?: (run: () => void) => void;
+  /** MSZ12: a vehicle seat is taken (true) or left: the seat's controls show in place of the walk's. */
+  readonly seated?: (on: boolean) => void;
 }
+/** What the chip shows of a ride: its speed (a share of the boosted top), whether it boosts, and (MSZ12, a vehicle seat) its
+ *  gear: R rolling back, N standing, D rolling forward. */
+export interface SteerRideShown { readonly speed: number; readonly boosting: boolean; readonly gear?: 'R' | 'N' | 'D' }
 /** The page's player as a steer ride reads and turns it: the view looks along `yaw` (forward is (-sin yaw, -cos yaw), as a
  *  steer vehicle's heading). */
 export interface SteerRider {
   yaw: number; readonly position: { x: number; y: number; z: number };
   /** MSZ11: the look's pitch, and the eye a vehicle seat poses the camera from while it holds the player (`Player.eye`). */
   pitch?: number; eye?: PlayerEye | null;
+  /** MSZ12: the seat's controls on the wire while seated (`Player.seatButtons`). */
+  seatButtons?: ((buttons: number) => number) | null;
 }
 /** SS-MS2a3b: what the rider's page predicts its vehicle from. */
 export interface SteerPredictPort {
@@ -40,6 +48,21 @@ const RECENTRE_SPEED = 0.5;
 /** How fast the shown speed follows the measured one (per second): a row's step is a frame's jitter. */
 const SPEED_EASE = 8;
 const angle = (a: number): number => Math.atan2(Math.sin(a), Math.cos(a));
+/** MSZ12: seconds a held BRAKE brakes before it pulls the handbrake. */
+export const HANDBRAKE_HOLD = 0.35;
+/** The walk's buttons, which a seat sends none of. */
+const WALK_BUTTONS = NET_BUTTONS.jump | NET_BUTTONS.dodge | NET_BUTTONS.hover | NET_BUTTONS.sprint | NET_BUTTONS.crouch | NET_BUTTONS.dive | NET_BUTTONS.surface
+  | NET_BUTTONS.heavy | NET_BUTTONS.lock | NET_BUTTONS.boost | NET_BUTTONS.secondary;
+/**
+ * MSZ12: the wire's buttons from a vehicle seat's controls (the `drive` context's actions, held by keys or the seat's discs):
+ * sprint is BOOST (Shift, the BOOST disc; a phone's stick pushed all the way no longer boosts), BRAKE brakes and, held
+ * `HANDBRAKE_HOLD` s, pulls the handbrake, as Space does, and the horn sounds while held. The walk's own buttons go.
+ */
+export function seatButtons(buttons: number, held: (action: 'drive.boost' | 'drive.brake' | 'drive.handbrake' | 'drive.horn') => boolean, braking: number): number {
+  const brake = held('drive.brake'), pulled = (brake && braking >= HANDBRAKE_HOLD) || held('drive.handbrake');
+  return (buttons & ~WALK_BUTTONS) | (held('drive.boost') ? NET_BUTTONS.sprint : 0) | (brake && !pulled ? NET_BUTTONS.brake : 0)
+    | (pulled ? NET_BUTTONS.handbrake : 0) | (held('drive.horn') ? NET_BUTTONS.horn : 0);
+}
 
 /**
  * SHARD-SOURCE SS-MS2a3: a steer vehicle on the page. The server leads the rider's body (`led`) and steers the vehicle by the
@@ -126,7 +149,7 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
   readonly system: (spec: SystemSpec) => void; readonly scope: Scope; readonly player: SteerRider; readonly view: SteerRideView; readonly boost: () => boolean;
 }): void {
   let seated: { readonly vehicle: string; readonly seat: number } | null = null, last: MoverPose | null = null, heading = 0, looked = 0, idle = 0, speed = 0, lookedPitch = SEAT_PITCH;
-  let shown: { speed: number; boosting: boolean } | null = null, chase = false, stowed = false;
+  let shown: SteerRideShown | null = null, chase = false, stowed = false, rolling = 0, braking = 0;
   // the reserved `drive` mode: the page's player's mode while a seat holds it (the server leads the body; the walk stands down)
   playerModes(page.player as unknown as ModePlayer).register({ id: 'drive', hud: 'ride', traverse: () => seated !== null }, page.scope, { events: app.events });
   // MSZ11: the seat's eye reads the seat live at the camera's pose, off the vehicle as the page draws it then
@@ -138,9 +161,14 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
   };
   const eye = new SeatEye({ seat: seatNow, look: page.player, chase: () => chase,
     clear: (from, to) => { const port = vehicles(), vehicle = seated?.vehicle; return port?.clear === undefined || vehicle === undefined ? Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) : port.clear(vehicle, from, to); } });
+  const buttons = (held: number): number => seatButtons(held, action => app.input.held(action), braking);
   const sit = (on: boolean): void => {
-    if (on) { page.player.eye = eye; if (app.input.has('drive')) app.input.push('drive', page.scope); }
-    else { eye.release(); if (page.player.eye === eye) page.player.eye = null; app.input.pop('drive'); }
+    if (on) { page.player.eye = eye; page.player.seatButtons = buttons; if (app.input.has('drive')) app.input.push('drive', page.scope); }
+    else {
+      eye.release(); if (page.player.eye === eye) page.player.eye = null; if (page.player.seatButtons === buttons) page.player.seatButtons = null;
+      app.input.pop('drive'); braking = 0;
+    }
+    page.view.seated?.(on);
     const equipment = app.equipment; // the held item is stowed in a seat, as other pages show it (MSZ10)
     if (on && equipment !== null && !equipment.stowed) { equipment.stowed = true; stowed = true; }
     if (!on && stowed) { stowed = false; if (equipment !== null) equipment.stowed = false; }
@@ -158,13 +186,16 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
     const p = page.player;
     if (seated?.vehicle !== held.vehicle || seated.seat !== held.seat) { // boarding faces the heading, the eye on the road ahead (MSZ11)
       if (seated === null) sit(true);
-      seated = held; last = null; speed = 0; p.yaw = angle(pose.euler.y); if (p.pitch !== undefined) p.pitch = SEAT_PITCH;
+      seated = held; last = null; speed = 0; rolling = 0; p.yaw = angle(pose.euler.y); if (p.pitch !== undefined) p.pitch = SEAT_PITCH;
     }
     if (app.input.consume('drive.view')) chase = !chase;
+    braking = app.input.held('drive.brake') ? braking + dt : 0;
     const pitched = p.pitch !== undefined && Math.abs(p.pitch - lookedPitch) > 1e-4; // a look up or down is a look too
     if (last === null) { heading = pose.euler.y; looked = p.yaw; lookedPitch = p.pitch ?? SEAT_PITCH; }
     const moved = last === null || dt <= 0 ? 0 : Math.hypot(pose.position.x - last.position.x, pose.position.z - last.position.z) / dt;
-    if (last !== null && dt > 0) speed += (moved - speed) * Math.min(1, dt * SPEED_EASE);
+    // MSZ12: the gauge's gear, off the speed along the heading (forward is (-sin yaw, -cos yaw))
+    const along = last === null || dt <= 0 ? 0 : (-(pose.position.x - last.position.x) * Math.sin(pose.euler.y) - (pose.position.z - last.position.z) * Math.cos(pose.euler.y)) / dt;
+    if (last !== null && dt > 0) { speed += (moved - speed) * Math.min(1, dt * SPEED_EASE); rolling += (along - rolling) * Math.min(1, dt * SPEED_EASE); }
     last = pose;
     if (Math.abs(angle(p.yaw - looked)) > 1e-4 || pitched) idle = 0; else idle += dt;
     const turned = angle(pose.euler.y - heading); heading = pose.euler.y; p.yaw = angle(p.yaw + turned);
@@ -176,7 +207,8 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
     looked = p.yaw; lookedPitch = p.pitch ?? SEAT_PITCH;
     const kind = port.kindOf(held.vehicle), top = kind === undefined ? 1 : kind.handling.speed * kind.handling.boost;
     const driving = kind?.seats[held.seat]?.role === 'driver';
-    const next = { speed: Math.max(0, Math.min(1, speed / top)), boosting: driving && page.boost() && speed > RECENTRE_SPEED };
-    if (shown === null || Math.abs(shown.speed - next.speed) > 0.01 || shown.boosting !== next.boosting) { shown = next; page.view.show(next); }
+    const gear = Math.abs(rolling) < RECENTRE_SPEED ? 'N' : rolling > 0 ? 'D' : 'R';
+    const next = { speed: Math.max(0, Math.min(1, speed / top)), boosting: driving && page.boost() && speed > RECENTRE_SPEED, gear } as const;
+    if (shown === null || Math.abs(shown.speed - next.speed) > 0.01 || shown.boosting !== next.boosting || shown.gear !== next.gear) { shown = next; page.view.show(next); }
   } });
 }

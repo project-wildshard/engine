@@ -200,6 +200,9 @@ export class Player {
   ride: PlayerModeDriver | null = null;
   /** MSZ11: while set (a vehicle seat), it poses the camera each frame instead of the feet's eye. */
   eye: PlayerEye | null = null;
+  /** MSZ12: while set (a vehicle seat), it rewrites the wire's buttons: the seat's controls in place of the walk's, and the
+   *  move goes unbent (a seat steers, it never sidesteps another player). */
+  seatButtons: ((buttons: number) => number) | null = null;
   private lastBobPhase = 0;
   // ── dash: dodge + lunge (see `dodge()` / `dash()`) ──
   /** the DODGE disc was tapped (TouchControls) — consumed next update, like `touchJump` */
@@ -504,6 +507,7 @@ export class Player {
     const buttons = (jump ? NET_BUTTONS.jump : 0) | (dodge ? NET_BUTTONS.dodge : 0) | (sprint ? NET_BUTTONS.sprint : 0) | (this.crouchWanted ? NET_BUTTONS.crouch : 0)
       | (dive ? NET_BUTTONS.dive : 0) | (surface ? NET_BUTTONS.surface : 0) | (board ? NET_BUTTONS.hover : 0) | (input?.held('skip') === true ? NET_BUTTONS.skip : 0)
       | (this.hoverBoost && isDev() ? NET_BUTTONS.boost : 0);
+    if (this.seatButtons !== null) return { steer, yaw: this.yaw, pitch: this.pitch, buttons: this.seatButtons(buttons) };
     if (ride === undefined) steer = this.bent(steer, buttons);
     return { steer, yaw: this.yaw, pitch: this.pitch, buttons };
   }
@@ -531,6 +535,7 @@ export class Player {
       | (((input?.held('dive') ?? k.has('Space')) || this.touchDive) ? NET_BUTTONS.dive : 0)
       | (((input?.held('surface') ?? (k.has('ShiftLeft') || k.has('ShiftRight'))) || this.touchSurface) ? NET_BUTTONS.surface : 0)
       | (this.hoverBoost && isDev() ? NET_BUTTONS.boost : 0);
+    if (this.seatButtons !== null) return { steer: { keyX: 0, keyY: 0, stickX: move.x, stickY: move.y }, yaw: this.yaw, pitch: this.pitch, buttons: this.seatButtons(buttons) };
     return { steer: this.bent({ keyX: 0, keyY: 0, stickX: move.x, stickY: move.y }, buttons), yaw: this.yaw, pitch: this.pitch, buttons };
   }
 

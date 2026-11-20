@@ -78,6 +78,9 @@ export interface SimCommand extends LocalMovementCommand {
   dive?: boolean; surface?: boolean;
   /** Developer boost held this tick (`hoverSpeed`), where the host allows it: `allowDeveloperBoost`. */
   boost?: true;
+  /** MIRROR-SALT-ZONE MSZ12: a vehicle seat's BRAKE (to a stop, never into reverse), handbrake and horn, held this tick;
+   *  read only by a seated driver's vehicle (`vehicleRuntime.ts` `driverStick`). */
+  brake?: true; handbrake?: true; horn?: true;
   /** J116: the body the client says it is locked on: its orbit and side-hop bend round it, if it is real and in reach. */
   lockTarget?: string;
 }

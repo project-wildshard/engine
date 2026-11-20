@@ -42,3 +42,19 @@ off the mast line. Round 3 passed the phone view: a portrait view tips 0.2 rad f
 one aims from a seat. Every round failed the wall shot, and this lane overruled it (Jake away). A chase arm pulled in to
 1.5 m off the rear bumper cannot frame the bumper without looking straight down, so the wall view instead tilts up to
 0.45 rad further down as it pulls in. The horizon stays and the cockpit stays in frame.
+
+**MSZ12, controls on phone and desktop.** A seat pushes the `drive` input context. It blocks the walk's verbs (jump,
+dodge, sprint, hover, attack, aim, lock, crouch), so TouchControls hides ATTACK, JUMP, DODGE and the HOVER tab on its
+own, because a disc shows only while its action is live. `DriveDiscs` takes their places: BRAKE in ATTACK's spot and
+size, BOOST in JUMP's, HORN in DODGE's, and LEAVE as a tab where HOVER was. The USE band, which would also read *Get out*,
+hides behind LEAVE. Keys: Shift boosts, Space is the handbrake, H the horn, V the view, E still gets out (`use` stays
+live), and W A S D are the stick. `Player.seatButtons` rewrites the wire's buttons while seated. The walk's buttons go,
+including the sprint a phone's stick sends when pushed all the way, so only BOOST boosts. Three new held bits ride the
+16-bit buttons field: `brake`, `handbrake` and `horn`. A BRAKE held 0.35 s becomes the handbrake. BRAKE stops the
+vehicle and holds it (`VehicleCommand.brake`); the back stick goes on into reverse. The server's `driverStick` reads the
+raw stick as the vehicle's own: forward throttles and the side turns, whichever way the driver looks. Before this, a
+driver looking round in the chase view turned the car, because the stick was a world move projected on the heading.
+That broke `dedicated-vehicle-drive`, whose bot steered by its view, so it now steers its stick toward -x. The gauge
+shows R N D off the speed along the heading. The touch tape on local phone WebKit (`scripts/parity/vehicle-touch.mjs`)
+is split out as MSZ12b, because no local build carries a vehicle yet: sharddev's example is engine-test-only until it
+pins format 0.53.0, and Mirror Salt's vehicles come with MSZ22.

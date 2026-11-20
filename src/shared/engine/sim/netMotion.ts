@@ -13,5 +13,7 @@ export function netSimCommand(command: NetCommand): SimCommand {
     dive: (buttons & NET_BUTTONS.dive) !== 0, surface: (buttons & NET_BUTTONS.surface) !== 0,
     ...(attack?.targetId === undefined ? {} : { attack: { targetId: attack.targetId } }), ...(lockTarget === undefined ? {} : { lockTarget }),
     ...((buttons & NET_BUTTONS.hover) === 0 ? {} : { hover: true as const }), ...((buttons & NET_BUTTONS.jump) === 0 ? {} : { jump: true as const }),
-    ...((buttons & NET_BUTTONS.dodge) === 0 ? {} : { dodge: true as const }), ...((buttons & NET_BUTTONS.boost) === 0 ? {} : { boost: true as const }) };
+    ...((buttons & NET_BUTTONS.dodge) === 0 ? {} : { dodge: true as const }), ...((buttons & NET_BUTTONS.boost) === 0 ? {} : { boost: true as const }),
+    ...((buttons & NET_BUTTONS.brake) === 0 ? {} : { brake: true as const }), ...((buttons & NET_BUTTONS.handbrake) === 0 ? {} : { handbrake: true as const }),
+    ...((buttons & NET_BUTTONS.horn) === 0 ? {} : { horn: true as const }) };
 }

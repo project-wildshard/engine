@@ -332,10 +332,24 @@ export class VehicleRuntime {
   }
 }
 
+/**
+ * MSZ12: a seated driver's controls as the vehicle reads them, whatever way the driver looks (the chase view, a look round):
+ * the raw stick's forward is the throttle (back brakes, then reverses) and its side the turn, as W and S, A and D, or the
+ * phone's move stick; sprint (Shift, the BOOST disc) boosts; BRAKE, the handbrake (Space, a held BRAKE) and the horn ride as
+ * held buttons. A command with no raw stick (a headless tape's world move) is read along the vehicle's heading, as before.
+ */
+export function driverStick(host: Pick<SimHost, 'tickCommand'>, player: string, yaw: number): VehicleCommand | undefined {
+  const command = host.tickCommand(player); if (command === undefined) return undefined;
+  const steer = command.commandVersion === 1 ? command.steer : undefined, clamp = (value: number): number => Math.max(-1, Math.min(1, value));
+  const stick = steer === undefined ? riderStick(host, player, yaw) : { throttle: clamp(steer.keyY + steer.stickY), turn: clamp(steer.keyX + steer.stickX), boost: command.boost === true || command.sprint === true };
+  if (stick === undefined) return undefined;
+  return { ...stick, ...(command.brake === true ? { brake: true } : {}), ...(command.handbrake === true ? { handbrake: true } : {}) };
+}
+
 /** MSZ9b: a host's vehicles, run and on its wire; null for a product with no docks. Each server path calls this once. */
 export function installVehicles(host: SimHost, vehicles: Vehicles, restoring = false): VehicleRuntime | null {
   if (vehicles.docks.length === 0) return null;
-  const runtime = new VehicleRuntime(vehicles, { physics: () => host.physics, stick: (driver, yaw) => riderStick(host, driver, yaw), restoring });
+  const runtime = new VehicleRuntime(vehicles, { physics: () => host.physics, stick: (driver, yaw) => driverStick(host, driver, yaw), restoring });
   runtime.bind(host);
   return runtime;
 }

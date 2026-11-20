@@ -15,12 +15,14 @@ import { steerGround } from './moverMotion';
  * Heading follows the player's convention: forward is (-sin yaw, -cos yaw), a right turn lowers yaw.
  */
 
-/** The driver's stick this step: throttle forward (back brakes, then reverses), turn right, boost and the handbrake. */
+/** The driver's stick this step: throttle forward (back brakes, then reverses), turn right, boost, the handbrake and (MSZ12)
+ *  the BRAKE, which brakes to a stop and holds there, never into reverse. */
 export interface VehicleCommand {
   readonly throttle: number;
   readonly turn: number;
   readonly boost: boolean;
   readonly handbrake?: boolean;
+  readonly brake?: boolean;
 }
 /** Where a vehicle is and how it moves. `forward` and `slip` are m/s along and across (right) its heading. */
 export interface VehicleState {
@@ -79,6 +81,7 @@ export function vehicleAt(at: { readonly x: number; readonly y: number; readonly
 function forwardTarget(state: VehicleState, command: VehicleCommand, handling: VehicleHandling): { readonly target: number; readonly rate: number } {
   const throttle = signed(command.throttle), top = handling.speed * (command.boost ? handling.boost : 1);
   if (command.handbrake === true) return { target: 0, rate: handling.brake + VEHICLE_COAST };
+  if (command.brake === true) return { target: 0, rate: handling.brake };
   if (throttle > 0) {
     if (state.forward < 0) return { target: 0, rate: handling.brake * throttle }; // rolling back: forward stick brakes first
     // SS-MS2a2's sail: a full sail adds its push downwind, holds it back upwind, never past a stand

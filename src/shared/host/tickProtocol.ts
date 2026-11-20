@@ -22,6 +22,7 @@ export const TickCommandSchema: v.GenericSchema<BoundedTickCommandInput, Bounded
   v.pipe(v.strictObject({ kind: v.literal('player'), moveX: finite, moveZ: finite, yaw: finite, attack: v.optional(v.strictObject({ targetId: text })), lockTarget: v.exactOptional(text), hover: v.optional(v.literal(true)), boost: v.optional(v.literal(true)),
     jump: v.optional(v.literal(true)), dodge: v.optional(v.literal(true)), heavy: v.optional(v.strictObject({ targetId: v.optional(text) })),
     swing: v.exactOptional(v.literal(true)), secondary: v.exactOptional(v.literal(true)), seq: v.exactOptional(natural), viewTick: v.exactOptional(natural), pitch: v.exactOptional(v.pipe(finite, v.minValue(-Math.PI / 2), v.maxValue(Math.PI / 2))), dive: v.exactOptional(v.boolean()), surface: v.exactOptional(v.boolean()),
+    brake: v.exactOptional(v.literal(true)), handbrake: v.exactOptional(v.literal(true)), horn: v.exactOptional(v.literal(true)),
     commandVersion: v.exactOptional(v.literal(1)), steer: v.exactOptional(v.strictObject({ keyX: v.pipe(finite, v.minValue(-1), v.maxValue(1)), keyY: v.pipe(finite, v.minValue(-1), v.maxValue(1)),
       stickX: v.pipe(finite, v.minValue(-1), v.maxValue(1)), stickY: v.pipe(finite, v.minValue(-1), v.maxValue(1)) })), sprint: v.exactOptional(v.boolean()), crouch: v.exactOptional(v.boolean()) }),
     v.check(command => command.commandVersion === 1 || (command.steer === undefined && command.sprint === undefined && command.crouch === undefined), 'Raw movement requires commandVersion 1')),
@@ -42,6 +43,7 @@ export function simPlayerCommand(command: Extract<HeadlessCommand, { kind: 'play
     ...(command.hover === undefined ? {} : { hover: command.hover }), ...(command.jump === undefined ? {} : { jump: command.jump }),
     ...(command.dodge === undefined ? {} : { dodge: command.dodge }),
     ...(command.dive === undefined ? {} : { dive: command.dive }), ...(command.surface === undefined ? {} : { surface: command.surface }), ...(command.boost === undefined ? {} : { boost: command.boost }),
+    ...(command.brake === undefined ? {} : { brake: command.brake }), ...(command.handbrake === undefined ? {} : { handbrake: command.handbrake }), ...(command.horn === undefined ? {} : { horn: command.horn }),
     ...(command.commandVersion === undefined ? {} : { commandVersion: command.commandVersion }),
     ...(command.steer === undefined ? {} : { steer: { ...command.steer } }),
     ...(command.sprint === undefined ? {} : { sprint: command.sprint }), ...(command.crouch === undefined ? {} : { crouch: command.crouch }) };
@@ -139,6 +141,9 @@ type BoundedTickCommand = {
     boost?: true | undefined;
     dive?: boolean;
     surface?: boolean;
+    brake?: true;
+    handbrake?: true;
+    horn?: true;
     commandVersion?: 1;
     steer?: {
         keyX: number;

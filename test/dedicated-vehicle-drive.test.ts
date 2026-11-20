@@ -34,9 +34,11 @@ test('a bot boards the example buggy at its dock, drives it 20 m and gets out', 
   // the bot's own client hears both rows
   await vi.waitFor(() => { expect(bot.client.handle(`script:${buggy}`)).toBeDefined(); expect(bot.client.handle(`state:${vehicleSeatRow(buggy, 0, body.id)}`)).toBeDefined(); }, { timeout: 5_000, interval: 50 });
   const pose = (): { x: number; z: number } => { const read = rows.bodies.get(`script:${buggy}`); if (read === undefined) throw new Error('The buggy left'); const at = read().position; return { x: at.x, z: at.z }; };
-  // the stick toward -x (the view's yaw pi/2): the buggy, facing -z, turns left onto it and drives on until it stands 20 m from
-  // its dock (the slice's wall 10 m ahead of the dock would stop a straight run); the seated body rides along
-  bot.thumb = hold(1, Math.PI / 2);
+  // MSZ12: the driver's stick is the vehicle's own (forward throttles, the side turns, whichever way the driver looks): forward
+  // and a left turn until the buggy faces -x (yaw pi/2), then straight on until it stands 20 m from its dock (the slice's wall
+  // 10 m ahead of the dock would stop a straight run); the seated body rides along
+  const heading = (): number => rows.bodies.get(`script:${buggy}`)?.().euler.y ?? 0;
+  bot.thumb = () => ({ viewTick: 0, steer: { keyX: Math.max(-1, Math.min(1, -2 * (Math.PI / 2 - heading()))), keyY: 1, stickX: 0, stickY: 0 }, yaw: 0, pitch: 0, buttons: 0 });
   await vi.waitFor(() => { const at = pose(); expect(Math.hypot(at.x - DOCK.x, at.z - DOCK.z)).toBeGreaterThan(20); }, { timeout: 30_000, interval: 50 });
   const driven = pose();
   expect(driven.x).toBeLessThan(DOCK.x - 12); // it went the way the stick said

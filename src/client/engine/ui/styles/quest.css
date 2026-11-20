@@ -59,6 +59,12 @@
 .ws-quest-steer.boosting .ws-quest-steer-fill { background: var(--ws-amber); }
 /* MSZ11: a vehicle seat's chip takes a tap (it swaps the seat's view and the chase view) */
 .ws-quest-steer.show.tappable { pointer-events: auto; cursor: pointer; }
+/* MSZ12: a vehicle seat's gauge: the gear (R N D, the one in use lit) and the seat's hints in place of the board's */
+.ws-quest-steer-gears { display: none; justify-content: center; gap: 14px; font-family: var(--ws-mono); font-size: 12px; font-weight: 700; color: var(--ws-text-dim); }
+.ws-quest-steer-gears b.on { color: var(--ws-cyan); }
+.ws-quest-steer.seated .ws-quest-steer-gears { display: flex; }
+.ws-quest-steer-seat, .ws-quest-steer.seated .ws-quest-steer-boost:not(.ws-quest-steer-seat) { display: none; }
+.ws-quest-steer.seated .ws-quest-steer-seat { display: block; }
 .ws-quest-steer-boost { font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); text-align: center; }
 .ws-quest-steer.boosting .ws-quest-steer-boost { color: var(--ws-amber); }
 .ws-quest-steer-touch, #hud.touch .ws-quest-steer-key { display: none; }

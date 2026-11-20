@@ -18,6 +18,7 @@ import { talkPages } from './talkPages';
 import '../../ui/styles/quest.css';
 import type { Scope } from '../../../../shared/engine/app/scope';
 import { app } from '../../app/runtime';
+import { hudSlots } from '../../ui/hudSlots';
 import { exploreChannel } from '../../app/view/exploreChannel';
 import { listenPage } from '../../input/dom';
 
@@ -157,6 +158,47 @@ export class RaceClockChip {
   }
 }
 
+/** An inline glyph for a seat's disc, in the touch discs' 64-unit box. */
+const glyph = (body: string): string => `<svg viewBox="0 0 64 64" fill="currentColor" stroke="none">${body}</svg>`;
+const DRIVE_GLYPHS = {
+  brake: glyph('<rect x="14" y="20" width="36" height="24" rx="6"/><rect x="20" y="46" width="24" height="6" rx="3"/>'),
+  boost: glyph('<path d="M12 16 L30 32 L12 48 Z"/><path d="M32 16 L50 32 L32 48 Z"/>'),
+  horn: glyph('<path d="M10 26 H22 L46 12 V52 L22 38 H10 Z"/><rect x="50" y="28" width="6" height="8" rx="2"/>'),
+  leave: glyph('<rect x="10" y="10" width="26" height="44" rx="3" fill="none" stroke="currentColor" stroke-width="5"/><path d="M34 32 H56 M46 22 L56 32 L46 42" fill="none" stroke="currentColor" stroke-width="5"/>'),
+} as const;
+
+/**
+ * MIRROR-SALT-ZONE MSZ12: a vehicle seat's touch controls. The `drive` input context blocks the walk's verbs, so their discs
+ * hide (TouchControls shows a disc only while its action is live), and these take their places. BRAKE stands where ATTACK
+ * does (held, it brakes; held on, the handbrake), BOOST where JUMP does, HORN where DODGE does, and LEAVE on the left edge
+ * where the HOVER tab does, while the USE band (which would read the same *Get out*) hides. Each holds its `drive.*` action.
+ */
+export class DriveDiscs {
+  private readonly discs: HTMLButtonElement[];
+  private layer: HTMLElement | null = null;
+  constructor(scope: Scope) {
+    const hold = (action: 'drive.brake' | 'drive.boost' | 'drive.horn'): { press: () => void; release: () => void } =>
+      ({ press: () => { app.input.setHeld(action, true); }, release: () => { app.input.setHeld(action, false); } });
+    this.discs = [
+      hudSlots.disc({ cls: 'ws-drive-brake', icon: DRIVE_GLYPHS.brake, label: engineString('s_drive_brake'), spot: 'r2', ...hold('drive.brake') }, scope),
+      hudSlots.disc({ cls: 'ws-drive-boost', icon: DRIVE_GLYPHS.boost, label: engineString('s_drive_boost'), spot: 'r0', ...hold('drive.boost') }, scope),
+      hudSlots.disc({ cls: 'ws-drive-horn', icon: DRIVE_GLYPHS.horn, label: engineString('s_drive_horn'), spot: 'r1', ...hold('drive.horn') }, scope),
+      hudSlots.disc({ cls: 'ws-drive-leave', icon: DRIVE_GLYPHS.leave, label: engineString('s_drive_leave'), spot: 'edge-l', press: () => { app.input.press('use'); } }, scope),
+    ];
+    scope.onDispose(hudSlots.onLayer(layer => { this.layer = layer; }));
+  }
+  /** The discs shown (seated) or hidden; hiding lets go of whatever they held. */
+  show(on: boolean): void {
+    for (const disc of this.discs) { hudSlots.show(disc, on); if (!on) disc.classList.remove('down'); }
+    this.layer?.classList.toggle('ws-drive-seated', on);
+    if (!on) for (const action of ['drive.brake', 'drive.boost', 'drive.horn'] as const) app.input.setHeld(action, false);
+  }
+  /** Each disc's class and whether it shows, for a probe. */
+  shown(): readonly { readonly cls: string; readonly show: boolean }[] {
+    return this.discs.map(disc => ({ cls: [...disc.classList].find(name => name.startsWith('ws-drive-')) ?? '', show: disc.classList.contains('show') }));
+  }
+}
+
 /** SHARD-SOURCE SS-MS2a3: a steer ride's chip at the bottom centre: its speed bar, BOOST lit while it boosts, and how to boost
  *  (Shift; on a phone, the stick pushed all the way). Leaving is the vehicle's own prompt. */
 export class SteerChip {
@@ -165,16 +207,31 @@ export class SteerChip {
   private readonly bar = el('div', 'ws-quest-steer-bar', this.root);
   private readonly fill = el('div', 'ws-quest-steer-fill', this.bar);
   private readonly boost = el('div', 'ws-quest-steer-boost', this.root);
+  /** MSZ12: a vehicle seat's gear (R N D, the one in use lit) and its controls' hints, shown while seated */
+  private readonly gears = el('div', 'ws-quest-steer-gears', this.root);
+  private readonly gear = new Map((['R', 'N', 'D'] as const).map(letter => { const g = el('b', '', this.gears); g.textContent = letter; return [letter, g] as const; }));
+  private readonly seatHint = el('div', 'ws-quest-steer-boost ws-quest-steer-seat', this.root);
+  private discs: DriveDiscs | null = null;
   constructor(owner: Scope) {
     this.scope = uiScope('steer-ride', owner); mountUi(this.root, this.scope, hudRoot());
     el('span', 'ws-quest-steer-key', this.boost).textContent = engineString('s_steer_boost_key');
     el('span', 'ws-quest-steer-touch', this.boost).textContent = engineString('s_steer_boost_touch');
+    el('span', 'ws-quest-steer-key', this.seatHint).textContent = engineString('s_drive_keys');
+    el('span', 'ws-quest-steer-touch', this.seatHint).textContent = engineString('s_drive_touch');
   }
-  show(ride: { readonly speed: number; readonly boosting: boolean } | null): void {
+  show(ride: { readonly speed: number; readonly boosting: boolean; readonly gear?: 'R' | 'N' | 'D' } | null): void {
     this.root.classList.toggle('show', ride !== null);
     if (ride === null) return;
     this.fill.style.width = `${String(Math.round(ride.speed * 100))}%`;
     this.root.classList.toggle('boosting', ride.boosting);
+    for (const [letter, g] of this.gear) g.classList.toggle('on', ride.gear === letter);
+  }
+  /** MIRROR-SALT-ZONE MSZ12: a vehicle seat is taken or left: the gauge shows its gear and the seat's hints, and on a phone the
+   *  seat's discs (BRAKE, BOOST, HORN, LEAVE) take the walk's places (`DriveDiscs`). */
+  seated(on: boolean): void {
+    this.root.classList.toggle('seated', on);
+    if (on) this.discs ??= new DriveDiscs(this.scope);
+    this.discs?.show(on);
   }
   /** MIRROR-SALT-ZONE MSZ11: a tap or click on the chip runs `run` (a vehicle seat swaps its view by it). */
   tap(run: () => void): void {
