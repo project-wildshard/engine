@@ -11,6 +11,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { pathToFileURL } from 'node:url';
 import { assembleCapture, atomicJson, cellPath, openResume, readCell, signature } from './matrix.mjs';
+import { agentFetch } from '../agent-requests.mjs';
 import { capFor, readCaps } from '../budgets/files.mjs';
 import { routeFor } from '../memory/iphone/route.mjs';
 
@@ -140,7 +141,7 @@ async function main() {
   }));
   if (choices['dry-run']) { console.log(JSON.stringify({zone,base,host,count,plan,route},null,2)); return 0; }
   if (existsSync(marker)) throw new Error('Jake is playing');
-  const version = await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(10_000)});
+  const version = await agentFetch(new URL('/version.json',base),{signal:AbortSignal.timeout(10_000)});
   const {build} = await version.json();
   if (!version.ok || typeof build !== 'string' || build === '') throw new Error('The served build could not be pinned');
   const source = ['fps/table.mjs','fps/matrix.mjs','fps/measure.mjs','fps/verdict.mjs','memory/iphone/route.mjs']
