@@ -10,7 +10,7 @@
  * uv, and flags the old unlit materials (the cyan rails, the lamp heads), which skip lighting exactly as `MeshBasicMaterial`
  * did. Parts never share a vertex across materials, so a triangle's layer is constant.
  */
-import { BufferAttribute, BufferGeometry, Color, DataArrayTexture, LinearFilter, LinearMipmapLinearFilter, MeshLambertMaterial, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
+import { BufferAttribute, BufferGeometry, Color, DataArrayTexture, LinearFilter, LinearMipmapLinearFilter, MeshLambertMaterial, RepeatWrapping, SRGBColorSpace, Sphere, type Texture } from 'three';
 import { PATCH_ORDER, patchShader } from '@wildshard/engine/render/shaderPatches';
 
 /** The texture array's layers, in order. */
@@ -60,8 +60,31 @@ export function* solidGeometrySteps(parts: readonly SolidPart[]): Generator<void
   }
   const geometry = new BufferGeometry().setAttribute('position', new BufferAttribute(position, 3)).setAttribute('normal', new BufferAttribute(normal, 3))
     .setAttribute('color', new BufferAttribute(colour, 3)).setAttribute('grainUv', new BufferAttribute(grain, 4)).setIndex(new BufferAttribute(index, 1));
-  geometry.computeBoundingSphere();
+  geometry.boundingSphere = boundingSphereOf(position);
+  if (Number.isNaN(geometry.boundingSphere.radius)) geometry.computeBoundingSphere(); // three's own report of a NaN position
   return geometry;
+}
+
+/** DF11: three's `computeBoundingSphere` over packed xyz positions, indexed in place (three reads every vertex through
+ *  getters into a Vector3, which boxed each coordinate while the road built beside play): the same box, centre and
+ *  farthest-vertex radius, in the same order of operations, so the same sphere to the bit. */
+export function boundingSphereOf(position: Float32Array): Sphere {
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (let k = 0; k + 2 < position.length; k += 3) {
+    const x = position[k] ?? 0, y = position[k + 1] ?? 0, z = position[k + 2] ?? 0;
+    minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
+    maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
+  }
+  const sphere = new Sphere();
+  if (!(maxX < minX || maxY < minY || maxZ < minZ)) sphere.center.set(minX + maxX, minY + maxY, minZ + maxZ).multiplyScalar(0.5);
+  const cx = sphere.center.x, cy = sphere.center.y, cz = sphere.center.z;
+  let farthest = 0;
+  for (let k = 0; k + 2 < position.length; k += 3) {
+    const dx = cx - (position[k] ?? 0), dy = cy - (position[k + 1] ?? 0), dz = cz - (position[k + 2] ?? 0);
+    farthest = Math.max(farthest, dx * dx + dy * dy + dz * dz);
+  }
+  sphere.radius = Math.sqrt(farthest);
+  return sphere;
 }
 
 const splitMap = Map;
@@ -222,6 +245,6 @@ export function gpuOnlyTextureBytes(width: number, height: number, layers = 1, s
 }
 
 /** A solid part as `solidGeometrySteps` will store it (Float32 positions, its one grain layer and unlit flag), for the cull count. */
-export function solidSource(part: SolidPart): { vertices: number; position: (k: number) => number; indices: ArrayLike<number>; layer: number; unlit: number } {
-  return { vertices: part.positions.length / 3, position: (k) => Math.fround(part.positions[k] ?? 0), indices: part.indices, layer: Math.fround(part.grain[0] ?? 0), unlit: Math.fround(part.grain[1] ?? 0) };
+export function solidSource(part: SolidPart): { vertices: number; position: (k: number) => number; float32: ArrayLike<number>; indices: ArrayLike<number>; layer: number; unlit: number } {
+  return { vertices: part.positions.length / 3, position: (k) => Math.fround(part.positions[k] ?? 0), float32: part.positions, indices: part.indices, layer: Math.fround(part.grain[0] ?? 0), unlit: Math.fround(part.grain[1] ?? 0) };
 }

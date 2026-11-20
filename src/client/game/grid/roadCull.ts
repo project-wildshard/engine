@@ -15,7 +15,7 @@
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { gpuOnlyAttributes, gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
-import { BufferAttribute, type BufferGeometry, type Camera, DoubleSide, DynamicDrawUsage, Frustum, InstancedMesh, type Material, Matrix4, Mesh, type Object3D, Sphere, type Texture, Vector3 } from 'three';
+import { BufferAttribute, type BufferGeometry, type Camera, DoubleSide, DynamicDrawUsage, Frustum, InstancedMesh, type InterleavedBufferAttribute, type Material, Matrix4, Mesh, type Object3D, Sphere, type Texture, Vector3 } from 'three';
 import type { PlatformRenderBytePlan } from './renderResidency';
 
 /** Drain ordered road construction without yielding (the synchronous/native callers). */
@@ -62,6 +62,24 @@ class Grow<A extends Uint32Array | Float64Array> {
 const growU32 = (size: number): Grow<Uint32Array> => new Grow(new Uint32Array(size), (n) => new Uint32Array(n));
 const growF64 = (size: number): Grow<Float64Array> => new Grow(new Float64Array(size), (n) => new Float64Array(n));
 
+/** DF11: whether `getX/Y/Z/W(n)` of an attribute is exactly `array[n * itemSize + component]`: a plain, unnormalized
+ *  attribute whose getters are three's own (no override, no spy). Then the hot loops index its array (a getter call
+ *  returning a number boxed it: frame garbage while the road builds beside play); otherwise they call the getters as
+ *  before. Checked again after every pause, so an array swapped or a getter set while paused is honoured from the next batch. */
+function plainAttribute(attribute: BufferAttribute | InterleavedBufferAttribute): attribute is BufferAttribute {
+  const proto = BufferAttribute.prototype;
+  return attribute instanceof BufferAttribute && !attribute.normalized && attribute.getX === proto.getX && attribute.getY === proto.getY
+    && attribute.getZ === proto.getZ && attribute.getW === proto.getW;
+}
+
+/** How the clip reads a run's corners and coordinates: from arrays when `refresh` finds them plain (`round` rounds each to
+ *  Float32 as the geometry stores it), else through the accessors. `refresh` runs before the first triangle and after
+ *  every pause. */
+interface ClipReads {
+  readonly refresh: () => void;
+  indices: ArrayLike<number> | null; readonly indexAt: (i: number) => number;
+  coords: ArrayLike<number> | null; coordStride: number; readonly round: boolean; readonly coordinate: (n: number, axis: number) => number;
+}
 
 /** The same attribute interpolation and index order, yielding between bounded triangle/copy batches. */
 export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSize?: number): Generator<void> {
@@ -79,7 +97,14 @@ export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSi
     }
   };
   const at = names.indexOf('position'), px = at === -1 ? 0 : sizes.slice(0, at).reduce((a, b) => a + b, 0);
-  const { extra, out } = yield* clipCore(index.count / 3, (i) => index.getX(i), count, stride, px, read, (n, axis) => position.array[n * position.itemSize + axis] ?? 0, pitch, tileSize);
+  // DF11: the index and positions straight from their arrays while the index's getter is three's own
+  const reads: ClipReads = { indices: null, indexAt: (i) => index.getX(i), coords: null, coordStride: 3, round: false,
+    coordinate: (n, axis) => position.array[n * position.itemSize + axis] ?? 0,
+    refresh: () => {
+      const plain = plainAttribute(index) && index.itemSize === 1;
+      reads.indices = plain ? index.array : null; reads.coords = plain ? position.array : null; reads.coordStride = position.itemSize;
+    } };
+  const { extra, out } = yield* clipCore(index.count / 3, reads, count, stride, px, read, pitch, tileSize);
   if (extra.length === 0) return;
   const total = count + extra.length / stride;
   let o = 0;
@@ -98,7 +123,7 @@ export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSi
  * x then z, a new vertex interpolating all `stride` values linearly (position at `px`). A plan that reads only positions
  * gets exactly the builder's positions, new vertices and triangles: every value interpolates on its own.
  */
-function* clipCore(triangles: number, indexAt: (i: number) => number, count: number, stride: number, px: number, read: (n: number, into: Float64Array, at: number) => void, coordinate: (n: number, axis: number) => number, pitch: number, tileSize?: number, retain = true): Generator<void, { extra: Float64Array; out: Uint32Array; added: number; corners: number }> {
+function* clipCore(triangles: number, reads: ClipReads, count: number, stride: number, px: number, read: (n: number, into: Float64Array, at: number) => void, pitch: number, tileSize?: number, retain = true): Generator<void, { extra: Float64Array; out: Uint32Array; added: number; corners: number }> {
   // Most triangles fit one bin, so the index is about three corners a triangle; cut triangles grow it.
   const { size: s, offset } = binGrid(pitch, tileSize), extra = growF64(retain ? stride * 64 : 0), out = growU32(retain ? triangles * 3 + 64 : 0);
   let added = 0, corners = 0;
@@ -143,13 +168,26 @@ function* clipCore(triangles: number, indexAt: (i: number) => number, count: num
       }
     }
   };
+  let indices: ArrayLike<number> | null = null, coords: ArrayLike<number> | null = null, cs = 3;
+  const round = reads.round;
   for (let t = 0; t < triangles; t++) {
-    if (t % 256 === 0) yield;
-    const a = indexAt(t * 3), b = indexAt(t * 3 + 1), third = indexAt(t * 3 + 2);
+    if (t % 256 === 0) { yield; reads.refresh(); indices = reads.indices; coords = reads.coords; cs = reads.coordStride; }
+    let a: number, b: number, third: number;
+    if (indices !== null) { a = indices[t * 3] ?? 0; b = indices[t * 3 + 1] ?? 0; third = indices[t * 3 + 2] ?? 0; }
+    else { a = reads.indexAt(t * 3); b = reads.indexAt(t * 3 + 1); third = reads.indexAt(t * 3 + 2); }
+    // the corners' x and z (DF11: indexed in place when the reads are arrays, so no call returns a boxed number)
+    let ax: number, bx: number, cx: number, az: number, bz: number, cz: number;
+    if (coords !== null) {
+      ax = coords[a * cs] ?? 0; bx = coords[b * cs] ?? 0; cx = coords[third * cs] ?? 0;
+      az = coords[a * cs + 2] ?? 0; bz = coords[b * cs + 2] ?? 0; cz = coords[third * cs + 2] ?? 0;
+      if (round) { ax = Math.fround(ax); bx = Math.fround(bx); cx = Math.fround(cx); az = Math.fround(az); bz = Math.fround(bz); cz = Math.fround(cz); }
+    } else {
+      ax = reads.coordinate(a, 0); bx = reads.coordinate(b, 0); cx = reads.coordinate(third, 0);
+      az = reads.coordinate(a, 2); bz = reads.coordinate(b, 2); cz = reads.coordinate(third, 2);
+    }
     // Most triangles already fit one bin. Keep their indices without allocating
     // polygons or copying attributes; only an interior cut needs interpolation.
-    if (!crossesBin(coordinate(a, 0), coordinate(b, 0), coordinate(third, 0), s, offset)
-      && !crossesBin(coordinate(a, 2), coordinate(b, 2), coordinate(third, 2), s, offset)) {
+    if (!crossesBin(ax, bx, cx, s, offset) && !crossesBin(az, bz, cz, s, offset)) {
       corners += 3; if (retain) { out.push(a); out.push(b); out.push(third); } continue;
     }
     used = 0;
@@ -192,6 +230,77 @@ function crossesBin(a: number, b: number, c: number, size: number, offset: numbe
   return (edge > lo ? edge : (k + 1 + offset) * size) < hi;
 }
 
+/** Lattice boxes within this many of the origin on every axis key as one number (a 46-bit integer: exact). */
+const LOD_SPAN = 4096;
+/** Exact edge predicate shared by each LOD vertex, without a closure per vertex. */
+function onLodLine(v: number, size: number, offset: number, pitch: number): boolean {
+  const bin = Math.abs(v / size - Math.round(v / size));
+  if (Math.abs(bin - offset) * size < 1e-3) return true;
+  const local = Math.abs(v - Math.round(v / pitch) * pitch);
+  return Math.abs(local - CELL_EDGE) < 1e-3;
+}
+
+/**
+ * DF11: the first vertex of each LOD lattice box and material, recorded once per key. A box and material in the usual
+ * ranges is one exact integer key (a 46-bit number) in an open-addressed table on typed arrays: a Map held each key as a
+ * boxed number and grew its table on the JS heap, one entry per box of every road install. Anything else keys a string.
+ * A vertex reads its position from its array, so no coordinate is passed as an argument.
+ */
+class LodFirsts {
+  private keys = ownedArray(Float64Array, 1024, { owner: 'grid/road-cull', asset: 'lod-firsts', kind: 'scratch' }).fill(-1);
+  private values = ownedArray(Int32Array, 1024, { owner: 'grid/road-cull', asset: 'lod-firsts', kind: 'scratch' });
+  private used = 0;
+  private readonly named = new Map<string, number>();
+  private readonly size: number; private readonly offset: number;
+  constructor(private readonly pitch: number, private readonly cell: number, tileSize?: number) {
+    this.size = tileSize ?? pitch / BIN_DIVISOR; this.offset = tileSize === undefined ? 0.5 : 0;
+  }
+  /** `n`'s representative: the first vertex recorded for its box and material (`n` itself when it is the first, or when it
+   *  lies on a bin or cell edge), at (`x`, `y`, `z`). */
+  rep(n: number, x: number, y: number, z: number, layer: number, unlit: number): number {
+    if (onLodLine(x, this.size, this.offset, this.pitch) || onLodLine(z, this.size, this.offset, this.pitch)) return n;
+    return this.box(n, Math.floor(x / this.cell), Math.floor(y / this.cell), Math.floor(z / this.cell), layer, unlit);
+  }
+  /** `rep` with the position read from `positions[at..at + 2]` (rounded to Float32 when `round`): no coordinate is passed. */
+  repAt(n: number, positions: ArrayLike<number>, at: number, round: boolean, layer: number, unlit: number): number {
+    let x = positions[at] ?? 0, y = positions[at + 1] ?? 0, z = positions[at + 2] ?? 0;
+    if (round) { x = Math.fround(x); y = Math.fround(y); z = Math.fround(z); }
+    if (onLodLine(x, this.size, this.offset, this.pitch) || onLodLine(z, this.size, this.offset, this.pitch)) return n;
+    return this.box(n, Math.floor(x / this.cell), Math.floor(y / this.cell), Math.floor(z / this.cell), layer, unlit);
+  }
+  private box(n: number, ix: number, iy: number, iz: number, layer: number, unlit: number): number {
+    if (Math.abs(ix) < LOD_SPAN && Math.abs(iy) < LOD_SPAN && Math.abs(iz) < LOD_SPAN && Number.isInteger(layer) && layer >= 0 && layer < 64 && (unlit === 0 || unlit === 1)) {
+      // the key lodKey always used: exact (under 2^47), never negative, so -1 marks an empty slot
+      const high = (ix + LOD_SPAN) * 2 * LOD_SPAN + iy + LOD_SPAN, low = (iz + LOD_SPAN) * 128 + layer * 2 + unlit;
+      return this.first(high, low, n);
+    }
+    const key = `${String(ix)},${String(iy)},${String(iz)},${String(layer)},${String(unlit)}`;
+    const seen = this.named.get(key); if (seen === undefined) { this.named.set(key, n); return n; }
+    return seen;
+  }
+  /** The value at key `high` * 2^20 + `low` (`high` < 2^26, `low` < 2^20: small integers, never boxed), or `n` stored
+   *  there when the key is new. */
+  private first(high: number, low: number, n: number): number {
+    const key = high * 1048576 + low;
+    if ((this.used + 1) * 2 > this.keys.length) this.grow();
+    const mask = this.keys.length - 1;
+    for (let at = (Math.imul(high, 0x9e3779b1) ^ Math.imul(low, 0x85ebca77)) & mask; ; at = (at + 1) & mask) {
+      const held = this.keys[at] ?? -1;
+      if (held === key) return this.values[at] ?? n;
+      if (held === -1) { this.keys[at] = key; this.values[at] = n; this.used++; return n; }
+    }
+  }
+  private grow(): void {
+    const keys = this.keys, values = this.values;
+    this.keys = ownedArray(Float64Array, keys.length * 2, { owner: 'grid/road-cull', asset: 'lod-firsts', kind: 'scratch' }).fill(-1); this.values = ownedArray(Int32Array, keys.length * 2, { owner: 'grid/road-cull', asset: 'lod-firsts', kind: 'scratch' }); this.used = 0;
+    for (let at = 0; at < keys.length; at++) {
+      const key = keys[at] ?? -1; if (key === -1) continue;
+      const high = Math.floor(key / 1048576), low = key - high * 1048576;
+      this.first(high, low, values[at] ?? 0);
+    }
+  }
+}
+
 /** Sort the identical bin/LOD runs with pauses inside triangle batches; no partial plan is published. */
 export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: readonly CullLod[] = [], tileSize?: number): Generator<void, CullPlan> {
   const index = geometry.getIndex(), position = geometry.getAttribute('position');
@@ -202,11 +311,20 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
   // no number[] list per bin on the JS heap).
   interface BinRow { readonly key: string; readonly x: number; readonly z: number; readonly id: number; count: number }
   const triangles = index.count / 3, byBin = new Map<number, Map<number, BinRow>>(), binOf = new Uint32Array(triangles);
+  // DF11: while the index, positions and grain are plain (`plainAttribute`, checked after every pause) the loops index
+  // their arrays; otherwise they call three's getters exactly as before
+  const grain = geometry.hasAttribute('grainUv') ? geometry.getAttribute('grainUv') : undefined;
+  let ix: ArrayLike<number> | null = null, pa: ArrayLike<number> = [], ps = 3;
+  const refresh = (): void => {
+    const plain = plainAttribute(index) && index.itemSize === 1 && plainAttribute(position) && (grain === undefined || plainAttribute(grain));
+    ix = plain ? index.array : null; pa = plain ? position.array : []; ps = position.itemSize;
+  };
   let binCount = 0;
   for (let t = 0; t < triangles; t++) {
-    if (t % 256 === 0) yield;
+    if (t % 256 === 0) { yield; refresh(); }
     let x = 0, z = 0;
-    for (let c = 0; c < 3; c++) { const n = index.getX(t * 3 + c); x += position.getX(n); z += position.getZ(n); }
+    if (ix !== null) for (let c = 0; c < 3; c++) { const n = ix[t * 3 + c] ?? 0; x += pa[n * ps] ?? 0; z += pa[n * ps + 2] ?? 0; }
+    else for (let c = 0; c < 3; c++) { const n = index.getX(t * 3 + c); x += position.getX(n); z += position.getZ(n); }
     const bx = Math.floor(x / 3 / size + offset), bz = Math.floor(z / 3 / size + offset);
     let row = byBin.get(bx); if (row === undefined) { row = new Map(); byBin.set(bx, row); }
     let bin = row.get(bz);
@@ -216,9 +334,22 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
   const firsts = new Uint32Array(binCount + 1), members = new Uint32Array(triangles);
   for (const row of byBin.values()) for (const bin of row.values()) firsts[bin.id + 1] = bin.count;
   for (let b = 0; b < binCount; b++) firsts[b + 1] = (firsts[b + 1] ?? 0) + (firsts[b] ?? 0);
-  { const cursor = firsts.slice(0, binCount); for (let t = 0; t < triangles; t++) { if (t % 4096 === 0) yield; const b = binOf[t] ?? 0; members[cursor[b] ?? 0] = t; cursor[b] = (cursor[b] ?? 0) + 1; } }
+  { const cursor = firsts.slice(0, binCount); for (let t = 0; t < triangles; t++) { if (t % 4096 === 0) { yield; refresh(); } const b = binOf[t] ?? 0; members[cursor[b] ?? 0] = t; cursor[b] = (cursor[b] ?? 0) + 1; } }
   const out = growU32(triangles * 3 + 64), bins: CullBin[] = [];
-  const clusters = lod.map((tier) => clusterer(geometry, pitch, tier.cell, tileSize));
+  const clusters = lod.map((tier) => ({ firsts: new LodFirsts(pitch, tier.cell, tileSize), memo: new Int32Array(position.count).fill(-1) }));
+  // Vertex clustering for a far LOD tier: each vertex maps to the first vertex of its `cell`-metre lattice box that wears the
+  // same material (grain layer + unlit flag). Vertices on a bin edge or a cell edge (where the seam meets the shard's own
+  // ground) stay themselves, so a coarse bin meets its fine neighbour and the shard's terrain without a crack. It reads
+  // as the bin loops do (DF11: arrays while plain, else three's getters in the old order).
+  const cluster = (tier: { readonly firsts: LodFirsts; readonly memo: Int32Array }, n: number): number => {
+    const known = tier.memo[n] ?? -1; if (known >= 0) return known;
+    let rep: number;
+    if (ix !== null) {
+      const layer = grain === undefined ? 0 : grain.array[n * grain.itemSize + 2] ?? 0, unlit = grain === undefined ? 0 : grain.array[n * grain.itemSize + 3] ?? 0;
+      rep = tier.firsts.repAt(n, pa, n * ps, false, layer, unlit);
+    } else rep = tier.firsts.rep(n, position.getX(n), position.getY(n), position.getZ(n), grain?.getZ(n) ?? 0, grain?.getW(n) ?? 0);
+    tier.memo[n] = rep; return rep;
+  };
   const ordered: BinRow[] = [];
   for (const row of byBin.values()) for (const bin of row.values()) ordered.push(bin);
   ordered.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
@@ -234,13 +365,13 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
     binId++;
     let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
     for (let i = 0; i < list.length; i++) {
-      if (i % 256 === 0) yield;
+      if (i % 256 === 0) { yield; refresh(); }
       const t = list[i] ?? 0;
       for (let c = 0; c < 3; c++) {
-        const n = index.getX(t * 3 + c); out.push(n);
+        const n = ix !== null ? ix[t * 3 + c] ?? 0 : index.getX(t * 3 + c); out.push(n);
         if (boundedIn[n] === binId) continue;
         boundedIn[n] = binId; unique[uniqueCount++] = n;
-        const x = position.getX(n), y = position.getY(n), z = position.getZ(n);
+        const x = ix !== null ? pa[n * ps] ?? 0 : position.getX(n), y = ix !== null ? pa[n * ps + 1] ?? 0 : position.getY(n), z = ix !== null ? pa[n * ps + 2] ?? 0 : position.getZ(n);
         minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
       }
     }
@@ -252,16 +383,18 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
     let farthest = 0;
     for (let i = 0; i < uniqueCount; i++) {
       const n = unique[i] ?? 0;
-      const dx = sphere.center.x - position.getX(n), dy = sphere.center.y - position.getY(n), dz = sphere.center.z - position.getZ(n);
+      const dx = sphere.center.x - (ix !== null ? pa[n * ps] ?? 0 : position.getX(n)), dy = sphere.center.y - (ix !== null ? pa[n * ps + 1] ?? 0 : position.getY(n)),
+        dz = sphere.center.z - (ix !== null ? pa[n * ps + 2] ?? 0 : position.getZ(n));
       farthest = Math.max(farthest, dx * dx + dy * dy + dz * dz);
     }
     sphere.radius = Math.sqrt(farthest);
-    for (const cluster of clusters) {
+    for (const tier of clusters) {
       const from = out.length;
       for (let i = 0; i < list.length; i++) {
-        if (i % 256 === 0) yield;
+        if (i % 256 === 0) { yield; refresh(); }
         const t = list[i] ?? 0;
-        const a = cluster(index.getX(t * 3)), b = cluster(index.getX(t * 3 + 1)), c = cluster(index.getX(t * 3 + 2));
+        const a = cluster(tier, ix !== null ? ix[t * 3] ?? 0 : index.getX(t * 3)), b = cluster(tier, ix !== null ? ix[t * 3 + 1] ?? 0 : index.getX(t * 3 + 1)),
+          c = cluster(tier, ix !== null ? ix[t * 3 + 2] ?? 0 : index.getX(t * 3 + 2));
         if (a !== b && b !== c && a !== c) { out.push(a); out.push(b); out.push(c); }
       }
       levels.push({ start: from, count: out.length - from });
@@ -269,46 +402,6 @@ export function* cullPlanSteps(geometry: BufferGeometry, pitch: number, lod: rea
     bins.push({ sphere, start, count, levels, ...(tileSize === undefined ? {} : { tile: { x: tileX, z: tileZ } }) });
   }
   return { source: out.view(true), bins, lod: lod.map((tier) => tier.distance) };
-}
-
-/**
- * Vertex clustering for a far LOD tier: each vertex maps to the first vertex of its `cell`-metre lattice box that wears the
- * same material (grain layer + unlit flag). Vertices on a bin edge or a cell edge (where the seam meets the shard's own
- * ground) stay themselves, so a coarse bin meets its fine neighbour and the shard's terrain without a crack.
- */
-function clusterer(geometry: BufferGeometry, pitch: number, cell: number, tileSize?: number): (n: number) => number {
-  const position = geometry.getAttribute('position'), grain = geometry.hasAttribute('grainUv') ? geometry.getAttribute('grainUv') : undefined;
-  const first = new Map<number | string, number>(), memo = new Int32Array(position.count).fill(-1);
-  return (n: number): number => {
-    const known = memo[n] ?? -1; if (known >= 0) return known;
-    const key = lodKey(position.getX(n), position.getY(n), position.getZ(n), grain?.getZ(n) ?? 0, grain?.getW(n) ?? 0, pitch, cell, tileSize);
-    let rep = n;
-    if (key !== null) { const seen = first.get(key); if (seen === undefined) first.set(key, n); else rep = seen; }
-    memo[n] = rep; return rep;
-  };
-}
-
-/** Lattice boxes within this many of the origin on every axis key as one number (a 46-bit integer: exact). */
-const LOD_SPAN = 4096;
-/** A vertex's LOD lattice box and material; null on a bin edge or a cell edge (it stays itself). One box and material is
- *  one key: a number in the usual ranges (string keys built per vertex were ~280 ms of a phone-tier road install), the
- *  string form outside them. */
-function lodKey(x: number, y: number, z: number, layer: number, unlit: number, pitch: number, cell: number, tileSize?: number): number | string | null {
-  const s = tileSize ?? pitch / BIN_DIVISOR, offset = tileSize === undefined ? 0.5 : 0;
-  if (onLodLine(x, s, offset, pitch) || onLodLine(z, s, offset, pitch)) return null;
-  const ix = Math.floor(x / cell), iy = Math.floor(y / cell), iz = Math.floor(z / cell);
-  if (Math.abs(ix) < LOD_SPAN && Math.abs(iy) < LOD_SPAN && Math.abs(iz) < LOD_SPAN && Number.isInteger(layer) && layer >= 0 && layer < 64 && (unlit === 0 || unlit === 1)) {
-    return ((((ix + LOD_SPAN) * 2 * LOD_SPAN + iy + LOD_SPAN) * 2 * LOD_SPAN + iz + LOD_SPAN) * 64 + layer) * 2 + unlit;
-  }
-  return `${String(ix)},${String(iy)},${String(iz)},${String(layer)},${String(unlit)}`;
-}
-
-/** Exact edge predicate shared by each LOD vertex, without a closure per vertex. */
-function onLodLine(v: number, size: number, offset: number, pitch: number): boolean {
-  const bin = Math.abs(v / size - Math.round(v / size));
-  if (Math.abs(bin - offset) * size < 1e-3) return true;
-  const local = Math.abs(v - Math.round(v / pitch) * pitch);
-  return Math.abs(local - CELL_EDGE) < 1e-3;
 }
 
 /** How the road builders cull a mesh (`cullRoadMesh` at `pitch`, the view camera) and where each mesh's plan is kept. */
@@ -334,7 +427,10 @@ export function publishRoadPlan(culler: RoadCuller, mesh: Mesh, plan: CullPlan):
  * k / 3) exactly as the geometry's Float32 array will store it, `indices` local to the run, and the run's one material
  * (`roadSolid.ts`: a part never mixes layers, so the deck's far LOD key needs one layer per run).
  */
-export interface CullSource { readonly vertices: number; readonly position: (k: number) => number; readonly indices: ArrayLike<number>; readonly layer?: number; readonly unlit?: number }
+export interface CullSource { readonly vertices: number; readonly position: (k: number) => number; readonly indices: ArrayLike<number>; readonly layer?: number; readonly unlit?: number;
+  /** DF11: the same components unrounded, when `position(k)` is exactly `Math.fround(float32[k] ?? 0)`: the count copies
+   *  them into one Float32Array instead of calling `position` (a call returning a number boxed it). */
+  readonly float32?: ArrayLike<number> }
 /** What `cullRoadMesh` will hold: the geometry's vertices before and after `clipToBins`, and the sorted source's length. */
 export interface CullCounts { readonly vertices: number; readonly clipped: number; readonly source: number }
 
@@ -343,19 +439,27 @@ export interface CullCounts { readonly vertices: number; readonly clipped: numbe
 export function* cullCountsSteps(sources: readonly CullSource[], pitch: number, lod?: readonly CullLod[], tileSize?: number): Generator<void, CullCounts> {
   let vertices = 0, clipped = 0, source = 0;
   for (const run of sources) {
-    const read = (n: number, into: Float64Array, at: number): void => { into[at] = run.position(n * 3); into[at + 1] = run.position(n * 3 + 1); into[at + 2] = run.position(n * 3 + 2); };
+    // DF11: a run with its components as an array (`float32`) is indexed in place, rounded as the geometry will store it;
+    // otherwise `position` is called as before. Either way every read is live, so an edit while paused is seen.
+    const float32 = run.float32, at = (n: number, c: number): number => run.position(n * 3 + c);
+    const read = (n: number, into: Float64Array, to: number): void => {
+      if (float32 !== undefined) { into[to] = Math.fround(float32[n * 3] ?? 0); into[to + 1] = Math.fround(float32[n * 3 + 1] ?? 0); into[to + 2] = Math.fround(float32[n * 3 + 2] ?? 0); }
+      else { into[to] = run.position(n * 3); into[to + 1] = run.position(n * 3 + 1); into[to + 2] = run.position(n * 3 + 2); }
+    };
+    const reads: ClipReads = { indices: run.indices, indexAt: (i) => run.indices[i] ?? 0, coords: float32 ?? null, coordStride: 3, round: true, coordinate: at, refresh: () => undefined };
     // Only an omitted tier list is privately known to stay empty. A supplied
     // empty array may acquire a tier while the original generator is paused.
-    const { extra, out, added, corners } = yield* clipCore(run.indices.length / 3, (i) => run.indices[i] ?? 0, run.vertices, 3, 0, read, (n, axis) => run.position(n * 3 + axis), pitch, tileSize, lod !== undefined);
+    const { extra, out, added, corners } = yield* clipCore(run.indices.length / 3, reads, run.vertices, 3, 0, read, pitch, tileSize, lod !== undefined);
     vertices += run.vertices; clipped += run.vertices + added; source += corners;
-    const at = (n: number, c: number): number => (n < run.vertices ? run.position(n * 3 + c) : Math.fround(extra[(n - run.vertices) * 3 + c] ?? 0));
     for (const tier of lod ?? []) {
-      const memo = new Int32Array(run.vertices + extra.length / 3).fill(-1), first = new Map<number | string, number>();
+      const memo = new Int32Array(run.vertices + extra.length / 3).fill(-1), firsts = new LodFirsts(pitch, tier.cell, tileSize);
+      const layer = run.layer ?? 0, unlit = run.unlit ?? 0;
+      // a clip vertex (past the run's own) reads the clip's Float64 values, rounded to Float32 as the geometry stores them
       const representative = (n: number): number => {
         const known = memo[n] ?? -1; if (known >= 0) return known;
-        const key = lodKey(at(n, 0), at(n, 1), at(n, 2), run.layer ?? 0, run.unlit ?? 0, pitch, tier.cell, tileSize);
-        let rep = n;
-        if (key !== null) { const seen = first.get(key); if (seen === undefined) first.set(key, n); else rep = seen; }
+        const rep = n >= run.vertices ? firsts.repAt(n, extra, (n - run.vertices) * 3, true, layer, unlit)
+          : float32 !== undefined ? firsts.repAt(n, float32, n * 3, true, layer, unlit)
+            : firsts.rep(n, at(n, 0), at(n, 1), at(n, 2), layer, unlit);
         memo[n] = rep; return rep;
       };
       for (let i = 0; i < out.length; i += 3) {

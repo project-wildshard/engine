@@ -164,8 +164,8 @@ export function curtainGeometry(curtain: SeamCurtain): BufferGeometry {
 /** Float32 values per curtain vertex (`position`). */
 export const CURTAIN_FLOATS = 3;
 /** The curtain as the cull count reads it (`roadCull.ts` `CullSource`). */
-export function curtainSource(curtain: SeamCurtain): { vertices: number; position: (k: number) => number; indices: ArrayLike<number> } {
-  return { vertices: curtain.positions.length / 3, position: (k) => curtain.positions[k] ?? 0, indices: curtain.indices };
+export function curtainSource(curtain: SeamCurtain): { vertices: number; position: (k: number) => number; float32: Float32Array; indices: ArrayLike<number> } {
+  return { vertices: curtain.positions.length / 3, position: (k) => curtain.positions[k] ?? 0, float32: curtain.positions, indices: curtain.indices };
 }
 
 /** The additive curtain material (G99 / G101), drawn in one pass (additive needs no back-then-front order). */

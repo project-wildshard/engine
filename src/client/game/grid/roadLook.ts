@@ -17,6 +17,7 @@ import { junctionTextureSteps, roadTextureSteps, ROAD_PERIOD, WHITE } from './ro
 import { packRoadSignPixels } from './roadSignPixels';
 import { paintRoadSignCanvas, roadSignPaintLayout, roadSignLineKey as lineKey, SIGN_LINE_W as LINE_W, SIGN_LINE_H as LINE_H, type RoadSignSource } from './roadSignPaint';
 import { ownRoadMesh, type RoadMapShare } from './roadResources';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { roadSignScale } from './roadSignScale';
 import { ROAD_SKY } from '@wildshard/format/roadLight';
 import { coverageMaterial, coverageTable, gpuOnlyTextureBytes, uniformPart, type CoverageColours, type SolidPart } from './roadSolid';
@@ -269,20 +270,29 @@ function streetlights(layout: RoadLayout, home: GridCell): { poles: SolidPart; h
   pole.beam({ x: -0.07, z: 0 }, { x: 0.07, z: 0 }, 0, 0.14, HEIGHT, grey);
   pole.beam({ x: 0, z: 0 }, { x: REACH, z: 0 }, HEIGHT - 0.12, 0.09, 0.09, grey);
   head.beam({ x: REACH - 0.45, z: 0 }, { x: REACH + 0.15, z: 0 }, HEIGHT - 0.24, 0.26, 0.14, new Color(0xfff0c8));
+  // DF11: every light's copy is written straight into the part's typed arrays, sized up front (the merged Mesher's
+  // number[] lists grew and were copied out again: garbage while the road builds beside play); the same Float32 values
   const place = (template: Mesher, unlit: boolean): SolidPart => {
-    const out = new Mesher(), matrix = new Matrix4(), q = new Quaternion(), up = new Vector3(0, 1, 0), pos = new Vector3(), one = new Vector3(1, 1, 1), v = new Vector3(), n = new Vector3();
-    for (const light of layout.lights) {
+    const matrix = new Matrix4(), q = new Quaternion(), up = new Vector3(0, 1, 0), pos = new Vector3(), one = new Vector3(1, 1, 1), v = new Vector3(), n = new Vector3();
+    const verts = template.p.length / 3, corners = template.i.length, lights = layout.lights.length;
+    const label = { owner: 'grid/road-look', asset: 'streetlights', kind: 'scratch' } as const;
+    const positions = ownedArray(Float32Array, lights * verts * 3, label), normals = ownedArray(Float32Array, lights * verts * 3, label);
+    const colours = ownedArray(Float32Array, lights * verts * 3, label), uvs = ownedArray(Float32Array, lights * verts * 2, label), indices = ownedArray(Uint32Array, lights * corners, label);
+    for (let l = 0; l < lights; l++) {
+      const light = layout.lights[l]; if (light === undefined) continue;
       q.setFromAxisAngle(up, Math.atan2(-light.reach.z, light.reach.x));
       matrix.compose(pos.set(light.at.x - home.origin.x, 0, light.at.z - home.origin.z), q, one);
-      const base = out.p.length / 3;
-      for (let k = 0; k < template.p.length / 3; k++) {
+      const base = l * verts;
+      for (let k = 0; k < verts; k++) {
         v.set(template.p[k * 3] ?? 0, template.p[k * 3 + 1] ?? 0, template.p[k * 3 + 2] ?? 0).applyMatrix4(matrix);
         n.set(template.n[k * 3] ?? 0, template.n[k * 3 + 1] ?? 0, template.n[k * 3 + 2] ?? 0).applyQuaternion(q);
-        out.p.push(v.x, v.y, v.z); out.n.push(n.x, n.y, n.z); out.uv.push(0, 0); out.c.push(template.c[k * 3] ?? 1, template.c[k * 3 + 1] ?? 1, template.c[k * 3 + 2] ?? 1);
+        const o = (base + k) * 3;
+        positions[o] = v.x; positions[o + 1] = v.y; positions[o + 2] = v.z; normals[o] = n.x; normals[o + 1] = n.y; normals[o + 2] = n.z;
+        colours[o] = template.c[k * 3] ?? 1; colours[o + 1] = template.c[k * 3 + 1] ?? 1; colours[o + 2] = template.c[k * 3 + 2] ?? 1;
       }
-      for (const i of template.i) out.i.push(i + base);
+      for (let j = 0; j < corners; j++) indices[l * corners + j] = (template.i[j] ?? 0) + base;
     }
-    return uniformPart(out.part(), 'white', unlit);
+    return uniformPart({ positions, normals, colours, uvs, indices }, 'white', unlit);
   };
   return { poles: place(pole, false), heads: place(head, true) };
 }
@@ -363,7 +373,7 @@ function signMesher(signs: readonly RoadSign[], home: GridCell, atlas: SignAtlas
 /** Float32 values per textured road vertex (`position`, `normal`, `uv`; `Mesher.geometry()` without colours). */
 const ROAD_FLOATS = 8;
 /** A mesher's triangles as the cull count reads them (positions exactly as its Float32 geometry will store them). */
-function mesherSource(m: Mesher): CullSource { return { vertices: m.p.length / 3, position: (k) => Math.fround(m.p[k] ?? 0), indices: m.i }; }
+function mesherSource(m: Mesher): CullSource { return { vertices: m.p.length / 3, position: (k) => Math.fround(m.p[k] ?? 0), float32: m.p, indices: m.i }; }
 /** One textured road mesh before it is built: its triangles, its canvas's size and how to paint it. */
 interface TexturedSource {
   readonly id: string; readonly name: string; readonly mesher: Mesher; readonly width: number; readonly height: number; readonly paint: () => Generator<void, Texture>;
