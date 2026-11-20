@@ -76,13 +76,14 @@ function roofGlb(x: number, z: number, y: number): Uint8Array {
   return out;
 }
 /** A flat green 500 m terrain tile, a red roof in the north-west quarter (+X, +Z) and a pool in the south-east (−X, −Z). */
-function source(withWorld: boolean, roofHeight = 6): MapSource {
+function source(withWorld: boolean, roofHeight = 6, sheet = false): MapSource {
   const r = 9, heights = new Float32Array(r * r), colours = new Float32Array(r * r * 3);
   for (let i = 0; i < r * r; i++) { colours[i * 3] = 0.1; colours[i * 3 + 1] = 0.3; colours[i * 3 + 2] = 0.05; }
   const files = new Map<string, Uint8Array>([['blobs/tile/t.bin', encodeTerrainTile({resolution: r, x: -250, z: -250, size: 500, heights, colours})], ['blobs/glb/roof.glb', roofGlb(120, 120, roofHeight)]]);
   const sections = new Map<string, unknown>(withWorld ? [
     ['world/tiles', {tiles: [{lod: 0, x: 0, z: 0, files: ['t', 'roof']}]}],
-    ['world/water', {water: [{level: 0.5, shape: {kind: 'polygon', points: [[-100, -100], [-140, -100], [-140, -140], [-100, -140]]}}]}],
+    ['world/water', {water: [{level: 0.5, shape: {kind: 'polygon', points: [[-100, -100], [-140, -100], [-140, -140], [-100, -140]]}},
+      ...(sheet ? [{level: 0.04, shape: {kind: 'circle', x: 0, z: 0, radius: 60}}] : [])]}],
   ] : []);
   return {files: [{hash: 't', path: 'blobs/tile/t.bin', kind: 'tile'}, {hash: 'roof', path: 'blobs/glb/roof.glb', kind: 'glb'}], sections,
     read: path => { const bytes = files.get(path); if (bytes === undefined) throw new Error(path); return bytes; }};
@@ -100,6 +101,15 @@ test('the map is in the minimap frame: +X +Z (north-west) top left, −X −Z (s
   expect(pool[2]).toBeGreaterThan(pool[0] ?? 0);            // the pool's water, bottom right
   expect(grass[1]).toBeGreaterThan(grass[0] ?? 0);          // the ground's own green
   expect(pixel(rgba, size, -120, 120)[1]).toBeGreaterThan(pixel(rgba, size, -120, 120)[0] ?? 0); // no roof mirrored to the north-east
+});
+
+test('a sheet of water a few centimetres deep (Mirror Salt\'s flood) wets the ground it lies on, it does not paint a lake', () => {
+  const {rgba, size, stats} = renderCookedMap(source(true, 6, true), {size: 256});
+  expect(stats.water).toBe(2);
+  const wetGrass = pixel(rgba, size, 10, -10), dryGrass = pixel(rgba, size, 0, -90), pool = pixel(rgba, size, -120, -120);
+  expect(wetGrass[1]).toBeGreaterThan(wetGrass[2] ?? 0);    // still the ground's green under the sheet
+  expect(wetGrass[2]).toBeGreaterThan(dryGrass[2] ?? 0);    // a little toward the water's colour
+  expect(pool[2]).toBeGreaterThan(pool[0] ?? 0);            // a real pool is still water
 });
 
 test('a zone with nothing in it shows its plot grid, never one flat colour, and encodes to a small PNG', async () => {

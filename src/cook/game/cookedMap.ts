@@ -312,11 +312,15 @@ export function renderCookedMap(source: MapSource, options: {readonly size?: num
   const lx = -0.5, ly = -0.5, lz = 0.7071, shadowSteps = Math.max(4, Math.round(10 * size / 1024));
   const out = new Uint8Array(n * 4), VOID: Rgb = [0.012, 0.017, 0.024], GRID: Rgb = [0.03, 0.04, 0.05];
   const WATER_DEEP: Rgb = [0.02, 0.09, 0.17], WATER_SHALLOW: Rgb = [0.09, 0.3, 0.42], SHORE: Rgb = [0.55, 0.72, 0.78];
+  /** Water shallower than this over ground is a wet sheet: the ground drawn as ground, a little toward the water's colour. */
+  const WATER_FILM = 0.25, FILM_TINT = 0.2;
   let covered = 0;
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     const at = y * size + x, here = top[at] ?? -Infinity, kind = what[at] ?? 0;
     let colour: Rgb;
-    if ((wet[at] ?? -Infinity) !== -Infinity) {
+    // a sheet of water a few centimetres over solid ground (Mirror Salt's flood) wets the ground, it doesn't hide it
+    const level = wet[at] ?? -Infinity, film = level !== -Infinity && here !== -Infinity && level - here < WATER_FILM;
+    if (level !== -Infinity && !film) {
       const depth = Math.min(1, Math.max(0, ((wet[at] ?? 0) - (here === -Infinity ? (wet[at] ?? 0) - 2 : here)) / 2.5));
       colour = [0, 1, 2].map(k => (WATER_SHALLOW[k] ?? 0) + ((WATER_DEEP[k] ?? 0) - (WATER_SHALLOW[k] ?? 0)) * depth) as Rgb;
       const dry = (dx: number, dy: number): boolean => { const xx = x + dx, yy = y + dy; return xx >= 0 && yy >= 0 && xx < size && yy < size && (wet[yy * size + xx] ?? -Infinity) === -Infinity; };
@@ -339,6 +343,7 @@ export function renderCookedMap(source: MapSource, options: {readonly size?: num
       const lift = kind === 2 ? 1.05 : 1;
       // a soft shoulder, not a clip: a pale stone stays a pale stone with its shading, never a white hole
       colour = [0, 1, 2].map(k => { const v = (rgb[at * 3 + k] ?? 0) * gain * shade * ink * lift; return 1.25 * v / (1 + v); }) as Rgb;
+      if (film) colour = [0, 1, 2].map(k => (colour[k] ?? 0) * (1 - FILM_TINT) + (WATER_SHALLOW[k] ?? 0) * FILM_TINT) as Rgb;
     }
     out[at * 4] = toSrgb(colour[0]); out[at * 4 + 1] = toSrgb(colour[1]); out[at * 4 + 2] = toSrgb(colour[2]); out[at * 4 + 3] = 255;
   }
