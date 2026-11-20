@@ -17,9 +17,11 @@ import { EquipmentService } from '@wildshard/engine/combat/EquipmentService';
 import type { Weapon } from '@wildshard/engine/combat/Weapon';
 import { playerModes } from '@wildshard/engine/player/modes';
 import type { Shardfile } from '@wildshard/format/shardSchema';
+import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 import { installDeclaredItems, leverLines, rackMeleeRows, rackToolRows, takenLine } from '../../../shared/game/shardfile/items';
 import { declaredItemIcon, declaredKitItemFamilies, declaredLever } from '../plugin/weaponFamily';
 import { itemScene } from '../shardfile/clientItems';
+import { clientMaterials } from '../shardfile/clientMaterials';
 import { loadItemModels } from '../shardfile/itemModels';
 import { wirePage } from '../shardfile/wirePage';
 import type { RegionalRuntimePage } from './regionalRuntime';
@@ -35,7 +37,9 @@ export function holdsItems(source: Pick<Shardfile, 'items'>): boolean {
 /** `here`: whether the wire's frames are this cell's (a crossing's frames are another's, and their lines are not this kit's). */
 export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<string, Uint8Array>, page: RegionalRuntimePage, entry: Scope, here: () => boolean = () => true,
   /** the kit's items, for the play list's held-tool lines (`playInstalls.ts`, SS-GP7) */
-  held: (runtimes: ReadonlyMap<string, ItemRuntime>) => void = () => undefined): Promise<EquipmentService | null> {
+  held: (runtimes: ReadonlyMap<string, ItemRuntime>) => void = () => undefined,
+  /** the cell's own product: a grid page's context names the page's, which a data cell's claw must not read */
+  product?: () => ShardFolder): Promise<EquipmentService | null> {
   const controls = page.equipment;
   if (controls === undefined || !holdsItems(source)) return null;
   const models = await loadItemModels(source.items, assets, entry);
@@ -65,6 +69,21 @@ export async function enterDataCellKit(source: Shardfile, assets: ReadonlyMap<st
   const kit = new EquipmentService(first, { scope: entry, events: app.events, input: { bind: (action, run, _scope, allowed) => { app.input.bind(action, run, entry, allowed ?? (() => kit.enabled)); } }, order: [...items.order] });
   for (const weapon of weapons) if (weapon !== first) kit.add(weapon, { locked: true });
   items.install(kit);
+  // P1 OF21: a declared grapple mode's claw comes to hand with the cell's kit, as a one-shard page's data client draws it
+  if (product !== undefined && source.modes?.grapple?.some(row => row.profile !== undefined) === true) {
+    const { installDataCellGrapple } = await import('../grapple/declaredGrapple');
+    if (entry.disposed || entry.disposing) return null;
+    // the cell's own admitted bytes: a data cell has no runtime folder for `runtimeLookMaterials` to read
+    await installDataCellGrapple({ ...page.context, scope: entry, product: product() }, source, kit, ids => {
+      const { curves: _curves, ...look } = source.look;
+      const materials = Object.fromEntries(ids.map(id => {
+        const row = look.materials[id]; if (row === undefined) throw new Error(`Declared grapple: no look.materials entry ${id}`);
+        return [id, row];
+      }));
+      return clientMaterials({ ...source, look: { ...look, families: [], materials }, terrain: null, props: null }, assets, page.world.game.renderer, entry, { graphs: true });
+    });
+    if (entry.disposed || entry.disposing) return null;
+  }
   // the held models hang off the page's viewmodel, as a standalone page's do (client.ts)
   const host = app.equipmentHost;
   if (host !== null) for (const item of [...weapons, ...items.tools]) {

@@ -1,6 +1,7 @@
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { GrappleRows } from '@wildshard/format/grapple';
 import type { EquipmentRow } from '@wildshard/engine/combat/Equipment';
+import type { EquipmentService } from '@wildshard/engine/combat/EquipmentService';
 import type { ShardContext } from '@wildshard/engine/game/plugin/context';
 import { ItemCatalogue } from '../../../shared/game/loadout/itemCatalogue';
 import { declaredGrappleProfile, declaredGrappleRow, type DeclaredGrappleRow } from '../../../shared/game/grapple/declared';
@@ -98,14 +99,31 @@ export function declaredGrapplePageOwns(source: Pick<Shardfile, 'modes'>, featur
 
 /** Install a plain upload's grapple on the page (OF41c): its looks compiled and lent from the shard's `look.materials`, the
  *  tool bound to its guard and added to the loadout, where the wire's claw (`clientWorker` `bindClaw`) picks it up. */
-export async function installDeclaredGrapplePage(ctx: ShardContext, source: Shardfile): Promise<GrappleTool | null> {
+export function installDeclaredGrapplePage(ctx: ShardContext, source: Shardfile): Promise<GrappleTool | null> {
+  const equipment = ctx.app.equipment;
+  if (equipment === null) throw new Error('A declared grapple needs the loadout');
+  return installDeclaredGrappleInto(ctx, source, equipment, missing => runtimeLookMaterials(ctx, source, true, missing));
+}
+
+/** The looks a claw draws with, compiled for its owner (`lendLooks`). */
+export type GrappleLooks = (ids: readonly string[]) => ReturnType<typeof runtimeLookMaterials>;
+
+/** P1 OF21 (v0.1.58): a grid data cell's held kit. A grid page enters Nine r6 (no runtime, no page entry) as a data cell,
+ *  whose kit `enterDataCellKit` builds; `ShardfileClient.play` never runs there, so the claw it draws on a one-shard page
+ *  never came to hand from the road: the staging walk held jian and hoverboard only. The kit takes the same claw. */
+export function installDataCellGrapple(ctx: ShardContext, source: Shardfile, kit: Pick<EquipmentService, 'add' | 'has'>, looks: GrappleLooks): Promise<GrappleTool | null> {
+  return declaredGrapplePageOwns(source, []) ? installDeclaredGrappleInto(ctx, source, kit, looks) : Promise.resolve(null);
+}
+
+async function installDeclaredGrappleInto(ctx: ShardContext, source: Shardfile, equipment: Pick<EquipmentService, 'add' | 'has'>, looks: GrappleLooks): Promise<GrappleTool | null> {
+  // one claw a loadout: a page that reaches this twice installs it once
+  const row = declaredGrappleRow(source);
+  if (row !== null && equipment.has(declaredGrappleToolId(row))) return null;
   const made = declaredGrappleTool(ctx, source);
   if (made === null) return null;
   const scope = ctx.scope, missing = made.looks.filter(id => !hasLentLook(id));
-  if (missing.length > 0) lendLooks(scope, await runtimeLookMaterials(ctx, source, true, missing));
+  if (missing.length > 0) lendLooks(scope, await looks(missing));
   if (scope.disposed || scope.disposing) throw new Error('Declared grapple owner ended during its looks');
-  const equipment = ctx.app.equipment;
-  if (equipment === null) throw new Error('A declared grapple needs the loadout');
   grappleGuard(scope).bind(made.tool);
   equipment.add(made.tool, { locked: false });
   return made.tool;

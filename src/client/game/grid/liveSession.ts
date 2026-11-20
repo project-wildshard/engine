@@ -268,7 +268,7 @@ export class LiveGridSession {
   private readonly dataBodies = new Map<string, { readonly claim: () => void }>();
   private readonly regions = new Map<string, { readonly spawn: LiveGridSpawn; readonly items: Shardfile['items']['rows']; readonly queries: PlayerFrameQueries; readonly colliders: PanelRegion['colliders']; readonly prompts: ReturnType<typeof copyPrompts>; readonly audio: PlotAudioScene | null;
     /** TC-E1b: the copy's admitted source and assets, its declared kit built from them on entry */
-    readonly kit: { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array> } | null;
+    readonly kit: { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array>; readonly product: () => ShardFolder } | null;
     /** SS-GP7: the copy's source when it wants an entry of the one install list (races, talks, rides, held-tool lines) */
     readonly play: Shardfile | null;
     /** SS-GP1: the copy's source when it declares quests, their state and views installed on entry */
@@ -801,7 +801,7 @@ export class LiveGridSession {
         transfer.sync(); this.transferWalls.set(cell.instance, transfer);
         this.regions.set(cell.instance, { spawn: { x: start.at.x, y: undefined, z: start.at.z, yaw: start.yaw },
           // the admitted terrain inside the cell (one source of truth); its strips are road level (the terrain tile ends at the cell edge)
-          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: [...copyPrompts(copySource, copySpent(copySource)), ...cellRidePrompts(movers)], kit: holdsItems(copySource) ? { source: copySource, assets } : null, play: PLAY_INSTALLS.some(entry => entry.wants(copySource)) ? copySource : null, quests: hasQuests(copySource) ? copySource : null, facts: hasLedger(copySource) ? copySource : null, hud: hasDeclaredHud(copySource) ? copySource : null,
+          queries: { heightAt: (x, z) => (Math.max(Math.abs(x), Math.abs(z)) <= CHUNK_HALF ? heightAt(x, z) : 0), waterSurfaceAt: (x, z) => water.restAt(x, z), platforms: [] }, colliders, items: copySource.items.rows, prompts: [...copyPrompts(copySource, copySpent(copySource)), ...cellRidePrompts(movers)], kit: holdsItems(copySource) ? { source: copySource, assets, product: folder } : null, play: PLAY_INSTALLS.some(entry => entry.wants(copySource)) ? copySource : null, quests: hasQuests(copySource) ? copySource : null, facts: hasLedger(copySource) ? copySource : null, hud: hasDeclaredHud(copySource) ? copySource : null,
           // AU20: the cell's declared audio scene, bound only while the feet stand in it (no entered hooks run here)
           audio: source.runtime === null && source.audio.scene !== undefined ? plotAudioScene(source, ((plot) => plot.has('client/plan') ? plot.section('client/plan') : undefined)(folder())) : null,
           completion: completionRows === null ? null : { source: copySource, rows: completionRows }, declaredAudio: cellDeclaredAudio(copySource), plumbing: hasPlumbing(copySource) ? copySource : null,
@@ -961,7 +961,7 @@ export class LiveGridSession {
     this.dataKit = { instance, scope: entry, runtimes: null };
     const enter = async (): Promise<void> => {
       try { await enterDataCellKit(kit.source, kit.assets, page, entry, () => this.wire === null || this.wire.site() === instance,
-        (runtimes) => { if (this.dataKit?.scope === entry) this.dataKit.runtimes = runtimes; }); } catch (error: unknown) {
+        (runtimes) => { if (this.dataKit?.scope === entry) this.dataKit.runtimes = runtimes; }, kit.product); } catch (error: unknown) {
         if (this.dataKit?.scope === entry) this.leaveDataKit();
         console.error(`[grid] ${instance}'s declared kit refused`, error);
       }

@@ -8,7 +8,7 @@ import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { ShardContext } from '@wildshard/engine/game/plugin/context';
 import { emptyShardfile } from '../src/shared/host/author';
 import { declaredGrappleProfile, declaredGrappleRow } from '../src/shared/game/grapple/declared';
-import { declaredGrapplePageOwns, declaredGrapplePresentation, declaredGrappleTool, installDeclaredGrapplePage } from '../src/client/game/grapple/declaredGrapple';
+import { declaredGrapplePageOwns, declaredGrapplePresentation, declaredGrappleTool, installDataCellGrapple, installDeclaredGrapplePage } from '../src/client/game/grapple/declaredGrapple';
 import { GrappleTool, grappleGuard, pageGrappleFacts } from '../src/client/game/grapple/tool';
 import { Filament } from '../src/client/game/grapple/ribbon';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
@@ -70,7 +70,7 @@ test('OF41c page: install binds the tool to its guard and adds it to the loadout
   const scope = new Scope('page'), add = vi.fn();
   try {
     lendLooks(scope, fakeLooks(Object.values(source.looks)));
-    const ctx = legacyDouble<ShardContext>({ scope, app: legacyDouble<ShardContext['app']>({ equipment: legacyDouble<NonNullable<ShardContext['app']['equipment']>>({ add }) }) });
+    const ctx = legacyDouble<ShardContext>({ scope, app: legacyDouble<ShardContext['app']>({ equipment: legacyDouble<NonNullable<ShardContext['app']['equipment']>>({ add, has: () => false }) }) });
     const installed = await installDeclaredGrapplePage(ctx, shard([{ id: 'quarry.claw', ...timings, profile: tool, hooks: HOOKS }]));
     expect(installed).toBeInstanceOf(GrappleTool);
     expect(add).toHaveBeenCalledWith(installed, { locked: false });
@@ -99,4 +99,24 @@ test('OF21 page: a client-plan page with a declared grapple and no held claw ent
   expect(declaredGrapplePageOwns(nine, [...plan, { kind: 'held.claims.enter', grapple: { item: 'tool.fei-zhua' } }])).toBe(false);
   expect(declaredGrapplePageOwns(nine, [...plan, { kind: 'held.claims.enter' }])).toBe(true);
   expect(declaredGrapplePageOwns(shard([{ id: 'hook', ...timings }]), plan)).toBe(false);
+});
+
+// P1 OF21 (v0.1.58 staging): a grid page enters Nine r6 (no runtime, no page entry) as a data cell, whose kit
+// `enterDataCellKit` builds and `ShardfileClient.play` never runs; the road's walk into Nine held jian and hoverboard only.
+test('OF21 grid: a data cell kit takes the declared claw, once', async () => {
+  const scope = new Scope('grid.data-kit'), add = vi.fn(), held = new Set<string>();
+  const plain = shard([{ id: 'quarry.claw', ...timings, profile: tool, hooks: HOOKS }]);
+  try {
+    lendLooks(scope, fakeLooks(Object.values(source.looks)));
+    const kit = { add: (item: { id: string }, options: { locked: boolean }) => { add(item, options); held.add(item.id); }, has: (id: string) => held.has(id) };
+    const ctx = legacyDouble<ShardContext>({ scope }), looks = vi.fn();
+    const installed = await installDataCellGrapple(ctx, plain, kit as never, looks);
+    expect(installed).toBeInstanceOf(GrappleTool);
+    expect(add).toHaveBeenCalledWith(installed, { locked: false });
+    expect(held.has('tool.quarry.claw')).toBe(true);
+    await expect(installDataCellGrapple(ctx, plain, kit as never, looks)).resolves.toBeNull();
+    expect(add).toHaveBeenCalledOnce();
+    await expect(installDataCellGrapple(ctx, shard([{ id: 'hook', ...timings }]), kit as never, looks)).resolves.toBeNull();
+    expect(looks).not.toHaveBeenCalled(); // the lent looks were already there
+  } finally { scope.dispose(); }
 });
