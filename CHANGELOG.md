@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.59 (2026-11-20)
+
+- The grapple claw is available when you enter Nine Dragon Stack from the road.
+- Driftwood Isle loads its newest revision.
+
 ## v0.1.58 (2026-11-20)
 
 - Nine Dragon Stack's grapple is back in the loadout.
