@@ -18,3 +18,10 @@ The dock leg stands still, so its frames over 50 ms on the iPhone 13 are things 
 collider is built once the feet come within 120 m (plus four seconds of travel) of its bounds; a distant entry or a
 recovery still gets the whole ring at once. Three alternating cooled phone pairs at the dock: 9, 18 and 8 frames over
 50 ms with it on, 30, 43 and 11 off, and no outer collider build over 4 ms. Unset, it is on at phone Low.
+
+## The cumulus at phone Low (DF9, later the same night)
+
+The sky's cumulus is never frustum culled, so Driftwood's 191 puffs at icosahedron detail 2 were 34k triangles in every
+frame at every yaw. At phone Low they are now drawn from detail 1 (15k). The puffs are lit by their smooth centre normal,
+so the light bands stay round; a blind look board at five poses (with shard-driftwood ef12da8's sea cut, Opus judge)
+found the same look at all five.

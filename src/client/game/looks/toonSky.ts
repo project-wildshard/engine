@@ -7,6 +7,17 @@ import { driveDayLight, runDayClock } from './daySky';
 import { graphDaySkyBackdrop } from './graphDaySky';
 import type { ColourRampFog } from '@wildshard/engine/world/Atmosphere';
 import { toonLighting } from './toonLighting';
+import { TIER } from '@wildshard/engine/core/tier';
+import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
+
+/** meta DRIFTWOOD-FPS DF9 (mini-driftwood13e): at phone Low the cumulus is drawn from a one-step icosahedron. The sky is
+ *  never frustum culled, so Driftwood's 191 puffs at detail 2 were 34k triangles in every frame at every yaw; detail 1
+ *  is 15k. The puffs are lit by their smooth centre normal, so the bands stay round; only the rim is coarser. */
+export function cloudDetail(detail: number | undefined, phoneLow: boolean): number {
+  const d = detail ?? 1;
+  return phoneLow ? Math.min(d, 1) : d;
+}
+const phoneLowNow = (): boolean => { try { return TIER === 'phone' && graphicsMode() === 'low'; } catch { return false; } };
 
 /** The cumulus: one icosahedron of `detail` subdivisions instanced per puff row `[x, y, z, r, puff, cluster, baseY]` (`aPuff` centre + radius,
  *  `aLump` phases + base cut); its graph lumps, squashes and turns each puff. */
@@ -31,7 +42,7 @@ export function toonSkyBackdrop(product: ShardFolder, row: ToonLookRow, rampFog:
     const { sky, scene, level } = context, envScene = new THREE.Scene().add(new THREE.Mesh(dome.geometry, dome.material)), cloudMaterial = g.material(row.sky.clouds.look);
     sky.sunDir.copy(startSun); g.setParam(row.sky.dome.look, 'sunDir', startSun.toArray()); // the first (offscreen) environment's sun
     cloudMaterial.toneMapped = false;
-    const clouds = new THREE.Mesh(cumulusGeometry(row.sky.clouds.puffs, row.sky.clouds.detail), cloudMaterial);
+    const clouds = new THREE.Mesh(cumulusGeometry(row.sky.clouds.puffs, cloudDetail(row.sky.clouds.detail, phoneLowNow())), cloudMaterial);
     clouds.frustumCulled = false; clouds.renderOrder = row.sky.clouds.order; dome.add(clouds); // drawn after the world (depth-tested against it)
     scene.environmentIntensity = level.sky.envIntensity;
     rampFog.zenith.value.copy(rgb(mid.zenith)); // the colour-ramp fog fades into the dome's own gradient
