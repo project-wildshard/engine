@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { featuredZoneEntry, portalExitPlan, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, zoneEntryCorridor, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
+import { approachBudget, featuredZoneEntry, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, zoneEntryCorridor, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
 import { zoneEntryGap } from '../scripts/page-release/flow.mjs';
 import curated from '../src/server/game/zoneSelect/featured.json';
 
@@ -135,4 +135,24 @@ test('uses the declared walk out of a portal arrival and rejoins the road from t
     decks: [{x:326.5,z:-562.5,dx:-1,dz:0}, {x:562.5,z:-326.5,dx:0,dz:1}],
   });
   expect(portalExitPlan([], center, {x:-1,z:0})).toBeNull();
+});
+
+test("budgets a fresh guest's swim round Driftwood's harbour by its length, never under two minutes", (): void => {
+  // opus-gate-p0 on staging 6bab8fcc: a guest from the pier swam to the east approach in 168 s at about 2.6 m/s
+  const spawn = {x:-0.5, z:-194};
+  const west = [{x:-235, z:-194, ride:false}, {x:-235, z:0, ride:false}, {x:-235, z:0, ride:false}];
+  expect(approachBudget(spawn, west)).toBeGreaterThanOrEqual(200_000);
+  expect(approachBudget(spawn, west)).toBeLessThanOrEqual(240_000);
+  expect(approachBudget({x:0, z:-194}, [{x:0, z:-235, ride:false}])).toBe(120_000);
+});
+
+test('steps round a pillar on the straight line: a hop, then side-steps that alternate and grow', (): void => {
+  // open-plot-2-0's centre pillar held the walker at z -1122.8 through two minutes of hops (opus-gate-p0, staging 6bab8fcc)
+  expect(unstick(0)).toEqual({key:'Space', ms:0});
+  const steps = [1, 2, 3, 4].map(unstick);
+  expect(steps.map(step => step.key)).toEqual(['KeyD', 'KeyA', 'KeyD', 'KeyA']);
+  let offset = 0;
+  const reach = steps.map(step => { offset += (step.key === 'KeyD' ? 1 : -1)*step.ms; return Math.abs(offset); });
+  expect(reach[2]).toBeGreaterThan(reach[0] ?? 0);
+  expect(Math.max(...steps.map(step => step.ms))).toBeLessThanOrEqual(4000);
 });

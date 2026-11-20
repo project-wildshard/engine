@@ -225,9 +225,33 @@ function crossingDetail(page) {
 
 /** @param {number} ms @param {() => Promise<void>} run @param {string} message */
 async function bounded(ms, run, message) {
-  /** @type {ReturnType<typeof setTimeout> | undefined} */ let timer;
-  const time = new Promise((_resolve, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); });
-  try { await Promise.race([time, run()]); } finally { clearTimeout(timer); }
+  const end = Date.now()+ms;
+  await boundedUntil(() => end, run, message);
+}
+
+/** As `bounded`, to a deadline the run may push out once it knows its route.
+ * @param {() => number} deadline @param {() => Promise<void>} run @param {string} message */
+async function boundedUntil(deadline, run, message) {
+  /** @type {ReturnType<typeof setInterval> | undefined} */ let timer;
+  const time = new Promise((_resolve, reject) => { timer = setInterval(() => { if (Date.now() >= deadline()) reject(new Error(message)); }, 250); });
+  try { await Promise.race([time, run()]); } finally { clearInterval(timer); }
+}
+
+/** The slowest the walker moves on an approach: a fresh guest swims Driftwood's harbour at about 2.6 m/s (opus-gate-p0's
+ *  staging walk on 6bab8fcc took 168 s from the pier to the east approach), so a route's budget is its length at 2 m/s.
+ * @param {Point} from @param {readonly Point[]} points @returns {number} the approach's milliseconds, never under APPROACH_MS */
+export function approachBudget(from, points) {
+  let length = 0, at = from;
+  for (const point of points) { length += Math.hypot(point.x-at.x, point.z-at.z); at = point; }
+  return Math.max(APPROACH_MS, Math.ceil(length/2)*1000);
+}
+
+/** The walker's way past a post or a pillar on its straight line (open-plot-2-0's centre pillar held it through two minutes
+ *  of hops): a hop first, then side-steps that alternate and grow, so the walker clears either side of a wide obstacle.
+ * @param {number} attempt the stalls since the walker last made headway @returns {{key:'Space'|'KeyD'|'KeyA', ms:number}} */
+export function unstick(attempt) {
+  if (attempt <= 0) return {key:'Space', ms:0};
+  return {key: attempt%2 === 1 ? 'KeyD' : 'KeyA', ms: Math.min(4000, 800*attempt)};
 }
 
 /** Travel by input. Reading feet and setting the heading leaves the online seat under the server's control.
@@ -235,7 +259,7 @@ async function bounded(ms, run, message) {
  * @param {{sprint?:boolean, arriving?:string, within?:number, landed?:(here:Point)=>boolean}} [options] */
 async function walk(page, target, end, {sprint = false, arriving, within = sprint ? 1.5 : 0.4, landed} = {}) {
   /** @type {Point | null} */ let last = null;
-  let movedAt = Date.now();
+  let movedAt = Date.now(), stalls = 0, best = Number.POSITIVE_INFINITY;
   if (sprint) await page.keyboard.down('ShiftLeft');
   try {
     while (Date.now() < end) {
@@ -243,13 +267,21 @@ async function walk(page, target, end, {sprint = false, arriving, within = sprin
       if (here === null) { await delay(150); continue; }
       const distance = Math.hypot(here.x-target.x, here.z-target.z);
       if (here.home === arriving || distance <= within || landed?.(here) === true) return;
+      // headway toward the target ends a run of stalls (a side-step's own motion does not)
+      if (distance < best-3) { best = distance; stalls = 0; }
       await face(page, here, target);
       await page.keyboard.down('KeyW');
       if (last === null || Math.hypot(last.x-here.x, last.z-here.z) >= 0.5) {
         last = here;
         movedAt = Date.now();
       } else if (sprint && Date.now()-movedAt > 1200) {
-        await page.keyboard.press('Space');
+        const step = unstick(stalls++);
+        if (step.ms === 0) await page.keyboard.press(step.key);
+        else {
+          await page.keyboard.up('KeyW');
+          await page.keyboard.down(step.key);
+          try { await delay(step.ms); } finally { await page.keyboard.up(step.key); }
+        }
         movedAt = Date.now();
       }
       await delay(Math.min(250, Math.max(65, distance*140)));
@@ -428,11 +460,14 @@ async function crossZoneEntry(page, leg, center, pitch, previous, fresh = false)
   const dx = to.cell[0]-from.cell[0], dz = to.cell[1]-from.cell[1];
   const gate = {x:center.x+dx*(pitch-HALF+2), z:center.z+dz*(pitch-HALF+2)};
   const targetCenter = {x:center.x+dx*pitch, z:center.z+dz*pitch};
-  const approachEnd = Date.now()+APPROACH_MS;
-  await bounded(APPROACH_MS, async () => {
+  let approachEnd = Date.now()+APPROACH_MS;
+  await boundedUntil(() => approachEnd, async () => {
     const approach = fresh ? await smokeApproach(page,leg,center,pitch,approachEnd)
       : previous === undefined ? [{x:center.x+dx*(HALF-15), z:center.z+dz*(HALF-15), ride:false}]
         : roadApproach(await exitToRoad(page, from, previous, center, approachEnd), leg, center, pitch);
+    // the route is known now: its length sets the budget (a fresh guest's swim round Driftwood's harbour takes nearly 3 minutes)
+    const at = await feet(page);
+    if (at !== null) approachEnd = Math.max(approachEnd, Date.now()+approachBudget(at, approach));
     for (const point of approach) await approachPoint(page, point, approachEnd);
   }, 'The walker timed out on the gate approach');
   const started = Date.now();
