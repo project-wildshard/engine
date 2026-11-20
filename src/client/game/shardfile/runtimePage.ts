@@ -1,7 +1,6 @@
 import type { GridCellEvents } from '../../../shared/game/grid/cellEvents';
 import { enterDeclaredAudioPhase } from '../audio/sceneDirector';
 import { admittedFolderClientPlan, installClientPhase, type ClientPhase } from './clientPlan';
-import { productCreaturesOwnPage } from './runtimeCreatureOwner';
 import { bindResidentWorldScope, boundResidentWorldScope, residentWorldScope } from './runtimePagePresentation';
 import { enterMovers, type BorrowedMoverRow } from '../plugin/moverViews';
 import { ownerTask, withOwner } from '@wildshard/engine/app/ownership';
@@ -333,8 +332,7 @@ export async function prepareRuntimePage(product: ShardFolder, options: FolderOp
       ...(binding.residency === undefined ? {} : { residency: binding.residency }),
     });
   };
-  const { load, mapImage } = await shardfileSource(source, folderOptions, { ...clientBindings, instance, nativeRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime',
-    ...(productCreaturesOwnPage(product) ? { creatureOwner: 'runtime' as const } : {}), onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
+  const { load, mapImage } = await shardfileSource(source, folderOptions, { ...clientBindings, instance, nativeRuntime: true, runtimeStagesOnly: stagesOwner === 'runtime', planLifetime: 'resident', audioOwner: clientBindings.audioOwner ?? 'runtime', worldOwner: clientBindings.worldOwner ?? 'runtime', onSimulationExpected, ...(onSimulation === undefined ? {} : { onSimulation }) })
     .then(data => ({ load: data.load, mapImage: data.minimap?.image }));
   if (load === undefined) throw new Error('Missing admitted runtime data plugin');
   const installed = await load().then(({ default: Data }) => new Data());
