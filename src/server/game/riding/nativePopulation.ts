@@ -6,6 +6,7 @@ import type { StalkerBrain } from '@wildshard/engine/ai/stalker';
 import { Rng, type RngState } from '@wildshard/format/seededRng';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { SimSnapshot } from '@wildshard/engine/sim/snapshot';
+import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { AnimalSim, AnimalSimSpec } from '@wildshard/engine/entities/AnimalSim';
 import { nativeBodySchema } from '@wildshard/format/nativePhysics';
 import { SpeciesSchema } from '@wildshard/format/speciesPrograms';
@@ -34,12 +35,12 @@ const Stream = v.strictObject({ version: v.literal(1), state: finite, initial: f
 const Adoption = v.strictObject({ stream: Stream, x: finite, z: finite });
 interface BakedRosterRows {
   readonly layout: 'baked';
-  readonly adoption: { id: string; stream: RngState; x: number; z: number }[];
+  readonly adoption: { id: string; stream: RngState; x: number; z: number; declared?: true }[];
   readonly centres: [number, number][];
   readonly stream: RngState;
   readonly wildStream: RngState;
 }
-const BakedRoster: v.GenericSchema<BakedRosterRows, BakedRosterRows> = v.strictObject({ layout: v.literal('baked'), adoption: v.pipe(v.array(v.strictObject({ id: v.string(), ...Adoption.entries })), v.maxLength(64)),
+const BakedRoster: v.GenericSchema<BakedRosterRows, BakedRosterRows> = v.strictObject({ layout: v.literal('baked'), adoption: v.pipe(v.array(v.strictObject({ id: v.string(), ...Adoption.entries, declared: v.exactOptional(v.literal(true)) })), v.maxLength(64)),
   centres: v.pipe(v.array(v.tuple([finite, finite])), v.maxLength(64)), stream: Stream, wildStream: Stream });
 const RosterPositions = v.pipe(v.array(v.object({ id: v.string(), at: v.tuple([finite, finite, finite]), yaw: finite })), v.maxLength(64));
 const Memory = v.record(v.string(), v.union([finite, v.boolean(), v.array(v.tuple([finite, finite, finite]))]));
@@ -91,18 +92,58 @@ interface NativeBootRoster {
 }
 type BootBake = Pick<NativePhysicsBake, 'actors' | 'herds'> & { readonly spawns?: unknown };
 
-/** Materialize the original roster order from one admitted physics bake and its adoption state. */
-export function resolveNativeBootRoster(input: NativePopulationBootRows['roster'], bake: BootBake): NativeBootRoster {
+interface DeclaredBootSpawn {
+  readonly kind: string; readonly variant: string; readonly at: readonly [number, number, number];
+  readonly yaw: number; readonly seed: number; readonly scale: number;
+}
+
+/** Reserve only the declared placements explicitly adopted by a native roster. */
+export function declaredBootSpawns(boot: unknown, shard: Pick<Shardfile, 'creatures' | 'rows'>): ReadonlyMap<string, DeclaredBootSpawn> {
+  const result = new Map<string, DeclaredBootSpawn>();
+  if (typeof boot !== 'object' || boot === null || !('roster' in boot)) return result;
+  const input = boot.roster;
+  if (typeof input !== 'object' || input === null || !('layout' in input)) return result;
+  const { adoption } = v.parse(BakedRoster, input);
+  const spawns = new Map(shard.creatures.spawns.map(row => [row.id, row]));
+  const species = new Map(shard.rows.species.map(row => [row.id, row]));
+  for (const row of adoption) {
+    if (row.declared !== true) continue;
+    const spawn = spawns.get(row.id);
+    if (spawn === undefined || result.has(row.id)) throw new Error(`Missing or repeated declared boot spawn ${row.id}`);
+    const { id, species: speciesId, variant, at, yaw, seed, scale, brain, strike, ...options } = spawn;
+    const recipe = species.get(speciesId);
+    if (brain !== null || strike !== null || Object.values(options).some(value => value !== undefined)
+      || recipe?.body === undefined || !recipe.variants.some(choice => choice.id === variant)) {
+      throw new Error(`Declared boot spawn ${id} requires a body layer and only placement fields`);
+    }
+    // The native roster consumed the original uint32 draw as a unit fraction.
+    result.set(id, { kind: recipe.kind, variant, at, yaw, seed: seed / 0x100000000, scale });
+  }
+  return result;
+}
+
+/** Materialize the original roster order from admitted placements and adoption state. */
+export function resolveNativeBootRoster(input: NativePopulationBootRows['roster'], bake: BootBake,
+  declared: ReadonlyMap<string, DeclaredBootSpawn> = new Map()): NativeBootRoster {
   if (!('layout' in input)) return structuredClone(input);
   const { adoption, centres, stream, wildStream } = v.parse(BakedRoster, input);
   const positions = v.parse(RosterPositions, bake.spawns);
   const adopted = new Map(adoption.map(({ id, ...row }) => [id, row]));
-  if (adopted.size !== adoption.length || adopted.size !== bake.actors.length || positions.length !== bake.actors.length ||
+  if (adopted.size !== adoption.length || adopted.size !== bake.actors.length || positions.length + declared.size !== bake.actors.length ||
     centres.length !== bake.herds.length) throw new Error('Baked roster does not cover every body and herd');
-  const bodies = bake.actors.map(({ id, kind, variant, seed, scale, herd }, index) => {
-    const placement = positions[index], memory = adopted.get(id);
-    if (placement?.id !== id || memory === undefined) throw new Error(`Baked roster placement or adoption missing for ${id}`);
-    return { id, kind, variant: { id: variant }, seed, scale, herd, position: { x: placement.at[0], z: placement.at[2] }, yaw: placement.yaw, adopted: memory };
+  let positionIndex = 0;
+  const bodies = bake.actors.map(({ id, kind, variant, seed, scale, herd }) => {
+    const memory = adopted.get(id), placement = declared.get(id);
+    if (memory === undefined || (memory.declared === true) !== (placement !== undefined)) throw new Error(`Roster adoption missing for ${id}`);
+    const { declared: _declared, ...adoptedState } = memory;
+    if (placement !== undefined) {
+      if (placement.kind !== kind || placement.variant !== variant) throw new Error(`Declared boot body differs from its native recipe for ${id}`);
+      return { id, kind, variant: { id: variant }, seed: placement.seed, scale: placement.scale, herd,
+        position: { x: placement.at[0], z: placement.at[2] }, yaw: placement.yaw, adopted: adoptedState };
+    }
+    const baked = positions[positionIndex++];
+    if (baked?.id !== id) throw new Error(`Baked roster placement missing for ${id}`);
+    return { id, kind, variant: { id: variant }, seed, scale, herd, position: { x: baked.at[0], z: baked.at[2] }, yaw: baked.yaw, adopted: adoptedState };
   });
   const herds = bake.herds.map(({ kind, members }, index) => {
     const centre = centres[index];
@@ -113,13 +154,15 @@ export function resolveNativeBootRoster(input: NativePopulationBootRows['roster'
 }
 /** Compare the exact admitted identity join before spawning on native floors. */
 export function installNativeBootRoster(host: SimHost, ports: { boot: NativePopulationBootRows; bake: BootBake; field: NativePopulationField; spawnY: number;
-  clock: { readonly phase: string; readonly storm: boolean }; elites: NativeEliteBindings }): {
+  clock: { readonly phase: string; readonly storm: boolean }; elites: NativeEliteBindings;
+  declared?: ReadonlyMap<string, DeclaredBootSpawn> }): {
   bodies: { boot: NativePopulationBootBody; baked: NativeBakedActor; actor: AnimalSim }[]; herds: readonly NativePopulationBootHerd[]; stream: RngState; wildStream: RngState;
 } {
-  const { bake,boot,field } = ports, roster = resolveNativeBootRoster(boot.roster, bake);
+  const { bake,boot,field } = ports, roster = resolveNativeBootRoster(boot.roster, bake, ports.declared);
   if (!(field instanceof NativePopulationField) || !boot.phases.includes(ports.clock.phase) || ports.clock.storm) throw new Error('Native boot phase is not hosted');
   if (roster.bodies.length !== bake.actors.length || JSON.stringify(roster.herds.map(h => ({ kind: h.kind,members: h.members.map(m => m.id) }))) !== JSON.stringify(bake.herds)
-    || roster.bodies.some((row,index) => { const body = bake.actors[index]; return body?.id !== row.id || body.kind !== row.kind || body.variant !== row.variant.id || body.seed !== row.seed || body.scale !== row.scale || body.herd !== row.herd; })) throw new Error('Native boot roster diverges from its admitted bake');
+    || roster.bodies.some((row,index) => { const body = bake.actors[index]; return body?.id !== row.id || body.kind !== row.kind || body.variant !== row.variant.id || body.herd !== row.herd ||
+      (!ports.declared?.has(row.id) && (body.seed !== row.seed || body.scale !== row.scale)); })) throw new Error('Native boot roster diverges from its admitted bake');
   host.useBodyBands({ present: actor => !ports.elites.absent.has(actor) && (!('hidden' in actor) || actor.hidden !== true),
     rate: actor => actor.driven || actor.state === 'sidestep' || ports.elites.pinned.has(actor) ? 'always' : 'ai' });
   const floorAt = creatureFloor(host,field.hunt.heightAt);

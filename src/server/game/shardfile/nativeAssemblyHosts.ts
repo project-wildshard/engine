@@ -166,7 +166,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
   switch (row.host) {
     case 'riding.roster': return run => {
       const field = fieldOf(at); run.bindings = nativeEliteBindings();
-      run.roster = installNativeBootRoster(run.host, { boot: bootOf(at), bake: bake as Parameters<typeof installNativeBootRoster>[1]['bake'], spawnY: shard.spawn.y, clock: { phase: dayOf(run).dayPhase, storm: false }, elites: run.bindings, field });
+      run.roster = installNativeBootRoster(run.host, { boot: bootOf(at), bake: bake as Parameters<typeof installNativeBootRoster>[1]['bake'], spawnY: shard.spawn.y, clock: { phase: dayOf(run).dayPhase, storm: false }, elites: run.bindings, field, declared: at.declaredRoster });
     };
     case 'riding.trample': { const { id, radius, strength, speedLimit } = row; return run => { installTrampleTrail(run.host, fieldOf(at).grass.trample, { id, radius, strength, speedLimit }); }; }
     case 'riding.environment': return run => { const { grass } = fieldOf(at); run.wild = new NativeWildEnvironment(grass.field, grass.trample, { wind: row.wind, flatten: row.flatten }, ReturnProgram.native(run.host, bootOf(at).admission)); };

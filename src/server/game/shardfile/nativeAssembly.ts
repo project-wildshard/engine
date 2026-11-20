@@ -14,6 +14,7 @@ import { need, readAssemblyInput, type AssemblyGround, type AssemblyPrepared, ty
 import { declaredWakeFight, prepareAssemblyFeature, prepareSectionMelee, type AssemblyRun } from './nativeAssemblyHosts';
 import { parseChapterWake } from '@wildshard/format/chapterDirector';
 import { installAssemblySolids, standsOwnSolids } from './assemblySolids';
+import { declaredBootSpawns } from '../riding/nativePopulation';
 import { readPatrolIntake } from '../boss/patrolNative';
 import { readSlotIntake } from '../boss/slotsNative';
 import { readWindIntake } from '../boss/windEliteNative';
@@ -134,8 +135,9 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const shard = product.shardfile, bake = await prepareBake(product, plan.bake), ground = await prepareGround(product, assets, plan, bake);
   const navigation = plan.navigation === 'shard' ? assets.get(need(shard.navigation, 'Missing navigation').file) : await product.file(plan.navigation.file);
   const nav = readNavmesh(navigation, 'Native assembly requires its navigation', () => 0);
-  const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake), product, assets, ports, plan, bake, nav,
-    boot: plan.boot === undefined ? null : await readAssemblyInput(product, plan.boot) };
+  const boot = plan.boot === undefined ? null : await readAssemblyInput(product, plan.boot);
+  const declaredRoster = declaredBootSpawns(plan.features.some(row => row.host === 'riding.roster') ? boot : null, shard);
+  const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake), product, assets, ports, plan, bake, nav, boot, declaredRoster };
   const features = withSectionWeather(product, plan.features);
   const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
@@ -144,7 +146,11 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const level = shardLevel(shard, { at: { x: shard.spawn.x, y: Math.max(shard.spawn.y, plan.level.stand ?? heightAt(shard.spawn.x, shard.spawn.z) + 0.1), z: shard.spawn.z }, yaw: shard.spawn.yaw, speed }, plan.level.ground);
   // OF22b0: the declared spawns stand in the native level as in an ordinary upload's, beside the assembly's hosts, and the
   // declared creature host drives them (`installRuntimeCreatures`, as OF19b0 does beside a runtime plan's keeper)
-  const counted = countedShard(shard), sections = outputDescriptor(shard)?.sections ?? new Map<string, unknown>(), keeper = assemblyKeeper(counted, sections);
+  // A placement loan belongs to the roster's existing birth point and save adapter.
+  // The ordinary creature host only stands the remaining declarations.
+  const ordinary = declaredRoster.size === 0 ? shard : { ...shard, creatures: { ...shard.creatures,
+    spawns: shard.creatures.spawns.filter(row => !declaredRoster.has(row.id)) } };
+  const counted = countedShard(ordinary), sections = outputDescriptor(shard)?.sections ?? new Map<string, unknown>(), keeper = assemblyKeeper(counted, sections);
   admitRuntimeCreatures(counted, sections, keeper);
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   // OF22c1: a chapter wake row's declared fight waits, as a quest page's summoned one does, for its wake cue

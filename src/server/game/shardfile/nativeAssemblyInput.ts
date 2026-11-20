@@ -1,3 +1,4 @@
+import type { declaredBootSpawns } from '../riding/nativePopulation';
 import type { GrappleTickContext } from '../grapple/native';
 import type { HeldTick } from '../weapons/nativeHeld';
 import type { OpenArenaPresentation } from '../boss/openArenaNative';
@@ -61,5 +62,6 @@ export interface AssemblyGround { readonly grid: BakedGrid | null; readonly samp
 export interface AssemblyPrepared<C extends NativeAssemblyContext> extends AssemblyGround {
   readonly product: ShardFolder; readonly assets: ReadonlyMap<string, Uint8Array>; readonly ports: NativeAssemblyPorts<C>; readonly plan: NativeAssemblyPlan;
   readonly bake: NativeCollisionBake & Readonly<Record<string, unknown>>; readonly nav: ReturnType<typeof readNavmesh>;
-  readonly boot: unknown; readonly field: NativePopulationField | null; readonly world: unknown; readonly pond: { readonly file: string; readonly bytes: Uint8Array } | null; readonly wet: { readonly file: string; readonly bytes: Uint8Array } | undefined;
+  readonly boot: unknown; readonly declaredRoster: ReturnType<typeof declaredBootSpawns>;
+  readonly field: NativePopulationField | null; readonly world: unknown; readonly pond: { readonly file: string; readonly bytes: Uint8Array } | null; readonly wet: { readonly file: string; readonly bytes: Uint8Array } | undefined;
 }

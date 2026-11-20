@@ -73,5 +73,17 @@ test('the baked roster keeps fractional seeds, ordered memberships and the adopt
   });
   expect(() => resolveNativeBootRoster({ ...input, adoption: [adoption, adoption] }, bake)).toThrow('cover every body');
   expect(() => resolveNativeBootRoster(input, { ...bake, spawns: [{ ...bake.spawns[0], id: 'another.guard' }] }))
-    .toThrow('placement or adoption missing');
+    .toThrow('placement missing');
+  const projected = { ...input, adoption: [{ ...adoption, declared: true as const }] };
+  const declared = new Map([[actor.id, {
+    kind: actor.kind, variant: actor.variant, seed: 0.75, scale: 1.2, at: [8, 0, 9] as const, yaw: 1,
+  }]]);
+  const withoutPlacement = { ...bake, spawns: [] };
+  expect(resolveNativeBootRoster(projected, withoutPlacement, declared).bodies[0]).toMatchObject({
+    id: actor.id, position: { x: 8, z: 9 }, yaw: 1, scale: 1.2, seed: 0.75, adopted: { stream, x: 1, z: 2 },
+  });
+  expect(() => resolveNativeBootRoster(projected, bake, declared)).toThrow('cover every body');
+  expect(() => resolveNativeBootRoster(projected, withoutPlacement, new Map([[actor.id, {
+    kind: actor.kind, variant: 'foreign', seed: 0.75, scale: 1.2, at: [8, 0, 9] as const, yaw: 1,
+  }]]))).toThrow('differs from its native recipe');
 });
