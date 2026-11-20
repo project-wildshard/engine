@@ -17,6 +17,9 @@ import { vehiclesExampleFolder } from './fixtures/vehiclesExample';
 // is judged only on a quiet machine with `WS_BENCH=1` (a shared CI runner read 19.95 ms, run 44656140001); it prints every run.
 // Receipt: 5.47 ms p95, 2.83 ms p50, 15 readings, on the Mac mini, 2026-11-19 (bf39171c0).
 const HOME = 'driftwood-isle', BUGGY = 'yard.buggy', DOCK = { x: -6, z: 20 }, BOX_TICK_P95_MS = 12, BENCH = process.env['WS_BENCH'] === '1';
+// the CI run proves the shape (every bot drives its own buggy, the worker keeps reading) with 4 bots for 4.5 s; the full 16 bots
+// for 15 s, the cap and the p95 run with WS_BENCH=1 (main-watch amber: 77.6 s against the file's 60 s, run 44660320581)
+const BOTS = BENCH ? 16 : 4, MEASURE_MS = BENCH ? 15_500 : 4500, READINGS = BENCH ? 10 : 3;
 let folder: ReturnType<typeof vehiclesExampleFolder>, bench: RoomBench | undefined;
 const bots: RoomBot[] = [];
 beforeAll(() => { folder = vehiclesExampleFolder(); });
@@ -51,7 +54,7 @@ test('a buggy driven at the cell\'s west edge stops short of the road, its drive
   expect(shardRows(road.host).world.has('vehicles')).toBe(false); // a road room runs no vehicles
 });
 
-test('the cell bench: 16 bots drive their own buggies under the cap and the worker keeps ticking (p95 judged with WS_BENCH=1)', { timeout: 240_000 }, async () => {
+test('the cell bench: bots drive their own buggies under the cap and the worker keeps ticking (16 bots and the p95 with WS_BENCH=1)', { timeout: 240_000 }, async () => {
   const readings: WorkerReading[] = [];
   let measuring = false;
   bench = await roomBench({ cells: [HOME], workers: 1, readingMs: 1000, socketsPerIp: 32, connectsPerMinute: 64, load: () => folderInput(folder.directory), reading: (_index, row) => { if (measuring) readings.push(row); } });
@@ -59,12 +62,12 @@ test('the cell bench: 16 bots drive their own buggies under the cap and the work
   const rows = shardRows(room.host);
   const pose = (id: string) => rows.bodies.get(`script:${id}`)?.();
   const clearDock = (): boolean => [...rows.bodies.keys()].filter(key => key.startsWith(`script:${BUGGY}:`)).every(key => { const p = rows.bodies.get(key)?.().position; return p === undefined || Math.hypot(p.x - DOCK.x, p.z - DOCK.z) > 8; });
-  for (let i = 0; i < 16; i++) {
+  for (let i = 0; i < BOTS; i++) {
     const bot = new RoomBot(bench.url, 'bench', `device:d${String(i)}`, `D${String(i)}`); bots.push(bot);
     const arrived = await bot.arrived(); if (!arrived) throw new Error(`bot ${String(i)} closed: ${String(bot.closed)}; crashes ${JSON.stringify(bench.crashes)}`);
     const body = room.bodyOf(`device:d${String(i)}`); if (body === undefined) throw new Error('No body for a bot');
     // each drives out to its own spot on the open side (west and south of the dock, away from the sail's dock east of it), and circles there
-    const buggy = playerVehicle(BUGGY, body.id), angle = Math.PI / 2 + Math.PI / 2 * i / 15, reach = 30 + 3 * i, spot = { x: DOCK.x + reach * Math.cos(angle), z: DOCK.z + reach * Math.sin(angle) };
+    const buggy = playerVehicle(BUGGY, body.id), angle = Math.PI / 2 + Math.PI / 2 * i / (BOTS - 1), reach = 30 + 3 * i, spot = { x: DOCK.x + reach * Math.cos(angle), z: DOCK.z + reach * Math.sin(angle) };
     await vi.waitFor(() => { expect(clearDock(), `bot ${String(i)}: ${JSON.stringify([...rows.bodies].filter(([key]) => key.includes(BUGGY)).map(([key, read]) => [key.slice(-12), Math.round(read().position.x), Math.round(read().position.z), Number(read().euler.y.toFixed(2))]))}`).toBe(true); }, { timeout: 20_000, interval: 100 });
     body.resetPose({ x: DOCK.x, y: 1, z: DOCK.z + 1 }, 0);
     await new Promise(resolve => { setTimeout(resolve, 150); });
@@ -74,13 +77,13 @@ test('the cell bench: 16 bots drive their own buggies under the cap and the work
     bot.thumb = tick => { const p = pose(buggy)?.position; return p !== undefined && Math.hypot(p.x - spot.x, p.z - spot.z) < 12 ? { ...out(tick), steer: { keyX: -1, keyY: 0.5, stickX: 0, stickY: 0 } } : out(tick); };
   }
   const out = [...rows.bodies.keys()].filter(key => key.startsWith('script:') && (key.includes(BUGGY) || key.includes('line.sail')));
-  expect(out.length).toBe(17); // 16 buggies and the shared sail
+  expect(out.length).toBe(BOTS + 1); // a buggy a bot and the shared sail
   expect(out.length).toBeLessThanOrEqual(VEHICLE_CAP);
   measuring = true;
-  await new Promise(resolve => { setTimeout(resolve, 15_500); });
+  await new Promise(resolve => { setTimeout(resolve, MEASURE_MS); });
   measuring = false;
   const awake = readings.filter(row => row.awake > 0 && row.ticks > 0);
-  expect(awake.length).toBeGreaterThanOrEqual(10);
+  expect(awake.length).toBeGreaterThanOrEqual(READINGS);
   const worst = Math.max(...awake.map(row => row.p95));
   console.info(JSON.stringify({ at: 'vehicle-cell-bench', vehicles: out.length, readings: awake.length, p95MaxMs: Number(worst.toFixed(2)), p50MaxMs: Number(Math.max(...awake.map(row => row.p50)).toFixed(2)), frameBytes: awake.reduce((sum, row) => sum + row.frameBytes, 0) }));
   expect(Number.isFinite(worst)).toBe(true);
