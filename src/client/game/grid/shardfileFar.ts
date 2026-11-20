@@ -1,4 +1,4 @@
-import { Matrix3, Matrix4, Mesh, BufferAttribute, BufferGeometry, Float32BufferAttribute, type Object3D } from 'three';
+import { Box3, Matrix3, Matrix4, Mesh, BufferAttribute, BufferGeometry, Float32BufferAttribute, type Object3D } from 'three';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -54,6 +54,7 @@ export async function loadShardfileFar(rows: ShardfileFarRows, read: (ref: strin
   return { prepared: { geometry, positionalMask: true, look: shardfileHaze(rows.fog), impostor }, bytes: far.decoded + far.gpu };
 }
 
+const SPHERE_BOX = new Box3();
 /** A plain float attribute three's per-vertex accessors would read: its own Float32Array, not normalized, three wide. */
 function plainFloat3(attribute: unknown): attribute is BufferAttribute & { array: Float32Array } {
   return attribute instanceof BufferAttribute && attribute.array instanceof Float32Array && !attribute.normalized && attribute.itemSize === 3;
@@ -88,8 +89,42 @@ export function poseInPlace(geometry: BufferGeometry, matrix: Matrix4): void {
     }
     normal.needsUpdate = true;
   }
-  if (geometry.boundingBox !== null) geometry.computeBoundingBox();
-  if (geometry.boundingSphere !== null) geometry.computeBoundingSphere();
+  if (position === undefined || geometry.morphAttributes.position !== undefined) {
+    if (geometry.boundingBox !== null) geometry.computeBoundingBox();
+    if (geometry.boundingSphere !== null) geometry.computeBoundingSphere();
+    return;
+  }
+  // three's computeBoundingBox / computeBoundingSphere for a plain position with no morph targets, by the array: the
+  // same Math.min / Math.max box, (min + max) * 0.5 centre and largest squared distance. A NaN result goes back to three's
+  // own pass, which also says so.
+  const box = geometry.boundingBox;
+  if (box !== null) {
+    float3Box(position.array, position.count, box);
+    if (Number.isNaN(box.min.x) || Number.isNaN(box.min.y) || Number.isNaN(box.min.z)) geometry.computeBoundingBox();
+  }
+  const sphere = geometry.boundingSphere;
+  if (sphere !== null) {
+    const center = float3Box(position.array, position.count, SPHERE_BOX).getCenter(sphere.center), a = position.array;
+    const cx = center.x, cy = center.y, cz = center.z;
+    let maxRadiusSq = 0;
+    for (let i = 0, l = position.count; i < l; i++) {
+      const o = i * 3, dx = cx - (a[o] ?? 0), dy = cy - (a[o + 1] ?? 0), dz = cz - (a[o + 2] ?? 0);
+      maxRadiusSq = Math.max(maxRadiusSq, dx * dx + dy * dy + dz * dz);
+    }
+    sphere.radius = Math.sqrt(maxRadiusSq);
+    if (Number.isNaN(sphere.radius)) geometry.computeBoundingSphere();
+  }
+}
+/** three's `Box3.setFromBufferAttribute` over a plain float3 array: empty, then each point's Math.min / Math.max */
+function float3Box(a: Float32Array, count: number, box: Box3): Box3 {
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (let i = 0; i < count; i++) {
+    const o = i * 3, x = a[o] ?? 0, y = a[o + 1] ?? 0, z = a[o + 2] ?? 0;
+    minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
+    maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
+  }
+  box.min.set(minX, minY, minZ); box.max.set(maxX, maxY, maxZ);
+  return box;
 }
 
 /** A shardfile's own placeholder look: pbr, its air its first fog key's colour. */

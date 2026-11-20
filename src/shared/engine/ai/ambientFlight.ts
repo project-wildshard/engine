@@ -1,4 +1,8 @@
 /** Circling/heading law for ambient flyers. The caller owns the clock, body and wing posing. */
+import { cosTo, sinTo } from '../core/portableMath';
+
+/** DF11: sin/cos land here, not as returned doubles (each a fresh heap number where the call was not inlined) */
+const TRIG = new Float64Array(6);
 export interface AmbientFlightPose {x:number;y:number;z:number;yaw:number;pitch:number;roll:number}
 export interface AmbientOrbit {ox:number;oz:number;orad:number;oalt:number;ow:number;oph:number}
 export interface AmbientFlightTuning {wave:number;amplitude:number;pitch:number;pitchRate:number;bank:number;bankLimit:number;bankRate:number;directionEpsilon?:number}
@@ -30,7 +34,8 @@ export class CirclingFlyer {
     const row=Object.hasOwn(this.bursts,id)?this.bursts[id]:undefined;if(row===undefined)throw new Error('Missing declared ambient wingbeat');
     if(state.burst>0){
       let phase=dt;for(const factor of row.phase)phase*=factor;state.flapT+=phase;
-      flap=Math.sin(state.flapT)*row.amplitude;fold=Math.max(0,-Math.sin(state.flapT-row.foldPhase))*row.foldAmplitude;
+      sinTo(state.flapT,TRIG,0);sinTo(state.flapT-row.foldPhase,TRIG,1);
+      flap=(TRIG[0]??0)*row.amplitude;fold=Math.max(0,-(TRIG[1]??0))*row.foldAmplitude;
       if(state.flapT>=Math.PI*2){state.flapT-=Math.PI*2;state.burst--;if(state.burst===0)state.glide=gliding?(row.glide[0]===row.glide[1]?row.glide[0]:rng.range(...row.glide)):0;}
     }else{
       flap+=(row.rest[0]-flap)*Math.min(1,dt*row.rates[0]);fold+=(row.rest[1]-fold)*Math.min(1,dt*row.rates[1]);state.glide-=dt;
@@ -40,21 +45,24 @@ export class CirclingFlyer {
   }
   face(p:AmbientFlightPose,dx:number,dy:number,dz:number,dt:number,bank: number=this.tuning.bank):void {
     const dh=Math.hypot(dx,dz);if(dh<(this.tuning.directionEpsilon??1e-5))return;
-    const turn=Math.atan2(dx,dz)-p.yaw,dyaw=Math.atan2(Math.sin(turn),Math.cos(turn));p.yaw+=dyaw;
+    const turn=Math.atan2(dx,dz)-p.yaw;sinTo(turn,TRIG,0);cosTo(turn,TRIG,1);const dyaw=Math.atan2(TRIG[0]??0,TRIG[1]??0);p.yaw+=dyaw;
     p.pitch+=(Math.atan2(dy,dh)*this.tuning.pitch-p.pitch)*Math.min(1,dt*this.tuning.pitchRate);
     const turnBank=Math.max(-this.tuning.bankLimit,Math.min(this.tuning.bankLimit,dyaw/Math.max(dt,1e-3)*bank));
     p.roll+=(turnBank-p.roll)*Math.min(1,dt*this.tuning.bankRate);
   }
   step(p:AmbientFlightPose,o:AmbientOrbit,dt:number):void {
-    o.oph+=o.ow*dt;const x=o.ox+Math.cos(o.oph)*o.orad,z=o.oz+Math.sin(o.oph)*o.orad,y=o.oalt+Math.sin(o.oph*this.tuning.wave)*this.tuning.amplitude;
+    o.oph+=o.ow*dt;cosTo(o.oph,TRIG,0);sinTo(o.oph,TRIG,1);sinTo(o.oph*this.tuning.wave,TRIG,2);
+    const x=o.ox+(TRIG[0]??0)*o.orad,z=o.oz+(TRIG[1]??0)*o.orad,y=o.oalt+(TRIG[2]??0)*this.tuning.amplitude;
     this.face(p,x-p.x,y-p.y,z-p.z,dt);p.x=x;p.y=y;p.z=z;
   }
   /** Sample a moving wheel into a borrowed target, also used by takeoff/landing approaches. */
   wheel(o:AmbientWheelOrbit,b:AmbientWheelBody,time:number,out:{x:number;y:number;z:number}):void {
     const tuning=this.wheelTuning;if(tuning===undefined)throw new Error('Missing declared ambient wheel');
     const phase=o.w*time+b.phase,radius=o.r*b.scale;
-    out.x=o.cx+radius*(Math.sin(phase+o.p1)+tuning.xAmplitude*Math.sin(tuning.xFrequency*phase+o.p2));
-    out.z=o.cz+radius*tuning.zScale*(Math.cos(phase+o.p1)+tuning.zAmplitude*Math.cos(tuning.zFrequency*phase+o.p3));
-    out.y=o.alt+b.altOff+tuning.altitudeAmplitude*Math.sin(tuning.altitudeFrequency*phase+o.p4)+tuning.detailAmplitude*Math.sin(tuning.detailFrequency*phase+b.phase);
+    sinTo(phase+o.p1,TRIG,0);sinTo(tuning.xFrequency*phase+o.p2,TRIG,1);cosTo(phase+o.p1,TRIG,2);cosTo(tuning.zFrequency*phase+o.p3,TRIG,3);
+    sinTo(tuning.altitudeFrequency*phase+o.p4,TRIG,4);sinTo(tuning.detailFrequency*phase+b.phase,TRIG,5);
+    out.x=o.cx+radius*((TRIG[0]??0)+tuning.xAmplitude*(TRIG[1]??0));
+    out.z=o.cz+radius*tuning.zScale*((TRIG[2]??0)+tuning.zAmplitude*(TRIG[3]??0));
+    out.y=o.alt+b.altOff+tuning.altitudeAmplitude*(TRIG[4]??0)+tuning.detailAmplitude*(TRIG[5]??0);
   }
 }

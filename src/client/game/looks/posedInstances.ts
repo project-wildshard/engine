@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import * as v from 'valibot';
 import { TIER } from '@wildshard/engine/core/tier';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
+import { cosTo, sinTo } from '@wildshard/engine/core/portableMath';
 import { uploadTexture } from '@wildshard/engine/core/assets';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { defineBakedModels } from '@wildshard/engine/models/model';
@@ -12,6 +13,9 @@ import { posedAssets, type PosedAssetSet } from '../plugin/geometry';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { lentLook, setLentParam, setLentTexture } from '../shardfile/lentLooks';
 import type { PosedBufferPool, PosedBufferView } from './posedBufferPool';
+
+/** DF11: the half-angle cosines and sines of one instance's turn (c1 c2 c3 s1 s2 s3) */
+const HALF_ANGLES = new Float64Array(6);
 
 /** One dynamic instance owner for shader-posed crowds. Geometry attributes,
  * material, channel meanings, decisions and clocks belong to the caller.
@@ -76,7 +80,12 @@ export class PosedInstances {
     if (this.n >= this.capacity) return;
     const i = this.n++;
     this.e.set(-pitch, yaw, roll, 'YXZ');
-    this.q.setFromEuler(this.e);
+    // DF11: three's setFromEuler for 'YXZ', its half-angle sines and cosines in a typed slot rather than six returned doubles
+    // (a fresh heap number each where the portable Math call was not inlined); the same products in the same order
+    const t = HALF_ANGLES, ex = this.e.x, ey = this.e.y, ez = this.e.z;
+    cosTo(ex / 2, t, 0); cosTo(ey / 2, t, 1); cosTo(ez / 2, t, 2); sinTo(ex / 2, t, 3); sinTo(ey / 2, t, 4); sinTo(ez / 2, t, 5);
+    const c1 = t[0] ?? 0, c2 = t[1] ?? 0, c3 = t[2] ?? 0, s1 = t[3] ?? 0, s2 = t[4] ?? 0, s3 = t[5] ?? 0;
+    this.q.set(s1 * c2 * c3 + c1 * s2 * s3, c1 * s2 * c3 - s1 * c2 * s3, c1 * c2 * s3 - s1 * s2 * c3, c1 * c2 * c3 + s1 * s2 * s3);
     this.m.compose(this.p.set(x, y, z), this.q, this.s.setScalar(scale));
     this.mesh.setMatrixAt(i, this.m);
     const a = this.anim.array, b = this.anim2?.array, k = i * 4;

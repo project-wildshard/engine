@@ -34,6 +34,9 @@ it('poses a far geometry to the same bits and bounds as three', () => {
     }
     expect(ours.boundingBox).toEqual(theirs.boundingBox);
     expect(ours.boundingSphere).toEqual(theirs.boundingSphere);
+    const boundsOf = (g: BufferGeometry): number[] => g.boundingBox === null || g.boundingSphere === null ? [] :
+      [...g.boundingBox.min.toArray(), ...g.boundingBox.max.toArray(), ...g.boundingSphere.center.toArray(), g.boundingSphere.radius];
+    expect(Buffer.from(Float64Array.from(boundsOf(ours)).buffer).equals(Buffer.from(Float64Array.from(boundsOf(theirs)).buffer))).toBe(true);
   }
 });
 

@@ -110,27 +110,42 @@ function reduced(x: number): number {
   reducedParts[0] = y; reducedParts[1] = (r - y) - w2;
   return n;
 }
-function sin(x: number): number {
-  if (!Number.isFinite(x) || x === 0 || Math.abs(x) >= 268435456) return nativeSin(x);
-  if (Math.abs(x) <= Math.PI / 4) return kSin(x, 0);
+/** sin and cos into `out[at]`: one body each, so `sin`/`cos` and `sinTo`/`cosTo` are the same bits by construction */
+function sinInto(x: number, out: Float64Array, at: number): void {
+  if (!Number.isFinite(x) || x === 0 || Math.abs(x) >= 268435456) { out[at] = nativeSin(x); return; }
+  if (Math.abs(x) <= Math.PI / 4) { out[at] = kSin(x, 0); return; }
   const n = reduced(x), hi = reducedParts[0] ?? 0, lo = reducedParts[1] ?? 0;
   switch (((n % 4) + 4) % 4) {
-    case 0: return kSin(hi, lo);
-    case 1: return kCos(hi, lo);
-    case 2: return -kSin(hi, lo);
-    default: return -kCos(hi, lo);
+    case 0: out[at] = kSin(hi, lo); return;
+    case 1: out[at] = kCos(hi, lo); return;
+    case 2: out[at] = -kSin(hi, lo); return;
+    default: out[at] = -kCos(hi, lo);
   }
 }
-function cos(x: number): number {
-  if (!Number.isFinite(x) || Math.abs(x) >= 268435456) return nativeCos(x);
-  if (Math.abs(x) <= Math.PI / 4) return kCos(x, 0);
+function cosInto(x: number, out: Float64Array, at: number): void {
+  if (!Number.isFinite(x) || Math.abs(x) >= 268435456) { out[at] = nativeCos(x); return; }
+  if (Math.abs(x) <= Math.PI / 4) { out[at] = kCos(x, 0); return; }
   const n = reduced(x), hi = reducedParts[0] ?? 0, lo = reducedParts[1] ?? 0;
   switch (((n % 4) + 4) % 4) {
-    case 0: return kCos(hi, lo);
-    case 1: return -kSin(hi, lo);
-    case 2: return -kCos(hi, lo);
-    default: return kSin(hi, lo);
+    case 0: out[at] = kCos(hi, lo); return;
+    case 1: out[at] = -kSin(hi, lo); return;
+    case 2: out[at] = -kCos(hi, lo); return;
+    default: out[at] = kSin(hi, lo);
   }
+}
+const trigOut = new Float64Array(1);
+function sin(x: number): number { sinInto(x, trigOut, 0); return trigOut[0] ?? Number.NaN; }
+function cos(x: number): number { cosInto(x, trigOut, 0); return trigOut[0] ?? Number.NaN; }
+
+/** DF11: `Math.sin(x)` into `out[at]`, the realm's own function's bits (the portable one where it is installed). A double
+ *  returned from a call that is not inlined is a fresh heap number; written into a typed slot it is none (the portable sin
+ *  and cos returns were ~12 KB a dock frame at 3x). */
+export function sinTo(x: number, out: Float64Array, at: number): void {
+  if (Math.sin === sin) sinInto(x, out, at); else out[at] = Math.sin(x);
+}
+/** DF11: `Math.cos(x)` into `out[at]`, as `sinTo`. */
+export function cosTo(x: number, out: Float64Array, at: number): void {
+  if (Math.cos === cos) cosInto(x, out, at); else out[at] = Math.cos(x);
 }
 function tan(x: number): number {
   if (!Number.isFinite(x) || x === 0 || Math.abs(x) >= 268435456) return nativeTan(x);
