@@ -13,3 +13,11 @@
 - Not yet cut: scene.updateMatrixWorld allocates about 25 KB a call, all under the `creature-warm` group (348
   nodes); a fresh 750-node tree in node allocates nothing, so something on those nodes (an accessor or a patched
   method) boxes. The next owner should read that group's nodes first.
+
+## mini-df11b (relay 2)
+
+- The `creature-warm` walk: nothing on those nodes is patched. three's `updateMatrix` itself boxes about 72 B a
+  call in the page's V8 (a fresh Bone chain does too); the warm group is 348 of the scene's nodes and nothing poses
+  it, so its matrices are composed once at staging and its auto update is off (24 of the walk's 28 KB a call).
+- The portable sin/cos stored the reduction's hi/lo in two module `let`s: two heap numbers a call. A Float64Array
+  slot now.

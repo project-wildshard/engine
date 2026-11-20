@@ -273,6 +273,10 @@ export class AnimalHerdView implements RowBodiesDraw {
       } catch (error) { console.warn(`[warm] creature rig ${model.kind}:${model.variant} not parked`, error); }
     }
     this.scene.add(group);
+    // DF11: nothing poses a parked rig, so its local matrices are composed once here and left off three's per-frame
+    // recompose. Each `updateMatrix` boxed about 72 B; this group's 348 nodes were 24 of the scene walk's 28 KB a call.
+    group.updateMatrixWorld(true);
+    group.traverse((node) => { node.matrixAutoUpdate = false; });
     this.warmRigs = group;
   }
 
