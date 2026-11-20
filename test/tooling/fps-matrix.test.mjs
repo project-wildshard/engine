@@ -43,3 +43,25 @@ test('stitch the full route in order, preserving floor misses and refusing gaps 
   expect(assembleCapture([dock,{...beach,witness:{build,gpu:'another GPU'}}],route,60))
     .toMatchObject({verdict:'incomplete',error:'build or GPU differs across cells'});
 });
+
+test('a quick cell requires all three consecutive legs, including the last leg duration', () => {
+  const scratch = resolve(process.env.VITEST_TMP_ROOT ?? 'tmp/vitest', 'fps-matrix');
+  mkdirSync(scratch,{recursive:true});
+  const out = mkdtempSync(join(scratch,'quick-'));
+  try {
+    const quickRoute = [...route, {name:'village',seconds:1}];
+    const cell = {id:'1-1-1',interval:quickRoute[0],route:quickRoute,floor:60,warm:false};
+    const fingerprint = signature({mode:'quick',route:quickRoute});
+    const file = cellPath(out,cell.id);
+    const legs = quickRoute.map(leg => capture(leg).legs[0]);
+    const save = legs => atomicJson(file,{fingerprint,id:cell.id,report:{browser:'Chromium',
+      cold:{version:{build},witness,verdict:'pass',legs},warm:null}});
+    save(legs);
+    expect(readCell(file,fingerprint,build,cell)).not.toBeNull();
+    save(legs.slice(0,2));
+    expect(readCell(file,fingerprint,build,cell)).toBeNull();
+    save([...legs.slice(0,2),{...legs[2],samples:[{seconds:0.99,frames:60,frameMs:Array(60).fill(15)}]}]);
+    expect(readCell(file,fingerprint,build,cell)).toBeNull();
+    expect(() => readCell(file,signature({mode:'qualify'}),build,cell)).toThrow('Mismatched resume');
+  } finally { rmSync(out,{recursive:true,force:true}); }
+});

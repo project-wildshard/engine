@@ -1,0 +1,40 @@
+import { routeFor } from '../memory/iphone/route.mjs';
+
+/** @typedef {Omit<Parameters<typeof import('./measure.mjs').measureFps>[0], 'cpu' | 'floor'> & {factor:string|null}} ProfileSpec */
+const PHONE = /** @type {const} */ ({ browser: 'chromium', tier: 'phone', width: 402, height: 812, dpr: 3 });
+const DESKTOP = /** @type {const} */ ({ browser: 'chromium', tier: 'desktop', cap: null });
+const displays = /** @type {const} */ ([{ width: 1496, height: 717, dpr: 2 }, { width: 1920, height: 1080, dpr: 1 }]);
+/** @param {(typeof displays)[number]} display @param {'low'|'high'} graphics @param {string|null} factor
+ * @returns {ProfileSpec} */
+function desktop(display, graphics, factor) {
+  return { ...DESKTOP, ...display, graphics, factor, tier: graphics === 'low' ? 'phone' : 'desktop' };
+}
+/** @type {Record<string, ProfileSpec[]>} */
+const fullProfiles = {
+  'phone-lpm-low': [{ ...PHONE, graphics: 'low', cap: 30, factor: 'phoneLpm' }],
+  'phone-high': [{ ...PHONE, graphics: 'high', cap: 60, factor: 'phoneNormal' }],
+  'phone-low': [{ ...PHONE, graphics: 'low', cap: 60, factor: 'phoneNormal' }],
+  'desktop-high': displays.map(display => desktop(display, 'high', 'desktopTypical')),
+  'desktop-native': displays.flatMap(display => [desktop(display, 'high', null), desktop(display, 'low', null)]),
+};
+
+/** Quick routes share one cold boot per profile. Qualification keeps every original window.
+ * @param {{qualify?:boolean,runs?:string,dockOnly?:boolean,coldOnly?:boolean}} [options] */
+export function fpsPlan({ qualify = false, runs, dockOnly = false, coldOnly = false } = {}) {
+  const count = Number(runs ?? (qualify ? 3 : 1));
+  if (!Number.isSafeInteger(count) || count < 1) throw new Error('Use a positive run count');
+  if (qualify && (count !== 3 || dockOnly || coldOnly))
+    throw new Error('--qualify requires three cold runs, every route window and the final warm repeat');
+  const fullRoute = routeFor('driftwood-fps');
+  /** @type {import('../memory/iphone/route.mjs').RouteLeg[]} */
+  const route = [];
+  for (const [index,leg] of fullRoute.entries()) {
+    if (!qualify && index >= (dockOnly ? 1 : 3)) break;
+    route.push(qualify ? leg : {...leg,seconds:[15,30,35][index],
+      dwell:leg.dwell ? {...leg.dwell,seconds:10} : undefined});
+  }
+  const profiles = Object.fromEntries(Object.entries(fullProfiles).map(([name, specs]) =>
+    [name, qualify ? specs : specs.slice(0, 1)]));
+  return { mode: qualify ? 'qualify' : 'quick', scope: qualify ? 'route' : dockOnly ? 'dock' : 'quick',
+    profiles, route, count, warm: qualify, limitMs: qualify ? null : 20 * 60 * 1000 };
+}

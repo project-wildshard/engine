@@ -56,3 +56,8 @@ test('repeating a cold sample or omitting a variant cannot qualify the nightly',
     expect(report.rows.flatMap(row => row.misses)).toEqual(['incomplete or uncalibrated']);
   }
 });
+
+test('a quick development table cannot qualify even when its synthetic frames pass every floor', () => {
+  const table = {...makeTable(),scope:'quick',mode:'quick'};
+  expect(reviewNight(table,build)).toMatchObject({exact:false,qualifies:false});
+});

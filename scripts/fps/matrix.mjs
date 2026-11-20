@@ -9,7 +9,7 @@ import { fpsVerdict } from './verdict.mjs';
 /** @typedef {{version?:{build:string}, witness?:{build:string, gpu:string|null}, legs?:Frames[],
  * costs?:unknown[], verdict:string, error?:string}} Capture */
 /** @typedef {{browser:string,cold:Capture,warm:Capture|null}} CellReport */
-/** @typedef {{id:string,interval:Leg,floor:number,warm:boolean}} Cell */
+/** @typedef {{id:string,interval:Leg,route?:Leg[],floor:number,warm:boolean}} Cell */
 
 const read = (/** @type {string} */ file) => JSON.parse(readFileSync(file, 'utf8'));
 
@@ -46,7 +46,7 @@ export function cellPath(out, id) { return join(out, `cell-${id}.json`); }
 function complete(capture, build, cell) {
   return (capture?.verdict === 'pass' || capture?.verdict === 'miss') &&
     capture.version?.build === build && capture.witness?.build === build &&
-    fpsVerdict(capture.legs ?? [], [cell.interval], cell.floor).verdict !== 'incomplete';
+    fpsVerdict(capture.legs ?? [], cell.route ?? [cell.interval], cell.floor).verdict !== 'incomplete';
 }
 
 /** @param {string} file @param {string} fingerprint @param {string} build @param {Cell} cell */

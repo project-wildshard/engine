@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // DF6 / J464. One browser at a time on the mini.
-// node scripts/fps/table.mjs --zone driftwood-isle [--profiles NAME,...] [--runs 3] [--base ORIGIN]
+// Default: one cold three-leg route per profile. --qualify: full nightly / DF15 sampling.
+// node scripts/fps/table.mjs --zone driftwood-isle [--qualify] [--profiles NAME,...] [--base ORIGIN]
 // --device key=value,... saves device slots for every profile (an A/B arm; true/false/numbers parsed).
 // --dock-only --cold-only is a short diagnostic. With WS_BENCH=1, add --pass-breakdown for CPU submit by pass.
 // The full matrix includes both desktop sizes and a warm repeat.
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { once } from 'node:events';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -15,37 +16,23 @@ import { pathToFileURL } from 'node:url';
 import { assembleCapture, atomicJson, cellPath, openResume, readCell, signature } from './matrix.mjs';
 import { agentFetch } from '../agent-requests.mjs';
 import { capFor, readCaps } from '../budgets/files.mjs';
-import { routeFor } from '../memory/iphone/route.mjs';
+import { fpsPlan } from './plan.mjs';
 import { passBreakdownAllowed, requirePassBench } from './passes.mjs';
 import { workloadCounts } from './workload.mjs';
 
-/** @typedef {Omit<Parameters<typeof import('./measure.mjs').measureFps>[0], 'cpu' | 'floor'> & {factor:string|null}} ProfileSpec */
-const PHONE = /** @type {const} */ ({ browser: 'chromium', tier: 'phone', width: 402, height: 812, dpr: 3 });
-const DESKTOP = /** @type {const} */ ({ browser: 'chromium', tier: 'desktop', cap: null });
-const displays = /** @type {const} */ ([{ width: 1496, height: 717, dpr: 2 }, { width: 1920, height: 1080, dpr: 1 }]);
-/** @param {(typeof displays)[number]} display @param {'low'|'high'} graphics @param {string|null} factor
- * @returns {ProfileSpec} */
-function desktop(display, graphics, factor) {
-  return { ...DESKTOP, ...display, graphics, factor, tier: graphics === 'low' ? 'phone' : 'desktop' };
-}
-/** @type {Record<string, ProfileSpec[]>} */
-const profiles = {
-  'phone-lpm-low': [{ ...PHONE, graphics: 'low', cap: 30, factor: 'phoneLpm' }],
-  'phone-high': [{ ...PHONE, graphics: 'high', cap: 60, factor: 'phoneNormal' }],
-  'phone-low': [{ ...PHONE, graphics: 'low', cap: 60, factor: 'phoneNormal' }],
-  'desktop-high': displays.map(display => desktop(display, 'high', 'desktopTypical')),
-  'desktop-native': displays.flatMap(display => [desktop(display, 'high', null), desktop(display, 'low', null)]),
-};
+/** @typedef {import('./plan.mjs').ProfileSpec} ProfileSpec */
 const root = resolve(import.meta.dirname, '../..');
 const lock = join(homedir(), 'projects/games/wildshard/engine/tmp/mini-measure.lock');
 const marker = join(homedir(), '.cache/wildshard/jake-playing');
 const exclusiveGPU = '^/.*(ms-playwright|[.]agent-browser/browsers)/.*(chrome-headless-shell|Chromium|Chrome for Testing|MiniBrowser|Playwright|WebKit[.]GPU[.]Development)( |$)';
-const keys = Object.keys(profiles);
+const keys = Object.keys(fpsPlan().profiles);
 const choices = parseArgs({ options: {
   zone: { type:'string', default:'driftwood-isle' }, profiles:{ type:'string', default:keys.join(',') },
-  runs:{ type:'string', default:'3' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
+  runs:{ type:'string' }, qualify:{ type:'boolean' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
   'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' }, device:{ type:'string' },
 } }).values;
+const sampling = fpsPlan({qualify:choices.qualify,runs:choices.runs,dockOnly:choices['dock-only'],coldOnly:choices['cold-only']});
+const {profiles,route,count} = sampling;
 
 function gpuBusy() {
   try {
@@ -59,7 +46,6 @@ function gpuBusy() {
 function model() { return execFileSync('/usr/sbin/sysctl',['-n','hw.model'],{encoding:'utf8'}).trim(); }
 const bookPath = join(root,'budgets/fps-calibration.json');
 const calibration = existsSync(bookPath) ? JSON.parse(readFileSync(bookPath,'utf8')) : { hosts:{} };
-const route = [...routeFor('driftwood-fps')].slice(0,choices['dock-only'] ? 1 : undefined);
 const order = new Map([['pass',0],['miss',2],['incomplete',3]]);
 const show = (/** @type {number|null|undefined} */ x) => x === null || x === undefined ? '—' : x.toFixed(1);
 
@@ -80,7 +66,7 @@ function table(runs) {
 
 /** @typedef {import('../memory/iphone/route.mjs').RouteLeg} RouteLeg */
 /** @typedef {{profile:ProfileSpec & {cpu:number, floor:number}, base:string, zone:string, build:string,
- * fingerprint:string, output:string, id:string, interval:RouteLeg, approach:RouteLeg[], warm:boolean, passBreakdown?:boolean}} Job */
+ * fingerprint:string, output:string, id:string, interval:RouteLeg, route?:RouteLeg[], approach:RouteLeg[], warm:boolean, passBreakdown?:boolean}} Job */
 
 /** @param {Job} job */
 async function worker(job) {
@@ -93,7 +79,7 @@ async function worker(job) {
   process.once('SIGINT',interrupt); process.once('SIGTERM',interrupt);
   try {
     const {measureFps} = await import('./measure.mjs');
-    const report = await measureFps(job.profile, {base:job.base, zone:job.zone, route:[job.interval],
+    const report = await measureFps(job.profile, {base:job.base, zone:job.zone, route:job.route ?? [job.interval],
       approach:job.approach, passBreakdown:job.passBreakdown===true, signal:AbortSignal.any([stop.signal, AbortSignal.timeout(240_000)]), warm:job.warm});
     if (stop.signal.aborted) return 3;
     atomicJson(job.output, {fingerprint:job.fingerprint, id:job.id, report});
@@ -126,6 +112,7 @@ async function measureCell(job, signal) {
 }
 
 async function main() {
+  const started = Date.now();
   const zone = choices.zone;
   if (zone !== 'driftwood-isle') throw new Error('DF2 defines a route for driftwood-isle');
   const selected = choices.profiles.split(',');
@@ -134,7 +121,6 @@ async function main() {
     throw new Error('Pass breakdown needs desktop profiles with --dock-only --cold-only');
   }
   if (passBreakdown && !choices['dry-run']) requirePassBench(process.env.WS_BENCH);
-  const count = Number(choices.runs);
   if (!Number.isSafeInteger(count)||count<1||new Set(selected).size!==selected.length||selected.some(p=>!keys.includes(p)))
     throw new Error('Use a positive run count and a unique list of known profiles');
   const base = new URL(choices.base).href, host = model(), factors = calibration.hosts[host]?.factors ?? {};
@@ -158,38 +144,42 @@ async function main() {
     return (rates ?? [cpu]).map(rate => ({ name, profile:{...spec,cpu:rate,floor,calibrated:rates===undefined && calibrated,
       ...(Object.keys(device).length > 0 ? {device} : {})} }));
   }));
-  if (choices['dry-run']) { console.log(JSON.stringify({zone,base,host,count,plan,route},null,2)); return 0; }
+  if (choices['dry-run']) { console.log(JSON.stringify({mode:sampling.mode,zone,base,host,count,plan,route,warm:sampling.warm},null,2)); return 0; }
   if (existsSync(marker)) throw new Error('Jake is playing');
   const version = await agentFetch(new URL('/version.json',base),{signal:AbortSignal.timeout(10_000)});
   const {build} = await version.json();
   if (!version.ok || typeof build !== 'string' || build === '') throw new Error('The served build could not be pinned');
-  const source = ['fps/table.mjs','fps/matrix.mjs','fps/measure.mjs','fps/workload.mjs',...(passBreakdown?['fps/passes.mjs']:[]),'fps/verdict.mjs','memory/iphone/route.mjs']
+  const source = ['fps/table.mjs','fps/plan.mjs','fps/matrix.mjs','fps/measure.mjs','fps/workload.mjs',...(passBreakdown?['fps/passes.mjs']:[]),'fps/verdict.mjs','memory/iphone/route.mjs']
     .map(file => readFileSync(join(root,'scripts',file),'utf8'));
-  const config = {build,host,base,zone,count,plan,route,warm:!choices['cold-only'],...(passBreakdown?{passBreakdown}:{}),method:signature(source)};
+  const config = {mode:sampling.mode,build,host,base,zone,count,plan,route,warm:sampling.warm,...(passBreakdown?{passBreakdown}:{}),method:signature(source)};
   const fingerprint = signature(config);
-  const out = resolve(choices.out ?? join(root,'tmp/driftwood-fps',fingerprint.slice(0,16)));
+  let out = resolve(choices.out ?? join(root,'tmp/driftwood-fps',fingerprint.slice(0,16)));
   mkdirSync(out,{recursive:true}); mkdirSync(resolve(lock,'..'),{recursive:true});
+  if (sampling.mode === 'quick' && choices.out === undefined) out = mkdtempSync(join(out,'quick-'));
   openResume(out,fingerprint,config);
   console.error(`Build ${build}, resume ${out}`);
 
-  const started = Date.now(), stop = new AbortController();
+  const stop = new AbortController();
   const interrupt = () => stop.abort(new Error('measurement interrupted or Jake is playing'));
+  const timer = sampling.limitMs === null ? null : setTimeout(() => stop.abort(new Error('quick table exceeded 20 minutes')),
+    Math.max(1,sampling.limitMs-(Date.now()-started)));
   const playing = setInterval(() => { if (existsSync(marker)) interrupt(); },150);
   process.once('SIGINT',interrupt); process.once('SIGTERM',interrupt);
   const runs = plan.flatMap(({name,profile},i) => Array.from({length:count},(_,rep) =>
     ({name,profile,i,rep:rep+1,warm:config.warm && rep+1===count})));
-  const groups = runs.map(run => route.map((interval,j) => {
+  const groups = runs.map(run => (sampling.mode === 'quick' ? [route[0]] : route).map((interval,j) => {
     const id = `${run.i+1}-${run.rep}-${j+1}`;
     // Get to the same starting waypoint on foot. Sample only the assigned leg.
     const approach = route.slice(0,j).filter(leg => leg.kind === 'walk').map(({dwell:_dwell,...leg}) => leg);
-    return { id, interval, approach, profile:run.profile, floor:run.profile.floor, warm:run.warm, passBreakdown,
+    return { id, interval, route:sampling.mode === 'quick' ? route : undefined, approach, profile:run.profile, floor:run.profile.floor, warm:run.warm, passBreakdown,
       output:cellPath(out,id), build, base, zone, fingerprint };
   }));
+  let resumedCells = 0;
   try {
     for (let rep=0; rep<count; rep++) {
       for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
         stop.signal.throwIfAborted();
-        if (readCell(job.output,fingerprint,build,job) !== null) continue;
+        if (readCell(job.output,fingerprint,build,job) !== null) { resumedCells++; continue; }
         const status = await measureCell(job,stop.signal);
         console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : 'incomplete'}`);
       }
@@ -198,23 +188,24 @@ async function main() {
     if (!stop.signal.aborted) throw error;
     console.error(stop.signal.reason.message);
   } finally {
+    if (timer !== null) clearTimeout(timer);
     clearInterval(playing); process.removeListener('SIGINT',interrupt); process.removeListener('SIGTERM',interrupt);
   }
   let completed = 0;
   const measured = runs.map(({name,profile,rep,warm},idx) => {
     const cells = groups[idx].map(job => readCell(job.output,fingerprint,build,job));
     completed += cells.filter(cell => cell !== null).length;
-    return { name,profile,rep,cold:assembleCapture(cells.map(cell => cell?.cold),route,profile.floor),
+    return { name,profile,rep,cold:sampling.mode === 'quick' && cells[0] ? cells[0].cold : assembleCapture(cells.map(cell => cell?.cold),route,profile.floor),
       warm:warm ? assembleCapture(cells.map(cell => cell?.warm),route,profile.floor) : null };
   });
-  const progress = {completed,total:groups.length*route.length};
-  const scope = choices['dock-only'] ? 'dock only' : 'full route';
+  const progress = {completed,total:groups.reduce((sum,group) => sum+group.length,0)};
+  const scope = sampling.scope === 'dock' ? 'dock only' : sampling.mode === 'quick' ? 'quick: dock, beach, village' : 'qualification: full route';
   const markdown = [`## Driftwood FPS (${scope})`, '',table(measured),'',
-    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. Each leg starts from a fresh boot and an on-foot approach.`,
+    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; three consecutive shorter legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
     'Phone GPU estimates await DF5.'].join('\n');
   writeFileSync(join(out,'table.md'),`${markdown}\n`);
-  atomicJson(join(out,'table.json'),{schema:1,host,base,zone,scope:choices['dock-only']?'dock':'route',
-    seconds:(Date.now()-started)/1000,progress,runs:measured});
+  atomicJson(join(out,'table.json'),{schema:1,mode:sampling.mode,host,base,zone,scope:sampling.scope,
+    seconds:(Date.now()-started)/1000,fresh:resumedCells===0,resumedCells,progress,runs:measured});
   console.log(markdown);
   if (stop.signal.aborted || measured.some(run=>run.cold.verdict==='incomplete'||run.warm?.verdict==='incomplete')) return 3;
   if (measured.some(run=>run.cold.verdict==='miss')) return 2;
