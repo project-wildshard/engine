@@ -13,6 +13,7 @@ import { parseAchievementCounterData } from '@wildshard/format/achievementCounte
 import { parseChapterDirector, parseChapterWake } from '@wildshard/format/chapterDirector';
 import { parseBarterEconomy } from '@wildshard/format/lootEconomy';
 import type { NativeAssemblyFeature, NativeEliteConditions } from '@wildshard/format/nativeAssembly';
+import type { NativeRidingRows } from '@wildshard/format/nativeRiding';
 import { parseNativeQuestComposition } from '@wildshard/format/nativeQuestComposition';
 import { QuestRuntimeDocumentSchema } from '@wildshard/format/questRuntime';
 import { TOON_DAY_PRESET } from '@wildshard/format/toonLook';
@@ -81,7 +82,7 @@ type Step<C extends NativeAssemblyContext> = (run: AssemblyRun<C>) => void;
 const combatOf = <C extends NativeAssemblyContext>(run: AssemblyRun<C>) => need(run.context.combat, 'Native assembly requires its combat frame');
 const dayOf = <C extends NativeAssemblyContext>(run: AssemblyRun<C>): DayCycleClock => need(run.day, 'Native assembly host requires a day clock before it');
 const bootOf = <C extends NativeAssemblyContext>(at: AssemblyPrepared<C>) => need(at.boot, 'Native assembly host requires boot rows') as NativePopulationBootRows & {
-  riding: NativeTamingRows['programs'] & { riding: unknown }; rest: NativeTamingRows['rest']; mountable: readonly string[] };
+  riding: NativeTamingRows['programs'] & { riding: unknown }; rest: NativeTamingRows['rest']; mountable?: readonly string[] };
 const fieldOf = <C extends NativeAssemblyContext>(at: AssemblyPrepared<C>) => need(at.field, 'Native assembly host requires its field');
 
 async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<NativeAssemblyFeature, { host: 'quest.composition' }>, at: AssemblyPrepared<C>): Promise<Step<C>> {
@@ -152,10 +153,17 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
         bake: bake as Parameters<typeof installNativePopulationHunt>[1]['bake'], spawnY: shard.spawn.y, config, field: fieldOf(at), ...(at.ports.pastureCues === undefined ? {} : { pastureCues: at.ports.pastureCues }), ...(run.context.snapshot === undefined ? {} : { snapshot: run.context.snapshot }) }); };
     }
     case 'riding.mounted': {
-      const profile = await readAssemblyInput<{ readonly speeds?: unknown }>(product, row.profile), { world } = at;
-      const mode = shard.modes?.ride?.find(entry => entry.id === 'ride');
-      const speeds = profile.speeds ?? (mode === undefined ? undefined : mountSpeeds(mode.gaits));
-      return run => { const boot = bootOf(at); installMountedPlayer(run.host, { ...profile, speeds, world, mountable: boot.mountable.concat(need(run.creatures, 'Riding needs its creatures').bondedHorseIds()), program: boot.riding.riding }, need(at.pond, 'Riding needs its pond'), at.wet); };
+      const profile = await readAssemblyInput<Pick<NativeRidingRows, 'adopted'> & Partial<Pick<NativeRidingRows, 'speeds' | 'mountable'>>>(product, row.profile);
+      const { world } = at;
+      const mounts = shard.rows.species.filter(species => species.kind === profile.adopted.kind && species.mount !== undefined);
+      if (profile.speeds === undefined && mounts.length > 1) throw new Error('Native riding has multiple mount rows for the adopted kind');
+      const gaits = mounts[0]?.mount?.gaits ?? shard.modes?.ride?.find(mode => mode.id === 'ride')?.gaits;
+      const speeds = profile.speeds ?? (gaits === undefined ? undefined : mountSpeeds(gaits));
+      return run => {
+        const boot = bootOf(at), camp = need(profile.mountable ?? boot.mountable, 'Native riding needs its camp mounts');
+        const mountable = [...camp, ...need(run.creatures, 'Riding needs its creatures').bondedHorseIds()];
+        installMountedPlayer(run.host, { ...profile, speeds, world, mountable, program: boot.riding.riding }, need(at.pond, 'Riding needs its pond'), at.wet);
+      };
     }
     case 'boss.arena': {
       const input = await readAssemblyInput<unknown>(product, { file: row.file }), spec = arenaSpecies(await readAssemblyInput<unknown>(product, { file: 'server/arena-species.json' }));
