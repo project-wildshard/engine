@@ -1,5 +1,5 @@
 // J234: a staging release abandoned before merge-back still has a place in the source history.
-// Only version/changelog-only prepared commits may use their main cut for forward ordering.
+// Prepared releases can use their main cut for forward ordering after a browser-test-only repair.
 import { spawnSync } from 'node:child_process';
 
 const VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/u;
@@ -15,19 +15,34 @@ export function preparedReleaseFollows(older, newer, cwd = process.cwd()) {
     const result = spawnSync('git', args, { cwd, env, encoding: 'utf8' });
     return result.status === 0 ? result.stdout.trim() : null;
   };
+  /** @param {string} commit */
+  const parentOf = commit => {
+    const parent = git(['show', '-s', '--format=%P', commit]);
+    return parent !== null && COMMIT.test(parent) ? parent : null;
+  };
+  /** @param {string} from @param {string} to */
+  const pathsBetween = (from, to) => git(['diff', '--name-only', '--no-renames', from, to])?.split('\n').filter(Boolean) ?? [];
   /** @param {string} build @returns {{version: number[], cut: string} | null} */
   const prepared = build => {
     try {
       const pkg = JSON.parse(git(['show', `${build}:package.json`]) ?? 'null');
       if (typeof pkg?.version !== 'string' || !VERSION.test(pkg.version)) return null;
       const version = pkg.version;
+      const subject = `chore(release): v${version}`;
       if (git(['rev-parse', '--verify', `refs/remotes/origin/release/v${version}^{commit}`]) !== build
-        || git(['show', '-s', '--format=%s', build]) !== `chore(release): v${version}`) return null;
-      const parents = (git(['show', '-s', '--format=%P', build]) ?? '').split(' ');
-      const cut = parents[0];
-      if (parents.length !== 1 || cut === undefined || !COMMIT.test(cut)
-        || git(['merge-base', '--is-ancestor', cut, 'refs/remotes/origin/main']) === null) return null;
-      const paths = (git(['diff', '--name-only', cut, build]) ?? '').split('\n');
+        || git(['show', '-s', '--format=%s', build]) !== subject) return null;
+      let stamp = build, cut = parentOf(stamp);
+      if (cut === null) return null;
+      if (git(['merge-base', '--is-ancestor', cut, 'refs/remotes/origin/main']) === null) {
+        const repair = pathsBetween(cut, build);
+        if (git(['show', '-s', '--format=%s', cut]) !== subject
+          || !repair.some(path => path.startsWith('src/e2e/'))
+          || repair.some(path => !path.startsWith('src/e2e/') && !path.startsWith('project/journal/'))) return null;
+        stamp = cut;
+        cut = parentOf(stamp);
+        if (cut === null || git(['merge-base', '--is-ancestor', cut, 'refs/remotes/origin/main']) === null) return null;
+      }
+      const paths = pathsBetween(cut, stamp);
       if (!paths.includes('package.json') || paths.some(path => !['package.json', 'CHANGELOG.md'].includes(path))) return null;
       // The manifest may change only its version. A code/dependency/config change on the release branch must be retained by real ancestry.
       const parent = JSON.parse(git(['show', `${cut}:package.json`]) ?? 'null');

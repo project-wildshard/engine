@@ -52,3 +52,29 @@ test('release-only code, dependency changes and unpublished cuts still require r
     expect(preparedReleaseFollows('not a commit', clean, repo.dir)).toBe(false);
   } finally { repo.cleanup(); }
 });
+
+test('a prepared release with a browser-test follow-up may supersede an untagged staging cut', () => {
+  const repo = createTempRepo();
+  try {
+    const cut = repo.commit({ 'package.json': manifest('0.1.50'), 'runtime.ts': 'old source' }, 'Main source');
+    const abandoned = prepare(repo, cut, '0.1.52');
+    repo.git(['switch', 'main']);
+    const nextCut = repo.commit({ 'runtime.ts': 'new source' }, 'Fix the entry loop');
+    repo.git(['update-ref', 'refs/remotes/origin/main', nextCut]);
+    const prepared = prepare(repo, nextCut, '0.1.53');
+    const repaired = repo.commit({
+      'src/e2e/t1/explore/explore.spec.ts': 'fixed proof',
+      'project/journal/explore-proof.md': 'Describe the repair',
+    }, 'chore(release): v0.1.53');
+    repo.git(['update-ref', 'refs/remotes/origin/release/v0.1.53', repaired]);
+    expect(preparedReleaseFollows(abandoned, repaired, repo.dir)).toBe(true);
+
+    repo.git(['switch', '--detach', prepared]);
+    const changed = repo.commit({
+      'src/e2e/t1/explore/explore.spec.ts': 'fixed proof',
+      'runtime.ts': 'release-only code',
+    }, 'chore(release): v0.1.53');
+    repo.git(['update-ref', 'refs/remotes/origin/release/v0.1.53', changed]);
+    expect(preparedReleaseFollows(abandoned, changed, repo.dir)).toBe(false);
+  } finally { repo.cleanup(); }
+});
