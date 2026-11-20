@@ -50,11 +50,21 @@ export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibili
         const attribute = tile.geometry.getAttribute(name);
         if (!(attribute instanceof BufferAttribute) || attribute.itemSize !== template.itemSize || attribute.normalized !== template.normalized
           || attribute.array.constructor !== template.array.constructor || attribute.count !== tile.geometry.getAttribute('position').count) throw new Error('Incompatible road tile attribute');
-        for (let i = 0; i < attribute.array.length; i++) {
-          if (i % 4096 === 0) yield;
-          const value = attribute.array[i]; if (value === undefined) throw new Error('Missing road tile attribute value');
-          array[at++] = value;
+        const source = attribute.array;
+        if (source.length !== attribute.count * attribute.itemSize) throw new Error('Missing road tile attribute values');
+        // Publication runs this merge synchronously. Copy typed pages at native
+        // speed while keeping a bounded step for sliced coarse-tile builds.
+        const chunk = 32_768;
+        if (source.length <= chunk) {
+          yield;
+          array.set(source, at);
+        } else {
+          for (let i = 0; i < source.length; i += chunk) {
+            yield;
+            array.set(source.subarray(i, i + chunk), at + i);
+          }
         }
+        at += source.length;
       }
       geometry.setAttribute(name, new BufferAttribute(array, template.itemSize, template.normalized));
     }

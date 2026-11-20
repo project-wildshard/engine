@@ -25,6 +25,24 @@ test('resident road geometry merges and rebases without retaining source arrays'
   a.geometry.dispose(); b.geometry.dispose(); merged.geometry.dispose();
 });
 
+test('a merge keeps normalized bytes across copy chunks and rejects a released channel', () => {
+  const a = fixture(0), b = fixture(10), vertices = 11_000;
+  for (const [tile, fill] of [[a, 13], [b, 241]] as const) {
+    tile.geometry.setAttribute('position', new BufferAttribute(new Float32Array(vertices * 3), 3));
+    tile.geometry.setAttribute('color', new BufferAttribute(new Uint8Array(vertices * 3).fill(fill), 3, true));
+  }
+  const merged = finishRoadSteps(mergeRoadTileSteps([a, b]));
+  const color = merged.geometry.getAttribute('color');
+  expect(color.normalized).toBe(true);
+  expect(color.array).toBeInstanceOf(Uint8Array);
+  expect(color.array).toEqual(Uint8Array.from({ length: vertices * 6 }, (_, i) => i < vertices * 3 ? 13 : 241));
+  const released = b.geometry.getAttribute('color');
+  if (!(released instanceof BufferAttribute)) throw new Error('Expected packed color');
+  released.array = released.array.slice(0, 0);
+  expect(() => finishRoadSteps(mergeRoadTileSteps([a, b]))).toThrow('Missing road tile attribute values');
+  a.geometry.dispose(); b.geometry.dispose(); merged.geometry.dispose();
+});
+
 test('pool keeps one material draw and retirement removes only the owned generation', () => {
   const owner = new Scope('road pool'), material = new MeshBasicMaterial(), culler: RoadCuller = { pitch: 562.5, tileSize: 62.5, plans: new Map() };
   const pool = new RoadTilePool(owner, material, culler, 'road'), a = fixture(0), b = fixture(10);

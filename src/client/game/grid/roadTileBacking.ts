@@ -3,6 +3,8 @@
 import { BufferAttribute, BufferGeometry, type Mesh } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { CONTENT_CAPS } from '@wildshard/engine/core/config';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { frameCost } from '@wildshard/engine/core/frameCost';
 import { presenting } from '@wildshard/engine/core/framePacing';
 import type { RingCamera, TileRequirement, TileStreamBudget, TileStreamer } from '@wildshard/engine/world/tileStreamer';
 import type { CullPlan, RoadCuller } from './roadCull';
@@ -289,6 +291,7 @@ export class RoadTileBacking {
   step(camera: RingCamera): void {
     const stream = this.stream; if (stream === null) return;
     if (this.primeFailure !== null) throw this.primeFailure;
+    const timedAt = frameCost.on ? diagnosticNow() : undefined;
     if (!this.priming) this.prime(camera, stream);
     stream.step(camera);
     if (!this.committed && this.primed && stream.ready()) {
@@ -302,6 +305,7 @@ export class RoadTileBacking {
       this.committed = true;
       for (const pin of this.initialPins) pin.release(); this.initialPins = [];
     }
+    if (timedAt !== undefined) frameCost.sectionOther('grid.road tiles', diagnosticNow() - timedAt);
   }
   /** Bound the first handoff to the existing fine/coarse counts. Coarse
    * publication alone must not retire nearby full-detail roads. */

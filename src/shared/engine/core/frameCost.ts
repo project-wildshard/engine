@@ -131,6 +131,12 @@ class FrameCost {
     this.splitMs += ms;
     if (ms > this.topMs) { this.topMs = ms; this.topLabel = `main:${bucket}`; }
   }
+  /** Name work inside an unbucketed system and deduct it from that system's total. */
+  sectionOther(label: string, ms: number): void {
+    this.other(label, ms);
+    this.splitMs += ms;
+    if (ms > this.topMs) { this.topMs = ms; this.topLabel = label; }
+  }
   /** a breakdown inside a bucket (not summed into it again) */
   sub(sub: Sub, t0: number): void { const i = SI[sub]; this.curSub[i] = (this.curSub[i] ?? 0) + performance.now() - t0; }
   /** one navmesh query that took `ms` (src/shared/engine/physics/navmesh.ts) */
