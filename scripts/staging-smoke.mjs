@@ -98,15 +98,15 @@ export async function runSmoke({ url, release, out, only, cells, card = 'driftwo
   const times = lastTimeToPlay ?? last?.timeToPlay;
   const judged = verdictOf(scenarios, { release, version, deploy, ...(build === undefined ? {} : { build }), ...(times === undefined ? {} : { lastTimeToPlay: times }) });
   // SM3: the Opus vision pass, against the last release's keyframes
-  /** @type {ReturnType<typeof visionPass>} */
+  /** @type {Awaited<ReturnType<typeof visionPass>>} */
   let looks = [];
   if (vision) {
     try {
       const bullets = changelogBullets(changelog, release);
-      // STAGING-QA SQ13: on a deploy the judge only reports, skips what already holds and makes at most 12 calls, 4 at a time
+      // STAGING-QA SQ13: on a deploy the judge only reports, skips what already holds and starts at most 12 judges, 2 at a time
       const held = new Set(judged.findings.filter((f) => f.severity === 'P0' || f.severity === 'P1').map((f) => f.scenario));
       looks = deploy ? await deployVision({ scenarios, held, release, ...(last === undefined ? {} : { last }), bullets, out })
-        : visionPass({ scenarios, release, ...(last === undefined ? {} : { last }), bullets, out });
+        : await visionPass({ scenarios, release, ...(last === undefined ? {} : { last }), bullets, out });
     } catch (error) {
       if (!deploy) throw error;
       looks = [{ scenario: 'vision', verdict: 'error', line: 'vision evidence could not be prepared' }];

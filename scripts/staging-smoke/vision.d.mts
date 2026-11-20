@@ -15,11 +15,17 @@ export function visionPrompt({ sheet, scenario, title, last, release, bullets, c
     bullets: readonly string[];
     columns?: string;
 }): string;
-/** The same call as askClaude, without blocking (SQ13). */
-export function askClaudeAsync(prompt: string, cwd: string, o?: { claude?: string; timeoutMs?: number }): Promise<Omit<Vision, "scenario">>;
-/** STAGING-QA SQ13: the most model calls one deploy run makes, and how many run at once. */
+/** J474: how a judge is reached: the herdr binary (a stub in the test), its timeout, the environment (HERDR_ENV, HERDR_PANE_ID). */
+export type JudgeOptions = { herdr?: string; timeoutMs?: number; env?: NodeJS.ProcessEnv; workRoot?: string };
+/** The judge's own Claude arguments: Opus, Read and Write, no added folders; never -p / --print (J474). */
+export function judgeArgs(): string[];
+/** The prompt's last line: write the verdict JSON to `file`. */
+export function writeVerdict(file: string): string;
+/** J474: one Opus judge, an interactive Claude in a no-focus herdr pane; `skipped` with no herdr. */
+export function askJudge(promptFor: (sheet: string) => string, sheet: string, verdictFile: string, o?: JudgeOptions): Promise<Omit<Vision, "scenario">>;
+/** STAGING-QA SQ13: the most judges one deploy run starts, and how many at once. */
 export const VISION_MAX_CALLS: 12;
-export const VISION_PARALLEL: 4;
+export const VISION_PARALLEL: 2;
 /** SQ13, the deploy judge (report-only): skips held scenarios, at most `maxCalls` calls, `parallel` at a time. */
 export function deployVision(o: {
     scenarios: readonly { id: string; title: string; status: string; frames: Record<string, string>; cells?: readonly string[] }[];
@@ -28,31 +34,15 @@ export function deployVision(o: {
     last?: { release: string; dir: string };
     bullets: readonly string[];
     out: string;
-    claude?: string;
-    timeoutMs?: number;
     maxCalls?: number;
     parallel?: number;
-}): Promise<Vision[]>;
+} & JudgeOptions): Promise<Vision[]>;
 /** The last JSON object in a model reply, checked. @param {string} text @returns {Omit<Vision, 'scenario'> | undefined} */
 export function parseVision(text: string): Omit<Vision, "scenario"> | undefined;
-/**
- * Ask Claude about one sheet. `claude` is whatever is first on PATH (the test puts a stub there). The call runs from
- * ~/.cache/wildshard/plan-artifacts (outside every repo, so no project instructions load), with only the Read tool and the
- * sheet's folder (`cwd`) added.
- * @param {string} prompt @param {string} cwd @param {{ claude?: string, timeoutMs?: number }} [o] @returns {Omit<Vision, 'scenario'>}
- */
-export function askClaude(prompt: string, cwd: string, { claude, timeoutMs }?: {
-    claude?: string;
-    timeoutMs?: number;
-}): Omit<Vision, "scenario">;
 /** The release's changelog bullets from CHANGELOG.md (`## vX.Y.Z (date)` then `- ` lines). @param {string} file @param {string} release */
 export function changelogBullets(file: string, release: string): string[];
-/**
- * The vision pass over every scenario that ran: a sheet each against the last release's frames, then one call.
- * @param {{ scenarios: readonly { id: string, title: string, status: string, frames: Record<string, string> }[], release: string,
- *   last?: { release: string, dir: string }, bullets: readonly string[], out: string, claude?: string }} o @returns {Vision[]}
- */
-export function visionPass({ scenarios, release, last, bullets, out, claude, timeoutMs }: {
+/** The vision pass over every scenario that ran: a sheet each against the last release's frames, then one judge, in turn. */
+export function visionPass(o: {
     scenarios: readonly {
         id: string;
         title: string;
@@ -66,14 +56,12 @@ export function visionPass({ scenarios, release, last, bullets, out, claude, tim
     };
     bullets: readonly string[];
     out: string;
-    claude?: string;
-    timeoutMs?: number;
-}): Vision[];
+} & JudgeOptions): Promise<Vision[]>;
 /** Regressions as findings (severity from the model, P1 when it gave none). @param {readonly Vision[]} vision */
 export function visionFindings(vision: readonly Vision[]): (import("./checks.mjs").Finding & {
     sheet?: string;
 })[];
-/** @typedef {'same' | 'changed' | 'regressed' | 'baseline' | 'error'} VisionVerdict */
+/** @typedef {'same' | 'changed' | 'regressed' | 'baseline' | 'error' | 'skipped'} VisionVerdict */
 /** @typedef {{ scenario: string, verdict: VisionVerdict, severity?: 'P0' | 'P1' | 'P2', bullet?: string, line: string, sheet?: string }} Vision */
 export const VISION_MODEL: "claude-opus-5-5";
 export type VisionVerdict = "same" | "changed" | "regressed" | "baseline" | "error" | "skipped";
