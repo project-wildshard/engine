@@ -7,7 +7,8 @@
 // --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
 // --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
 // --voices times every procedural voice render from the wake lock to the route's end (census.mjs), with the page clock.
-// --frames logs every frame over 45 ms from the wake lock to the route's end with the links, uploads and scene adds in it.
+// --frames logs every frame over 45 ms from the wake lock to the route's end with the links, uploads and scene adds in it,
+// and on the phone JavaScriptCore's collections (the inspector's Heap agent), then names each frame over 50 ms's cause.
 // --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split). --legs n plays the first n segments only.
 //
 // Each run plays the route (route.mjs) once per cap, each from its own cold boot (fresh Safari on the phone, a fresh WebKit
@@ -24,7 +25,7 @@ import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone } from './safari.mjs';
-import { FRAME_LOG_READ, FRAME_LOG_START, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
+import { FRAME_LOG_READ, FRAME_LOG_START, nameLongFrames, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 
 const { values } = parseArgs({ options: {
@@ -82,6 +83,7 @@ async function bench() {
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
           if (values.frames === true) row.frameLog = await driver.evaluate(FRAME_LOG_START).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
+          if (values.frames === true && 'heapStart' in driver && typeof driver.heapStart === 'function') row.heapLog = await driver.heapStart().then(() => 'logging', (/** @type {unknown} */ error) => `error: ${String(error)}`);
           if (values.voices === true) row.voiceLog = await driver.evaluate(VOICE_LOG_START).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           if ('gesture' in driver && typeof driver.gesture === 'function') row.audioUnlock = await driver.gesture(unlockAudio).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           // --profile <s>: WebKit's sampling profiler over the route's first seconds (DW2: what the long tasks are)
@@ -124,6 +126,19 @@ async function bench() {
               for (const c of (log?.costs ?? []).filter((/** @type {any[]} */ cost) => cost[1] > 50)) {
                 console.log(`  update ${String(c[1])} ms at ${String(Math.round((c[0] - (log?.from ?? 0)) / 100) / 10)} s: top ${String(c[3])}; ${String(c[4])}`);
               }
+              // DF8 (mini-driftwood13h): each frame over 50 ms named (gc, compile, upload, update, render, other)
+              if (row.heapLog === 'logging' && 'heapStop' in driver && typeof driver.heapStop === 'function') {
+                row.gc = await driver.heapStop().catch((/** @type {unknown} */ error) => ({ error: String(error), collections: [] }));
+                const gcs = /** @type {[string, number, number][]} */ (row.gc?.collections ?? []);
+                console.log(`  gc: ${String(gcs.length)} collections (${String(gcs.filter((c) => c[0] === 'full').length)} full), ${String(gcs.filter((c) => c[2] - c[1] >= 10).length)} of 10 ms or more, anchor ±${String((row.gc?.anchorMs ?? 0) / 2)} ms`);
+              }
+              const named = nameLongFrames(log?.frames ?? [], row.gc?.collections ?? []);
+              row.named = named;
+              /** @type {Record<string, number>} */
+              const byCause = {};
+              for (const n of named) byCause[n.cause] = (byCause[n.cause] ?? 0) + 1;
+              console.log(`  long frames by cause: ${JSON.stringify(byCause)}`);
+              for (const n of named) console.log(`  long ${String(Math.round(n.ms))} ms at ${String(Math.round((n.at - (log?.from ?? 0)) / 100) / 10)} s: ${n.causes.join('; ') || 'other'}`);
             } catch (error) { row.framesError = String(error); }
           }
           if (values.census === true) {

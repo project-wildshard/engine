@@ -65,8 +65,14 @@ export const FRAME_LOG_START = `
 const g = window.__wildshard?.world?.game, r = g?.renderer;
 if (r === undefined) return 'no game';
 const gl = r.getContext(), log = (window.__wsFrameLog = { frames: [], adds: [] });
-let cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0, uloc: 0, ulocProgs: new Set() };
+let cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0, uloc: 0, ulocProgs: new Set(), slow: 0, slowName: '' };
 const render = r.render; r.render = function (...args) { cur.renders++; return render.apply(this, args); };
+// DF8 (mini-driftwood13h): the frame's slowest single draw (renderBufferDirect: a first draw's vertex pack and upload, a
+// first use's uniform lookups) and what it drew, so a long render names its object
+const direct = r.renderBufferDirect;
+r.renderBufferDirect = function (camera, scene, geometry, material, object, group) { const t = performance.now();
+  try { return direct.call(this, camera, scene, geometry, material, object, group); } finally { const ms = performance.now() - t;
+    if (ms > cur.slow) { cur.slow = ms; cur.slowName = (object?.parent?.name || object?.parent?.type || '') + '>' + (object?.name || object?.type || '?'); } } };
 const wrap = (name, count) => { const own = gl[name]; if (typeof own !== 'function') return;
   gl[name] = function (...args) { count(args); return own.apply(this, args); }; };
 wrap('linkProgram', () => { cur.links++; });
@@ -123,16 +129,16 @@ let last = performance.now();
 const tick = (now) => { if (window.__wsFrameLog !== log) return;
   const progs = r.info.programs ?? [], fresh = [];
   for (const p of progs) if (!seen.has(p.id)) { seen.add(p.id); fresh.push(p.name ?? '?'); }
-  log.frames.push([Math.round(now), Math.round((now - last) * 10) / 10, cur.links, cur.tex, cur.texels, cur.buf, r.info.render.triangles, r.info.memory.geometries, fresh.join(','), cur.renders, Math.round(cur.uloc * 10) / 10, [...cur.ulocProgs].join(','), gameSplit(), slowSystems.join(',')]); slowSystems = [];
+  log.frames.push([Math.round(now), Math.round((now - last) * 10) / 10, cur.links, cur.tex, cur.texels, cur.buf, r.info.render.triangles, r.info.memory.geometries, fresh.join(','), cur.renders, Math.round(cur.uloc * 10) / 10, [...cur.ulocProgs].join(','), gameSplit(), slowSystems.join(','), cur.slow >= 5 ? [Math.round(cur.slow), cur.slowName] : null]); slowSystems = [];
   if (log.frames.length > 4000) log.frames.shift();
-  last = now; cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0, uloc: 0, ulocProgs: new Set() }; requestAnimationFrame(tick); };
+  last = now; cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0, uloc: 0, ulocProgs: new Set(), slow: 0, slowName: '' }; requestAnimationFrame(tick); };
 requestAnimationFrame(tick);
 return 'logging';
 `;
 
 /** In the page: FRAME_LOG_START's log, and stop logging: { count, frames: [page ms, interval ms, links, tex uploads,
  * texels, buffer bytes, triangles, geometries, new programs, renderer.render calls, uniform-lookup ms, programs looked up
- * slowly], adds: [page ms, parent>child, triangles], costs: FRAME_LOG_START's update splits }. Only the frames
+ * slowly, the game's update/render split, systems over 15 ms, the slowest draw [ms, parent>object] when 5 ms or more], adds: [page ms, parent>child, triangles], costs: FRAME_LOG_START's update splits }. Only the frames
  * that are long (over 45 ms), link, or upload more than 64k texels or 64 KB, and the frame before each, so the socket
  * holds it. */
 export const FRAME_LOG_READ = `
@@ -143,3 +149,38 @@ const f = log.frames, keep = new Set();
 f.forEach((x, i) => { if (x[1] > 45 || x[2] > 0 || x[4] > 65536 || x[5] > 65536 || x[9] > 1 || x[10] > 5 || (x[13] ?? '') !== '') { keep.add(i); if (i > 0) keep.add(i - 1); } });
 return { count: f.length, from: f[0]?.[0] ?? 0, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders, costs: log.costs ?? [] };
 `;
+
+/**
+ * DF8 (mini-driftwood13h): what each frame over `over` ms waited on, from FRAME_LOG_READ's frames and the inspector's
+ * collections ([type, start ms, end ms] on the page clock). A frame's interval runs from the previous rAF's start to
+ * this one's, so the game frame inside it is the previous tick's (its update/render split, systems, links, uploads),
+ * read from the frame before when the log kept it and from this frame's older split otherwise. Causes, strongest first:
+ * `gc` (a collection overlapping the interval by 10 ms or more), `compile` (a link or 5 ms of first uniform lookups),
+ * `upload` (1 MB of buffers or a million texels), `update` and `render` (20 ms or more), else `other`.
+ * @param {any[][]} frames @param {[string, number, number][]} [collections] @param {number} [over]
+ * @returns {{ at: number, ms: number, cause: string, causes: string[] }[]}
+ */
+export function nameLongFrames(frames, collections = [], over = 50) {
+  /** @type {{ at: number, ms: number, cause: string, causes: string[] }[]} */
+  const named = [];
+  frames.forEach((f, i) => {
+    const ms = Number(f[1]);
+    if (!(ms > over)) return;
+    const end = Number(f[0]), start = end - ms, prev = frames[i - 1];
+    const before = prev !== undefined && Math.abs(Number(prev[0]) - start) <= 2 ? prev : null;
+    const split = /** @type {unknown[] | null} */ (f[12] ?? null), last = /** @type {unknown[] | null} */ (before?.[12] ?? null);
+    const update = Number((before !== null ? last?.[0] : split?.[2]) ?? 0), render = Number((before !== null ? last?.[1] : split?.[3]) ?? 0);
+    /** @type {string[]} */
+    const causes = [];
+    let gc = 0; const kinds = new Set();
+    for (const [type, s, e] of collections) { const lap = Math.min(e, end) - Math.max(s, start); if (lap > 0) { gc += lap; kinds.add(type); } }
+    if (gc >= 10) causes.push(`gc ${[...kinds].join('+')} ${String(Math.round(gc))}`);
+    if (before !== null && (Number(before[2]) > 0 || Number(before[10] ?? 0) >= 5)) { const names = [before[8], before[11]].map(String).find((n) => n !== '' && n !== 'undefined') ?? '?'; causes.push(`compile ${names}`); }
+    if (before !== null && (Number(before[5]) >= 1e6 || Number(before[4]) >= 1e6)) causes.push(`upload ${(Number(before[5]) / 1e6).toFixed(1)} MB`);
+    if (update >= 20) causes.push(`update ${String(update)}${before?.[13] ? ` ${String(before[13])}` : ''}`);
+    const slow = /** @type {[number, string] | null} */ (before?.[14] ?? null);
+    if (render >= 20) causes.push(`render ${String(render)}${slow === null ? '' : ` (draw ${String(slow[0])} ms ${slow[1]})`}`);
+    named.push({ at: end, ms, cause: (causes[0] ?? 'other').split(' ')[0] ?? 'other', causes });
+  });
+  return named;
+}

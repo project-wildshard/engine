@@ -176,6 +176,10 @@ async function attach(socketUrl, { overrides = [] }) {
     if (result?.wasThrown) throw new WebDriverError('javascript error', String(result.result?.description ?? JSON.stringify(result.result)));
     return result?.result?.value ?? null;
   };
+  /** DF8: the Heap agent's collections since heapStart, in the inspector's stopwatch seconds. */
+  /** @type {{ type: string, startTime: number, endTime: number }[]} */
+  const heapLog = [];
+  const heapListener = (/** @type {any} */ message) => { if (message.method === 'Heap.garbageCollected' && heapLog.length < 5000) heapLog.push(message.params.collection); };
   /** @param {(href: string) => boolean} arrived */
   const settle = async (arrived, timeout = 180_000) => {
     const deadline = Date.now() + timeout;
@@ -213,6 +217,42 @@ async function attach(socketUrl, { overrides = [] }) {
         const params = await Promise.race([complete, pause(60_000).then(() => null)]);
         return params?.samples?.stackTraces ?? [];
       } finally { listeners.delete(listener); }
+    },
+    /** DF8 (mini-driftwood13h): JavaScriptCore's collections from now on (the Heap agent's garbageCollected events). */
+    async heapStart() {
+      await ready;
+      heapLog.length = 0;
+      listeners.add(heapListener);
+      await send('Heap.enable', {}, 15_000);
+    },
+    /** Stop the collection log and answer it on the page clock: [type, start ms, end ms] per collection. The inspector's
+     * stopwatch is tied to performance.now() by three forced collections, each between two page clock reads; the tightest
+     * window's middle is the offset (`anchorMs` its width). The forced ones are left out. */
+    async heapStop() {
+      /** @type {{ lo: number, hi: number } | null} */ let best = null;
+      const forced = new Set();
+      try {
+        for (let i = 0; i < 3; i++) {
+          const seen = heapLog.length;
+          const t1 = Number(await run('performance.now()', false, 10_000));
+          await send('Heap.gc', {}, 15_000);
+          const t2 = Number(await run('performance.now()', false, 10_000));
+          for (let wait = 0; heapLog.length === seen && wait < 20; wait++) await pause(100);
+          const gc = heapLog.slice(seen).find((c) => c.type === 'full') ?? heapLog[seen];
+          if (gc === undefined) continue;
+          forced.add(gc);
+          const lo = t1 - gc.startTime * 1000, hi = t2 - gc.startTime * 1000;
+          if (best === null || hi - lo < best.hi - best.lo) best = { lo, hi };
+        }
+      } finally {
+        listeners.delete(heapListener);
+        await send('Heap.disable', {}, 15_000).catch(() => undefined);
+      }
+      if (best === null) return { collections: [], anchorMs: null, offsetMs: null };
+      const offset = (best.lo + best.hi) / 2;
+      // offsetMs maps any inspector stopwatch time (a ScriptProfiler sample's timestamp) onto the page clock: s * 1000 + offsetMs
+      return { anchorMs: Math.round((best.hi - best.lo) * 10) / 10, offsetMs: Math.round(offset * 10) / 10, collections: heapLog.filter((c) => !forced.has(c))
+        .map((c) => [c.type, Math.round(c.startTime * 1000 + offset), Math.round(c.endTime * 1000 + offset)]) };
     },
     async gesture(expression) {
       await ready;

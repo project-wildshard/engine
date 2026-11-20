@@ -1,7 +1,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13): the route bench's numbers. The device half runs on the iPhone 13
 // (meta project/evidence/iphone13-driftwood/).
 import { expect, test } from 'vitest';
-import { OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
+import { nameLongFrames, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
 import { linkStages, linkTable } from '../scripts/memory/iphone/link.mjs';
 import { legSummary, routeFor, routeTable, worstSegment, type LegSample } from '../scripts/memory/iphone/route.mjs';
 
@@ -73,4 +73,27 @@ test('the owner census sums each pass\'s draws by owner, per frame, and puts the
     expect(result.owners).toEqual([['shadow|Scene>palm', 1, 300], ['main|Scene>palm', 1, 300], ['main|Scene>rock', 1, 100]]);
     expect(renderer.renderBufferDirect).toBe(draw);
   } finally { delete globals['window']; delete globals['requestAnimationFrame']; }
+});
+
+test('a long frame is named by what ran in the interval before it: a collection, a link, an upload, the update or the render', () => {
+  // [page ms, interval, links, tex, texels, buffer bytes, tris, geos, new programs, renders, uniform ms, slow programs, split, systems, slowest draw]
+  const frame = (at: number, ms: number, extra: Record<number, unknown> = {}): unknown[] => {
+    const row: unknown[] = [at, ms, 0, 0, 0, 0, 0, 0, '', 2, 0, '', [4, 5, 4, 5], '', null];
+    for (const [i, v] of Object.entries(extra)) row[Number(i)] = v;
+    return row;
+  };
+  const frames = [
+    frame(1000, 33), frame(1060, 60),                                          // nothing in the game: other, unless a collection
+    frame(2000, 33, { 12: [31, 5, 4, 5], 13: 'player.update:26' }), frame(2055, 55), // the update before it
+    frame(3000, 33, { 5: 24_000_000, 12: [3, 40, 4, 5], 14: [28, 'Scene>grid-deck'] }), frame(3090, 90), // upload, then render
+    frame(4000, 33, { 2: 1, 8: 'graph:material:kit' }), frame(4052, 52),       // a link
+    frame(5000, 60),                                                           // no frame before it kept: the older split
+  ];
+  const named = nameLongFrames(frames, [['full', 1010, 1030]]);
+  expect(named.map(n => n.cause)).toEqual(['gc', 'update', 'upload', 'compile', 'other']);
+  expect(named[0]?.causes).toEqual(['gc full 20']);
+  expect(named[1]?.causes).toEqual(['update 31 player.update:26']);
+  expect(named[2]?.causes).toEqual(['upload 24.0 MB', 'render 40 (draw 28 ms Scene>grid-deck)']);
+  expect(named[3]?.causes).toEqual(['compile graph:material:kit']);
+  expect(nameLongFrames(frames, [['partial', 1010, 1015]])[0]?.cause).toBe('other'); // under 10 ms of collection
 });

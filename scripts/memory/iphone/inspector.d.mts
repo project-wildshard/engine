@@ -9,6 +9,9 @@ export interface InspectedSafari {
   gesture: (expression: string) => Promise<unknown>;
   profileStart: () => Promise<void>;
   profileStop: () => Promise<{ timestamp: number; stackFrames: { name: string; url: string; line: number; column: number }[] }[]>;
+  /** DF8: JavaScriptCore's collections, on the page clock: [type, start ms, end ms] */
+  heapStart: () => Promise<void>;
+  heapStop: () => Promise<{ collections: [string, number, number][]; anchorMs: number | null; offsetMs: number | null }>;
   navigate: (url: string) => Promise<void>;
   reload: () => Promise<void>;
   freshTab: () => Promise<void>;

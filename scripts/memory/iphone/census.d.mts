@@ -7,3 +7,5 @@ export declare const VOICE_WORKER_READ: string;
 /** In-page bodies (census.mjs): log every frame's interval with its GL links, uploads and scene adds, then read it. */
 export declare const FRAME_LOG_START: string;
 export declare const FRAME_LOG_READ: string;
+/** DF8: what each long frame waited on (gc, compile, upload, update, render or other). */
+export declare function nameLongFrames(frames: unknown[][], collections?: [string, number, number][], over?: number): { at: number; ms: number; cause: string; causes: string[] }[];
