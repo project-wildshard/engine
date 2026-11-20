@@ -124,7 +124,7 @@ export class AacTrack {
     try { index = indexRecordingAac(bytes); } catch { return undefined; }
     const frames = index.sizes.length * 1024 - index.primingFrames;
     if (!aacWindowEligible(48000, loopStart, loopEnd, frames)) return undefined;
-    const native = factory ?? await nativeAacFactory(index);
+    const native = factory ?? await nativeAacFactory(index, bytes);
     if (!native || owner?.disposed) return undefined;
     return new AacTrack(bytes, index, native, loopStart, loopEnd, decode, buffers, prefillFrames, copy);
   }
