@@ -14,6 +14,7 @@ import * as v from 'valibot';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import { slicer } from '@wildshard/engine/boot/plan';
 import { ktx2File, ktx2Texture } from '@wildshard/engine/core/ktx2';
+import { ChangedBatchedMesh, prepareBatchGeometryRetirement } from '@wildshard/engine/render/changedTextureUploads';
 import { TIER } from '@wildshard/engine/core/tier';
 import { gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
 import { graphicsMode, PIXELS_EVENT } from '@wildshard/engine/core/graphicsMode';
@@ -45,7 +46,9 @@ import { NO_VIEW_MERGE } from '../grid/staticViewMerge';
  *  (absent: the ambient owner, as a resident world's build). */
 export interface BakedTilesOwner { readonly product: ShardFolder; readonly parent: THREE.Object3D; readonly sky: SkyRig; readonly registry: WorldRegistry; readonly scope?: Scope;
   /** the world's ground mesh geometry a row's `wear` declares as its part 0 */
-  readonly ground?: THREE.BufferGeometry }
+  readonly ground?: THREE.BufferGeometry;
+  /** the renderer multi-draws (`WEBGL_multi_draw`): the cove batch (`debug.coveBatch`) may draw its families */
+  readonly multiDraw?: boolean }
 /** The drawn set: its group, its tiles in file order, its once-a-frame bounce update, and (registered whole, under its own
  *  scope) the colliders no copy claims, which `bakedTileContents` moves onto the collider ring. */
 export interface BakedTiles { readonly group: THREE.Group; readonly tiles: readonly THREE.Mesh[]; readonly update: () => void; readonly unclaimed?: BakedUnclaimed }
@@ -143,19 +146,24 @@ async function placeFamilies(owner: BakedTilesOwner, row: BakedTilesRow, instanc
   const ctx = modelContext(owner.sky), slice = slicer();
   const batch = owner.scope !== undefined && TIER === 'phone' && bakedPropBatchEnabled(row.id);
   const batchMeshes: THREE.Mesh[] = [];
+  // DF10 (mini-df10c): one multi-draw batch per look, every family's copies in it (the cove drew ~17 draws a frame)
+  const shared = owner.scope !== undefined && owner.multiDraw === true && coveBatchOn() ? new Map<string, GrowingBatch>() : null;
   for (const family of plan.families) {
     const declared = instances.families.find(entry => entry.key === family.key); if (declared === undefined) throw new Error('Missing baked family');
     const model = defineGeometryModel(declared.model, 'proto', { category: declared.model.category, pipeline: declared.model.pipeline }, { geometry, materials });
     const placements = bakedPlacementPoses(f, family.indices, instances.names, row.drop);
     const slot = instances.looks[declared.look]; if (slot === undefined) throw new Error('Missing baked family look');
     const cull: CullOptions = slot.cull[TIER];
+    const into = shared === null ? undefined : coveBatchOf(shared, declared.look, materials[declared.look], declared.model.parts, declared.model.lods, cull);
     // FC12: a merged family is one mesh per material (its tints baked into its vertex colours); the rest instanced
-    const placed = await owned(owner, () => placeSliced(model, placements, { ctx, registry: owner.registry, parent: group, cull,
-      ...(declared.merge === true ? { draw: 'merged' as const, mergedTint: true, shadowWhole: true } : { draw: 'instanced' as const }),
+    const placed = await owned(owner, () => placeSliced(model, placements, { ctx, registry: owner.registry, parent: group,
+      ...(into !== undefined ? { draw: 'batched' as const, batch: into, cull: batchedCull(cull) }
+        : declared.merge === true ? { cull, draw: 'merged' as const, mergedTint: true, shadowWhole: true } : { cull, draw: 'instanced' as const }),
       piece: { id: `${row.id}-${family.key}`, ...(family.colliders.length > 0 ? { colliders: family.colliders.map(c => boxDesc(c, instances.surface)) } : {}) } }, slice.due));
     if (batch && declared.merge === true && isMesh(placed.object)) batchMeshes.push(placed.object);
   }
   if (batch) installBakedPropBatch(group, batchMeshes, owner.scope);
+  if (shared !== null) for (const look of shared.values()) fitBatch(look);
   const piece = { name: instances.unclaimed, category: 'nature' as const, file: 'src/client/game/shardfile/bakedTiles.ts', surface: instances.surface, solidFloor: false };
   const colliders = plan.unclaimed.map(c => boxDesc(c, instances.surface)), id = `${row.id}-unclaimed`;
   if (owner.scope === undefined) { owned(owner, () => owner.registry.add({ ...piece, id, colliders })); return undefined; }
@@ -170,6 +178,81 @@ const batchSlot = jsonSlot('debug.bakedPropBatch', 'device');
 /** DF10: a baked set's looks stay out of the static view merge (`debug.staticMerge`). The cove's tiles and props drew black
  *  merged on relay 1's look board, and again with their normals kept (mini-df10b's shots, 2026-11-20). */
 function markBakedLook(look: THREE.Material): void { look.userData[NO_VIEW_MERGE] = true; }
+
+export const COVE_BATCH_SLOT = 'debug.coveBatch';
+export const COVE_BATCH_DEFAULT = false;
+/** Unset at phone Low: off until an iPhone 13 pair decides (DF10, mini-df10c). */
+export const COVE_BATCH_PHONE_LOW = false;
+const coveBatchSlot = jsonSlot(COVE_BATCH_SLOT, 'device');
+/** The slot's value: a boolean wins; unset, COVE_BATCH_PHONE_LOW at phone Low, else COVE_BATCH_DEFAULT. */
+export function coveBatch(saved: unknown, phoneLow = false): boolean {
+  if (typeof saved === 'boolean') return saved;
+  return phoneLow ? COVE_BATCH_PHONE_LOW : COVE_BATCH_DEFAULT;
+}
+function coveBatchOn(): boolean {
+  let saved: unknown = null;
+  try { saved = coveBatchSlot.read(); } catch { /* storage blocked: the default */ }
+  let low = false;
+  try { low = graphicsMode() === 'low'; } catch { /* no settings: not Low */ }
+  return TIER === 'phone' && low && coveBatch(saved, true);
+}
+
+const usedVertices = (batch: THREE.BatchedMesh): number => Number(Reflect.get(batch, '_nextVertexStart'));
+const usedIndices = (batch: THREE.BatchedMesh): number => Number(Reflect.get(batch, '_nextIndexStart'));
+/**
+ * DF10 (mini-df10c): a cove look's one multi-draw batch, grown as each family adds its geometries and copies (a shared
+ * `place` batch is sized by its owner; the families' sizes are known only once built), then fitted to what it holds.
+ */
+export class GrowingBatch extends ChangedBatchedMesh {
+  override addGeometry(geometry: THREE.BufferGeometry, reservedVertexCount = -1, reservedIndexCount = -1): number {
+    const vertices = Math.max(reservedVertexCount, geometry.getAttribute('position').count), indices = Math.max(reservedIndexCount, geometry.index?.count ?? 0);
+    const needVertices = vertices - this.unusedVertexCount, needIndices = indices - this.unusedIndexCount;
+    if (needVertices > 0 || needIndices > 0) {
+      const maxVertices = this.unusedVertexCount + usedVertices(this), maxIndices = this.unusedIndexCount + usedIndices(this);
+      this.setGeometrySize(Math.max(maxVertices * 2, maxVertices + needVertices), Math.max(maxIndices * 2, maxIndices + needIndices));
+    }
+    return super.addGeometry(geometry, reservedVertexCount, reservedIndexCount);
+  }
+  override addInstance(geometryId: number): number {
+    if (this.instanceCount >= this.maxInstanceCount) this.setInstanceCount(this.maxInstanceCount * 2);
+    return super.addInstance(geometryId);
+  }
+}
+/** Shrink a grown batch to what the families added, and keep its CPU copy only until the upload (as a family's own
+ *  phone batch). */
+function fitBatch(batch: GrowingBatch): void {
+  if (batch.instanceCount === 0) return;
+  batch.setGeometrySize(usedVertices(batch), Math.max(1, usedIndices(batch)));
+  batch.setInstanceCount(batch.instanceCount);
+  const ids: number[] = [];
+  for (let id = 0; id < Number(Reflect.get(batch, '_geometryCount')); id++) ids.push(id);
+  prepareBatchGeometryRetirement(batch, ids);
+  batch.computeBoundingBox(); batch.computeBoundingSphere();
+}
+type ModelParts = Readonly<Record<string, readonly { readonly castShadow: boolean; readonly receiveShadow: boolean }[] | undefined>>;
+/** The look's batch, made at its first family: it casts and receives if any part does, as the families' own draws did. A
+ *  celled look (the cover: thousands of copies) is chosen by cell and drawn as chosen; the casters (palms, crags) are
+ *  frustum-tested by three per camera, shadow cascades included, which stands in for `casters`. */
+function coveBatchOf(shared: Map<string, GrowingBatch>, look: string, material: THREE.Material | undefined, parts: ModelParts, lods: readonly { readonly parts: ModelParts }[], cull: CullOptions): GrowingBatch {
+  if (material === undefined) throw new Error('Missing baked family look');
+  let batch = shared.get(look);
+  if (batch === undefined) {
+    batch = new GrowingBatch(64, 4096, 8192, material);
+    batch.name = `cove-batch:${look}`; batch.sortObjects = false; batch.perObjectFrustumCulled = cull.cells === undefined;
+    shared.set(look, batch);
+  }
+  for (const rows of [parts, ...lods.map(level => level.parts)]) for (const list of Object.values(rows)) for (const part of list ?? []) {
+    if (part.castShadow) batch.castShadow = true;
+    if (part.receiveShadow) batch.receiveShadow = true;
+  }
+  return batch;
+}
+/** A batched family's cull: the cells as they were; the casters' frustum test is the batch's own (three's, per camera). */
+function batchedCull(cull: CullOptions): CullOptions {
+  if (cull.cells !== undefined) return cull;
+  const { casters: _casters, ...rest } = cull;
+  return { ...rest, frustum: false };
+}
 
 export function bakedPropBatchEnabled(row: string): boolean {
   try { return batchSlot.read() === row; } catch { return false; }
@@ -194,6 +277,13 @@ export function installBakedPropBatch(group: THREE.Group, meshes: readonly THREE
   };
   resident.listen(document, PIXELS_EVENT, refresh);
   refresh();
+}
+
+/** whether a renderer multi-draws (`WEBGL_multi_draw`); none (a test host): no */
+function multiDrawOf(renderer: unknown): boolean {
+  const extensions: unknown = typeof renderer === 'object' && renderer !== null ? Reflect.get(renderer, 'extensions') : null;
+  const has: unknown = typeof extensions === 'object' && extensions !== null ? Reflect.get(extensions, 'has') : null;
+  return typeof has === 'function' && Reflect.apply(has, extensions, ['WEBGL_multi_draw']) === true;
 }
 
 /** baked sets already tiled (a set is shared by its shard's residents: it is tiled once) */
@@ -281,7 +371,7 @@ async function draw(ctx: ShardContext, rows: readonly BakedTilesRow[], resident:
   const drawn = new Map<string, BakedTiles>();
   for (const row of rows) {
     const ground = row.wear?.ground === true ? { ground: world.terrain.mesh.geometry } : {};
-    const baked = await installBakedTiles({ product: ctx.product, parent: ctx.root, sky: world.sky, registry, scope: resident, ...ground }, row);
+    const baked = await installBakedTiles({ product: ctx.product, parent: ctx.root, sky: world.sky, registry, scope: resident, multiDraw: multiDrawOf(world.game?.renderer), ...ground }, row);
     drawn.set(row.id, baked); resident.onDispose(() => { baked.group.removeFromParent(); });
   }
   return drawn;

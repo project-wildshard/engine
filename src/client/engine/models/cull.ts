@@ -19,6 +19,7 @@
  * camera), `flat` (distances on the ground), `from: 'origin'` (measured from the placement, not the bounds' centre),
  * `radiusBias` (a big copy switches later), `step` (re-chosen only once the eye moved that far), `bounds: 'sphere'`.
  */
+import { ownedArray } from '../../../shared/engine/core/ownedBuffer';
 import * as THREE from 'three';
 import { TIER_CONFIG } from '../core/tier';
 
@@ -803,6 +804,114 @@ export class BatchedCull {
         // its level's geometry; in a dissolve band, the next level's when it has none at this one (the forest's impostor)
         let g = l < 0 ? -1 : BatchedCull.at(slot, l, d2);
         if (g < 0 && a >= 0) g = BatchedCull.at(slot, a, d2);
+        if (this.shown[k] === g) continue;
+        if (g < 0) slot.mesh.setVisibleAt(slot.instance, false);
+        else { slot.mesh.setGeometryIdAt(slot.instance, g); slot.mesh.setVisibleAt(slot.instance, true); }
+        this.shown[k] = g;
+      }
+    }
+  }
+}
+
+/**
+ * DF10 (mini-df10c): `CullOptions.cells` for a batch. CelledCopiesCull's buckets and tests (each cell's sphere for range and
+ * view, then each of its copies' ground distance against `far` and `test`), but a copy is drawn by setting its batch
+ * instance's geometry and visibility, and only the slots whose level changed are touched (no matrices rewritten).
+ * `slots` are grouped per copy as BatchedCull's: copy i owns slots [start[i], start[i + 1]).
+ */
+const CELLED_BATCH_LABEL = { owner: 'engine/celled-batch-cull', asset: 'choice' } as const;
+export class CelledBatchCull {
+  private readonly view: View;
+  private readonly sphere = new THREE.Sphere();
+  private readonly slots: readonly BatchedSlot[];
+  private readonly start: Uint32Array;
+  /** per slot: the geometry it draws now (-1 hidden, -2 not yet chosen) */
+  private readonly shown: Int32Array;
+  /** per copy, this choice: its level (-1: not drawn) and its ground distance squared */
+  private readonly level: Int8Array;
+  private readonly d2: Float64Array;
+  private readonly cells: Float64Array;
+  private readonly cellStart: Uint32Array;
+  private readonly order: Uint32Array;
+  private readonly far: number;
+  private readonly test: ((i: number, d2: number) => boolean) | null;
+  private readonly from2: Float32Array;
+  private readonly origins: Float32Array;
+  constructor(slots: readonly BatchedSlot[], start: Uint32Array, origins: Float32Array, from: readonly number[],
+    o: CullOptions & { readonly cells: { readonly size: number; readonly pad: number } }) {
+    this.slots = slots;
+    this.start = start;
+    this.origins = origins;
+    this.view = viewFor(o, true);
+    this.far = o.far ?? Number.POSITIVE_INFINITY;
+    this.test = o.test ?? null;
+    this.from2 = ownedArray(Float32Array, from.length, CELLED_BATCH_LABEL);
+    from.forEach((d, k) => { this.from2[k] = d * d; });
+    const n = origins.length / 3, { size, pad } = o.cells;
+    this.shown = ownedArray(Int32Array, slots.length, CELLED_BATCH_LABEL).fill(-2);
+    this.level = ownedArray(Int8Array, n, CELLED_BATCH_LABEL);
+    this.d2 = ownedArray(Float64Array, n, CELLED_BATCH_LABEL);
+    const buckets = new Map<string, number[]>();
+    for (let i = 0; i < n; i++) {
+      const k = `${Math.floor((origins[i * 3] ?? 0) / size)},${Math.floor((origins[i * 3 + 2] ?? 0) / size)}`;
+      let b = buckets.get(k);
+      if (!b) buckets.set(k, (b = []));
+      b.push(i);
+    }
+    this.cells = ownedArray(Float64Array, buckets.size * 4, CELLED_BATCH_LABEL);
+    this.cellStart = ownedArray(Uint32Array, buckets.size + 1, CELLED_BATCH_LABEL);
+    this.order = ownedArray(Uint32Array, n, CELLED_BATCH_LABEL);
+    let c = 0, at = 0;
+    for (const [k, idx] of buckets) {
+      const [ix = 0, iz = 0] = k.split(',').map(Number);
+      let ymin = Number.POSITIVE_INFINITY, ymax = Number.NEGATIVE_INFINITY;
+      for (const i of idx) { const y = origins[i * 3 + 1] ?? 0; if (y < ymin) ymin = y; if (y > ymax) ymax = y; }
+      this.cells.set([(ix + 0.5) * size, (ymin + ymax) * 0.5, (iz + 0.5) * size, Math.hypot(size * 0.5, (ymax - ymin) * 0.5, size * 0.5) + pad], c * 4);
+      this.cellStart[c] = at;
+      for (const i of idx) this.order[at++] = i;
+      c++;
+    }
+    this.cellStart[c] = at;
+  }
+
+  /** @frame */
+  update(camera: THREE.Camera): void {
+    if (this.view.changed(camera)) this.choose();
+  }
+
+  /** a view handed in (`CullOptions.view`) @frame */
+  updateWith(frustum: THREE.Frustum, eye: THREE.Vector3): void {
+    this.view.use(frustum, eye);
+    this.choose();
+  }
+
+  /** @frame */
+  private choose(): void {
+    const p = this.origins, e = this.view.eye, far = this.far, max2 = far * far, cells = this.cells, from2 = this.from2;
+    const level = this.level, dist = this.d2;
+    level.fill(-1);
+    for (let c = 0; c + 1 < this.cellStart.length; c++) {
+      const cx = cells[c * 4] ?? 0, cz = cells[c * 4 + 2] ?? 0, r = cells[c * 4 + 3] ?? 0;
+      const dx = cx - e.x, dz = cz - e.z;
+      if (dx * dx + dz * dz > (far + r) * (far + r)) continue;
+      this.sphere.center.set(cx, cells[c * 4 + 1] ?? 0, cz); this.sphere.radius = r;
+      if (!this.view.sees(this.sphere)) continue;
+      for (let j = this.cellStart[c] ?? 0; j < (this.cellStart[c + 1] ?? 0); j++) {
+        const i = this.order[j] ?? 0;
+        const ex = (p[i * 3] ?? 0) - e.x, ez = (p[i * 3 + 2] ?? 0) - e.z, d2 = ex * ex + ez * ez;
+        if (d2 > max2 || (this.test !== null && !this.test(i, d2))) continue;
+        let l = from2.length - 1;
+        while (l > 0 && d2 < (from2[l] ?? 0)) l--;
+        level[i] = l; dist[i] = d2;
+      }
+    }
+    for (let i = 0; i + 1 < this.start.length; i++) {
+      const l = level[i] ?? -1, d2 = dist[i] ?? 0;
+      for (let k = this.start[i] ?? 0; k < (this.start[i + 1] ?? 0); k++) {
+        const slot = this.slots[k];
+        if (!slot) continue;
+        let g = l < 0 ? -1 : slot.geometry[l] ?? -1;
+        if (g >= 0 && slot.until2 !== null && d2 >= (slot.until2[l] ?? Number.POSITIVE_INFINITY)) g = -1;
         if (this.shown[k] === g) continue;
         if (g < 0) slot.mesh.setVisibleAt(slot.instance, false);
         else { slot.mesh.setGeometryIdAt(slot.instance, g); slot.mesh.setVisibleAt(slot.instance, true); }

@@ -40,7 +40,7 @@ import { buildTier, TIER_CONFIG } from '../core/tier';
 import { loadingSpecimen } from './gear';
 import { specimenReady, paramsOf, seedOf, type ModelBuild, type ModelBuildVisit, type ModelContext, type ModelDef, type ModelPart, type Placement } from './model';
 import { drawnHullOwn, drawnHullWorld, placeCollider, poseGeometry, poseOf, type Pose } from './colliders';
-import { BatchedCull, CelledCopiesCull, CellCull, cullFresh, InstancedCull, SetCull, UntilCull, WeldCull, type BatchedSlot, type CullOptions, type HostedSet, type InstancedSink } from './cull';
+import { BatchedCull, CelledBatchCull, CelledCopiesCull, CellCull, cullFresh, InstancedCull, SetCull, UntilCull, WeldCull, type BatchedSlot, type CullOptions, type HostedSet, type InstancedSink } from './cull';
 import { UnitParts, nearProxy, weldAcross, type WeldBuild } from './weld';
 import { resourceScope } from '../../../shared/engine/app/resources';
 import { ownSceneResource } from '../app/sceneOwnership';
@@ -922,7 +922,12 @@ function drawBatched<P extends object>(def: ModelDef<P>, pls: readonly Placement
   });
   start[n] = slots.length;
   let cull: ((camera: THREE.Camera) => void) | null = null, cullWith: Drawn['cullWith'] = null;
-  if (o.cull !== undefined || levels > 1) {
+  const cells = o.cull?.cells;
+  if (cells !== undefined) {
+    // DF10 (mini-df10c): a celled batch (the cove's cover drawn as one batch per look) keeps the instanced draw's cells
+    const c = new CelledBatchCull(slots, start, pointsOf(pls), levelsOf(def), { ...o.cull, cells });
+    ({ cull, cullWith } = cullersOf(c));
+  } else if (o.cull !== undefined || levels > 1) {
     const bounds = o.cull?.bounds === 'sphere' ? posedSpheres((i) => built[of[i] ?? 0]?.[0] ?? [], poses) : spheresOf(boxes);
     const c = new BatchedCull(slots, start, bounds, levelsOf(def), o.cull ?? {}, originsOf(pls, o), fadesOf(def));
     ({ cull, cullWith } = cullersOf(c));
