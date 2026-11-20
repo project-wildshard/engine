@@ -25,6 +25,7 @@ import { readFolderDescriptor, browserContentHash, type AdmittedFolder, type Fol
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { runtimeBoundWorldFiles } from '../../../shared/game/plugin/runtimeRows';
 import { clientMaterials } from './clientMaterials';
+import { skinTextureRefs } from './clientSkins';
 import { materialTextureRefs } from '@wildshard/format/materials';
 import { keptGraphFileTextureRefs } from './clientGraphs';
 import type { ShardContext } from '../plugin/context';
@@ -384,7 +385,9 @@ export async function runtimeLookMaterials(ctx: Pick<ShardContext, 'scope' | 'ga
     const files = new Map(product.assets.retained);
     const graphFiles = Object.values(shard.look.materials).flatMap(entry => entry.family === 'graph' && 'file' in entry ? [entry.file] : []);
     for (const ref of graphFiles) files.set(ref, await product.assets.read(ref));
-    for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...keptGraphFileTextureRefs(shard.look.materials, hash => files.get(hash))])) files.set(ref, await product.assets.read(ref));
+    // OF23a: a skin look's textures (its skin and variant files' maps) are compiled here too (`clientMaterials` reads
+    // `skinTextureRefs`), so a native runtime with skin looks (Pine's species rows) reads them like its material maps
+    for (const ref of new Set([...materialTextureRefs(shard.look.materials), ...keptGraphFileTextureRefs(shard.look.materials, hash => files.get(hash)), ...skinTextureRefs(shard)])) files.set(ref, await product.assets.read(ref));
     return files;
   });
   if (ctx.scope.disposed) throw new Error('Runtime look scope unloaded while reading materials');
