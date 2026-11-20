@@ -2,7 +2,7 @@ import { bakedSamplers, parseBakedTerrain } from '@wildshard/engine/world/BakedT
 import { clamp } from '@wildshard/format/noise';
 import { readNavmesh } from '@wildshard/engine/physics/navmesh';
 import { createSimHost, type SimHost, type SimLevel } from '@wildshard/engine/sim';
-import { parseNativeAssembly, NATIVE_ASSEMBLY_FILE, type NativeAssemblyBake, type NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';
+import { parseNativeAssembly, NATIVE_ASSEMBLY_FILE, type NativeAssemblyBake, type NativeAssemblyFeature, type NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';
 import { decodeTerrainTile, terrainTileHeight } from '@wildshard/format/terrainTileBytes';
 import { nativeArenaSealSolids } from '../boss/nativeArenaSeal';
 import type { ArenaSealDimensions } from '../../../shared/game/boss/arenaCollision';
@@ -107,6 +107,15 @@ function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan): (host: Si
     return days === undefined ? null : host.useDayClock(declaredDay(days));
   };
 }
+/** The cooked weather files choose the storm owner after its native environment exists. */
+function withSectionWeather(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
+  const environment = features.findIndex(row => row.host === 'riding.environment');
+  if (environment === -1 || features.some(row => row.host === 'weather.native' || row.host === 'weather.program')
+    || !product.hasFile('world/weather.json') || !product.hasFile('server/shelters.json') || !product.hasFile('server/weather.json')) return features;
+  const weather: NativeAssemblyFeature = { host: 'weather.native', program: { file: 'world/weather.json' },
+    shelters: { file: 'server/shelters.json' }, rows: { file: 'server/weather.json' } };
+  return [...features.slice(0, environment + 1), weather, ...features.slice(environment + 1)];
+}
 /** True when this product ships a native-assembly plan. */
 export function hasNativeAssembly(product: ShardFolder): boolean { return product.hasFile(NATIVE_ASSEMBLY_FILE); }
 /**
@@ -123,7 +132,8 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const nav = readNavmesh(navigation, 'Native assembly requires its navigation', () => 0);
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake), product, assets, ports, plan, bake, nav,
     boot: plan.boot === undefined ? null : await readAssemblyInput(product, plan.boot) };
-  const steps = await Promise.all(plan.features.map(feature => prepareAssemblyFeature(feature, prepared)));
+  const features = withSectionWeather(product, plan.features);
+  const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
   const harvest = species === undefined ? [] : [...species.native, ...species.program?.species ?? []];
   const heightAt = ground.heightAt, speed = plan.level.authorCap === true ? clamp(shard.authorCaps.speed, 0, plan.level.speed) : plan.level.speed;
@@ -153,7 +163,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     try { installNativeCollision(proof, bake, { ...need(plan.collision, 'A fresh entry walk needs its collision'), omit: fresh.omit } as Parameters<typeof installNativeCollision>[2]); proof.step(); return walk(proof); } finally { proof.dispose(); }
   }, install: (host, context) => {
     lendReturns(host);
-    recordPrimitives(host, shard, plan.features.map(row => row.host)); // OF17b1: native features name their families until M8
+    recordPrimitives(host, shard, features.map(row => row.host)); // OF17b1: native features name their families until M8
     const run: AssemblyRun<C> = { host, context, input: null, day: world(host) };
     // OF22a3: the ground and prop solids stand first, where a plan's `collision` host stood, before any host reads them
     if (ownSolids) installAssemblySolids(host, shard, assets, ownGround, context.restoring);
