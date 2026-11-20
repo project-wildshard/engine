@@ -297,6 +297,14 @@ export class ShardDecisions {
   }
   /** The player the running binding deals with; between bindings, the host's. */
   private get player(): DecisionRuntime['player'] { return this.dealing ?? this.sim.player; }
+  /** Meta MOSSGATE-ZONE MZ20: who a strike at `handle` lands on. The player handle is the player this binding deals with
+   *  (OF25a: nearest its creature, or nearest `near` for a move's strike outside the script's call), never the id the
+   *  handle table took at install: on a server of two that was always the first player, so a boss struck only at them. */
+  private targetId(handle: number, near?: { x: number; y: number; z: number }): string {
+    if (handle !== DECISION_PLAYER_HANDLE) return requireValue(this.actors.get(handle), 'strike target');
+    const nearest = near === undefined ? undefined : this.sim.nearestPlayer?.(near);
+    return (nearest ?? this.player).id;
+  }
   private combatHandle(id: string): number | undefined {
     for (const [handle, name] of this.actors) if (this.sim.borrowedActors?.has(name) === true && this.sim.entities.get(name)?.combatActor().id === id) return handle;
     // A retained-body binding shares the world's events but lends only its own body.
@@ -443,7 +451,8 @@ export class ShardDecisions {
           apply.push(() => { const runner = new ActorMoveRunner(row, actor); this.motions.set(target, { move: a, target: b, runner, binding: context.binding.id }); this.events.push({ kind: 'move', actor: target, id: a, target: b }); });
         } else {
           this.name('strikes', a); if (b === 0) throw new Error('Decision strike requires a target');
-          apply.push(() => { if (this.sim.startDeclaredStrike(name, requireValue(this.actors.get(b), 'strike target'), this.name('strikes', a))) {
+          const struck = this.targetId(b);
+          apply.push(() => { if (this.sim.startDeclaredStrike(name, struck, this.name('strikes', a))) {
             this.striking.set(target, { strike: a, target: b, binding: context.binding.id, hit: false }); this.events.push({ kind: 'strike', actor: target, id: a, target: b });
           } else this.host.enqueue(context.binding.id, [11, target, a, 0, 0, 0]); });
         }
@@ -577,7 +586,7 @@ export class ShardDecisions {
       if (result.field !== undefined) { const id = requireValue(this.registries.fields?.get(result.field.id), 'move field'); this.writeField(handle, id, result.field.value); }
       if (result.strike !== undefined && motion.target > 0) {
         const strikeId = requireValue(this.registries.strikes?.get(result.strike), 'dive strike');
-        if (this.sim.startDeclaredStrike(requireValue(this.actors.get(handle), 'move strike actor'), requireValue(this.actors.get(motion.target), 'move strike target'), result.strike))
+        if (this.sim.startDeclaredStrike(requireValue(this.actors.get(handle), 'move strike actor'), this.targetId(motion.target, actor.position), result.strike))
           this.striking.set(handle, { strike: strikeId, target: motion.target, binding: motion.binding, hit: false });
         else this.host.enqueue(motion.binding, [11, handle, strikeId, 0, 0, 0]);
       }
