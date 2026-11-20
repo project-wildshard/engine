@@ -18,7 +18,6 @@ import { graphicsMode } from './graphicsMode';
 import { passSplitLimit } from '../render/passSplit';
 import { bindDrawWatch } from '../render/drawCheck';
 import { jsonSlot } from '../saves/slots';
-import { TIER } from './tier';
 import { watchPixelReader } from './watchPixels';
 
 /** what a look found */
@@ -79,7 +78,9 @@ export const LOOKS_S: readonly number[] = [3, 8, 20, 45];
 /** Watch a world reached control: the looks in LOOKS_S, each skipped while it cannot judge. */
 export function installWorldWatch(host: WorldWatchHost, looks: readonly number[] = LOOKS_S): void {
   let reported = false, failed = 0, stopped = false;
-  const asyncRead = TIER === 'desktop' && looks.length > 0 && jsonSlot('debug.worldWatchDrawCheck', 'device').read() === true;
+  // meta DRIFTWOOD-FPS DF8 (mini-driftwood13j): the slot is honoured on phones too; on the iPhone 13 it took the looks'
+  // and DrawCheck's 50 to 70 ms of page-thread GPU waits a boot to none (three cooled pairs)
+  const asyncRead = looks.length > 0 && jsonSlot('debug.worldWatchDrawCheck', 'device').read() === true;
   const readPixels = asyncRead ? watchPixelReader(host.scope) : null;
   const canLook = (): boolean => !stopped && !host.scope.disposed && !host.scope.disposing
     && document.visibilityState === 'visible' && !host.hold && !host.contextLost() && host.playing();
