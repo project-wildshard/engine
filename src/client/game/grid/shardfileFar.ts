@@ -1,4 +1,4 @@
-import { Matrix4, Mesh, BufferGeometry, Float32BufferAttribute, type Object3D } from 'three';
+import { Matrix3, Matrix4, Mesh, BufferAttribute, BufferGeometry, Float32BufferAttribute, type Object3D } from 'three';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -48,10 +48,48 @@ export async function loadShardfileFar(rows: ShardfileFarRows, read: (ref: strin
     throw new Error('Authored far GLB must contain one mesh');
   }
   const geometry = mesh.geometry;
-  geometry.applyMatrix4(mesh.matrixWorld);
+  poseInPlace(geometry, mesh.matrixWorld);
   // G539: its baked impostor, when the build gave it one
   const impostor = far.impostor === undefined ? null : await decodeFarImpostor(far.impostor, await read(far.impostor.file));
   return { prepared: { geometry, positionalMask: true, look: shardfileHaze(rows.fog), impostor }, bytes: far.decoded + far.gpu };
+}
+
+/** A plain float attribute three's per-vertex accessors would read: its own Float32Array, not normalized, three wide. */
+function plainFloat3(attribute: unknown): attribute is BufferAttribute & { array: Float32Array } {
+  return attribute instanceof BufferAttribute && attribute.array instanceof Float32Array && !attribute.normalized && attribute.itemSize === 3;
+}
+/** DF11: `geometry.applyMatrix4(matrix)` with the position and normal passes read straight from their arrays. three's passes
+ *  box every component through `getX`/`fromBufferAttribute` (~15 KB a dock frame while a neighbour's far proxy loads). The
+ *  arithmetic is three's (`Vector3.applyMatrix4`, `applyNormalMatrix` = `applyMatrix3` then `normalize`), in its order, so the
+ *  float32 results are the same bits; tangents, other attribute kinds and the bounds stay three's own. */
+export function poseInPlace(geometry: BufferGeometry, matrix: Matrix4): void {
+  const position = geometry.attributes['position'], normal = geometry.attributes['normal'];
+  if (geometry.attributes['tangent'] !== undefined || (position !== undefined && !plainFloat3(position)) || (normal !== undefined && !plainFloat3(normal))) {
+    geometry.applyMatrix4(matrix); return;
+  }
+  if (position !== undefined) {
+    const a = position.array, e = matrix.elements;
+    for (let i = 0, l = position.count; i < l; i++) {
+      const o = i * 3, x = a[o] ?? 0, y = a[o + 1] ?? 0, z = a[o + 2] ?? 0;
+      const w = 1 / (e[3] * x + e[7] * y + e[11] * z + e[15]);
+      a[o] = (e[0] * x + e[4] * y + e[8] * z + e[12]) * w;
+      a[o + 1] = (e[1] * x + e[5] * y + e[9] * z + e[13]) * w;
+      a[o + 2] = (e[2] * x + e[6] * y + e[10] * z + e[14]) * w;
+    }
+    position.needsUpdate = true;
+  }
+  if (normal !== undefined) {
+    const a = normal.array, e = new Matrix3().getNormalMatrix(matrix).elements;
+    for (let i = 0, l = normal.count; i < l; i++) {
+      const o = i * 3, x = a[o] ?? 0, y = a[o + 1] ?? 0, z = a[o + 2] ?? 0;
+      const nx = e[0] * x + e[3] * y + e[6] * z, ny = e[1] * x + e[4] * y + e[7] * z, nz = e[2] * x + e[5] * y + e[8] * z;
+      const s = 1 / (Math.sqrt(nx * nx + ny * ny + nz * nz) || 1);
+      a[o] = nx * s; a[o + 1] = ny * s; a[o + 2] = nz * s;
+    }
+    normal.needsUpdate = true;
+  }
+  if (geometry.boundingBox !== null) geometry.computeBoundingBox();
+  if (geometry.boundingSphere !== null) geometry.computeBoundingSphere();
 }
 
 /** A shardfile's own placeholder look: pbr, its air its first fog key's colour. */

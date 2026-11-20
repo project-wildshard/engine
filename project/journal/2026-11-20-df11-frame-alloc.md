@@ -34,3 +34,4 @@
   encode loop is branch-light; all bit-equal.
 
 - mini-df11c: an undrawable wire row (another cell's creature) no longer throws and copies the species lists every frame; findSpecies and a per-scope miss cache answer it, and its fields are read only after its kind is drawable (~20 KB a dock frame).
+- mini-df11c: road tile decode checks positions with an indexed loop (a for-of over the Float32Array boxed every component), and a far proxy poses its positions and normals straight from their arrays with three's arithmetic in three's order (test/far-pose-bits.test.ts holds it bit-equal to applyMatrix4).

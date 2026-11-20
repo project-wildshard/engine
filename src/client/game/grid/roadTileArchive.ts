@@ -167,7 +167,9 @@ export function decodeRoadTile(input: Uint8Array): RoadTileGeometry {
     if (index.some(vertex => vertex >= header.vertices)) throw new Error('Road tile index outside vertex table');
     const position = geometry.getAttribute('position');
     if (position.itemSize !== 3) throw new Error('Invalid road tile positions');
-    for (const value of position.array) if (!Number.isFinite(value)) throw new Error('Invalid road tile positions');
+    // DF11: indexed, so no iterator result and boxed float per vertex component (~5 KB a dock frame)
+    const positions = position.array;
+    for (let i = 0; i < positions.length; i++) if (!Number.isFinite(positions[i])) throw new Error('Invalid road tile positions');
     const bounds = new Sphere().makeEmpty(), bins: RoadTileGeometry['plan']['bins'][number][] = []; let start = 0, fineCount = 0;
     for (const row of header.bins) {
       const runs: { start: number; count: number }[] = [];
