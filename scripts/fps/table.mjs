@@ -130,14 +130,14 @@ async function main() {
   if (rates && (selected.length !== 1 || new Set(rates).size !== rates.length ||
     rates.some(rate => !Number.isFinite(rate) || rate < 1 || rate > 8))) throw new Error('Use unique CPU rates from 1 to 8 for one profile');
   const caps = readCaps(root);
-  const plan = selected.flatMap(name => profiles[name].map(spec => {
+  const plan = selected.flatMap(name => profiles[name].flatMap(spec => {
     const cap = capFor(caps, `fps/${name}/${zone}`), floor = cap?.hard;
     if (cap?.kind !== 'floor' || typeof floor !== 'number') throw new Error(`Missing FPS floor for ${name}`);
     const cpu = spec.factor === null ? 1 : factors[spec.factor]?.factor ?? (spec.factor === 'desktopTypical' ? 2 : 1);
     if (!Number.isFinite(cpu) || cpu < 1) throw new Error(`Invalid CPU factor for ${name}`);
     const calibrated = spec.factor===null || spec.factor==='desktopTypical' || factors[spec.factor]?.qualified===true;
     return (rates ?? [cpu]).map(rate => ({ name, profile:{...spec,cpu:rate,floor,calibrated:rates===undefined && calibrated} }));
-  }).flat());
+  }));
   if (choices['dry-run']) { console.log(JSON.stringify({zone,base,host,count,plan,route},null,2)); return 0; }
   if (existsSync(marker)) throw new Error('Jake is playing');
   const version = await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(10_000)});
@@ -166,12 +166,13 @@ async function main() {
       output:cellPath(out,id), build, base, zone, fingerprint };
   }));
   try {
-    for (let j=0; j<route.length; j++) for (const group of groups) {
-      stop.signal.throwIfAborted();
-      const job = group[j];
-      if (readCell(job.output,fingerprint,build,job) !== null) continue;
-      const status = await measureCell(job,stop.signal);
-      console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : 'incomplete'}`);
+    for (let rep=0; rep<count; rep++) {
+      for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
+        stop.signal.throwIfAborted();
+        if (readCell(job.output,fingerprint,build,job) !== null) continue;
+        const status = await measureCell(job,stop.signal);
+        console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : 'incomplete'}`);
+      }
     }
   } catch (error) {
     if (!stop.signal.aborted) throw error;

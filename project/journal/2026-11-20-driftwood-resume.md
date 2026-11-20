@@ -10,3 +10,7 @@ inputs to reach the previous waypoint. Cold and warm measurements use
 their own ordered leg samples. The table still feeds the nightly grader
 with the same full-route report shape. Route samples retain the CPU
 costs and add sparse Metal timer queries for calibration.
+
+The queue finishes every leg of a repeat before moving to the next
+variant, so the first complete route is available while other lanes
+measure. An interrupted run preserved its first two cold dock cells.

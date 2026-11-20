@@ -8,7 +8,7 @@ const witness = { build, gpu:'ANGLE Metal' };
 const route = [{ name:'dock', seconds:1 }, { name:'beach', seconds:1 }];
 const capture = (interval, ms = 15) => ({
   version:{build}, witness, verdict:ms > 20 ? 'miss' : 'pass',
-  legs:[{ name:interval.name, samples:[{ seconds:1, frames:60, frameMs:Array(60).fill(ms) }] }],
+  legs:[{ name:interval.name, samples:[{ seconds:1, frames:60, frameMs:Array.from({length:60}, () => ms) }] }],
 });
 
 test('the resume keeps completed cells and retries missing or incomplete evidence', () => {

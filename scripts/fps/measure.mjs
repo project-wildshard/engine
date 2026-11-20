@@ -18,7 +18,7 @@ import { fpsVerdict } from './verdict.mjs';
 function observeMetal(composer, gl) {
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   if (ext === null) return () => null;
-  const render = composer.render;
+  const originalRender = composer.render;
   /** @type {number[]} */
   const millis = [];
   /** @type {WebGLQuery|null} */
@@ -33,17 +33,17 @@ function observeMetal(composer, gl) {
     gl.deleteQuery(pending);
     pending = null;
   };
-  composer.render = function (...args) {
+  composer.render = function render(...args) {
     settle();
-    if (pending !== null || ++frame % 8 !== 0) return render.apply(this, args);
+    if (pending !== null || ++frame % 8 !== 0) return originalRender.apply(this, args);
     pending = gl.createQuery();
-    if (pending === null) return render.apply(this, args);
+    if (pending === null) return originalRender.apply(this, args);
     gl.beginQuery(ext.TIME_ELAPSED_EXT, pending);
-    try { return render.apply(this, args); }
+    try { return originalRender.apply(this, args); }
     finally { gl.endQuery(ext.TIME_ELAPSED_EXT); }
   };
   return () => {
-    composer.render = render;
+    composer.render = originalRender;
     settle();
     if (pending !== null) gl.deleteQuery(pending);
     millis.sort((a, b) => a - b);
