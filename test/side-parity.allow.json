@@ -8,7 +8,7 @@
  },
  "shards": {
   "driftwood-isle": {
-   "row": "SERVER-PARITY SS1 and SS10b (SS1: the boat's owner and material names are declared the same below, its solids agree since HS2; the pier's chunk copies are declared. SS10b closed: a placed figure's page body sits at its feet, and Driftwood revision 4 bakes Wendell's body as `piece:npc-castaway`)",
+   "row": "SERVER-PARITY SS1 and SS10b (SS1: the boat's owner and material names are declared the same below, its solids agree since HS2; the pier's chunk copies are declared. SS10b closed: a placed figure's page body sits at its feet, and Driftwood revision 4 bakes Wendell's body as `piece:npc-castaway`) Rev 7 (ONE-FORMAT OF22e2, opus-of21-drift5, 2026-11-20) holds its solids as prop rows: the room names them piece.<name> (landing.<edge> for the grid landings) where the page groups the scene name, same shapes; the Sea Cave barrel is a mover on the server and the trade counter overlaps the trader.",
    "same": {
     "driftwood.boat": {
      "page": "boat",
@@ -22,7 +22,45 @@
    "chunked": {
     "pier": "the page registers a pier piece once in every chunk it spans (`pier.c3`, `pier.c4`, `pier.c11`, `pier.c12`): the deck four times, the two landings twice; the room builds each piece once"
    },
-   "known": []
+   "known": [
+    "bridge (planks): 10 page collider(s) the server holds as bridge (wood, dynamic), same shape",
+    "bridge (planks): 4 page collider(s) the server holds as piece.bridge (planks), same shape",
+    "cove (rock): 17 page collider(s) the server holds as piece.cove (rock), same shape",
+    "cove-bpalm (wood): 15 page collider(s) the server holds as piece.cove-bpalm (wood), same shape",
+    "cove-cliff (wood): 176 page collider(s) the server holds as piece.cove-cliff (wood), same shape",
+    "cove-palm (wood): 9 page collider(s) the server holds as piece.cove-palm (wood), same shape",
+    "entry-landings (stone): 1 page collider(s) the server holds as landing.east (stone), same shape",
+    "entry-landings (stone): 1 page collider(s) the server holds as landing.north (stone), same shape",
+    "entry-landings (stone): 1 page collider(s) the server holds as landing.south (stone), same shape",
+    "entry-landings (stone): 1 page collider(s) the server holds as landing.west (stone), same shape",
+    "hut (planks): 24 page collider(s) the server holds as piece.hut (planks), same shape",
+    "interact-altar (wood): 1 page collider(s) the server holds as piece.interact-altar (wood), same shape",
+    "interact-beacon (wood): 1 page collider(s) the server holds as piece.interact-beacon (wood), same shape",
+    "interact-castaway-chest (wood): 1 page collider(s) the server holds as piece.interact-castaway-chest (wood), same shape",
+    "interact-hold-pump (wood): 1 page collider(s) the server holds as piece.wreck (planks), same shape",
+    "interact-hold-winch (wood): 1 page collider(s) the server holds as piece.interact-hold-winch (wood), same shape",
+    "interact-reef-treasure (wood): 1 page collider(s) the server holds as piece.interact-reef-treasure (wood), same shape",
+    "interact-sluice (wood): 1 page collider(s) the server holds as piece.interact-sluice (wood), same shape",
+    "interact-tide-barrel (wood): 1 page collider(s) with no server match, e.g. [147, 0, 3, 148, 1, 4]",
+    "lookout (planks): 39 page collider(s) the server holds as piece.lookout (planks), same shape",
+    "npc-castaway (wood): 1 page collider(s) the server holds as piece.npc-castaway (wood), same shape",
+    "palms (wood): 33 page collider(s) the server holds as piece.palms.2 (wood), same shape",
+    "palms (wood): 6 page collider(s) the server holds as piece.palms (wood), same shape",
+    "palms (wood): 9 page collider(s) the server holds as piece.palms.3 (wood), same shape",
+    "paths (ground): 61 page collider(s) the server holds as piece.trailside (wood), same shape",
+    "paths (ground): 71 page collider(s) the server holds as piece.paths (ground), same shape",
+    "pier (planks): 63 page collider(s) the server holds as piece.pier (planks), same shape",
+    "rocks (rock): 13 page collider(s) the server holds as piece.rocks (rock), same shape",
+    "shrine (stone): 32 page collider(s) the server holds as piece.shrine (stone), same shape",
+    "trade-counter (wood): 1 page collider(s) the server holds as actor (flesh), same shape",
+    "trail-fence-posts (wood): 2 page collider(s) the server holds as piece.pier (planks), same shape",
+    "trail-fence-posts (wood): 32 page collider(s) the server holds as piece.trail-fence-posts (wood), same shape",
+    "trail-signposts (wood): 1 page collider(s) the server holds as piece.trail-signposts (wood), same shape",
+    "trailside (wood): 1 page collider(s) the server holds as piece.lookout (planks), same shape",
+    "trailside (wood): 256 page collider(s) the server holds as piece.trailside (wood), same shape",
+    "trailside (wood): 93 page collider(s) the server holds as piece.trailside.2 (wood), same shape",
+    "zipline (planks): 2 page collider(s) the server holds as piece.zipline (planks), same shape"
+   ]
   },
   "nalati-grasslands": {
    "row": "SERVER-PARITY SS10b: Nalati r3 tags the baked solids. Chunk copies and model-variant names below are matched against the page.",
