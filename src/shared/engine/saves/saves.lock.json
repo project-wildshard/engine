@@ -618,13 +618,14 @@
       "migrations": []
     },
     "shared/sim.snapshot": {
-      "version": 5,
-      "shape": "bbd31cdbefb1e545",
+      "version": 6,
+      "shape": "c7b753e008677dc5",
       "migrations": [
         1,
         2,
         3,
-        4
+        4,
+        5
       ]
     }
   },

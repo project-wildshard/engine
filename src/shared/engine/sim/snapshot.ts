@@ -26,7 +26,7 @@ import type { RespawnRow } from '../../../server/engine/sim/respawn';
 import type { DayClockState } from './dayClock';
 
 /** Same-engine snapshot format; live callbacks and authored content are installed by the fresh host. */
-export const SIM_SNAPSHOT_VERSION = 5;
+export const SIM_SNAPSHOT_VERSION = 6;
 /** Durable per-region ceiling in stored characters; the grid caller uses a logical checkpoint if exact encoding exceeds it. */
 export const SIM_REGION_SNAPSHOT_CHAR_BUDGET: number = 512 * 1024;
 /**
@@ -102,6 +102,8 @@ export interface SimSnapshot {
   /** SB34b: the lead's kill credit, when it is not the world's record of every death (`flags`); absent, it is, so a one-player
    *  save keeps its bytes until a body respawns. */
   credit?: string[] | undefined;
+  /** Authored death flags waiting to be credited at the next tick. */
+  pendingKillCredit?: string[];
   slots: SimSlots; adapters: { id: string; state: SimValue }[];
   /** SF72 body band clocks (SimHost.useBodyBands); absent for a host without bands, so its bytes are unchanged. */
   bands?: BandsState | undefined;
@@ -390,9 +392,13 @@ const restoringHosts = new WeakSet<SimHost>();
 /** True only during the unpublished native replacement transaction. */
 export function isSimHostRestoring(host: SimHost): boolean { return restoringHosts.has(host); }
 /** The lead's kill credit, only where it parts from the world's deaths. */
-function creditField(host: SimHost): { credit?: string[] } {
+function creditField(host: SimHost): { credit?: string[]; pendingKillCredit?: string[] } {
   const credit = host.questFlags.credit.sort((a, b) => a.localeCompare(b)), world = host.flags.all.filter(isCredit).sort((a, b) => a.localeCompare(b));
-  return credit.length === world.length && credit.every((flag, i) => flag === world[i]) ? {} : { credit };
+  const pendingKillCredit = host.pendingKillCredit();
+  return {
+    ...(credit.length === world.length && credit.every((flag, i) => flag === world[i]) ? {} : { credit }),
+    ...(pendingKillCredit === undefined ? {} : { pendingKillCredit }),
+  };
 }
 function savedBooks(host: SimHost): { books?: QuestBookSaved[] } {
   const books = host.questStore?.save();
@@ -433,6 +439,7 @@ export function restoreInstalledHost(host: SimHost, ports: { rapier: Rapier }, s
     for (const entry of saved.strikes) host.strikes.get(entry.id)?.restore(entry.state, host.strikeSpecifications(entry.id));
     host.flags.restore(saved.flags);
     host.questFlags.restoreCredit(saved.credit ?? saved.flags.filter(isCredit));
+    host.restorePendingKillCredit(saved.pendingKillCredit);
     for (const quest of host.quests) { const state = saved.quests.find((entry) => entry.id === quest.def.id); if (state !== undefined) quest.restore(state); }
     // a save's books come back though no quest owner made the store yet: kill credit makes them (SB34a)
     if (saved.books !== undefined) (host.questStore ?? questBooks(host)).restore(saved.books);
