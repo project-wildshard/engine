@@ -15,6 +15,11 @@ export const vehicleDockOf = (vehicle: string): string => { const cut = vehicle.
 const SEAT_ROW = 'vehicle.seat|';
 /** A taken seat's `state` row (MSZ9b): there while someone sits in it, gone when it empties; its value is 1. */
 export const vehicleSeatRow = (vehicle: string, seat: number, player: string): string => `${SEAT_ROW}${vehicle}|${String(seat)}|${player}`;
+const WORN_ROW = 'vehicle.worn|';
+/** MSZ14: a vehicle worn under `VEHICLE_SMOKE` of its health: a `state` row there while it smokes, its value 1. */
+export const vehicleWornRow = (vehicle: string): string => `${WORN_ROW}${vehicle}`;
+/** A worn row's vehicle, or null for any other row. */
+export const parseVehicleWornRow = (name: string): string | null => name.startsWith(WORN_ROW) && name.length > WORN_ROW.length ? name.slice(WORN_ROW.length) : null;
 /** A seat row's vehicle, seat and rider, or null for any other row. */
 export function parseVehicleSeatRow(name: string): { readonly vehicle: string; readonly seat: number; readonly player: string } | null {
   if (!name.startsWith(SEAT_ROW)) return null;

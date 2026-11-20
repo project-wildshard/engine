@@ -70,3 +70,15 @@ restitution 0, the vehicle slows through). A creature has no push law yet: the h
 an overlap (MSZ14 brings its hit by speed). Each hit over 0.5 m/s is an impact with its strength (`runtime.impacts()`)
 for MSZ14 and MSZ15. The floor probe still stops a ledge the cast cannot see, but no longer zeroes a bounce. Two cast
 gotchas: query as WORLD (as PLAYER the filter skipped the wall), and read `normal1` (the hit collider's) facing the move.
+
+## MSZ14: wear and wrecks (opus-mirrorsalt-m4)
+
+Call 4 B: a crash costs something, ramming hurts no creature. Wear goes by each hull's change of speed in a hit (the
+impulse over its own mass), past 8 m/s at 1.8 health per m/s, so a wall at a buggy's top speed costs the default 100 about
+40, a walker or a creature costs nothing (its 90 kg barely moves 600), and the lighter of two vehicles takes more. Under
+30% the server adds a `vehicleWornRow` state row, which the page reads (`FollowedVehicles.worn`) for the smoke, MSZ14b. At
+none the riders are set down by the ordinary leave, the vehicle goes, and its dock has it back after `respawn` s: a shared
+dock spawns it again, a player dock refuses that player's claim until then. Health and the wreck timers ride the save
+(both optional, so older saves restore). The page now drops any vehicle whose row left, shared ones too, since a wrecked
+shared vehicle's collider would otherwise stand where it broke up. The smoke and break-apart look is MSZ14b: it needs a look
+board, and the page's look port still has no way to hide a gone vehicle's panel.

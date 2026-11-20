@@ -13,7 +13,7 @@ import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type Vehi
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
 import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
-import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt, vehicleSeatRow } from '../../../shared/game/shardfile/wirePrompts';
+import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow } from '../../../shared/game/shardfile/wirePrompts';
 import { riderStick } from './mover';
 
 /**
@@ -32,6 +32,12 @@ import { riderStick } from './mover';
  * out), each taken seat a `state` row (`vehicleSeatRow`), and a seated rider's leave press goes by `vehicleLeavePrompt`. A
  * seated body answers the host's `player.traversal` ask, so its walk stands down while the seat leads it. A save keeps every
  * vehicle out, its state, seats and body handle; a save from before the vehicles restores with them fresh at their docks.
+ *
+ * MSZ14 (J459 call 4 B): hits wear a vehicle down. A hit whose change of speed passes `VEHICLE_WEAR.from` takes health by
+ * the rest (so a wall at speed costs a lot, a walker or a creature almost nothing, and the lighter of two vehicles more);
+ * under `VEHICLE_SMOKE` of its health it smokes (a `vehicleWornRow`); at none it is wrecked: its riders are set down beside
+ * it, it goes, and its dock has it back after the dock's `respawn` s (a shared dock spawns it again, a player dock takes that
+ * player's ask again). Ramming hurts no creature (call 4 B).
  */
 export const VEHICLE_IDLE_DESPAWN = 60;
 /** m within which a free seat's prompt shows. */
@@ -75,6 +81,8 @@ interface Live {
   readonly seats: (string | null)[];
   /** s since its driver left (or since it spawned riderless). */
   idle: number;
+  /** MSZ14: what is left of its health. */
+  health: number;
 }
 
 const finite = v.pipe(v.number(), v.finite());
@@ -83,8 +91,9 @@ const Saved = v.strictObject({
     id: v.pipe(v.string(), v.maxLength(256)), dock: v.pipe(v.string(), v.maxLength(128)), owner: v.nullable(v.pipe(v.string(), v.maxLength(128))),
     state: v.strictObject({ x: finite, y: finite, z: finite, yaw: finite, forward: finite, slip: finite, pitch: finite, roll: finite }),
     seats: v.pipe(v.array(v.nullable(v.pipe(v.string(), v.maxLength(128)))), v.maxLength(8)), idle: finite,
-    handle: v.pipe(finite, v.minValue(0)),
+    handle: v.pipe(finite, v.minValue(0)), health: v.exactOptional(finite),
   })), v.maxLength(256)),
+  wrecks: v.exactOptional(v.pipe(v.array(v.strictObject({ id: v.pipe(v.string(), v.maxLength(256)), dock: v.pipe(v.string(), v.maxLength(128)), left: finite })), v.maxLength(256))),
   led: v.pipe(v.array(v.tuple([v.pipe(v.string(), v.maxLength(128)), finite, finite, finite])), v.maxLength(256)),
 });
 type SavedVehicles = v.InferOutput<typeof Saved>;
@@ -101,6 +110,15 @@ const VEHICLE_RESTITUTION = { solid: 0.35, vehicle: 0.3, walker: 0 } as const;
 const WALKER_MASS = 90, CREATURE_MASS = 150;
 /** m/s a walker in a vehicle's way is pushed aside at, at least: no harm (MSZ13), just out of the way. */
 const PUSH_ASIDE = 4;
+/** MSZ14: a kind with no `health` has this much. */
+export const VEHICLE_HEALTH = 100;
+/** MSZ14: a hit wears a vehicle by `per` health for each m/s its speed changes past `from` m/s: a wall at a buggy's top speed
+ *  (22 m/s, a change of 30) costs the default about 40, so the third such hit wrecks it; a scrape or a bump costs nothing. */
+export const VEHICLE_WEAR = { from: 8, per: 1.8 } as const;
+/** MSZ14: under this share of its health a vehicle smokes. */
+export const VEHICLE_SMOKE = 0.3;
+/** MSZ14: a vehicle wrecked this step, where it broke up. */
+export interface VehicleWreckEvent { readonly vehicle: string; readonly at: { readonly x: number; readonly y: number; readonly z: number } }
 /** MSZ13: one hit this step, as the host's sounds and damage read it (MSZ14, MSZ15). */
 export interface VehicleImpactEvent { readonly vehicle: string; readonly strength: number; readonly owner: unknown }
 /** A point of the kind's frame (x right, y up, z back) in the cell, about its heading. */
@@ -127,6 +145,9 @@ export class VehicleRuntime {
   private routes: ReturnType<typeof actRoutes> | null = null;
   /** A restore's vehicles, waiting for their saved world. */
   private restored: SavedVehicles | null = null;
+  /** MSZ14: each wrecked vehicle's id, its dock, and the s left before the dock has it back. */
+  private readonly wrecked = new Map<string, { readonly dock: VehicleDock; left: number }>();
+  private lastWrecks: VehicleWreckEvent[] = [];
   constructor(vehicles: Vehicles, ports: VehicleRuntimePorts) {
     this.ports = ports;
     this.kinds = new Map(vehicles.kinds.map(kind => [kind.id, kind]));
@@ -141,6 +162,12 @@ export class VehicleRuntime {
     const id = playerVehicle(dockId, player);
     return this.live.has(id) ? id : this.spawnAt(dock, player);
   }
+  /** MSZ14: what is left of a vehicle's health, as a share of its kind's. */
+  health(id: string): number { const vehicle = this.get(id); return vehicle.health / (vehicle.kind.health ?? VEHICLE_HEALTH); }
+  /** MSZ14: the vehicles wrecked last step. */
+  wrecks(): readonly VehicleWreckEvent[] { return this.lastWrecks; }
+  /** MSZ14: s before a wrecked vehicle's dock has it back, or none while it is out (or was never wrecked). */
+  respawning(id: string): number | undefined { return this.wrecked.get(id)?.left; }
   /** Whether a player dock stands clear for a new vehicle: no other vehicle's centre within its hull's reach. */
   clear(dockId: string): boolean {
     const dock = this.docks.get(dockId), boxes = this.hulls.get(dockId); if (dock === undefined || boxes === undefined) return false;
@@ -208,7 +235,12 @@ export class VehicleRuntime {
   /** One fixed step of every vehicle: drive, pose the body, then despawn or bring home the idle ones. */
   step(dt: number): void {
     const out: VehicleStepOut = { blocked: false, sliding: 0, impact: null };
-    this.lastImpacts = [];
+    this.lastImpacts = []; this.lastWrecks = [];
+    for (const [id, wreck] of this.wrecked) {
+      wreck.left -= dt; if (wreck.left > 0) continue;
+      this.wrecked.delete(id);
+      if (wreck.dock.per === 'shared' && !this.live.has(id)) this.spawnAt(wreck.dock, null);
+    }
     for (const vehicle of this.live.values()) {
       const driver = this.driver(vehicle.id), command = driver === null ? NEUTRAL : this.ports.stick(driver, vehicle.state.yaw) ?? NEUTRAL;
       out.impact = null;
@@ -222,14 +254,29 @@ export class VehicleRuntime {
       const [x, , z] = vehicle.dock.at;
       if (vehicle.idle >= vehicle.dock.respawn && Math.hypot(vehicle.state.x - x, vehicle.state.z - z) > HOME_RADIUS) this.home(vehicle);
     }
+    for (const vehicle of this.live.values()) if (vehicle.health <= 0) this.wreck(vehicle); // a Map iterates on past a deleted entry
+  }
+  /** MSZ14: a hit's wear on one vehicle: its change of speed past `VEHICLE_WEAR.from`. */
+  private wear(vehicle: Live, change: number): void {
+    if (change > VEHICLE_WEAR.from) vehicle.health = Math.max(0, vehicle.health - (change - VEHICLE_WEAR.from) * VEHICLE_WEAR.per);
+  }
+  /** MSZ14: a vehicle worn out: its riders set down beside it, then it goes until its dock has it back. */
+  private wreck(vehicle: Live): void {
+    for (const rider of vehicle.seats) if (rider !== null) this.leave(rider);
+    this.lastWrecks.push({ vehicle: vehicle.id, at: { x: vehicle.state.x, y: vehicle.state.y, z: vehicle.state.z } });
+    this.despawn(vehicle.id);
+    this.wrecked.set(vehicle.id, { dock: vehicle.dock, left: vehicle.dock.respawn });
   }
   /** MSZ13: a hit's other side: another vehicle takes the impulse over its mass, a walker is pushed aside (no harm); the hit is
    *  heard (`impacts`). */
   private hand(vehicle: Live, impact: VehicleImpact): void {
     this.lastImpacts.push({ vehicle: vehicle.id, strength: impact.strength, owner: impact.owner });
     this.lastImpacts.sort((a, b) => b.strength - a.strength);
+    const push = Math.hypot(impact.impulse.x, impact.impulse.z);
+    this.wear(vehicle, push / vehicle.kind.handling.mass);
     const other = typeof impact.owner === 'string' ? this.live.get(impact.owner) : undefined;
     if (other !== undefined) {
+      this.wear(other, push / other.kind.handling.mass);
       const mass = other.kind.handling.mass, s = other.state, dx = impact.impulse.x / mass, dz = impact.impulse.z / mass;
       const fx = -Math.sin(s.yaw), fz = -Math.cos(s.yaw), rx = Math.cos(s.yaw), rz = -Math.sin(s.yaw);
       other.state = { ...s, forward: s.forward + dx * fx + dz * fz, slip: s.slip + dx * rx + dz * rz };
@@ -296,7 +343,10 @@ export class VehicleRuntime {
   /** Every taken seat as its `state` row. */
   seatRows(): readonly StateNetRow[] {
     const rows: StateNetRow[] = [];
-    for (const vehicle of this.live.values()) vehicle.seats.forEach((player, seat) => { if (player !== null) rows.push({ name: vehicleSeatRow(vehicle.id, seat, player), value: 1 }); });
+    for (const vehicle of this.live.values()) {
+      vehicle.seats.forEach((player, seat) => { if (player !== null) rows.push({ name: vehicleSeatRow(vehicle.id, seat, player), value: 1 }); });
+      if (vehicle.health < VEHICLE_SMOKE * (vehicle.kind.health ?? VEHICLE_HEALTH)) rows.push({ name: vehicleWornRow(vehicle.id), value: 1 });
+    }
     return rows;
   }
   /**
@@ -308,7 +358,7 @@ export class VehicleRuntime {
     for (const vehicle of this.live.values()) this.claim(vehicle);
     for (const dock of this.docks.values()) if (dock.per === 'player') this.routes.claims.set(vehicleDockPrompt(dock.id), player => {
       const body = host.players.get(player);
-      if (body === undefined || !this.clear(dock.id) || Math.hypot(body.position.x - dock.at[0], body.position.z - dock.at[2]) > SEAT_REACH) return;
+      if (body === undefined || this.wrecked.has(playerVehicle(dock.id, player)) || !this.clear(dock.id) || Math.hypot(body.position.x - dock.at[0], body.position.z - dock.at[2]) > SEAT_REACH) return;
       const id = this.spawn(dock.id, player);
       this.board(id, player, this.get(id).kind.seats.findIndex(seat => seat.role === 'driver'));
     });
@@ -331,8 +381,9 @@ export class VehicleRuntime {
   private snapshot(): SavedVehicles {
     return { vehicles: [...this.live.values()].map(vehicle => {
       const handle = vehicle.body?.body.handle; if (handle === undefined) throw new Error(`Vehicle ${vehicle.id} has no body to save`);
-      return { id: vehicle.id, dock: vehicle.dock.id, owner: vehicle.owner, state: { ...vehicle.state }, seats: [...vehicle.seats], idle: vehicle.idle, handle };
-    }), led: [...this.led].map(([player, at]) => [player, at.x, at.y, at.z] as [string, number, number, number]) };
+      return { id: vehicle.id, dock: vehicle.dock.id, owner: vehicle.owner, state: { ...vehicle.state }, seats: [...vehicle.seats], idle: vehicle.idle, handle, health: vehicle.health };
+    }), led: [...this.led].map(([player, at]) => [player, at.x, at.y, at.z] as [string, number, number, number]),
+    wrecks: [...this.wrecked].map(([id, wreck]) => ({ id, dock: wreck.dock.id, left: wreck.left })) };
   }
   /** After a restore's world: its saved vehicles on their saved bodies, or (a save from before them) fresh ones at their docks. */
   private reconnect(): void {
@@ -340,14 +391,15 @@ export class VehicleRuntime {
     const fresh = [...this.live.values()].filter(vehicle => vehicle.owner === null).map(vehicle => vehicle.dock);
     // the old bodies were in the world the restore replaced: drop them and their rows, not their colliders
     for (const vehicle of this.live.values()) { vehicle.body = null; this.unpublish(vehicle.id); }
-    this.live.clear(); this.led.clear();
+    this.live.clear(); this.led.clear(); this.wrecked.clear();
     if (saved === null) { for (const dock of fresh) this.spawnAt(dock, null); return; }
+    for (const row of saved.wrecks ?? []) { const dock = this.docks.get(row.dock); if (dock !== undefined) this.wrecked.set(row.id, { dock, left: row.left }); }
     for (const row of saved.vehicles) {
       const dock = this.docks.get(row.dock);
       if (dock === undefined || row.id !== (row.owner === null ? dock.id : playerVehicle(dock.id, row.owner))) throw new Error(`Invalid vehicle continuation ${row.id}`);
       const vehicle = this.spawnAt(dock, row.owner, row.handle), live = this.get(vehicle);
       if (row.seats.length !== live.kind.seats.length) throw new Error(`Invalid vehicle seats ${row.id}`);
-      live.state = row.state; live.idle = row.idle; row.seats.forEach((player, seat) => { live.seats[seat] = player; });
+      live.state = row.state; live.idle = row.idle; if (row.health !== undefined) live.health = row.health; row.seats.forEach((player, seat) => { live.seats[seat] = player; });
     }
     for (const [player, x, y, z] of saved.led) this.led.set(player, { x, y, z });
   }
@@ -380,7 +432,7 @@ export class VehicleRuntime {
     const floor = (x: number, z: number, fromY: number): number | undefined => floorBelow(this.ports.physics(), x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== id);
     const body = this.ports.restoring === true && handle === undefined && this.host === null ? null : new KinematicMover(this.ports.physics(), boxes, poseOf(state), id, false, handle);
     const reach = reachOf(boxes);
-    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, hit: (from, move, yaw) => this.hullHit(id, reach, from, move, yaw) }, state, seats: kind.seats.map(() => null), idle: 0 };
+    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, hit: (from, move, yaw) => this.hullHit(id, reach, from, move, yaw) }, state, seats: kind.seats.map(() => null), idle: 0, health: kind.health ?? VEHICLE_HEALTH };
     this.live.set(id, vehicle); this.claim(vehicle);
     return id;
   }

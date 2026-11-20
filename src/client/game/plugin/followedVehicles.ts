@@ -8,7 +8,7 @@ import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, Vehicles } from '@wildshard/format/vehicles';
 import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
-import { parseVehicleSeatRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
+import { parseVehicleSeatRow, parseVehicleWornRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { vehiclePoint, type MoverView } from './followedMovers';
 
 /** m within which a seat's or a dock's prompt shows (the server's `SEAT_REACH`). */
@@ -50,6 +50,8 @@ export class FollowedVehicles {
   private readonly live = new Map<string, Followed>();
   /** Who sits in each seat, by vehicle, as the newest rows say. */
   private readonly seats = new Map<string, (string | null)[]>();
+  /** MSZ14: the vehicles worn enough to smoke, off their `vehicleWornRow`s. */
+  private readonly wornOut = new Set<string>();
   /** This page's player, as its wire's welcome names it. */
   private me: string | null = null;
   /** This page's player's feet, as the last frame had them: a seat's prompt goes to the nearest free one. */
@@ -115,17 +117,21 @@ export class FollowedVehicles {
    */
   sync(ids: Iterable<string>, me: string | null, feet: { readonly x: number; readonly z: number }): void {
     this.me = me; this.feet.x = feet.x; this.feet.z = feet.z;
-    const out = new Set<string>(); this.seats.clear();
+    const out = new Set<string>(); this.seats.clear(); this.wornOut.clear();
     for (const id of ids) {
       if (id.startsWith(SCRIPT)) { const vehicle = id.slice(SCRIPT.length); if (this.docks.has(vehicleDockOf(vehicle))) out.add(vehicle); continue; }
       if (!id.startsWith(STATE)) continue;
+      const worn = parseVehicleWornRow(id.slice(STATE.length)); if (worn !== null) { this.wornOut.add(worn); continue; }
       const row = parseVehicleSeatRow(id.slice(STATE.length)); if (row === null) continue;
       let seats = this.seats.get(row.vehicle);
       if (seats === undefined) { seats = this.kindOf(row.vehicle)?.seats.map(() => null) ?? []; this.seats.set(row.vehicle, seats); }
       if (row.seat < seats.length) seats[row.seat] = row.player;
     }
-    for (const [id, vehicle] of this.live) if (vehicle.dock.per === 'player' && !out.has(id)) { vehicle.body.dispose(); this.live.delete(id); }
+    // a vehicle whose row left is gone: a per-player one despawned, or any one wrecked (MSZ14)
+    for (const [id, vehicle] of this.live) if (!out.has(id)) { vehicle.body.dispose(); this.live.delete(id); }
   }
+  /** MSZ14: whether a vehicle is worn enough to smoke (its look reads it, MSZ14b). */
+  worn(id: string): boolean { return this.wornOut.has(id); }
   /** The prompts this page offers for its vehicles: the same objects every call, which follow the vehicles. */
   prompts(): Interactable[] { return this.made; }
 
