@@ -57,45 +57,34 @@ export const openArenaArrows: HeldArrowTargets = {
   key: (host, target) => { const owner = owners.get(host); return owner?.fight.combatTarget === target ? owner.target : null; },
   resolve: (host, id) => { const owner = owners.get(host); return owner !== undefined && id === owner.target ? owner.fight.combatTarget : null; },
 };
-/** What a prepared arena lends the world around it, and its own install. */
-export interface OpenArenaPlan {
-  readonly eliteDamage: (host: SimHost, actor: HuntBody, request: { readonly point: { readonly x: number; readonly z: number } }) => number;
-  readonly advance: (host: SimHost, dt: number) => void;
-  readonly observeWeather: (host: SimHost, weather: { readonly wind: Wind; readonly storm: WeatherReactions }) => void;
-  /** The page samples its encounter answer before the weather advances: run this before the world's weather registers. */
-  readonly cover: (host: SimHost) => void;
-  readonly install: (host: SimHost, ports: OpenArenaPorts) => void;
+/** One arena's lifecycle and the loans it gives its host. */
+export interface OpenArenaRuntime {
+  readonly eliteDamage: (actor: HuntBody, request: { readonly point: { readonly x: number; readonly z: number } }) => number;
+  readonly advance: (dt: number) => void;
+  readonly observeWeather: (actual: { readonly wind: Wind; readonly storm: WeatherReactions }) => void;
+  /** Reserve the cover phase before the weather and body owners start ticking. */
+  readonly cover: () => void;
+  readonly install: (ports: OpenArenaPorts) => void;
 }
 
-/** Read the arena's rows now; nothing here touches a host. */
-export async function prepareOpenArena(product: Pick<ShardFolder, 'json' | 'section' | 'file' | 'shardfile'>, row: OpenArenaRow): Promise<OpenArenaPlan> {
+/** Read the arena's rows now, then bind each install to its own host. */
+export async function prepareOpenArenaHost(product: Pick<ShardFolder, 'json' | 'section' | 'file' | 'shardfile'>, row: OpenArenaRow): Promise<(host: SimHost) => OpenArenaRuntime> {
   const data = await readArenaScriptData(product, { fight: row.fight, geometry: row.geometry });
   const plan = parseClientPlan(product.section('client/plan')), view = plan.features.find(entry => entry.kind === 'view.program' && entry.id === row.view);
   if (view?.kind !== 'view.program') throw new Error('Open arena requires its admitted pose view');
   const [prefix] = row.id.split('.');
   const module = await product.file(view.module), installRecords = await prepareChapterRecords(product, { step: `${prefix ?? row.id}.chapter-records`, elites: `${prefix ?? row.id}.elites` });
-  const weather = new WeakMap<SimHost, { wind: Wind; storm: WeatherReactions }>();
-  const shares = new WeakMap<SimHost, Map<HuntBody, (scale: number, x: number, z: number) => number>>();
-  const updates = new WeakMap<SimHost, (dt: number) => void>();
-  return {
-    eliteDamage: (host, actor, request) => shares.get(host)?.get(actor)?.(actor.scale, request.point.x, request.point.z) ?? 1,
-    advance: (host, dt) => { const run = updates.get(host); if (run === undefined) throw new Error('Arena owner was not installed before patrol advance'); run(dt); },
-    observeWeather: (host, actual) => { weather.set(host, actual); },
-    cover: host => {
-      host.onStep(`${row.id}.weather-cover`, () => {
-        const owner = owners.get(host), actual = weather.get(host);
-        if (owner === undefined || actual === undefined) throw new Error('Arena weather cover lost its entered owners');
-        applyWeatherCover(actual.storm.weather, actual.storm.inputs, host.events.ask('weather.indoors', 0) > 0, owner.boss.engaged);
-      });
-    },
-    install: (host, ports) => {
-      const actual=weather.get(host),mount=mountedPlayerOf(host),patrolOwner=patrolOf(host),[first]=host.players.values();
+  return host => {
+    let weather: Parameters<OpenArenaRuntime['observeWeather']>[0] | undefined;
+    let advance: ((dt: number) => void) | undefined;
+    const damageShares = new Map<HuntBody, (scale: number, x: number, z: number) => number>();
+    const install = (ports: OpenArenaPorts): void => {
+      const actual=weather,mount=mountedPlayerOf(host),patrolOwner=patrolOf(host),[first]=host.players.values();
       const env=nativeGroupCollection(host,row.groups).environment;
       if(actual===undefined||mount===undefined||patrolOwner===undefined||env===undefined||first===undefined||owners.has(host))throw new Error('Open arena requires its actual world owners');
       const records=installRecords(host,ports.ledger),camera=ports.presentation.camera();
       let locked=false,reward=false,bar=false,rewardPoint:Vector3|null=null;
-      const toasts:string[]=[],feeds:string[]=[],support=new Map<number,HuntBody>(),damageShares=new Map<HuntBody,(scale:number,x:number,z:number)=>number>();
-      shares.set(host,damageShares);
+      const toasts:string[]=[],feeds:string[]=[],support=new Map<number,HuntBody>();
       const toast=(line:string):void=>{toasts.push(line);if(toasts.length>256)toasts.shift();};
       const feed=(line:string):void=>{feeds.push(line);if(feeds.length>256)feeds.shift();};
       const prompt={position:new Vector3(data.arena.anchor.x,host.groundHeightAt(data.arena.anchor.x,data.arena.anchor.z)+data.view.promptLift,data.arena.anchor.z),radius:0,label:data.lines.tie};
@@ -165,10 +154,10 @@ export async function prepareOpenArena(product: Pick<ShardFolder, 'json' | 'sect
       actRoutes(host).interactions.set(`${data.definition.id}.tie`,{actorId:row.input.use,value:1});
       // the tie prompt is the fight's to judge, so a page hears it: its reach in centimetres, and which line it reads in the units place
       publishOwned(host,`${row.id}.tie`,(_player,out)=>{out.set(OWNED_ROW.tie,Math.round(prompt.radius*100)*10+(prompt.label===data.lines.tieOnFoot?1:prompt.label===data.lines.tieQuiet?2:0));});
-      updates.set(host,run);owners.set(host,{fight,boss,records,target:row.target,locked:()=>locked,reward:()=>reward,storm:()=>actual.storm.stormActive,
+      advance=run;owners.set(host,{fight,boss,records,target:row.target,locked:()=>locked,reward:()=>reward,storm:()=>actual.storm.stormActive,
         weather:()=>({state:actual.storm.weather.state,left:actual.storm.weather.phaseLeft}),
         rewardPrompt:()=>rewardPoint===null?null:{position:rewardPoint.clone(),radius:2.6,label:data.reward.prompt}});
-      host.scope.onDispose(()=>{owners.delete(host);updates.delete(host);shares.delete(host);weather.delete(host);});
+      host.scope.onDispose(()=>{owners.delete(host);advance=undefined;weather=undefined;damageShares.clear();});
       // The next intro step reads the previous frame's heart before drawing
       // its new pose. Rebuild derived body matrices from the restored clock
       // and pose now, without advancing the guest or replaying any effects.
@@ -200,5 +189,52 @@ export async function prepareOpenArena(product: Pick<ShardFolder, 'json' | 'sect
           }
           prompt.radius=saved.prompt.radius;prompt.label=saved.prompt.label;toasts.splice(0,toasts.length,...saved.toasts);feeds.splice(0,feeds.length,...saved.feeds);room.contacts=saved.contacts;room.party.restoreEngaged(saved.engaged??0);room.bounty.restore(saved.earned??[]);
         }});
-    } };
+    };
+    return {
+      eliteDamage: (actor, request) => damageShares.get(actor)?.(actor.scale, request.point.x, request.point.z) ?? 1,
+      advance: dt => {
+        if (advance === undefined) throw new Error('Arena owner was not installed before patrol advance');
+        advance(dt);
+      },
+      observeWeather: actual => { weather = actual; },
+      cover: () => {
+        host.onStep(`${row.id}.weather-cover`, () => {
+          const owner = owners.get(host);
+          if (owner === undefined || weather === undefined) throw new Error('Arena weather cover lost its entered owners');
+          applyWeatherCover(weather.storm.weather, weather.storm.inputs, host.events.ask('weather.indoors', 0) > 0, owner.boss.engaged);
+        });
+      },
+      install,
+    };
+  };
+}
+
+/** The tape API used by previously packed shard fixtures. Each tape still
+ * binds the same host-owned lifecycle before its first registration. */
+export interface OpenArenaPlan {
+  readonly eliteDamage: (host: SimHost, ...args: Parameters<OpenArenaRuntime['eliteDamage']>) => number;
+  readonly advance: (host: SimHost, dt: number) => void;
+  readonly observeWeather: (host: SimHost, actual: Parameters<OpenArenaRuntime['observeWeather']>[0]) => void;
+  readonly cover: (host: SimHost) => void;
+  readonly install: (host: SimHost, ports: OpenArenaPorts) => void;
+}
+
+export async function prepareOpenArena(product: Parameters<typeof prepareOpenArenaHost>[0], row: OpenArenaRow): Promise<OpenArenaPlan> {
+  const bind = await prepareOpenArenaHost(product, row);
+  const tapes = new WeakMap<SimHost, OpenArenaRuntime>();
+  const tape = (host: SimHost): OpenArenaRuntime => {
+    const current = tapes.get(host);
+    if (current !== undefined) return current;
+    const arena = bind(host);
+    tapes.set(host, arena);
+    host.scope.onDispose(() => { tapes.delete(host); });
+    return arena;
+  };
+  return {
+    eliteDamage: (host, actor, request) => tape(host).eliteDamage(actor, request),
+    advance: (host, dt) => { tape(host).advance(dt); },
+    observeWeather: (host, actual) => { tape(host).observeWeather(actual); },
+    cover: host => { tape(host).cover(); },
+    install: (host, ports) => { tape(host).install(ports); },
+  };
 }

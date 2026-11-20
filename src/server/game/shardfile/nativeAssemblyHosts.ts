@@ -26,7 +26,7 @@ import { installGroundBoss } from '../boss/native';
 import { EliteCore, memoryElitePersistence, type EliteCoreRule, type EliteCoreScript } from '../../../shared/game/eliteSystem';
 import { installNativeHeldAmmunition } from '../loadout/nativeAmmunition';
 import { prepareHeldArms } from '../weapons/nativeHeld';
-import { openArenaArrows, prepareOpenArena, type OpenArenaPlan } from '../boss/openArenaNative';
+import { openArenaArrows, prepareOpenArenaHost, type OpenArenaRuntime } from '../boss/openArenaNative';
 import { patrolOf, preparePatrol } from '../boss/patrolNative';
 import { prepareSlots } from '../boss/slotsNative';
 import type { Wind } from '@wildshard/engine/world/steppeWind';
@@ -79,7 +79,7 @@ export interface AssemblyRun<C extends NativeAssemblyContext> {
   day: DayCycleClock | null; boss?: ReturnType<typeof installGroundBoss>; quest?: ReturnType<typeof installNativeQuestComposition>;
   ammunition?: ReturnType<typeof installNativeHeldAmmunition>; elites?: ReturnType<typeof installNativeEliteFeature>;
   island?: ReturnType<typeof installMixedPopulation>; bindings?: NativeEliteBindings; roster?: ReturnType<typeof installNativeBootRoster>;
-  weather?: { readonly wind: Wind; readonly storm: WeatherReactions }; patrol?: () => void; arena?: OpenArenaPlan;
+  weather?: { readonly wind: Wind; readonly storm: WeatherReactions }; patrol?: () => void; arena?: OpenArenaRuntime;
   wild?: NativeWildEnvironment; groups?: ReturnType<typeof installNativeGroupRows>; nativeElites?: NativeEliteRoster; eliteCore?: ReturnType<typeof nativeEliteCore>; creatures?: ReturnType<typeof installNativePopulationHunt>; taming?: ReturnType<typeof installNativeTaming>;
   /** OF22c1: the declared encounters by their spawn, once the declared creature host stands (after every host). */
   declared?: ReadonlyMap<string, RuntimeEncounter>;
@@ -214,7 +214,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       const [kernel] = kernels, ride = elites === undefined || kernel === undefined ? null : await prepareCaptain(product, external, row.actors, kernel.knockdown), fly = kernel === undefined ? null : prepareWindElite(product, kernel.knockdown);
       return run => {
         let captain: NativeCaptain | null = null, windElite: NativeWindElite | null = null;
-        const finish = patrol.begin(run.host, { eliteDamage: (host, actor, request) => captain?.scale(actor, request.point) ?? run.arena?.eliteDamage(host, actor, request) ?? 1, beforePatrol: (host, dt) => { slots?.advance(host, dt); captain?.advance(dt); windElite?.advance(dt); }, afterPatrol: (host, dt) => { run.arena?.advance(host, dt); } });
+        const finish = patrol.begin(run.host, { eliteDamage: (_host, actor, request) => captain?.scale(actor, request.point) ?? run.arena?.eliteDamage(actor, request) ?? 1, beforePatrol: (host, dt) => { slots?.advance(host, dt); captain?.advance(dt); windElite?.advance(dt); }, afterPatrol: (_host, dt) => { run.arena?.advance(dt); } });
         run.patrol = () => {
           finish();
           if (slots !== null) { slots.install(run.host, need(run.bindings, 'Slots need their bindings'), run.context.restoring); registerInstalled(run.host, 'slots'); registerInstalled(run.host, 'poseViews'); }
@@ -230,11 +230,11 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     }
     case 'boss.open-arena': {
       if (at.ports.room !== true) return () => undefined;
-      const arena = await prepareOpenArena(product, row);
+      const bind = await prepareOpenArenaHost(product, row);
       return run => {
-        const { host, context } = run; run.arena = arena;
-        arena.observeWeather(host, need(run.weather, 'An open arena needs its weather')); arena.cover(host); need(run.patrol, 'An open arena needs its patrol')();
-        arena.install(host, { presentation: need(at.ports.arena, 'An open arena needs its presentation'), commands: at.ports.heldTick(context).commands, ledger: at.ports.ledger(context), restoring: context.restoring, grantItem: at.ports.grantItem(context) });
+        const { host, context } = run, arena = bind(host); run.arena = arena;
+        arena.observeWeather(need(run.weather, 'An open arena needs its weather')); arena.cover(); need(run.patrol, 'An open arena needs its patrol')();
+        arena.install({ presentation: need(at.ports.arena, 'An open arena needs its presentation'), commands: at.ports.heldTick(context).commands, ledger: at.ports.ledger(context), restoring: context.restoring, grantItem: at.ports.grantItem(context) });
         registerInstalled(host, 'poseViews');
       };
     }
