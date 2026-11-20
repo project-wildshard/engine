@@ -11,6 +11,7 @@ import {capturePushTree,pushProofDisposition,readPushProof,writePushProof} from 
 import {gateEnvironment} from '../scripts/push-environment.mjs';
 import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
 import {discoverLocalDeltaPlan,localDeltaPlan} from '../scripts/local-land-delta.mjs';
+import {fs27Plan,ringSlugs} from '../scripts/push-path-edges.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
@@ -104,7 +105,7 @@ export async function parallelChecks(tasks,options={}) {
 }
 
 /** The static half of the gate: no test runs here. @param {number} [lintThreads] */
-function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
+export function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
   return [
     {name:'typecheck (kit + layers)',commands:[['pnpm','run','--silent','typecheck:kit'],['pnpm','exec','npr','tsc','-b','tsconfig.layers.json','--builders',String(PUSH_BUDGET.builders)]]},
     {name:'lint (kit + game)',commands:[['pnpm','run','--silent','lint:kit','--threads',String(lintThreads)],['pnpm','run','--silent','lint:game']]},
@@ -196,6 +197,12 @@ async function main(){
     logHostedOnly(plan.hosted,{sha:context?.commit??'unknown',lane:process.env.WS_LANE_NAME});
     console.error(`  - split gate: ${local.length} local Vitest file(s), ${plan.hosted.length} sent to hosted CI`);
   }
+  // FS27: declared readers with no import edge, CI static's cheap checks, and the Ring 1 slugs a pin push moves.
+  const refs=split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS;
+  const fs27=fs27Plan(selection,{split,slugs:selection.mode==='docs'?[]:ringSlugs(refs,process.cwd())});
+  if(local!==null)local=[...new Set([...local,...fs27.tests])].sort();
+  const readers=local===null&&fs27.tests.length>0?[{name:`vitest (FS27 readers: ${fs27.tests.length})`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...fs27.tests]]}]:[];
+  if(fs27.tests.length>0||fs27.tasks.length>0)console.error(`  - FS27: ${fs27.tests.length} declared reader file(s); ${fs27.tasks.map(task=>task.name).join(', ')}`);
   // Known reds (scripts/push-known-red.mjs): a split gate keeps a JSON report, so a red that origin/main has too never
   // refuses the push. WS_KNOWN_RED=0 refuses on every red again.
   const knownRed=split&&env.WS_KNOWN_RED!=='0'&&(local?.length??0)>0;
@@ -211,7 +218,7 @@ async function main(){
   // With known reds on, Vitest runs beside the static lane, not inside it: a Vitest red must not stop the static checks,
   // since a known red still lets the push go when everything else is green.
   const [rest,tests]=await Promise.all([
-    parallelChecks([...staticChecks(),...(delta.eligible&&selection.mode==='docs'?[{name:'check:parity (incoming docs)',commands:[['pnpm','run','--silent','check:parity']]}]:[]),{name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},...(knownRed?[]:vitest)],{env}),
+    parallelChecks([...staticChecks(),...fs27.tasks,...readers,...(delta.eligible&&selection.mode==='docs'?[{name:'check:parity (incoming docs)',commands:[['pnpm','run','--silent','check:parity']]}]:[]),{name:'test:kit',commands:[['pnpm','run','--silent','test:kit']]},...(knownRed?[]:vitest)],{env}),
     knownRed?parallelChecks(vitest,{env}):Promise.resolve({ok:true,seconds:0,results:[],timedOut:false}),
   ]);
   let result={...rest,ok:rest.ok&&tests.ok,results:[...rest.results,...tests.results]},tolerated=false;
