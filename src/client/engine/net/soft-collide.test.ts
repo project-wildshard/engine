@@ -14,13 +14,13 @@ const body = (w: Walker): SoftBody => ({ key: w.key, x: w.x, y: 0, z: w.z });
 
 /** One frame for every walker: each reads the others where they were drawn (`lag` frames back, as a page's interpolation draws
  *  them, and led by that much), then steps its asked move, bent. */
-function tick(walkers: readonly Walker[], asks: readonly { x: number; z: number }[], deep: (x: number, z: number) => boolean = dry, lag = 0): void {
+function tick(walkers: readonly Walker[], asks: readonly { x: number; z: number }[], deep: (x: number, z: number) => boolean = dry, lag = 0, lead = lag * STEP): void {
   const now = walkers.map(body);
   history.push(now);
   if (history.length > 64) history.shift();
   const seen = history[Math.max(0, history.length - 1 - lag)] ?? now;
   walkers.forEach((w, i) => {
-    w.soft.frame({ x: w.x, y: 0, z: w.z, vx: w.vx, vz: w.vz, deep }, seen.filter((_, j) => j !== i), STEP, true, lag * STEP);
+    w.soft.frame({ x: w.x, y: 0, z: w.z, vx: w.vx, vz: w.vz, deep }, seen.filter((_, j) => j !== i), STEP, true, lead);
     const move = w.soft.steer(asks[i] ?? { x: 0, z: 0 }, { x: 0, z: 0 });
     w.vx += (move.x * WALK - w.vx) * Math.min(1, ACCEL * STEP); w.vz += (move.z * WALK - w.vz) * Math.min(1, ACCEL * STEP);
     w.x += w.vx * STEP; w.z += w.vz * STEP;
@@ -149,6 +149,20 @@ describe('soft collision between players (QA 2026-11-19 row 54)', () => {
     expect(metAt).toBeGreaterThan(0);
     expect(passedAt).toBeGreaterThan(metAt);
     expect(passedAt - metAt).toBeLessThan(YIELD_AFTER + 1.5);
+  });
+
+  it('head-on on open ground on staging: drawn 250 ms late and led 300 ms, the two never meet closer than 0.35 m', () => {
+    // QA 11-19 row 54 on staging v0.1.53: two WebKit phones met head-on and passed 0.085 m apart 0.25 s after contact, neither
+    // pressing long enough to pass. Each page drew the other late; the late row of a player who had already stopped was led on
+    // through the stopped one, so the way to it flipped and the walk went on. Each keeps to its line, as the proof's strafe does.
+    const a = walker(1, -3, 0.02), b = walker(2, 3, -0.02), lag = 15, lead = 0.3;
+    let closest = Infinity, passed = false;
+    for (let i = 0; i < 4 * 60; i++) {
+      tick([a, b], [{ x: 1, z: -a.z * 2 }, { x: -1, z: -b.z * 2 }], dry, lag, lead);
+      if (a.soft.report.passing + b.soft.report.passing === 0 && !passed) closest = Math.min(closest, gap(a, b));
+      if (a.x > b.x) passed = true;
+    }
+    expect(closest).toBeGreaterThan(0.35); // about a body radius (0.38 m), never through, but for a pass
   });
 
   it('a body walked past is led by its drawn velocity, so a late row is met where it is', () => {

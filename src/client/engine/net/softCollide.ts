@@ -103,7 +103,15 @@ export class SoftCollide {
       }
       track.seen = true;
       if (Math.abs(body.y - self.y) >= BODY_TALL) continue;
-      let dx = self.x - (body.x + track.vx * ahead), dz = self.z - (body.z + track.vz * ahead), d = Math.hypot(dx, dz);
+      // the way to it is read off where it is drawn (a drawn body never crosses this one but by a pass); its lead only brings it
+      // nearer along that way. A lead alone carried the late row of a player who had stopped through this one (QA 11-19 row 54
+      // on staging: the way to it flipped and the walk went on, 0.085 m apart).
+      let dx = self.x - body.x, dz = self.z - body.z, d = Math.hypot(dx, dz);
+      if (d >= 1e-4) {
+        const nx = dx / d, nz = dz / d, lx = dx - track.vx * ahead, lz = dz - track.vz * ahead, along = lx * nx + lz * nz;
+        d = Math.max(1e-4, Math.min(d, Math.hypot(Math.max(0, along), lx * nz - lz * nx)));
+        dx = nx * d; dz = nz * d;
+      }
       if (this.nearest === null || d < this.nearest) this.nearest = d;
       // how fast the two close: the fade starts that much sooner, so a meeting at a walk stops at contact, not through it
       const closing = d < 1e-4 ? 0 : Math.max(0, -((self.vx - track.vx) * dx + (self.vz - track.vz) * dz) / d), early = closing * BRAKE_TIME;
