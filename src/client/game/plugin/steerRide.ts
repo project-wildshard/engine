@@ -4,14 +4,24 @@ import { app } from '@wildshard/engine/app/runtime';
 import { playerModes, type ModePlayer } from '@wildshard/engine/player/modes';
 import type { MoverPose } from '@wildshard/format/moverPose';
 import { steerStick } from '@wildshard/engine/sim/moverMotion';
+import type { PlayerEye } from '@wildshard/engine/player/Player';
 import type { FollowedMovers } from './followedMovers';
+import { SEAT_PITCH, SeatEye, type SeatNow } from './seatView';
 import type { SteerRow } from './steerPrediction';
 
 /** What the page shows a steer ride in: its speed (a share of the boosted top speed) and whether it boosts, or nothing. */
-export interface SteerRideView { show: (ride: { readonly speed: number; readonly boosting: boolean } | null) => void }
+export interface SteerRideView {
+  show: (ride: { readonly speed: number; readonly boosting: boolean } | null) => void;
+  /** MSZ11: a tap on the gauge runs `run` (a seat swaps its view by it). */
+  readonly tap?: (run: () => void) => void;
+}
 /** The page's player as a steer ride reads and turns it: the view looks along `yaw` (forward is (-sin yaw, -cos yaw), as a
  *  steer vehicle's heading). */
-export interface SteerRider { yaw: number; readonly position: { x: number; y: number; z: number } }
+export interface SteerRider {
+  yaw: number; readonly position: { x: number; y: number; z: number };
+  /** MSZ11: the look's pitch, and the eye a vehicle seat poses the camera from while it holds the player (`Player.eye`). */
+  pitch?: number; eye?: PlayerEye | null;
+}
 /** SS-MS2a3b: what the rider's page predicts its vehicle from. */
 export interface SteerPredictPort {
   /** The world move the rider's held stick and view make now: the walk's, as the server reads it off the rider's command. */
@@ -94,8 +104,12 @@ export function installSteerRide(movers: FollowedMovers, page: {
 export interface VehicleRidePort {
   readonly seatOf: () => { readonly vehicle: string; readonly seat: number } | undefined;
   readonly pose: (id: string) => MoverPose | undefined;
-  readonly kindOf: (id: string) => { readonly seats: readonly { readonly role: string }[]; readonly handling: { readonly speed: number; readonly boost: number } } | undefined;
+  readonly kindOf: (id: string) => { readonly seats: readonly VehicleRideSeat[]; readonly handling: { readonly speed: number; readonly boost: number } } | undefined;
+  /** MSZ11: m clear from `from` toward `to` before a wall, `vehicle`'s own hull aside (the chase view's arm); none, the whole way. */
+  readonly clear?: (vehicle: string, from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }) => number;
 }
+/** A kind's seat as a ride reads it: who sits there, and (MSZ11) where its base is and how it is sat, for the seat's eye. */
+export interface VehicleRideSeat { readonly role: string; readonly at?: readonly [number, number, number]; readonly pose?: 'sit' | 'stand' }
 
 /**
  * MIRROR-SALT-ZONE MSZ9b: a seat in a `world/vehicles` vehicle on the page, as the server's `VehicleRuntime` leads it. While the
@@ -103,31 +117,63 @@ export interface VehicleRidePort {
  * walk stands down while the seat leads the body), boarding faces the heading, and a driver's view turns with the vehicle and
  * swings back behind it as the steer ride's does (`STEER_RECENTRE`), with its speed and boost on the steer chip. `vehicles` is
  * read each frame: the follower the page's wire holds now (a grid cell's changes with the feet).
+ *
+ * MSZ11: while seated the player's eye is the seat's (`SeatEye`: first person from the seat, widening past top speed, or the
+ * chase view, swapped by V in the `drive` input context or a tap on the gauge, kept from one ride to the next), and the held
+ * item is stowed.
  */
 export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, page: {
   readonly system: (spec: SystemSpec) => void; readonly scope: Scope; readonly player: SteerRider; readonly view: SteerRideView; readonly boost: () => boolean;
 }): void {
-  let seated: { readonly vehicle: string; readonly seat: number } | null = null, last: MoverPose | null = null, heading = 0, looked = 0, idle = 0, speed = 0;
-  let shown: { speed: number; boosting: boolean } | null = null;
+  let seated: { readonly vehicle: string; readonly seat: number } | null = null, last: MoverPose | null = null, heading = 0, looked = 0, idle = 0, speed = 0, lookedPitch = SEAT_PITCH;
+  let shown: { speed: number; boosting: boolean } | null = null, chase = false, stowed = false;
   // the reserved `drive` mode: the page's player's mode while a seat holds it (the server leads the body; the walk stands down)
   playerModes(page.player as unknown as ModePlayer).register({ id: 'drive', hud: 'ride', traverse: () => seated !== null }, page.scope, { events: app.events });
+  // MSZ11: the seat's eye reads the seat live at the camera's pose, off the vehicle as the page draws it then
+  const seatNow = (): SeatNow | null => {
+    const port = vehicles(), held = seated === null ? undefined : port?.seatOf(), pose = held === undefined ? undefined : port?.pose(held.vehicle);
+    const kind = held === undefined ? undefined : port?.kindOf(held.vehicle), row = held === undefined ? undefined : kind?.seats[held.seat];
+    if (pose === undefined || kind === undefined || row === undefined) return null;
+    return { pose, at: row.at ?? [0, 0, 0], sit: row.pose ?? 'sit', speed, handling: kind.handling };
+  };
+  const eye = new SeatEye({ seat: seatNow, look: page.player, chase: () => chase,
+    clear: (from, to) => { const port = vehicles(), vehicle = seated?.vehicle; return port?.clear === undefined || vehicle === undefined ? Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z) : port.clear(vehicle, from, to); } });
+  const sit = (on: boolean): void => {
+    if (on) { page.player.eye = eye; if (app.input.has('drive')) app.input.push('drive', page.scope); }
+    else { eye.release(); if (page.player.eye === eye) page.player.eye = null; app.input.pop('drive'); }
+    const equipment = app.equipment; // the held item is stowed in a seat, as other pages show it (MSZ10)
+    if (on && equipment !== null && !equipment.stowed) { equipment.stowed = true; stowed = true; }
+    if (!on && stowed) { stowed = false; if (equipment !== null) equipment.stowed = false; }
+  };
+  page.view.tap?.(() => { if (seated !== null) chase = !chase; });
+  page.scope.onDispose(() => { if (seated !== null) { seated = null; sit(false); } });
   page.system({ id: 'game.plugin.vehicle-ride', phase: 'update', run: (dt: number) => {
     const port = vehicles(), held = port?.seatOf(), pose = held === undefined ? undefined : port?.pose(held.vehicle);
     if (held === undefined || pose === undefined || port === undefined) {
+      if (seated !== null) sit(false);
       seated = null; last = null;
       if (shown !== null) { shown = null; page.view.show(null); }
       return;
     }
     const p = page.player;
-    if (seated?.vehicle !== held.vehicle || seated.seat !== held.seat) { seated = held; last = null; speed = 0; p.yaw = angle(pose.euler.y); } // boarding faces the heading
-    if (last === null) { heading = pose.euler.y; looked = p.yaw; }
+    if (seated?.vehicle !== held.vehicle || seated.seat !== held.seat) { // boarding faces the heading, the eye on the road ahead (MSZ11)
+      if (seated === null) sit(true);
+      seated = held; last = null; speed = 0; p.yaw = angle(pose.euler.y); if (p.pitch !== undefined) p.pitch = SEAT_PITCH;
+    }
+    if (app.input.consume('drive.view')) chase = !chase;
+    const pitched = p.pitch !== undefined && Math.abs(p.pitch - lookedPitch) > 1e-4; // a look up or down is a look too
+    if (last === null) { heading = pose.euler.y; looked = p.yaw; lookedPitch = p.pitch ?? SEAT_PITCH; }
     const moved = last === null || dt <= 0 ? 0 : Math.hypot(pose.position.x - last.position.x, pose.position.z - last.position.z) / dt;
     if (last !== null && dt > 0) speed += (moved - speed) * Math.min(1, dt * SPEED_EASE);
     last = pose;
-    if (Math.abs(angle(p.yaw - looked)) > 1e-4) idle = 0; else idle += dt;
+    if (Math.abs(angle(p.yaw - looked)) > 1e-4 || pitched) idle = 0; else idle += dt;
     const turned = angle(pose.euler.y - heading); heading = pose.euler.y; p.yaw = angle(p.yaw + turned);
-    if (idle >= STEER_RECENTRE.idle && speed > RECENTRE_SPEED) p.yaw = angle(p.yaw + angle(heading - p.yaw) * (1 - Math.exp(-dt * STEER_RECENTRE.rate)));
-    looked = p.yaw;
+    if (idle >= STEER_RECENTRE.idle && speed > RECENTRE_SPEED) {
+      const swing = 1 - Math.exp(-dt * STEER_RECENTRE.rate);
+      p.yaw = angle(p.yaw + angle(heading - p.yaw) * swing);
+      if (p.pitch !== undefined) p.pitch += (SEAT_PITCH - p.pitch) * swing; // and the eye back down the road
+    }
+    looked = p.yaw; lookedPitch = p.pitch ?? SEAT_PITCH;
     const kind = port.kindOf(held.vehicle), top = kind === undefined ? 1 : kind.handling.speed * kind.handling.boost;
     const driving = kind?.seats[held.seat]?.role === 'driver';
     const next = { speed: Math.max(0, Math.min(1, speed / top)), boosting: driving && page.boost() && speed > RECENTRE_SPEED };

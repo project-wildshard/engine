@@ -176,6 +176,11 @@ export class SteerChip {
     this.fill.style.width = `${String(Math.round(ride.speed * 100))}%`;
     this.root.classList.toggle('boosting', ride.boosting);
   }
+  /** MIRROR-SALT-ZONE MSZ11: a tap or click on the chip runs `run` (a vehicle seat swaps its view by it). */
+  tap(run: () => void): void {
+    this.root.classList.add('tappable');
+    this.scope.listen(this.root, 'pointerdown', (event: PointerEvent) => { event.preventDefault(); event.stopPropagation(); run(); });
+  }
 }
 
 export class DialogueBox {

@@ -1,6 +1,8 @@
 import { Vector3, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { KinematicMover } from '@wildshard/engine/physics/mover';
+import { queryGroups } from '@wildshard/engine/physics/groups';
+import { tagOf } from '@wildshard/engine/physics/surface';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
@@ -87,6 +89,15 @@ export class FollowedVehicles {
   seatPoint(id: string, seat: number): [number, number, number] | undefined {
     const vehicle = this.live.get(id), row = vehicle?.kind.seats[seat];
     return vehicle === undefined || row === undefined ? undefined : vehiclePoint(vehicle.pose, row.at);
+  }
+  /** MSZ11: m clear from `from` toward `to` before a world surface, `id`'s own hull aside (the chase view's arm); the whole way
+   *  when nothing is between. */
+  clear(id: string, from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }): number {
+    const physics = this.ports.physics, dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z, length = Math.hypot(dx, dy, dz);
+    if (length < 1e-6) return 0;
+    const ray = new physics.R.Ray({ x: from.x, y: from.y, z: from.z }, { x: dx / length, y: dy / length, z: dz / length });
+    const hit = physics.castRay(ray, length, true, physics.R.QueryFilterFlags.EXCLUDE_SENSORS, queryGroups(['WORLD']), undefined, undefined, collider => tagOf(collider)?.owner !== id);
+    return hit === null ? length : hit.timeOfImpact;
   }
   /** The view a vehicle's row poses, when its dock is one of these: its body is made on its first row. */
   view(id: string): MoverView | undefined {

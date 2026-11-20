@@ -57,6 +57,8 @@
 .ws-quest-steer-bar { height: 4px; background: rgba(255, 255, 255, 0.12); }
 .ws-quest-steer-fill { height: 100%; width: 0; background: var(--ws-cyan); transition: width 0.1s linear; }
 .ws-quest-steer.boosting .ws-quest-steer-fill { background: var(--ws-amber); }
+/* MSZ11: a vehicle seat's chip takes a tap (it swaps the seat's view and the chase view) */
+.ws-quest-steer.show.tappable { pointer-events: auto; cursor: pointer; }
 .ws-quest-steer-boost { font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); text-align: center; }
 .ws-quest-steer.boosting .ws-quest-steer-boost { color: var(--ws-amber); }
 .ws-quest-steer-touch, #hud.touch .ws-quest-steer-key { display: none; }

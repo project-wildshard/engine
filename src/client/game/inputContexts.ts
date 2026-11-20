@@ -3,7 +3,7 @@ import type { Action } from '@wildshard/engine/input/InputService';
 import type { InputContextDef } from '@wildshard/engine/level/context';
 import { engineString } from '@wildshard/engine/strings';
 
-declare module '@wildshard/engine/input/InputService' { interface ActionMap { bag: true } }
+declare module '@wildshard/engine/input/InputService' { interface ActionMap { bag: true; 'drive.view': true } }
 
 const movement = ['move', 'look', 'move.forward', 'move.back', 'move.left', 'move.right'] as const;
 const moveKeys = { 'move.forward': ['KeyW'], 'move.back': ['KeyS'], 'move.left': ['KeyA'], 'move.right': ['KeyD'] };
@@ -24,6 +24,9 @@ export const INPUT_CONTEXTS: readonly InputContextDef[] = [
   { id: 'swim', actions: [...movement, 'dive', 'surface'], blocks: ['attack', 'heavy', 'aim', 'reload', 'jump', 'dodge', 'sprint', 'crouch'],
     keys: { dive: ['Space'], surface: ['ShiftLeft', 'ShiftRight'] }, touch: { relabel: { jump: { label: engineString('s_1d7cf9037135'), tone: 'rest' }, r1: { label: engineString('s_15c0f7da1543'), tone: 'rest' } } } },
   { id: 'board', actions: ['hover', 'jump'], blocks: ['dodge', 'crouch', 'crouch.hold', 'sprint'], keys: { hover: ['KeyH'], jump: ['Space'] } },
+  // MIRROR-SALT-ZONE MSZ11: a vehicle seat (`steerRide.ts` pushes it while seated): V swaps the seat's view and the chase
+  // view, so it is no dodge there (the walk stands down in a seat anyway)
+  { id: 'drive', actions: ['drive.view'], blocks: ['dodge', 'crouch', 'crouch.hold'], keys: { 'drive.view': ['KeyV'] } },
   { id: 'title', actions: ['confirm', 'nav.left', 'nav.right'], blocks: 'below', enabled: () => app.state === 'title', keys: { confirm: ['*'], 'nav.left': ['ArrowLeft'], 'nav.right': ['ArrowRight'] } },
   { id: 'menu', actions: ['nav.left', 'nav.right', 'tab', 'confirm', 'back', 'pause', 'bag', 'map', 'journal', 'note', 'use'], blocks: 'below',
     keys: { 'nav.left': ['ArrowLeft', 'KeyA'], 'nav.right': ['ArrowRight', 'KeyD'], tab: ['Tab'], confirm: ['Enter', 'Space'], use: ['KeyE'], back: ['Escape'], map: ['KeyM'], journal: ['KeyJ'], note: ['KeyN'] } },

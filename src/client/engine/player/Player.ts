@@ -39,6 +39,9 @@ import type { Physics } from '../../../shared/engine/physics/Physics';
 /** Frame-local surfaces supplied with a motor rebind; null restores the standalone level's existing queries. */
 /** A step's controls, as a wire command before it has a `seq` (P1-E5.3-C6). */
 export type PlayerWireInput = Pick<NetCommand, 'steer' | 'yaw' | 'pitch' | 'buttons'>;
+/** MIRROR-SALT-ZONE MSZ11: an eye that poses the camera in place of the feet's (a vehicle seat's: first person from the seat,
+ *  or its chase view). The look (yaw, pitch) stays the player's; the walk's bob, crouch and dodge feel stand down. */
+export interface PlayerEye { pose: (camera: THREE.PerspectiveCamera, dt: number) => void }
 /** Where a controls step goes when a server owns this body: `client/net/netPlayer.ts`. False: the step did not run. */
 export interface PlayerLink {
   /** A device reader is called only after admission, so a refused tick cannot
@@ -195,6 +198,8 @@ export class Player {
    *  phase), `step` moves the horse on its own motor (each fixed step), `pose` places the rider and the camera from the
    *  interpolated saddle (update, `alpha`) — and walking / swimming / the board are skipped */
   ride: PlayerModeDriver | null = null;
+  /** MSZ11: while set (a vehicle seat), it poses the camera each frame instead of the feet's eye. */
+  eye: PlayerEye | null = null;
   private lastBobPhase = 0;
   // ── dash: dodge + lunge (see `dodge()` / `dash()`) ──
   /** the DODGE disc was tapped (TouchControls) — consumed next update, like `touchJump` */
@@ -643,6 +648,7 @@ export class Player {
   update(dtRaw: number, alpha = 1): void {
     const dt = Math.min(dtRaw, 0.05);
     if (this.ride !== null) { this.ride.pose(dt, alpha); this.renderFeet.copy(this.position); return; }   // the saddle's eye (Mount.pose) owns the camera
+    if (this.eye !== null) { this.eye.pose(this.camera, dt); this.renderFeet.copy(this.position); return; } // MSZ11: a vehicle seat's eye
     const hover = this.hover;
     const swim = this.swimming && !hover;
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);

@@ -894,6 +894,7 @@
     "src/client/game/plugin/heldTool.ts": "client",
     "src/client/game/plugin/moverViews.ts": "client",
     "src/client/game/plugin/scene.ts": "client",
+    "src/client/game/plugin/seatView.ts": "client",
     "src/client/game/plugin/shaderFamily.ts": "client",
     "src/client/game/plugin/steerPrediction.ts": "client",
     "src/client/game/plugin/steerRide.ts": "client",

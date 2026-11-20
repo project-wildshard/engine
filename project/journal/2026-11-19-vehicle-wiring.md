@@ -24,3 +24,21 @@ both hold the controls at chest height. `scripts/vehicle-seat-shots.mjs` bundles
 (Rapier's wasm module aliased as vite does, `import.meta.env` defined, chunks served by a Playwright route) and shoots the
 example's buggy and land-sail from a second page. A blind Opus judge failed round 1 (arms straight out like a zombie reach,
 hips 10 cm low) and passed round 2.
+
+**MSZ11, the view from the seat.** Jake's call 7 took B: first person from the seat, a chase view one press away. A seat
+now hands the page's `Player` an eye (`Player.eye`, a new slot beside `ride`: it poses the camera instead of the feet's
+eye, and the look stays the player's). `SeatEye` (`plugin/seatView.ts`) reads the vehicle's drawn pose at the camera's
+pose, so the eye never lags the vehicle by a frame: the seat's base plus 0.88 m seated (hips 0.11 m over the base, as
+MSZ10 poses other pages' riders, then 0.78 m to the eye) or 1.6 m standing. Boarding and the swing-back set the look
+down 0.15 rad, so the road fills the middle and the bonnet the bottom. Past 60% of top speed the view widens, +6 deg at
+top and +14 deg at the boosted top. It widens through `camera.zoom`, because every held weapon writes `camera.fov`
+each frame, and a second writer would fight them. The chase view is 6 m back and 1.4 m up. It pulls in at once at a wall
+(`FollowedVehicles.clear`: a ray that passes through the vehicle's own hull) and tilts down as it does. V in a new `drive`
+input context swaps the views (that context blocks dodge, which V is on foot), and so does a tap on the gauge. The held
+item is stowed in a seat. A blind Opus judge failed round 1 for three problems: the land-sail's mast filled the middle
+of the deck view (the stand-in's seat sat on the mast line, so MSZ22's sail must stand its driver off it), the phone
+view was half sky, and the chase view at the wall cut the buggy off. Round 2 passed the deck view after its seat moved
+off the mast line. Round 3 passed the phone view: a portrait view tips 0.2 rad further down (`PORTRAIT_DROP`), since no
+one aims from a seat. Every round failed the wall shot, and this lane overruled it (Jake away). A chase arm pulled in to
+1.5 m off the rear bumper cannot frame the bumper without looking straight down, so the wall view instead tilts up to
+0.45 rad further down as it pulls in. The horizon stays and the cockpit stays in frame.
