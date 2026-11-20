@@ -1370,7 +1370,6 @@
     "./net/otherPlayers": "./src/client/engine/net/otherPlayers.ts",
     "./net/hurtOther": "./src/client/engine/net/hurtOther.ts",
     "./game/plugin/playerSeats": "./src/server/game/plugin/playerSeats.ts",
-    "./game/plugin/vehicleRuntime": "./src/server/game/plugin/vehicleRuntime.ts",
     "./test/headless-native": "./src/test/game/headlessNative.ts",
     "./test/headless/checkedReplayPipeline": "./src/test/game/headless/checkedReplayPipeline.ts",
     "./test/headless/nativeBounds": "./src/test/game/headless/nativeBounds.ts",
