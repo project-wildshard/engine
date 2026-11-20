@@ -48,3 +48,13 @@ test('a short, missing, interrupted or overrun ring is incomplete', () => {
   road.frameMs.pop();
   expect(fpsVerdict(legs, route, 30).verdict).toBe('incomplete');
 });
+
+
+test('interval accumulation preserves the duration boundary and rejects a real shortfall', () => {
+  const samples = [...Array.from({length:266}, () => sample(16, 1, 0.15)), sample(16, 1, 0.1)];
+  const leg = {name:'road', samples}, expected = [{name:'road', seconds:40}];
+  expect(samples.reduce((total, row) => total + row.seconds, 0)).toBeLessThan(40);
+  expect(fpsVerdict([leg], expected, 30).verdict).toBe('miss');
+  samples.at(-1).seconds -= 1e-8;
+  expect(fpsVerdict([leg], expected, 30).verdict).toBe('incomplete');
+});

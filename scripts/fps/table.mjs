@@ -106,9 +106,10 @@ async function worker(job) {
 /** @param {Job} job @param {AbortSignal} signal */
 async function measureCell(job, signal) {
   for (;;) {
-    while (gpuBusy()) await sleep(2000, undefined, {signal});
+    // Join the kernel queue even while another measurement owns the GPU.
+    // The worker checks for unrelated GPU users after acquiring this lease.
     signal.throwIfAborted();
-    const child = spawn('/usr/bin/lockf',['-s','-t','30','-k',lock,join(root,'scripts/browser-lane.sh'),'--max','5',
+    const child = spawn('/usr/bin/lockf',['-k',lock,join(root,'scripts/browser-lane.sh'),'--max','5',
       process.execPath,import.meta.filename,'--worker',JSON.stringify(job)],{stdio:'inherit',detached:true});
     const stop = () => {
       try { if (child.pid !== undefined) process.kill(-child.pid, 'SIGTERM'); }

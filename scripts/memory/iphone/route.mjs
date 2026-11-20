@@ -149,7 +149,9 @@ export function routeLegOnPage(leg) {
   };
   const steer = (/** @type {number} */ dx, /** @type {number} */ dz, /** @type {number} */ dt) => {
     const want = Math.atan2(-dx, -dz), turn = ((want - p.yaw) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
-    p.yaw += Math.max(-4 * dt, Math.min(4 * dt, turn));
+    // Approaches are unmeasured: align before walking through a reversal.
+    // Measured legs retain the player-like turn rate and every navigation check.
+    p.yaw = leg.approach ? want : p.yaw + Math.max(-4 * dt, Math.min(4 * dt, turn));
     return Math.abs(turn);
   };
   /** @type {(value: unknown) => void} */ let finish = () => undefined;
@@ -198,7 +200,9 @@ export function routeLegOnPage(leg) {
     const movedSinceFrame = Math.hypot(p.position.x - prevX, p.position.z - prevZ);
     if (leg.fixed && movedSinceFrame > 18) { end('position jumped during the route'); return; }
     metres += movedSinceFrame; prevX = p.position.x; prevZ = p.position.z;
-    if (!leg.approach && now - previous >= (leg.fixed ? 150 : 1000)) sample(now);
+    // Uncapped native runs can fill the 120-frame ring in less than 150 ms.
+    const ringFilling = leg.fixed && game.frameCount - seen >= game.frameMs.length / 2;
+    if (!leg.approach && (ringFilling || now - previous >= (leg.fixed ? 150 : 1000))) sample(now);
     const returning = leg.dwell?.road === true && nav.road && !nav.returned;
     const road = returning ? travel() : undefined, crossing = road?.live?.crossing;
     const held = crossing?.current === null && crossing.target === state.home &&

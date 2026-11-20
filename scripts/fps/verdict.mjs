@@ -6,7 +6,14 @@ const FLOORS = new Set([30, 60, 120]);
 
 /** @param {Sample[]} samples */
 export function frameMetrics(samples) {
-  const seconds = samples.reduce((n, sample) => n + sample.seconds, 0);
+  // Compensate interval addition: a complete 40 s capture must not become
+  // 39.99999999999999 s when hundreds of fractional spans are summed.
+  let seconds = 0, remainder = 0;
+  for (const sample of samples) {
+    const span = sample.seconds - remainder, next = seconds + span;
+    remainder = (next - seconds) - span;
+    seconds = next;
+  }
   const intervals = samples.flatMap(sample => sample.frameMs).sort((a, b) => a - b);
   const frames = samples.reduce((n, sample) => n + sample.frames, 0);
   if (!Number.isFinite(seconds) || seconds <= 0 || frames === 0 || intervals.length !== frames ||
