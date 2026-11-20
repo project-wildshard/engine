@@ -16,8 +16,9 @@
  * DF10 (mini-df10b): a merged mesh links programs its members never did (a flat look's merge drops its normals, three's
  * `vertexNormals` variant; a cell-wide merge draws materials whose members sat outside the spawn view). Swept after
  * control, the iPhone 13's first boot linked ~11 of them in play (36 dock frames over 50 ms). `primeStaticMerges` merges
- * every live view's mergeable meshes at once under the loading card, before the world frame's precompile draws them; a
- * primed member that then moves leaves at the first sweep, as any member does.
+ * every live view's mergeable meshes at once under the loading card, before the world frame's precompile draws them. A
+ * primed member that moves before its first sweep (a piece placed or snapped after the load) leaves without a refusal and
+ * joins again once still; after that first sweep it is a member like any other.
  */
 import { Matrix4, Mesh, ShaderMaterial, Texture, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -115,7 +116,8 @@ export async function primeStaticMerges(): Promise<number> {
   return joined;
 }
 
-interface Member { readonly mesh: Mesh; readonly material: Material; readonly at: Float64Array; readonly scope: Scope; readonly mask: number }
+/** `primed`: joined by the loading card's prime, untested for stillness (one that moves leaves without a refusal) */
+interface Member { readonly mesh: Mesh; readonly material: Material; readonly at: Float64Array; readonly scope: Scope; readonly mask: number; primed: boolean }
 /** the mesh's matrix in root space, or null when it has left the root or something below the root hides it */
 function rootPose(mesh: Mesh, root: Object3D, inverse: Matrix4, scratch: Matrix4, out: Float64Array): Float64Array | null {
   for (let node: Object3D | null = mesh.parent; node !== root; node = node.parent) if (node === null || !node.visible) return null;
@@ -158,7 +160,9 @@ export function installStaticViewMerge(root: Object3D, scope: Scope, frame: (che
     // members that moved, hid, changed material or left draw on their own again, for good
     for (const member of Array.from(members.values())) {
       const at = rootPose(member.mesh, root, inverse, scratch, pose);
-      if (at === null || !member.mesh.visible || member.mesh.material !== member.material || !samePose(at, member.at)) leave(member, true);
+      // a primed member that settled after the load (snapped, placed, revealed) leaves unrefused, and joins again when still
+      if (at === null || !member.mesh.visible || member.mesh.material !== member.material || !samePose(at, member.at)) leave(member, !member.primed);
+      else member.primed = false;
     }
     // candidates: still for a whole sweep, on a material another candidate or member shares
     const candidates: Mesh[] = [], next = new Map<Mesh, Float64Array>();
@@ -182,7 +186,7 @@ export function installStaticViewMerge(root: Object3D, scope: Scope, frame: (che
       const mask = mesh.layers.mask, memberScope = owner.child('static-view-merge.member');
       // the whole cell per layout (a set piece's block would draw it alone); a flat-shaded look reads no normals
       mergeView(root, mesh, material, memberScope, sharedHook(mesh), { grouping: 'region', ignore: readsNoNormals(material) ? ['normal'] : [] });
-      members.set(mesh, { mesh, material, at, scope: memberScope, mask });
+      members.set(mesh, { mesh, material, at, scope: memberScope, mask, primed: eager });
       seen.delete(mesh); joined++;
     }
     return joined;

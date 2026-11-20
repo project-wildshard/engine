@@ -84,7 +84,7 @@ test('a member hidden under the root leaves its merge', () => {
   } finally { scope.dispose(); }
 });
 
-test('the loading prime merges every mergeable mesh at once and builds the merged mesh; a primed mover leaves at its sweep', async () => {
+test('the loading prime merges every mergeable mesh at once and builds the merged mesh; a primed mover leaves unrefused', async () => {
   const scope = new Scope('region'), root = new Group(), material = new MeshBasicMaterial();
   const pieces = [0, 10, 20].map(x => { const mesh = new Mesh(tri(x), material); root.add(mesh); return mesh; });
   const checks: (() => void)[] = [];
@@ -102,6 +102,11 @@ test('the loading prime merges every mergeable mesh at once and builds the merge
     sweep();
     expect(census().members).toBe(2);
     expect(moved.layers.mask).toBe(1);
+    sweep(); sweep(); // primed, so not refused: still again, it rejoins
+    expect(census().members).toBe(3);
+    moved.position.x = 6; moved.updateMatrixWorld(true);
+    sweep(); sweep(); sweep();
+    expect(census().members).toBe(2); // a member past its first sweep that moves is refused, as any
   } finally { scope.dispose(); }
   expect(await primeStaticMerges()).toBe(0); // a disposed view leaves the prime
 });
