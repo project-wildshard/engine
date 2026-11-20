@@ -63,6 +63,7 @@ async function attach(socketUrl, { overrides = [] }) {
   let id = 0, closed = false;
   /** @type {string | null} */
   let target = null;
+  let bootstrapScript = '';
   /** @type {Map<number, {resolve: (value: any) => void, reject: (error: Error) => void}>} */
   const waiting = new Map();
   const fail = (/** @type {string} */ why) => {
@@ -88,6 +89,7 @@ async function attach(socketUrl, { overrides = [] }) {
     // Sent in order without waiting: a paused target answers only once resumed, and it queues these first
     /** @type {Promise<unknown>[]} */
     const sent = [];
+    if (bootstrapScript !== '') sent.push(send('Page.setBootstrapScript', { source: bootstrapScript }, 15_000, to));
     if (overrides.length > 0) {
       // Interception needs the Network agent on, which also keeps response bodies for the inspector. Resource caching
       // stays on: a Nine boot with it off lost its tab at texture upload. A cached response never reaches the interception,
@@ -197,6 +199,15 @@ async function attach(socketUrl, { overrides = [] }) {
   return {
     sessionId: `inspector:${socketUrl}`,
     served,
+    /** Seed capture fixtures before the next document's game modules read saves.
+     * New provisional targets receive the same script before resuming.
+     * @param {string} source */
+    async bootstrap(source) {
+      await ready;
+      await send('Page.setBootstrapScript', { source }, 15_000);
+      await send('Target.setPauseOnStart', { pauseOnStart: true }, 5_000, null);
+      bootstrapScript = source;
+    },
     getUrl: () => run('location.href', false, 10_000),
     /** Evaluate one expression as a user gesture (Runtime.evaluate's emulateUserGesture): an API that wants transient
      * activation, such as the Screen Wake Lock, accepts it. Returns the value, or throws what the page threw.
