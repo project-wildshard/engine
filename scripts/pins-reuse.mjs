@@ -42,6 +42,7 @@ export const KEY_SOURCES=Object.freeze(['scripts/pins.ts','scripts/pin-packs.ts'
  'scripts/bake-loader.mjs','scripts/format-hook.mjs','scripts/shardfile-validation-revision.mjs','scripts/pins-reuse.mjs',
  'scripts/tracked-public.mjs','scripts/pin-local.ts','scripts/local-candidates.ts','pnpm-lock.yaml',PINS,'test/pins/assets.json']);
 export const KEY_EXEMPT=Object.freeze({
+ 'scripts/agent-requests.mjs':'adds HTTP request markers; the pinned digest still decides the admitted bytes',
  'scripts/pins-exclude.mjs':'writes Git\'s exclude file only',
  'scripts/apfs-clone.mjs':'clones bytes that are then hashed against the manifest',
  'scripts/slice-inputs.ts':'slice and ring commands only, which delete the manifest',
