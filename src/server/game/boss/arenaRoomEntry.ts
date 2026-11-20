@@ -16,7 +16,8 @@ import { ArenaFightPageSchema, ArenaRoomSchema } from '../../../shared/game/boss
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { nativePopulationOf } from '../riding/nativePopulation';
 import { slotsOf } from './slotsNative';
-import type { readEncounterPoses } from '../population/encounterBook';
+import { readEncounterIntake, type readEncounterPoses } from '../population/encounterBook';
+import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { attachNativeCreaturePose, type NativeCreaturePose } from '../../../shared/game/plugin/animation';
 
 const Entry = v.object({ room: v.unknown(), encounter: v.object({ definition: v.record(v.string(), v.unknown()), page: v.unknown(), portal: v.unknown(), program: v.unknown() }) });
@@ -27,7 +28,7 @@ const entered = new WeakMap<SimHost, ReturnType<typeof installArenaRoom<ArenaRoo
 export interface ArenaEntryRow { readonly id: string; readonly body: { readonly kind: string; readonly variant: string }; readonly reward: string; readonly entrance: readonly [number, number, number, number] }
 /** What a shard lends. */
 export interface ArenaEntryPorts {
-  readonly spec: (kind: string, variant: string) => AnimalSimSpec;
+  readonly spec: AnimalSimSpec;
   readonly poses?: Awaited<ReturnType<typeof readEncounterPoses>>;
   readonly grantItem: (player: string, item: string, count: number) => void;
   /** The restored save, whose dynamic actors go back before its adapters do. */
@@ -37,14 +38,32 @@ export interface ArenaEntryPorts {
 const Species = v.object({ species: v.array(v.object({ kind: v.string(), aggressive: v.boolean(), lockable: v.optional(v.boolean()), dims: v.record(v.string(), v.unknown()),
   variants: v.array(v.object({ id: v.string(), label: v.string(), rarity: v.string(), hp: v.number(), mods: v.optional(v.record(v.string(), v.unknown())) })) })) });
 /** A room's bodies by kind and variant, from the server's own species rows. */
-export function arenaSpecies(input: unknown): ArenaEntryPorts['spec'] {
+function arenaMods(overrides: object | undefined): AnimalSimSpec['mods'] {
+  return { speed: 1, chargeDist: 1, damageTaken: 1, chargeDamage: 1, relentless: false, ...overrides };
+}
+
+function legacyArenaSpecies(input: unknown, kind: string, variant: string): AnimalSimSpec {
   const { species } = v.parse(Species, input);
-  return (kind, variant) => {
-    const row = species.find(entry => entry.kind === kind), selected = row?.variants.find(entry => entry.id === variant);
-    if (row === undefined || selected === undefined) throw new Error(`Arena body ${kind}.${variant} has no species row`);
-    const spec: unknown = { kind, label: selected.label, variant, rarity: selected.rarity, hp: selected.hp, aggressive: row.aggressive, dims: row.dims, mods: { speed: 1, chargeDist: 1, damageTaken: 1, chargeDamage: 1, relentless: false, ...selected.mods }, ...(row.lockable === undefined ? {} : { lockable: row.lockable }) };
-    return spec as AnimalSimSpec;
-  };
+  const row = species.find(entry => entry.kind === kind), selected = row?.variants.find(entry => entry.id === variant);
+  if (row === undefined || selected === undefined) throw new Error(`Arena body ${kind}.${variant} has no species row`);
+  const spec: unknown = { kind, label: selected.label, variant, rarity: selected.rarity, hp: selected.hp, aggressive: row.aggressive,
+    dims: row.dims, mods: arenaMods(selected.mods), ...(row.lockable === undefined ? {} : { lockable: row.lockable }) };
+  return spec as AnimalSimSpec;
+}
+
+/** The room's body comes from the admitted creature book. Older products carry a server body file. */
+export async function prepareArenaBody(product: Pick<ShardFolder, 'hasFile' | 'file' | 'json'>, { kind, variant }: ArenaEntryRow['body']): Promise<AnimalSimSpec> {
+  const legacy = 'server/arena-species.json';
+  if (product.hasFile(legacy)) {
+    const rows: unknown = JSON.parse(new TextDecoder().decode(await product.file(legacy)));
+    return legacyArenaSpecies(rows, kind, variant);
+  }
+  const { recipes, species: [species] } = await readEncounterIntake(product, [kind]);
+  const recipe = recipes.find(row => row.variant === variant);
+  const selected = species === undefined ? undefined : [...species.variants, ...species.spawnOnly ?? []].find(row => row.id === variant);
+  if (recipe === undefined || selected === undefined) throw new Error(`Arena body ${kind}.${variant} has no admitted variant`);
+  // The encounter program sets its attack damage. Species-level charge damage is for ordinary wildlife.
+  return { ...recipe, mods: arenaMods(selected.mods) };
 }
 
 /** Install one arena room. Its record lives in plain flags, as a boss row's does. */
@@ -71,9 +90,9 @@ export function installArenaEntry(host: SimHost, input: unknown, row: ArenaEntry
     }
     return actor as ArenaRoomBody;
   };
-  const spawn = (id: string, kind: string, variant: string, x: number, z: number, yaw: number): ArenaRoomBody => {
+  const spawn = (id: string, x: number, z: number, yaw: number): ArenaRoomBody => {
     const held = body(id); if (held !== null) { held.place(x, z, yaw); return held; }
-    host.spawn({ id, spec: ports.spec(kind, variant), seed: host.level.seed, scale: 1, at: { x, y: room.origin.y, z }, yaw });
+    host.spawn({ id, spec: ports.spec, seed: host.level.seed, scale: 1, at: { x, y: room.origin.y, z }, yaw });
     const actor = body(id); if (actor === null) throw new Error('Arena body was not spawned'); actor.hidden = false; return actor;
   };
   let door: (() => void) | null = null;
@@ -87,7 +106,7 @@ export function installArenaEntry(host: SimHost, input: unknown, row: ArenaEntry
   const fight = installArenaRoom<ArenaRoomBody>(host, { step: row.id, room, definition: { ...encounter.definition, reward: {} } as Parameters<typeof installArenaRoom>[1]['definition'], fight: page,
     portal: { rows: v.parse(v.looseObject({}), encounter.portal) as NonNullable<Parameters<typeof installArenaRoom>[1]['portal']>['rows'], program: ReturnProgram.native(host, encounter.program),
       entrance: { x, y: host.groundHeightAt(x, z) + 0.1, z, facing } } }, {
-    spawnBody: () => spawn(`${row.id}.body`, row.body.kind, row.body.variant, room.origin.x, room.origin.z, 0),
+    spawnBody: () => spawn(`${row.id}.body`, room.origin.x, room.origin.z, 0),
     spawnAdd: (_index, ax, az, yaw) => {
       const population = nativePopulationOf(host), slots = slotsOf(host);
       if (population === undefined || slots === undefined) throw new Error('Arena adds need their native species owner');

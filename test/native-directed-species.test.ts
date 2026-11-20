@@ -22,6 +22,7 @@ import { builtFolder } from '../src/test/game/builtFolder';
 import { createNativeProofResident } from '../src/test/game/headlessNative';
 import { prepareNalatiWorld } from './fixtures/nalati-world';
 import { readPatrolIntake } from '../src/server/game/boss/patrolNative';
+import { prepareArenaBody } from '../src/server/game/boss/arenaRoomEntry';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
@@ -81,3 +82,14 @@ test('a bound ghost rider decides and scales hits through its law natively, and 
     }
   } finally { bound.dispose(); plain.dispose(); }
 }, 60_000);
+
+
+test('the arena body from the cooked creature book preserves the released King recipe', async () => {
+  const product = await loadHeadlessFolder(builtFolder('nalati-grasslands'));
+  const body = { kind: 'golden-king', variant: 'king' };
+  const legacy = await prepareArenaBody(product, body);
+  const shared = { ...product, hasFile: (file: string) => file === 'server/arena-species.json' ? false : product.hasFile(file) };
+  expect(await prepareArenaBody(shared, body)).toEqual(legacy);
+  expect(legacy.mods.chargeDamage).toBe(1);
+  await expect(prepareArenaBody(shared, { ...body, variant: 'absent' })).rejects.toThrow('has no admitted variant');
+});
