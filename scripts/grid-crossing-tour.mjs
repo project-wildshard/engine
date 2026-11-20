@@ -17,6 +17,7 @@
 // behind let its world go (`fromEvictedMs`) and the most the page's playing cost reached (`peakPlayingMB`).
 // --cold (GC3's cold-cache pass): no HTTP cache and no service worker in any page, so every crossing fetches its cell from the
 // network as a first visit does (Chromium: the DevTools cache switch; WebKit: service workers blocked only).
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';

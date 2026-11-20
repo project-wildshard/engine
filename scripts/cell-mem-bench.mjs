@@ -14,6 +14,7 @@
 // and each scrape is a loopback curl over ssh (the agent account forwards no ports). Memory is RSS (Linux has no `footprint`). The
 // box fetches its own packs from R2 into the run's cache, kept across counts. The directory goes when the run ends, however it ends.
 // SC4: each count also says `arrivalTickMax`, the worst tick in the worker readings heard in the 20 s after the bots arrived.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';

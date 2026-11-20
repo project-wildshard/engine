@@ -1,4 +1,5 @@
 // J476 smoke: real gates into the eight featured shards. J451's full route stays available by hand.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';

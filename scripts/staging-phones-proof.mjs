@@ -15,6 +15,7 @@
 // body. Page errors are listed, not failed. Why 25 of 30 hosted runs failed (2026-11-17/18): the hosted macOS and Linux
 // runners have no GPU, so the title took 16 min, `simctl io screenshot` timed out, or Safari or Chrome never opened a page
 // in 90 s; no failure was the game's.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { agentUrl } from './agent-marker.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';

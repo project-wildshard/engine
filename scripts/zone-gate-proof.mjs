@@ -15,6 +15,7 @@
 // the spawn by grid-crossing-walk-proof.mjs's route. Staging's fresh boot can't be placed, so its playingMB is reported, not held.
 // J451: `--walk-all --expected-build=<sha>` walks the phone tour. `--resume=<held zone-entry.json> --from=33`
 // continues at crossing 33 and uses a fresh `--out`. Omit `--from` to take the next crossing from the held report.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from "./browser-playwright.mjs";

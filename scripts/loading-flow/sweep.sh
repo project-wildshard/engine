@@ -32,7 +32,8 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -n "$url" ] || { echo 'usage: sweep.sh <url> [--out <dir>] [--dist <dir>] [--source-rev <engine SHA>] [--worker-row] [--only <step,step>]' >&2; exit 2; }
-build=$(curl -fsS --max-time 15 "$url/version.json" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["build"])') \
+WS_AGENT_UA=$(node --input-type=module -e 'import { agentUserAgent } from "./scripts/agent-marker.mjs"; console.log(agentUserAgent("curl"));')
+build=$(curl -A "$WS_AGENT_UA" -fsS --max-time 15 "$url/version.json" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["build"])') \
   || { echo "sweep.sh: no version.json at $url" >&2; exit 2; }
 rev=${build%%-*}
 [ -n "$source_rev" ] || source_rev=$rev

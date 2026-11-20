@@ -9,6 +9,7 @@
 // phone on a new build). Its prep page navigation lets Safari check for the new worker, as opening the app does.
 // Writes <out>/<mode>-timeline.jsonl (events, card polls every ~200 ms, page frame stamps from a requestAnimationFrame
 // sampler), <out>/<mode>-perf.json (resources, marks, measures of the world page) and <out>/<mode>-raw.mp4.
+import { agentFetch as fetch } from '../agent-requests.mjs';
 import { agentUrl } from '../agent-marker.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { appendFileSync, writeFileSync, rmSync, existsSync, readdirSync, mkdirSync } from 'node:fs';

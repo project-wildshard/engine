@@ -10,6 +10,7 @@
 // J205: staging only, never production. At most 3 pages at once (`WORLD_SEATS` 32).
 //   node scripts/grid-spawn-proof.mjs <out dir> [--layouts=desktop,phone] [--cells=<instance,…>] [--parallel=3] [--no-dev]
 //   node scripts/grid-spawn-proof.mjs <out dir> --report-only [--again=<a second run's runs.json>]   (redraws report.html from <out dir>/runs.json)
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { basename, join, resolve as absolute } from 'node:path';

@@ -12,6 +12,7 @@
 // 3. `sudo -n wildshard-config cook vX.Y.Z`: the box verifies the tag, writes cook.settings, rebuilds the cook step alone,
 //    waits for its /health and rolls back if it does not come up. Then `show cook` and the worker's /health.
 // --dry-run reads the box and says what it would do; it writes nothing. Output never carries an address or a secret.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { spawnSync } from 'node:child_process';
 import {resolve as resolvePath} from 'node:path';
 import {pathToFileURL} from 'node:url';

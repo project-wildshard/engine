@@ -20,6 +20,7 @@
 //   replica.mjs pg-restart [--checkpoint]  restarts only the scratch cluster. With the flag, wait for a blocked save.
 //   replica.mjs stop      ends both units, drops the scratch cluster and removes the folder.
 // Nothing a channel's user can write is read (Codex J206): no bundle folder, no pulled release.json.
+import { agentFetch as fetch } from '../agent-requests.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

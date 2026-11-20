@@ -1,3 +1,4 @@
+import { agentFetch as fetch } from '../agent-requests.mjs';
 import {spawn} from 'node:child_process';
 import {readFile, writeFile, mkdir} from 'node:fs/promises';
 import {resolve as resolvePath} from 'node:path';

@@ -6,5 +6,6 @@
 # J427) are folded into staging-qa.mjs's legs or retired: SQ9's K6 enters every Shard Select card, K3 and K4 hold the journey.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-version=$(curl -fsS --max-time 30 https://staging.wildshard.io/version.json | node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(0,"utf8")).clientVersion)')
+WS_AGENT_UA=$(node --input-type=module -e 'import { agentUserAgent } from "./scripts/agent-marker.mjs"; console.log(agentUserAgent("curl"));')
+version=$(curl -A "$WS_AGENT_UA" -fsS --max-time 30 https://staging.wildshard.io/version.json | node -e 'process.stdout.write(JSON.parse(require("node:fs").readFileSync(0,"utf8")).clientVersion)')
 exec node scripts/staging-qa.mjs --release "v$version" "$@"

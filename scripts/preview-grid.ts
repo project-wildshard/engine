@@ -11,6 +11,7 @@
 //
 // Staging's file missing (404): staging placed no cell, so the pinned grid. Unreadable, refused or a bad signature (the "staging MMO down"):
 // the live preview's own borrowed cells stay, and the run says so with a warning. Neither readable: the pinned grid, also with a warning.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { createPublicKey, verify } from 'node:crypto';
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

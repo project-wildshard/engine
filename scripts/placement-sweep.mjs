@@ -9,6 +9,7 @@
 // gets its line within the hour engine main keeps moving.
 //   node scripts/placement-sweep.mjs [--dry-run]
 // State (the last serial and each slug's hash) is ~/.cache/wildshard/placement-sweep.json; output under <checkout>/tmp/placement-sweep/.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';

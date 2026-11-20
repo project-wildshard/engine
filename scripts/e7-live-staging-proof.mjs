@@ -1,4 +1,5 @@
 // Manual live proof. J205: staging only; never an agent socket on production.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import assert from 'node:assert/strict';
 import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from "./browser-playwright.mjs";

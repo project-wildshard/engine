@@ -12,6 +12,7 @@
 //   node scripts/zone-select-return-proof.mjs --base=<https://staging.wildshard.io or a loopback rig url> --out=<dir> [--engine=webkit]
 // J205: staging or loopback only, never production; a guest seat, every staging socket guarded to the staging door.
 // The loopback form runs on the local rig: node scripts/zone-gate-rig.mjs <dist> <work> <key.json> --proof=zone-select-return-proof.mjs --out=<dir>
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, webkit } from './browser-playwright.mjs';

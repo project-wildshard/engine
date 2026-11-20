@@ -8,6 +8,7 @@
 //   node scripts/pins-catalogue.ts check    CI (job 1, before install): the pins and both release variables against the live
 //                                           GET /api/catalogue; the offline half is test/pins-catalogue.test.ts
 // `pins.ts refresh` refuses the same way before it writes a pin. Node built-ins only, so CI runs it before `pnpm install`.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';

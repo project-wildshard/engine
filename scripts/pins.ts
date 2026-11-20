@@ -33,6 +33,7 @@
 // match its committed hash, byte count and file count exactly. Coverage rows 4 and 5.
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
 import './bake-loader.mjs';
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';

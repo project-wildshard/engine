@@ -10,6 +10,7 @@
 //
 // The T1 spec (src/e2e/t1/journey.spec.ts) drives the same `tapJourney` against the local build; this CLI is the release
 // staging gate (J386), run before any prod promote. It only reads: every request but a GET is aborted.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as resolvePath } from 'node:path';
 import { watchFaults } from './proof-faults.mjs';

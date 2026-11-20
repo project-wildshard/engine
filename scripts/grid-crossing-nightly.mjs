@@ -11,6 +11,7 @@
 //   node scripts/grid-crossing-nightly.mjs [--root=<dir>] [--force=release|nightly] [--dry-run] [--ratchet=<file>]
 // --ratchet hands the report another ratchet file (the seeded break that proves a worse pair turns the run red).
 // --root defaults to ~/.cache/wildshard/plan-artifacts/grid/nightly. --dry-run prints what is due and runs nothing.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';

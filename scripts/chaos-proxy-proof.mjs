@@ -1,4 +1,5 @@
 // Explicit Ring 2/manual proof. Never part of pre-push.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import assert from 'node:assert/strict'
 import { spawn, spawnSync, execFileSync } from 'node:child_process'
 import { once, on } from 'node:events'

@@ -13,6 +13,7 @@
  * stack under `error`). They have no screenshot. `.review/errors-seen` keeps the newest error id pulled: the session brief
  * (.claude/hooks/session-brief.sh) counts the ones after it.
  */
+import { agentFetch as fetch } from './agent-requests.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { apiOrigin, envLocal } from './api-origin.mjs';

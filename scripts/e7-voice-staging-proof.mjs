@@ -3,6 +3,7 @@
 //   node scripts/e7-voice-staging-proof.mjs https://staging.wildshard.io/ <engine-sha> <release-key-hex> [out-dir]
 // v0.1.9's distance fade (VOICE-POLISH V7) silences a talker from 40 m, so the two stand within hearing range before either talks:
 // both take a fresh seat (the server stands fresh joiners a metre apart) and the proof measures the gap before voice starts.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import assert from 'node:assert/strict';
 import {createPublicKey,verify} from 'node:crypto';
 import {mkdirSync} from 'node:fs';

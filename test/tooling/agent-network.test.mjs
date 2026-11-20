@@ -3,6 +3,7 @@ import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { test, vi } from 'vitest';
 import { agentHeaders, agentUserAgent } from '../../scripts/agent-marker.mjs';
+import { markerIssues } from '../../scripts/agent-marker-check.mjs';
 import { markedFetch } from '../../scripts/agent-fetch.mjs';
 
 test('passes third-party reads through and marks only the game request', async () => {
@@ -44,4 +45,24 @@ test('preloaded fetch and WebSocket preserve the handshake and mark an owned end
     assert.equal(request.headers['x-wildshard-agent'], marker);
     assert.equal(request.headers['sec-websocket-protocol'], 'sample-protocol');
   } finally { await new Promise(resolve => { server.close(resolve); }); }
+});
+
+test('flags an unmarked hosted read, curl and browser even when their address is named first', () => {
+  const address = 'https://staging.wildshard.io/';
+  assert.equal(markerIssues(`const origin = '${address}'; await fetch(origin);`, 'scripts/probe.mjs').length, 1);
+  assert.equal(markerIssues(`url='${address}'\ncurl -fsS "$url"`, 'scripts/probe.sh').length, 1);
+  assert.equal(markerIssues(`const origin = '${address}'; await chromium.launch();`, 'scripts/probe.mjs').length, 1);
+  assert.deepEqual(markerIssues(`curl -fsS https://not-wildshard.io/`, 'scripts/probe.sh'), []);
+  assert.deepEqual(markerIssues(`import { agentFetch as fetch } from './agent-requests.mjs';\nawait fetch('${address}');`, 'scripts/probe.mjs'), []);
+  assert.deepEqual(markerIssues(`url='${address}'\ncurl -A "$WS_AGENT_UA" -fsS "$url"`, 'scripts/probe.sh'), []);
+});
+
+test('accepts browser navigation and refuses a browser-wide agent header', () => {
+  const address = 'https://staging.wildshard.io/';
+  assert.deepEqual(markerIssues(`import { chromium } from './browser-playwright.mjs';\nawait chromium.launch();\npage.goto('${address}');`, 'scripts/probe.mjs'), []);
+  assert.deepEqual(markerIssues(`await page.goto(agentUrl('${address}'));\nawait chromium.launch();`, 'scripts/probe.mjs'), []);
+  assert.deepEqual(markerIssues('browser.newContext({extraHTTPHeaders: {...agentHeaders()}});', 'scripts/probe.mjs'), [
+    'keep the actor header out of browser-wide request options',
+  ]);
+  assert.deepEqual(markerIssues(`await page.evaluate(() => fetch('/version.json'));\nconst url = '${address}';`, 'scripts/probe.mjs'), []);
 });

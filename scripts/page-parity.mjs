@@ -12,6 +12,7 @@
 // A redirect's or a 404's content type is not compared (the old host said text/plain, Workers nothing).
 // `--identity` asks without compression, for a local `wrangler dev`, which never compresses.
 
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { createHash } from 'node:crypto';
 import process from 'node:process';
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // TC40 / J186: explicit Ring 2 only. Complete cold cooks and actual publisher
 // SIGKILL/recovery exceed ten seconds. Never a hook or ordinary test discovery.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';

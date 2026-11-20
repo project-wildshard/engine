@@ -8,6 +8,7 @@
 //
 // It refuses unless the API's channel document names exactly that revision and hash for the slug, and a slug engine
 // never pinned (a first pin is a reviewed `pins.ts refresh`, DEL9).
+import { agentFetch as fetch } from './agent-requests.mjs';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {refreshStaging} from './pins-staging.ts';

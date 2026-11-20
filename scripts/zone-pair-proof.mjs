@@ -10,6 +10,7 @@
 // staging); --probe stops after C's entry and logs C's worker report beside a card-seated D for 20 s. Several WebGL pages in one
 // headless browser can starve one page's game loop (its socket still receives at 60/s): a FAIL on C's sighting alone is read with the
 // logged reports (`ws` counts what the socket received) before it is called the wire's (ZE16, opus-gcm18).
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, webkit } from "./browser-playwright.mjs";

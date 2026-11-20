@@ -12,6 +12,7 @@
 // R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_NOTIFY_TOKEN; COOK_PORT (8792; 8790 and 8791 are the game's), COOK_HOST (127.0.0.1);
 // COOK_SERVER_PACKS, COOK_SCRATCH; COOK_SECONDS, COOK_MEMORY_MB, COOK_HEAP_MB, COOK_MAX_SHARDFILE_BYTES; COOK_JOB_WRAP, a JSON array the host puts
 // before each job to take its network away (see the wildshard-cook unit in scripts/vps/rebuild.sh).
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';

@@ -6,6 +6,7 @@
 // It boots the built product at iPhone portrait size in Chromium and WebKit, records every change of the
 // card's bars with the LS1 counters that moved with it, screenshots the card loading and ready, and reports
 // each stretch of over 2 s where the bar took less than 1 %, by the stage that held it.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import {
   mkdirSync,
   writeFileSync,

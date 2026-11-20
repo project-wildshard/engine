@@ -1,4 +1,5 @@
 // MU13: a staging probe uploaded after the cut otherwise made native entry GET a missing build index.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import {execFileSync} from 'node:child_process';
 import {readFileSync, mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';

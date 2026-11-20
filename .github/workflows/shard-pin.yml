@@ -31,6 +31,9 @@ on:
   repository_dispatch:
     types: [shard-published]
 
+env:
+  WS_AGENT_UA: WildshardAgent/1 (ci-shard-pin)
+
 permissions:
   contents: write
 
@@ -87,7 +90,7 @@ jobs:
           if gh release view pins --json assets --jq '.assets[].name' | grep -qx "$HASH.tar"; then
             echo "pins already holds $HASH.tar"
           else
-            curl -fsSL -o "$RUNNER_TEMP/$HASH.tar" "https://api.wildshard.io/api/shardfiles/$HASH" --compressed
+            curl -A "$WS_AGENT_UA" -fsSL -o "$RUNNER_TEMP/$HASH.tar" "https://api.wildshard.io/api/shardfiles/$HASH" --compressed
             echo "$HASH  $RUNNER_TEMP/$HASH.tar" | sha256sum -c -
             gh release upload pins "$RUNNER_TEMP/$HASH.tar"
           fi

@@ -14,6 +14,7 @@
 // release's wire package and minor, the bundle's SHA-256, every seat and the database's save rows.
 // J205: loopback only; nothing is sent off this Mac but the bundle, pack and catalogue reads (packs.wildshard.io, GitHub).
 // Everything goes in tmp/wire-pair/<stamp>/ (or --work-dir under tmp/); the trees and bundles go after the run, the report stays.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, verify } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';

@@ -1,4 +1,5 @@
 // E7.2c.b.1: verified, bounded observation inputs. No socket or service mutation.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import {createHash} from 'node:crypto';
 import {readReleaseFile} from '../src/server/host/dedicated/releaseFile.ts';
 import {botTarget,STAGING_SOCKET} from '../test/fixtures/dedicated/mmoBotsGuard.ts';

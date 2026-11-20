@@ -12,6 +12,7 @@
 //   pnpm bench:ci                  # same, exit code = number of budget rows over
 //   pnpm bench -- --url=https://play.wildshard.io   # live site, no build
 //   pnpm bench -- --compare progress/bench/a.json progress/bench/b.json
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { spawn, execSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { resolve as resolvePath, basename, join } from 'node:path';

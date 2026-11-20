@@ -30,6 +30,9 @@ on:
         required: false
         default: ''
 
+env:
+  WS_AGENT_UA: WildshardAgent/1 (ci-preview)
+
 permissions:
   contents: read
   actions: read # the newest green main ci run
@@ -53,7 +56,7 @@ jobs:
         id: due
         if: github.event_name == 'workflow_run'
         run: |
-          built=$(curl -fsS -m 20 "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const t=Date.parse(JSON.parse(s).time);console.log(Number.isFinite(t)?Math.floor(t/1000):'')}catch{console.log('')}})" || true)
+          built=$(curl -A "$WS_AGENT_UA" -fsS -m 20 "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const t=Date.parse(JSON.parse(s).time);console.log(Number.isFinite(t)?Math.floor(t/1000):'')}catch{console.log('')}})" || true)
           if [ -n "$built" ] && [ $(( $(date +%s) - built )) -lt 3600 ]; then
             echo "the live preview was built $(( ($(date +%s) - built) / 60 )) minutes ago: under the hour, no deploy"
             echo "deploy=false" >> "$GITHUB_OUTPUT"
@@ -94,7 +97,7 @@ jobs:
         if: steps.due.outputs.deploy != 'false'
         run: |
           echo "this build names itself $(git describe --tags --match 'v[0-9]*' 2>/dev/null || echo '(no version tag)')"
-          live=$(curl -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(String(JSON.parse(s).build).split('-')[0])}catch{console.log('')}})" || true)
+          live=$(curl -A "$WS_AGENT_UA" -fsS "https://preview.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(String(JSON.parse(s).build).split('-')[0])}catch{console.log('')}})" || true)
           # every input of the client build: the game's code (the solo page bundles the server worker), its shards (the pins), the build tooling, the lockfile and the page host
           inputs=(src/client src/shared src/server types vite vite.config.ts index.html public package.json pnpm-lock.yaml test/pins scripts/app-build scripts/build-app.mjs scripts/app-build-pipeline.mjs scripts/gen.mjs scripts/pins.ts pages scripts/page-release scripts/page-release.mjs scripts/preview-grid.ts)
           if [ -n "$live" ] && git cat-file -e "$live^{commit}" 2>/dev/null && git diff --quiet "$live" HEAD -- "${inputs[@]}"; then

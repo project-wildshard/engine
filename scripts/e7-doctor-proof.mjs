@@ -1,4 +1,5 @@
 // Manual E7 Doctor proof. J205: live checks only on staging; human checks are static.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import assert from 'node:assert/strict';
 import {createPublicKey,verify} from 'node:crypto';
 import {chromium,webkit,devices} from "./browser-playwright.mjs";

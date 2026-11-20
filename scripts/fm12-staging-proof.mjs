@@ -13,6 +13,7 @@
 // 5. Offline (mode 2): page A goes offline (Playwright setOffline); the offline-play card shows, then it rejoins and chat crosses.
 // 6. failure.screen: every POST the pages send to the API's telemetry ingest that carries a failure.screen episode, with its status.
 // The receipt is <out>/receipt.json; shots are <out>/*.png. Exit 0: all pass; 1: a screen or recovery failed.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import assert from 'node:assert/strict';
 import { createPublicKey, verify } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';

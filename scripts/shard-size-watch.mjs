@@ -6,6 +6,7 @@
 // .github/workflows/size-watch.yml runs it nightly against production and files what it finds.
 //
 //   node scripts/shard-size-watch.mjs --upstream <url> --out <dir> [--only pine-hollow:phone,grid:phone]
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

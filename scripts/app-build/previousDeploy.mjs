@@ -7,6 +7,7 @@
  * (`content: true`) and names its code only, so a later release carries its code only. Its content is on R2, keyed by
  * hash, and `cook-worker gc` keeps every build a channel's live deploy-chunks.json names. A graph without the mark is a
  * build whose tabs read content from the page, so its content is carried as before until it ages out. */
+import { agentFetch as fetch } from '../agent-requests.mjs';
 import {execFileSync} from 'node:child_process';
 import {copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {dirname, join, relative} from 'node:path';

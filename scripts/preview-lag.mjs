@@ -11,6 +11,7 @@
 //   node scripts/preview-lag.mjs [--dry-run]     prints the verdict; --dry-run checks in and dispatches nothing
 //
 // Exit 0 when current or within 75 minutes, 1 when behind (after the dispatch), 2 when it could not tell.
+import { agentFetch as fetch } from './agent-requests.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
