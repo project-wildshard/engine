@@ -69,7 +69,8 @@ export function admitRuntimeCreatures(shard: Shardfile, sections: ReadonlyMap<st
   if (shard.creatures.spawns.length === 0) return;
   const shared = shard.creatures.spawns.filter(row => keeper.actors.has(row.id)).map(row => row.id);
   if (shared.length > 0) throw new Error(`A declared spawn and the runtime plan's keeper both own ${shared.join(', ')}: one body, one owner`);
-  const declared = new Set(shard.creatures.spawns.map(row => row.id));
+  // OF23d: a keeper's row may bind a declared spawn with no brain of its own: the keeper lends it that body (a boss fight's)
+  const declared = new Set(shard.creatures.spawns.filter(row => row.brain !== null).map(row => row.id));
   for (const row of decisionScriptsFromSections(sections)) if (keeper.scripts.has(row.id) && Object.values(row.actors).some(id => declared.has(id)))
     throw new Error(`Decision ${row.id} is the keeper's and binds a declared spawn: one decision row, one owner`);
   if (shard.crowds.length > 0) throw new Error('Declared crowds do not run beside a native runtime plan');

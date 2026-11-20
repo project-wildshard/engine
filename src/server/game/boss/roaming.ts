@@ -1,7 +1,7 @@
 /** Native roaming boss binding: rows supply identity, streams and strike names;
  * the existing AS guest owns choices and the platform owns native effects. */
 import type { SpeciesProgramData } from '@wildshard/format/speciesPrograms';
-import type { SpeciesDecisionAuthority } from '../plugin/brain';
+import type { BorrowedSpeciesControl, SpeciesDecisionAuthority } from '../plugin/brain';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import type { BossBrain } from '@wildshard/engine/ai/BossBrain';
 import { fnv1a32, Rng, type RngState } from '@wildshard/format/seededRng';
@@ -18,6 +18,8 @@ export interface GroundBossBody extends AnimalSim { hp: number; readonly maxHp: 
 /** The native or rendered world's existing contact, health and feedback ports. */
 export interface GroundBossEnv<B extends GroundBossBody> extends Pick<GroundBossPorts<B>, 'player'|'hurt'|'trauma'|'shot'> {
   readonly reach: (actor:B,target:{readonly x:number;readonly y:number;readonly z:number})=>boolean;
+  /** A body no roster binds (a declared spawn) takes its decision observation here, once, as its control is bound. */
+  readonly observe?: (actor:B,control:BorrowedSpeciesControl)=>void;
 }
 /** One fight state, with the real lane and independent seeded stream continuations. */
 export type GroundBossFight<B extends GroundBossBody> = RoamingBossFight<B, LaneState, RngState>;
@@ -37,7 +39,7 @@ export function createGroundBossFight<B extends GroundBossBody>(row: RoamingEnco
   if(species?.brain?.archetype!=='decision'||species.body===undefined)throw new Error('Boss requires its admitted decision/body recipe');
   const declared=species.brain.data,recipe=species.body;
   const bound=new WeakSet<B>();
-  const bind=(actor:B):B=>{if(!bound.has(actor)){decisions.bind(actor,declared,recipe);bound.add(actor);}return actor;};
+  const bind=(actor:B):B=>{if(!bound.has(actor)){const control=decisions.bind(actor,declared,recipe);env.observe?.(actor,control);bound.add(actor);}return actor;};
   const contacts = new Map(program.strikes.map(strikeData => [strikeData.id, strikeFromData(strikeData)]));
   const body={...host.body,make:():B=>bind(host.body.make())};
   const fight = bossFight(profile, { ...host, body, player: env.player, random: bossStreams(seed, row),

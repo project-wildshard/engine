@@ -228,7 +228,8 @@ export class ShardDecisions {
           bodies.add(body); owners.add(name); this.fieldActors.add(handle);
           continue;
         }
-        if (owners.has(name) || (borrowed ? spawn !== undefined || !nativeActors.includes(name) && ![...runtime?.homes ?? [], ...runtime?.bosses ?? [], ...runtime?.actors ?? []].some(value => value.id === name)
+        // OF23d: a borrowed body may be a declared spawn with no brain of its own (a boss fight's declared body)
+        if (owners.has(name) || (borrowed ? spawn !== undefined ? spawn.brain !== null : !nativeActors.includes(name) && ![...runtime?.homes ?? [], ...runtime?.bosses ?? [], ...runtime?.actors ?? []].some(value => value.id === name)
           : spawn?.brain !== null)) throw new Error('Decision actor has two controllers');
         const body = requireValue(sim.entities.get(name), 'absent actor');
         if (bodies.has(body)) throw new Error('Decision body has two controllers');

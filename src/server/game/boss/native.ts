@@ -2,6 +2,8 @@
  * damage ownership, reward flags and save continuation are shared platform law. */
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { nativeDecisions } from '../shardfile/borrowedDecisions';
+import { bindSpeciesBody, type BorrowedSpeciesControl } from '../plugin/brain';
+import { fnv1a32, Rng } from '@wildshard/format/seededRng';
 import { populationRoster, type NativePopulationActor } from '../population/roster';
 import { grantNativeInventory } from '../../../shared/game/inventoryLaw';
 import type { SpeciesProgramData } from '@wildshard/format/speciesPrograms';
@@ -21,6 +23,9 @@ import { strikeFromData } from '@wildshard/engine/ai/strikeRows';
 import { itemPickupFloor, ITEM_PICKUP_HOVER } from '@wildshard/engine/world/interact/pickup';
 import { pickPrompt } from '@wildshard/engine/world/interact/prompts';
 import { nearestOnGround } from '@wildshard/engine/sim/nearPlayer';
+import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
+import { ABSENT_Y } from '../shardfile/declaredSpawnWhen';
+import { lendDeclaredBodies } from '../shardfile/declaredHerds';
 
 /** The actual native body remains owned by its installed population service; its limb pose roster publishes the ribs
  * volume (game/animation/limbPopulation `ribsWorld`: the chest chain, then the baked ribs point). */
@@ -44,8 +49,47 @@ const RIB_POINT = new Vector3();
 /** The lane states `ROAMING_VIEW.lane` numbers. */
 const LANE_STATES = ['none', 'tell', 'run', 'skid'] as const;
 
+/** A declared spawn row as the fight reads it: its id and spawn group. */
+export interface GroundBossSpawn { readonly id: string; readonly group?: string | undefined }
+/**
+ * ONE-FORMAT OF23d: the fight's declared bodies, the `creatures.spawns` rows in its spawn group (its fight step, Pine's
+ * `pine.king`). The one of the boss's kind is the boss: the fight raises it in place of the roster's parked body. The rest
+ * are its thralls, by kind (each of an add kind and variant): a summon of a kind with declared thralls stands a fallen or
+ * absent one of them, at least one per add lane. Each is out of the world until the fight stands it (absent, as a `when`
+ * row is), a retired one leaves again, and a layer hunt stands aside for them all (scripted). The roster keeps every kind
+ * the group does not declare.
+ */
+function declaredGroundBodies(host: SimHost, row: RoamingEncounterRow, declared: readonly GroundBossSpawn[]): {
+  readonly boss: NativeGroundBossBody | null; readonly adds: readonly NativeGroundBossBody[]; readonly owns: (id: string) => boolean;
+  readonly stand: (body: NativeGroundBossBody, x: number, z: number, yaw: number) => void; readonly leave: (body: NativeGroundBossBody) => void;
+  readonly settle: () => void;
+} {
+  const bodies = declared.filter(spawn => spawn.group === row.steps.fight).map(spawn => {
+    const actor: AnimalSim | undefined = host.entities.get(spawn.id);
+    if (actor === undefined) throw new Error(`Declared boss body ${spawn.id} names no declared body`);
+    const body: NativeGroundBossBody = Object.assign(actor, { hidden: false, sampleTerrain: () => undefined }); return body;
+  });
+  const bosses = bodies.filter(body => body.kind === row.kind), adds = bodies.filter(body => body.kind !== row.kind);
+  const fight = row.profile.fight;
+  if (bosses.length > 1) throw new Error(`Boss ${row.steps.fight} declares more than one ${row.kind}`);
+  if (adds.some(body => !fight.adds.kinds.includes(body.kind) || body.variant !== row.adds.variant)) throw new Error(`Boss ${row.steps.fight} declares a body that is neither it nor its thrall`);
+  for (const kind of new Set(adds.map(body => body.kind))) if (adds.filter(body => body.kind === kind).length < row.lanes.count)
+    throw new Error(`Boss ${row.steps.fight} declares fewer ${kind} thralls than its ${String(row.lanes.count)} add lanes`);
+  lendDeclaredBodies(host, bodies.map(body => body.entityId)); // a boss's group is never a herd
+  const leave = (body: NativeGroundBossBody): void => {
+    body.hidden = true; body.alive = false; body.position.y = ABSENT_Y; body.motor?.resetAt?.(body.position); host.flags.clear(`dead:${body.entityId}`);
+  };
+  const stand = (body: NativeGroundBossBody, x: number, z: number, yaw: number): void => {
+    body.hidden = false; body.place(x, z, yaw); body.revive(); body.motor?.resetAt?.(body.position); host.flags.clear(`dead:${body.entityId}`);
+  };
+  for (const body of bodies) { body.scripted = true; leave(body); }
+  return { boss: bosses[0] ?? null, adds, owns: id => bodies.some(body => body.entityId === id), stand, leave,
+    // a save keeps no `hidden`: a body saved out of the world is absent again (the fight's own body takes its saved flag after)
+    settle: () => { for (const body of bodies) body.hidden = !body.alive && body.position.y <= ABSENT_Y + 1; } };
+}
 
-function nativeGroundFight(host: SimHost, row: RoamingEncounterRow, program: SpeciesProgramData, binding: NativeBossBinding): { fight: GroundBossFight<NativeGroundBossBody>; own: { first: boolean; light: boolean }; waves:readonly {readonly r:number;readonly on:boolean;readonly delay:number}[] } {
+
+function nativeGroundFight(host: SimHost, row: RoamingEncounterRow, program: SpeciesProgramData, binding: NativeBossBinding, lent: ReturnType<typeof declaredGroundBodies>): { fight: GroundBossFight<NativeGroundBossBody>; own: { first: boolean; light: boolean }; waves:readonly {readonly r:number;readonly on:boolean;readonly delay:number}[] } {
   const own = { first: false, light: false }, roster = () => populationRoster(host, binding.population);
   declareStandingLooks(host, ROAMING_STANDING);
   /** What a page on this server paints: the fight's own view calls, which are nothing here. */
@@ -56,11 +100,22 @@ function nativeGroundFight(host: SimHost, row: RoamingEncounterRow, program: Spe
   const sayLane = (slot: number, state: Lane<NativeGroundBossBody>): void => {
     if (state.state !== 'none') sayFightView(host, ROAMING_VIEW.lane, [slot, LANE_STATES.indexOf(state.state), state.t, state.tell, state.x0, state.z0, state.x1, state.z1, state.width, host.clock.now]);
   };
+  // a declared body's ribs are its skin's first lock point (the chest)
   const ribs = (body: NativeGroundBossBody, out: Vector3): Vector3 => {
-    if (body.ribsWorld === undefined) throw new Error('Boss body has no ribs volume'); return body.ribsWorld(out);
+    if (body.ribsWorld !== undefined) return body.ribsWorld(out);
+    const locks = body.lockPoints; if (locks === undefined) throw new Error('Boss body has no ribs volume'); return locks.point(0, out);
   };
   const reach = (a: NativeGroundBossBody, target: { x: number; y: number; z: number }): boolean => canReach(a, target, host.physics);
   const player = { position: host.playerFocus };
+  const observeDeclared = (actor: NativeGroundBossBody, control: BorrowedSpeciesControl): void => {
+    const recipe = program.species.find(candidate => candidate.kind === actor.kind)?.body;
+    if (recipe === undefined) throw new Error(`Declared boss body ${actor.entityId} has no admitted body recipe`);
+    const attacks = recipe.attack === 'keeper' ? { kind: 'keeper' as const, claim: (): boolean => true } : { kind: 'unlimited' as const, limit: Infinity };
+    bindSpeciesBody(actor, recipe, { host, stream: new Rng(fnv1a32(`${String(host.level.seed)}:${actor.entityId}`)), attacks }, ports => {
+      control.observe(ports);
+      return { think: observation => { control.observe(observation); }, act: observation => { control.observe(observation); }, snapshot: control.snapshot, restore: control.restore };
+    });
+  };
   const env: GroundBossEnv<NativeGroundBossBody> = {
     reach,
     player: { position: player.position, get onGround(): boolean { return host.focusedPlayer.fall.grounded; }, shove: (x, z, speed) => { host.focusedPlayer.knockBack(x, z, speed); } },
@@ -71,6 +126,9 @@ function nativeGroundFight(host: SimHost, row: RoamingEncounterRow, program: Spe
         point: a.position.clone(), dir: new Vector3(), throughWalls, cause: { kind: a.kind, label: a.label } });
     },
     trauma: () => undefined, shot: () => undefined,
+    // a declared body has no roster to observe its decision row each tick: it takes the same body port once (its contact,
+    // reach and shove), with every claim granted (a boss's blows wait on no herd's tokens)
+    observe: (actor, control) => { if (lent.owns(actor.entityId)) observeDeclared(actor, control); },
   };
   const profiles = new Map(program.strikes.map(strike => [strike.id, strikeFromData(strike)]));
   const bossLane = profiles.get(row.lanes.boss), addLane = profiles.get(row.lanes.add);
@@ -81,6 +139,7 @@ function nativeGroundFight(host: SimHost, row: RoamingEncounterRow, program: Spe
     groundAt: (x, z) => host.groundHeightAt(x, z),
     body: {
       make: () => {
+        if (lent.boss !== null) { lent.stand(lent.boss, row.profile.fight.origin.x, row.profile.fight.origin.z, 0); own.first = true; return lent.boss; }
         const parked = roster().parked().find(candidate => candidate.kind === row.kind);
         if (parked === undefined) throw new Error('Missing parked boss body');
         // Adopt the prewarm once; later appearances consume normal roster draws.
@@ -90,16 +149,19 @@ function nativeGroundFight(host: SimHost, row: RoamingEncounterRow, program: Spe
         a.scripted = true;
         return a;
       },
-      retire: k => { roster().retire(k); }, park: k => { k.hidden = true; }, unpark: k => { k.hidden = false; },
+      retire: k => { if (lent.owns(k.entityId)) lent.leave(k); else roster().retire(k); }, park: k => { k.hidden = true; }, unpark: k => { k.hidden = false; },
     },
     adds: {
       spawn: (kind, x, z, yaw) => {
-        const a = roster().spawn(kind, x, z, yaw, row.adds.variant);
+        const kept = lent.adds.filter(add => add.kind === kind), free = kept.find(add => !add.alive);
+        if (kept.length > 0 && free === undefined) throw new Error(`Boss ${row.steps.fight} has no free declared ${kind} thrall`);
+        if (free !== undefined) lent.stand(free, x, z, yaw);
+        const a = free ?? roster().spawn(kind, x, z, yaw, row.adds.variant);
         // combat/ctx.ts own: out of its herd, under the fight's control
         a.herd = -1; a.state = row.adds.state; a.scripted = true;
         return a;
       },
-      retire: a => { roster().retire(a); }, lanes: () => addLanes,
+      retire: a => { if (lent.owns(a.entityId)) lent.leave(a); else roster().retire(a); }, lanes: () => addLanes,
     },
     lane: () => lane, rings: () => waves,
     // the same forced chest-chain read as the page's cage getter, with its admitted radius
@@ -144,10 +206,12 @@ export function takeNativeBossReward(host: SimHost, id: string, eye: { x: number
 
 const finite = v.pipe(v.number(), v.finite());
 /** Install from rows without allocating a body or consuming a random draw. */
-export function installGroundBoss(host: SimHost, input: unknown, profile: unknown, program: SpeciesProgramData, bindingInput: unknown, grantItem?: (player: string, item: string, count: number) => void): { boss: BossBrain; fight: GroundBossFight<NativeGroundBossBody>; locked: () => boolean;
+export function installGroundBoss(host: SimHost, input: unknown, profile: unknown, program: SpeciesProgramData, bindingInput: unknown, grantItem?: (player: string, item: string, count: number) => void,
+  declared: readonly GroundBossSpawn[] = []): { boss: BossBrain; fight: GroundBossFight<NativeGroundBossBody>; locked: () => boolean;
   rewardPoint: () => { x: number; y: number; z: number } | null; takeReward: (eye: { x: number; y: number; z: number }) => boolean } {
   const row = parseRoamingEncounter(input, profile), binding = v.parse(NativeBossBindingSchema, bindingInput), roster = () => populationRoster(host, binding.population);
-  const { fight, own, waves } = nativeGroundFight(host, row, program, binding), brain: { boss: BossBrain | null } = { boss: null }, origin = row.profile.fight.origin;
+  const lent = declaredGroundBodies(host, row, declared);
+  const { fight, own, waves } = nativeGroundFight(host, row, program, binding, lent), brain: { boss: BossBrain | null } = { boss: null }, origin = row.profile.fight.origin;
   host.onStep(row.steps.presence, () => { if (brain.boss !== null) groundBossPresence(row, brain.boss, fight, nearestOnGround(host.players, origin.x, origin.z).position, (host.dayClock?.night ?? 0) > 0.5); });
   // read at install (a restoring install's record is the brain's continuation, which restores over it)
   const record = bossFlagRecord(host.flags, row.record), saved = record.saved;
@@ -162,6 +226,8 @@ export function installGroundBoss(host: SimHost, input: unknown, profile: unknow
         own.light = lightActive;
         const actors = new Map<string, NativeGroundBossBody>();
         for (const id of host.entities.keys()) { const actor = roster().actor(id); if (actor !== null) actors.set(id, actor); }
+        for (const actor of [...lent.boss === null ? [] : [lent.boss], ...lent.adds]) actors.set(actor.entityId, actor);
+        lent.settle();
         restoreRoamingFight(row, fight, value, actors);
         if (fight.body !== null) fight.body.hidden = hidden;
       },

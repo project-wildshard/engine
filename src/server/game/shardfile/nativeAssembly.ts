@@ -99,10 +99,16 @@ const mergedIntake = (a: EncounterIntake, ...more: readonly EncounterIntake[]): 
  * one of them stands refuses as it spawns, `SimHost.spawn`); its decision rows are every row that binds a body no declared
  * spawn is, which its `decisions` host lends to the bodies that bind them. A row binding both refuses at preparation.
  */
-function assemblyKeeper(shard: Shardfile, sections: ReadonlyMap<string, unknown>): ReturnType<typeof keeperOwnership> {
+function assemblyKeeper(shard: Shardfile, sections: ReadonlyMap<string, unknown>, brained: ReadonlySet<string>): ReturnType<typeof keeperOwnership> {
   const declared = new Set(shard.creatures.spawns.map(row => row.id));
   return { actors: new Set(), scripts: new Set(decisionScriptsFromSections(sections).flatMap(row => {
-    const ids = Object.values(row.actors); return ids.length === 0 || ids.some(id => !declared.has(id)) ? [row.id] : []; })) };
+    const ids = Object.values(row.actors); return ids.length === 0 || ids.some(id => !declared.has(id)) || brained.has(row.id) ? [row.id] : []; })) };
+}
+/** OF23d: the decision rows a species programme's decision brain names: their body port binds them (a boss fight's
+ *  declared body), so the keeper keeps them even when every actor they bind is a declared spawn. */
+function brainedScripts(product: ShardFolder): ReadonlySet<string> {
+  const program = product.has('actors/species-programs') ? product.section('actors/species-programs').program : undefined;
+  return new Set((program?.species ?? []).flatMap(row => row.brain?.archetype === 'decision' ? [row.brain.data.script] : []));
 }
 /**
  * OF22a1: the day and the sea a native assembly's plan names no host for, from its sections: the look's toon sky clock
@@ -175,7 +181,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   // The ordinary creature host only stands the remaining declarations.
   const ordinary = declaredRoster.size === 0 ? shard : { ...shard, creatures: { ...shard.creatures,
     spawns: shard.creatures.spawns.filter(row => !declaredRoster.has(row.id)) } };
-  const counted = countedShard(ordinary), sections = outputDescriptor(shard)?.sections ?? new Map<string, unknown>(), keeper = assemblyKeeper(counted, sections);
+  const counted = countedShard(ordinary), sections = outputDescriptor(shard)?.sections ?? new Map<string, unknown>(), keeper = assemblyKeeper(counted, sections, brainedScripts(product));
   admitRuntimeCreatures(counted, sections, keeper);
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   // OF22c1: a chapter wake row's declared fight waits, as a quest page's summoned one does, for its wake cue

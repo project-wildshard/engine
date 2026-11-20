@@ -314,7 +314,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     }
     case 'boss.ground': {
       const encounter = await readAssemblyInput<{ profile: unknown }>(product, row.encounter), program = need(product.section('actors/species-programs').program, 'Native boss needs its decision programme');
-      return run => { run.boss = installGroundBoss(run.host, encounter, encounter.profile, program, row.binding, at.ports.grantItem(run.context)); };
+      return run => { run.boss = installGroundBoss(run.host, encounter, encounter.profile, program, row.binding, at.ports.grantItem(run.context), shard.creatures.spawns); };
     }
     case 'population.environment': { const input = await readAssemblyInput(product, row.rows); return run => { installPopulationEnvironment(run.host, need(at.grid, 'Population environment needs its grid'), input); }; }
     case 'population.shelter': { const input = await readAssemblyInput(product, row.rows); return run => { installNativeHerdShelter(run.host, rows['shelterTrees'] as Parameters<typeof installNativeHerdShelter>[1], input); }; }
