@@ -30,22 +30,26 @@ test('a fur sheen draws as three physical sheen; a plain surface stays standard'
 });
 
 const H = (c: string): string => c.repeat(64);
-function shard(phone: boolean): Pick<Shardfile, 'rows' | 'files'> {
+function shard(shape: 'variants' | 'phone' | 'both'): Pick<Shardfile, 'rows' | 'files'> {
   const file = (hash: string, kind: Shardfile['files'][number]['kind'], dependencies: string[]): Shardfile['files'][number] =>
     ({ hash, kind, dependencies, compressed: 1, decoded: 1, gpu: 0, triangles: 0, draws: 0, critical: false });
   const look = { id: 'deer.look', species: 'deer', recipe: 'platform.skin', material: null,
-    parameters: { skin: H('1'), variants: H('3'), ...(phone ? { phone: H('4') } : {}) },
+    parameters: { skin: H('1'), ...(shape === 'phone' ? {} : { variants: H('3') }),
+      ...(shape === 'variants' ? {} : { phone: shape === 'phone' ? H('4') : H('5') }) },
     animation: { recipe: 'platform.clips', parameters: { attackSpan: 1 } } } as unknown as ShardRows['looks'][number];
   return { rows: { looks: [look] } as unknown as Shardfile['rows'], files: [
     file(H('1'), 'json', [H('a'), H('b'), H('n')]), file(H('2'), 'json', [H('a'), H('c'), H('n')]),
-    file(H('3'), 'json', [H('1'), H('2')]), file(H('4'), 'json', [H('a'), H('p')]),
+    file(H('3'), 'json', [H('1'), H('2')]), file(H('4'), 'json', [H('a'), H('f')]),
+    file(H('5'), 'json', [H('4'), H('6')]), file(H('6'), 'json', [H('a'), H('e')]),
   ] };
 }
 
 test('the loader transcodes each tier\'s skin textures: every variant\'s coat, or the phone skin\'s', () => {
-  expect(skinTextureRefs(shard(false), 'desktop').sort()).toEqual([H('b'), H('c'), H('n')]);
-  expect(skinTextureRefs(shard(true), 'phone')).toEqual([H('p')]);
-  expect(skinTextureRefs(shard(true), 'desktop').sort()).toEqual([H('b'), H('c'), H('n')]);
+  expect(skinTextureRefs(shard('variants'), 'phone').sort()).toEqual([H('b'), H('c'), H('n')]);
+  expect(skinTextureRefs(shard('phone'), 'phone')).toEqual([H('f')]);
+  expect(skinTextureRefs(shard('phone'), 'desktop').sort()).toEqual([H('b'), H('n')]);
+  expect(skinTextureRefs(shard('both'), 'phone').sort()).toEqual([H('e'), H('f')]);
+  expect(skinTextureRefs(shard('both'), 'desktop').sort()).toEqual([H('b'), H('c'), H('n')]);
 });
 
 test('each skin variant draws in its own material', () => {
