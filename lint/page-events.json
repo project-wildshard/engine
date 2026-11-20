@@ -361,10 +361,6 @@
      "emits": "ctx.app.events.emit('boss.attempt'"
     },
     {
-     "file": "src/client/game/boss/presentation.ts",
-     "emits": "events.emit('boss.attempt'"
-    },
-    {
      "file": "src/client/game/shardfile/client.ts",
      "emits": "ctx.app.events.emit('boss.attempt'"
     }

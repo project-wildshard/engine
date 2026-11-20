@@ -117,7 +117,6 @@
     "../test/fixtures/item-effects.ts",
     "../test/fixtures/kurgan-oracle/dungeon.ts",
     "../test/fixtures/loot-page.ts",
-    "../test/fixtures/mixed-population.ts",
     "../test/fixtures/nalati-ambient-observation.ts",
     "../test/fixtures/nalati-balbal-native.ts",
     "../test/fixtures/nalati-chapter-native.ts",
