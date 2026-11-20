@@ -69,6 +69,9 @@ export function retireWholeRoadMesh(mesh: Mesh): BufferGeometry {
   return previous;
 }
 
+/** DF8 (mini-driftwood13n): a paced handoff's merge time a step, for the material it hands over next */
+export const ROAD_MERGE_SLICE_MS = 4;
+
 /** How often the first road handoff asks again for tiles the archive could not read before it settles on the whole meshes. */
 export const ROAD_PRIME_TRIES = 8;
 
@@ -283,6 +286,8 @@ export class RoadTileBacking {
       if (source.retire === null || Array.isArray(source.mesh.material)) throw new Error('Road backing lacks an admitted material');
       const pool = new RoadTilePool(this.scope.child(`material:${String(sources.length)}`), source.mesh.material, this.culler, source.mesh.name, source.mesh.receiveShadow, source.mesh.renderOrder);
       pool.root.visible = false; source.mesh.add(pool.root); source.pool = pool;
+      // DF8 (mini-driftwood13n): paced, the hidden pools merge once, in slices, at the handoff (RoadTilePool.settle)
+      if (this.handoffPaced()) pool.defer();
       sources.push({ pool, references: source.references, coarseReferences: source.coarseReferences });
     }
     this.stream = roadTileStream(this.scope, sources, origin, layout, budget, this.store, id);
@@ -311,11 +316,13 @@ export class RoadTileBacking {
     const handoffAt = timedAt === undefined ? undefined : diagnosticNow();
     if (timedAt !== undefined && handoffAt !== undefined) frameCost.sectionOther('grid.road tiles', handoffAt - timedAt);
     if (!this.committed && (this.handingOff || (this.primed && stream.ready()))) {
-      // DF8: `debug.roadHandoffPaced` (roadHandoffPaced.ts) hands one material over a step, once the ring was ready
+      // DF8: `debug.roadHandoffPaced` (roadHandoffPaced.ts) hands one material over a step, once the ring was ready and
+      // that material's pool has merged (in ROAD_MERGE_SLICE_MS slices)
       const paced = this.handoffPaced();
       this.handingOff = true;
       for (const source of this.sources.values()) {
         if (this.handedOff.has(source)) continue;
+        if (paced && source.pool !== null && !source.pool.settle(ROAD_MERGE_SLICE_MS, diagnosticNow)) break;
         // Reveal first, so retiring a whole mesh cannot leave its ready children
         // hidden. Geometry disposal precedes each corresponding lease shrink.
         if (source.pool !== null) source.pool.root.visible = true;

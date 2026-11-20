@@ -93,6 +93,8 @@ export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibili
     completed = true; return { geometry, plan: { source: index, bins, lod: [] } };
   } finally { if (!completed) geometry.dispose(); }
 }
+/** Close a superseded merge: its `finally` disposes the partial geometry. */
+function abandon(steps: Generator<void, unknown>): void { steps.return(undefined); }
 /** A publication sink for scopedTilePorts. It never reserves or invents a lease:
  * the shared TileStreamer must admit roadTileWorkingBytes before preparation.
  * The one shared material and its textures remain owned by the road session. */
@@ -100,11 +102,17 @@ export class RoadTilePool {
   readonly root: Group = new Group();
   private current: Mesh<BufferGeometry, Material>;
   private readonly resident = new Map<string, { data: RoadTileGeometry; scope: Scope; flags: Map<CullPlan['bins'][number], { visible: boolean }> }>();
+  /** DF8 (mini-driftwood13n): while deferred, a publish or a tile's retirement only bumps `revision`; `settle` merges */
+  private deferred = false;
+  private revision = 0;
+  private built = 0;
+  private job: { readonly revision: number; readonly steps: Generator<void, { geometry: BufferGeometry; plan: CullPlan }> } | null = null;
   constructor(private readonly owner: Scope, private readonly material: Material, private readonly culler: RoadCuller, private readonly name: string, private readonly receiveShadow = true, private readonly renderOrder = 0) {
     if (!Number.isFinite(renderOrder)) throw new Error('Invalid road render order');
     if (owner.disposed || owner.disposing) throw new Error('Road tile pool owner retired');
     this.current = this.makeMesh(new BufferGeometry()); this.root.name = name; this.root.matrixAutoUpdate = false; this.root.updateMatrix(); this.root.add(this.current);
     owner.onDispose(() => {
+      if (this.job !== null) abandon(this.job.steps); this.job = null;
       this.resident.clear(); this.culler.plans.delete(this.current);
       this.current.onBeforeRender = () => { /* Drop the retired plan closure. */ };
       this.root.removeFromParent(); this.root.clear(); this.current.geometry.dispose();
@@ -125,13 +133,15 @@ export class RoadTilePool {
     }
     const flags = new Map(data.plan.bins.map(bin => [bin, { visible: true }]));
     const entry = { data, scope, flags }; this.resident.set(tile.key, entry);
-    try { this.rebuild(); }
+    if (this.deferred) this.revision++;
+    else try { this.rebuild(); }
     catch (error) { this.resident.delete(tile.key); throw error; }
     if (scope.disposed || scope.disposing) { this.owner.dispose(); throw new Error('Road tile retired during publication'); }
     scope.onDispose(() => {
       if (this.resident.get(tile.key) !== entry) return;
       this.resident.delete(tile.key);
       if (this.owner.disposed || this.owner.disposing) return;
+      if (this.deferred) { this.revision++; return; }
       try { this.rebuild(); }
       catch (error) { this.owner.dispose(); throw error; }
     });
@@ -157,10 +167,48 @@ export class RoadTilePool {
     mesh.receiveShadow = this.receiveShadow; mesh.renderOrder = this.renderOrder; mesh.castShadow = false;
     mesh.matrixAutoUpdate = false; mesh.updateMatrix(); return mesh;
   }
+  /**
+   * DF8 (mini-driftwood13n, `debug.roadHandoffPaced`): defer the merge while the pool's root is hidden (before the road
+   * handoff). Every publish re-merged the material's whole pool at once; while the tile ring filled, two publishes a step
+   * each re-merged every material (31 to 35 ms `grid.road tiles` laps on the iPhone 13 dock). Deferred, a publish only
+   * records its tile, and `settle` merges the pool once, in slices, before the handoff shows it.
+   */
+  defer(): void { this.deferred = true; }
+  /** Advance the deferred merge for up to `ms` (at least one slice); true once the draw holds every resident tile, and
+   *  the pool then merges each publish at once again, as it does undeferred. A tile published or retired meanwhile
+   *  restarts the merge from the current tiles. */
+  settle(ms: number, now: () => number): boolean {
+    if (!this.deferred) return true;
+    if (this.owner.disposed || this.owner.disposing) throw new Error('Road tile pool owner retired');
+    if (this.job === null && this.built === this.revision) { this.deferred = false; return true; }
+    if (this.job !== null && this.job.revision !== this.revision) { abandon(this.job.steps); this.job = null; }
+    if (this.job === null) {
+      const entries = [...this.resident.values()];
+      const flags = new Map(entries.flatMap(entry => [...entry.flags]));
+      this.job = { revision: this.revision, steps: mergeRoadTileSteps(entries.map(entry => entry.data), flags) };
+    }
+    const job = this.job, started = now();
+    for (;;) {
+      let next: IteratorResult<void, { geometry: BufferGeometry; plan: CullPlan }>;
+      try { next = job.steps.next(); }
+      catch (error) { this.job = null; this.owner.dispose(); throw error; }
+      if (next.done === true) {
+        this.job = null;
+        try { this.install(next.value); }
+        catch (error) { this.owner.dispose(); throw error; }
+        this.built = job.revision;
+        if (this.built !== this.revision) return false;
+        this.deferred = false; return true;
+      }
+      if (now() - started >= ms) return false;
+    }
+  }
   private rebuild(): void {
     const entries = [...this.resident.values()];
     const flags = new Map(entries.flatMap(entry => [...entry.flags]));
-    const next = finishRoadSteps(mergeRoadTileSteps(entries.map(entry => entry.data), flags));
+    this.install(finishRoadSteps(mergeRoadTileSteps(entries.map(entry => entry.data), flags)));
+  }
+  private install(next: { geometry: BufferGeometry; plan: CullPlan }): void {
     const mesh = this.makeMesh(next.geometry);
     try { publishRoadPlan(this.culler, mesh, next.plan); gpuOnlyRoad(mesh, []); }
     catch (error) { this.culler.plans.delete(mesh); next.geometry.dispose(); throw error; }

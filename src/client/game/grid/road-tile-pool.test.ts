@@ -82,3 +82,34 @@ test('a pool with no resident tile draws nothing', () => {
   expect(pool.mesh().visible).toBe(false);
   owner.dispose(); material.dispose();
 });
+
+// DF8 (mini-driftwood13n): deferred, publishes only record their tiles; settle merges once, in slices, then the pool merges
+// each publish at once again
+test('a deferred pool merges once, in slices, and a publish during the merge restarts it', () => {
+  const owner = new Scope('road pool deferred'), material = new MeshBasicMaterial(), culler: RoadCuller = { pitch: 562.5, tileSize: 62.5, plans: new Map() };
+  const pool = new RoadTilePool(owner, material, culler, 'road'), a = fixture(0), b = fixture(10), c = fixture(20);
+  const empty = pool.mesh();
+  pool.defer();
+  pool.publish(descriptor('a'), a, owner.child('a')); pool.publish(descriptor('b'), b, owner.child('b'));
+  expect(pool.mesh()).toBe(empty);
+  let clock = 0; const tick = (): number => clock++;
+  expect(pool.settle(0, tick)).toBe(false); // one slice, not done
+  expect(pool.mesh()).toBe(empty);
+  pool.publish(descriptor('c'), c, owner.child('c'));
+  let steps = 1; while (!pool.settle(0, tick)) steps++;
+  expect(steps).toBeGreaterThan(1);
+  expect(pool.mesh().geometry.getAttribute('position').count).toBe(9);
+  expect(culler.plans.size).toBe(1);
+  const d = fixture(30), view = pool.publish(descriptor('d'), d, owner.child('d'));
+  expect(pool.mesh().geometry.getAttribute('position').count).toBe(12); // undeferred again: at once
+  view.dispose(); expect(pool.mesh().geometry.getAttribute('position').count).toBe(9);
+  expect(pool.settle(0, tick)).toBe(true);
+  owner.dispose(); expect(culler.plans.size).toBe(0); material.dispose();
+});
+
+test('a deferred pool with no tiles settles at once', () => {
+  const owner = new Scope('road pool empty'), material = new MeshBasicMaterial(), culler: RoadCuller = { pitch: 562.5, tileSize: 62.5, plans: new Map() };
+  const pool = new RoadTilePool(owner, material, culler, 'road');
+  pool.defer(); expect(pool.settle(4, () => 0)).toBe(true);
+  owner.dispose(); material.dispose();
+});
