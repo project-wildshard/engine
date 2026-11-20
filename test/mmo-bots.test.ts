@@ -134,8 +134,7 @@ test('bots on the host need --remote, dial its loopback with no tunnel, and are 
   }
   expect(driver).toContain("const tunnel = botsOnHost ? [] : ['-o', 'ExitOnForwardFailure=yes', '-L'");
   // The same loopback URL and forwarded addresses as a local replica's bots, pinned to their own cores.
-  expect(driver).toContain('const botUrl = agentUrl(url)');
-  expect(driver).toContain('exec taskset -c ${values[\'bot-cpus\']} node "$HOME/${away}/bots/mmoBots.mjs" \'${botUrl}\' ${botArgs.join(\' \')} "$HOME/${away}/bots.json" forwarded');
+  expect(driver).toContain('exec taskset -c ${values[\'bot-cpus\']} node "$HOME/${away}/bots/mmoBots.mjs" \'${url}\' ${botArgs.join(\' \')} "$HOME/${away}/bots.json" forwarded');
   const tellBots = driver.indexOf("hostSsh(`pkill -TERM -f '[/]${away}/bots/mmoBots.mjs'`, '', 20_000)");
   expect(tellBots).toBeGreaterThan(0); expect(tellBots).toBeLessThan(driver.indexOf("running.kill('SIGTERM')"));
   // A dropped bots link still leaves no bot running: the host stop tells, then kills them before the replica goes.
@@ -143,6 +142,15 @@ test('bots on the host need --remote, dial its loopback with no tunnel, and are 
   expect(driver).toContain("ssh(`${hostBots}pkill -TERM -f '[/]${away}/server/main.mjs';");
   // Their report comes back before remoteStop removes the host directory.
   expect(driver.indexOf('hostSsh(`cat ${away}/bots.json`)')).toBeLessThan(driver.indexOf('await stopRoom();\nconst full'));
+});
+
+test('the driver passes the allowed URL verbatim and bots mark the handshake in headers', () => {
+  expect(driver).toContain("[join(out, 'mmoBots.mjs'), url, ...botArgs, result");
+  expect(driver).not.toContain('agentUrl(');
+  expect(entry).toContain("...agentHeaders(), 'user-agent': agentUserAgent('node')");
+  for (const target of [STAGING_SOCKET, BOX_REPLICA_SOCKET, TAILNET_SOCKET]) {
+    expect(() => botTarget(`${target}/?agent=proof`, 'own', 2, target === TAILNET_SOCKET)).toThrow(/J205/u);
+  }
 });
 
 // NET-LAG NL3: each bot's frame inter-arrival over the play window (p50, p95, max), and all bots' together, so one run says whether
