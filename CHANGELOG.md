@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.58 (2026-11-20)
+
+- Nine Dragon Stack's grapple is back in the loadout.
+- Shard audio prepares correctly on Linux.
+
 ## v0.1.57 (2026-11-20)
 
 - Nine Dragon Stack, Sunscar Dunes and Pine Hollow now run on the new zone format.
