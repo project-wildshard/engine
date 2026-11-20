@@ -11,7 +11,10 @@ export interface DeclaredQuestBodies {
   readonly kindOf: (actor: unknown) => string | undefined;
   /** Whether a declared body of `kind` stands alive. */
   readonly standing: (kind: string) => boolean;
+  /** OF22c3: every declared body the host holds, with its species kind and herd (what the mixed roster lent a bounty). */
+  readonly bodies: () => readonly DeclaredQuestBody[];
 }
+export interface DeclaredQuestBody { readonly id: string; readonly kind: string; readonly herd: number; readonly actor: NonNullable<ReturnType<SimHost['entities']['get']>> }
 
 export function declaredQuestBodies(host: SimHost, shard: Shardfile): DeclaredQuestBodies {
   const kinds = new Map(shard.rows.species.map(row => [row.id, row.kind] as const));
@@ -26,5 +29,9 @@ export function declaredQuestBodies(host: SimHost, shard: Shardfile): DeclaredQu
       return body === undefined || body.combatActor() !== actor ? undefined : kinds.get(body.species);
     },
     standing: kind => (byKind.get(kind) ?? []).some(id => host.entities.get(id)?.alive === true),
+    bodies: () => spawns.flatMap(row => {
+      const actor = host.entities.get(row.id), kind = kinds.get(row.species);
+      return actor === undefined || kind === undefined ? [] : [{ id: row.id, kind, herd: actor.herd, actor }];
+    }),
   };
 }

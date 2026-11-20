@@ -15,7 +15,7 @@ import { readLootTables } from '../../../../src/shared/game/loot/tableRows';
 import { declaredLootEconomy } from '../../../../src/shared/game/shard/declaredRows';
 import { createHeadlessPromptPicker, type HeadlessPrompt } from '../../../../src/shared/game/quest/interactionRows';
 import { nativeQuestInputs } from '../../../../src/server/game/quest/nativeInputs';
-import type { MixedPopulationBody } from '@wildshard/engine/game/population/mixedRoster';
+import type { DeclaredQuestBody } from '../../../../src/server/game/quest/declaredQuestBodies';
 import { nativeQuestPromptRoster } from '@wildshard/engine/game/quest/nativeComposition';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
@@ -34,14 +34,14 @@ export function nativeEconomy(host: SimHost): ReturnType<typeof installNativeEco
 
 /** The page's actual purse, bounty, coin pool, ownership and exchange; only the
  * storage/RNG and command delivery belong to this fixed native fixture. */
-export function installNativeEconomy(host: SimHost, product: ShardFolder, roster: () => readonly MixedPopulationBody[],
+export function installNativeEconomy(host: SimHost, product: ShardFolder, roster: () => readonly DeclaredQuestBody[],
   questStep: string, closeDistance: number): { readonly purse: () => Purse; readonly owned: () => Owned; readonly exchange: Exchange; readonly coins: CoinMotion } {
   if (economies.has(host)) throw new Error('Native economy already installed');
   const rows = declaredLootEconomy(product.section('economy/loot').rows.loot);
   const coinRow = readLootTables(rows.tables).reverse().find(row => row.id === 'coins' || row.domain === 'coins');
   const coinTable = coinRow === undefined ? undefined : new WeightedTable(coinRow.table);
   let durable = 0, ownedSaved = { owned: [] as string[], worn: [] as string[] }, paid: Record<string, number> = {};
-  let caps = Bounty.census(roster().map(body => ({ kind: body.kind, herd: body.herd, alive: body.actor?.alive ?? false })));
+  let caps = Bounty.census(roster().map(body => ({ kind: body.kind, herd: body.herd, alive: body.actor.alive })));
   const shard = product.shardfile.identity.slug;
   const purseSlot = { read: () => durable, write: (n: number) => { durable = n; return true; } };
   const ownedSlot = { read: () => structuredClone(ownedSaved), write: (value: typeof ownedSaved) => { ownedSaved = structuredClone(value); return true; } };
@@ -60,8 +60,8 @@ export function installNativeEconomy(host: SimHost, product: ShardFolder, roster
   const candidates = prompts.map(prompt => prompt === original ? trade : prompt), picker = createHeadlessPromptPicker(host);
   const input = nativeQuestInputs(host);
   host.events.on('actor.died', ({ actor }) => {
-    const body = roster().find(candidate => candidate.actor?.combatActor() === actor);
-    if (body === undefined || body.actor === null) return;
+    const body = roster().find(candidate => candidate.actor.combatActor() === actor);
+    if (body === undefined) return;
     const amount = coinValue(coinTable?.roll({ kind: body.kind }, () => 0) ?? []);
     if (amount > 0 && bounty.claim(body)) burst.spawn(body.actor.position, amount, callbacks.onCoin, callbacks.onDone);
   }, host.scope, { order: DEATH_ORDER.loot });

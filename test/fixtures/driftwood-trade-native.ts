@@ -10,10 +10,10 @@ export const prepareHeadlessRuntime: PrepareHeadlessRuntime = async preparation 
   const {prepareFolderPlan} = await import('../../src/test/game/headlessNative');
   const plan = await prepareFolderPlan(preparation);
   const { installNativeEconomy } = await import('./native-hosts/loot/nativeEconomy');
-  const { mixedPopulation } = await import('@wildshard/engine/game/population/mixedRoster');
+  const { declaredQuestBodies } = await import('../../src/server/game/quest/declaredQuestBodies');
   const { installCoinModel } = await import('../../src/client/game/loot/coinModel');
   const coinGeometry = await prepareNativeCoinRecipe();
-  const nativeQuest = v.parse(v.object({step:v.string(),acquisition:v.object({population:v.string()})}),
+  const nativeQuest = v.parse(v.object({step:v.string()}),
     await preparation.product.json('server/quest-policy.json'));
   const trader = v.parse(v.object({ view: v.object({ closeDistance: v.pipe(v.number(), v.finite(), v.minValue(Number.MIN_VALUE)) }) }),
     await preparation.product.json('quests/stall.json'));
@@ -21,7 +21,7 @@ export const prepareHeadlessRuntime: PrepareHeadlessRuntime = async preparation 
     plan.install(host, context);
     if(context.restoring)retainRestoredWalkBodies(host);
     installCoinModel(coinGeometry);
-    const population = mixedPopulation(host, nativeQuest.acquisition.population);
-    installNativeEconomy(host, preparation.product, population.bodies, nativeQuest.step, trader.view.closeDistance);
+    // OF22c3: the island's creatures are declared spawns; the bounty counts and pays over those bodies
+    installNativeEconomy(host, preparation.product, declaredQuestBodies(host, preparation.product.shardfile).bodies, nativeQuest.step, trader.view.closeDistance);
   } };
 };

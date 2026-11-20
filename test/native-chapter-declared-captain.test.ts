@@ -16,7 +16,6 @@ import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import type { SimHost } from '../src/server/engine/sim';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
-import { mixedPopulation } from '../src/server/game/population/mixedRoster';
 import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
@@ -87,7 +86,7 @@ test('Driftwood\'s chapter wakes the declared Captain: the fight waits for the a
   const live = await resident(fixture, shard);
   let restored: NativeHeadlessResident | undefined;
   try {
-    const { host } = live, island = mixedPopulation(host, 'driftwood.island'), body = host.entities.get(CAPTAIN);
+    const { host } = live, body = host.entities.get(CAPTAIN);
     if (body === undefined) throw new Error('Missing declared Captain');
     expect(body.capExempt, 'his blows skip the fight cap').toBe(true);
     // at the pool before the altar: the fight waits, out of the world
@@ -96,7 +95,6 @@ test('Driftwood\'s chapter wakes the declared Captain: the fight waits for the a
     // the altar wakes him: the chapter's wake cue summons the declared fight, which a player at the pool starts
     host.flags.set(ALTAR); run(live, fixture.pool, 120);
     expect(fight(host)).toBe('fight'); expect(body.alive).toBe(true);
-    expect(island.captain(), 'the mixed population\'s reserved body never stands').toBeNull();
     expect([...host.entities.values()].filter(actor => actor.kind === 'captain')).toEqual([]);
     expect(host.flags.has(DEAD)).toBe(false);
     // a save mid-fight restores it exactly
