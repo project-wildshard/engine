@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.57 (2026-11-20)
+
+- Nine Dragon Stack, Sunscar Dunes and Pine Hollow now run on the new zone format.
+- Declared creatures load when you enter a zone from the grid.
+- Swords land hits in Driftwood, Pine Hollow and Nalati when you enter from the grid.
+- Voices no longer stutter on a cold first load on phones.
+- Shard uploads recover from temporary storage errors.
+
 ## v0.1.54 (2026-11-19)
 
 - The title Settings menu keeps its own layout when the Bag uses the new sheet.
