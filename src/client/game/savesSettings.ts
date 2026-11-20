@@ -14,7 +14,7 @@ import { markReload } from '@wildshard/engine/boot/lastEnd';
 import { isDev } from '@wildshard/engine/core/devMode';
 import { playerHidden } from '../../shared/game/grid/catalogueSlot';
 import { forgetServerInstance, openIndexedSaves, serverSaveDatabase } from '@wildshard/engine/saves/indexed';
-import { SaveStore } from '@wildshard/engine/saves/store';
+import { SaveStore, type SaveStorage } from '@wildshard/engine/saves/store';
 import type { GameMenu } from '@wildshard/engine/ui/Menu';
 import { mountUi } from '@wildshard/engine/ui/ownership';
 import { catalogueDocument } from '../../shared/game/grid/catalogueDocument';
@@ -109,6 +109,26 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = '
 const preview = (instance: LocalSaveInstance): NewGameSummary | null => { try { return previewNewGame(app.saves, instance); } catch { return null; } };
 const reset = (instance: LocalSaveInstance): boolean => { try { return resetNewGame(app.saves, instance).applied; } catch { return false; } };
 
+/** A store's documents, read and never written: inspecting a save must not touch the running server's copy. */
+const readOnly = (storage: SaveStorage): SaveStorage => ({ get length() { return storage.length; }, key: index => storage.key(index),
+  getItem: key => storage.getItem(key), setItem: () => undefined, removeItem: () => undefined });
+/** J130: what the server's copy of each save holds. A page on a server (every grid cell) keeps its progress there, and the
+ *  page's own copy stays empty, so the cards read "QUESTS 0 DONE · EMPTY" mid-quest (meta QA-FEEDBACK-2026-11-20-mini row 5). */
+async function serverPreviews(instances: readonly LocalSaveInstance[]): Promise<Map<string, NewGameSummary>> {
+  const saves = await openIndexedSaves(serverSaveDatabase()), out = new Map<string, NewGameSummary>();
+  try {
+    const store = new SaveStore({ local: readOnly(saves.storage), session: readOnly(saves.storage) });
+    for (const instance of instances) { try { out.set(instance.id, previewNewGame(store, instance)); } catch { /* that copy is unreadable: the page's stands */ } }
+  } finally { saves.close?.(); }
+  return out;
+}
+/** The save a card shows: the server's copy when it holds anything (a reset clears both), else the page's own. */
+export function mergedSummary(page: NewGameSummary | null, server: NewGameSummary | undefined): NewGameSummary | null {
+  if (server === undefined || !hasSave(server)) return page;
+  if (page === null || !hasSave(page)) return server;
+  return { ...server, removedKeys: [...new Set([...server.removedKeys, ...page.removedKeys])].sort() };
+}
+
 /** J130: a page on a server has a second copy, and the server would reopen it. Stop the server first: it saves as a page hides. */
 async function resetServerCopy(instance: LocalSaveInstance): Promise<void> {
   wirePage.stop();
@@ -118,10 +138,8 @@ async function resetServerCopy(instance: LocalSaveInstance): Promise<void> {
   await forgetServerInstance(saves, savePrefix, instance.id);
 }
 
-/** The New game sheet over the menu: before → after, what is kept, NEW GAME / KEEP PLAYING. `done` re-renders the cards. */
-function openSheet(card: SaveCardSpec, opts: SavesSettingsOptions, done: () => void): void {
-  const summary = preview(card.instance);
-  if (summary === null) { done(); return; }
+/** The New game sheet over the menu: before → after (the card's merged summary), what is kept, NEW GAME / KEEP PLAYING. */
+function openSheet(card: SaveCardSpec, summary: NewGameSummary, opts: SavesSettingsOptions): void {
   const scope = opts.scope.child('saves.sheet');
   const root = el('div', 'ws-saves-sheet');
   const panel = el('div', 'ws-saves-panel'); panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', SAVES_STRINGS.sheetTitle(card.name));
@@ -166,10 +184,15 @@ export function installSavesSettings(menu: GameMenu, opts: SavesSettingsOptions)
   const label = el('div', 'ws-gmenu-label', SAVES_STRINGS.title);
   const strip = el('div', 'ws-saves-strip'); strip.dataset['scroll'] = '';
   let cards: Scope | null = null; // the cards' listeners, renewed with every render
-  const render = (): void => {
+  let reads = 0; // the newest server read: an older one that lands late is dropped
+  const render = (server?: ReadonlyMap<string, NewGameSummary>): void => {
     cards?.dispose(); const owner = opts.scope.child('saves.cards'); cards = owner;
-    const here = opts.here();
-    const rows = saveCards(catalogueManifests(), isDev()).map((card) => ({ card, summary: preview(card.instance), here: here !== null && here.id === card.instance.id }))
+    const here = opts.here(), specs = saveCards(catalogueManifests(), isDev());
+    if (server === undefined) {
+      const read = ++reads;
+      void serverPreviews(specs.map((card) => card.instance)).then((found) => { if (read === reads && !owner.disposed && found.size > 0) render(found); return found; }, () => null);
+    }
+    const rows = specs.map((card) => ({ card, summary: mergedSummary(preview(card.instance), server?.get(card.instance.id)), here: here !== null && here.id === card.instance.id }))
       .filter((row) => row.here || row.card.listed || row.summary === null || hasSave(row.summary));
     rows.sort((a, b) => Number(b.here) - Number(a.here));
     strip.replaceChildren(...rows.map(({ card, summary, here: isHere }) => {
@@ -180,10 +203,10 @@ export function installSavesSettings(menu: GameMenu, opts: SavesSettingsOptions)
       if (summary === null) { box.append(el('div', 'ws-saves-line', SAVES_STRINGS.unreadable)); return box; }
       const [q, inv] = cardLines(summary);
       const go = el('button', 'ws-saves-new', SAVES_STRINGS.newGame); go.type = 'button';
-      owner.listen(go, 'click', () => { openSheet(card, opts, render); });
+      owner.listen(go, 'click', () => { openSheet(card, summary, opts); });
       box.append(el('div', 'ws-saves-line', q), el('div', 'ws-saves-line', inv), go);
       return box;
     }));
   };
-  menu.addSettingsSection('saves.game', [label, strip], { first: true, refresh: render });
+  menu.addSettingsSection('saves.game', [label, strip], { first: true, refresh: () => { render(); } });
 }

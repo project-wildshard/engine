@@ -630,7 +630,10 @@ export class LiveGridSession {
 
   /** Capture before reset; run only after success, without flushing old state into the reset save. */
   prepareNewGameRecovery(target?: LocalSaveInstance): () => void {
-    if (!this.checkpoint()) throw new Error('New game requires a durable current checkpoint');
+    // as `prepareRecovery`: on a wire `bindWire` suppressed this page's checkpoints (the server's saves are the session's), so
+    // a checkpoint here always refused and New Game said "your save is unchanged" on every grid cell (meta
+    // QA-FEEDBACK-2026-11-20-mini row 5); there only where the page stands is the page's to save
+    if (this.wire === null ? !this.checkpoint() : !this.saveLocation()) throw new Error('New game requires a durable current checkpoint');
     const road = this.recoveryRoad();
     const current = this.live.current();
     const home = current === null ? this.ports.home : this.ports.assembly.cell(current);

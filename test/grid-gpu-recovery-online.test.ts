@@ -10,6 +10,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { GridAssembly } from '../src/shared/game/grid/assembly';
 import { gridRecovery } from '../src/shared/game/grid/recovery';
+import { resetNewGame } from '../src/shared/game/newGame';
 
 await installCatalogueFixture();
 
@@ -90,4 +91,21 @@ test('a location save after the recovery is prepared keeps the prepared place, s
     expect(owner.serverPlace(home?.instance ?? '', { x: 1, y: 2.02, z: -194, yaw: 0 })).toBe(false);
     expect(gridRecovery(store).consume(assembly)).toMatchObject({ kind: 'resume', record: { saved: { location: { kind: 'cell', x: 1, z: -194 } } } });
   } finally { vi.useRealTimers(); }
+});
+
+// meta QA-FEEDBACK-2026-11-20-mini row 5 (mini-dw-fix, IPHONE13-DRIFTWOOD DW9): New Game on any grid cell said "Could not start a
+// new game: your save is unchanged." Its recovery asked for a checkpoint, which `bindWire` suppresses on a wire, so it always
+// threw. As a GPU recovery does, a wired page saves only where it stands; offline the checkpoint must still land first.
+test('an online page prepares New Game from where it stands, and the reset reloads onto the road', () => {
+  if (home === undefined) throw new Error('Missing actual grid home');
+  const { owner, store } = session({ wired: true, checkpoint: false }), target = { id: home.instance, shard: home.slug };
+  const commit = owner.prepareNewGameRecovery(target);
+  expect(resetNewGame(store, target).applied).toBe(true); // the page's copy, as the sheet's NEW GAME resets it
+  commit();
+  expect(gridRecovery(store).consume(assembly)).toMatchObject({ kind: 'resume', record: { instance: home.instance, reason: 'new-game' } });
+});
+
+test('offline, New Game still needs its checkpoint to land first', () => {
+  if (home === undefined) throw new Error('Missing actual grid home');
+  expect(() => session({ wired: false, checkpoint: false }).owner.prepareNewGameRecovery({ id: home.instance, shard: home.slug })).toThrow(/checkpoint/u);
 });
