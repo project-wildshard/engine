@@ -364,10 +364,19 @@ export class SerpentDeath {
 }
 
 /** A custom-rig engine look over a loaded skin; the platform brain's state drives the clip choice per instance. */
-export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardRows['species'][number], skin: ClientSkin): SpeciesLook {
+export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardRows['species'][number], skin: ClientSkin, lendCoat = false): SpeciesLook {
   const drivers = new WeakMap<Record<string, Bone>, SkinDriver>();
   // fresh joint and dims records per call: the factory owns what it is handed
   const select = (id: string): ClientSkin => clientVariantSkin(skin, id);
+  const coats = lendCoat ? new Map<ClientSkin, ReturnType<ClientSkin['material']>['map']>() : null;
+  const coat = (selected: ClientSkin): ReturnType<ClientSkin['material']>['map'] => {
+    if (coats === null) return null;
+    const known = coats.get(selected);
+    if (known !== undefined) return known;
+    const material = selected.material(), texture = material.map;
+    coats.set(selected, texture); material.dispose();
+    return texture;
+  };
   const bones = (selected: ClientSkin): BoneDef[] => selected.bones.map((bone): BoneDef => ({ name: bone.name, parent: bone.parent, pos: [bone.pos[0], bone.pos[1], bone.pos[2]] }));
   const dims = (): AnimalSpecies['dims'] => ({ ...species.dims, feet: species.dims.feet.map(([x, z]): [number, number] => [x, z]) });
   const quadruped = species.body?.skeleton === 'quadruped';
@@ -408,7 +417,10 @@ export function skinSpeciesLook(row: ShardRows['looks'][number], species: ShardR
     // OF27b: each variant wears its own coat (its skin file's material: maps, sheen, rim, glow)
     material: (_sky, _glow, _intensity, variant) => (variant === undefined ? skin : select(variant.id)).material(),
     ...(skin.parts.length === 0 ? {} : { partMaterials: () => skin.parts.map((part) => part()) }),
-    skin: (variant) => { const selected = select(variant.id); return { geometry: selected.geometry, map: null, normalMap: null, bones: bones(selected), overgrown: false }; },
+    skin: (variant) => {
+      const selected = select(variant.id);
+      return { geometry: selected.geometry, map: coat(selected), normalMap: null, bones: bones(selected), overgrown: false };
+    },
     ...(quadruped ? { postPose: animate } : { animate }),
   };
 }

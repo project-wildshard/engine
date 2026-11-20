@@ -1,5 +1,6 @@
 import type { CueDirector } from '../audio/cueDirector';
 import type { Scope } from '@wildshard/engine/app/scope';
+import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
 import type { ShardContext } from '../plugin/context';
 import type { createDeclaredHeldMelee } from '../plugin/weaponFamily';
 import type { RuntimeHomes, RuntimeCoins } from '../../../shared/game/plugin/runtimeRows';
@@ -12,6 +13,7 @@ import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 export interface ClientNativeBook {
   held: ReturnType<typeof createDeclaredHeldMelee> | null;
   species: boolean;
+  catalogueSkins?: readonly SpeciesLook[];
   population: RuntimeHomes | null;
   quest: (PersistedQuest & { readonly coins: RuntimeCoins }) | null;
   fight: ReturnType<typeof bindDeclaredFight> | null;
@@ -25,14 +27,14 @@ export interface ClientNativeBook {
 const owners = new WeakMap<Scope, WeakMap<ShardFolder, ClientNativeBook>>();
 /** Feature admission precedes this book. Its lifetime is the entered scope,
  * independently of the world's resident scene/material scope. */
-export function clientNativeBook(ctx: ShardContext): ClientNativeBook {
-  if (ctx.scope.disposed) throw new Error('Native client features require a living entered scope');
-  let products = owners.get(ctx.scope);
-  if (products === undefined) { products = new WeakMap(); owners.set(ctx.scope, products); }
+export function clientNativeBook(ctx: ShardContext, scope: Scope = ctx.scope): ClientNativeBook {
+  if (scope.disposed) throw new Error('Native client features require a living scope');
+  let products = owners.get(scope);
+  if (products === undefined) { products = new WeakMap(); owners.set(scope, products); }
   const previous = products.get(ctx.product); if (previous !== undefined) return previous;
   const book: ClientNativeBook = { held: null, species: false, population: null, quest: null,
     fight: null, page: null, stages: null, capture: null, presentations: new Map(), returnModules:null, decisionAssets: new Map() };
   products.set(ctx.product, book);
-  ctx.scope.onDispose(() => { book.decisionAssets.clear(); book.presentations.clear(); products.delete(ctx.product); });
+  scope.onDispose(() => { book.decisionAssets.clear(); book.presentations.clear(); products.delete(ctx.product); });
   return book;
 }

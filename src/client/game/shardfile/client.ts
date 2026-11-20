@@ -72,7 +72,8 @@ import { loadClientRigLooks } from './clientRigLooks';
 import { clientNativeBook } from './clientNativeBook';
 import { loadItemModels, loadStaticModels } from './itemModels';
 import { attachmentRefs, withAttachments } from './clientAttachments';
-import { loadClientSkins, type ClientSkin } from './clientSkins';
+import { loadClientSkins, skinSpeciesLook, type ClientSkin } from './clientSkins';
+import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import { clientViews } from './clientViews';
 import { createShardfileClientScripts, captureClientScriptPosition } from './clientScripts';
 
@@ -173,9 +174,14 @@ function withoutPresentation(source: Shardfile): Shardfile {
   const files = new Set([...(source.terrain === null ? [] : [source.terrain.collider,
     ...(source.terrain.sampling === undefined ? [] : [source.terrain.sampling.file]), ...source.terrain.tiles.map((tile) => tile.file)]), ...materialTextureRefs(source.look.materials), ...graphFileRefs(source), ...splatGroundFiles(source)]);
   const keep = (ref: string): boolean => !files.has(ref);
+  // A native world's catalogue can take a cooked skin without transferring
+  // its roster, equipment or play stage to the parallel data client.
+  const skins = new Set(source.rows.looks.filter(look => look.recipe === SKIN_LOOK_RECIPE).map(look => look.species));
+  const rows = { ...source.rows, species: source.rows.species.filter(species => !skins.has(species.id)),
+    looks: source.rows.looks.filter(look => look.recipe !== SKIN_LOOK_RECIPE) };
   return { ...source, terrain: null, props: source.props === null ? null : { ...source.props, tiles: source.props.tiles.filter(tile => keep(tile.file)) }, files: source.files.filter((file) => keep(file.hash)), critical: source.critical.filter(keep), library: source.library.filter(keep),
     tiles: source.tiles.flatMap((tile) => { const kept = tile.files.filter(keep); return kept.length === 0 ? [] : [kept.length === tile.files.length ? tile : { ...tile, files: kept }]; }),
-    look: { ...source.look, families: [], materials: {}, familyLooks: {} } };
+    rows, look: { ...source.look, families: [], materials: {}, familyLooks: {} } };
 }
 
 /** Look-only native data draws with its native world and never creates another gameplay owner. */
@@ -473,11 +479,26 @@ export class ShardfileClient {
   }
 
   private kitData(ctx: ShardContext): void {
+    const catalogue = this.plan?.features.find(row => row.kind === 'species.program' && row.catalogue !== undefined);
+    if (catalogue !== undefined && this.skins.size > 0) {
+      const rows = this.source.rows;
+      const looks = rows.looks.flatMap(row => {
+        const skin = this.skins.get(row.id);
+        if (skin === undefined) return [];
+        const species = rows.species.find(value => value.id === row.species);
+        if (species === undefined) throw new Error(`Missing catalogue skin species: ${row.species}`);
+        return [skinSpeciesLook(row, species, skin, true)];
+      });
+      clientNativeBook(ctx).catalogueSkins = looks;
+      return;
+    }
     if (this.mode !== 'full') return;
     // ONE-FORMAT OF19b0: a client-page shard whose creatures are declared spawns (its runtime plan keeps the quest page and
     // held melee) draws them as an ordinary upload's page does, unless a `species.program` feature owns its species
     if (this.nativeFeatures) {
-      if ((this.plan?.features ?? []).some(row => row.kind === 'species.program')) return;
+      if ((this.plan?.features ?? []).some(row => row.kind === 'species.program')) {
+        return;
+      }
       // OF19d2: with no `species.program` the page's species are its declared rows, registered here for `population.homes`
       clientNativeBook(ctx).species = true;
       if (this.source.creatures.spawns.length === 0) return;
