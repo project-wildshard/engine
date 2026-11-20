@@ -4,13 +4,13 @@
 // the handbrake), BOOST, HORN and LEAVE. On a keyboard W and S throttle, brake and reverse, A and D steer, Shift boosts, Space
 // is the handbrake and H the horn. The wire carries them as held buttons, the server reads the stick as the vehicle's own
 // (whichever way the driver looks), and BRAKE stops the vehicle without reversing it.
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import { Scope } from '@wildshard/engine/app/scope';
 import { app } from '@wildshard/engine/app/runtime';
 import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 import { hudSlots } from '@wildshard/engine/ui/hudSlots';
-import { DriveDiscs } from '@wildshard/engine/quest/view/ui';
+import { DriveDiscs, SteerChip } from '@wildshard/engine/quest/view/ui';
 import { netSimCommand } from '@wildshard/engine/sim/netMotion';
 import { stepVehicle, vehicleAt } from '@wildshard/engine/sim/vehicle';
 import type { MoverPose } from '@wildshard/format/moverPose';
@@ -99,4 +99,22 @@ test('seated, the walk\'s discs give way to BRAKE, BOOST, HORN and LEAVE, and a 
   expect(walkLive()).toEqual([true, true, true, true, true]);
   expect(player.seatButtons).toBe(null);
   expect(discs.shown().every(disc => !disc.show)).toBe(true);
+});
+
+// MSZ18: the cell's edge turns a driven vehicle back; the chip says vehicles stay in the zone for a moment, once a turn-back
+test('the edge\'s turn-back says vehicles stay in the zone on the chip, for a moment', () => {
+  vi.useFakeTimers();
+  try {
+    scope = new Scope('drive-edge');
+    const chip = new SteerChip(scope), systems: SystemSpec[] = [];
+    let edged = true;
+    const port = { seatOf: () => ({ vehicle: 'v', seat: 0 }), pose: (): MoverPose => ({ position: { x: 0, y: 0, z: 0 }, euler: { x: 0, y: 0, z: 0 }, enabled: true }),
+      kindOf: () => ({ seats: [{ role: 'driver', at: [0, 0.9, 0] as const, pose: 'sit' as const }], handling: { speed: 20, boost: 1.5 } }), takeEdge: () => { const was = edged; edged = false; return was; } };
+    installVehicleRide(() => port, { system: spec => { systems.push(spec); }, scope, player: { yaw: 0, pitch: 0, position: { x: 0, y: 0, z: 0 } }, boost: () => false, view: chip });
+    for (const system of systems) system.run(1 / 60, 0);
+    expect(chip.root.classList.contains('staying')).toBe(true);
+    expect(chip.root.querySelector('.ws-quest-steer-stay')?.textContent).toBe('Vehicles stay in this zone');
+    vi.advanceTimersByTime(2600);
+    expect(chip.root.classList.contains('staying')).toBe(false);
+  } finally { vi.useRealTimers(); }
 });

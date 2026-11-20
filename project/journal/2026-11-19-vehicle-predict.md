@@ -24,3 +24,19 @@
   passenger stays led within 1.5 m of the seat through a full circle; a ram moves a parked, braking buggy and every seat holds.
   No engine change was needed: MSZ9's seats and MSZ13's bounce already held it; the passenger's page follows rows (MSZ16
   predicts only the driver's seat).
+
+## MSZ18: what the MMO server must know
+
+- The cell's edge is a wall to a vehicle, the whole square `VEHICLE_EDGE` (6 m) inside `CHUNK_HALF`, not only the gate roads:
+  every way out of a cell is its edge, and a seated driver led past `CHUNK_HALF + CROSS_MARGIN` would cross with the seat
+  emptying behind. Shared `edgeHit` in `sim/vehicleHull.ts`, so the driver's page predicts the same turn-back. The edge wears
+  nothing; the driver's chip says *Vehicles stay in this zone* for 2.5 s (generic text: the chip has no zone name, and Mirror
+  Salt's own wording can come with MSZ26's Start Yard pass if Jake wants the name).
+- `VEHICLE_CAP` 24 a cell: a player dock's ask past it is refused. One per-player vehicle a player: asking at another player
+  dock takes the first one back, its riders set down.
+- Road rooms install no shard sim, so they run no vehicles; the grid test asserts it.
+- `hostVehicles(host)` and `VehicleRuntime.place` let a test set a vehicle down: the example's ground ends at about x -184, so a
+  drive from the dock never reaches the edge.
+- The bench (`test/dedicated-vehicle-cell.test.ts`): 16 bots' buggies circling in one cell, 15 readings, tick p95 at most
+  5.47 ms (p50 2.83 ms) against the box probe's 12 ms line, on the Mac mini. The door's 4 sockets an address needed
+  `socketsPerIp: 32` for 16 bots. Frame bytes print with it for MSZ20's budget.

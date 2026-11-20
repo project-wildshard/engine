@@ -65,6 +65,9 @@
 .ws-quest-steer.seated .ws-quest-steer-gears { display: flex; }
 .ws-quest-steer-seat, .ws-quest-steer.seated .ws-quest-steer-boost:not(.ws-quest-steer-seat) { display: none; }
 .ws-quest-steer.seated .ws-quest-steer-seat { display: block; }
+/* MIRROR-SALT-ZONE MSZ18: the cell's edge turned the vehicle back */
+.ws-quest-steer-stay { display: none; font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-amber); text-align: center; }
+.ws-quest-steer.staying .ws-quest-steer-stay { display: block; }
 .ws-quest-steer-boost { font-family: var(--ws-mono); font-size: 9.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ws-text-dim); text-align: center; }
 .ws-quest-steer.boosting .ws-quest-steer-boost { color: var(--ws-amber); }
 .ws-quest-steer-touch, #hud.touch .ws-quest-steer-key { display: none; }

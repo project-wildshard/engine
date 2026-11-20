@@ -8,7 +8,7 @@ import { GROUP, queryGroups } from '@wildshard/engine/physics/groups';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { STEER_PROBE } from '@wildshard/engine/sim/moverMotion';
 import { publishScriptBody, publishWorldState, withdrawScriptBody, type StateNetRow } from '@wildshard/engine/sim/shardRows';
-import { castVehicleHull, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullShapes, type VehicleReach } from '@wildshard/engine/sim/vehicleHull';
+import { castVehicleHull, edgeHit, firstHit, VEHICLE_EDGE_OWNER, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullShapes, type VehicleReach } from '@wildshard/engine/sim/vehicleHull';
 import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type VehicleImpact, type VehicleState, type VehicleStepOut, type VehicleWorld } from '@wildshard/engine/sim/vehicle';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
@@ -39,6 +39,8 @@ import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleMotionRow,
  * player's ask again). Ramming hurts no creature (call 4 B).
  */
 export const VEHICLE_IDLE_DESPAWN = 60;
+/** MSZ18: the most vehicles a cell runs at once: a player dock's ask past it is refused. */
+export const VEHICLE_CAP = 24;
 /** m within which a free seat's prompt shows. */
 export const SEAT_REACH = 2.5;
 /** m from its dock within which a shared vehicle counts as home (it does not snap back). */
@@ -118,6 +120,11 @@ function worldPoint(state: VehicleState, local: readonly [number, number, number
   return { x: state.x + x * cos + z * sin, y: state.y + y, z: state.z - x * sin + z * cos };
 }
 
+/** MSZ18: each bound host's vehicles, for a tape or a bench that sets one up (`hostVehicles`). */
+const RUNTIMES = new WeakMap<SimHost, VehicleRuntime>();
+/** The vehicles a host runs, if it runs any. */
+export const hostVehicles = (host: SimHost): VehicleRuntime | undefined => RUNTIMES.get(host);
+
 export class VehicleRuntime {
   private readonly kinds: ReadonlyMap<string, VehicleKind>;
   private readonly docks: ReadonlyMap<string, VehicleDock>;
@@ -146,7 +153,10 @@ export class VehicleRuntime {
     const dock = this.docks.get(dockId); if (dock === undefined) throw new Error(`Unknown vehicle dock ${dockId}`);
     if (dock.per === 'shared') return dockId;
     const id = playerVehicle(dockId, player);
-    return this.live.has(id) ? id : this.spawnAt(dock, player);
+    if (this.live.has(id)) return id;
+    // MSZ18: one per-player vehicle out at a time: a player's other one goes, its riders set down beside it
+    for (const other of this.live.values()) if (other.owner === player) { for (const rider of other.seats) if (rider !== null) this.leave(rider); this.despawn(other.id); }
+    return this.spawnAt(dock, player);
   }
   /** MSZ14: what is left of a vehicle's health, as a share of its kind's. */
   health(id: string): number { const vehicle = this.get(id); return vehicle.health / (vehicle.kind.health ?? VEHICLE_HEALTH); }
@@ -160,6 +170,8 @@ export class VehicleRuntime {
     const { bow, stern, side } = vehicleReach(boxes), reach = Math.hypot(Math.max(bow, stern), side) * 2;
     return [...this.live.values()].every(vehicle => Math.hypot(vehicle.state.x - dock.at[0], vehicle.state.z - dock.at[2]) >= reach);
   }
+  /** MSZ18: whether a cell holds `VEHICLE_CAP` vehicles, `id` not among them (a player's own, out already, is no new one). */
+  full(id: string): boolean { return !this.live.has(id) && this.live.size >= VEHICLE_CAP; }
   /** Every vehicle out now. */
   ids(): readonly string[] { return [...this.live.keys()]; }
   /** The dock a vehicle out now came from. */
@@ -211,6 +223,17 @@ export class VehicleRuntime {
     body.position.set(at.x, at.y, at.z); body.velocity.set(0, 0, 0); body.motor.resetAt(body.position); body.carried = false;
     return at;
   }
+  /** MSZ18: set a vehicle down at rest at `at`, heading `yaw`, its riders led along (a tape's or a bench's setup). */
+  place(id: string, at: { readonly x: number; readonly y: number; readonly z: number }, yaw: number): void {
+    const vehicle = this.get(id);
+    vehicle.state = vehicleAt(at, yaw); vehicle.body?.resetPose(poseOf(vehicle.state));
+    vehicle.kind.seats.forEach((row, seat) => {
+      const player = vehicle.seats[seat], body = player === null || player === undefined ? undefined : this.host?.players.get(player);
+      if (player === null || player === undefined || body === undefined) return;
+      const point = worldPoint(vehicle.state, row.at);
+      body.position.set(point.x, point.y, point.z); body.motor.resetAt(body.position); this.led.set(player, point);
+    });
+  }
   /** Pose of a vehicle now. */
   pose(id: string): MoverPose { return poseOf(this.get(id).state); }
   /** How fast it goes along its heading (m/s). */
@@ -259,6 +282,7 @@ export class VehicleRuntime {
     this.lastImpacts.push({ vehicle: vehicle.id, strength: impact.strength, owner: impact.owner });
     this.lastImpacts.sort((a, b) => b.strength - a.strength);
     const push = Math.hypot(impact.impulse.x, impact.impulse.z);
+    if (impact.owner === VEHICLE_EDGE_OWNER) return; // MSZ18: the cell's edge turns it back and wears nothing
     this.wear(vehicle, push / vehicle.kind.handling.mass);
     const other = typeof impact.owner === 'string' ? this.live.get(impact.owner) : undefined;
     if (other !== undefined) {
@@ -327,11 +351,11 @@ export class VehicleRuntime {
    * keep led bodies out of the hulls and their walk standing down, and keep its vehicles in the host's saves.
    */
   bind(host: SimHost): void {
-    this.host = host; this.routes = actRoutes(host);
+    this.host = host; this.routes = actRoutes(host); RUNTIMES.set(host, this);
     for (const vehicle of this.live.values()) this.claim(vehicle);
     for (const dock of this.docks.values()) if (dock.per === 'player') this.routes.claims.set(vehicleDockPrompt(dock.id), player => {
       const body = host.players.get(player);
-      if (body === undefined || this.wrecked.has(playerVehicle(dock.id, player)) || !this.clear(dock.id) || Math.hypot(body.position.x - dock.at[0], body.position.z - dock.at[2]) > SEAT_REACH) return;
+      if (body === undefined || this.wrecked.has(playerVehicle(dock.id, player)) || !this.clear(dock.id) || this.full(playerVehicle(dock.id, player)) || Math.hypot(body.position.x - dock.at[0], body.position.z - dock.at[2]) > SEAT_REACH) return;
       const id = this.spawn(dock.id, player);
       this.board(id, player, this.get(id).kind.seats.findIndex(seat => seat.role === 'driver'));
     });
@@ -405,7 +429,7 @@ export class VehicleRuntime {
     const floor = (x: number, z: number, fromY: number): number | undefined => floorBelow(this.ports.physics(), x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== id);
     const body = this.ports.restoring === true && handle === undefined && this.host === null ? null : new KinematicMover(this.ports.physics(), boxes, poseOf(state), id, false, handle);
     const reach = vehicleReach(boxes);
-    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, hit: (from, move, yaw) => this.hullHit(id, reach, from, move, yaw) }, state, seats: kind.seats.map(() => null), idle: 0, health: kind.health ?? VEHICLE_HEALTH };
+    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, hit: (from, move, yaw) => firstHit(this.hullHit(id, reach, from, move, yaw), edgeHit(from, move)) }, state, seats: kind.seats.map(() => null), idle: 0, health: kind.health ?? VEHICLE_HEALTH };
     this.live.set(id, vehicle); this.claim(vehicle);
     return id;
   }

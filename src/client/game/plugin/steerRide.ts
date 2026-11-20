@@ -17,6 +17,8 @@ export interface SteerRideView {
   readonly tap?: (run: () => void) => void;
   /** MSZ12: a vehicle seat is taken (true) or left: the seat's controls show in place of the walk's. */
   readonly seated?: (on: boolean) => void;
+  /** MSZ18: a driven vehicle turned back at the cell's edge: the chip says vehicles stay in the zone, for a moment. */
+  readonly stays?: () => void;
 }
 /** What the chip shows of a ride: its speed (a share of the boosted top), whether it boosts, and (MSZ12, a vehicle seat) its
  *  gear: R rolling back, N standing, D rolling forward. */
@@ -132,6 +134,8 @@ export interface VehicleRidePort {
   readonly clear?: (vehicle: string, from: { x: number; y: number; z: number }, to: { x: number; y: number; z: number }) => number;
   /** MSZ16: where a seat stands as the page draws its vehicle (the driver's, where the page predicts it): the seated body sits there. */
   readonly seatPoint?: (vehicle: string, seat: number) => readonly [number, number, number] | undefined;
+  /** MSZ18: the driven vehicle met the cell's edge since the last ask (the chip says vehicles stay in the zone). */
+  readonly takeEdge?: () => boolean;
 }
 /** A kind's seat as a ride reads it: who sits there, and (MSZ11) where its base is and how it is sat, for the seat's eye. */
 export interface VehicleRideSeat { readonly role: string; readonly at?: readonly [number, number, number]; readonly pose?: 'sit' | 'stand' }
@@ -193,6 +197,7 @@ export function installVehicleRide(vehicles: () => VehicleRidePort | undefined, 
       seated = held; last = null; speed = 0; rolling = 0; p.yaw = angle(pose.euler.y); if (p.pitch !== undefined) p.pitch = SEAT_PITCH;
     }
     if (app.input.consume('drive.view')) chase = !chase;
+    if (port.takeEdge?.() === true) page.view.stays?.();
     braking = app.input.held('drive.brake') ? braking + dt : 0;
     const pitched = p.pitch !== undefined && Math.abs(p.pitch - lookedPitch) > 1e-4; // a look up or down is a look too
     if (last === null) { heading = pose.euler.y; looked = p.yaw; lookedPitch = p.pitch ?? SEAT_PITCH; }

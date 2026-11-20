@@ -1,6 +1,7 @@
 import type { MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleHandling } from '@wildshard/format/vehicles';
-import { stepVehicle, type VehicleCommand, type VehicleState, type VehicleWorld } from '@wildshard/engine/sim/vehicle';
+import { stepVehicle, type VehicleCommand, type VehicleState, type VehicleStepOut, type VehicleWorld } from '@wildshard/engine/sim/vehicle';
+import { VEHICLE_EDGE_OWNER } from '@wildshard/engine/sim/vehicleHull';
 
 /** A server row of the driven vehicle: the frame's tick, its pose, and (MSZ16) its speeds along and across its heading. */
 export interface VehicleRow { readonly tick: number; readonly pose: MoverPose; readonly forward?: number; readonly slip?: number }
@@ -39,6 +40,9 @@ export class VehiclePrediction {
   corrections = 0; snaps = 0;
   /** The widest gap a row found, m. */
   worst = 0;
+  /** MSZ18: a live step met the cell's edge since the page last asked (`takeEdge`). */
+  private edged = false;
+  private readonly out: VehicleStepOut = { blocked: false, sliding: 0, impact: null };
   private readonly handling: VehicleHandling;
   private readonly world: VehicleWorld;
   private now: VehicleState;
@@ -52,7 +56,9 @@ export class VehiclePrediction {
   }
   /** One command, stepped as the server will step it. */
   step(command: VehicleCommand): VehicleState {
-    this.now = stepVehicle(this.now, command, this.handling, this.world, VEHICLE_DT);
+    this.out.impact = null;
+    this.now = stepVehicle(this.now, command, this.handling, this.world, VEHICLE_DT, this.out);
+    if ((this.out.impact as VehicleStepOut['impact'])?.owner === VEHICLE_EDGE_OWNER) this.edged = true;
     this.steps.push({ command, after: this.now });
     if (this.steps.length > KEPT) this.steps.shift();
     return this.now;
@@ -91,6 +97,8 @@ export class VehiclePrediction {
     this.offset.x *= keep; this.offset.y *= keep; this.offset.z *= keep; this.offset.yaw *= keep;
     this.easing = Math.max(0, this.easing - dt);
   }
+  /** MSZ18: whether a step met the cell's edge since the last ask (its chip says why the vehicle turned back). */
+  takeEdge(): boolean { const edged = this.edged; this.edged = false; return edged; }
   /** Where the page has it now: its collider stands here. */
   state(): VehicleState { return this.now; }
   /** Where it is drawn now: the prediction, with a correction's lag still easing out. */

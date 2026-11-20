@@ -201,6 +201,8 @@ export class DriveDiscs {
 
 /** SHARD-SOURCE SS-MS2a3: a steer ride's chip at the bottom centre: its speed bar, BOOST lit while it boosts, and how to boost
  *  (Shift; on a phone, the stick pushed all the way). Leaving is the vehicle's own prompt. */
+/** MSZ18: ms the steer chip says vehicles stay in the zone. */
+const STAY_MS = 2500;
 export class SteerChip {
   readonly scope: Scope;
   readonly root: HTMLDivElement = el('div', 'ws-quest-steer');
@@ -211,6 +213,9 @@ export class SteerChip {
   private readonly gears = el('div', 'ws-quest-steer-gears', this.root);
   private readonly gear = new Map((['R', 'N', 'D'] as const).map(letter => { const g = el('b', '', this.gears); g.textContent = letter; return [letter, g] as const; }));
   private readonly seatHint = el('div', 'ws-quest-steer-boost ws-quest-steer-seat', this.root);
+  /** MSZ18: *Vehicles stay in this zone*, for a moment after the cell's edge turns a vehicle back */
+  private readonly stayNote = el('div', 'ws-quest-steer-stay', this.root);
+  private stayTimer: ReturnType<Scope['timeout']> | undefined;
   private discs: DriveDiscs | null = null;
   constructor(owner: Scope) {
     this.scope = uiScope('steer-ride', owner); mountUi(this.root, this.scope, hudRoot());
@@ -232,6 +237,12 @@ export class SteerChip {
     this.root.classList.toggle('seated', on);
     if (on) this.discs ??= new DriveDiscs(this.scope);
     this.discs?.show(on);
+  }
+  /** MIRROR-SALT-ZONE MSZ18: the cell's edge turned the vehicle back: say vehicles stay in the zone for `STAY_MS`. */
+  stays(): void {
+    this.stayNote.textContent = engineString('s_vehicle_stays'); this.root.classList.add('staying');
+    this.scope.cancelTimer(this.stayTimer);
+    this.stayTimer = this.scope.timeout(STAY_MS, () => { this.stayTimer = undefined; this.root.classList.remove('staying'); });
   }
   /** MIRROR-SALT-ZONE MSZ11: a tap or click on the chip runs `run` (a vehicle seat swaps its view by it). */
   tap(run: () => void): void {

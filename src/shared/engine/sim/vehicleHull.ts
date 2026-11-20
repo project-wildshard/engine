@@ -3,7 +3,8 @@ import type { MoverBox } from '@wildshard/format/moverPose';
 import type { Physics } from '../physics/Physics';
 import type { SimCommand } from '../../../server/engine/sim';
 import { steerStick } from './moverMotion';
-import type { VehicleCommand } from './vehicle';
+import type { VehicleCommand, VehicleHit } from './vehicle';
+import { CHUNK_HALF } from '../core/config';
 
 /**
  * MIRROR-SALT-ZONE MSZ16: what the server's `VehicleRuntime` and its driver's page both need to step a vehicle alike: the
@@ -20,6 +21,27 @@ const WALL_NORMAL = 0.5;
 /** What a vehicle's hull meets besides a static solid: another vehicle gives a little back; a walker or a creature (kg) is
  *  pushed aside, so gives nothing back. */
 export const VEHICLE_RESTITUTION = { solid: 0.35, vehicle: 0.3, walker: 0 } as const;
+
+/** MIRROR-SALT-ZONE MSZ18: m inside its cell's edge a vehicle's centre stays (its hull and a margin): the gate roads begin at the
+ *  edge, and a vehicle stays in its cell, so the cell server needs no hand-over. What the edge is, as a hit's owner. */
+export const VEHICLE_EDGE = 6;
+export const VEHICLE_EDGE_OWNER = 'cell.edge';
+/** MSZ18: the cell's edge as a wall to a vehicle moving by `move` from `from`: where along the move its centre would pass
+ *  `half - VEHICLE_EDGE` on either axis, facing back in; none while it stays inside or moves back in. */
+export function edgeHit(from: { readonly x: number; readonly z: number }, move: { readonly x: number; readonly z: number }, half: number = CHUNK_HALF): VehicleHit | null {
+  const limit = half - VEHICLE_EDGE;
+  let best: VehicleHit | null = null;
+  const axis = (at: number, by: number, normal: { readonly x: number; readonly z: number }): void => {
+    if (by === 0) return;
+    const side = Math.sign(by), end = at + by; if (side * end <= limit) return;
+    const t = Math.max(0, Math.min(1, (side * limit - at) / by));
+    if (best === null || t < best.at) best = { at: t, normal, owner: VEHICLE_EDGE_OWNER, mass: Infinity, velocity: { x: 0, z: 0 }, restitution: VEHICLE_RESTITUTION.solid };
+  };
+  axis(from.x, move.x, { x: -Math.sign(move.x), z: 0 }); axis(from.z, move.z, { x: 0, z: -Math.sign(move.z) });
+  return best;
+}
+/** The nearer of two hits along one move. */
+export const firstHit = (a: VehicleHit | null, b: VehicleHit | null): VehicleHit | null => (a === null ? b : b === null || a.at <= b.at ? a : b);
 
 /** How far a hull reaches forward (its frame's -z), back and to the side: where its wheels read the ground. */
 export interface VehicleReach { readonly bow: number; readonly stern: number; readonly side: number }

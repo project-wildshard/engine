@@ -814,7 +814,8 @@ export const ENGINE_STRINGS = {
   "s_drive_brake": "Brake",
   "s_drive_boost": "Boost",
   "s_drive_horn": "Horn",
-  "s_drive_leave": "Leave"
+  "s_drive_leave": "Leave",
+  "s_vehicle_stays": "Vehicles stay in this zone"
 } as const;
 export type EngineStringKey = keyof typeof ENGINE_STRINGS;
 const overrides: Partial<Record<EngineStringKey, string>> = {};

@@ -53,6 +53,8 @@ export interface VehicleFollower {
   readonly command?: (command: SimCommand, wire: VehicleWire) => void;
   readonly frame?: (dt: number) => void;
   readonly report?: () => VehicleReport;
+  /** MSZ18: the driven vehicle met the cell's edge since the last ask. */
+  readonly takeEdge?: () => boolean;
 }
 /** A mover's look in one grid cell, as `WirePage.moverLooks` keys it. */
 export const moverLookKey = (instance: string, id: string): string => `${instance}\n${id}`;

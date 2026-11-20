@@ -5,7 +5,7 @@ import { queryGroups } from '@wildshard/engine/physics/groups';
 import { floorBelow } from '@wildshard/engine/physics/query';
 import { STEER_PROBE } from '@wildshard/engine/sim/moverMotion';
 import type { VehicleWorld } from '@wildshard/engine/sim/vehicle';
-import { castVehicleHull, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullShapes } from '@wildshard/engine/sim/vehicleHull';
+import { castVehicleHull, edgeHit, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullShapes } from '@wildshard/engine/sim/vehicleHull';
 import type { SimCommand } from '@wildshard/engine/sim';
 import { tagOf } from '@wildshard/engine/physics/surface';
 import type { Physics } from '@wildshard/engine/physics/Physics';
@@ -183,6 +183,8 @@ export class FollowedVehicles {
     return { driving: this.predicted?.id ?? null, ...this.driven, docks: [...this.docks.values()].map(dock => [dock.id, dock.at[0], dock.at[2]] as const) };
   }
   private readonly driven = { corrections: 0, snaps: 0, worst: 0 };
+  /** MSZ18: whether the vehicle this page's player drives met the cell's edge since the last ask. */
+  takeEdge(): boolean { return this.predicted?.run.takeEdge() ?? false; }
   /** MSZ16: the prediction of the vehicle this page's player drives, while it drives one. */
   prediction(): VehiclePrediction | null { return this.predicted?.run ?? null; }
   /** MSZ14: whether a vehicle is worn enough to smoke (its look reads it, MSZ14b). */
@@ -208,8 +210,8 @@ export class FollowedVehicles {
     return {
       floor: (x, z, fromY) => floorBelow(physics, x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, mine), ...reach,
       hit: (from, move, yaw) => {
-        const hit = castVehicleHull(physics, this.shapes, reach, from, move, yaw, queryGroups(['WORLD'], 'WORLD'), mine);
-        if (hit === null) return null;
+        const hit = castVehicleHull(physics, this.shapes, reach, from, move, yaw, queryGroups(['WORLD'], 'WORLD'), mine), edge = edgeHit(from, move);
+        if (hit === null || (edge !== null && edge.at < hit.at)) return edge; // MSZ18: the cell's edge, as the server has it
         const owner = tagOf(hit.collider)?.owner ?? null, other = typeof owner === 'string' ? this.live.get(owner) : undefined;
         return other === undefined ? { at: hit.at, normal: hit.normal, owner, mass: Infinity, velocity: { x: 0, z: 0 }, restitution: VEHICLE_RESTITUTION.solid }
           : { at: hit.at, normal: hit.normal, owner, mass: other.kind.handling.mass, velocity: { x: 0, z: 0 }, restitution: VEHICLE_RESTITUTION.vehicle };
