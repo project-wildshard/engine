@@ -93,6 +93,7 @@ export const DONE = {
     'src/client/engine/render/lookRender.ts': { why: 'meta SHARD-SOURCE M4.8 lamp halos: one additive billboard per declared lamp, an effect', counts: { InstancedMesh: 1 } },
     'src/client/game/ambient/crowdDraw.ts': { why: 'the ambient crowd draw from admitted rows: a population, like the flock in posedInstances', counts: { InstancedMesh: 1 } },
     'src/client/game/ambient/foragerDraw.ts': { why: 'the native forager population, one draw over its owner rows: a population, not placed world', counts: { InstancedMesh: 1 } },
+    'src/client/game/plugin/vehicleFx.ts': { why: 'meta MIRROR-SALT-ZONE MSZ14b: a wrecked vehicle\'s break-apart chunks, one bounded draw that settles and empties: an effect, like CoinBurst', counts: { InstancedMesh: 1 } },
     'src/client/game/loot/CoinMotion.ts': { why: 'loot coins in flight to the player: an effect, like CoinBurst', counts: { InstancedMesh: 1 } },
     'src/client/game/plugin/scene.ts': { why: "a plugin scene's declared instanced nodes, built from admitted scene data; the shard's data owns what is drawn", counts: { InstancedMesh: 1 } },
     'src/client/game/plugin/weaponFamily.ts': { why: "a declared weapon family's held frame merged from primitives: held gear, not a thing in the world", counts: { mergeGeometries: 1 } },
