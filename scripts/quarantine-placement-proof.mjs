@@ -5,7 +5,7 @@ import {mkdirSync,mkdtempSync,rmSync,writeFileSync} from 'node:fs';
 import {join,relative,resolve as resolvePath} from 'node:path';
 import {createEnginePlan} from './engine-ci-plan.ts';
 
-const files=['test/nalati-bot-taming.test.ts','test/nalati-taming-verbs.test.ts','test/nalati-awareness-verbs.test.ts','test/driftwood-long-session.test.ts','test/physics-open-plots-headless.test.ts','test/standalone-grid.test.ts'];
+const files=['test/nalati-bot-taming.test.ts','test/nalati-taming-verbs.test.ts','test/nalati-awareness-verbs.test.ts','test/physics-open-plots-headless.test.ts','test/standalone-grid.test.ts'];
 const base=resolvePath(process.argv[2]??'tmp/quarantine-placement-proof');mkdirSync(base,{recursive:true});
 const work=mkdtempSync(join(base,'run-')),filename=join(work,'plan.json');
 try{

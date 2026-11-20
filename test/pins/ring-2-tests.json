@@ -10,7 +10,6 @@
  "test/cook-worker-limits.test.ts",
  "test/released-save-play.test.ts",
  "test/driftwood-headless-population.test.ts",
- "test/driftwood-long-session.test.ts",
  "test/elite-encounters.test.ts",
  "test/grid-board-limit.test.ts",
  "test/grid-product-metadata.test.ts",
