@@ -119,7 +119,7 @@ import { tileRing } from '../shardfile/tileDriver';
 import { readGridSeamData, type GridSeamAddress } from '../../../shared/game/grid/seamData';
 import { OUTER_BLOCK_READS, readGridStripsOrSeeds } from '../../../shared/game/grid/compiledStrips';
 import { startRoadGrain } from './roadGrainPreparation';
-import { startRoadSigns } from './roadSignPreparation';
+import { roadSignWorkerSource, startRoadSigns } from './roadSignPreparation';
 import { RoadMapShare } from './roadResources';
 import { prepareRoadSurfaceMaps } from './roadCompressedSurfaces';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
@@ -453,9 +453,10 @@ export class GridSession {
     const ring = (x: number, z: number): boolean => Math.abs(x - home.origin.x) <= reach && Math.abs(z - home.origin.z) <= reach;
     const layout = roadLayout(assembly, slug => findShard(slug)?.name ?? slug);
     const grain = startRoadGrain(host.scope, allocator, instance);
+    const signWorker = roadSignWorkerSource(host.scope);
     let signs: ReturnType<typeof startRoadSigns>;
     try {
-    signs = startRoadSigns(host.scope, allocator, instance, layout.signs.filter(sign => ring(sign.at.x, sign.at.z)));
+    signs = startRoadSigns(host.scope, allocator, instance, layout.signs.filter(sign => ring(sign.at.x, sign.at.z)), 'initial', signWorker);
     timing?.mark('setup');
     let prepared = 0;
     progress?.set(0, 3, 'Grid seam data · 0 / 1 files');
@@ -572,7 +573,7 @@ export class GridSession {
     const outer = async (): Promise<PlatformRoad> => {
       let outerSigns: ReturnType<typeof startRoadSigns>;
       try {
-        outerSigns = startRoadSigns(roadScope, allocator, instance, layout.signs.filter(sign => !ring(sign.at.x, sign.at.z)), 'outer');
+        outerSigns = startRoadSigns(roadScope, allocator, instance, layout.signs.filter(sign => !ring(sign.at.x, sign.at.z)), 'outer', signWorker);
         if (outerSigns !== undefined) await waitFor('Grid outer road signs', outerSigns.ready, 'worker');
         if (roadScope.disposed || roadScope.disposing) throw new Error('Grid session left during outer road preparation');
         const outerSlice = workSlice(OUTER_RING_SLICE_MS, roadScope);

@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import { roadSignPaintLayout } from './roadSignPaint';
-import { startRoadSigns } from './roadSignPreparation';
+import { roadSignWorkerSource, startRoadSigns } from './roadSignPreparation';
 import type { RoadSign } from '../../../shared/game/grid/roadLayout';
 
 const signs: RoadSign[] = [{ at: { x: 0, z: 0 }, facing: { x: 1, z: 0 }, lines: [{ arrow: 'ahead', names: ['Port'], metres: 120 }] }];
@@ -87,5 +87,31 @@ test('initial and later banks keep distinct claims, planes and cleanup under the
     initial.release(); expect(allocator.entries()).toHaveLength(1); expect(outer.get(later)?.[0]).toBe(42);
     outer.release(); expect(allocator.entries()).toEqual([]);
     expect([a.terminated, b.terminated]).toEqual([1, 1]);
+  } finally { scope.dispose(); }
+});
+
+test('the opt-in painter completes both banks and lives until the grid leaves', async () => {
+  support();
+  const scope = new Scope('sign-reuse'), road = scope.child('road'), allocator = new ResidencyAllocator();
+  const acquire = roadSignWorkerSource(scope, true), layout = roadSignPaintLayout(signs);
+  const result = (value: number) => ({ width: layout.width, height: layout.height, pixels: new Uint8Array(layout.width * layout.height * 2).fill(value) });
+  try {
+    const initial = startRoadSigns(scope, allocator, 'home', signs, 'initial', acquire);
+    if (initial === undefined) throw new Error('Missing initial bank');
+    const shared = worker();
+    shared.reply(result(41)); await initial.ready;
+    expect(initial.get(layout)?.[0]).toBe(41);
+    initial.release();
+    const outer = startRoadSigns(road, allocator, 'home', signs, 'outer', acquire);
+    if (outer === undefined) throw new Error('Missing outer bank');
+    expect(workers).toEqual([shared]);
+    expect(shared.sent).toHaveLength(2);
+    shared.reply(result(42)); await outer.ready;
+    expect(outer.get(layout)?.[0]).toBe(42);
+    road.dispose();
+    expect(allocator.entries()).toEqual([]);
+    expect(shared.terminated).toBe(0);
+    scope.dispose();
+    expect(shared.terminated).toBe(1);
   } finally { scope.dispose(); }
 });

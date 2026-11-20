@@ -4,6 +4,7 @@ import { packRoadSignPixels } from './roadSignPixels';
 import { installWorkerBootTiming } from '@wildshard/engine/boot/workerTiming';
 
 installWorkerBootTiming('road-sign');
+let canvas: OffscreenCanvas | undefined;
 
 function signLines(value: unknown): value is readonly SignLine[] {
   return Array.isArray(value) && value.length <= 2048 && value.every((row: unknown) => {
@@ -22,10 +23,19 @@ self.onmessage = (event: MessageEvent<unknown>): void => {
     if (typeof scale !== 'number' || !SIGN_SCALES.includes(scale)) throw new Error('Invalid sign scale');
     const layout = roadSignPaintLayout(rows.map(line => ({ lines: [line] })), scale);
     if (layout.width * layout.height > 16 * 1024 * 1024) throw new Error('Worker sign plane too large');
-    const context = new OffscreenCanvas(layout.width, layout.height).getContext('2d');
-    if (context === null) throw new Error('Worker sign has no 2D canvas');
-    paintRoadSignCanvas(context, layout);
-    const pixels = packRoadSignPixels(context.getImageData(0, 0, layout.width, layout.height).data, layout.width, layout.height, red, green);
+    const reusable = Reflect.get(input, 'reusable') === true;
+    const surface = reusable ? (canvas ??= new OffscreenCanvas(1, 1)) : new OffscreenCanvas(layout.width, layout.height);
+    if (reusable) { surface.width = layout.width; surface.height = layout.height; }
+    let pixels: Uint8Array;
+    try {
+      const context = surface.getContext('2d');
+      if (context === null) throw new Error('Worker sign has no 2D canvas');
+      paintRoadSignCanvas(context, layout);
+      pixels = packRoadSignPixels(context.getImageData(0, 0, layout.width, layout.height).data, layout.width, layout.height, red, green);
+    } finally {
+      // The bank's transient atlas claim can leave when its paint is ready.
+      if (reusable) { surface.width = 1; surface.height = 1; }
+    }
     self.postMessage({ width: layout.width, height: layout.height, pixels }, { transfer: [pixels.buffer] });
   } catch (error) { self.postMessage({ error: error instanceof Error ? error.message : String(error) }, { transfer: [] }); }
 };

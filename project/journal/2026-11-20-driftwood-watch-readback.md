@@ -31,3 +31,20 @@ A locked staging dock pair at 1496 × 717 and DPR 2 moved four
 raw gaps over 50 ms to one. The remaining 159.4 ms gap followed
 the road-sign worker's reply, while all three watch samples returned
 pixels without a hitch at their old times.
+
+## Reuse the desktop road-sign painter
+
+The initial and outer road banks now borrow the same painter under
+the desktop watch slot. Each bank keeps its own lease and plane. The
+retained worker resets the atlas canvas to 1 × 1 before publishing
+the plane, so it does not retain a bank-sized canvas after its lease.
+An overlapping bank still gets its own worker. A cancelled, timed
+out or failed job retires its worker and allows the original painter.
+
+A native 1496 × 717 @2 staging pair used the patched worker body.
+Both banks reused the same worker and had matching 512-sample RG8
+checksums against the one-shot control. The one-shot outer bank's
+174.3 ms interval included 163.4 ms in Blink's worker teardown.
+Reuse eliminated that teardown. The capture still had a 154.2 ms
+interval, with 135.7 ms inside Chrome's compositor begin-frame task.
+The small dock's p95 was 13.7 ms with one-shot and 13.4 ms with reuse.
