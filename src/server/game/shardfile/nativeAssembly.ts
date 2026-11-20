@@ -2,7 +2,7 @@ import { bakedSamplers, parseBakedTerrain } from '@wildshard/engine/world/BakedT
 import { clamp } from '@wildshard/format/noise';
 import { readNavmesh } from '@wildshard/engine/physics/navmesh';
 import { createSimHost, type SimHost, type SimLevel } from '@wildshard/engine/sim';
-import { parseNativeAssembly, NATIVE_ASSEMBLY_FILE, type NativeAssemblyBake, type NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';
+import { parseNativeAssembly, NATIVE_ASSEMBLY_FILE, type NativeAssemblyBake, type NativeAssemblyFeature, type NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';
 import { decodeTerrainTile, terrainTileHeight } from '@wildshard/format/terrainTileBytes';
 import { nativeArenaSealSolids } from '../boss/nativeArenaSeal';
 import type { ArenaSealDimensions } from '../../../shared/game/boss/arenaCollision';
@@ -18,6 +18,8 @@ import { readSlotIntake } from '../boss/slotsNative';
 import { readWindIntake } from '../boss/windEliteNative';
 import { withEncounters, type EncounterIntake } from '../population/encounterIntake';
 import { installNativeHarvest } from '../loot/harvest';
+import { PopulationFieldSchema, type PopulationFieldRows } from '@wildshard/format/populationEnvironment';
+import { parse } from 'valibot';
 import { prepareReturns } from './nativeRuntimeLoans';
 import { recordPrimitives } from './hostPrimitives';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
@@ -40,6 +42,8 @@ export interface NativeAssemblyRuntime<C extends NativeAssemblyContext> {
   readonly install: (host: SimHost, context: C) => void;
   readonly proveEntries: (host: SimHost) => ReturnType<typeof proveTerrainEntries>;
 }
+const MEADOW_FILE = 'world/meadow.json';
+const TAMING_FILE = 'server/taming.json';
 /** A world with no population has no bake: no ground lattice and no solids of its own. */
 const NO_BAKE: NativeCollisionBake & Readonly<Record<string, unknown>> = { ground: { heights: new Float32Array(0), friction: 0, groups: 0, scale: { x: 0, y: 0, z: 0 }, at: { x: 0, y: 0, z: 0 } }, solids: [] };
 /** The bake every population host reads: the reader's rows joined with the plan's owners. Each host admits its fields. */
@@ -71,12 +75,19 @@ async function prepareGround(product: ShardFolder, assets: ReadonlyMap<string, U
   const samplers = bakedSamplers(grid);
   return { grid, samplers, heightAt: samplers.heightAt };
 }
+function fieldScalarFile(row: PopulationFieldRows['world']['pond']): string | undefined {
+  return typeof row === 'string' || typeof row.data === 'string' ? undefined : row.data.file;
+}
+/** The meadow file names the same pond and wet rasters the older plan pointed to. */
 async function prepareField(product: ShardFolder, plan: NativeAssemblyPlan, grid: AssemblyGround['grid'], bake: NativeCollisionBake & Readonly<Record<string, unknown>>): Promise<Pick<AssemblyPrepared<never>, 'field' | 'world' | 'pond' | 'wet'>> {
-  if (plan.field === undefined) return { field: null, world: null, pond: null, wet: undefined };
-  const rows = await readAssemblyInput<{ world: { wet: string | { data: string | { file: string } } } }>(product, plan.field.rows), pond = { file: plan.field.pond, bytes: await product.file(plan.field.pond) };
-  const wet = rows.world.wet, file = typeof wet === 'string' || typeof wet.data === 'string' ? undefined : wet.data.file;
-  const block = file === undefined ? undefined : { file, bytes: await product.file(file) };
-  return { pond, wet: block, world: rows.world, field: new NativePopulationField(need(grid, 'A native field needs its terrain grid'), rows, bake['trees'] as readonly (readonly [number, number, number])[], bake['tops'] as readonly number[], pond, block) };
+  if (plan.field === undefined && !product.hasFile(MEADOW_FILE)) return { field: null, world: null, pond: null, wet: undefined };
+  const rows = parse(PopulationFieldSchema, await readAssemblyInput(product, plan.field?.rows ?? { file: MEADOW_FILE }));
+  const { world } = rows;
+  const pondFile = need(plan.field?.pond ?? fieldScalarFile(world.pond), 'A declared meadow needs its pond scalar file');
+  const pond = { file: pondFile, bytes: await product.file(pondFile) };
+  const wetFile = fieldScalarFile(world.wet);
+  const wet = wetFile === undefined ? undefined : { file: wetFile, bytes: await product.file(wetFile) };
+  return { pond, wet, world, field: new NativePopulationField(need(grid, 'A native field needs its terrain grid'), rows, bake['trees'] as readonly (readonly [number, number, number])[], bake['tops'] as readonly number[], pond, wet) };
 }
 const mergedIntake = (a: EncounterIntake, ...more: readonly EncounterIntake[]): EncounterIntake => more.reduce((all, row) => ({ species: [...all.species, ...row.species], recipes: [...all.recipes, ...row.recipes], motorless: [...all.motorless ?? [], ...row.motorless ?? []] }), a);
 /**
@@ -94,17 +105,37 @@ function assemblyKeeper(shard: Shardfile, sections: ReadonlyMap<string, unknown>
  * (`look/toon` `sky.day` over `sky.cycleSeconds`, as the page's toon sky runs it) else the first `world/days` row; the declared sea row's water
  * (as the `water.sea` host, its swell when the row has `waves`). A plan that still names a `day.*` or `water.*` host keeps it.
  */
-function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan): (host: SimHost) => DayCycleClock | null {
+function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan, field: NativePopulationField | null): (host: SimHost) => DayCycleClock | null {
   const shard = product.shardfile, families = new Set(plan.features.map(row => row.host.split('.')[0]));
   const toon = families.has('day') || !product.has('look/toon') ? undefined : product.section('look/toon').sky;
   const days = families.has('day') || toon !== undefined ? undefined : shard.rows.days[0];
-  const sea = families.has('water') ? undefined : shard.water.find(row => row.kind === 'sea');
+  const meadow = families.has('water') || !product.hasFile(MEADOW_FILE) ? null : field;
+  const sea = families.has('water') || meadow !== null ? undefined : shard.water.find(row => row.kind === 'sea');
   const body = sea === undefined ? undefined : declaredWaterBody(structuredClone(sea));
   return host => {
-    if (body !== undefined) host.useWater({ surfaceAt: body.restAt, ...(sea?.waves === true ? { bob: (x: number, z: number) => waveHeight(x, z, host.clock.now) } : {}) });
+    if (meadow !== null) host.useWater({ surfaceAt: meadow.queries.surfaceAt });
+    else if (body !== undefined) host.useWater({ surfaceAt: body.restAt, ...(sea?.waves === true ? { bob: (x: number, z: number) => waveHeight(x, z, host.clock.now) } : {}) });
     if (toon !== undefined) { const clock = new DayCycle(dayClock(TOON_DAY_PRESET, toon.day, { dusk: 'dusk' }).spec); clock.cycle = toon.cycleSeconds; return host.useDayClock(clock); }
     return days === undefined ? null : host.useDayClock(declaredDay(days));
   };
+}
+/**
+ * The riding family owns taming when the product supplies taming rows. Bind it before the elite continuation reads the bonded mount.
+ * Existing products can still supply their exact legacy row and file references.
+ */
+function assemblyFeatures(product: ShardFolder, plan: NativeAssemblyPlan): readonly NativeAssemblyFeature[] {
+  const { features } = plan;
+  if (!product.hasFile(TAMING_FILE)
+    || !features.some(row => row.host === 'riding.mounted')
+    || features.some(row => row.host === 'riding.taming')) return features;
+  const taming: NativeAssemblyFeature = {
+    host: 'riding.taming',
+    rows: { file: TAMING_FILE },
+    poses: { file: 'sim/taming-poses.json', path: ['poses'] },
+    pose: { file: 'actors/species-looks.json', path: ['poses', 'horse'] },
+  };
+  const at = features.findIndex(row => row.host === 'riding.elites-ready');
+  return at === -1 ? [...features, taming] : [...features.slice(0, at), taming, ...features.slice(at)];
 }
 /** True when this product ships a native-assembly plan. */
 export function hasNativeAssembly(product: ShardFolder): boolean { return product.hasFile(NATIVE_ASSEMBLY_FILE); }
@@ -122,7 +153,8 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const nav = readNavmesh(navigation, 'Native assembly requires its navigation', () => 0);
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake), product, assets, ports, plan, bake, nav,
     boot: plan.boot === undefined ? null : await readAssemblyInput(product, plan.boot) };
-  const steps = await Promise.all(plan.features.map(feature => prepareAssemblyFeature(feature, prepared)));
+  const features = assemblyFeatures(product, plan);
+  const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
   const harvest = species === undefined ? [] : [...species.native, ...species.program?.species ?? []];
   const heightAt = ground.heightAt, speed = plan.level.authorCap === true ? clamp(shard.authorCaps.speed, 0, plan.level.speed) : plan.level.speed;
@@ -133,11 +165,13 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   admitRuntimeCreatures(counted, sections, keeper);
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   const declaredLevel: SimLevel = { ...level, entities: declaredSpawnEntities(counted) };
-  const world = sectionWorld(product, plan);
+  const world = sectionWorld(product, plan, prepared.field);
   // OF22a3: with no collision host the bake lends its ground alone and the shard's prop solids stand beside it
   const ownSolids = standsOwnSolids(plan.features.map(row => row.host));
   const ownGround = ownSolids && plan.bake !== undefined && plan.collision !== undefined ? { bake, resolution: plan.collision.resolution } : null;
   const levelPorts = { ground: false as const, heightAt };
+  const hosts = features.map(row => row.host);
+  if (prepared.field !== null && product.hasFile(MEADOW_FILE) && !hosts.some(name => name.startsWith('water.'))) hosts.push('water.field');
   const walk = (host: SimHost): ReturnType<typeof proveTerrainEntries> => proveTerrainEntries(host.physics, shard.entryways, heightAt, plan.entries.walk as Parameters<typeof proveTerrainEntries>[3]);
   return { level: declaredLevel, ports: levelPorts, proveEntries: host => {
     const { fresh, proven } = plan.entries;
@@ -147,7 +181,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     try { installNativeCollision(proof, bake, { ...need(plan.collision, 'A fresh entry walk needs its collision'), omit: fresh.omit } as Parameters<typeof installNativeCollision>[2]); proof.step(); return walk(proof); } finally { proof.dispose(); }
   }, install: (host, context) => {
     lendReturns(host);
-    recordPrimitives(host, shard, plan.features.map(row => row.host)); // OF17b1: native features name their families until M8
+    recordPrimitives(host, shard, hosts); // OF17b1: native features name their families until M8
     const run: AssemblyRun<C> = { host, context, input: null, day: world(host) };
     // OF22a3: the ground and prop solids stand first, where a plan's `collision` host stood, before any host reads them
     if (ownSolids) installAssemblySolids(host, shard, assets, ownGround, context.restoring);

@@ -66,6 +66,7 @@ import { installNativeGroupRows } from './groupRuntime';
 import { need, readAssemblyInput, type AssemblyPrepared, type NativeAssemblyContext } from './nativeAssemblyInput';
 import { installBodyScripts, installCombatMotion } from './nativeRuntimeLoans';
 import { registerInstalled } from './installedSides';
+import { mountSpeeds } from './declaredRiding';
 
 /** What one install's hosts hand each other, in the plan's order. A later host reads what an earlier one left. */
 export interface AssemblyRun<C extends NativeAssemblyContext> {
@@ -151,8 +152,10 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
         bake: bake as Parameters<typeof installNativePopulationHunt>[1]['bake'], spawnY: shard.spawn.y, config, field: fieldOf(at), ...(at.ports.pastureCues === undefined ? {} : { pastureCues: at.ports.pastureCues }), ...(run.context.snapshot === undefined ? {} : { snapshot: run.context.snapshot }) }); };
     }
     case 'riding.mounted': {
-      const profile = await readAssemblyInput<object>(product, row.profile), { world } = at;
-      return run => { const boot = bootOf(at); installMountedPlayer(run.host, { ...profile, world, mountable: boot.mountable.concat(need(run.creatures, 'Riding needs its creatures').bondedHorseIds()), program: boot.riding.riding }, need(at.pond, 'Riding needs its pond'), at.wet); };
+      const profile = await readAssemblyInput<{ readonly speeds?: unknown }>(product, row.profile), { world } = at;
+      const mode = shard.modes?.ride?.find(entry => entry.id === 'ride');
+      const speeds = profile.speeds ?? (mode === undefined ? undefined : mountSpeeds(mode.gaits));
+      return run => { const boot = bootOf(at); installMountedPlayer(run.host, { ...profile, speeds, world, mountable: boot.mountable.concat(need(run.creatures, 'Riding needs its creatures').bondedHorseIds()), program: boot.riding.riding }, need(at.pond, 'Riding needs its pond'), at.wet); };
     }
     case 'boss.arena': {
       const input = await readAssemblyInput<unknown>(product, { file: row.file }), spec = arenaSpecies(await readAssemblyInput<unknown>(product, { file: 'server/arena-species.json' }));
