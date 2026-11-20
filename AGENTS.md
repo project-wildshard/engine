@@ -65,7 +65,10 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
    the same lane environment reserves that consumer by receipt. Link the
    canonical main checkouts; repo-kit `docs/local-development.md` owns
    peer compatibility and restoration. Run the consumer's normal check.
-   To test an unpublished built shard, run `node scripts/pins.ts install
+   To try an engine or SDK worktree with zero waiting (J475), add
+   `--provider engine=<worktree>` (or `sdk=`) to that link: a plain
+   symlink, no pack, package.json and the lock untouched; `local unlink
+   --consumer <repo>` restores it. To test an unpublished built shard, run `node scripts/pins.ts install
    --from-dir <canonical-shard/built-product-directory>` here, then its
    cook/journey proof. Before main-push, restore the consumer with `local
    pinned --consumer sharddev --production-live v0.1.2` and restore engine
