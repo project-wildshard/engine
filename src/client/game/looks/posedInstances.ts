@@ -2,6 +2,7 @@ import { PosedLibrarySchema } from '@wildshard/format/namedJsonContracts';
 import * as THREE from 'three';
 import * as v from 'valibot';
 import { TIER } from '@wildshard/engine/core/tier';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { uploadTexture } from '@wildshard/engine/core/assets';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { defineBakedModels } from '@wildshard/engine/models/model';
@@ -119,7 +120,10 @@ export class PosedDraw {
   readonly look: { readonly name: string; readonly geometry: THREE.BufferGeometry; readonly material: THREE.Material };
   readonly glow: { value: number };
   private readonly posed: PosedInstances;
-  private readonly lanes: readonly ((pose: DrawPose) => number)[];
+  /** DF11: each lane writes its value into `laneValues` at its index; a lane closure returning a double boxed it (8 a
+   *  pose, ~8 KB a dock frame at 3x for one flock) */
+  private readonly lanes: readonly ((pose: DrawPose, out: Float64Array, at: number) => void)[];
+  private readonly laneValues = ownedArray(Float64Array, 8, { owner: 'looks/posed', asset: 'lane-values', kind: 'scratch' });
   constructor(private readonly row: PosedLayout, capacity: number, geometry: THREE.BufferGeometry, material: THREE.Material, buffers?: PosedBufferPool) {
     this.look = { name: row.name, geometry, material };
     this.posed = new PosedInstances(capacity, row.name, material, () => geometry, row.attributes, buffers?.supports(row.attributes) === true ? buffers : undefined);
@@ -130,11 +134,11 @@ export class PosedDraw {
       return value;
     };
     this.lanes = [...row.channels[0], ...row.channels[1] ?? [0, 0, 0, 0]].map(lane => {
-      if (typeof lane === 'number') return () => lane;
-      if (typeof lane === 'string') return pose => read(pose, lane);
+      if (typeof lane === 'number') return (_pose: DrawPose, out: Float64Array, at: number) => { out[at] = lane; };
+      if (typeof lane === 'string') return (pose: DrawPose, out: Float64Array, at: number) => { out[at] = read(pose, lane); };
       const checks = lane.any.map(test => test.op === 'gt'
         ? (pose: DrawPose) => read(pose, test.field) > test.value : (pose: DrawPose) => read(pose, test.field) < test.value);
-      return pose => { for (const check of checks) if (check(pose)) return lane.yes; return lane.no; };
+      return (pose: DrawPose, out: Float64Array, at: number) => { let value = lane.no; for (const check of checks) if (check(pose)) { value = lane.yes; break; } out[at] = value; };
     });
     let glow = 0;
     this.glow = { get value() { return glow; }, set value(value: number) {
@@ -145,10 +149,10 @@ export class PosedDraw {
   begin(): void { this.posed.begin(); }
   /** Pack one pose without changing the caller's state or allocating a frame buffer. */
   add(pose: DrawPose): void {
-    const lanes = this.lanes;
+    const lanes = this.lanes, out = this.laneValues;
+    for (let k = 0; k < 8; k++) { const lane = lanes[k]; if (lane === undefined) out[k] = 0; else lane(pose, out, k); }
     this.posed.add(pose.x, pose.y, pose.z, pose.pitch, pose.yaw + (this.row.yaw ?? 0), pose.roll, this.row.scale ?? pose.scale ?? 1,
-      lanes[0]?.(pose) ?? 0, lanes[1]?.(pose) ?? 0, lanes[2]?.(pose) ?? 0, lanes[3]?.(pose) ?? 0,
-      lanes[4]?.(pose) ?? 0, lanes[5]?.(pose) ?? 0, lanes[6]?.(pose) ?? 0, lanes[7]?.(pose) ?? 0);
+      out[0] ?? 0, out[1] ?? 0, out[2] ?? 0, out[3] ?? 0, out[4] ?? 0, out[5] ?? 0, out[6] ?? 0, out[7] ?? 0);
   }
   /** Publish exactly the packed instances. */
   commit(): void { this.posed.commit(); }
