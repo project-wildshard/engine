@@ -34,6 +34,7 @@ import { declaredWaterBody } from '@wildshard/engine/world/water/declared';
 import { waveHeight } from '@wildshard/engine/world/waves';
 import { TOON_DAY_PRESET } from '@wildshard/format/toonLook';
 import { dayClock } from '../../../shared/game/looks/dayClock';
+import { keyedSkyDaySpec } from '../../../shared/game/looks/keyedSkyClock';
 import { declaredDay } from '../../../shared/game/shard/declaredRows';
 import { admitRuntimeCreatures, declaredSpawnEntities, installRuntimeCreatures, type keeperOwnership } from './runtimeCreatures';
 
@@ -112,13 +113,15 @@ function brainedScripts(product: ShardFolder): ReadonlySet<string> {
 }
 /**
  * OF22a1: the day and the sea a native assembly's plan names no host for, from its sections: the look's toon sky clock
- * (`look/toon` `sky.day` over `sky.cycleSeconds`, as the page's toon sky runs it) else the first `world/days` row; the declared sea row's water
+ * (`look/toon` `sky.day` over `sky.cycleSeconds`, as the page's toon sky runs it), else the keyed sky's clock (`look/keyed-sky`, as
+ * the `day.keyed-sky` host, OF23e2), else the first `world/days` row; the declared sea row's water
  * (as the `water.sea` host, its swell when the row has `waves`). A plan that still names a `day.*` or `water.*` host keeps it.
  */
 function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan, field: NativePopulationField | null): (host: SimHost) => DayCycleClock | null {
   const shard = product.shardfile, families = new Set(plan.features.map(row => row.host.split('.')[0]));
   const toon = families.has('day') || !product.has('look/toon') ? undefined : product.section('look/toon').sky;
-  const days = families.has('day') || toon !== undefined ? undefined : shard.rows.days[0];
+  const keyed = families.has('day') || toon !== undefined || !product.has('look/keyed-sky') ? undefined : keyedSkyDaySpec(product.section('look/keyed-sky'));
+  const days = families.has('day') || toon !== undefined || keyed !== undefined ? undefined : shard.rows.days[0];
   const meadow = families.has('water') ? null : field;
   const sea = families.has('water') || meadow !== null ? undefined : shard.water.find(row => row.kind === 'sea');
   const body = sea === undefined ? undefined : declaredWaterBody(structuredClone(sea));
@@ -126,6 +129,7 @@ function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan, field: Nat
     if (meadow !== null) host.useWater({ surfaceAt: meadow.queries.surfaceAt });
     else if (body !== undefined) host.useWater({ surfaceAt: body.restAt, ...(sea?.waves === true ? { bob: (x: number, z: number) => waveHeight(x, z, host.clock.now) } : {}) });
     if (toon !== undefined) { const clock = new DayCycle(dayClock(TOON_DAY_PRESET, toon.day, { dusk: 'dusk' }).spec); clock.cycle = toon.cycleSeconds; return host.useDayClock(clock); }
+    if (keyed !== undefined) return host.useDayClock(new DayCycle(keyed));
     return days === undefined ? null : host.useDayClock(declaredDay(days));
   };
 }
