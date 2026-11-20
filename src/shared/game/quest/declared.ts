@@ -52,8 +52,8 @@ export interface DialogueView { id: string; lines: readonly string[]; choices: r
  *  MSZ31: a race of laps or checkpoints also keeps, while running, the laps done (`lap`), the next checkpoint (`next`), the tick
  *  the lap began (`lapAt`) and the last lap's time in seconds (`split`); a plain race never has them, so its bytes stand. */
 export interface RaceRun { running: number | null; last: number | null; best: number | null; runs: number; lap?: number; next?: number; lapAt?: number; split?: number }
-/** MSZ31: a race row; `laps`, `checkpoints` and `ride` (format 0.57.0) read as optional so the row's older shape still types. */
-type Race = NonNullable<QuestData['races']>[number] & { readonly laps?: number; readonly checkpoints?: readonly string[]; readonly ride?: 'vehicle' | 'foot' | 'any' };
+/** A race row; MSZ31 (format 0.57.0): its `laps`, `checkpoints` and `ride`. */
+type Race = NonNullable<QuestData['races']>[number];
 /** MSZ31: a race counted by laps or checkpoints. */
 const lapped = (race: Race): boolean => (race.laps ?? 1) > 1 || (race.checkpoints ?? []).length > 0;
 
@@ -316,6 +316,6 @@ function restoreRuns(runs: Map<string, RaceRun>, races: readonly Race[], value: 
 
 /** Every flag a quest row raises on the player it runs for: each keeps its own. */
 function declaredFlags(data: QuestData): string[] {
-  return [...data.quests.map(q => q.completeFlag), ...data.triggers.map(t => t.flag), ...(data.races ?? []).flatMap((race: Race) => [race.start, race.stop].concat(race.checkpoints ?? [])),
+  return [...data.quests.map(q => q.completeFlag), ...data.triggers.map(t => t.flag), ...(data.races ?? []).flatMap(race => [race.start, race.stop].concat(race.checkpoints ?? [])),
     ...data.dialogue.flatMap(d => d.nodes.flatMap(n => [...n.sets ?? [], ...n.choices.flatMap(c => c.sets ?? [])]))];
 }
