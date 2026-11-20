@@ -202,7 +202,7 @@ test('declared move debris resolves actual local and confirmed contacts by speci
   } finally { live.dispose(); }
 }, 120_000);
 
-test('native local and confirmed debris resolve the admitted row while wire species stays empty', async () => {
+test('native local and confirmed debris resolve the admitted row for a declared body', async () => {
   const { product, resident } = await shipped('driftwood-isle'), live = await resident();
   const previous = app.levelScope, scope = new Scope('native-contact-row');
   app.levelScope = scope;
@@ -211,7 +211,8 @@ test('native local and confirmed debris resolve the admitted row while wire spec
     for (const row of [...(species.program?.species ?? []), ...species.page]) app.species.registerRow(row, scope);
     const crab = nearest(live, 'crab'), rowId = app.species.rowId(crab.kind);
     if (rowId === undefined) throw new Error('Missing admitted native contact row');
-    expect(crab.species).toBe(''); hold(live); tick(live, 2); facing(live, crab, 1.4);
+    // Driftwood rev 7 (OF22e2) declares its crabs: the wire names the species row
+    expect(crab.species).toBe('creature.crab'); hold(live); tick(live, 2); facing(live, crab, 1.4);
     crab.hp = crab.maxHp = 10000;
     const page = pageWorld(live, chest(crab)), row = v.parse(MeleeWeaponProfileSchema, weaponRow(product.shardfile, 'weapon.driftwood-isle.wood').profile);
     const debris = { default: { surface: 'sand' as const, count: 4, atFeet: true, sparks: false },
@@ -225,10 +226,10 @@ test('native local and confirmed debris resolve the admitted row while wire spec
       expect(burst).toHaveBeenCalledWith('shell', expect.any(Vector3), expect.any(Vector3), 2);
       sword.serverHit({ kind: crab.kind, species: '', at: chest(crab), head: false, killed: false, amount: 1, seq: 1 });
       expect(burst).toHaveBeenLastCalledWith('shell', expect.any(Vector3), expect.any(Vector3), 2);
-      expect(crab.species).toBe('');
+      expect(crab.species).toBe('creature.crab');
       sword.serverHit({ kind: crab.kind, species: crab.kind, at: chest(crab), head: false, killed: false, amount: 1, seq: 2 });
       expect(burst).toHaveBeenLastCalledWith('sand', expect.any(Vector3), expect.any(Vector3), 4);
-      expect(crab.species).toBe('');
+      expect(crab.species).toBe('creature.crab');
       scope.dispose();
       sword.serverHit({ kind: crab.kind, species: '', at: chest(crab), head: false, killed: false, amount: 1, seq: 3 });
       expect(burst).toHaveBeenLastCalledWith('sand', expect.any(Vector3), expect.any(Vector3), 4);
@@ -541,7 +542,7 @@ test('candidate native swords preserve original local and confirmed effects and 
         burst.mockClear();sword.serverHit({kind, species: '', at: chest(target), head: false, killed: false, amount: 1, seq: 2});
         expect(burst).toHaveBeenCalledWith(surface, expect.any(Vector3), expect.any(Vector3), Math.round(count * 1.6));
         if (blade === 'iron') expect(burst).toHaveBeenCalledWith('sparks', expect.any(Vector3), expect.any(Vector3), 16);
-        expect(target.species).toBe('');
+        expect(target.species).toBe(`creature.${kind}`); // rev 7 declares its bodies (OF22e2)
       } finally {burst.mockRestore();}
     } finally {scope.dispose();app.levelScope = previous;live.dispose();restore();restore = () => undefined;}
   }

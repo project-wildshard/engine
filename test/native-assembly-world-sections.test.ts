@@ -11,7 +11,8 @@ import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
@@ -23,7 +24,7 @@ async function shipped() {
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Missing admitted driftwood-isle output');
   // the files a server reads (a Ring 1 slice carries only these)
-  const assets = new Map(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider))
+  const assets = new Map(serverInputFiles(descriptor.index.files, shard)
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   return { product, shard, assets, rapier };

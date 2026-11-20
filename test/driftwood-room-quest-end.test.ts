@@ -37,7 +37,12 @@ test('Driftwood\'s quest ends in a room: the Captain killed, the player stands i
   let captain: Captain | undefined;
   await vi.waitFor(() => { captain = [...host.entities.values()].find(actor => actor.kind === 'captain') as Captain | undefined; expect(captain?.alive).toBe(true); }, { timeout: 15_000, interval: 100 });
   if (captain === undefined) throw new Error('No Captain');
-  host.combat.hit({ source: (player as unknown as { health: never }).health, sourceTags: ['actor.player'], target: captain.combatActor() as never, amount: 1e9, point: captain.position.clone(), dir: new Vector3(), cause: { kind: 'test', label: 'test' } });
+  // Driftwood rev 7 (OF22e2): he is a declared boss fight, whose phases each take their own blows; strike until he falls
+  const fighting = captain;
+  await vi.waitFor(() => {
+    if (fighting.alive) host.combat.hit({ source: (player as unknown as { health: never }).health, sourceTags: ['actor.player'], target: fighting.combatActor() as never, amount: 1e9, point: fighting.position.clone(), dir: new Vector3(), cause: { kind: 'test', label: 'test' } });
+    expect(fighting.alive, 'the Captain falls').toBe(false);
+  }, { timeout: 15_000, interval: 250 });
   await vi.waitFor(() => { expect(host.flags.has('dead:captain'), 'his fall is the world\'s').toBe(true); expect(flags.has('dead:captain'), 'and the player\'s credit').toBe(true); }, { timeout: 5000, interval: 50 });
   player.resetPose(REWARD, 2.51);
   await vi.waitFor(() => { expect(DONE.filter(flag => flags.has(flag))).toEqual(DONE); }, { timeout: 30_000, interval: 250 });

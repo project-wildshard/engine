@@ -2,54 +2,41 @@
 // quest's sword guard (`quest.composition`'s acquisition) read only the mixed population's bodies (`run.island`), so once
 // its sailors are declared spawns (OF22b1) a sailor's fall would file nothing and the sword would lie unguarded. Now a
 // declared body counts as its species row's kind: its fall advances the kill step (`dead:sailor`), and the guard sees it
-// standing. The fixture is the shipped Driftwood product with a converted Dunes strider declared as a sailor.
+// standing. Since Driftwood rev 7 (OF22e2) the fixture is the shipped product's hold sailor.
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
-import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
-import type { ShardRows } from '@wildshard/format/rows';
-import type { ShardCreatures } from '@wildshard/format/creatures';
+import type { Shardfile } from '@wildshard/format/shardSchema';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import type { SimHost } from '../src/server/engine/sim';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { declaredQuestBodies } from '../src/server/game/quest/declaredQuestBodies';
-import { outputDescriptor, serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { emptyShardfile } from '../src/shared/host/author';
 import { builtFolder } from '../src/test/game/builtFolder';
 
-const rows = JSON.parse(readFileSync('test/fixtures/dunes-of11b-rows.json', 'utf8')) as {
-  rows: { species: ShardRows['species']; brains: ShardCreatures['brains']; strikes: ShardRows['strikes'] };
-};
 /** Driftwood's kill row `hold-key` targets `sailor` and files this flag; its quest's guard kind is `sailor` too. */
-const SAILOR = 'of22e.sailor', DEAD = 'dead:sailor', AT: [number, number, number] = [8, 0, -75];
+const SAILOR = 'creature:33', DEAD = 'dead:sailor';
+let AT: readonly [number, number, number] = [0, 0, 0];
 
 async function shipped() {
   const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
   const descriptor = outputDescriptor(shard);
   if (descriptor === undefined) throw new Error('Missing admitted driftwood-isle output');
-  const assets = new Map(descriptor.index.files.filter(file => serverReadsFile(file, shard.terrain?.collider))
+  const assets = new Map(serverInputFiles(descriptor.index.files, shard)
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   return { product, shard, assets, rapier };
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
-/** The shipped shard with one declared body whose species row's kind is `sailor` (a converted strider). */
+/** Driftwood rev 7 (OF22e2) declares its hold sailor: the shipped shard is the fixture. */
 function declaring(source: Shardfile): Shardfile {
-  const strider = rows.rows.species.find(row => row.kind === 'duneStrider');
-  if (strider === undefined) throw new Error('Missing converted strider');
-  const species = [{ ...strider, id: 'of22e.creature.sailor', kind: 'sailor', body: { ...strider.body, look: 'of22e.look.sailor' },
-  }] as ShardRows['species'];
-  const base = emptyShardfile({ slug: 'of22e-rows', name: 'Rows', author: 'Test', revision: 1, seed: 7 });
-  const looks = [{ id: 'of22e.look.sailor', species: 'of22e.creature.sailor', recipe: 'of22e.rig', material: null, parameters: {}, animation: { recipe: 'of22e.clips', parameters: {} } }];
-  const parsed = parseShardfile({ ...base, rows: { ...base.rows, species, strikes: rows.rows.strikes, looks },
-    creatures: { ...base.creatures, brains: rows.rows.brains,
-      spawns: [{ id: SAILOR, species: 'of22e.creature.sailor', variant: 'dusk', brain: strider.temperament?.brain ?? null, strike: null, seed: 3, scale: 1, at: AT, yaw: 0, phaseOffset: 0 }] } });
-  return { ...source, rows: { ...source.rows, species: [...source.rows.species, ...parsed.rows.species], strikes: [...source.rows.strikes, ...parsed.rows.strikes],
-    looks: [...source.rows.looks, ...parsed.rows.looks] }, creatures: parsed.creatures };
+  if (!source.creatures.spawns.some(row => row.id === SAILOR)) throw new Error('Driftwood must declare its hold sailor');
+  return source;
 }
 function resident(fixture: Shipped, shard: Shardfile): Promise<NativeHeadlessResident> {
   const product: ShardFolder = { ...fixture.product, shardfile: shard };
@@ -65,6 +52,7 @@ function run(live: NativeHeadlessResident, ticks: number): void { for (let tick 
 
 test('Driftwood\'s quest hosts read a declared sailor: his fall files the kill step, and he guards the sword while he stands', async () => {
   const fixture = await shipped(), shard = declaring(fixture.shard), live = await resident(fixture, shard);
+  AT = fixture.shard.creatures.spawns.find(row => row.id === SAILOR)?.at ?? AT;
   try {
     const { host } = live, body = host.entities.get(SAILOR), guard = declaredQuestBodies(host, shard);
     if (body === undefined) throw new Error('Missing declared sailor');

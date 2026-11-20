@@ -2,7 +2,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { Vector3 } from 'three';
-import * as v from 'valibot';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
@@ -19,7 +18,6 @@ import { builtFolder } from '../src/test/game/builtFolder';
 // rows under server/, no fixture and no overlay.
 
 const SLUG = 'driftwood-isle', PRACTICE = 'creature:21';
-const Keeper = v.object({ bodies: v.array(v.object({ id: v.string(), kind: v.string(), variant: v.string(), practice: v.boolean() })) });
 
 async function shipped() {
   const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile;
@@ -38,27 +36,28 @@ const kill = (resident: NativeHeadlessResident, id: string): void => {
 };
 const steps = (resident: NativeHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
 
-test('Driftwood spawns, moves, kills and returns its mixed population headless, and its census round-trips a snapshot', async () => {
-  const { product, resident } = await shipped(), keeper = v.parse(Keeper, await product.json('server/keeper.json'));
+test('Driftwood spawns, moves, kills and returns its declared population headless, and its census round-trips a snapshot', async () => {
+  const { shard, resident } = await shipped();
   const live = await resident();
   let restored: NativeHeadlessResident | undefined;
   try {
-    // spawning: every keeper row stands in the world, with the kinds and variants the product declares
-    const born = populationCensus(live.host), rows = [...keeper.bodies].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    expect(born.bodies.map(body => [body.id, body.kind, body.variant])).toEqual(rows.map(row => [row.id, row.kind, row.variant]));
-    expect(born.kinds).toEqual({ boar: { alive: 11, fallen: 0 }, bear: { alive: 2, fallen: 0 }, crab: { alive: 9, fallen: 0 }, monkey: { alive: 11, fallen: 0 }, sailor: { alive: 1, fallen: 0 } });
+    // spawning: every declared spawn row (Driftwood rev 7, OF22e2) stands in the world; the Captain waits out of it for his wake
+    const born = populationCensus(live.host);
+    expect(born.bodies.map(body => body.id).sort()).toEqual(shard.creatures.spawns.map(row => row.id).sort());
+    expect(born.kinds).toEqual({ captain: { alive: 0, fallen: 1 }, boar: { alive: 11, fallen: 0 }, bear: { alive: 2, fallen: 0 }, crab: { alive: 9, fallen: 0 }, monkey: { alive: 11, fallen: 0 }, sailor: { alive: 1, fallen: 0 } });
     expect(born.alive).toBe(34);
-    expect(keeper.bodies.find(row => row.practice)?.id).toBe(PRACTICE);
+    expect(shard.creatures.spawns.find(row => row.id === PRACTICE)?.species).toBe('creature.crab');
     const wire = JSON.stringify(born); // plain JSON: no live body, vector or clock
     expect(JSON.parse(wire)).toEqual(born);
 
-    // AI: walk the player at the eastern herd; the boars and the monkeys above them move on the fixed tick
+    // AI: walk the player at the eastern herd; the boars, the crabs and the monkeys above them move on the fixed tick
     const journey = runHeadlessJourney(live.host, input => { live.step(input); }, { ticks: 900, points: [{ x: 0, z: -194 }, { x: 60, z: -130 }] });
     expect(journey.ticks).toBe(900);
     const walked = populationCensus(live.host), was = new Map(born.bodies.map(body => [body.id, body]));
     const moved = walked.bodies.filter(body => { const before = was.get(body.id); return before !== undefined
       && Math.hypot(body.position[0] - before.position[0], body.position[2] - before.position[2]) > 1; }).map(body => body.kind);
-    expect(new Set(moved)).toEqual(new Set(['boar', 'bear', 'monkey']));
+    // rev 7's crabs scuttle on their declared brain too
+    expect(new Set(moved)).toEqual(new Set(['boar', 'bear', 'crab', 'monkey']));
     expect(walked.bodies.some(body => body.state === 'perch')).toBe(true);
 
     // a fallen boar counts as fallen; its return is the keeper's, and it stays down for its 300 s minimum
@@ -103,15 +102,16 @@ test('the worker runs Driftwood from its built product, tick for tick with the r
     const result = await part;
     expect(result.commit.tick).toBe(300);
     expect(result.commit.snapshot).toBe(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
-    expect(live.host.entities.size).toBe(34);
+    expect(live.host.entities.size).toBe(35); // 34 declared bodies and the Captain's, waiting for his wake
   } finally { await (await starting.catch(() => undefined))?.dispose(); live?.dispose(); }
 }, 10_000); // Both owners still run every tick; only the final full continuation is asserted and published.
 
 test("Driftwood's server files stay off every client path", async () => {
   const { descriptor, directory } = await shipped(), { admission, files, packs } = descriptor.index;
   const server = admission.server ?? [], names = server.map(row => row.name).sort();
-  expect(names).toEqual(['server/keeper.json', 'server/kill-steps.json', 'server/mixed-population.json', 'server/native-assembly.json', 'server/physics.json',
-    'server/quest-policy.json', 'server/quest-props.json', 'server/quest-spots.json', 'server/swords.json']);
+  // Driftwood rev 7 (OF22e2): the keeper, the mixed population and the swords left with their hosts
+  expect(names).toEqual(['server/kill-steps.json', 'server/native-assembly.json', 'server/physics.json', 'server/quest-policy.json', 'server/quest-props.json',
+    'server/quest-spots.json']);
   const shard: unknown = JSON.parse(readFileSync(`${directory}/shard.json`, 'utf8'));
   const hashes = new Set(server.map(row => row.hash)), listed = JSON.stringify([shard, packs], (key, value: unknown) => key === 'server' ? undefined : value);
   expect(files.filter(file => hashes.has(file.hash) || file.path.startsWith('server/') || file.name?.startsWith('server/') === true)).toEqual([]);

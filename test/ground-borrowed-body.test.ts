@@ -18,7 +18,8 @@ const logical = v.object({ decision: v.object({ bindings: v.array(v.object({ fai
 function record(value:SimValue):Record<string,SimValue> {
   if(value===null||typeof value!=='object'||Array.isArray(value))throw new Error('Missing continuation record');return value;
 }
-for (const [slug,kind] of [['driftwood-isle','captain'],['pine-hollow','antler-king']] as const) {
+// Driftwood rev 7 (OF22e2) declares its Captain with a declared fight (native-chapter-declared-captain): no retained boss row
+for (const [slug,kind] of [['pine-hollow','antler-king']] as const) {
   test(`${kind} uses the same native body through guest phases and restore`, async () => {
     const directory=builtFolder(slug),product=await loadHeadlessFolder(directory),descriptor=outputDescriptor(product.shardfile);
     if(descriptor===undefined)throw new Error('Missing verified product');

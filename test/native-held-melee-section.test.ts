@@ -1,9 +1,8 @@
 // ONE-FORMAT OF22d2: a native world's sword from its `held/melee` section. Driftwood swings its swords through its plan's
 // `item.swept` host, which reads the swept policy from a server file (`server/swords.json`). Format 0.55.0 declares the
 // same policy as the `held/melee` section (OF22d1); a native plan that names no `item.swept` host now stands its melee
-// from that section, before any host, so the quest host that lends the sword still finds it. The fixture is the shipped
-// Driftwood product twice: as shipped, and with its plan's `item.swept` row gone and its policy as the section. The same
-// three taps at the same crab land the same blows.
+// from that section, before any host, so the quest host that lends the sword still finds it. Driftwood rev 7 (OF22e2)
+// ships that: the fixture is the shipped product, and three taps at the nearest crab land three blows.
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
@@ -31,18 +30,6 @@ async function shipped() {
   return { product, assets, rapier };
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
-/** The shipped product with its plan's `item.swept` row gone and that row's policy file as the `held/melee` section. */
-async function sectioned(fixture: Shipped): Promise<ShardFolder> {
-  const { product } = fixture, plan = JSON.parse(new TextDecoder().decode(await product.file(NATIVE_ASSEMBLY_FILE))) as { features: { host: string; policy?: { file: string } }[] };
-  const swept = plan.features.find(row => row.host === 'item.swept');
-  if (swept?.policy === undefined) throw new Error('Driftwood\'s plan names its item.swept host');
-  const policy = await product.json<unknown>(swept.policy.file);
-  const bytes = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.filter(row => row !== swept) }));
-  return { ...product,
-    file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : product.file(name),
-    has: name => name === 'held/melee' || product.has(name),
-    section: ((name: string) => name === 'held/melee' ? policy : product.section(name as never)) as ShardFolder['section'] };
-}
 function resident(fixture: Shipped, product: ShardFolder): Promise<NativeHeadlessResident> {
   return createNativeHeadlessResident({ shard: product.shardfile, assets: fixture.assets, rapier: fixture.rapier, product });
 }
@@ -67,14 +54,17 @@ function swings(live: NativeHeadlessResident): { readonly crab: string; readonly
   return { crab: crab.entityId, hp, swung: nativeMeleeItem(live.host, STEP).swings() };
 }
 
-test('a native plan with no item.swept host swings its held/melee section\'s sword as the host did', async () => {
-  const fixture = await shipped();
-  const host = await resident(fixture, fixture.product), section = await resident(fixture, await sectioned(fixture));
+test('a native plan with no item.swept host swings its held/melee section\'s sword', async () => {
+  const fixture = await shipped(), { product } = fixture;
+  // Driftwood rev 7 (OF22e2) ships the move: its plan names no item.swept host and its policy is the held/melee section
+  const plan = JSON.parse(new TextDecoder().decode(await product.file(NATIVE_ASSEMBLY_FILE))) as { features: { host: string }[] };
+  expect(plan.features.map(row => row.host)).not.toContain('item.swept');
+  expect(product.has('held/melee')).toBe(true);
+  const live = await resident(fixture, product);
   try {
-    expect(() => nativeMeleeItem(section.host, STEP), 'the section stands the sword').not.toThrow();
-    const before = swings(host), after = swings(section);
-    expect(before.swung).toBe(3);
-    expect(after).toEqual(before);
-    expect(after.hp.at(-1)).toBeLessThan(after.hp[0] ?? 0);
-  } finally { host.dispose(); section.dispose(); }
+    expect(() => nativeMeleeItem(live.host, STEP), 'the section stands the sword').not.toThrow();
+    const swung = swings(live);
+    expect(swung.swung).toBe(3);
+    expect(swung.hp.at(-1)).toBeLessThan(swung.hp[0] ?? 0);
+  } finally { live.dispose(); }
 }, 180_000);

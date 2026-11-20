@@ -143,7 +143,8 @@ test('across Driftwood\'s west edge: the bot inside and the bot on the road each
   inside.resetPose({ x: -(CHUNK_HALF - 80), y: inside.position.y + 0.5, z: 40 }, 0);
   await vi.waitFor(() => { expect(placeIn(b, aRow), 'A 80 m in is not shown on the road').toBeNull(); }, { timeout: 5_000, interval: 50 });
   // MP5.2b: one of Driftwood's creatures 20 m inside the edge: B on the road reads it at its world place, and nothing on the road can hit it
-  const [beastId, beast] = [...home.host.entities][0] ?? [];
+  // the first living one: Driftwood rev 7's first declared spawn is the Captain, out of the world until his wake
+  const [beastId, beast] = [...home.host.entities].find(([, actor]) => actor.alive) ?? [];
   if (beastId === undefined || beast === undefined) throw new Error('Driftwood has creatures');
   const beastRow = `${EDGE_PREFIX}${HOME}:animal:${beastId}`;
   await vi.waitFor(() => {
