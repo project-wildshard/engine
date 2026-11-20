@@ -19,7 +19,7 @@ import { installCompileShadowSkip } from './compileShadows';
 import { installSkinnedSortSpheres } from './skinnedSpheres';
 import { isDev, onDev } from '../core/devMode';
 import { installShadowMaterialOwnership } from './shadowMaterialOwnership';
-import { installProvokingVertex } from './drawHooks';
+import { installCookedSkinUvBinding, installProvokingVertex } from './drawHooks';
 import { installPassSplit, passSplitLimit, PASS_SPLIT_VERTICES } from './passSplit';
 import { installByteTriples } from './byteTriples';
 import { installVertexPack, VERTEX_PACK_SLOT, vertexPackWanted } from './vertexPack';
@@ -60,6 +60,7 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   installShadowMaterialOwnership(renderer, ownership.assets, ownership.scope);
   installCompileShadowSkip(renderer);
   installProvokingVertex(renderer); // MG10: Metal's own convention, so ANGLE rewrites no index data per draw
+  installCookedSkinUvBinding(renderer);
   // MG10: no Metal pass bins more than 400 k vertices (`debug.passSplit` overrides, 0 off); MG9: still on under a loading card
   installPassSplit(context, undefined, passSplitLimit(), PASS_SPLIT_VERTICES);
   // MG10: tight three-byte vertex channels upload at stride 4 (byteTriples.ts); before the Memory saver's upload watch

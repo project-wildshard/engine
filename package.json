@@ -283,6 +283,7 @@
     "./render/programRetention": "./src/client/engine/render/programRetention.ts",
     "./render/drawnEnvironment": "./src/client/engine/render/drawnEnvironment.ts",
     "./render/drawNeutral": "./src/client/engine/render/drawNeutral.ts",
+    "./render/cookedSkinUv": "./src/client/engine/render/cookedSkinUv.ts",
     "./models/modelPose": "./src/client/engine/models/modelPose.ts",
     "./models/ownedGeometry": "./src/client/engine/models/ownedGeometry.ts",
     "./entities/bodyClear": "./src/server/engine/entities/bodyClear.ts",
