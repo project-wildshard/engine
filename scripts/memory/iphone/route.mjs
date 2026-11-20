@@ -393,13 +393,18 @@ export async function playRoute(driver, { slug, cap, rec = [], legs: count, log 
   const legs = [];
   // the grid's sky-down reveal (grid/reveal.ts: the camera comes down from ~400 m over the pier, 3 s) runs after control;
   // the route measures play, so it starts once the reveal has ended, and says how long the reveal took
+  // DF8 (mini-driftwood13f): `--rec reveal` starts REC 30 S before the reveal, so its spike frames cover the reveal and the
+  // first leg's opening (the dock's ~2 s frame is a game update inside the reveal); it is read after the first leg
+  const revealRec = rec.includes('reveal');
+  if (revealRec) log(`reveal: REC ${String(await driver.evaluateAsync(recStart, [], 15_000))}`);
   const reveal = await driver.evaluateAsync(revealEnd, [], 20_000).catch((/** @type {unknown} */ error) => ({ error: String(error) }));
   log(`reveal: ${JSON.stringify(reveal)}`);
   for (const leg of routeFor(slug).slice(0, count)) {
     // DW2: the game's own REC 30 S (perfHud.ts: every frame's update by system, render and gpu~, and the top spike frames
     // with their causes) over this leg; the Developer panel is open while it records, so these legs are not DW1's numbers
-    const recording = rec.includes(leg.name);
-    if (recording) log(`${leg.name}: REC ${String(await driver.evaluateAsync(recStart, [], 15_000))}`);
+    const recording = rec.includes(leg.name) || (revealRec && legs.length === 0);
+    const startRec = rec.includes(leg.name) && !(revealRec && legs.length === 0);
+    if (startRec) log(`${leg.name}: REC ${String(await driver.evaluateAsync(recStart, [], 15_000))}`);
     const result = await driver.evaluateAsync(`
       const done = arguments[arguments.length - 1];
       (${routeLegOnPage.toString()})(arguments[0]).then(done, (error) => done({ error: String(error) }));

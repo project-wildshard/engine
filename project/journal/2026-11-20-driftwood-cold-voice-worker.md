@@ -16,3 +16,10 @@ state read `on: false, unstarted`: the pick, read once at the first prewarm slic
 load. So the worker is now on for every phone when the slot is unset, whatever the graphics pick. Three boots after it
 (the first load of a new build, then two with Safari's cache off): the worker up in 19 to 207 ms, 109 renders in it,
 no voice render over 30 ms on the page thread (before: 11, 10 and 20 in three cold boots).
+
+## The dock's first seconds
+
+`route-bench --frames` now times first uniform lookups per frame, keeps the game's update and render split, and names
+any app system over 15 ms. The dock's "~2 s frame" (106 to 182 ms, 2.4 s after the wake lock, inside the reveal) is a
+57 to 109 ms game update that no app system owns, with no link, upload or uniform lookup in it. Next: time Game's
+update outside the systems (event delivery, the late phase, the grid's own hooks).

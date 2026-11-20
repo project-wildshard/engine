@@ -65,11 +65,19 @@ export const FRAME_LOG_START = `
 const g = window.__wildshard?.world?.game, r = g?.renderer;
 if (r === undefined) return 'no game';
 const gl = r.getContext(), log = (window.__wsFrameLog = { frames: [], adds: [] });
-let cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0 };
+let cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0, uloc: 0, ulocProgs: new Set() };
 const render = r.render; r.render = function (...args) { cur.renders++; return render.apply(this, args); };
 const wrap = (name, count) => { const own = gl[name]; if (typeof own !== 'function') return;
   gl[name] = function (...args) { count(args); return own.apply(this, args); }; };
 wrap('linkProgram', () => { cur.links++; });
+// DF8 (mini-driftwood13f): a program's first uniform lookups wait for its link (and ANGLE Metal's library build): time them
+// per frame and name the programs, so a long frame with no link in it can still name the shader it waited on
+const glNames = new WeakMap(), nameOf = (program) => { let name = glNames.get(program);
+  if (name === undefined) { for (const p of r.info.programs ?? []) if (p.program === program) { name = p.name ?? '?'; glNames.set(program, name); } }
+  return name ?? '?'; };
+const ownUloc = gl.getUniformLocation;
+gl.getUniformLocation = function (program, name) { const t = performance.now();
+  try { return ownUloc.call(this, program, name); } finally { const ms = performance.now() - t; cur.uloc += ms; if (ms > 1) cur.ulocProgs.add(nameOf(program)); } };
 const texels = (a) => { for (const x of a) if (x && typeof x === 'object' && 'width' in x) return (x.width | 0) * (x.height | 0);
   const n = a.filter((x) => typeof x === 'number'); return n.length >= 5 ? (n[3] | 0) * (n[4] | 0) : 0; };
 for (const n of ['texImage2D', 'texSubImage2D', 'texImage3D', 'texSubImage3D', 'texStorage2D', 'compressedTexImage2D', 'compressedTexSubImage2D'])
@@ -92,25 +100,36 @@ if (typeof create === 'function') setProto.createCollider = function (bodies, de
   try { return create.call(this, bodies, desc, parent); } finally {
     const tris = desc?.shape?.indices?.length ? desc.shape.indices.length / 3 : 0;
     if (log.colliders.length < 2000) log.colliders.push([Math.round(t), Math.round((performance.now() - t) * 10) / 10, tris]); } };
+// DF8: every game system's run is timed; a frame keeps the systems that took over 15 ms (id:ms)
+let slowSystems = [];
+try { const byPhase = g.app.systemsByPhase(), wrapped = new WeakSet();
+  for (const phase of Object.keys(byPhase)) for (const spec of byPhase[phase]) {
+    if (wrapped.has(spec) || typeof spec.run !== 'function') continue; wrapped.add(spec);
+    const own = spec.run; try { spec.run = function (...args) { const t = performance.now();
+      try { return own.apply(this, args); } finally { const ms = performance.now() - t; if (ms > 15) slowSystems.push(String(spec.id) + ':' + Math.round(ms)); } }; } catch {} } } catch {}
+// DF8: the game's own update and render ms for its last two frames (Game's rings), so a long frame says which side it was
+const gameSplit = () => { try { const ring = g.frameMs.length, a = (g.frameI - 1 + ring) % ring, b = (g.frameI - 2 + ring) % ring;
+  return [Math.round(g.updateMs[a]), Math.round(g.renderMs[a]), Math.round(g.updateMs[b]), Math.round(g.renderMs[b])]; } catch { return null; } };
 let last = performance.now();
 const tick = (now) => { if (window.__wsFrameLog !== log) return;
   const progs = r.info.programs ?? [], fresh = [];
   for (const p of progs) if (!seen.has(p.id)) { seen.add(p.id); fresh.push(p.name ?? '?'); }
-  log.frames.push([Math.round(now), Math.round((now - last) * 10) / 10, cur.links, cur.tex, cur.texels, cur.buf, r.info.render.triangles, r.info.memory.geometries, fresh.join(','), cur.renders]);
+  log.frames.push([Math.round(now), Math.round((now - last) * 10) / 10, cur.links, cur.tex, cur.texels, cur.buf, r.info.render.triangles, r.info.memory.geometries, fresh.join(','), cur.renders, Math.round(cur.uloc * 10) / 10, [...cur.ulocProgs].join(','), gameSplit(), slowSystems.join(',')]); slowSystems = [];
   if (log.frames.length > 4000) log.frames.shift();
-  last = now; cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0 }; requestAnimationFrame(tick); };
+  last = now; cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0, uloc: 0, ulocProgs: new Set() }; requestAnimationFrame(tick); };
 requestAnimationFrame(tick);
 return 'logging';
 `;
 
 /** In the page: FRAME_LOG_START's log, and stop logging: { count, frames: [page ms, interval ms, links, tex uploads,
- * texels, buffer bytes, triangles, geometries, new programs, renderer.render calls], adds: [page ms, parent>child, triangles] }. Only the frames
+ * texels, buffer bytes, triangles, geometries, new programs, renderer.render calls, uniform-lookup ms, programs looked up
+ * slowly], adds: [page ms, parent>child, triangles] }. Only the frames
  * that are long (over 45 ms), link, or upload more than 64k texels or 64 KB, and the frame before each, so the socket
  * holds it. */
 export const FRAME_LOG_READ = `
 const log = window.__wsFrameLog ?? null; window.__wsFrameLog = undefined;
 if (log === null) return null;
 const f = log.frames, keep = new Set();
-f.forEach((x, i) => { if (x[1] > 45 || x[2] > 0 || x[4] > 65536 || x[5] > 65536 || x[9] > 1) { keep.add(i); if (i > 0) keep.add(i - 1); } });
+f.forEach((x, i) => { if (x[1] > 45 || x[2] > 0 || x[4] > 65536 || x[5] > 65536 || x[9] > 1 || x[10] > 5 || (x[13] ?? '') !== '') { keep.add(i); if (i > 0) keep.add(i - 1); } });
 return { count: f.length, from: f[0]?.[0] ?? 0, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders };
 `;
