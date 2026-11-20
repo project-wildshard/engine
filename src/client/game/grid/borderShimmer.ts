@@ -151,25 +151,33 @@ export function installBorderShimmer(input: { readonly cells: readonly ShimmerCe
     if (status === null) since = 0;
     const want: CrossingSaveStatus = status !== null && (status === 'failed' || now - since > 0.15) ? status : now < holdUntil ? shown : null;
     if (want !== null && status !== null) holdUntil = now + 0.8;
+    // no status to show: the panel hides whatever border is nearest, so skip the search (DF11)
+    if (want === null) { panel.visible = false; shown = null; return; }
     const feet = ports.feet();
     // the nearest border of the cell whose square the feet are nearest (the one being crossed)
-    let best: { x: number; z: number; ry: number; d: number } | null = null;
+    // DF11: the four sides are scored in locals (four candidate objects a cell every step were frame garbage); a tie keeps
+    // the earlier side, as the old strict `<` over the north, south, east, west list did
+    let found = false, bestX = 0, bestZ = 0, bestRy = 0, bestD = 0;
     for (const cell of cells) {
       const lx = feet.x - cell.x, lz = feet.z - cell.z;
       const sx = Math.max(-CHUNK_HALF + 1.5, Math.min(CHUNK_HALF - 1.5, lx)), sz = Math.max(-CHUNK_HALF + 1.5, Math.min(CHUNK_HALF - 1.5, lz));
-      const candidates = [{ x: cell.x + sx, z: cell.z + CHUNK_HALF, d: Math.abs(lz - CHUNK_HALF) + Math.abs(lx - sx), ry: lz > CHUNK_HALF ? 0 : Math.PI },
-        { x: cell.x + sx, z: cell.z - CHUNK_HALF, d: Math.abs(lz + CHUNK_HALF) + Math.abs(lx - sx), ry: lz < -CHUNK_HALF ? Math.PI : 0 },
-        { x: cell.x + CHUNK_HALF, z: cell.z + sz, d: Math.abs(lx - CHUNK_HALF) + Math.abs(lz - sz), ry: lx > CHUNK_HALF ? Math.PI / 2 : -Math.PI / 2 },
-        { x: cell.x - CHUNK_HALF, z: cell.z + sz, d: Math.abs(lx + CHUNK_HALF) + Math.abs(lz - sz), ry: lx < -CHUNK_HALF ? -Math.PI / 2 : Math.PI / 2 }];
-      for (const c of candidates) if (best === null || c.d < best.d) best = c;
+      for (let side = 0; side < 4; side++) {
+        const ns = side < 2, sign = side % 2 === 0 ? 1 : -1;
+        const d = ns ? Math.abs(lz - sign * CHUNK_HALF) + Math.abs(lx - sx) : Math.abs(lx - sign * CHUNK_HALF) + Math.abs(lz - sz);
+        if (found && !(d < bestD)) continue;
+        found = true; bestD = d;
+        bestX = ns ? cell.x + sx : cell.x + sign * CHUNK_HALF; bestZ = ns ? cell.z + sign * CHUNK_HALF : cell.z + sz;
+        bestRy = side === 0 ? (lz > CHUNK_HALF ? 0 : Math.PI) : side === 1 ? (lz < -CHUNK_HALF ? Math.PI : 0)
+          : side === 2 ? (lx > CHUNK_HALF ? Math.PI / 2 : -Math.PI / 2) : (lx < -CHUNK_HALF ? -Math.PI / 2 : Math.PI / 2);
+      }
     }
-    if (want === null || best === null || best.d > PANEL_RANGE) { panel.visible = false; if (want === null) shown = null; return; }
+    if (!found || bestD > PANEL_RANGE) { panel.visible = false; return; }
     if (want !== shown) {
       shown = want;
       labelMaterial.map?.dispose(); labelMaterial.map = label(ports.text(want), want === 'failed'); labelMaterial.needsUpdate = true;
     }
     // stands on the line where the traveller meets it, at eye height, facing back at them
-    panel.position.set(best.x, 1.9 + groundNear(cells, best.x, best.z), best.z); panel.rotation.set(0, best.ry, 0);
+    panel.position.set(bestX, 1.9 + groundNear(cells, bestX, bestZ), bestZ); panel.rotation.set(0, bestRy, 0);
     panel.visible = true;
   };
   scope.onDispose(() => { group.removeFromParent(); line.geometry.dispose(); material.dispose(); panel.geometry.dispose(); labelMaterial.map?.dispose(); labelMaterial.dispose(); });

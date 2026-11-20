@@ -69,14 +69,17 @@ export class NearColliders {
   step(x: number, z: number, speed: number): number {
     if (this.waiting.length === 0) return 0;
     const reach = REACH + Math.min(Math.max(speed, 0), 60) * 4;
-    let built = 0, far = false;
-    const keep: Waiting[] = [];
-    for (const w of this.waiting) {
+    let built = 0, far = false, kept = 0;
+    // DF11: the waiting list compacts in place (a fresh keep list every fixed step was frame garbage); same order kept
+    const waiting = this.waiting;
+    for (let i = 0; i < waiting.length; i++) {
+      const w = waiting[i];
+      if (w === undefined) continue;
       const d = Math.hypot(Math.max(0, w.minX - x, x - w.maxX), Math.max(0, w.minZ - z, z - w.maxZ));
       if (d <= CLOSE || (d <= reach && !far)) { if (d > CLOSE) far = true; this.install(w.mesh); built++; }
-      else keep.push(w);
+      else waiting[kept++] = w;
     }
-    this.waiting = keep;
+    waiting.length = kept;
     return built;
   }
 
