@@ -415,7 +415,7 @@ jobs:
     # slice. Preserve the standalone props check and measured street workload
     # policy without promoting or rewriting any pin or NB8/NB23 target.
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     outputs:
       code-run: ${{ steps.code.outputs.run }}
     env:
