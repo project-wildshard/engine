@@ -9,9 +9,11 @@ import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { STEER_PROBE } from '@wildshard/engine/sim/moverMotion';
 import { publishScriptBody, publishWorldState, withdrawScriptBody, type StateNetRow } from '@wildshard/engine/sim/shardRows';
 import { castVehicleHull, edgeHit, firstHit, VEHICLE_EDGE_OWNER, VEHICLE_RESTITUTION, vehicleCommandOf, vehicleReach, type HullFrom, type HullShapes, type VehicleReach } from '@wildshard/engine/sim/vehicleHull';
+import { rivalAdvance, rivalCommand, rivalCourse, type RivalCourse } from '@wildshard/engine/sim/rivalDriver';
 import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type VehicleImpact, type VehicleState, type VehicleStepOut, type VehicleWorld } from '@wildshard/engine/sim/vehicle';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
+import type { Race } from '../../../shared/game/quest/declared';
 import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
 import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow, vehicleWreckRow } from '../../../shared/game/shardfile/wirePrompts';
 
@@ -84,7 +86,23 @@ interface Live {
   idle: number;
   /** MSZ14: what is left of its health. */
   health: number;
+  /** MSZ33: a race's rival, driven by his AI for one player's run; no seats, no wear, never saved. */
+  readonly rival?: RivalRun;
 }
+/** MSZ33: a rival out for one player's run: his line, how far he and the player have come along it (m), and his finish. */
+interface RivalRun {
+  readonly player: string; readonly race: string; readonly course: RivalCourse;
+  /** m along his line to his finish: a lap race's laps round it. */
+  readonly total: number;
+  readonly band: number; readonly top: number;
+  travelled: number; chased: number; finished: boolean;
+}
+/** MSZ33: m a rival starts beside his line (to its right), clear of the player on it; his finish counts this short of its end. */
+const RIVAL_BESIDE = 3.5, RIVAL_FINISH = 3;
+/** MSZ33: m of catch-up band a rival keeps when his race names none. */
+export const RIVAL_BAND = 40;
+/** MSZ33: a rival's vehicle id: his dock's, for the player and race he races. */
+export const rivalVehicle = (dock: string, race: string, player: string): string => playerVehicle(dock, `rival.${race}.${player}`);
 
 const finite = v.pipe(v.number(), v.finite());
 const Saved = v.strictObject({
@@ -164,6 +182,42 @@ export class VehicleRuntime {
   health(id: string): number { const vehicle = this.get(id); return vehicle.health / (vehicle.kind.health ?? VEHICLE_HEALTH); }
   /** MSZ14: the vehicles wrecked last step. */
   wrecks(): readonly VehicleWreckEvent[] { return this.lastWrecks; }
+  /**
+   * MSZ33: race `race`'s rival out for `player`'s run: the vehicle his dock hands out, set down beside his line's start and
+   * facing along it, driven by his AI; none in a full cell. A run begun again sends the last one home first.
+   */
+  startRival(player: string, race: Race): string | null {
+    const rival = race.rival; if (rival === undefined) return null;
+    const dock = this.docks.get(rival.dock), kind = dock === undefined ? undefined : this.kinds.get(dock.kind);
+    if (dock === undefined || kind === undefined) throw new Error(`Race ${race.id}'s rival has no vehicle dock ${rival.dock}`);
+    const id = rivalVehicle(dock.id, race.id, player);
+    this.stopRival(player, race.id);
+    if (this.full(id)) return null;
+    const closed = (race.laps ?? 1) > 1, course = rivalCourse(rival.line, closed, kind.handling, rival.speed);
+    const [x0, y0, z0] = rival.line[0] ?? [0, 0, 0], [x1, , z1] = rival.line[1] ?? [x0, y0, z0 - 1];
+    const yaw = Math.atan2(-(x1 - x0), -(z1 - z0)), at: [number, number, number] = [x0 + Math.cos(yaw) * RIVAL_BESIDE, y0, z0 - Math.sin(yaw) * RIVAL_BESIDE];
+    const run: RivalRun = { player, race: race.id, course, total: course.length * (closed ? race.laps ?? 1 : 1), band: rival.band ?? RIVAL_BAND, top: rival.speed, travelled: 0, chased: 0, finished: false };
+    return this.spawnAt({ ...dock, at, yaw }, `rival.${race.id}.${player}`, undefined, run);
+  }
+  /** MSZ33: whether `race`'s rival has finished `player`'s run (one sent home, or never out, has not). */
+  rivalFinished(player: string, race: string): boolean {
+    for (const vehicle of this.live.values()) if (vehicle.rival?.player === player && vehicle.rival.race === race) return vehicle.rival.finished;
+    return false;
+  }
+  /** MSZ33: the vehicle `race`'s rival drives for `player`, if he is out. */
+  rivalOf(player: string, race: string): string | undefined {
+    for (const vehicle of this.live.values()) if (vehicle.rival?.player === player && vehicle.rival.race === race) return vehicle.id;
+    return undefined;
+  }
+  /** MSZ33: `race`'s rival for `player` goes home. */
+  stopRival(player: string, race: string): void { const id = this.rivalOf(player, race); if (id !== undefined) this.despawn(id); }
+  /** MSZ33: a rival's stick: his AI along his line, against how far the player has come; past his finish he brakes and holds. */
+  private rivalStick(vehicle: Live, rival: RivalRun): VehicleCommand {
+    if (rival.finished) return { throttle: 0, turn: 0, boost: false, brake: true };
+    const body = this.host?.players.get(rival.player);
+    if (body !== undefined) rival.chased = rivalAdvance(rival.course, rival.chased, body.position.x, body.position.z);
+    return rivalCommand(vehicle.state, rival.course, rival.travelled, rival.travelled - rival.chased, rival.band, vehicle.kind.handling, rival.top);
+  }
   /** MSZ14: s before a wrecked vehicle's dock has it back, or none while it is out (or was never wrecked). */
   respawning(id: string): number | undefined { return this.wrecked.get(id)?.left; }
   /** Whether a player dock stands clear for a new vehicle: no other vehicle's centre within its hull's reach. */
@@ -194,7 +248,7 @@ export class VehicleRuntime {
   }
   /** Every free seat's prompt, and each player dock's while it stands clear. */
   prompts(): readonly VehicleSeatPrompt[] {
-    const seats = [...this.live.values()].flatMap(vehicle => vehicle.kind.seats.flatMap((row, seat): VehicleSeatPrompt[] => vehicle.seats[seat] !== null ? [] : [{
+    const seats = [...this.live.values()].filter(vehicle => vehicle.rival === undefined).flatMap(vehicle => vehicle.kind.seats.flatMap((row, seat): VehicleSeatPrompt[] => vehicle.seats[seat] !== null ? [] : [{
       id: vehicleSeatPrompt(vehicle.id, seat), vehicle: vehicle.id, seat, role: row.role, at: worldPoint(vehicle.state, row.at), radius: SEAT_REACH,
       label: row.role === 'driver' ? vehicle.kind.labels?.drive ?? DRIVE_LABEL : vehicle.kind.labels?.ride ?? RIDE_LABEL,
       owner: row.role === 'driver' ? vehicle.owner : null }]));
@@ -206,7 +260,7 @@ export class VehicleRuntime {
   /** Take a free seat (the first free one, or `seat`): a per-player vehicle's driver seat only its owner, one seat a player. */
   board(id: string, player: string, seat?: number): boolean {
     const vehicle = this.get(id);
-    if (this.seatOf(player) !== undefined) return false;
+    if (this.seatOf(player) !== undefined || vehicle.rival !== undefined) return false;
     const index = seat ?? vehicle.seats.findIndex((rider, at) => rider === null && (vehicle.kind.seats[at]?.role !== 'driver' || vehicle.owner === null || vehicle.owner === player));
     const row = vehicle.kind.seats[index];
     if (row === undefined || vehicle.seats[index] !== null || (row.role === 'driver' && vehicle.owner !== null && vehicle.owner !== player)) return false;
@@ -270,11 +324,17 @@ export class VehicleRuntime {
       if (wreck.dock.per === 'shared' && !this.live.has(id)) this.spawnAt(wreck.dock, null);
     }
     for (const vehicle of this.live.values()) {
-      const driver = this.driver(vehicle.id), command = driver === null ? NEUTRAL : this.ports.stick(driver, vehicle.state.yaw) ?? NEUTRAL;
+      const driver = this.driver(vehicle.id), rival = vehicle.rival;
+      const command = rival !== undefined ? this.rivalStick(vehicle, rival) : driver === null ? NEUTRAL : this.ports.stick(driver, vehicle.state.yaw) ?? NEUTRAL;
       out.impact = null;
       vehicle.state = stepVehicle(vehicle.state, command, vehicle.kind.handling, vehicle.world, dt, out);
       if (out.impact !== null && out.impact !== undefined) this.hand(vehicle, out.impact);
       vehicle.body?.setPose(poseOf(vehicle.state));
+      if (rival !== undefined) {
+        rival.travelled = rivalAdvance(rival.course, rival.travelled, vehicle.state.x, vehicle.state.z);
+        if (rival.travelled >= rival.total - RIVAL_FINISH) rival.finished = true;
+        continue;
+      }
       if (driver !== null) continue;
       vehicle.idle += dt;
       if (vehicle.seats.some(rider => rider !== null)) continue; // a passenger keeps it out
@@ -286,6 +346,7 @@ export class VehicleRuntime {
   }
   /** MSZ14: a hit's wear on one vehicle: its change of speed past `VEHICLE_WEAR.from`. */
   private wear(vehicle: Live, change: number): void {
+    if (vehicle.rival !== undefined) return; // MSZ33: a rival is never worn out mid-race
     if (change > VEHICLE_WEAR.from) vehicle.health = Math.max(0, vehicle.health - (change - VEHICLE_WEAR.from) * VEHICLE_WEAR.per);
   }
   /** MSZ14: a vehicle worn out: its riders set down beside it, then it goes until its dock has it back. */
@@ -397,7 +458,7 @@ export class VehicleRuntime {
   dispose(): void { for (const id of this.live.keys()) this.despawn(id); }
 
   private snapshot(): SavedVehicles {
-    return { vehicles: [...this.live.values()].map(vehicle => {
+    return { vehicles: [...this.live.values()].filter(vehicle => vehicle.rival === undefined).map(vehicle => {
       const handle = vehicle.body?.body.handle; if (handle === undefined) throw new Error(`Vehicle ${vehicle.id} has no body to save`);
       return { id: vehicle.id, dock: vehicle.dock.id, owner: vehicle.owner, state: { ...vehicle.state }, seats: [...vehicle.seats], idle: vehicle.idle, handle, health: vehicle.health };
     }), led: [...this.led].map(([player, at]) => [player, at.x, at.y, at.z] as [string, number, number, number]),
@@ -424,6 +485,7 @@ export class VehicleRuntime {
   private get(id: string): Live { const vehicle = this.live.get(id); if (vehicle === undefined) throw new Error(`No vehicle ${id}`); return vehicle; }
   private claim(vehicle: Live): void {
     const routes = this.routes, host = this.host; if (routes === null || host === null) return;
+    if (vehicle.rival !== undefined) { publishScriptBody(host, vehicle.id, () => poseOf(this.live.get(vehicle.id)?.state ?? vehicle.state)); return; }
     vehicle.kind.seats.forEach((row, seat) => {
       routes.claims.set(vehicleSeatPrompt(vehicle.id, seat), player => {
         // the claimant's body must be within reach of the seat (the page offers it only there)
@@ -442,7 +504,7 @@ export class VehicleRuntime {
     vehicle.kind.seats.forEach((_row, seat) => { this.routes?.claims.delete(vehicleSeatPrompt(id, seat)); });
     this.routes?.claims.delete(vehicleLeavePrompt(id)); withdrawScriptBody(host, id);
   }
-  private spawnAt(dock: VehicleDock, owner: string | null, handle?: number): string {
+  private spawnAt(dock: VehicleDock, owner: string | null, handle?: number, rival?: RivalRun): string {
     const kind = this.kinds.get(dock.kind), boxes = this.hulls.get(dock.id);
     if (kind === undefined || boxes === undefined) throw new Error(`Vehicle dock ${dock.id} has no kind or hull`);
     const id = owner === null ? dock.id : playerVehicle(dock.id, owner), state = vehicleAt({ x: dock.at[0], y: dock.at[1], z: dock.at[2] }, dock.yaw);
@@ -450,7 +512,7 @@ export class VehicleRuntime {
     const floor = (x: number, z: number, fromY: number): number | undefined => floorBelow(this.ports.physics(), x, z, fromY, STEER_PROBE.up + STEER_PROBE.down, undefined, collider => tagOf(collider)?.owner !== id);
     const body = this.ports.restoring === true && handle === undefined && this.host === null ? null : new KinematicMover(this.ports.physics(), boxes, poseOf(state), id, false, handle);
     const reach = vehicleReach(boxes);
-    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, hit: (from, move, yaw) => firstHit(this.hullHit(id, reach, from, move, yaw), edgeHit(from, move)) }, state, seats: kind.seats.map(() => null), idle: 0, health: kind.health ?? VEHICLE_HEALTH };
+    const vehicle: Live = { id, dock, kind, owner, body, world: { floor, ...reach, hit: (from, move, yaw) => firstHit(this.hullHit(id, reach, from, move, yaw), edgeHit(from, move)) }, state, seats: kind.seats.map(() => null), idle: 0, health: kind.health ?? VEHICLE_HEALTH, ...(rival === undefined ? {} : { rival }) };
     this.live.set(id, vehicle); this.claim(vehicle);
     return id;
   }

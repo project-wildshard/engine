@@ -15,6 +15,6 @@ export function raceElapsedTicks(line: number, now: number): number {
   return (((now - (line - 1)) % RACE_TICK_WINDOW) + RACE_TICK_WINDOW) % RACE_TICK_WINDOW;
 }
 
-/** MIRROR-SALT-ZONE MSZ31: why a run was refused at its start, or a lap voided: the `race:<id>.chip` owned line, which
+/** MIRROR-SALT-ZONE MSZ31: why a run was refused at its start, or a lap voided (MSZ33: or how it went against the rival, won or lost): the `race:<id>.chip` owned line, which
  *  `race:<id>.chipAt` stamps with the tick it showed (as `raceStartLine` writes a tick). */
-export const RACE_CHIP = { vehicle: 1, foot: 2, void: 3 } as const;
+export const RACE_CHIP = { vehicle: 1, foot: 2, void: 3, won: 4, lost: 5 } as const;

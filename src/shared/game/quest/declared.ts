@@ -43,6 +43,17 @@ export interface QuestDataPorts {
   coins?: (quantity: number, entity: string) => void;
   /** MIRROR-SALT-ZONE MSZ31: how a player moves now, for a race that names its `ride`; without it every run is admitted. */
   ride?: (player: string) => RaceRide;
+  /** MIRROR-SALT-ZONE MSZ33: the server's rivals, for a race that names one; without it a rival race runs as a plain one. */
+  rival?: RaceRivalPort;
+}
+/** MSZ33: a race's rival, driven by the server's vehicles for each player's run. */
+export interface RaceRivalPort {
+  /** A run began: his vehicle out at his line's start, racing. */
+  start: (player: string, race: Race) => void;
+  /** Whether he has finished this player's run. */
+  finished: (player: string, race: string) => boolean;
+  /** The run ended (a finish, a lapse, a refused start): his vehicle goes. */
+  stop: (player: string, race: string) => void;
 }
 /** How a player moves, as a race's `ride` reads it: seated in a vehicle, on the hoverboard, or on foot. */
 export type RaceRide = 'vehicle' | 'board' | 'foot';
@@ -52,8 +63,8 @@ export interface DialogueView { id: string; lines: readonly string[]; choices: r
  *  MSZ31: a race of laps or checkpoints also keeps, while running, the laps done (`lap`), the next checkpoint (`next`), the tick
  *  the lap began (`lapAt`) and the last lap's time in seconds (`split`); a plain race never has them, so its bytes stand. */
 export interface RaceRun { running: number | null; last: number | null; best: number | null; runs: number; lap?: number; next?: number; lapAt?: number; split?: number }
-/** A race row; MSZ31 (format 0.57.0): its `laps`, `checkpoints` and `ride`. */
-type Race = NonNullable<QuestData['races']>[number];
+/** A race row; MSZ31 (format 0.57.0): its `laps`, `checkpoints` and `ride`; MSZ33 (format 0.59.0): its `rival`. */
+export type Race = NonNullable<QuestData['races']>[number];
 /** MSZ31: a race counted by laps or checkpoints. */
 const lapped = (race: Race): boolean => (race.laps ?? 1) > 1 || (race.checkpoints ?? []).length > 0;
 
@@ -154,6 +165,7 @@ export class DeclaredQuests {
   /** The start flag rose: a run begun the wrong way (`ride`) is refused with a chip and its start lowered; else the clock starts
    *  over and a run counts only the gates and checkpoints crossed in it. */
   private startRace(book: QuestBook, race: Race, run: RaceRun): void {
+    if (race.rival !== undefined) this.ports.rival?.stop(book.player, race.id); // a run begun again sends the last one's rival home
     const ride = race.ride ?? 'any', moving = ride === 'any' ? null : this.ports.ride?.(book.player) ?? null;
     if (moving !== null && moving !== ride) {
       this.chip(book.player, race, ride === 'vehicle' ? RACE_CHIP.vehicle : RACE_CHIP.foot);
@@ -162,6 +174,7 @@ export class DeclaredQuests {
     run.running = this.host.state.tick; clearLaps(run);
     if (lapped(race)) Object.assign(run, { lap: 0, next: 0, lapAt: this.host.state.tick });
     for (const lowered of [race.stop, ...race.resets ?? [], ...race.checkpoints ?? []]) book.flags.set(lowered, false);
+    if (race.rival !== undefined) { this.chips.get(book.player)?.delete(race.id); this.ports.rival?.start(book.player, race); }
   }
   /** MSZ31: a checkpoint crossed in order counts; out of order it is lowered again. The lap's first one lowers the line's stop,
    *  which stays up from the lap before so standing on the line counts nothing. */
@@ -191,6 +204,7 @@ export class DeclaredQuests {
     const seconds = (this.host.state.tick - (run.running ?? this.host.state.tick)) * FIXED_STEP;
     run.running = null; run.last = seconds; run.best = run.best === null ? seconds : Math.min(run.best, seconds); run.runs++; clearLaps(run);
     lowerRun(book, race);
+    this.endRival(book, race, true);
     this.ports.fact?.(race.fact, book.player === this.books.lead.player ? race.id : `${book.player}:${race.id}`);
   }
   /** A run past its cap lapses: nothing is filed and its start flag drops so it can begin again. */
@@ -198,9 +212,25 @@ export class DeclaredQuests {
     const runs = this.races.get(book.player); if (runs === undefined) return;
     for (const race of this.data.races ?? []) {
       const run = runs.get(race.id);
-      if (run === undefined || run.running === null || (this.host.state.tick - run.running) * FIXED_STEP <= race.cap) continue;
-      run.running = null; clearLaps(run); lowerRun(book, race);
+      if (run === undefined || run.running === null) continue;
+      if ((this.host.state.tick - run.running) * FIXED_STEP <= race.cap) { this.rivalHome(book, race); continue; }
+      run.running = null; clearLaps(run); lowerRun(book, race); this.endRival(book, race, false);
     }
+  }
+  /** MSZ33: a running race's rival crossed his line first: the player hears it once (their run goes on, for its time). */
+  private rivalHome(book: QuestBook, race: Race): void {
+    const port = this.ports.rival; if (race.rival === undefined || port === undefined) return;
+    if (port.finished(book.player, race.id) && this.chips.get(book.player)?.get(race.id)?.chip !== RACE_CHIP.lost) this.chip(book.player, race, RACE_CHIP.lost);
+  }
+  /** MSZ33: a run with a rival ended: a finish ahead of him raises the race's `beat` flag, and says who won; he goes home. */
+  private endRival(book: QuestBook, race: Race, finished: boolean): void {
+    const port = this.ports.rival; if (race.rival === undefined || port === undefined) return;
+    if (finished) {
+      const won = !port.finished(book.player, race.id);
+      if (won) book.flags.set(race.rival.beat);
+      this.chip(book.player, race, won ? RACE_CHIP.won : RACE_CHIP.lost);
+    }
+    port.stop(book.player, race.id);
   }
   /** One player's run of a race, or null for an unknown race or player. */
   race(id: string, player: string = this.books.lead.player): RaceRun | null {

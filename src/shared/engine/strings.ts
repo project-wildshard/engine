@@ -812,6 +812,8 @@ export const ENGINE_STRINGS = {
   "s_race_vehicle_only": "This race is driven: take a vehicle",
   "s_race_foot_only": "This race is run on foot",
   "s_race_lap_void": "Lap void: missed a checkpoint",
+  "s_race_rival_won": "You beat ⟦0⟧",
+  "s_race_rival_lost": "⟦0⟧ wins",
   "s_steer_boost_key": "Shift · boost",
   "s_steer_boost_touch": "Push the stick · boost",
   "s_drive_keys": "Shift boost · Space handbrake · V view",

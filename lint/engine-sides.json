@@ -1766,6 +1766,7 @@
     "src/shared/engine/sim/moverLifecycle.ts": "shared",
     "src/shared/engine/sim/moverMotion.ts": "shared",
     "src/shared/engine/sim/vehicle.ts": "shared",
+    "src/shared/engine/sim/rivalDriver.ts": "shared",
     "src/shared/engine/sim/vehicleHull.ts": "shared",
     "src/shared/engine/sim/nearPlayer.ts": "shared",
     "src/shared/engine/sim/netMotion.ts": "shared",

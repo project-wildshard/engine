@@ -269,6 +269,7 @@
     "./sim/cableTraversal": "./src/shared/engine/sim/cableTraversal.ts",
     "./sim/moverMotion": "./src/shared/engine/sim/moverMotion.ts",
     "./sim/vehicle": "./src/shared/engine/sim/vehicle.ts",
+    "./sim/rivalDriver": "./src/shared/engine/sim/rivalDriver.ts",
     "./sim/vehicleHull": "./src/shared/engine/sim/vehicleHull.ts",
     "./ai/moves": "./src/server/engine/ai/moves.ts",
     "./script/decision": "./src/server/engine/script/decision.ts",

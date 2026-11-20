@@ -701,6 +701,9 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     const quest = new DeclaredQuests(host, shard.quests, { ...ports.quest,
       // MIRROR-SALT-ZONE MSZ31: a race's `ride` reads a seat in a vehicle, the hoverboard, or foot (the vehicles install below)
       ride: player => hostVehicles(host)?.seatOf(player) !== undefined ? 'vehicle' : host.players.get(player)?.board.on === true ? 'board' : 'foot',
+      // MSZ33: a race's rival is a vehicle the server's runtime drives for each run
+      rival: { start: (player, race) => { hostVehicles(host)?.startRival(player, race); }, finished: (player, race) => hostVehicles(host)?.rivalFinished(player, race) ?? false,
+        stop: (player, race) => { hostVehicles(host)?.stopRival(player, race); } },
       ...(lane === undefined ? {} : { script: createQuestScriptPorts(lane, hooks, actors) }),
     });
     installDeclaredTalks(host, shard, quest); // TE-ENG3: a no-code quest-giver's answers and each player's node
@@ -775,6 +778,8 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     const groups = preparedGroups.install(ports.restoring ?? false);
     // MIRROR-SALT-ZONE MSZ9b: the docks' vehicles, on the wire and in the saves, before the first physics step
     const vehicleRuntime = installVehicles(host, vehicles, ports.restoring === true || isSimHostRestoring(host));
+    // MSZ33: every race's rival drives a vehicle a dock of this shard hands out
+    for (const race of shard.quests.races ?? []) if (race.rival !== undefined && !vehicles.docks.some(dock => dock.id === race.rival?.dock)) throw new Error(`Race ${race.id}'s rival has no vehicle dock ${race.rival.dock}`);
     if (!host.embedded && !ports.restoring) host.physics.step();
     // Crowd setup is last: all scripts, actor/group controllers, quests, encounters and physics have admitted.
     const crowds = preparedCrowds.install(host, ports.restoring ?? false);

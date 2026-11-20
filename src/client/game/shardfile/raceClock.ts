@@ -6,7 +6,7 @@ import { RACE_CHIP, raceElapsedTicks } from '@wildshard/engine/game/quest/raceWi
 /** What the page shows a race in: one line of text, or nothing. */
 export interface RaceClockView { show: (text: string | null) => void }
 /** A declared race, as the page reads it (MSZ31: its laps, when it runs more than one). */
-export interface RaceRow { readonly id: string; readonly laps?: number }
+export interface RaceRow { readonly id: string; readonly laps?: number; readonly rival?: { readonly name: string } }
 /** How long the finish line stays up, in seconds. */
 export const RACE_FINISH_SHOWN = 5;
 
@@ -22,6 +22,7 @@ export function raceTime(seconds: number): string {
  * start tick to the wire's latest; a finish shows the time and the best for a few seconds. A line at zero is absent.
  * MIRROR-SALT-ZONE MSZ31: a race of laps shows the lap (`.lap`) and the last lap's time (`.split`, ms) beside the clock; a run refused
  * at its start (a race driven, or run on foot) or a void lap shows why for a few seconds (`.chip`, which `.chipAt` stamps).
+ * MSZ33: a race with a rival shows who won, the player or the rival, by name.
  */
 export function installRaceClock(races: readonly RaceRow[], page: {
   system: (spec: SystemSpec) => void; line: (name: string) => number; tick: () => number | null; view: RaceClockView;
@@ -37,7 +38,7 @@ export function installRaceClock(races: readonly RaceRow[], page: {
     let running: string | null = null;
     for (const race of races) {
       const chipAt = page.line(`race:${race.id}.chipAt`), chipBefore = chips.get(race.id); chips.set(race.id, chipAt);
-      if (chipBefore !== undefined && chipAt > 0 && chipAt !== chipBefore) chip = { text: chipText(page.line(`race:${race.id}.chip`)), left: RACE_FINISH_SHOWN };
+      if (chipBefore !== undefined && chipAt > 0 && chipAt !== chipBefore) chip = { text: chipText(page.line(`race:${race.id}.chip`), race), left: RACE_FINISH_SHOWN };
       const runs = page.line(`race:${race.id}.runs`), before = seen.get(race.id);
       seen.set(race.id, runs);
       if (before !== undefined && runs > before) {
@@ -62,7 +63,9 @@ function lapText(race: RaceRow, clock: string, line: (name: string) => number): 
   if (split > 0) parts.push(engineString('s_race_split', [raceTime(split / 1000)]));
   return parts.join(' · ');
 }
-/** MSZ31: why a run was refused or a lap voided. */
-function chipText(chip: number): string {
+/** MSZ31: why a run was refused or a lap voided; MSZ33: who won, the player or the race's rival. */
+function chipText(chip: number, race: RaceRow): string {
+  const rival = race.rival?.name ?? '';
+  if (chip === RACE_CHIP.won || chip === RACE_CHIP.lost) return engineString(chip === RACE_CHIP.won ? 's_race_rival_won' : 's_race_rival_lost', [rival]);
   return engineString(chip === RACE_CHIP.vehicle ? 's_race_vehicle_only' : chip === RACE_CHIP.foot ? 's_race_foot_only' : 's_race_lap_void');
 }
