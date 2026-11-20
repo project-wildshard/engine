@@ -51,7 +51,7 @@ export function routeFor(slug) {
 }
 
 /** In the page: play one leg and keep its frames per second. Must not close over anything outside itself.
- * @param {RouteLeg & { cap: 0 | 30 | 60 | null }} leg */
+ * @param {RouteLeg & { cap: 0 | 30 | 60 | null, approach?: boolean }} leg */
 export function routeLegOnPage(leg) {
   const api = /** @type {any} */ (window).__wildshard, w = api?.world;
   if (!w || !w.hud.entered || w.hud.paused || !w.game.frameGate()) return Promise.resolve({ error: 'cannot run a route leg before control' });
@@ -175,7 +175,7 @@ export function routeLegOnPage(leg) {
     clearTimeout(timeout);
     timeout = undefined;
     input.setHeld('move.forward', false); input.setHeld('sprint', false); input.setHeld('attack', false);
-    if (leg.fixed && performance.now() > previous) sample(performance.now());
+    if (leg.fixed && !leg.approach && performance.now() > previous) sample(performance.now());
     nav.metres = Math.round(metres);
     finish({ error, samples, nav, frames: game.frameCount - frames0, ms: performance.now() - t0, cap: leg.cap,
       programs: renderer.info?.programs?.length ?? null });
@@ -189,7 +189,7 @@ export function routeLegOnPage(leg) {
     const movedSinceFrame = Math.hypot(p.position.x - prevX, p.position.z - prevZ);
     if (leg.fixed && movedSinceFrame > 18) { end('position jumped during the route'); return; }
     metres += movedSinceFrame; prevX = p.position.x; prevZ = p.position.z;
-    if (now - previous >= (leg.fixed ? 150 : 1000)) sample(now);
+    if (!leg.approach && now - previous >= (leg.fixed ? 150 : 1000)) sample(now);
     const returning = leg.dwell?.road === true && nav.road && !nav.returned;
     const road = returning ? travel() : undefined, crossing = road?.live?.crossing;
     const held = crossing?.current === null && crossing.target === state.home &&
@@ -238,7 +238,8 @@ export function routeLegOnPage(leg) {
         if (now < detourUntil) p.yaw = detourYaw;
         else steer(nextX - x, nextZ - z, dt);
       } else if (!dwelling && leg.face !== undefined) steer(leg.face[0] - x, leg.face[1] - z, dt);
-      if (over) {
+      const arrived = leg.approach === true && at === points.length && (leg.dwell === undefined || dwelled);
+      if (over || arrived) {
         end(nav.reached !== points.length || nav.stuck.length > 0 || (leg.dwell !== undefined && !dwelled)
           || (leg.dwell?.road && !(nav.road && nav.returned)) ? 'incomplete waypoint, dwell or road return' : null);
         return;

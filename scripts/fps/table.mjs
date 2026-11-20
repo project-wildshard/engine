@@ -7,7 +7,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { once } from 'node:events';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
+import { pathToFileURL } from 'node:url';
+import { assembleCapture, atomicJson, cellPath, openResume, readCell, signature } from './matrix.mjs';
 import { capFor, readCaps } from '../budgets/files.mjs';
 import { routeFor } from '../memory/iphone/route.mjs';
 
@@ -36,16 +39,15 @@ const keys = Object.keys(profiles);
 const choices = parseArgs({ options: {
   zone: { type:'string', default:'driftwood-isle' }, profiles:{ type:'string', default:keys.join(',') },
   runs:{ type:'string', default:'3' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
-  'dock-only':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' },
+  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' },
 } }).values;
 
-function assertIdle() {
-  if (existsSync(marker)) throw new Error('Jake is playing');
+function gpuBusy() {
   try {
-    const active = execFileSync('/usr/bin/pgrep',['-f',exclusiveGPU],{encoding:'utf8'}).trim();
-    if (active) throw new Error(`Another browser owns GPU processes ${active}`);
+    return execFileSync('/usr/bin/pgrep', ['-f', exclusiveGPU], {encoding:'utf8'}).trim() !== '';
   } catch (error) {
     if (typeof error !== 'object' || error === null || !('status' in error) || error.status !== 1) throw error;
+    return false;
   }
 }
 
@@ -70,20 +72,50 @@ function table(runs) {
   return [heading,'|---|---:|---:|---:|---:|---:|---:|---:|---|---|',...rows].join('\n');
 }
 
-/** @param {string} description */
-async function worker(description) {
-  const { profile, base, zone, warm, output } = JSON.parse(description);
-  assertIdle();
+/** @typedef {import('../memory/iphone/route.mjs').RouteLeg} RouteLeg */
+/** @typedef {{profile:ProfileSpec & {cpu:number, floor:number}, base:string, zone:string, build:string,
+ * fingerprint:string, output:string, id:string, interval:RouteLeg, approach:RouteLeg[], warm:boolean}} Job */
+
+/** @param {Job} job */
+async function worker(job) {
+  if (existsSync(marker)) return 3;
+  if (gpuBusy()) return 75;
+  if (readCell(job.output, job.fingerprint, job.build, { ...job, floor:job.profile.floor }) !== null) return 0;
   const stop = new AbortController();
   const interrupt = () => stop.abort(new Error('measurement interrupted'));
-  const playing = setInterval(() => { if (existsSync(marker)) stop.abort(new Error('Jake is playing')); },150);
+  const playing = setInterval(() => { if (existsSync(marker)) interrupt(); },150);
   process.once('SIGINT',interrupt); process.once('SIGTERM',interrupt);
   try {
     const {measureFps} = await import('./measure.mjs');
-    const report = await measureFps(profile,{base,zone,route,signal:stop.signal,warm});
-    writeFileSync(output,JSON.stringify(report));
-    return stop.signal.aborted ? 3 : 0;
+    const report = await measureFps(job.profile, {base:job.base, zone:job.zone, route:[job.interval],
+      approach:job.approach, signal:AbortSignal.any([stop.signal, AbortSignal.timeout(240_000)]), warm:job.warm});
+    if (stop.signal.aborted) return 3;
+    atomicJson(job.output, {fingerprint:job.fingerprint, id:job.id, report});
+    if (readCell(job.output, job.fingerprint, job.build, { ...job, floor:job.profile.floor }) !== null) return 0;
+    console.error(report.cold.error ?? report.warm?.error ?? 'cell did not produce complete evidence for this build');
+    return 3;
   } finally { clearInterval(playing); process.removeListener('SIGINT',interrupt); process.removeListener('SIGTERM',interrupt); }
+}
+
+/** @param {Job} job @param {AbortSignal} signal */
+async function measureCell(job, signal) {
+  for (;;) {
+    while (gpuBusy()) await sleep(2000, undefined, {signal});
+    signal.throwIfAborted();
+    const child = spawn('/usr/bin/lockf',['-s','-t','30','-k',lock,join(root,'scripts/browser-lane.sh'),'--max','5',
+      process.execPath,import.meta.filename,'--worker',JSON.stringify(job)],{stdio:'inherit',detached:true});
+    const stop = () => {
+      try { if (child.pid !== undefined) process.kill(-child.pid, 'SIGTERM'); }
+      catch (error) {
+        if (typeof error !== 'object' || error === null || !('code' in error) || error.code !== 'ESRCH') throw error;
+      }
+    };
+    signal.addEventListener('abort',stop,{once:true});
+    const [status] = await once(child,'exit').finally(() => signal.removeEventListener('abort',stop));
+    signal.throwIfAborted();
+    if (status !== 75) return status;
+    await sleep(2000, undefined, {signal});
+  }
 }
 
 async function main() {
@@ -94,53 +126,81 @@ async function main() {
   if (!Number.isSafeInteger(count)||count<1||new Set(selected).size!==selected.length||selected.some(p=>!keys.includes(p)))
     throw new Error('Use a positive run count and a unique list of known profiles');
   const base = new URL(choices.base).href, host = model(), factors = calibration.hosts[host]?.factors ?? {};
-  const out = resolve(choices.out ?? join('tmp/driftwood-fps',String(Date.now())));
+  const rates = choices['cpu-rates']?.split(',').map(Number);
+  if (rates && (selected.length !== 1 || new Set(rates).size !== rates.length ||
+    rates.some(rate => !Number.isFinite(rate) || rate < 1 || rate > 8))) throw new Error('Use unique CPU rates from 1 to 8 for one profile');
   const caps = readCaps(root);
   const plan = selected.flatMap(name => profiles[name].map(spec => {
-    const floor = capFor(caps, `fps/${name}/${zone}`);
-    if (floor?.kind !== 'floor' || floor.hard === null) throw new Error(`Missing FPS floor for ${name}`);
+    const cap = capFor(caps, `fps/${name}/${zone}`), floor = cap?.hard;
+    if (cap?.kind !== 'floor' || typeof floor !== 'number') throw new Error(`Missing FPS floor for ${name}`);
     const cpu = spec.factor === null ? 1 : factors[spec.factor]?.factor ?? (spec.factor === 'desktopTypical' ? 2 : 1);
     if (!Number.isFinite(cpu) || cpu < 1) throw new Error(`Invalid CPU factor for ${name}`);
-    return { name, profile:{...spec,cpu,floor:floor.hard,calibrated:spec.factor===null || spec.factor==='desktopTypical' || factors[spec.factor]?.qualified===true} };
-  }));
-  if (choices['dry-run']) { console.log(JSON.stringify({zone,base,out,host,count,plan,route},null,2)); return 0; }
+    const calibrated = spec.factor===null || spec.factor==='desktopTypical' || factors[spec.factor]?.qualified===true;
+    return (rates ?? [cpu]).map(rate => ({ name, profile:{...spec,cpu:rate,floor,calibrated:rates===undefined && calibrated} }));
+  }).flat());
+  if (choices['dry-run']) { console.log(JSON.stringify({zone,base,host,count,plan,route},null,2)); return 0; }
   if (existsSync(marker)) throw new Error('Jake is playing');
+  const version = await fetch(new URL('/version.json',base),{signal:AbortSignal.timeout(10_000)});
+  const {build} = await version.json();
+  if (!version.ok || typeof build !== 'string' || build === '') throw new Error('The served build could not be pinned');
+  const source = ['fps/table.mjs','fps/matrix.mjs','fps/measure.mjs','fps/verdict.mjs','memory/iphone/route.mjs']
+    .map(file => readFileSync(join(root,'scripts',file),'utf8'));
+  const config = {build,host,base,zone,count,plan,route,warm:!choices['cold-only'],method:signature(source)};
+  const fingerprint = signature(config);
+  const out = resolve(choices.out ?? join(root,'tmp/driftwood-fps',fingerprint.slice(0,16)));
   mkdirSync(out,{recursive:true}); mkdirSync(resolve(lock,'..'),{recursive:true});
-  const started = Date.now(), runs = [];
-  let stopped = false;
-  for (const [i,{name,profile}] of plan.entries()) for (let rep=1;rep<=count;rep++) {
-    if (stopped || existsSync(marker)) break;
-    const output = join(out,`run-${i+1}-${rep}.json`);
-    const description = JSON.stringify({profile,base,zone,warm:!choices['cold-only'] && rep===count,output});
-    const args = ['-k',lock,join(root,'scripts/browser-lane.sh'),'--max','10',process.execPath,import.meta.filename,
-      '--worker',description,...choices['dock-only']?['--dock-only']:[]];
-    const child = spawn('/usr/bin/lockf',args,{stdio:'inherit'});
-    const stop = () => { stopped = true; child.kill('SIGTERM'); };
-    const playing = setInterval(() => { if (existsSync(marker)) stop(); },150);
-    process.once('SIGINT',stop); process.once('SIGTERM',stop);
-    const [status] = await once(child,'exit').finally(() => {
-      clearInterval(playing);
-      process.removeListener('SIGINT',stop); process.removeListener('SIGTERM',stop);
-    });
-    const report = status === 0 ? JSON.parse(readFileSync(output,'utf8')) :
-      { cold:{ verdict:'incomplete', error:`measurement exited ${status}` },warm:null };
-    runs.push({name,profile,rep,...report});
-    console.error(`${name} ${profile.width}×${profile.height} DPR ${profile.dpr}, ${profile.graphics}, #${rep}: ${report.cold.verdict}`);
-    if (report.cold.error) console.error(report.cold.error);
+  openResume(out,fingerprint,config);
+  console.error(`Build ${build}, resume ${out}`);
+
+  const started = Date.now(), stop = new AbortController();
+  const interrupt = () => stop.abort(new Error('measurement interrupted or Jake is playing'));
+  const playing = setInterval(() => { if (existsSync(marker)) interrupt(); },150);
+  process.once('SIGINT',interrupt); process.once('SIGTERM',interrupt);
+  const runs = plan.flatMap(({name,profile},i) => Array.from({length:count},(_,rep) =>
+    ({name,profile,i,rep:rep+1,warm:config.warm && rep+1===count})));
+  const groups = runs.map(run => route.map((interval,j) => {
+    const id = `${run.i+1}-${run.rep}-${j+1}`;
+    // Get to the same starting waypoint on foot. Sample only the assigned leg.
+    const approach = route.slice(0,j).filter(leg => leg.kind === 'walk').map(({dwell:_dwell,...leg}) => leg);
+    return { id, interval, approach, profile:run.profile, floor:run.profile.floor, warm:run.warm,
+      output:cellPath(out,id), build, base, zone, fingerprint };
+  }));
+  try {
+    for (let j=0; j<route.length; j++) for (const group of groups) {
+      stop.signal.throwIfAborted();
+      const job = group[j];
+      if (readCell(job.output,fingerprint,build,job) !== null) continue;
+      const status = await measureCell(job,stop.signal);
+      console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : 'incomplete'}`);
+    }
+  } catch (error) {
+    if (!stop.signal.aborted) throw error;
+    console.error(stop.signal.reason.message);
+  } finally {
+    clearInterval(playing); process.removeListener('SIGINT',interrupt); process.removeListener('SIGTERM',interrupt);
   }
+  let completed = 0;
+  const measured = runs.map(({name,profile,rep,warm},idx) => {
+    const cells = groups[idx].map(job => readCell(job.output,fingerprint,build,job));
+    completed += cells.filter(cell => cell !== null).length;
+    return { name,profile,rep,cold:assembleCapture(cells.map(cell => cell?.cold),route,profile.floor),
+      warm:warm ? assembleCapture(cells.map(cell => cell?.warm),route,profile.floor) : null };
+  });
+  const progress = {completed,total:groups.length*route.length};
   const scope = choices['dock-only'] ? 'dock only' : 'full route';
-  const builds = new Set(runs.flatMap(run => [run.cold.version?.build, run.warm?.version?.build].filter(Boolean)));
-  const mixed = builds.size > 1;
-  const markdown = [`## Driftwood FPS (${scope})`, '', table(runs), '',
-    ...(mixed ? ['The served build changed between captures. Repeat on a pinned origin.'] : []),
+  const markdown = [`## Driftwood FPS (${scope})`, '',table(measured),'',
+    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. Each leg starts from a fresh boot and an on-foot approach.`,
     'Phone GPU estimates await DF5.'].join('\n');
   writeFileSync(join(out,'table.md'),`${markdown}\n`);
-  writeFileSync(join(out,'table.json'),`${JSON.stringify({schema:1,host,base,zone,scope:choices['dock-only']?'dock':'route',seconds:(Date.now()-started)/1000,runs},null,1)}\n`);
+  atomicJson(join(out,'table.json'),{schema:1,host,base,zone,scope:choices['dock-only']?'dock':'route',
+    seconds:(Date.now()-started)/1000,progress,runs:measured});
   console.log(markdown);
-  if (mixed || stopped || runs.length!==plan.length*count || runs.some(run=>run.cold.verdict==='incomplete'||run.warm?.verdict==='incomplete')) return 3;
-  if (runs.some(run=>run.cold.verdict==='miss')) return 2;
-  return runs.every(run=>run.profile.calibrated) ? 0 : 3;
+  if (stop.signal.aborted || measured.some(run=>run.cold.verdict==='incomplete'||run.warm?.verdict==='incomplete')) return 3;
+  if (measured.some(run=>run.cold.verdict==='miss')) return 2;
+  return measured.every(run=>run.profile.calibrated) ? 0 : 3;
 }
 
-try { process.exitCode = choices.worker ? await worker(choices.worker) : await main(); }
-catch (error) { console.error(error); process.exitCode = 3; }
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try { process.exitCode = choices.worker ? await worker(JSON.parse(choices.worker)) : await main(); }
+  catch (error) { console.error(error); process.exitCode = 3; }
+}

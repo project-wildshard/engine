@@ -9,13 +9,57 @@ import { fpsVerdict } from './verdict.mjs';
  * width:number, height:number, dpr:1|2|3, cap:30|60|null, floor:number}} Profile */
 /** @typedef {import('../memory/iphone/route.mjs').RouteLeg} RouteLeg */
 
+/**
+ * Time a subset of real composer frames without synchronizing the GPU.
+ * It is serialized with the route and runs in the page.
+ * @param {{render:(...args:unknown[])=>unknown}} composer
+ * @param {WebGL2RenderingContext} gl
+ */
+function observeMetal(composer, gl) {
+  const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+  if (ext === null) return () => null;
+  const render = composer.render;
+  /** @type {number[]} */
+  const millis = [];
+  /** @type {WebGLQuery|null} */
+  let pending = null;
+  let frame = 0;
+  const settle = () => {
+    if (pending === null || !gl.getQueryParameter(pending, gl.QUERY_RESULT_AVAILABLE)) return;
+    if (!gl.getParameter(ext.GPU_DISJOINT_EXT)) {
+      const ms = gl.getQueryParameter(pending, gl.QUERY_RESULT) / 1e6;
+      if (Number.isFinite(ms) && ms > 0) millis.push(ms);
+    }
+    gl.deleteQuery(pending);
+    pending = null;
+  };
+  composer.render = function (...args) {
+    settle();
+    if (pending !== null || ++frame % 8 !== 0) return render.apply(this, args);
+    pending = gl.createQuery();
+    if (pending === null) return render.apply(this, args);
+    gl.beginQuery(ext.TIME_ELAPSED_EXT, pending);
+    try { return render.apply(this, args); }
+    finally { gl.endQuery(ext.TIME_ELAPSED_EXT); }
+  };
+  return () => {
+    composer.render = render;
+    settle();
+    if (pending !== null) gl.deleteQuery(pending);
+    millis.sort((a, b) => a - b);
+    const at = (/** @type {number} */ q) => millis[Math.floor((millis.length - 1) * q)] ?? null;
+    return { frames: millis.length, p50Ms: at(0.5), p95Ms: at(0.95) };
+  };
+}
+
 /** Attach the first measurement before the boot can give control to the player.
- * @param {RouteLeg[]} route @param {Profile} profile */
-function routeScript(route, profile) {
+ * @param {RouteLeg[]} route @param {Profile} profile @param {RouteLeg[]} approach */
+function routeScript(route, profile, approach) {
   const cap = profile.cap ?? (profile.tier === 'phone' ? 0 : null);
   return `(() => {
     const runLeg = (${routeLegOnPage.toString()});
-    const route = ${JSON.stringify(route)};
+    const route = ${JSON.stringify(route)}, approach = ${JSON.stringify(approach)};
+    const observeMetal = (${observeMetal.toString()});
     document.addEventListener('ws:control-ready', () => {
       window.__dfRoute = (async () => {
         const game = window.__wildshard.world.game, renderer = game.renderer;
@@ -25,9 +69,16 @@ function routeScript(route, profile) {
         const witness = { build: window.__WS_BUILD_ID__ ?? null, dpr: renderer.getPixelRatio(), css: [innerWidth, innerHeight],
           gpu, level: game.level.id, phoneGraphics: game.phoneGraphics, programs: renderer.info.programs?.length ?? null };
         const legs = [];
+        for (const leg of approach) {
+          const result = await runLeg({...leg, approach: true, cap: ${JSON.stringify(cap)}});
+          if (result.error) return {witness, legs, error: leg.name + ': ' + result.error};
+        }
         for (const leg of route) {
+          const startPrograms = renderer.info.programs?.length ?? null;
+          const stopMetal = observeMetal(game.composer, gl);
           const result = await runLeg({...leg, cap: ${JSON.stringify(cap)}});
-          legs.push({ name: leg.name, ...result });
+          const metal = stopMetal();
+          legs.push({ name: leg.name, ...result, metal, startPrograms });
           if (result.error) break;
         }
         return { witness, legs };
@@ -76,8 +127,8 @@ async function enterGrid(page, base, zone) {
 }
 
 /** @param {import('playwright').BrowserContext} context @param {Profile} profile
- * @param {{base:string, zone:string, route:RouteLeg[], signal:AbortSignal}} options */
-async function capture(context, profile, { base, zone, route, signal }) {
+ * @param {{base:string, zone:string, route:RouteLeg[], approach?:RouteLeg[], signal:AbortSignal}} options */
+async function capture(context, profile, { base, zone, route, approach = [], signal }) {
   const page = await context.newPage();
   const stop = () => { void page.close().catch(() => undefined); };
   const deadline = AbortSignal.any([signal, AbortSignal.timeout(240_000)]);
@@ -88,7 +139,7 @@ async function capture(context, profile, { base, zone, route, signal }) {
       const cdp = await context.newCDPSession(page);
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: profile.cpu });
     }
-    await page.addInitScript({ content: routeScript(route, profile) });
+    await page.addInitScript({ content: routeScript(route, profile, approach) });
     const version = await page.request.get(new URL('/version.json', base).href, {timeout:10_000}).then(response => response.json());
     await enterGrid(page, base, zone);
     await page.waitForFunction('window.__dfRoute !== undefined', undefined, { timeout: 90_000 });
@@ -97,9 +148,9 @@ async function capture(context, profile, { base, zone, route, signal }) {
     const costs = raw.legs.map((/** @type {{name:string,samples?:Parameters<typeof legSummary>[0]}} */ leg) =>
       ({ name: leg.name, ...legSummary(leg.samples ?? []) }));
     const dpr = profile.cap === null ? profile.dpr : profile.graphics === 'high' ? 2 : 1;
-    const error = raw.witness.phoneGraphics !== (profile.tier === 'phone') ? 'engine tier differs from profile' :
+    const error = raw.error ?? (raw.witness.phoneGraphics !== (profile.tier === 'phone') ? 'engine tier differs from profile' :
       raw.witness.dpr !== dpr ? 'drawing buffer DPR differs from profile' :
-      raw.witness.build !== version.build ? 'game build differs from version.json' : null;
+      raw.witness.build !== version.build ? 'game build differs from version.json' : null);
     return { version, ...raw, ...check, costs, ...(error === null ? {} : { verdict: 'incomplete', error }) };
   } catch (error) {
     return { ...fpsVerdict([], route, profile.floor), error: deadline.aborted ? String(deadline.reason) : String(error) };
@@ -110,7 +161,7 @@ async function capture(context, profile, { base, zone, route, signal }) {
 }
 
 /** One cold capture per fresh browser context. Its optional warm repeat keeps the actual HTTP and SW caches.
- * @param {Profile} profile @param {{base:string,zone:string,route:RouteLeg[],signal:AbortSignal,warm?:boolean}} options */
+ * @param {Profile} profile @param {{base:string,zone:string,route:RouteLeg[],approach?:RouteLeg[],signal:AbortSignal,warm?:boolean}} options */
 export async function measureFps(profile, options) {
   const browser = await openProfile(profile);
   try {
