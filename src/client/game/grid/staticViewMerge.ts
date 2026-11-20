@@ -13,7 +13,7 @@
  * A member that moves, hides (itself or an ancestor below the root), changes material or leaves the root leaves its merge
  * at the next check and draws on its own again for good. Leaving phone Low or the region ends every merge.
  */
-import { Matrix4, Mesh, ShaderMaterial, type Material, type Object3D } from 'three';
+import { Matrix4, Mesh, ShaderMaterial, Texture, type Material, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { TIER } from '@wildshard/engine/core/tier';
@@ -52,10 +52,20 @@ export function mergeableMaterial(material: unknown): 'any' | 'translation' | nu
   const m = material as Material;
   if (!m.visible || m.transparent || m.userData['sceneAlpha'] === true || m.userData['sceneCard'] === true) return null;
   if (Reflect.get(m, 'isGraphShaderMaterial') === true) {
-    if (Reflect.get(m, 'readsModelSpace') !== false) return null;
+    // a graph that samples a texture (the cove's baked lightmaps) drew black merged on the look board: keep it off
+    if (Reflect.get(m, 'readsModelSpace') !== false || samplesTexture(m)) return null;
     return Reflect.get(m, 'movesVertices') === false ? 'any' : 'translation';
   }
   return m instanceof ShaderMaterial ? null : 'any';
+}
+/** Whether a shader material's uniforms hold a texture. */
+function samplesTexture(material: Material): boolean {
+  const uniforms: unknown = Reflect.get(material, 'uniforms');
+  if (typeof uniforms !== 'object' || uniforms === null) return false;
+  return Object.values(uniforms).some((uniform: unknown) => {
+    const value: unknown = typeof uniform === 'object' && uniform !== null ? Reflect.get(uniform, 'value') : undefined;
+    return value instanceof Texture || (Array.isArray(value) && value.some(item => item instanceof Texture));
+  });
 }
 /** A plain mesh (own prototype Mesh) with a mergeable material and a geometry the merge copies whole. */
 export function mergeableMesh(object: Object3D): object is Mesh {

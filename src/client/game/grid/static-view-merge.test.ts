@@ -2,7 +2,7 @@
 // meta DRIFTWOOD-FPS DF10 (mini-df10): a region's still set pieces drawn one view mesh per material; a member that moves
 // or hides draws on its own again.
 import { expect, test } from 'vitest';
-import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, ShaderMaterial } from 'three';
+import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, ShaderMaterial, Texture } from 'three';
 import { Scope } from '@wildshard/engine/app/scope';
 import { SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
 import { installStaticViewMerge, mergeableMaterial, mergeableMesh, staticMerge, STATIC_MERGE_DEFAULT, STATIC_MERGE_PHONE_LOW, SWEEP_STEPS } from './staticViewMerge';
@@ -26,6 +26,8 @@ test('only plain opaque meshes on a world-space material merge', () => {
   expect(mergeableMaterial(graph(true, false))).toBeNull();
   expect(mergeableMaterial(graph(false, false))).toBe('any');
   expect(mergeableMaterial(graph(false, true))).toBe('translation');
+  const lit = Object.assign(new ShaderMaterial({ uniforms: { lightMap: { value: new Texture() } } }), { isGraphShaderMaterial: true, readsModelSpace: false, movesVertices: false });
+  expect(mergeableMaterial(lit)).toBeNull(); // a sampled texture keeps a graph off the merge
   expect(mergeableMesh(new Mesh(tri(0), basic))).toBe(true);
   const hooked = new Mesh(tri(0), basic); hooked.onBeforeRender = function onBeforeRender() { /* reads the mesh */ };
   expect(mergeableMesh(hooked)).toBe(false);
