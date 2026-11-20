@@ -1,3 +1,4 @@
+import type { Events } from '../events/events';
 import type { SimHost } from '../../../server/engine/sim';
 import { Flags, type FlagListener } from '../world/interact/flags';
 import { QuestState, type QuestDef } from './core';
@@ -76,12 +77,14 @@ export class QuestBook {
   /** Silent document restores invalidate derived owners until they rebind. */
   restoreVersion = 0;
   private readonly unwatch: () => void;
-  constructor(player: string, flags: Flags, quests: QuestState[]) {
-    this.player = player; this.flags = flags; this.quests = quests;
+  private readonly events: Events | undefined;
+  constructor(player: string, flags: Flags, quests: QuestState[], events?: Events) {
+    this.player = player; this.flags = flags; this.quests = quests; this.events = events;
+    for (const quest of quests) quest.ownedBy(player);
     this.unwatch = flags.onChange(() => { this.version++; });
   }
   /** Add a quest to this book; the lead's are the host's own. */
-  adopt(def: QuestDef): QuestState { const state = new QuestState(def, this.flags); this.quests.push(state); return state; }
+  adopt(def: QuestDef): QuestState { const state = new QuestState(def, this.flags, this.events); state.ownedBy(this.player); this.quests.push(state); return state; }
   /** Register a quest owner's per-player continuation. */
   part(id: string, part: QuestBookPart): void { if (this.parts.has(id)) throw new Error(`Duplicate quest book part ${id}`); this.parts.set(id, part); }
   save(): QuestBookSaved {
@@ -104,7 +107,7 @@ export class QuestBook {
 /** What a player's client reads: its quests, and which of its own flags are up: a personal flag reaches nobody else. */
 export interface QuestProgressRead { readonly version: number; readonly rows: readonly QuestProgress[]; readonly flags: readonly string[] }
 /** What a host lends its books: the lead's quest view (SB34b) is the host's `questFlags`. */
-type QuestHost = Pick<SimHost, 'flags' | 'quests' | 'players' | 'level'> & { readonly questFlags?: Flags };
+type QuestHost = Pick<SimHost, 'flags' | 'quests' | 'players' | 'level'> & { readonly questFlags?: Flags; readonly events?: Events };
 /** Every player's book on one host, made as a player is first read. */
 export class QuestBooks {
   /** The first player's book is the host's flags and quests. */
@@ -120,7 +123,7 @@ export class QuestBooks {
   constructor(host: QuestHost) {
     const [first] = host.players.keys();
     if (first === undefined) throw new Error('Quest books require a player');
-    this.host = host; this.lead = new QuestBook(first, host.questFlags ?? host.flags, host.quests);
+    this.host = host; this.lead = new QuestBook(first, host.questFlags ?? host.flags, host.quests, host.events);
     this.books.set(this.lead.player, this.lead);
     this.claim(host.level.quests.flatMap(questFlags));
     // A marker hides on a flag, and a client draws markers: it is told those flags as it is told a gate's.
@@ -141,7 +144,7 @@ export class QuestBooks {
     const known = this.books.get(id);
     if (known !== undefined) return known;
     if (!this.host.players.has(id)) throw new RangeError(`Unknown quest player ${id}`);
-    const flags = new PlayerFlags(this.host.flags, this.claimed), book = new QuestBook(id, flags, this.host.level.quests.map(def => new QuestState(def, flags)));
+    const flags = new PlayerFlags(this.host.flags, this.claimed), book = new QuestBook(id, flags, this.host.level.quests.map(def => new QuestState(def, flags, this.host.events)), this.host.events);
     this.books.set(id, book);
     for (const owner of this.owners) owner(book);
     return book;
@@ -188,7 +191,7 @@ export class QuestBooks {
 }
 
 /** The host's books; the host saves them from here on. */
-export function questBooks(host: Pick<SimHost, 'flags' | 'quests' | 'players' | 'level' | 'questStore'>): QuestBooks {
+export function questBooks(host: Pick<SimHost, 'flags' | 'quests' | 'players' | 'level' | 'questStore'> & Partial<Pick<SimHost, 'events'>>): QuestBooks {
   const held = host.questStore;
   if (held instanceof QuestBooks) return held;
   const books = new QuestBooks(host);

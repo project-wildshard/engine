@@ -29,7 +29,9 @@ export function installWakeBoss(host: SimHost, input: unknown, placement: { pool
     disarm: () => undefined, arm: () => undefined, onPlayerDeath: () => false,
     returnBeaten: () => { host.flags.clear(row.deadFlag); returned?.(); encounter.returnBeaten(); } };
   const observation = (): WakeBossObservation => ({ player: nearestOnGround(host.players, pool.x, pool.z).position, animal: body(), wake: host.flags.has(row.wakeFlag), dead: host.flags.has(row.deadFlag) });
-  const flush = (): void => { for (const effect of encounter.takeEffects()) if (effect.kind === 'outcome') host.events.emit('boss.attempt', { boss: row.id, level: row.level, outcome: effect.outcome }); };
+  const flush = (player?: string): void => {
+    for (const effect of encounter.takeEffects()) if (effect.kind === 'outcome') host.events.emit('boss.attempt', { boss: row.id, level: row.level, outcome: effect.outcome, player: player ?? nearestOnGround(host.players, pool.x, pool.z).id });
+  };
   host.events.on('world.slept', ({ seconds }) => { party.slept(seconds); }, host.scope);
   host.events.on('damage.dealt', ({ req, killed }) => {
     const actor = body(); if (killed && actor !== null && req.target === actor.combatActor()) host.flags.set(row.deadFlag);
@@ -39,7 +41,7 @@ export function installWakeBoss(host: SimHost, input: unknown, placement: { pool
   host.events.on('player.died', ({ actor }) => {
     // A room's fight outlives a fall while anyone else stands in the arena; the fallen one goes to their checkpoint as ever.
     for (const [id, player] of host.players) if (id !== actor.id && player.health.alive && near(player.position)) return;
-    encounter.onPlayerDeath(host.players.get(actor.id)?.position ?? host.playerFocus); flush();
+    encounter.onPlayerDeath(host.players.get(actor.id)?.position ?? host.playerFocus); flush(actor.id);
   }, host.scope);
   host.onStep(row.step, dt => { party.observe(contended, dt); encounter.update(observation()); flush(); }, {
     snapshot: () => { const { engaged } = party; return JSON.stringify({ ...encounter.encounterSnapshot(), ...(engaged === 0 ? {} : { engaged }) }); },

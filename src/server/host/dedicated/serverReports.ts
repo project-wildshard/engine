@@ -5,12 +5,13 @@ import type { WorkerReading } from './cellProtocol';
 import type { ServerSentry } from './serverSentry';
 import type { World } from './world';
 import type { RoomSessionSummary } from './roomSessions';
+import type { RoomGameCount } from './roomGameMetrics';
 
 /** How often a record goes, in ms. */
 const RECORD_MS = 60_000;
 /** A report's wait. */
 const POST_MS = 3000;
-const SESSIONS_PER_REPORT = 48;
+const METRIC_ROWS_PER_REPORT = 48;
 
 /** How the reports are built. */
 export interface ServerReportsOptions {
@@ -39,6 +40,7 @@ export class ServerReports {
   private world: Pick<World, 'livePlayers'> | undefined;
   private lastActive = false;
   private readonly ended: RoomSessionSummary[] = [];
+  private readonly gameEvents: RoomGameCount[] = [];
   private players = 0;
   private held = 0;
   constructor(options: ServerReportsOptions) {
@@ -48,12 +50,18 @@ export class ServerReports {
   watch(world: Pick<World, 'livePlayers'>): void { this.world = world; }
   sessions(rows: readonly RoomSessionSummary[]): void {
     if (this.options.telemetryUrl === undefined) return;
-    const room = Math.max(0, SESSIONS_PER_REPORT * 60 - this.ended.length);
+    const room = Math.max(0, METRIC_ROWS_PER_REPORT * 60 - this.ended.length);
     this.ended.push(...rows.slice(0, room));
     if (rows.length > room) this.options.log({ at: 'report.sessions-backlog', discarded: rows.length - room });
   }
-  flushSessions(): void {
-    while (this.ended.length > 0) this.record();
+  game(rows: readonly RoomGameCount[]): void {
+    if (this.options.telemetryUrl === undefined) return;
+    const room = Math.max(0, METRIC_ROWS_PER_REPORT * 60 - this.gameEvents.length);
+    this.gameEvents.push(...rows.slice(0, room));
+    if (rows.length > room) this.options.log({ at: 'report.game-backlog', discarded: rows.length - room });
+  }
+  flushGameMetrics(): void {
+    while (this.ended.length > 0 || this.gameEvents.length > 0) this.record();
   }
   /** One worker's 10 s reading. */
   heard(index: number, reading: WorkerReading): void {
@@ -81,14 +89,16 @@ export class ServerReports {
     this.players = 0; this.held = 0;
     const live = this.world?.livePlayers();
     const active = players + held + (live?.humans ?? 0) + (live?.agents ?? 0) > 0;
-    const sessions = this.ended.splice(0, SESSIONS_PER_REPORT);
-    const due = active || this.lastActive || sessions.length > 0;
+    const sessions = this.ended.splice(0, METRIC_ROWS_PER_REPORT);
+    const gameEvents = this.gameEvents.splice(0, METRIC_ROWS_PER_REPORT - sessions.length);
+    const metrics = sessions.length + gameEvents.length > 0;
+    const due = active || this.lastActive || metrics;
     this.lastActive = active;
     if (telemetryUrl === undefined || !due) return;
-    this.post(telemetryUrl, { kind: 'room', build, install: `server-${channel}`, ...(tag === undefined ? {} : { tag }), readings: rows.length, players, held, ...(live === undefined ? {} : { zones: live.zones }), ...(sessions.length === 0 ? {} : { sessions }), awake: total(latest, row => row.awake), cells: total(latest, row => row.cells),
+    this.post(telemetryUrl, { kind: 'room', build, install: `server-${channel}`, ...(tag === undefined ? {} : { tag }), readings: rows.length, players, held, ...(live === undefined ? {} : { zones: live.zones }), ...(sessions.length === 0 ? {} : { sessions }), ...(gameEvents.length === 0 ? {} : { gameEvents }), awake: total(latest, row => row.awake), cells: total(latest, row => row.cells),
       ticks: total(rows, row => row.ticks), ticksPerSecond: rows.length === 0 ? 0 : rows.reduce((low, row) => Math.min(low, row.ticksPerSecond), Number.POSITIVE_INFINITY), p50: peak(rows, row => row.p50), p95: peak(rows, row => row.p95), p99: peak(rows, row => row.p99), max: peak(rows, row => row.max),
       drops: total(rows, row => row.drops), rss: peak(rows, row => row.rss), heap: peak(rows, row => row.heap), refused: total(latest, row => row.refused), dropped: total(latest, row => row.dropped),
-      frameBytes: total(latest, row => row.frameBytes), eventBytes: total(latest, row => row.eventBytes) }, sessions.length === 0 ? undefined : this.options.roomMetricsToken);
+      frameBytes: total(latest, row => row.frameBytes), eventBytes: total(latest, row => row.eventBytes) }, metrics ? this.options.roomMetricsToken : undefined);
   }
   private post(url: string, body: unknown, roomToken?: string): void {
     const sent = this.send(url, body, roomToken).finally(() => { this.flying.delete(sent); });

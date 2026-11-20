@@ -73,7 +73,7 @@ function subscribe(app: App): void {
   app.events.on('player.died', ({ cause }) => { analytics?.record('death.cause', { level, cause: cause?.kind ?? 'unknown' }); }, scope);
   app.events.on('weapon.fired', ({ id }) => { analytics?.record('weapon.used', { level, weapon: id }); }, scope);
   app.events.on('quest.step', ({ level: questLevel, quest, step }) => { analytics?.record('quest.step', { level: questLevel, quest, step: step ?? 'completed' }); }, scope);
-  app.events.on('boss.attempt', (event) => { analytics?.record('boss.attempt', { level, ...event }); }, scope);
+  app.events.on('boss.attempt', ({ boss, outcome, level: where }) => { analytics?.record('boss.attempt', { level: where ?? level, boss, outcome }); }, scope);
   app.events.on('download.parts', (event) => { analytics?.record('download.parts', { id: event.id, level: event.level, outcome: event.outcome, packs: event.packs ? 'on' : 'off', parts: event.parts, failed: event.failed, fallback: event.fallbackFiles, fetched: event.fetched }); }, scope);
 }
 /** Bind telemetry counters to the current application. */

@@ -35,6 +35,7 @@ import { clearStand, entrywaysStand, floorBelow } from '@wildshard/engine/physic
 import type { GridAssembly } from '@wildshard/engine/game/grid/assembly';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
 import { buildStrips } from '../standalone/roadWorld';
+import type { RoomGameEvent } from './roomGameMetrics';
 import { crossedTo, finite, type CrossArrival, type CrossTarget } from './crossing';
 
 /** A fresh seat's step aside from the spawn, in metres, in turn. */
@@ -136,15 +137,30 @@ export class DedicatedRoom implements CrossTarget {
       const history=hitHistoryOf(this.host);if(history!==undefined)history.measureRewinds=true;
       this.host.events.on('damage.dealt',({req,dealt})=>{options.playtest?.({kind:'hit',tick:this.host.state.tick,amount:dealt,network:req.attackSeq!==undefined,rewind:req.rewind??{requested:0,applied:0,clamped:false}});},this.host.scope);
     }
-    if (options.metricEvents === true) this.host.events.on('player.died', ({ actor }) => {
-      const seat = bodies.get(actor.id);
-      if (seat !== undefined) options.post({ kind: 'metric-death', device: seat.device });
-    }, this.host.scope);
+    if (options.metricEvents === true) this.collectGameMetrics();
     // E7.7: a room shares one sky, and no client's word moves it.
     actRoutes(this.host).climate = null;
     actRoutes(this.host).time = null;
     delete actRoutes(this.host).day;
     this.blank = exportPlayer(this.host, this.lead, { store: {}, ledger: { serial: 0, rows: [] } });
+  }
+  private collectGameMetrics(): void {
+    const { events, scope } = this.host;
+    const tell = (id: string, metric: RoomGameEvent): void => {
+      const seat = this.bodies.get(id);
+      if (seat !== undefined) this.options.post({ kind: 'metric-event', device: seat.device, metric });
+    };
+    events.on('player.died', ({ actor }) => { tell(actor.id, 'death'); }, scope);
+    events.on('quest.step', ({ player, step, startedNow }) => {
+      if (player === undefined || questBooks(this.host).restoring) return;
+      if (startedNow === true) tell(player, 'quest-start');
+      if (step === null) tell(player, 'quest-complete');
+    }, scope);
+    events.on('boss.attempt', ({ outcome, player }) => {
+      if (player === undefined) return;
+      const metric = outcome === 'started' ? 'boss-start' : outcome === 'won' ? 'boss-kill' : outcome === 'died' ? 'boss-wipe' : undefined;
+      if (metric !== undefined) tell(player, metric);
+    }, scope);
   }
   /** The grid instance this room is (GO3). */
   get name(): string { return this.options.cell ?? cellName(this.options.slug); }

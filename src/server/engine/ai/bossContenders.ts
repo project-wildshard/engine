@@ -39,11 +39,11 @@ export class BossContenders {
   /** SC5: seconds a beaten boss's arena has stood empty. */
   private emptyFor = 0;
   /** The point `BossBrain` watches, live. */
-  readonly player: { readonly position: Vector3 };
+  readonly player: { readonly position: Vector3; readonly id: string };
   constructor(players: ReadonlyMap<string, PlayerSim>, inArena: ArenaPlayer, place: (player: PlayerSim, position: Vector3, yaw: number) => void, beaten?: BeatenReturn) {
     this.players = players; this.inArena = inArena; this.place = place; this.beaten = beaten;
     const contender = (): PlayerSim => this.contender();
-    this.player = { get position() { return contender().position; } };
+    this.player = { get position() { return contender().position; }, get id() { return contender().id; } };
   }
   private first(): PlayerSim {
     const first = this.players.values().next();

@@ -1,3 +1,4 @@
+import type { RoomGameEvent } from './roomGameMetrics';
 import type { ChatReport, WorldLine } from '@wildshard/engine/net/chat';
 import type { DevAnswer } from './devControl';
 import type { PlayerDoc } from './playerDoc';
@@ -79,7 +80,7 @@ export interface WorkerReading {
 }
 /** What a cell tells the worker it runs on. */
 export type RoomNews =
-  | { readonly kind: 'metric-death'; readonly device: string }
+  | { readonly kind: 'metric-event'; readonly device: string; readonly metric: RoomGameEvent }
   | {readonly kind:'playtest';readonly row:PlaytestHit}
   | { readonly kind: 'left'; readonly device: string; readonly seats: number }
   | { readonly kind: 'seated'; readonly device: string; readonly body: string; readonly seats: number;readonly admission?:number;readonly checkpoint?:DurableCheckpoint }

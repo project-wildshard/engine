@@ -42,6 +42,7 @@ import { persistenceEnvelope } from '@wildshard/engine/net/persistenceWord';
 import { SeatQueue } from './seatQueue';
 import type { ZoneEntryStore } from './saves/zoneEntries';
 import type { RoomSessions, RoomSessionStore } from './roomSessions';
+import type { RoomGameStore } from './roomGameMetrics';
 
 export interface LivePlayers {
   readonly humans: number;
@@ -146,6 +147,7 @@ export interface PlayerSaves {
   stats?: () => Readonly<Record<string, number>>;
   readonly zoneEntries?: ZoneEntryStore;
   readonly metricSessions?: RoomSessionStore;
+  readonly roomGame?: RoomGameStore;
 }
 /** How the world is built. */
 export interface WorldOptions {
@@ -427,9 +429,9 @@ export class World {
         }
       }
     }
-    else if (news.kind === 'metric-death') {
-      const { device, slug: cell } = news;
-      if (this.seated.get(device) === cell) this.options.sessions?.died(device);
+    else if (news.kind === 'metric-event') {
+      const { device, slug: cell, metric } = news;
+      if (this.seated.get(device) === cell) this.options.sessions?.event(device, metric);
     }
     else if (news.kind === 'refused') this.refuse(news.reason);
     else if (news.kind === 'recovered') void this.recover(news.device, cellShard(news.slug), news.seq);

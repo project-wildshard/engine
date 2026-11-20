@@ -7,7 +7,7 @@ export interface FaultEvent { source: string; message: string; phase?: Phase; li
 export interface EventMap {
   'app.state': { prev: AppState; next: AppState };
   /** a quest moved a step (src/shared/engine/quest/core.ts emits it; telemetry reads it) */
-  'quest.step': { level: string; quest: string; step: string | null; previous: string | null };
+  'quest.step': { level: string; quest: string; step: string | null; previous: string | null; player?: string; startedNow?: boolean };
   'level.loaded': { id: string };
   'level.unloaded': { id: string };
   'creature.signal': { name: string; x: number; z: number };
@@ -30,7 +30,7 @@ export interface EventMap {
   'explore.studio': boolean;
   'explore.turntable': { on: boolean; key?: { x: number; y: number; z: number } };
   'fault': FaultEvent;
-  'boss.attempt': { boss: string; outcome: 'started' | 'won' | 'died' | 'lost' | 'left'; level?: string };
+  'boss.attempt': { boss: string; outcome: 'started' | 'won' | 'died' | 'lost' | 'left'; level?: string; player?: string };
   /** DL20: one per boot, once its level download settled (complete, failed or cancelled; cached or downloaded): on the
    *  packs path the parts read and failed, the files a failed part left to their loose copies and the loose fetches made
    *  for them (the loose copies retire only after a week of boots with none); `packs` false is the denominator's rest */

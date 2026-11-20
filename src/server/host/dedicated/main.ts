@@ -29,6 +29,7 @@ import { readZoneUploads, zoneSelectRoute } from './zoneSelect';
 import { zoneSelectPressRoute } from './zoneSelectPress';
 import { ServerReports } from './serverReports';
 import { RoomSessions } from './roomSessions';
+import { RoomGameMetrics } from './roomGameMetrics';
 import { ServerMetrics, metricsPort } from './serverMetrics';
 import { sendSentryTest, serverSentry } from './serverSentry';
 import {PlaytestFile} from './playtest';
@@ -85,9 +86,13 @@ const seatSecret = need('SEAT_SECRET');
 const arrivals = saves.zoneEntries === undefined ? undefined : new ZoneEntries(saves.zoneEntries, release.channel, seatSecret, log);
 const sessions = saves.metricSessions === undefined ? undefined
   : new RoomSessions(saves.metricSessions, release.channel, seatSecret, rows => { reports.sessions(rows); }, log);
+const roomGame = saves.roomGame === undefined ? undefined
+  : new RoomGameMetrics(saves.roomGame, release.channel, rows => { reports.game(rows); }, log);
+if (roomGame !== undefined) sessions?.watchGame(roomGame);
 const arrivalScope = new Scope('dedicated.zone-entries');
 if (arrivals !== undefined) arrivalScope.interval(ZONE_ENTRY_MINUTE_MS, () => { void arrivals.flush(); });
 if (sessions !== undefined) arrivalScope.interval(ZONE_ENTRY_MINUTE_MS, () => { void sessions.flush(); });
+if (roomGame !== undefined) arrivalScope.interval(ZONE_ENTRY_MINUTE_MS, () => { void roomGame.flush(); });
 const recordTag=setting('RECORD_TAG');
 const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD_TURN_KEY_TOKEN');
 // J353: zone entry is the only implementation. Old box files may retain this row during rollout.
@@ -183,8 +188,10 @@ stop = (code): void => { if (draining) return; draining = true; void (async (): 
   if (sessions !== undefined) {
     sessions.endAll();
     await within(3000, () => sessions.drain()).catch(() => { log({ at: 'room-sessions.drain-timeout', channel: release.channel }); });
-    reports.flushSessions();
   }
+  if (roomGame !== undefined) await within(3000, async () => { await roomGame.flush(); await roomGame.flush(); })
+    .catch(() => { log({ at: 'room-game-metrics.drain-timeout', channel: release.channel }); });
+  reports.flushGameMetrics();
   reports.dispose();
   await reports.settled();
   const recorded=await playtest?.close();if(recorded===false)log({at:'playtest.incomplete'});

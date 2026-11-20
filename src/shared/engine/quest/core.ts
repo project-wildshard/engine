@@ -66,6 +66,7 @@ export class QuestState {
   readonly def: QuestDef;
   readonly flags: Flags;
   private readonly events: Events | undefined;
+  private player: string | undefined;
   constructor(def: QuestDef, flags: Flags, events?: Events, scope?: Scope) {
     this.def = def; this.flags = flags; this.events = events;
     this.started = test(flags, def.startWhen);
@@ -73,6 +74,8 @@ export class QuestState {
     this.unsub = flags.onChange(() => this.tick());
     scope?.onDispose(() => this.dispose());
   }
+
+  ownedBy(player: string): void { this.player = player; }
 
   dispose(): void { this.unsub(); this.observers.clear(); }
   /** Multiple scoped views can observe transitions without replacing the authored callbacks. */
@@ -99,14 +102,15 @@ export class QuestState {
     const started = test(this.flags, this.def.startWhen);
     const next = this.compute();
     if (started === this.started && next === this.cur) return;
-    const prev = this.started ? this.cur : null;
+    const startedNow = !this.started && started, prev = this.started ? this.cur : null;
     this.started = started; this.cur = next;
     if (!started) return;
     if (next === null && !this.flags.has(this.def.completeFlag)) {
       this.flags.set(this.def.completeFlag); this.onComplete?.();
       for (const observer of this.observers) observer.complete?.();
     }
-    this.events?.emit('quest.step', { level: this.flags.level, quest: this.def.id, step: next?.id ?? null, previous: prev?.id ?? null });
+    this.events?.emit('quest.step', { level: this.flags.level, quest: this.def.id, step: next?.id ?? null, previous: prev?.id ?? null,
+      ...(this.player === undefined ? {} : { player: this.player, startedNow }) });
     this.onStep?.(next, prev);
     for (const observer of this.observers) observer.step?.(next, prev);
   }
