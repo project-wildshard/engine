@@ -119,12 +119,18 @@ function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan, field: Nat
     return days === undefined ? null : host.useDayClock(declaredDay(days));
   };
 }
-/**
- * The riding family owns taming when the product supplies taming rows. Bind it before the elite continuation reads the bonded mount.
- * Existing products can still supply their exact legacy row and file references.
- */
+/** Admit cooked world owners at the same point as their original explicit features. */
 function assemblyFeatures(product: ShardFolder, plan: NativeAssemblyPlan): readonly NativeAssemblyFeature[] {
-  const { features } = plan;
+  let features = plan.features;
+  const environment = features.findIndex(row => row.host === 'riding.environment');
+  if (environment !== -1 && !features.some(row => row.host === 'weather.native' || row.host === 'weather.program')
+    && product.hasFile('world/weather.json') && product.hasFile('server/shelters.json') && product.hasFile('server/weather.json')) {
+    // Native storm reactions borrow the environment before groups and the arena use it.
+    const weather: NativeAssemblyFeature = { host: 'weather.native', program: { file: 'world/weather.json' },
+      shelters: { file: 'server/shelters.json' }, rows: { file: 'server/weather.json' } };
+    features = [...features.slice(0, environment + 1), weather, ...features.slice(environment + 1)];
+  }
+  // Taming binds before the elite continuation reads the bonded mount.
   if (!product.hasFile(TAMING_FILE)
     || !features.some(row => row.host === 'riding.mounted')
     || features.some(row => row.host === 'riding.taming')) return features;
