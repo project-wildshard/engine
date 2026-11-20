@@ -9,6 +9,8 @@ interface Pair {
   from: string;
   to: string;
 }
+interface Leg { from: Cell; to: Cell }
+interface SmokeArrival extends Pair { index: number; ms: number }
 export interface Tour {
   expected: number;
   arrivals: (Pair & {ms: number})[];
@@ -19,6 +21,12 @@ export interface Tour {
 }
 
 export const FIRST_ZONE_PAIR: Readonly<Pair>;
+export function featuredZoneEntry(cells: readonly Cell[], seed: number): Leg[];
+export function smokeBatches(pending: readonly number[]): number[][];
+export function retrySmokeEntries(route: readonly Leg[], proof: unknown, build: string, seed: number):
+  {arrivals: SmokeArrival[]; pending: number[]};
+export function smokeGap(proof: unknown): string | undefined;
+export function stagedTourProof(value: unknown): unknown;
 export function zoneEntryTour(cells: readonly Cell[]): {from: Cell; to: Cell}[];
 export function resumeZoneEntry(route: readonly {from: Cell; to: Cell}[], proof: unknown, build: string, from: number): Tour['arrivals'];
 export function retryZoneEntry<T>(run: (attempt: 1 | 2) => Promise<T | undefined>): Promise<T | undefined>;
