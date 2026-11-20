@@ -30,6 +30,7 @@ import { zoneSelectPressRoute } from './zoneSelectPress';
 import { ServerReports } from './serverReports';
 import { RoomSessions } from './roomSessions';
 import { RoomGameMetrics } from './roomGameMetrics';
+import { roomMetricsDailyRoute } from './metricsDailyRoute';
 import { ServerMetrics, metricsPort } from './serverMetrics';
 import { sendSentryTest, serverSentry } from './serverSentry';
 import {PlaytestFile} from './playtest';
@@ -165,7 +166,10 @@ const zoneSelectPress = zoneSelectPressRoute({
   enterable: slug => world.openShards().includes(slug),
   press: (slug, actor) => { arrivals?.pressed(slug, actor); },
 });
+const dailyMetrics = saves.metricsDaily === undefined || release.channel === 'preview' ? undefined
+  : roomMetricsDailyRoute({ channel: release.channel, read: saves.metricsDaily, log });
 const server = createServer((request, response) => {
+  if (dailyMetrics?.(request, response) === true) return;
   if (zoneSelect(request, response)) return;
   if (zoneSelectPress(request, response)) return;
   if (activationReceiver?.(request, response)) return;

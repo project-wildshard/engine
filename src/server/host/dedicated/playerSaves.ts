@@ -15,6 +15,7 @@ import { admitDoc } from './playerDoc';
 import { PersistenceFeed } from './saves/persistenceStatus';
 import { roomSessionStore } from './saves/roomSessionStore';
 import { roomGameStore } from './saves/roomGameStore';
+import { readRoomMetricDay } from './saves/metricsDailyStore';
 import { memoryZoneEntryStore, zoneEntryStore } from './saves/zoneEntries';
 
 const WRITE_REPORT = 'insert into chat_report (reporter, speaker, name, channel, typed, shown, shard, tick, delivery_id) values ($1, $2, $3, $4, $5, $6, $7, $8, $9) on conflict (delivery_id) do nothing';
@@ -55,7 +56,7 @@ export function playerSavesOver(db: Database, epoch: number, log: (line: Record<
       const certificate=witness && saved?.source === 'doc' && doc !== null && recovery.length === 0 ? checkpointCertificate(doc,saved.seq,shard) : undefined;
       return { doc, seq: saved?.seq ?? 0, recovery, ...(certificate===undefined?{}:{checkpoint:certificate}), ...(previous === undefined ? {} : { previous: { doc: previous, recovery: receipts.filter(row => row.serial > previous.ledger.serial) } }) };
     };
-  return { queue, reports, zoneEntries: zoneEntryStore(db), metricSessions: roomSessionStore(db), roomGame: roomGameStore(db), onSave: listener => persistence.listen(listener), write: write => { queue.post(write); }, drain: async ms => (await Promise.all([queue.drain(ms), reports.drain(ms)])).every(Boolean), stats: () => ({ ...queue.stats, waiting: queue.waiting, p95Ms: Number(queue.p95.toFixed(2)), reportsWaiting: reports.waiting, reportsWritten: reports.stats.written, reportsFailed: reports.stats.failed, reportsRefused: reports.stats.refused }),
+  return { queue, reports, zoneEntries: zoneEntryStore(db), metricSessions: roomSessionStore(db), roomGame: roomGameStore(db), metricsDaily: readRoomMetricDay(db), onSave: listener => persistence.listen(listener), write: write => { queue.post(write); }, drain: async ms => (await Promise.all([queue.drain(ms), reports.drain(ms)])).every(Boolean), stats: () => ({ ...queue.stats, waiting: queue.waiting, p95Ms: Number(queue.p95.toFixed(2)), reportsWaiting: reports.waiting, reportsWritten: reports.stats.written, reportsFailed: reports.stats.failed, reportsRefused: reports.stats.refused }),
     where: async device => { if (!await queue.drain(3000, device)) throw new Error('Player save is pending'); return await placeOf(db, epoch, device) ?? await lastCell(db, epoch, device); },
     read:(device,shard)=>read(device,shard), readWitness:(device,shard)=>read(device,shard,true),
     recover: (device, shard, seq) => healSave(db, epoch, device, shard, seq),

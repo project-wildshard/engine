@@ -43,6 +43,7 @@ import { SeatQueue } from './seatQueue';
 import type { ZoneEntryStore } from './saves/zoneEntries';
 import type { RoomSessions, RoomSessionStore } from './roomSessions';
 import type { RoomGameStore } from './roomGameMetrics';
+import type { ReadRoomMetricDay } from './saves/metricsDailyStore';
 
 export interface LivePlayers {
   readonly humans: number;
@@ -148,6 +149,7 @@ export interface PlayerSaves {
   readonly zoneEntries?: ZoneEntryStore;
   readonly metricSessions?: RoomSessionStore;
   readonly roomGame?: RoomGameStore;
+  readonly metricsDaily?: ReadRoomMetricDay;
 }
 /** How the world is built. */
 export interface WorldOptions {
