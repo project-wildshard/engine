@@ -238,7 +238,7 @@ describe('the inventory (HR8, HA1)', () => {
     expect(byModule.get('src/client/game/shardfile/clientMeadow.ts')).toMatchObject({ users: ['closure-a'], entry: 'kind world.meadow' });
     expect(byModule.get('src/client/game/shardfile/worldScenes.ts')?.entry).toContain('section world/scenes');
     expect(byModule.get('src/client/game/shardfile/clientForestPage.ts')?.register).toBe('pending G571');
-    expect(byModule.get('src/server/game/shardfile/nativeAssemblyHosts.ts')?.entry).toBe('none');
+    expect(byModule.get('src/server/game/shardfile/nativeAssemblyHosts.ts')?.entry).toBe('section held/melee');
     expect(formatInventory(rows.slice(0, 2)).split('\n')).toHaveLength(4);
   });
 });
