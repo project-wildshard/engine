@@ -14,8 +14,11 @@ import { shardVehicles } from '../src/shared/game/shardfile/shardVehicles';
 import { vehicleHulls } from '../src/shared/game/shardfile/vehicleHulls';
 import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../src/shared/game/shardfile/wirePrompts';
 import { createShardfileSim, prepareShardfileSimRestore } from '../src/server/game/plugin/simulation';
+import { createSimHost } from '../src/server/engine/sim';
+import { VehicleRuntime } from '../src/server/game/plugin/vehicleRuntime';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
+import { questBooks } from '../src/shared/engine/quest/players';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld';
 import { SaveStore } from '../src/shared/engine/saves/store';
@@ -29,8 +32,9 @@ import { bindResidentWorldScope } from '../src/client/game/shardfile/runtimePage
 import { wirePage } from '../src/client/game/shardfile/wirePage';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import type { installFollowedMovers } from '../src/client/game/plugin/followedMovers';
-import type { FollowedVehicles, VehicleDress } from '../src/client/game/plugin/followedVehicles';
+import { FollowedVehicles, type VehicleDress } from '../src/client/game/plugin/followedVehicles';
 import { GAMEPLAY_SLICE } from './fixtures/gameplaySlice';
+import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { vehiclesExampleFolder } from './fixtures/vehiclesExample';
 
 // MIRROR-SALT-ZONE MSZ6, MSZ9b: the engine reads a product's `world/vehicles` (format 0.53.0) on every install path the
@@ -68,6 +72,45 @@ test('the loader admits the section: two kinds, each with its dock, and no mover
   expect(vehicles.docks.map(dock => [dock.id, dock.kind, dock.per])).toEqual([[BUGGY, 'salt.buggy', 'player'], [SAIL, 'salt.land-sail', 'shared']]);
   expect(product.shardfile.movers.some(row => DOCKS.includes(row.id))).toBe(false);
   expect(DOCKS.some(dock => vehicleHulls(product.shardfile).has(dock))).toBe(false);
+});
+
+test('a quest flag unlocks a vehicle dock for its owner only', () => {
+  const host = createSimHost({ ...SIM_LEVEL, entities: [], ground: { size: 120, height: 0 } }, { rapier });
+  const scope = new Scope('reward-dock');
+  const original = shardVehicles(product.shardfile);
+  const dock = original.docks.find(row => row.id === BUGGY);
+  if (dock === undefined) throw new Error('Missing example buggy dock');
+  const id = 'reward.buggy', flag = 'reward.dock.earned';
+  const gated = { kinds: original.kinds, docks: [{ ...dock, id, requiresFlag: flag }] };
+  const server = new VehicleRuntime(gated, { physics: () => host.physics, stick: () => undefined });
+  const page = new FollowedVehicles(gated, { physics: new Physics(rapier), scope });
+  try {
+    server.bind(host);
+    const player = leadPlayer(host);
+    const books = questBooks(host), guest = 'another-player';
+    host.addPlayer(guest);
+    books.claim([flag]);
+    const feet = { x: dock.at[0], z: dock.at[2] };
+    const prompt = vehicleDockPrompt(id);
+    page.sync([], player.id, feet);
+    expect(shown(page.prompts(), feet)).toEqual([]);
+    player.position.set(...dock.at);
+    actRoutes(host).claims.get(prompt)?.(player.id);
+    expect(server.ids()).toEqual([]);
+
+    books.of(player.id).flags.set(flag);
+    const progress = books.progressOf(player.id, -1);
+    page.sync([], player.id, feet, new Set(progress?.flags));
+    expect(shown(page.prompts(), feet)).toEqual([[prompt, 'Drive the buggy']]);
+    expect(books.progressOf(guest, -1)?.flags).not.toContain(flag);
+    const second = host.players.get(guest);
+    if (second === undefined) throw new Error('Missing guest');
+    second.position.set(...dock.at);
+    actRoutes(host).claims.get(prompt)?.(guest);
+    expect(server.ids()).toEqual([]);
+    actRoutes(host).claims.get(prompt)?.(player.id);
+    expect(server.seatOf(player.id)?.vehicle).toBe(playerVehicle(id, player.id));
+  } finally { server.dispose(); scope.dispose(); host.dispose(); }
 });
 
 describe('each install path finds both docks\' vehicles', () => {

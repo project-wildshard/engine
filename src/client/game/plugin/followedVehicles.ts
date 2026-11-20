@@ -12,7 +12,7 @@ import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, Vehicles } from '@wildshard/format/vehicles';
-import { dockHulls, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
+import { dockHulls, dockUnlocked, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
 import { parseVehicleSeatRow, parseVehicleWornRow, parseVehicleWreckRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { vehiclePoint, type MoverView } from './followedMovers';
 import { rowState, statePose, VehiclePrediction, type VehicleRow } from './vehiclePrediction';
@@ -96,6 +96,7 @@ export class FollowedVehicles {
   private lookOf: FollowedVehiclePorts['look']; private fx: VehicleFxPort | undefined;
   /** This page's player, as its wire's welcome names it. */
   private me: string | null = null;
+  private ownedFlags: ReadonlySet<string> | undefined;
   /** This page's player's feet, as the last frame had them: a seat's prompt goes to the nearest free one. */
   private readonly feet = { x: 0, z: 0 };
   private readonly made: Interactable[];
@@ -169,7 +170,8 @@ export class FollowedVehicles {
    * Once a frame, the wire's entity ids: the vehicles out (a per-player one whose row left goes) and the seats taken. `me` is
    * this page's player and `feet` where it stands.
    */
-  sync(ids: Iterable<string>, me: string | null, feet: { readonly x: number; readonly z: number }): void {
+  sync(ids: Iterable<string>, me: string | null, feet: { readonly x: number; readonly z: number }, ownedFlags?: ReadonlySet<string>): void {
+    this.ownedFlags = ownedFlags;
     this.me = me; this.feet.x = feet.x; this.feet.z = feet.z;
     const out = new Set<string>(); this.seats.clear(); this.wornOut.clear(); this.wrecks.clear();
     for (const id of ids) {
@@ -293,7 +295,7 @@ export class FollowedVehicles {
     });
     // each player dock's, while it stands clear and this player has none of its vehicles out
     for (const dock of this.docks.values()) if (dock.per === 'player') {
-      const shown = (): number => (this.me !== null && this.seatOf() === undefined && !this.live.has(playerVehicle(dock.id, this.me)) && this.dockClear(dock) ? SEAT_REACH : 0);
+      const shown = (): number => (this.me !== null && dockUnlocked(dock, this.ownedFlags) && this.seatOf() === undefined && !this.live.has(playerVehicle(dock.id, this.me)) && this.dockClear(dock) ? SEAT_REACH : 0);
       prompts.push(followingPrompt(new Vector3(dock.at[0], dock.at[1], dock.at[2]), this.kinds.get(dock.kind)?.labels?.drive ?? DRIVE_LABEL, shown, () => vehicleDockPrompt(dock.id)));
     }
     // one way out a kind, over this player's own seat

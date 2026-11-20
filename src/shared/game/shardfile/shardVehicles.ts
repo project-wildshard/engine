@@ -1,6 +1,6 @@
 import type { MoverBox } from '@wildshard/format/moverPose';
 import { vehicleCarryHulls } from '@wildshard/format/vehicle-lift';
-import { parseVehicles, type Vehicles } from '@wildshard/format/vehicles';
+import { parseVehicles, type VehicleDock, type Vehicles } from '@wildshard/format/vehicles';
 import type { VehicleWorld } from '@wildshard/engine/sim/vehicle';
 import { outputDescriptor } from './outputDescriptor';
 import type { ShardFolder } from './shardFolder';
@@ -13,6 +13,11 @@ import type { ShardFolder } from './shardFolder';
  * `vehicleCarryHulls` gives each dock's hull. A product with no section has no vehicles.
  */
 export const NO_VEHICLES: Vehicles = Object.freeze({ kinds: [], docks: [] });
+
+/** The requirement belongs to the player taking the dock. */
+export function dockUnlocked(dock: VehicleDock & { readonly requiresFlag?: string }, flags?: Pick<ReadonlySet<string>, 'has'>): boolean {
+  return dock.requiresFlag === undefined || flags?.has(dock.requiresFlag) === true;
+}
 
 const parsed = new WeakMap<object, Vehicles>();
 

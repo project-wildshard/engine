@@ -15,6 +15,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { takenLine } from '../../../shared/game/shardfile/items';
 import { spentUses } from '../shard/declaredTargets';
 import { wirePage } from '../shardfile/wirePage';
+import { ownedLineFields } from '../shardfile/ownedLines';
 
 type Interactable = ShardRuntime['interactables'][number];
 
@@ -28,12 +29,13 @@ export function copyPrompts(source: Pick<Shardfile, 'targets'>, spent?: (row: Sh
 
 /** A copy's spent uses off the wire's rows: its fields as the server sends them, a rack taken when its owned line says so.
  *  The page offers a copy's prompts only while the feet stand in it, so the wire's lines are that copy's. */
-export function copySpent(source: Pick<Shardfile, 'targets' | 'hooks' | 'items' | 'state'>): (row: Shardfile['targets']['interactions'][number]) => boolean {
+export function copySpent(source: Pick<Shardfile, 'targets' | 'hooks' | 'items' | 'state' | 'sim'>): (row: Shardfile['targets']['interactions'][number]) => boolean {
+  const lines = ownedLineFields(source);
   return spentUses(source, {
     read: (scope, id) => {
       const field = source.state[scope].find(row => row.id === id); if (field === undefined) throw new Error('Missing declared state field');
-      // a public shared field has rows; a player's own stands at its authored default, as on a one-shard page (RETIRE-FEED A6)
-      const value = scope === 'shared' && field.privacy === 'public' ? wirePage.row(field.name) : undefined;
+      const value = scope === 'player' && lines.has(field.name) ? wirePage.line(field.name)
+        : scope === 'shared' && field.privacy === 'public' ? wirePage.row(field.name) : undefined;
       return value ?? (typeof field.default === 'number' ? field.default : Number(field.default === true));
     },
     taken: item => wirePage.line(takenLine(item)) > 0,

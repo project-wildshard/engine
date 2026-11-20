@@ -5,6 +5,7 @@ import type { Physics } from '@wildshard/engine/physics/Physics';
 import { clearStand, floorBelow } from '@wildshard/engine/physics/query';
 import { tagOf } from '@wildshard/engine/physics/surface';
 import { GROUP, queryGroups } from '@wildshard/engine/physics/groups';
+import { questBooks } from '@wildshard/engine/quest/players';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { STEER_PROBE } from '@wildshard/engine/sim/moverMotion';
 import { publishScriptBody, publishWorldState, withdrawScriptBody, type StateNetRow } from '@wildshard/engine/sim/shardRows';
@@ -14,7 +15,7 @@ import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type Vehi
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
 import type { Race } from '../../../shared/game/quest/declared';
-import { dockHulls, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
+import { dockHulls, dockUnlocked, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
 import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow, vehicleWreckRow } from '../../../shared/game/shardfile/wirePrompts';
 
 /**
@@ -178,6 +179,7 @@ export class VehicleRuntime {
   spawn(dockId: string, player: string): string {
     const dock = this.docks.get(dockId); if (dock === undefined) throw new Error(`Unknown vehicle dock ${dockId}`);
     if (dock.per === 'shared') return dockId;
+    if (!this.unlocked(dock, player)) throw new Error(`Vehicle dock ${dockId} is locked`);
     const id = playerVehicle(dockId, player);
     if (this.live.has(id)) return id;
     // MSZ18: one per-player vehicle out at a time: a player's other one goes, its riders set down beside it
@@ -448,7 +450,7 @@ export class VehicleRuntime {
     for (const vehicle of this.live.values()) this.claim(vehicle);
     for (const dock of this.docks.values()) if (dock.per === 'player') this.routes.claims.set(vehicleDockPrompt(dock.id), player => {
       const body = host.players.get(player);
-      if (body === undefined || this.wrecked.has(playerVehicle(dock.id, player)) || !this.clear(dock.id) || this.full(playerVehicle(dock.id, player)) || Math.hypot(body.position.x - dock.at[0], body.position.z - dock.at[2]) > SEAT_REACH) return;
+      if (body === undefined || !this.unlocked(dock, player) || this.wrecked.has(playerVehicle(dock.id, player)) || !this.clear(dock.id) || this.full(playerVehicle(dock.id, player)) || Math.hypot(body.position.x - dock.at[0], body.position.z - dock.at[2]) > SEAT_REACH) return;
       const id = this.spawn(dock.id, player);
       this.board(id, player, this.get(id).kind.seats.findIndex(seat => seat.role === 'driver'));
     });
@@ -466,6 +468,13 @@ export class VehicleRuntime {
     });
   }
   /** Remove every body (a Map keeps iterating past an entry deleted under it). */
+  private unlocked(dock: VehicleDock & { readonly requiresFlag?: string }, player: string): boolean {
+    if (dock.requiresFlag === undefined) return true;
+    const host = this.host;
+    if (host === null || !host.players.has(player)) return false;
+    const books = questBooks(host);
+    return books.personal(dock.requiresFlag) && dockUnlocked(dock, books.of(player).flags);
+  }
   dispose(): void { for (const id of this.live.keys()) this.despawn(id); }
 
   private snapshot(): SavedVehicles {

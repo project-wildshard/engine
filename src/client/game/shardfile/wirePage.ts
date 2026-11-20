@@ -39,8 +39,8 @@ type Live = (client: NetClient) => (() => void) | undefined;
 export interface VehicleFollower {
   /** The view a vehicle's row poses, when it is one of these. */
   readonly view: (id: string) => MoverView | undefined;
-  /** Once a frame: the wire's entity ids, this page's player and its feet. */
-  readonly sync: (ids: Iterable<string>, me: string | null, feet: { readonly x: number; readonly z: number }) => void;
+  /** Once a frame: the wire's entity ids, this page's player, its feet and owned quest flags. */
+  readonly sync: (ids: Iterable<string>, me: string | null, feet: { readonly x: number; readonly z: number }, ownedFlags?: ReadonlySet<string>) => void;
   /** The seat this page's player holds, a vehicle's pose and its kind, as the newest rows say. */
   readonly seatOf: () => { readonly vehicle: string; readonly seat: number } | undefined;
   readonly pose: (id: string) => MoverPose | undefined;
@@ -123,7 +123,7 @@ export class WirePage {
   syncVehicles(feet: { readonly x: number; readonly z: number }, dt = 0): void {
     const client = this.client; if (client === null || this.vehicles.size === 0) return;
     const ids: string[] = []; for (const info of client.entities.values()) ids.push(info.id);
-    for (const follower of this.vehicles.values()) { follower.sync(ids, client.welcome?.player ?? null, feet); follower.frame?.(dt); }
+    for (const follower of this.vehicles.values()) { follower.sync(ids, client.welcome?.player ?? null, feet, client.phased); follower.frame?.(dt); }
   }
   /** MSZ16: each command the page sends, as it goes: the driven vehicle steps on it. */
   command(command: NetCommand): void {
