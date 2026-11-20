@@ -65,6 +65,7 @@ export interface CellHostOptions {
   readonly booted?: (slug: string, room: DedicatedRoom) => void;
   readonly roaded?: (road: RoadRoom) => void;
   readonly playtest?:boolean;
+  readonly metricEvents?: boolean;
   /** QA 11-15 row 8 (G540): honour a Developer page's boost bit (on unless `WORLD_BOOST=off`, `cellWorker.ts`). */
   readonly developerBoost?: boolean;
   /**
@@ -154,6 +155,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
     const shard = cellShard(slug), hash = placedHash(shard), begun = diagnosticNow(), input = await options.load(shard), onto = seams(slug);
     rapier ??= input.rapier;
     const room: DedicatedRoom = await DedicatedRoom.boot({ slug: shard, cell: slug, build: options.build, bootId: options.bootId(), input, now: options.roomNow ?? diagnosticNow, ...(onto === undefined ? {} : { road: onto }),
+      ...(options.metricEvents === true ? { metricEvents: true } : {}),
       post: news => {
         if (news.kind === 'seated') { if (news.seats === 1) woke(room); used(slug, room); } else if (news.kind === 'left' && news.seats === 0) { asleep.set(room, diagnosticNow()); emptied(slug, room); }
         post({ ...news, slug });

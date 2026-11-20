@@ -92,6 +92,7 @@ export interface DedicatedRoomOptions {
   /** A proof's override of `HOLD_MS`. */
   readonly holdMs?: number;
   readonly playtest?:(row:PlaytestHit)=>void;
+  readonly metricEvents?: boolean;
 }
 
 /** How `loot/personal` marks what a player has been paid. */
@@ -135,6 +136,10 @@ export class DedicatedRoom implements CrossTarget {
       const history=hitHistoryOf(this.host);if(history!==undefined)history.measureRewinds=true;
       this.host.events.on('damage.dealt',({req,dealt})=>{options.playtest?.({kind:'hit',tick:this.host.state.tick,amount:dealt,network:req.attackSeq!==undefined,rewind:req.rewind??{requested:0,applied:0,clamped:false}});},this.host.scope);
     }
+    if (options.metricEvents === true) this.host.events.on('player.died', ({ actor }) => {
+      const seat = bodies.get(actor.id);
+      if (seat !== undefined) options.post({ kind: 'metric-death', device: seat.device });
+    }, this.host.scope);
     // E7.7: a room shares one sky, and no client's word moves it.
     actRoutes(this.host).climate = null;
     actRoutes(this.host).time = null;

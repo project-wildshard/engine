@@ -28,6 +28,7 @@ import { ZoneEntries, ZONE_ENTRY_MINUTE_MS } from './zoneEntries';
 import { readZoneUploads, zoneSelectRoute } from './zoneSelect';
 import { zoneSelectPressRoute } from './zoneSelectPress';
 import { ServerReports } from './serverReports';
+import { RoomSessions } from './roomSessions';
 import { ServerMetrics, metricsPort } from './serverMetrics';
 import { sendSentryTest, serverSentry } from './serverSentry';
 import {PlaytestFile} from './playtest';
@@ -77,12 +78,16 @@ const hold = process.env['HOLD_MS'], empty = process.env['EMPTY_MS'], grace = pr
 // An env file's blank row means unset.
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
 const sentry = serverSentry({ dsn: setting('SENTRY_DSN'), version: engineVersion, build, channel: release.channel });
-const reports = new ServerReports({ build, channel: release.channel, telemetryUrl: setting('TELEMETRY_URL'), errorsUrl: setting('ERRORS_URL'), tag: setting('RECORD_TAG'), log, sentry, ...(recordEvery === undefined ? {} : { everyMs: Number(recordEvery) }) });
+const roomMetricsToken = setting('ROOM_METRICS_TOKEN');
+const reports = new ServerReports({ build, channel: release.channel, telemetryUrl: setting('TELEMETRY_URL'), errorsUrl: setting('ERRORS_URL'), tag: setting('RECORD_TAG'), log, sentry, ...(roomMetricsToken === undefined ? {} : { roomMetricsToken }), ...(recordEvery === undefined ? {} : { everyMs: Number(recordEvery) }) });
 const url = process.env['DATABASE_URL'] ?? savesUrl(release.channel), saves: PlayerSaves = url === 'memory:' ? memoryPlayerSaves() : await openPlayerSaves(url, new URL('migrations/', import.meta.url), release.saveEpoch, log, issue => { reports.contract(issue); });
 const seatSecret = need('SEAT_SECRET');
 const arrivals = saves.zoneEntries === undefined ? undefined : new ZoneEntries(saves.zoneEntries, release.channel, seatSecret, log);
+const sessions = saves.metricSessions === undefined ? undefined
+  : new RoomSessions(saves.metricSessions, release.channel, seatSecret, rows => { reports.sessions(rows); }, log);
 const arrivalScope = new Scope('dedicated.zone-entries');
 if (arrivals !== undefined) arrivalScope.interval(ZONE_ENTRY_MINUTE_MS, () => { void arrivals.flush(); });
+if (sessions !== undefined) arrivalScope.interval(ZONE_ENTRY_MINUTE_MS, () => { void sessions.flush(); });
 const recordTag=setting('RECORD_TAG');
 const turnKey = setting('WILDSHARD_TURN_KEY_ID'), turnToken = setting('WILDSHARD_TURN_KEY_TOKEN');
 // J353: zone entry is the only implementation. Old box files may retain this row during rollout.
@@ -101,7 +106,7 @@ const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting
 
 /** One row of the table is one worker thread, started once (J182). */
 function bootWorker(slugs: readonly string[]): WorkerLink {
-  const data: CellWorkerData = { slugs, build, origin, cache, catalogue, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing, ...(metrics === undefined ? {} : { metrics: true }),...(playtest===undefined?{}:{playtest:true}),
+  const data: CellWorkerData = { slugs, build, origin, cache, catalogue, placed: placedCells(), ...(hold === undefined ? {} : { holdMs: Number(hold) }), ...(empty === undefined ? {} : { emptyMs: Number(empty) }), crossing, ...(metrics === undefined ? {} : { metrics: true }), ...(sessions === undefined ? {} : { metricEvents: true }),...(playtest===undefined?{}:{playtest:true}),
     ...(authorProduct === undefined ? {} : { authorProduct }) };
   const worker = new Worker(new URL('cellWorker.mjs', import.meta.url), { workerData: data });
   let stopped = false;
@@ -128,6 +133,7 @@ const ticketKey = setting('PLAYER_TICKET_PUBLIC_KEY');
 if (ticketKey !== undefined) log({ at: 'tickets.key', pinned: false, key: ticketKey.slice(-16) });
 const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, ...(ticketKey === undefined ? {} : { ticketKey }), secret: seatSecret, saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   ...(arrivals === undefined ? {} : { entered: (seat, slug, actor) => { if (arrivals.entered(seat, slug, actor)) metrics?.entered(slug, actor.actor); } }),
+  ...(sessions === undefined ? {} : { sessions }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
   crashed: failed, reading: (index, row) => { reports.heard(index, row); metrics?.reading(index, row); },
   ...(metrics === undefined ? {} : { booted: (_index: number, _slug: string, ms: number) => { metrics.booted(ms); }, crossed: (ms: number, moved: boolean) => { metrics.crossed(ms, moved); } }),
@@ -174,6 +180,12 @@ stop = (code): void => { if (draining) return; draining = true; void (async (): 
   arrivalScope.dispose();
   if (arrivals !== undefined) await within(3000, async () => { await arrivals.flush(); await arrivals.flush(); })
     .catch(() => { log({ at: 'zone-entries.drain-timeout', channel: release.channel }); });
+  if (sessions !== undefined) {
+    sessions.endAll();
+    await within(3000, () => sessions.drain()).catch(() => { log({ at: 'room-sessions.drain-timeout', channel: release.channel }); });
+    reports.flushSessions();
+  }
+  reports.dispose();
   await reports.settled();
   const recorded=await playtest?.close();if(recorded===false)log({at:'playtest.incomplete'});
   process.exit(written ? code : 1);

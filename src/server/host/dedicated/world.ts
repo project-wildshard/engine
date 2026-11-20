@@ -41,6 +41,7 @@ import type { PersistenceStatus } from './saves/persistenceStatus';
 import { persistenceEnvelope } from '@wildshard/engine/net/persistenceWord';
 import { SeatQueue } from './seatQueue';
 import type { ZoneEntryStore } from './saves/zoneEntries';
+import type { RoomSessions, RoomSessionStore } from './roomSessions';
 
 export interface LivePlayers {
   readonly humans: number;
@@ -144,6 +145,7 @@ export interface PlayerSaves {
   /** How writes are going: E7.8's numbers. */
   stats?: () => Readonly<Record<string, number>>;
   readonly zoneEntries?: ZoneEntryStore;
+  readonly metricSessions?: RoomSessionStore;
 }
 /** How the world is built. */
 export interface WorldOptions {
@@ -170,6 +172,7 @@ export interface WorldOptions {
   readonly crossed?: (ms: number, moved: boolean) => void;
   /** METRICS MT4: a confirmed Zone Select or walking arrival. The seat id stays inside the world process. */
   readonly entered?: (seat: string, slug: string, actor: ActorTags) => void;
+  readonly sessions?: RoomSessions;
   readonly playtest?:(row:PlaytestRow)=>void;
   /** J218: the ICE servers voice chat hands a player who joins; public STUN when absent. */
   readonly voiceIce?: () => Promise<readonly VoiceIceServer[]>;
@@ -411,6 +414,8 @@ export class World {
         const socket=this.seatSockets.get(device);
         if (socket !== undefined && socket.admission === news.admission) {
           socket.confirmed = true;
+          const actor = this.seatActors.get(device)?.mark;
+          if (actor !== undefined) this.options.sessions?.seated(device, roadHome(from) === null ? cellShard(from) : null, actor);
           if (socket.entering) {
             socket.entering = false;
             this.countEntry(device, from);
@@ -421,6 +426,10 @@ export class World {
           if(bytes!==undefined)socket.end.control('world',bytes);
         }
       }
+    }
+    else if (news.kind === 'metric-death') {
+      const { device, slug: cell } = news;
+      if (this.seated.get(device) === cell) this.options.sessions?.died(device);
     }
     else if (news.kind === 'refused') this.refuse(news.reason);
     else if (news.kind === 'recovered') void this.recover(news.device, cellShard(news.slug), news.seq);
@@ -449,7 +458,10 @@ export class World {
       if (this.seated.get(news.device) === news.from) {
         if (news.moved) {
           this.seated.set(news.device, news.to); this.names.set(news.device, news.name); this.voiceBodies.get(news.device)?.(news.body);
-          if (news.from !== news.to) this.countEntry(news.device, news.to);
+          if (news.from !== news.to) {
+            this.options.sessions?.crossed(news.device, roadHome(news.to) === null ? cellShard(news.to) : null);
+            this.countEntry(news.device, news.to);
+          }
         }
         else if (!news.stays) this.forgetSeat(news.device);
         else this.thaw(news.from, news.device, this.moving.get(news.device), 'refused');
@@ -459,6 +471,7 @@ export class World {
     }
   }
   private forgetSeat(device: string): void {
+    this.options.sessions?.left(device);
     this.seated.delete(device); this.names.delete(device); this.seatActors.delete(device);
   }
   private countEntry(device: string, cell: string): void {

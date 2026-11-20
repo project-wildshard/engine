@@ -79,6 +79,7 @@ export interface WorkerReading {
 }
 /** What a cell tells the worker it runs on. */
 export type RoomNews =
+  | { readonly kind: 'metric-death'; readonly device: string }
   | {readonly kind:'playtest';readonly row:PlaytestHit}
   | { readonly kind: 'left'; readonly device: string; readonly seats: number }
   | { readonly kind: 'seated'; readonly device: string; readonly body: string; readonly seats: number;readonly admission?:number;readonly checkpoint?:DurableCheckpoint }

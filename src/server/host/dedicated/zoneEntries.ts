@@ -1,6 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Account and install ids are keyed on the box before they enter metrics.
-import { createHmac, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import type { ActorTags } from '@wildshard/engine/app/actor';
+import { metricPlayerKey } from './metricIdentity';
 import type { ZoneEntryBatch, ZoneEntryStore, ZoneEntryTotal } from './saves/zoneEntries';
 
 export const ZONE_ENTRY_MINUTE_MS = 60_000;
@@ -30,7 +31,7 @@ export class ZoneEntries {
 
   entered(seat: string, slug: string, { actor }: ActorTags): boolean {
     const now = this.now(), day = new Date(now).toISOString().slice(0, 10);
-    const player = createHmac('sha256', this.secret).update('metrics\0').update(seat).digest('hex');
+    const player = metricPlayerKey(this.secret, seat);
     const key = `${player}/${slug}`;
     if (now - (this.recent.get(key) ?? -Infinity) < ZONE_ENTRY_MINUTE_MS) return false;
     if (this.visits >= MAX_MINUTE_ARRIVALS) {
