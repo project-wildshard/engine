@@ -66,6 +66,7 @@ export const SECTION_HOSTS = Object.freeze({
   'held/loadout': ['src/client/game/loadout/held.ts#installHeldLoadout'],
   'held/finishes': ['src/client/game/loadout/finishes.ts#HeldFinishes'],
   'held/gear': ['src/client/game/models/heldGear.ts#heldGear'],
+  'held/melee': ['src/server/game/shardfile/nativeAssemblyHosts.ts#prepareSectionMelee'],
   'combat/items': ['src/shared/game/shardfile/items.ts#installDeclaredItems'],
   'combat/encounters': ['src/server/game/plugin/simulation.ts#createShardfileSim'],
   'combat/strikes': ['src/server/game/plugin/simulation.ts#createShardfileSim'],
