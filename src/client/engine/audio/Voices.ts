@@ -6,6 +6,7 @@ import { tap } from '../../../shared/engine/core/harnessTap';
 import { observeAudioMemory } from '../../../shared/engine/core/memoryResources';
 import { panFromYaw, audioRandom } from './util';
 import type { Scope } from '../../../shared/engine/app/scope';
+import { jsonSlot } from '../saves/slots';
 /**
  * Voices — the procedural sound bank (src/client/engine/audio/gen.ts) as AudioBuffers, and a one-node-chain player for them.
  *
@@ -20,6 +21,20 @@ import type { Scope } from '../../../shared/engine/app/scope';
  */
 import type { Vector3 } from 'three';
 import { footstep, whoosh, impact, hurt, death, plunge, bubbleBed, noiseLoop, impulseChannel, interact, STEP_KINDS, MATERIALS, INTERACT_SOUNDS, type Room } from './gen';
+
+/** meta IPHONE13-DRIFTWOOD DW3 (mini-driftwood13b, 2026-11-19): iOS Safari 18.6 has no requestIdleCallback, so the prewarm's
+ *  "idle" slices fall back to this timer. At 16 ms they ran between nearly every pair of frames: about 375 ms of the main
+ *  thread in Driftwood's first 3 s of play on the iPhone 13 (impulse responses 200 ms of it). The device slot
+ *  `debug.audioWarmPaceMs` (0 to 2000) sets the gap; unset, 16 until the phone pairs decide. */
+export const AUDIO_WARM_PACE_SLOT = 'debug.audioWarmPaceMs';
+export const AUDIO_WARM_PACE_DEFAULT_MS = 16;
+/** The slot's gap: a number from 0 to 2000 wins, anything else is the default. */
+export function audioWarmPace(saved: unknown): number {
+  return typeof saved === 'number' && Number.isFinite(saved) && saved >= 0 && saved <= 2000 ? saved : AUDIO_WARM_PACE_DEFAULT_MS;
+}
+function audioWarmPaceMs(): number {
+  try { return audioWarmPace(jsonSlot(AUDIO_WARM_PACE_SLOT, 'device').read()); } catch { return AUDIO_WARM_PACE_DEFAULT_MS; }
+}
 
 interface Host { readonly ctx: BaseAudioContext; readonly sfx: GainNode; readonly ready: boolean }
 type Gen = (sr: number, seed: number) => Float32Array;
@@ -213,7 +228,7 @@ export class VoicePool {
       let forget = (): void => undefined;
       const id = w.requestIdleCallback(() => { forget(); this.slice(); }, { timeout: 400 });
       forget = this.scope.capture('disposers', () => { w.cancelIdleCallback?.(id); });
-    } else this.scope.timeout(16, () => this.slice());
+    } else this.scope.timeout(audioWarmPaceMs(), () => this.slice());
   }
   private slice(): void {
     if (!this.live) return;

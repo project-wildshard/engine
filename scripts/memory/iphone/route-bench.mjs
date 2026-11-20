@@ -2,7 +2,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--cool-to <°C>] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C>] [--out <dir>] [--dry-run]
 //
 // --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split). --legs n plays the first n segments only.
 //
@@ -25,7 +25,7 @@ import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstS
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
-  slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'cool-to': { type: 'string' }, out: { type: 'string' }, udid: { type: 'string' },
+  slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, out: { type: 'string' }, udid: { type: 'string' },
   'dry-run': { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
@@ -78,9 +78,13 @@ async function bench() {
           // --profile <s>: WebKit's sampling profiler over the route's first seconds (DW2: what the long tasks are)
           if (values.profile !== undefined && 'profileStart' in driver && typeof driver.profileStart === 'function') {
             const profiled = driver;
-            await profiled.profileStart();
+            // --profile-delay <s>: start the sampler that long after the route starts, to reach a later leg (a long
+            // sample overflows the inspector socket: 8 s with the top-up off closed it three times, 3 s did not)
+            const delay = Number(values['profile-delay'] ?? 0) * 1000;
+            if (delay === 0) await profiled.profileStart();
             profiling = (async () => {
               try {
+                if (delay > 0) { await pause(delay); await profiled.profileStart(); }
                 await pause(Number(values.profile) * 1000);
                 const samples = await profiled.profileStop();
                 writeFileSync(join(directory, 'profile.json'), JSON.stringify(samples));

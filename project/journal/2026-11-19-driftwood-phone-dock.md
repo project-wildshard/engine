@@ -32,3 +32,7 @@ touchend as a gesture to unlock it. With the context running, Driftwood's dock w
 biggest site that never ended was `Synth.tone`'s vibrato LFO: it reaches the output only through its tone's frequency, WebKit
 renders it only while the tone renders, and it was stopped after the tone. It now stops as the envelope reaches silence. Music
 pad oscillators (12 live, 0 ended in 40 s) are the next site to read.
+
+With the top-up off, a 3 s ScriptProfiler sample of the dock names the next main-thread cost: Voices' audio prewarm, about
+375 ms of the first 3 s. iOS Safari 18.6 has no `requestIdleCallback`, so its "idle" slices run on a 16 ms timer. The slot
+`debug.audioWarmPaceMs` sets that gap so the phone pairs can decide; program first use (`getUniformLocation`) is next.
