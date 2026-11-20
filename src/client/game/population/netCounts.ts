@@ -3,6 +3,7 @@ import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
 
 /** Fill the projection's requested kinds in one pass over the rows near the player. */
 export function countNetCreatures(client: NetClient | null, counts: Map<string, number>): void {
+  if (counts.size === 0) return;
   for (const kind of counts.keys()) counts.set(kind, 0);
   if (client === null || client.latest === null) return;
   const frame = client.latest;
