@@ -52,6 +52,20 @@ test('a fixed 90 ms transport offset is not jitter', () => {
   expect(delayed.delayMs).toBeCloseTo(loopback.delayMs, 5);
 });
 
+test('receipt spacing recovers on the next frame after the server loses time', () => {
+  const clock = new NetClock(), tick = 120, lostMs = 150;
+  run(clock, 2, () => 0);
+  const first = 5000 + tick * TICK_MS + lostMs;
+  expect(clock.arrival(tick, first)).toBeCloseTo(lostMs, 8);
+  for (let next = tick + 2; next <= tick + 20; next += 2) {
+    expect(clock.arrival(next, first + (next - tick) * TICK_MS)).toBeCloseTo(0, 8);
+  }
+  expect(clock.jitterMs).toBeGreaterThan(100);
+  expect(clock.arrival(tick + 18, first + 1000)).toBeNull();
+  clock.reset();
+  expect(clock.arrival(0, first + 2000)).toBeNull();
+});
+
 test('the clock tracks the server and never runs more than 1 % off', () => {
   const clock = new NetClock();
   clock.arrival(0, 0); clock.arrival(2, 2 * TICK_MS + 40); // a late frame: 40 ms of error

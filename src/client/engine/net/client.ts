@@ -68,7 +68,7 @@ export class NetClient {
   private readonly now: () => number;
   private transport: Transport;
   private readonly frames = new Map<number, DecodedFrame>();
-  private readonly listeners = new Set<(frame: DecodedFrame) => void>();
+  private readonly listeners = new Set<(frame: DecodedFrame, spacingErrorMs?: number | null) => void>();
   private readonly presented = new Set<() => void>();
   private readonly corrected = new Set<(row: Omit<NetCorrection,'kind'|'session'>) => void>();
   private readonly fights = new Set<(event: NetCombatEvent) => void>();
@@ -153,8 +153,8 @@ export class NetClient {
   onHeldFrame(listener: () => void): () => void { this.heldFrames.add(listener); return () => { this.heldFrames.delete(listener); }; }
   /** Call when a new link replaces the old one, before its `hello`; returns the unsubscribe. */
   onRejoin(listener: () => void): () => void { this.rejoins.add(listener); return () => { this.rejoins.delete(listener); }; }
-  /** Call for every frame decoded; returns the unsubscribe. */
-  onFrame(listener: (frame: DecodedFrame) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
+  /** Subscribe to decoded frames. Each new tick after the first includes its receipt spacing error. */
+  onFrame(listener: (frame: DecodedFrame, spacingErrorMs?: number | null) => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   /** E7.8a observes actual presentation calls and actual prediction corrections. */
   onRender(listener:()=>void):()=>void{this.presented.add(listener);return()=>{this.presented.delete(listener);};}
   rendered():void{for(const listener of this.presented)listener();}
@@ -368,7 +368,8 @@ export class NetClient {
     if (this.frames.size > FRAME_RING) for (const tick of this.frames.keys()) { this.frames.delete(tick); if (this.frames.size <= FRAME_RING) break; }
     if (this.latest === null) bootMark('server:first-authoritative-frame', {tick: frame.tick});
     if (this.latest === null || frame.tick > this.latest.tick) this.latest = frame;
-    this.clock.arrival(frame.tick, arrived); this.interpolator.push(frame);
-    for (const listener of this.listeners) listener(frame);
+    const spacingErrorMs = this.clock.arrival(frame.tick, arrived);
+    this.interpolator.push(frame);
+    for (const listener of this.listeners) listener(frame, spacingErrorMs);
   }
 }

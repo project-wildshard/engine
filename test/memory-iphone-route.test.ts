@@ -23,7 +23,20 @@ test('a leg counts its frames, its spikes over 33 and 50 ms, and its rate per 30
 });
 
 test('a worker-free page reads no delay rather than zero', () => {
-  expect(legSummary([second([16.7], { delayMs: null, jitterMs: null })]).delayMs).toBeNull();
+  const summary = legSummary([second([16.7], { delayMs: null, jitterMs: null })]);
+  expect(summary.delayMs).toBeNull();
+  expect(summary.receiptSpacingP95Ms).toBeNull();
+  expect(summary.receiptSpacingMaxMs).toBeNull();
+});
+
+test('receipt spacing is summarized over packet samples and retains its worst interval', () => {
+  const summary = legSummary([
+    second([33], { jitterMs: 150, receiptSpacingErrorsMs: [150] }),
+    second([33], { jitterMs: 145, receiptSpacingErrorsMs: Array<number>(29).fill(6) }),
+  ]);
+  expect(summary.receiptSpacingP95Ms).toBe(6);
+  expect(summary.receiptSpacingMaxMs).toBe(150);
+  expect(summary.jitterMs).toBe(145);
 });
 
 test('the worst segment is the highest median p95 at that cap', () => {

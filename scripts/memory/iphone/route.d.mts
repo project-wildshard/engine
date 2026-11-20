@@ -2,13 +2,14 @@ export interface RouteLeg { name: string; kind: 'stand' | 'walk' | 'fight'; seco
   turn?: number; prey?: string; reach?: number; grid?: boolean; fixed?: boolean; face?: [number, number];
   dwell?: { point: number; seconds: number; face?: [number, number]; road?: boolean } }
 export interface LegSample { seconds: number; frames: number; frameMs: number[]; updateMs: number[]; renderMs: number[]; gpuApproxMs: number[];
-  draws: number; triangles: number; programs: number | null; delayMs: number | null; jitterMs: number | null;
+  draws: number; triangles: number; programs: number | null; delayMs: number | null; jitterMs: number | null; receiptSpacingErrorsMs?: number[];
   texUploads?: number; bufUploads?: number; readBacks?: number; textures?: number | null; geometries?: number | null; mem?: string | null;
   audioStarts?: number; audioLive?: number; busyMs?: number }
 export interface LegSummary { seconds: number | null; fps: number | null; p50Ms: number | null; p95Ms: number | null; maxMs: number | null;
   over33: number; over50: number; over50Per30s: number | null; updateP50Ms: number | null; updateP95Ms: number | null;
   renderP50Ms: number | null; renderP95Ms: number | null; gpuApproxP95Ms: number | null; delayMs: number | null; delayMaxMs: number | null;
-  jitterMs: number | null; jitterMaxMs: number | null; trianglesP95: number | null; drawsP95: number | null; programsMax: number;
+  jitterMs: number | null; jitterMaxMs: number | null; receiptSpacingP95Ms: number | null; receiptSpacingMaxMs: number | null;
+  trianglesP95: number | null; drawsP95: number | null; programsMax: number;
   texUploads: number; bufUploads: number; readBacks: number; texturesMin: number; texturesMax: number; mem: string | null;
   audioLiveMax: number; audioLiveEnd: number | null; audioStartsPerS: number | null }
 export interface LegResult { name: string; kind?: string; cap: number | null; error: string | null; nav: unknown; summary: LegSummary | null; samples?: LegSample[]; rec?: string | null }

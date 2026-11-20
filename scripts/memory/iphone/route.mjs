@@ -68,7 +68,9 @@ export function routeLegOnPage(leg) {
   if (leg.cap !== null) {
     try { Object.defineProperty(game, 'qualityCap', { get: () => leg.cap, set: () => { /* held */ }, configurable: true }); } catch { /* read-only */ }
   }
-  const clock = p.link?.client?.clock ?? null;
+  /** @type {import('../../../src/client/engine/net/client').NetClient | undefined} */
+  const client = p.link?.client;
+  const clock = client?.clock ?? null;
   // GPU traffic per second (DW1, for opus-fps: does the Memory saver purge and re-upload?): texture uploads, buffer uploads
   // and buffer read-backs (a released array read again, memorySaver.ts restore), counted on the context's prototype once
   const counts = leg.fixed ? null : (/** @type {any} */ (window).__wsRouteGl ??= (() => {
@@ -123,6 +125,12 @@ export function routeLegOnPage(leg) {
     return null;
   };
   const t0 = performance.now(), frames0 = game.frameCount;
+  /** @type {number[]} */
+  const receiptSpacingErrorsMs = [];
+  const stopSpacing = leg.approach ? undefined : client?.onFrame((_frame, ms) => {
+    // Older builds call the listener with only the decoded frame.
+    if (typeof ms === 'number' && Number.isFinite(ms)) receiptSpacingErrorsMs.push(ms);
+  });
   let seen = game.frameCount, previous = t0, last = t0, at = 0, metres = 0, prevX = p.position.x, prevZ = p.position.z;
   let detours = 0, detourUntil = 0, detourYaw = 0, pressedLock = 0, checkX = prevX, checkZ = prevZ, still = 0, swings = 0, target = /** @type {any} */ (null), engaged = false;
   /** @type {any[]} */ const samples = [];
@@ -160,7 +168,7 @@ export function routeLegOnPage(leg) {
     }
     samples.push({ tMs: now - t0, seconds: (now - previous) / 1000, frames, frameMs, updateMs, renderMs, gpuApproxMs,
       draws: game.lastFrame.calls, triangles: game.lastFrame.triangles, programs: renderer.info?.programs?.length ?? null,
-      delayMs: clock?.delayMs ?? null, jitterMs: clock?.jitterMs ?? null,
+      delayMs: clock?.delayMs ?? null, jitterMs: clock?.jitterMs ?? null, receiptSpacingErrorsMs: receiptSpacingErrorsMs.splice(0),
       ...(counts === null ? {} : {
         texUploads: counts.tex - seenGl.tex, bufUploads: counts.buf - seenGl.buf, readBacks: counts.read - seenGl.read,
         audioStarts: counts.audioStarts - seenGl.audioStarts, audioLive: counts.audioStarts - counts.audioEnds, busyMs: Math.round(counts.busyMs),
@@ -172,6 +180,7 @@ export function routeLegOnPage(leg) {
   const end = (/** @type {string|null} */ error) => {
     if (ended) return;
     ended = true;
+    stopSpacing?.();
     clearTimeout(timeout);
     timeout = undefined;
     input.setHeld('move.forward', false); input.setHeld('sprint', false); input.setHeld('attack', false);
@@ -298,10 +307,11 @@ const finite = (values) => /** @type {number[]} */ (values.filter((value) => typ
 
 /** One leg's numbers from its per-second samples. Pure.
  * @param {{seconds:number, frames:number, frameMs:number[], updateMs:number[], renderMs:number[], gpuApproxMs:number[],
- *   draws:number, triangles:number, programs:number|null, delayMs:number|null, jitterMs:number|null}[]} samples */
+ *   draws:number, triangles:number, programs:number|null, delayMs:number|null, jitterMs:number|null, receiptSpacingErrorsMs?:number[]}[]} samples */
 export function legSummary(samples) {
   const seconds = samples.reduce((sum, row) => sum + row.seconds, 0);
   const frames = samples.flatMap((row) => row.frameMs);
+  const spacingErrors = samples.flatMap((row) => row.receiptSpacingErrorsMs ?? []);
   const over = (/** @type {number} */ ms) => frames.filter((value) => value > ms).length;
   const round = (/** @type {number|null} */ value, digits = 1) => value === null ? null : Number(value.toFixed(digits));
   return {
@@ -313,6 +323,8 @@ export function legSummary(samples) {
     gpuApproxP95Ms: round(percentile(samples.flatMap((row) => row.gpuApproxMs), 0.95)),
     delayMs: round(percentile(finite(samples.map((row) => row.delayMs)), 0.5), 0), delayMaxMs: round(Math.max(0, ...finite(samples.map((row) => row.delayMs))), 0),
     jitterMs: round(percentile(finite(samples.map((row) => row.jitterMs)), 0.5)), jitterMaxMs: round(Math.max(0, ...finite(samples.map((row) => row.jitterMs)))),
+    receiptSpacingP95Ms: round(percentile(spacingErrors, 0.95)),
+    receiptSpacingMaxMs: round(spacingErrors.length > 0 ? Math.max(...spacingErrors) : null),
     trianglesP95: percentile(samples.map((row) => row.triangles), 0.95), drawsP95: percentile(samples.map((row) => row.draws), 0.95),
     programsMax: Math.max(0, ...finite(samples.map((row) => row.programs))),
     texUploads: samples.reduce((sum, row) => sum + (row.texUploads ?? 0), 0), bufUploads: samples.reduce((sum, row) => sum + (row.bufUploads ?? 0), 0),
@@ -429,12 +441,12 @@ export async function playRoute(driver, { slug, cap, rec = [], legs: count, log 
 /** The route's markdown table: one row per leg. Pure.
  * @param {{name:string, cap:number|null, error:string|null, summary: ReturnType<typeof legSummary> | null, nav: any}[]} legs */
 export function routeTable(legs) {
-  const head = '| Segment | Cap | s | fps | p50 | p95 | max | >33 | >50 | >50/30 s | upd p50/p95 | rnd p50/p95 | gpu~ p95 | delay / jitter | tris | draws | progs | tex/buf up, reads | textures | mem | audio live end/max, starts/s | stuck |';
+  const head = '| Segment | Cap | s | fps | p50 | p95 | max | >33 | >50 | >50/30 s | upd p50/p95 | rnd p50/p95 | gpu~ p95 | delay / phase error | receipt spacing error p95/max | tris | draws | progs | tex/buf up, reads | textures | mem | audio live end/max, starts/s | stuck |';
   const rows = legs.map(({ name, cap, error, summary: s, nav }) => s === null ? `| ${name} | ${String(cap)} | ${String(error)} |` :
     `| ${name} | ${String(cap)} | ${String(s.seconds)} | ${String(s.fps)} | ${String(s.p50Ms)} | ${String(s.p95Ms)} | ${String(s.maxMs)} | ${String(s.over33)} | ${String(s.over50)} | ${String(s.over50Per30s)} | ` +
-    `${String(s.updateP50Ms)} / ${String(s.updateP95Ms)} | ${String(s.renderP50Ms)} / ${String(s.renderP95Ms)} | ${String(s.gpuApproxP95Ms)} | ${String(s.delayMs)} / ${String(s.jitterMs)} | ` +
+    `${String(s.updateP50Ms)} / ${String(s.updateP95Ms)} | ${String(s.renderP50Ms)} / ${String(s.renderP95Ms)} | ${String(s.gpuApproxP95Ms)} | ${String(s.delayMs)} / ${String(s.jitterMs)} | ${s.receiptSpacingP95Ms ?? '—'} / ${s.receiptSpacingMaxMs ?? '—'} | ` +
     `${s.trianglesP95 === null ? '—' : `${String(Math.round(s.trianglesP95 / 1000))}k`} | ${String(s.drawsP95)} | ${String(s.programsMax)} | ${String(s.texUploads)}/${String(s.bufUploads)}, ${String(s.readBacks)} | ${String(s.texturesMin)}–${String(s.texturesMax)} | ${s.mem ?? '—'} | ${String(s.audioLiveEnd)}/${String(s.audioLiveMax)}, ${String(s.audioStartsPerS)} | ${String(nav?.stuck?.length ?? 0)}${nav?.skipped ? ` (${String(nav.skipped)} skipped)` : ''} |`);
-  return [head, `|${'---|'.repeat(22)}`, ...rows].join('\n');
+  return [head, `|${'---|'.repeat(23)}`, ...rows].join('\n');
 }
 
 /** The worst segment over every run of a cap: the highest p95, then the most spikes over 50 ms per 30 s.

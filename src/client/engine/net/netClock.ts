@@ -13,7 +13,7 @@ export const INTERP_START_MS = 100;
 export const INTERP_MAX_MS = 200;
 /** The floor on the delay (J51). */
 export const INTERP_FLOOR_MS = 66;
-/** Most of a second of the wire's 30 Hz: what `jitterP95` reads. */
+/** Three seconds of phase samples at the wire's 30 Hz. */
 export const JITTER_FRAMES = 90;
 
 const TICK_MS = FIXED_STEP * 1000, FRAME_MS = 2 * TICK_MS;
@@ -35,7 +35,7 @@ export class NetClock {
   delayMs: number = INTERP_START_MS;
   /** What the delay is moving to. */
   targetMs: number = INTERP_START_MS;
-  /** The clock's own view of the wire's lateness: 95th percentile, ms. */
+  /** Absolute phase error against the clock estimate, rolling p95 in ms. */
   jitterMs = 0;
   private anchorMs = 0;
   private anchorTick = 0;
@@ -51,26 +51,28 @@ export class NetClock {
   /** A frame has been heard. */
   get started(): boolean { return this.newest !== -1; }
 
-  /** Stamp a frame as it arrives. Only a new frame moves the clock: a late one says nothing about now. */
-  arrival(tick: number, nowMs: number): void {
-    if (tick <= this.newest) return;
+  /** Stamp a new frame and return its absolute spacing error in ms, once two increasing ticks have arrived. */
+  arrival(tick: number, nowMs: number): number | null {
+    if (tick <= this.newest) return null;
     // The first heard frame can be the oldest of a boot backlog smaller than
     // SNAP_MS. Acquire through its newest frame as after a later snap, rather
     // than spending seconds correcting a false phase error at the PLL's 1%.
-    if (this.newest === -1) { this.newest = tick; this.anchorMs = nowMs; this.anchorTick = tick; this.snapMs = nowMs; return; }
+    if (this.newest === -1) { this.newest = tick; this.anchorMs = nowMs; this.anchorTick = tick; this.snapMs = nowMs; return null; }
+    const waitedMs = nowMs - this.anchorMs, spacingErrorMs = Math.abs(waitedMs - (tick - this.newest) * TICK_MS);
     this.newest = tick;
-    const estimate = this.serverTick(nowMs), errorMs = (tick - estimate) * TICK_MS, waitedMs = nowMs - this.anchorMs;
+    const estimate = this.serverTick(nowMs), errorMs = (tick - estimate) * TICK_MS;
     // A stall's backlog arrives as one burst, oldest first: the oldest snaps the clock back, and every frame ahead of the clock
     // in the next SNAP_MS carries it forward, to the burst's newest, which is now. Left at the oldest, the clock ran up to 250 ms
     // behind, caught up at 1 %, and every frame meanwhile read as jitter (NL2).
-    if (errorMs > 0 && nowMs - this.snapMs < SNAP_MS) { this.anchorTick = tick; this.anchorMs = nowMs; return; }
-    if (Math.abs(errorMs) > SNAP_MS) { this.anchorTick = tick; this.anchorMs = nowMs; this.rate = 1; this.filled = 0; this.next = 0; this.snapMs = nowMs; return; }
+    if (errorMs > 0 && nowMs - this.snapMs < SNAP_MS) { this.anchorTick = tick; this.anchorMs = nowMs; return spacingErrorMs; }
+    if (Math.abs(errorMs) > SNAP_MS) { this.anchorTick = tick; this.anchorMs = nowMs; this.rate = 1; this.filled = 0; this.next = 0; this.snapMs = nowMs; return spacingErrorMs; }
     this.anchorTick = estimate; this.anchorMs = nowMs;
     this.rate = 1 + Math.max(-NUDGE, Math.min(NUDGE, errorMs / 1000));
     this.lateness[this.next] = Math.abs(errorMs);
     this.next = (this.next + 1) % JITTER_FRAMES;
     if (this.filled < JITTER_FRAMES) this.filled++;
     this.adapt(waitedMs);
+    return spacingErrorMs;
   }
   /** The newest server tick this client can be sure has happened, as a fraction of a tick. */
   serverTick(nowMs: number): number { return this.anchorTick + (nowMs - this.anchorMs) / TICK_MS * this.rate; }
