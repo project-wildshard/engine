@@ -201,6 +201,9 @@ function rankTile(rows: TileDistance[], index: number, tile: RingTile, distance:
   return row;
 }
 
+/** A comparator's order of two distances as -1, 0 or 1 (0 when equal or either is NaN, where `x - y` was 0 or NaN). DF11: a
+ *  comparator returning `x - y` boxed the difference on every comparison the native sort made (~35 KB a dock frame at 3x). */
+function byNumber(x: number, y: number): number { return x < y ? -1 : x > y ? 1 : 0; }
 function key(instance: string, level: RingLevel, x: number, z: number): string { return level === 'far' ? `${instance}:far` : `${instance}:${level}/${x}/${z}`; }
 /** Distance from a cell-local point to a tile's square (0 inside). */
 function rectDistance(lx: number, lz: number, level: RingLevel, x: number, z: number, cell: LayoutCell): number {
@@ -554,7 +557,7 @@ export class TileStreamer<D> {
       else { row.cell = cell; row.d = cellDistance(cell); }
       ranked.push(row);
     }
-    ranked.sort((a, b) => a.d - b.d || a.cell.instance.localeCompare(b.cell.instance));
+    ranked.sort((a, b) => byNumber(a.d, b.d) || a.cell.instance.localeCompare(b.cell.instance));
     this.visibleCells = ranked.filter((r) => r.d <= this.options.viewDistance).map((r) => r.cell);
     // the far ring: nearest first while the proxies' own bytes fit its budget; a cell with no far proxy keeps the old
     // reach and slot count for its 16 L1 tiles (its coarse level), which the near L1 refinement shares
@@ -578,7 +581,7 @@ export class TileStreamer<D> {
       for (let z = 0; z < cell.rows.l1; z++) for (let x = 0; x < cell.columns.l1; x++) { const td = rectDistance(lx, lz, 'l1', x, z, cell); if (td <= L1_RADIUS) l1.push(rankTile(work.l1Rows, l1.length, this.tile(cell.instance, 'l1', x, z), td)); }
       if (!this.fullRings.has(cell.instance)) for (let z = 0; z < cell.rows.l0; z++) for (let x = 0; x < cell.columns.l0; x++) { const td = rectDistance(lx, lz, 'l0', x, z, cell); if (td <= L0_RADIUS) l0.push(rankTile(work.l0Rows, l0.length, this.tile(cell.instance, 'l0', x, z), td)); }
     }
-    const order = (a: { tile: RingTile; d: number }, b: { tile: RingTile; d: number }): number => a.d - b.d || a.tile.key.localeCompare(b.tile.key);
+    const order = (a: { tile: RingTile; d: number }, b: { tile: RingTile; d: number }): number => byNumber(a.d, b.d) || a.tile.key.localeCompare(b.tile.key);
     l0.sort(order); l1.sort(order);
     const fine = work.fine;
     for (let i = 0; i < l0.length && i < C.l0Count; i++) { const row = l0[i]; if (row !== undefined) fine.push(row); }
@@ -659,7 +662,7 @@ export class TileStreamer<D> {
       order.sort((a, b) => {
         const first = a.slot, second = b.slot;
         if (first === undefined || second === undefined) throw new Error('Missing release work slot');
-        return LEVEL_RANK[second.tile.level] - LEVEL_RANK[first.tile.level] || b.distance - a.distance || first.tile.key.localeCompare(second.tile.key);
+        return LEVEL_RANK[second.tile.level] - LEVEL_RANK[first.tile.level] || byNumber(b.distance, a.distance) || first.tile.key.localeCompare(second.tile.key);
       });
       const dropTree = (slot: Slot<D>): void => {
         for (const child of this.slots.values()) if (child.parent === slot.tile.key) dropTree(child);
@@ -711,7 +714,7 @@ export class TileStreamer<D> {
     const required = this.requiredKeys();
     const pending = [...want.values()].filter(({ tile }) => !this.slots.has(tile.key) && (this.retryAt.get(tile.key) ?? 0) <= this.frame)
       .sort((a, b) => Number(required.has(b.tile.key)) - Number(required.has(a.tile.key))
-        || LEVEL_RANK[a.tile.level] - LEVEL_RANK[b.tile.level] || a.distance - b.distance || a.tile.key.localeCompare(b.tile.key));
+        || LEVEL_RANK[a.tile.level] - LEVEL_RANK[b.tile.level] || byNumber(a.distance, b.distance) || a.tile.key.localeCompare(b.tile.key));
     let inFlight = [...this.slots.values()].filter((s) => s.state === 'fetching').length;
     for (const { tile: plan, distance } of pending) {
       const parentKey = parentOf(plan), parent = parentKey === null ? undefined : this.slots.get(parentKey);

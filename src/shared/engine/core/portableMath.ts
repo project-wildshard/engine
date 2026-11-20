@@ -13,7 +13,7 @@
 
 /** Math.hypot is free to round as an engine likes, and JavaScriptCore's isn't V8's. This is V8's own (Kahan summation over the
  *  largest term), so V8 keeps its bits. */
-function hypot(...values: number[]): number {
+function hypotList(...values: number[]): number {
   let max = 0, nan = false;
   for (const value of values) {
     const size = Math.abs(value);
@@ -26,6 +26,31 @@ function hypot(...values: number[]): number {
   let sum = 0, compensation = 0;
   for (const value of values) {
     const n = Math.abs(value) / max, summand = n * n - compensation, preliminary = sum + summand;
+    compensation = (preliminary - sum) - summand;
+    sum = preliminary;
+  }
+  return Math.sqrt(sum) * max;
+}
+
+/** `hypotList` without a rest array for up to four arguments (DF11: as Math.hypot, every call made a fresh array, ~5 KB a
+ *  dock frame at 3x, and boxed its result where it was not inlined). The same two passes in the same order, each
+ *  argument coerced by Math.abs where `hypotList` coerces it; five or more forward to `hypotList`. */
+function hypot(a?: number, b?: number, c?: number, d?: number): number {
+  const count = arguments.length;
+  // oxlint-disable-next-line prefer-rest-params -- forwarding `arguments` makes no array; a rest parameter is the cost
+  if (count > 4) return Reflect.apply(hypotList, undefined, arguments) as number;
+  let max = 0, nan = false;
+  for (let i = 0; i < count; i++) {
+    const size = Math.abs((i === 0 ? a : i === 1 ? b : i === 2 ? c : d) as number);
+    if (Number.isNaN(size)) nan = true;
+    else if (size > max) max = size;
+  }
+  if (max === Infinity) return Infinity;
+  if (nan) return Number.NaN;
+  if (max === 0) return 0;
+  let sum = 0, compensation = 0;
+  for (let i = 0; i < count; i++) {
+    const n = Math.abs((i === 0 ? a : i === 1 ? b : i === 2 ? c : d) as number) / max, summand = n * n - compensation, preliminary = sum + summand;
     compensation = (preliminary - sum) - summand;
     sum = preliminary;
   }

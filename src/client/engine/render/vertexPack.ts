@@ -100,8 +100,10 @@ export function encode(f: PackFormat, from: number, to: number, source: ArrayLik
     const at = v * lanes, base = (from + v) * size + shift;
     for (let c = 0; c < size; c++) {
       const i = base + c, value = i >= 0 && i < length ? source[i] ?? Number.NaN : Number.NaN;
-      if (!(value <= hi && value >= floor)) { ok = false; if (!Number.isFinite(value)) { words[at + c] = 0; continue; } }
-      words[at + c] = Math.round((value > 1 ? 1 : value < lo ? lo : value) * scale);
+      // DF11: no `continue` or nested ternary here; V8 kept that shape's doubles boxed even when hot (48 B a vertex in
+      // node, 0 now). The same words: a non-finite value writes 0, a finite one is clamped to [lo, 1] and scaled.
+      if (!(value <= hi && value >= floor)) ok = false;
+      words[at + c] = Number.isFinite(value) ? Math.round(Math.min(1, Math.max(lo, value)) * scale) : 0;
     }
   }
   const n = vertices * lanes;

@@ -28,3 +28,7 @@
   and radius loops and the seam merge's per-strip vertex loop now run in plain functions between the same pauses.
 - Parsed-page decode defined every key with a fresh descriptor object; a plain store makes the same own property,
   so only `__proto__` is still defined. The road look's Mesher grows typed arrays instead of number lists.
+- V8 shapes that box: Math.hypot (installed portable) took a rest array per call; a sort comparator returning `a.d - b.d`
+  boxed every difference (the ring planner, 35 KB a frame); vertexPack's encode loop with a `continue` and nested
+  ternary boxed 48 B a vertex even hot (node). hypot takes up to four plain arguments, comparators return -1/0/1, the
+  encode loop is branch-light; all bit-equal.
