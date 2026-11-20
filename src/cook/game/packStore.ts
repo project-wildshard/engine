@@ -7,6 +7,8 @@ import {createHash, createHmac} from 'node:crypto';
 import {mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {dirname, join, relative, resolve, sep} from 'node:path';
+// oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
+import {setTimeout as delay} from 'node:timers/promises';
 
 export interface StoredObject {readonly key: string; readonly bytes: number; readonly modified: number}
 export interface ObjectHeaders {readonly type: string; readonly encoding?: string; readonly cache: string}
@@ -61,6 +63,7 @@ const hmac = (secret: Uint8Array | string, text: string): Uint8Array => createHm
 /** RFC 3986 unreserved stays; S3 wants everything else escaped, `/` too in a query. */
 const escape = (text: string): string => encodeURIComponent(text).replaceAll(/[!'()*]/gu, char => `%${(char.codePointAt(0) ?? 0).toString(16).toUpperCase()}`);
 const EMPTY = new Uint8Array();
+const PUT_RETRY_DELAYS_MS = [250, 1_000] as const;
 
 export function r2Store(config: R2Config): PackStore {
   const origin = new URL(config.endpoint), read = config.fetch ?? fetch, clock = config.now ?? ((): Date => new Date());
@@ -92,9 +95,16 @@ export function r2Store(config: R2Config): PackStore {
       return new Uint8Array(await response.arrayBuffer());
     },
     put: async (key, body, headers) => {
-      const response = await send('PUT', key, {}, body, {'cache-control': headers.cache, 'content-type': headers.type, ...(headers.encoding === undefined ? {} : {'content-encoding': headers.encoding})});
-      await response.body?.cancel();
-      if (!response.ok) throw failed('PUT', key, response.status);
+      const extra = {'cache-control': headers.cache, 'content-type': headers.type, ...(headers.encoding === undefined ? {} : {'content-encoding': headers.encoding})};
+      for (let attempt = 0;; attempt++) {
+        const response = await send('PUT', key, {}, body, extra);
+        await response.body?.cancel();
+        if (response.ok) return;
+        const wait = PUT_RETRY_DELAYS_MS[attempt];
+        if (wait === undefined || (response.status !== 429 && response.status < 500)) throw failed('PUT', key, response.status);
+        // Retry the same object before the worker has to recook the whole shard.
+        await delay(wait);
+      }
     },
     list: async prefix => {
       const rows: StoredObject[] = [];

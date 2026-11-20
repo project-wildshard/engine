@@ -148,6 +148,32 @@ describe('the cook worker', () => {
 });
 
 describe('the R2 store', () => {
+  it('retries the same cooked object when R2 temporarily refuses its PUT', async () => {
+    const requests: {readonly url: string; readonly bytes: number[]}[] = [];
+    const send: typeof fetch = async (input, init) => {
+      requests.push({url: String(input), bytes: [...new Uint8Array(await new Response(init?.body ?? null).arrayBuffer())]});
+      return new Response(null, {status: requests.length === 1 ? 503 : 200});
+    };
+    const store = r2Store({endpoint: 'https://r2.invalid', bucket: 'packs', accessKeyId: 'key', secretAccessKey: 'secret', fetch: send});
+    const key = 'assets/spawn/pine-hollow-entry-phone-test.json';
+    await store.put(key, new Uint8Array([1, 2, 3]), objectHeaders(key));
+    const expected = {url: `https://r2.invalid/packs/${key}`, bytes: [1, 2, 3]};
+    expect(requests).toEqual([expected, expected]);
+  });
+
+  it('fails permanent PUT refusals immediately and bounds transient retries', async () => {
+    const key = 'assets/spawn/test.json';
+    const put = async (status: number, attempts: number): Promise<void> => {
+      let calls = 0;
+      const send: typeof fetch = async () => { calls++; return new Response(null, {status}); };
+      const store = r2Store({endpoint: 'https://r2.invalid', bucket: 'packs', accessKeyId: 'key', secretAccessKey: 'secret', fetch: send});
+      await expect(store.put(key, new Uint8Array([1]), objectHeaders(key))).rejects.toThrow(`R2 PUT ${key} answered ${status}`);
+      expect(calls).toBe(attempts);
+    };
+    await put(403, 1);
+    await put(503, 3);
+  });
+
   it('signs what S3 checks, says Content-Encoding on a part, and pages a listing', async () => {
     const bucket = new Map<string, {body: Buffer; headers: Record<string, string | string[] | undefined>}>();
     const signingKey = (day: string): Uint8Array => ['auto', 's3', 'aws4_request'].reduce<Uint8Array>((key, text) => createHmac('sha256', key).update(text).digest(), createHmac('sha256', 'AWS4secret').update(day).digest());
