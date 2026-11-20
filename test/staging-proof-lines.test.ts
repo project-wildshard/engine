@@ -105,8 +105,12 @@ describe('the live proof refuses every socket but the staging door (J205)', () =
     } finally { Reflect.set(globalThis, 'WebSocket', saved.ws); Reflect.set(globalThis, 'location', saved.location); }
   };
   const staging = 'wss://rooms-staging.wildshard.io';
-  it('admits the staging door, bare or with one GO7 chunk', () => {
+  it('admits the staging door, bare or with one chunk', () => {
     for (const href of [staging, `${staging}/`, `${staging}/?chunk=driftwood-isle`, `${staging}/?chunk=template-2`]) expect(dial(staging, href)).toBe('opened');
+  });
+  it('admits a named arrival with the chunk on the staging door', () => {
+    expect(dial(staging, `${staging}/?chunk=driftwood-isle&at=spawn`)).toBe('opened');
+    expect(dial(staging, `${staging}/?at=north_gate-2&chunk=far-reach`)).toBe('opened');
   });
   it('refuses production and every other host, with and without ?chunk=', () => {
     for (const host of ['wss://rooms.wildshard.io', 'wss://play.wildshard.io', 'wss://preview.wildshard.io', 'wss://staging.wildshard.io', 'ws://127.0.0.1:8787'])
@@ -114,5 +118,12 @@ describe('the live proof refuses every socket but the staging door (J205)', () =
   });
   it('refuses any other path or query on the staging door', () => {
     for (const href of [`${staging}/x`, `${staging}/?chunk=a&x=1`, `${staging}/?x=1`, `${staging}/?chunk=`, `${staging}/?chunk=A/B`, `${staging}/#h`]) expect(dial(staging, href)).toMatch(/J205 refused/u);
+  });
+  it('refuses an arrival without one valid chunk and one valid arrival name', () => {
+    for (const query of ['at=spawn', 'chunk=a&at=', 'chunk=a&at=a/b', 'chunk=a&at=UP',
+      'chunk=a&chunk=b&at=spawn', 'chunk=a&at=spawn&at=other', 'chunk=a&at=spawn&extra=1'])
+      expect(dial(staging, `${staging}/?${query}`)).toMatch(/J205 refused/u);
+    expect(dial(staging, 'wss://rooms.wildshard.io/?chunk=a&at=spawn')).toMatch(/J205 refused/u);
+    expect(dial(staging, `${staging}/other?chunk=a&at=spawn`)).toMatch(/J205 refused/u);
   });
 });
