@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import * as v from 'valibot';
 import { catalogueDocument } from '@wildshard/engine/game/grid/catalogueDocument';
 import { FEATURED_ZONES } from '@wildshard/engine/game/zoneSelect/featured';
-import type { ZoneSelectCard, ZoneSelectDocument } from '../../../shared/host/zoneSelectRows';
+import type { ZoneSelectCard, ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 import { originAllowed } from './doorTrust';
 import type { ZoneEntryTotal } from './saves/zoneEntries';
 import { within } from './saves/saveStore';

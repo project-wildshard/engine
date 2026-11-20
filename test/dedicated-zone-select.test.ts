@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import { afterEach, expect, test, vi } from 'vitest';
 import { parse } from 'valibot';
 import { zoneSelectRoute } from '../src/server/host/dedicated/zoneSelect';
-import { ZoneSelectSchema, type ZoneSelectCard } from '../src/shared/host/zoneSelectRows';
+import { ZoneSelectSchema, type ZoneSelectCard } from '../src/shared/game/grid/zoneSelectRows';
 
 const staging = 'https://staging.wildshard.io';
 const names = (cards: readonly ZoneSelectCard[]): string[] => cards.map(card => card.slug);

@@ -21,6 +21,7 @@ import { voiceUi } from './voiceUi';
 import { FRESH_WAIT_MS, fetchSignedRelease, freshAfterDial, releaseToDial, type ReleaseKeep } from './release';
 import { releaseScreens } from './releaseScreens';
 import { beginRelease, takeRelease } from './earlyRelease';
+import type { ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 import { newBuildPanel } from './reconnectStrip';
 import { linkScreens } from './linkScreens';
 import { saveScreens } from './saveScreens';
@@ -392,6 +393,18 @@ export async function worldWord(config: { readonly release: string; readonly key
   if (word !== null) { try { keep.write({ of: config.release, at: Date.now(), word }); } catch { /* a page that can keep nothing asks again */ } }
   return word;
 }
+/** Use the signed world address for its channel's public Zone Select read. */
+export async function zoneSelectLocation(config: { readonly release: string; readonly key: string }, deadline: number):
+Promise<{ readonly url: string; readonly channel: ZoneSelectDocument['channel'] } | null> {
+  const { socket, channel } = await fetchSignedRelease(config.release, config.key, deadline);
+  if (socket === undefined) return null;
+  const at = new URL(socket);
+  if (at.protocol === 'wss:') at.protocol = 'https:';
+  else if (at.protocol === 'ws:') at.protocol = 'http:';
+  else return null;
+  return { url: new URL('/zone-select', at).href, channel };
+}
+
 const GATE_KEEP_MS = 60_000;
 /** A page that lends no keep reads the release file every time. */
 const NO_KEEP: ReleaseKeep = { read: () => null, write: () => undefined };

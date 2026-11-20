@@ -33,6 +33,7 @@ import { armTitleHandover } from './titleHandover';
 import { GAME_STRINGS } from '../../shared/game/strings';
 import { WHATS_NEW, type WhatsNew } from './whatsNew';
 import { buildWhatsNewBanner, type HiddenStore } from './whatsNewBanner';
+import type { ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 import './mainMenu.css';
 /** MOBILE-GRAPHICS MG4 (Jake: "put a fucking banner on the homepage saying low power mode is on. You're automatically going
  *  into low graphics") */
@@ -59,6 +60,8 @@ let screen: MainMenuScreen = 'main';
 export interface TitleMenuOptions extends Omit<TitleDeckOptions, 'cards'> {
   /** the deck's cards (default: `titleCards()`, Developer read live) */
   readonly cards?: TitleDeckOptions['cards'];
+  /** Live or baked order. The title's own manifests still provide art and entry policy. */
+  readonly zoneSelect?: ZoneSelectDocument | null;
   /** the home screen's SETTINGS (J458); the deck under ZONE SELECT has none (EXPLORE-MODE EX1, QA row 48) */
   readonly onSettings: () => void;
   /** ENTER THE MMO's tap: boots the grid from its one-shot intent (src/client/game/grid/pageEntry.ts `enterGrid`) */
@@ -97,6 +100,18 @@ function required<T extends HTMLElement>(root: ParentNode, selector: string, typ
   return found;
 }
 
+function orderTitleCards(cards: TitleDeck['cards'], served: readonly { readonly slug: string }[] | undefined): TitleDeck['cards'] {
+  if (served === undefined) return cards;
+  const bySlug = new Map(cards.map(card => [card.slug, card]));
+  const ordered = served.flatMap(({ slug }) => {
+    const card = bySlug.get(slug);
+    if (card === undefined) return [];
+    bySlug.delete(slug);
+    return [card];
+  });
+  return ordered.length === 0 ? cards : ordered;
+}
+
 /** Build the shared title menu from its supplied deck and callbacks. */
 export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const owner = pageScope.child('title-prefetch');
@@ -104,7 +119,9 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   let stopReadAhead: (() => void) | undefined;
   const leaveTitle = (): void => { leavingTitle = true; stopReadAhead?.(); };
   const mode = opts.mode ?? menuMode;
-  const { notice, onGrid, screen: first, cards = titleCards(), whatsNew = WHATS_NEW, whatsNewStore, ...deckOpts } = opts;
+  const { notice, onGrid, screen: first, zoneSelect, whatsNew = WHATS_NEW, whatsNewStore, ...deckOpts } = opts;
+  const dev = mode().developer;
+  const cards = opts.cards ?? orderTitleCards(titleCards(dev), dev ? zoneSelect?.all : zoneSelect?.popular);
   let viewScreen = first ?? screen;
   // leaving the title for a world resets it: pause ▸ EXIT TO MAIN opens on the main menu again
   // MG4 / MG5: a phone, by the rule the tier uses (core/tier.ts), read here without the tier's render tables (the title's graph)
@@ -114,7 +131,6 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     // session save, so it survives the hand-over); any other entry drops a first play armed and never reached
     onEnter: (card) => { if (!(phone && !firstPlayDone() && startFirstPlay(card.slug))) dropFirstPlay(); leaveTitle(); screen = 'main'; deckOpts.onEnter(card); } });
   const s = GAME_STRINGS.mainMenu;
-  const dev = mode().developer;
 
   const root = document.createElement('div');
   root.className = 'ws-title-stack';

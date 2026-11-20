@@ -1,0 +1,419 @@
+{
+  "channel": "staging",
+  "serial": 0,
+  "featured": [
+    {
+      "slug": "driftwood-isle",
+      "name": "Driftwood Isle",
+      "status": "live",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "pine-hollow",
+      "name": "Pine Hollow",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "nalati-grasslands",
+      "name": "Nalati Grasslands",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "name": "Nine Dragon Stack",
+      "status": "partial",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "sunscar-dunes",
+      "name": "Signal Dunes",
+      "status": "experimental",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "far-reach",
+      "name": "Sky Reach",
+      "status": "experimental",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    }
+  ],
+  "popular": [
+    {
+      "slug": "driftwood-isle",
+      "name": "Driftwood Isle",
+      "status": "live",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "pine-hollow",
+      "name": "Pine Hollow",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "nalati-grasslands",
+      "name": "Nalati Grasslands",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "name": "Nine Dragon Stack",
+      "status": "partial",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "sunscar-dunes",
+      "name": "Signal Dunes",
+      "status": "experimental",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "far-reach",
+      "name": "Sky Reach",
+      "status": "experimental",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-clockwork-canyon",
+      "name": "Open Plot \u00b7 Clockwork Canyon",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-coral-drift",
+      "name": "Open Plot \u00b7 Coral Drift",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-ember-forge",
+      "name": "Open Plot \u00b7 Ember Forge",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-sky-race",
+      "name": "Open Plot \u00b7 Floating Island Race",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-fossil-badlands",
+      "name": "Open Plot \u00b7 Fossil Badlands",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-frostline-peaks",
+      "name": "Open Plot \u00b7 Frostline Peaks",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-jungle-ziggurat",
+      "name": "Open Plot \u00b7 Jungle Ziggurat",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-lantern-bayou",
+      "name": "Open Plot \u00b7 Lantern Bayou",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-mosslight-ruins",
+      "name": "Open Plot \u00b7 Mosslight Ruins",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-night-market",
+      "name": "Open Plot \u00b7 Night Market",
+      "status": "experimental",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-alien-plain",
+      "name": "Open Plot \u00b7 Pastel Alien Plain",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-patchwork-fairground",
+      "name": "Open Plot \u00b7 Patchwork Fairground",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-saltwind-lighthouse",
+      "name": "Open Plot \u00b7 Saltwind Lighthouse",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-sky-harbor",
+      "name": "Open Plot \u00b7 Sky Harbor",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-starfall-observatory",
+      "name": "Open Plot \u00b7 Starfall Observatory",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    }
+  ],
+  "new": [],
+  "all": [
+    {
+      "slug": "brasscap-mesa",
+      "name": "Brasscap Mesa",
+      "status": "hidden",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "driftwood-isle",
+      "name": "Driftwood Isle",
+      "status": "live",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "ink-cel-valley",
+      "name": "Ink & Cel Valley",
+      "status": "hidden",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "nalati-grasslands",
+      "name": "Nalati Grasslands",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "nine-dragon-stack",
+      "name": "Nine Dragon Stack",
+      "status": "partial",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-clockwork-canyon",
+      "name": "Open Plot \u00b7 Clockwork Canyon",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-coral-drift",
+      "name": "Open Plot \u00b7 Coral Drift",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-ember-forge",
+      "name": "Open Plot \u00b7 Ember Forge",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-sky-race",
+      "name": "Open Plot \u00b7 Floating Island Race",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-fossil-badlands",
+      "name": "Open Plot \u00b7 Fossil Badlands",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-frostline-peaks",
+      "name": "Open Plot \u00b7 Frostline Peaks",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-jungle-ziggurat",
+      "name": "Open Plot \u00b7 Jungle Ziggurat",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-lantern-bayou",
+      "name": "Open Plot \u00b7 Lantern Bayou",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-mosslight-ruins",
+      "name": "Open Plot \u00b7 Mosslight Ruins",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-night-market",
+      "name": "Open Plot \u00b7 Night Market",
+      "status": "experimental",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-alien-plain",
+      "name": "Open Plot \u00b7 Pastel Alien Plain",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-patchwork-fairground",
+      "name": "Open Plot \u00b7 Patchwork Fairground",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-saltwind-lighthouse",
+      "name": "Open Plot \u00b7 Saltwind Lighthouse",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-sky-harbor",
+      "name": "Open Plot \u00b7 Sky Harbor",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "open-plot-starfall-observatory",
+      "name": "Open Plot \u00b7 Starfall Observatory",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "pastel-plain",
+      "name": "Pastel Plain",
+      "status": "hidden",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "pine-hollow",
+      "name": "Pine Hollow",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "sunscar-dunes",
+      "name": "Signal Dunes",
+      "status": "experimental",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "far-reach",
+      "name": "Sky Reach",
+      "status": "experimental",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    }
+  ]
+}

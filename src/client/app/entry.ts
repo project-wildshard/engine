@@ -300,7 +300,8 @@ async function showExploreIndex(notice?: string): Promise<void> {
 
 function preparePageTitleImports() {
   return prepareBootImports(Promise.all([import('@wildshard/engine/ui/StartTitle'),
-    import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel')]));
+    import('@wildshard/engine/game/mainMenu'), import('@wildshard/engine/game/travel/travel'),
+    import('@wildshard/engine/game/zoneSelect/served')]));
 }
 let titleImports: ReturnType<typeof preparePageTitleImports> | undefined;
 function pageTitleImports(): ReturnType<typeof preparePageTitleImports> {
@@ -309,7 +310,7 @@ function pageTitleImports(): ReturnType<typeof preparePageTitleImports> {
 }
 async function showPageTitle(refusal = ''): Promise<void> {
   // S20: the title's ended note reads lastEnd(), settled (the imports take longer than the lock query)
-  const [[{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }]] = await Promise.all([pageTitleImports().ready(), settleLastEnd()]);
+  const [[{ showStartTitle }, { buildTitleMenu, installGridTitle }, { travel }, { zoneSelectSource }]] = await Promise.all([pageTitleImports().ready(), settleLastEnd()]);
   if (document.querySelector('.ws-load[data-failed="true"]') !== null) return;
   const mountedCatalogue = installedCatalogue(), mountedTitles = titleManifests();
   // SF21a: a tap or validated recovery selects a grid; unrecorded process loss returns to title
@@ -325,6 +326,8 @@ async function showPageTitle(refusal = ''): Promise<void> {
       .finally(() => { asking = null; });
     return asking;
   };
+  const selectSource = zoneSelectSource(document, world);
+  let servedZones = selectSource.initial();
   let menu: ReturnType<typeof buildTitleMenu> | undefined;
   // the composition root wires the game's main menu (over its shard deck) into the engine's title (E405)
   const title = showStartTitle(({ settings, notice }) => {
@@ -332,6 +335,7 @@ async function showPageTitle(refusal = ''): Promise<void> {
     const screen = menu?.screen ?? grid.screen;
     menu = buildTitleMenu({
       active: null,
+      zoneSelect: servedZones,
       onEnter: (card) => { travel({ to: card.slug, mode: 'enter' }); },
       onGrid: grid.onGrid,
       ...(gate === undefined ? {} : { gate }),
@@ -343,13 +347,23 @@ async function showPageTitle(refusal = ''): Promise<void> {
     return menu;
   });
   // Published cards can arrive after the first menu. Rebuild through the same
-  // owner as Developer changes, preserving its selected card and menu screen.
+  // owner as Developer changes once a name prompt or entry is clear.
   void (async (): Promise<void> => {
     await placedCells;
     if (installedCatalogue() === mountedCatalogue && titleManifests() === mountedTitles) return;
     await menu?.whenIdle();
     title.refresh();
   })();
+  async function refreshServedZones(): Promise<void> {
+    const live = await selectSource.refresh();
+    if (live === null) return;
+    servedZones = live;
+    await menu?.whenIdle();
+    title.refresh();
+  }
+  entryScope.raf(() => {
+    entryScope.raf(() => { void refreshServedZones(); });
+  });
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
   showDropOnTitle();

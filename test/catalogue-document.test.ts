@@ -8,7 +8,7 @@ import {afterEach, describe, expect, it} from 'vitest';
 import * as v from 'valibot';
 import {packsBookPath} from '../src/shared/game/shardfile/spawnManifest';
 import {StandaloneCatalogueSchema} from '@wildshard/format/standaloneCatalogue';
-import {addCookedShards, appendValidationVerdicts, catalogueWithAdded, writeCatalogueDocument, writeTitleRows} from '../scripts/app-build/catalogue';
+import {addCookedShards, appendValidationVerdicts, catalogueWithAdded, stagingZoneSelect, writeCatalogueDocument, writeTitleRows, writeZoneSelectDocument} from '../scripts/app-build/catalogue';
 import {stampBuildHtml} from '../scripts/app-build/buildIdentity.mjs';
 import {refreshServiceWorker, workerScripts} from '../scripts/app-build/serviceWorker';
 import {installTitleManifests, titleManifests, withCatalogueHeads, type TitleManifest} from '../src/client/game/shard/titleList';
@@ -121,6 +121,25 @@ describe('the bake', () => {
       const baked: unknown = JSON.parse(readFileSync(join(out, 'catalogue.json'), 'utf8')), inlined: unknown = JSON.parse(body);
       expect(v.parse(StandaloneCatalogueSchema, baked).shards[0]?.name).toBe('</script><b>');
       expect(inlined).toEqual(baked);
+    } finally { rmSync(out, {recursive: true, force: true}); }
+  });
+
+  it('inlines one escaped staging Zone Select snapshot and falls back to its pin', async () => {
+    const out = folder();
+    try {
+      const file = join(out, 'index.html');
+      writeFileSync(file, '<head></head>');
+      const pin = await stagingZoneSelect(process.cwd(), async () => new Response(null, {status: 503}));
+      const card = pin.all[0];
+      if (card === undefined) throw new Error('Staging pin has no cards');
+      const wanted = {...pin, all: [{...card, name: '</script> & Friends'}]};
+      writeZoneSelectDocument(out, pin);
+      writeZoneSelectDocument(out, wanted);
+      const html = readFileSync(file, 'utf8');
+      const elements = [...html.matchAll(/<script type="application\/json" id="ws-zone-select">([^<]*)<\/script>/gu)];
+      expect(elements).toHaveLength(1);
+      expect(JSON.parse(elements[0]?.[1] ?? '')).toEqual(wanted);
+      await expect(stagingZoneSelect(process.cwd(), async () => Response.json(wanted))).resolves.toEqual(wanted);
     } finally { rmSync(out, {recursive: true, force: true}); }
   });
 

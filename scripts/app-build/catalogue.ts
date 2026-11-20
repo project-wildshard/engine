@@ -16,6 +16,7 @@ import {serverPackBookPath} from '../../src/shared/game/shardfile/serverPack';
 import {folderTarball} from '../../src/cook/game/folderTarball';
 import {titleMetadata, type TitleManifest} from '../../src/client/game/shard/titleList';
 import {servedDiscoveryPath} from '../../src/cook/game/entryTotals';
+import {ZoneSelectSchema, type ZoneSelectDocument} from '../../src/shared/game/grid/zoneSelectRows';
 
 /** C3 (J61, D7): every build bakes `catalogue.json`, so a build needs no server, and inlines it in `index.html`, so the
  * first paint waits on no new fetch. `WILDSHARD_CATALOGUE` names a file a deploy took from `api-server`'s
@@ -77,6 +78,29 @@ export function writeCatalogueDocument(outDir: string, document: unknown): void 
   writeFileSync(file, ELEMENT.test(html) ? html.replace(ELEMENT, () => inline(text)) : html.replace('</head>', () => `${inline(text)}</head>`));
 }
 
+const ZONE_SELECT = /<script type="application\/json" id="ws-zone-select">[^<]*<\/script>/u;
+const STAGING_ZONE_SELECT = 'https://rooms-staging.wildshard.io/zone-select';
+
+export function writeZoneSelectDocument(outDir: string, document: ZoneSelectDocument): void {
+  const text = JSON.stringify(document).replaceAll('<', String.raw`\u003c`);
+  const element = `<script type="application/json" id="ws-zone-select">${text}</script>`;
+  const file = join(outDir, 'index.html'), html = readFileSync(file, 'utf8');
+  if (!html.includes('</head>')) throw new Error('No document head for Zone Select');
+  writeFileSync(file, ZONE_SELECT.test(html) ? html.replace(ZONE_SELECT, () => element) : html.replace('</head>', () => `${element}</head>`));
+}
+
+/** Each release carries the staging list for a first launch offline. */
+export async function stagingZoneSelect(root: string, read: typeof fetch = fetch): Promise<ZoneSelectDocument> {
+  try {
+    const reply = await read(STAGING_ZONE_SELECT, { credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(1500) });
+    if (reply.ok) {
+      const document = v.parse(ZoneSelectSchema, await reply.json());
+      if (document.channel === 'staging') return document;
+    } else await reply.body?.cancel();
+  } catch { /* A release can use the checked-in staging snapshot. */ }
+  return v.parse(ZoneSelectSchema, JSON.parse(readFileSync(join(root, 'test/pins/zone-select.json'), 'utf8')));
+}
+
 interface Listed {readonly slug: string; readonly order?: number; readonly status?: string}
 
 /** The in-tree grid with this build's heads: a product's slug, name and tarball hash, at revision 1. */
@@ -98,12 +122,14 @@ export function inTreeCatalogue(root: string, products: string, listed: readonly
 }
 
 /** The build's step: the file a deploy names, else the tree's. */
-export function bakeCatalogue(outDir: string, root: string): void {
+export async function bakeCatalogue(outDir: string, root: string): Promise<void> {
   const {WILDSHARD_CATALOGUE: source} = process.env;
   const rows = folderTitleRows(join(root, 'out'), outDir);
   const document = source === undefined ? inTreeCatalogue(root, join(root, 'out'), rows) : v.parse(StandaloneCatalogueSchema, JSON.parse(readFileSync(source, 'utf8')));
   writeCatalogueDocument(outDir, document);
   writeTitleRows(outDir, rows);
+  const {WS_RELEASE: release} = process.env;
+  if (release === '1') writeZoneSelectDocument(outDir, await stagingZoneSelect(root));
 }
 
 interface CookedManifest {readonly url: string; readonly tier: 'phone' | 'desktop'; readonly set: 'entry' | 'whole'; readonly files: number; readonly totalBytes: number; readonly wireBytes: number}
