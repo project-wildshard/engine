@@ -20,8 +20,6 @@ import { bindDrawWatch } from '../render/drawCheck';
 import { jsonSlot } from '../saves/slots';
 import { TIER } from './tier';
 
-export const WORLD_WATCH_DRAW_CHECK_SLOT = 'debug.worldWatchDrawCheck';
-
 /** what a look found */
 export type WorldLook = 'drawn' | 'transparent' | 'black';
 
@@ -113,7 +111,7 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
     report(`the world still reads ${look} ${String(failed)} looks after control`, look, true);
   };
   for (const s of looks) host.scope.timeout(s * 1000, () => { void lookOnce(); });
-  if (TIER === 'desktop' && looks.length > 0 && jsonSlot(WORLD_WATCH_DRAW_CHECK_SLOT, 'device').read() === true) {
+  if (TIER === 'desktop' && looks.length > 0 && jsonSlot('debug.worldWatchDrawCheck', 'device').read() === true) {
     bindDrawWatch(host.canvas, host.scope);
   }
 }
