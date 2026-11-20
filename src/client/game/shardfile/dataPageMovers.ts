@@ -19,6 +19,7 @@ import { wirePage } from './wirePage';
 import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
 import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
 import { FollowedVehicles, panelLook } from '../plugin/followedVehicles';
+import { VehicleFx } from '../plugin/vehicleFx';
 
 /** What a one-shard page lends its data movers. */
 export interface DataPagePorts {
@@ -51,12 +52,16 @@ export function installDataPageMovers(source: Pick<Shardfile, 'movers'> & Partia
   return movers;
 }
 
-/** MIRROR-SALT-ZONE MSZ9b: a plain page's `world/vehicles`, each posed off its row with its hull and a copy of its kind's panel;
+/** MIRROR-SALT-ZONE MSZ9b: a plain page's `world/vehicles`, each posed off its row with its hull and a copy of its kind's panel
+ * (hidden while gone, smoking while worn and broken apart when wrecked: MSZ14b);
  * their prompts join the page's. Null with no docks. */
 export function installDataPageVehicles(source: object, page: DataPagePorts, key = 'page'): FollowedVehicles | null {
   const vehicles = shardVehicles(source);
   if (vehicles.docks.length === 0) return null;
-  const followed = new FollowedVehicles(vehicles, { physics: page.physics, scope: page.scope, look: panelLook(page.panels, page.scope) });
+  // MSZ14b: a hurt vehicle's smoke and break-apart draw beside its look, under its panels' root
+  const root = vehicles.kinds.map(kind => page.panels?.get(kind.panel)?.parent ?? null).find(parent => parent !== null) ?? null;
+  const fx = root === null ? undefined : new VehicleFx(root, page.scope);
+  const followed = new FollowedVehicles(vehicles, { physics: page.physics, scope: page.scope, look: panelLook(page.panels, page.scope), ...(fx === undefined ? {} : { fx }) });
   wirePage.vehicles.set(key, followed);
   page.scope.onDispose(() => { if (wirePage.vehicles.get(key) === followed) wirePage.vehicles.delete(key); });
   page.prompts?.push(...followed.prompts());

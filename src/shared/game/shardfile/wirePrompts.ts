@@ -18,6 +18,12 @@ export const vehicleSeatRow = (vehicle: string, seat: number, player: string): s
 const WORN_ROW = 'vehicle.worn|';
 /** MSZ14: a vehicle worn under `VEHICLE_SMOKE` of its health: a `state` row there while it smokes, its value 1. */
 export const vehicleWornRow = (vehicle: string): string => `${WORN_ROW}${vehicle}`;
+const WRECK_ROW = 'vehicle.wreck|';
+/** MSZ14b: a wrecked vehicle's `state` row, there until its dock has it back, its value 1: a page whose vehicle's row leaves
+ *  with this one up breaks it apart where it stood, where a row leaving without it (a despawn) only takes it away. */
+export const vehicleWreckRow = (vehicle: string): string => `${WRECK_ROW}${vehicle}`;
+/** A wreck row's vehicle, or null for any other row. */
+export const parseVehicleWreckRow = (name: string): string | null => name.startsWith(WRECK_ROW) && name.length > WRECK_ROW.length ? name.slice(WRECK_ROW.length) : null;
 /** MSZ16: a driven vehicle's speed along (`forward`) or across (`slip`) its heading, m/s: a `state` row there while it has a
  *  driver, which the driver's page replays its unanswered commands from. */
 export const vehicleMotionRow = (vehicle: string, motion: 'forward' | 'slip'): string => `vehicle.${motion}|${vehicle}`;

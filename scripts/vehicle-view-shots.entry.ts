@@ -3,8 +3,12 @@
 // speed, from the land-sail's deck (`stand`), and the chase view on open ground and backed against a wall. The vehicles are
 // the vehicles example's shapes (sharddev packages/sdk/src/shards/vehicles/generators/world.ts) with a bonnet and a wheel, as
 // MSZ22's buggy will have; a row of marker posts down the flat shows the field of view.
+// MSZ14b: a worn buggy's smoke and a wrecked one's break-apart (`VehicleFx`), from a fixed spot beside it.
 import * as THREE from 'three';
+import { Scope } from '@wildshard/engine/app/scope';
 import { SEAT_PITCH, SeatEye, type SeatNow } from '../src/client/game/plugin/seatView';
+import { panelColours } from '../src/client/game/plugin/followedVehicles';
+import { VehicleFx } from '../src/client/game/plugin/vehicleFx';
 import type { MoverPose } from '@wildshard/format/moverPose';
 
 const material = (color: string, side: THREE.Side = THREE.FrontSide): THREE.MeshStandardMaterial => new THREE.MeshStandardMaterial({ color, roughness: 0.8, side });
@@ -80,5 +84,19 @@ Object.defineProperty(globalThis, '__viewShots', { value: {
     renderer.render(scene, camera);
     const shown = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) / camera.zoom));
     return { fov: Math.round(shown * 10) / 10, zoom: Math.round(camera.zoom * 1000) / 1000, widen: Math.round(eye.widen * 10) / 10, eye: camera.position.toArray().map(v => Math.round(v * 100) / 100) };
+  },
+  /** MSZ14b: the buggy 12 m down the flat, seen from beside and behind it: worn (smoking for `seconds`), or wrecked `seconds`
+   *  ago (gone, broken apart where it stood). Returns the points alive. */
+  wreck(o: { readonly width: number; readonly height: number; readonly state: 'worn' | 'wrecked'; readonly seconds: number }): { puffs: number; chunks: number } {
+    renderer.setSize(o.width, o.height); camera.aspect = o.width / o.height; camera.fov = 60; camera.zoom = 1; camera.updateProjectionMatrix();
+    const scope = new Scope('wreck-shots'), fx = new VehicleFx(scene, scope, 7), worn = o.state === 'worn', smoking = new Set(worn ? ['car'] : []);
+    carPose.position.z = -12; car.position.z = -12; car.visible = worn; sail.visible = false;
+    camera.position.set(5, 2.4, -3); camera.lookAt(0, 2.2, -12);
+    if (!worn) fx.burst(carPose, panelColours(car));
+    for (let t = 0; t < o.seconds; t += 1 / 60) { if (worn) fx.smokeFrom('car', carPose, 1 / 60); fx.frame(1 / 60, smoking); }
+    renderer.render(scene, camera);
+    const live = fx.live();
+    scope.dispose(); car.visible = true; sail.visible = true;
+    return { ...live };
   },
 } });

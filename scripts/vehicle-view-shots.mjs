@@ -1,7 +1,9 @@
 // MIRROR-SALT-ZONE MSZ11: headless shots of the view from a vehicle's seat (scripts/vehicle-view-shots.entry.ts, the page's own
 // `SeatEye`): the buggy's driver seat at rest and at the boosted top speed (desktop and a portrait phone), the land-sail's
 // deck, and the chase view on open ground and against a wall. It fails if the boost does not widen the view by the curve's
-// +14°, if the seat's eye is not at the seat's height, or if the chase view at the wall is not pulled in.
+// +14°, if the seat's eye is not at the seat's height, or if the chase view at the wall is not pulled in. MSZ14b adds a worn
+// buggy's smoke and a wrecked one's break-apart (just after, and once it has settled); it fails if the worn buggy draws no
+// plume, the wreck throws no chunks, or anything is still alive 4 s after the wreck.
 //   scripts/browser-lane.sh --max 5 node scripts/vehicle-view-shots.mjs --scratch=tmp/<lane>/view-shots --out=<shots dir>
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -32,6 +34,15 @@ const SHOTS = /** @type {const} */ ([
   ['7-phone-seat-rest', { ...PHONE, vehicle: 'buggy', z: 0, speed: 0, chase: false }],
   ['8-phone-seat-boost', { ...PHONE, vehicle: 'buggy', z: 0, speed: 30, chase: false }],
 ]);
+/** MSZ14b: the worn buggy after 3 s of smoke, the wreck 0.35 s and 1.2 s after it broke apart, and 4 s after (all settled). */
+const WRECKS = /** @type {const} */ ([
+  ['9-worn-smoke', { ...DESK, state: 'worn', seconds: 3 }],
+  ['10-wreck-burst', { ...DESK, state: 'wrecked', seconds: 0.35 }],
+  ['11-wreck-falling', { ...DESK, state: 'wrecked', seconds: 1.2 }],
+  ['12-wreck-settled', { ...DESK, state: 'wrecked', seconds: 4 }],
+  ['13-phone-worn-smoke', { ...PHONE, state: 'worn', seconds: 3 }],
+]);
+const wrecks = /** @type {Record<string, { puffs: number, chunks: number }>} */ ({});
 const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
 const read = /** @type {Record<string, { fov: number, zoom: number, widen: number, eye: number[] }>} */ ({}), errors = /** @type {string[]} */ ([]);
 try {
@@ -44,8 +55,12 @@ try {
     read[name] = await page.evaluate(v => /** @type {any} */ (globalThis).__viewShots.view(v), view);
     await page.screenshot({ path: join(out, `${name}.png`), clip: { x: 0, y: 0, width: view.width, height: view.height } });
   }
+  for (const [name, view] of WRECKS) {
+    wrecks[name] = await page.evaluate(v => /** @type {any} */ (globalThis).__viewShots.wreck(v), view);
+    await page.screenshot({ path: join(out, `${name}.png`), clip: { x: 0, y: 0, width: view.width, height: view.height } });
+  }
 } finally { await browser.close(); }
-console.log(JSON.stringify(read));
+console.log(JSON.stringify(read)); console.log(JSON.stringify(wrecks));
 const near = (/** @type {number} */ a, /** @type {number} */ b, /** @type {number} */ e) => Math.abs(a - b) <= e;
 const fails = [
   ...errors,
@@ -55,6 +70,9 @@ const fails = [
   ...(near(read['4-sail-deck']?.eye[1] ?? 0, 0.83 + 1.6, 0.01) ? [] : ['the deck\'s eye is not at 2.43 m']),
   ...((read['6-chase-wall']?.eye[2] ?? 99) < 6.5 ? [] : ['the chase view went through the wall']),
   ...((read['5-chase']?.eye[2] ?? 0) > -40 + 5 ? [] : ['the chase view is not behind the buggy']),
+  ...((wrecks['9-worn-smoke']?.puffs ?? 0) >= 20 ? [] : ['the worn buggy draws no plume']),
+  ...((wrecks['10-wreck-burst']?.chunks ?? 0) >= 30 ? [] : ['the wreck throws no chunks']),
+  ...((wrecks['12-wreck-settled']?.puffs ?? 1) + (wrecks['12-wreck-settled']?.chunks ?? 1) === 0 ? [] : ['the wreck is still breaking apart 4 s on']),
 ];
 console.log(fails.length > 0 ? `FAIL ${JSON.stringify(fails)}` : 'PASS');
 process.exitCode = fails.length > 0 ? 1 : 0;

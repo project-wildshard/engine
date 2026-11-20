@@ -13,7 +13,7 @@ import { stepVehicle, vehicleAt, type VehicleCommand, type VehicleHit, type Vehi
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
 import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
-import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow } from '../../../shared/game/shardfile/wirePrompts';
+import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow, vehicleWreckRow } from '../../../shared/game/shardfile/wirePrompts';
 
 /**
  * MIRROR-SALT-ZONE MSZ8 and MSZ9: the vehicles a cell's server runs, beside `MoverRuntime`. It spawns each kind from its
@@ -354,7 +354,7 @@ export class VehicleRuntime {
       this.led.set(player, at);
     });
   }
-  /** Every taken seat as its `state` row. */
+  /** Every taken seat as its `state` row, and each worn or wrecked vehicle's (MSZ14, MSZ14b). */
   seatRows(): readonly StateNetRow[] {
     const rows: StateNetRow[] = [];
     for (const vehicle of this.live.values()) {
@@ -363,6 +363,8 @@ export class VehicleRuntime {
       if (this.driver(vehicle.id) !== null) rows.push({ name: vehicleMotionRow(vehicle.id, 'forward'), value: vehicle.state.forward }, { name: vehicleMotionRow(vehicle.id, 'slip'), value: vehicle.state.slip });
       if (vehicle.health < VEHICLE_SMOKE * (vehicle.kind.health ?? VEHICLE_HEALTH)) rows.push({ name: vehicleWornRow(vehicle.id), value: 1 });
     }
+    // MSZ14b: a wrecked vehicle's row while its dock waits to have it back, so a page breaks it apart rather than just losing it
+    for (const id of this.wrecked.keys()) rows.push({ name: vehicleWreckRow(id), value: 1 });
     return rows;
   }
   /**

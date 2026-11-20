@@ -1,4 +1,4 @@
-import { Vector3, type Object3D } from 'three';
+import { Color, Material, Mesh, Vector3, type Object3D } from 'three';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { KinematicMover } from '@wildshard/engine/physics/mover';
 import { queryGroups } from '@wildshard/engine/physics/groups';
@@ -13,7 +13,7 @@ import type { Interactable } from '@wildshard/engine/world/interact/types';
 import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, Vehicles } from '@wildshard/format/vehicles';
 import { dockHulls } from '../../../shared/game/shardfile/shardVehicles';
-import { parseVehicleSeatRow, parseVehicleWornRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
+import { parseVehicleSeatRow, parseVehicleWornRow, parseVehicleWreckRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { vehiclePoint, type MoverView } from './followedMovers';
 import { rowState, statePose, VehiclePrediction, type VehicleRow } from './vehiclePrediction';
 
@@ -27,8 +27,20 @@ const restPose = (dock: VehicleDock): MoverPose => ({ position: { x: dock.at[0],
 function followingPrompt(position: Vector3, label: string, radius: () => number, wireId: () => string): Interactable {
   return { position, label, onInteract: () => undefined, get radius() { return radius(); }, get wireId() { return wireId(); } };
 }
+/** MSZ14b: one vehicle's drawn look: posed off its rows, hidden when its row leaves (a despawn or a wreck) until it is back. */
+export interface VehicleLook {
+  readonly pose: (pose: MoverPose) => void; readonly hide: () => void;
+  /** its main colours, most used first (a wreck's chunks are thrown in them) */
+  readonly colours?: () => readonly (readonly [number, number, number])[];
+}
+/** MSZ14b: what a page draws of a hurt vehicle (`VehicleFx`): a worn one's smoke each frame, a wrecked one's break-apart. */
+export interface VehicleFxPort {
+  readonly smokeFrom: (id: string, pose: MoverPose, dt: number) => void;
+  readonly burst: (pose: MoverPose, colours?: readonly (readonly [number, number, number])[]) => void;
+  readonly frame: (dt: number, smoking: ReadonlySet<string>) => void;
+}
 /** One vehicle this page follows: its collider in the page's physics, its drawn look, and its last row. */
-interface Followed { readonly id: string; readonly dock: VehicleDock; readonly kind: VehicleKind; readonly body: KinematicMover; readonly look: ((pose: MoverPose) => void) | null; pose: MoverPose; readonly view: MoverView }
+interface Followed { readonly id: string; readonly dock: VehicleDock; readonly kind: VehicleKind; readonly body: KinematicMover; readonly look: VehicleLook | null; pose: MoverPose; readonly view: MoverView }
 
 /** MSZ16: what the wire says of a driven vehicle as a command goes: its row in the newest frame (when that frame carried one),
  *  and how many of the commands this page sent the server has not stepped yet, this one among them. */
@@ -41,8 +53,11 @@ export interface VehicleReport {
 /** What a page lends the vehicles it follows. */
 export interface FollowedVehiclePorts {
   readonly physics: Physics; readonly scope: Scope;
-  /** A kind's drawn look for one vehicle of it (a copy of its props panel), posed by its rows; none draws nothing. */
-  readonly look?: (kind: VehicleKind, id: string) => ((pose: MoverPose) => void) | null;
+  /** A kind's drawn look for one vehicle of it (a copy of its props panel), posed by its rows; none draws nothing. Made once
+   *  an id: a vehicle back from a despawn or a wreck shows the same look again. */
+  readonly look?: (kind: VehicleKind, id: string) => VehicleLook | null;
+  /** MSZ14b: a hurt vehicle's smoke and break-apart; none draws neither. */
+  readonly fx?: VehicleFxPort;
 }
 
 /**
@@ -70,6 +85,10 @@ export class FollowedVehicles {
   private readonly seats = new Map<string, (string | null)[]>();
   /** MSZ14: the vehicles worn enough to smoke, off their `vehicleWornRow`s. */
   private readonly wornOut = new Set<string>();
+  /** MSZ14b: the vehicles wrecked and not yet back at their docks, off their `vehicleWreckRow`s. */
+  private readonly wrecks = new Set<string>();
+  /** MSZ14b: each vehicle's look, kept while it is gone so it shows again when it is back. */
+  private readonly looks = new Map<string, VehicleLook | null>();
   /** This page's player, as its wire's welcome names it. */
   private me: string | null = null;
   /** This page's player's feet, as the last frame had them: a seat's prompt goes to the nearest free one. */
@@ -131,7 +150,7 @@ export class FollowedVehicles {
   follow(id: string, pose: MoverPose): void {
     if (this.predicted?.id === id) return;
     const vehicle = this.live.get(id) ?? this.make(id, pose); if (vehicle === null) return;
-    vehicle.pose = pose; vehicle.body.setPose(pose); vehicle.look?.(pose);
+    vehicle.pose = pose; vehicle.body.setPose(pose); vehicle.look?.pose(pose);
   }
   /**
    * Once a frame, the wire's entity ids: the vehicles out (a per-player one whose row left goes) and the seats taken. `me` is
@@ -139,18 +158,23 @@ export class FollowedVehicles {
    */
   sync(ids: Iterable<string>, me: string | null, feet: { readonly x: number; readonly z: number }): void {
     this.me = me; this.feet.x = feet.x; this.feet.z = feet.z;
-    const out = new Set<string>(); this.seats.clear(); this.wornOut.clear();
+    const out = new Set<string>(); this.seats.clear(); this.wornOut.clear(); this.wrecks.clear();
     for (const id of ids) {
       if (id.startsWith(SCRIPT)) { const vehicle = id.slice(SCRIPT.length); if (this.docks.has(vehicleDockOf(vehicle))) out.add(vehicle); continue; }
       if (!id.startsWith(STATE)) continue;
       const worn = parseVehicleWornRow(id.slice(STATE.length)); if (worn !== null) { this.wornOut.add(worn); continue; }
+      const wreck = parseVehicleWreckRow(id.slice(STATE.length)); if (wreck !== null) { this.wrecks.add(wreck); continue; }
       const row = parseVehicleSeatRow(id.slice(STATE.length)); if (row === null) continue;
       let seats = this.seats.get(row.vehicle);
       if (seats === undefined) { seats = this.kindOf(row.vehicle)?.seats.map(() => null) ?? []; this.seats.set(row.vehicle, seats); }
       if (row.seat < seats.length) seats[row.seat] = row.player;
     }
-    // a vehicle whose row left is gone: a per-player one despawned, or any one wrecked (MSZ14)
-    for (const [id, vehicle] of this.live) if (!out.has(id)) { vehicle.body.dispose(); this.live.delete(id); }
+    // a vehicle whose row left is gone: a per-player one despawned, or any one wrecked (MSZ14); its look hides, and a wrecked
+    // one breaks apart where it stood (MSZ14b)
+    for (const [id, vehicle] of this.live) if (!out.has(id)) {
+      vehicle.body.dispose(); this.live.delete(id); vehicle.look?.hide();
+      if (this.wrecks.has(id)) this.ports.fx?.burst(vehicle.pose, vehicle.look?.colours?.() ?? []);
+    }
     // MSZ16: out of the driver's seat (left, set down, wrecked), the vehicle follows its rows again
     if (this.predicted !== null && !this.driving(this.predicted.id)) this.predicted = null;
   }
@@ -171,11 +195,13 @@ export class FollowedVehicles {
     if (row !== null && run.settle(row, wire.behind)) { this.driven.corrections++; this.driven.snaps += run.snaps - snaps; this.driven.worst = Math.max(this.driven.worst, run.worst); }
     this.place(vehicle, run);
   }
-  /** MSZ16, a drawn frame of `dt` s: a correction eases out of the driven vehicle. */
+  /** MSZ16, a drawn frame of `dt` s: a correction eases out of the driven vehicle; each worn one smokes (MSZ14b). */
   frame(dt: number): void {
     const predicted = this.predicted, vehicle = predicted === null ? undefined : this.live.get(predicted.id);
-    if (predicted === null || vehicle === undefined) return;
-    predicted.run.ease(dt); this.place(vehicle, predicted.run);
+    if (predicted !== null && vehicle !== undefined) { predicted.run.ease(dt); this.place(vehicle, predicted.run); }
+    const fx = this.ports.fx; if (fx === undefined) return;
+    for (const id of this.wornOut) { const worn = this.live.get(id); if (worn !== undefined) fx.smokeFrom(id, worn.pose, dt); }
+    fx.frame(dt, this.wornOut);
   }
   /** MSZ16, what a proof reads: the vehicle this page's player drives, every correction its rows made (and the snaps among
    *  them, and the widest gap), and where each dock stands. */
@@ -200,7 +226,7 @@ export class FollowedVehicles {
   /** The driven vehicle's collider where the page has it, its look (and every seat's point) where it is drawn. */
   private place(vehicle: Followed, run: VehiclePrediction): void {
     vehicle.body.setPose(statePose(run.state()));
-    const drawn = statePose(run.drawnState()); vehicle.pose = drawn; vehicle.look?.(drawn);
+    const drawn = statePose(run.drawnState()); vehicle.pose = drawn; vehicle.look?.pose(drawn);
   }
   /** MSZ16: the world a driven vehicle steps through on this page, as the server's (`VehicleRuntime.spawnAt`): the floor under
    *  it through its own hull, and its hull's cast against what this page has (the world and the other vehicles; walkers and
@@ -221,7 +247,9 @@ export class FollowedVehicles {
   private make(id: string, pose: MoverPose): Followed | null {
     const dock = this.docks.get(vehicleDockOf(id)), kind = dock === undefined ? undefined : this.kinds.get(dock.kind), boxes = dock === undefined ? undefined : this.hulls.get(dock.id);
     if (dock === undefined || kind === undefined || boxes === undefined) return null;
-    const vehicle: Followed = { id, dock, kind, body: new KinematicMover(this.ports.physics, boxes, pose, id), look: this.ports.look?.(kind, id) ?? null, pose,
+    let look = this.looks.get(id);
+    if (look === undefined) { look = this.ports.look?.(kind, id) ?? null; this.looks.set(id, look); }
+    const vehicle: Followed = { id, dock, kind, body: new KinematicMover(this.ports.physics, boxes, pose, id), look, pose,
       view: { pose: next => { this.follow(id, next); } } };
     this.live.set(id, vehicle);
     return vehicle;
@@ -274,16 +302,33 @@ export class FollowedVehicles {
   }
 }
 
-/** A kind's look for one vehicle: a copy of its props panel (a library panel, drawn nowhere itself), hung beside it. */
-export function panelLook(panels: ReadonlyMap<string, Object3D> | undefined, scope: Scope): (kind: VehicleKind, id: string) => ((pose: MoverPose) => void) | null {
+/** A kind's look for one vehicle: a copy of its props panel (a library panel, drawn nowhere itself), hung beside it; hidden
+ *  while the vehicle is gone (MSZ14b). */
+export function panelLook(panels: ReadonlyMap<string, Object3D> | undefined, scope: Scope): (kind: VehicleKind, id: string) => VehicleLook | null {
   return kind => {
     const panel = panels?.get(kind.panel), parent = panel?.parent;
     if (panel === undefined || parent === null || parent === undefined) return null;
     const copy = panel.clone(); copy.visible = true; copy.matrixAutoUpdate = false; parent.add(copy);
     scope.onDispose(() => { copy.removeFromParent(); });
-    return pose => {
-      copy.position.set(pose.position.x, pose.position.y, pose.position.z); copy.rotation.set(pose.euler.x, pose.euler.y, pose.euler.z, 'YXZ');
-      copy.updateMatrix(); copy.visible = pose.enabled;
+    return {
+      pose: pose => {
+        copy.position.set(pose.position.x, pose.position.y, pose.position.z); copy.rotation.set(pose.euler.x, pose.euler.y, pose.euler.z, 'YXZ');
+        copy.updateMatrix(); copy.visible = pose.enabled;
+      },
+      hide: () => { copy.visible = false; },
+      colours: () => panelColours(copy),
     };
   };
+}
+
+/** MSZ14b: a panel's main colours, by how many of its meshes wear each (at most three, most used first). */
+export function panelColours(panel: Object3D): readonly (readonly [number, number, number])[] {
+  const counts = new Map<number, number>();
+  panel.traverse(node => {
+    if (!(node instanceof Mesh)) return;
+    const material: unknown = Array.isArray(node.material) ? node.material[0] : node.material;
+    if (!(material instanceof Material) || !('color' in material) || !(material.color instanceof Color)) return;
+    const hex = material.color.getHex(); counts.set(hex, (counts.get(hex) ?? 0) + 1);
+  });
+  return [...counts].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([hex]) => new Color(hex).toArray() as [number, number, number]);
 }

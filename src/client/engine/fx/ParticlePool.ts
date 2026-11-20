@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 
-/** one per-particle attribute after `position`: its width and whether it is rewritten every frame */
-export interface ParticleAttr { readonly itemSize: 1 | 3; readonly dynamic: boolean }
+/** one per-particle attribute after `position`: its width (4: a colour with its alpha, MSZ14b) and whether it is rewritten every frame */
+export interface ParticleAttr { readonly itemSize: 1 | 3 | 4; readonly dynamic: boolean }
 
 /** A pool's data (E357 X5): its size, its extra attributes in geometry order, its material and draw order. */
 export interface ParticlePoolSpec<K extends string> {

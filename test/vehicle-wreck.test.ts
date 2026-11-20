@@ -9,7 +9,7 @@ import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import type { VehicleCommand } from '../src/shared/engine/sim/vehicle';
 import { VEHICLE_SMOKE, VehicleRuntime } from '../src/server/game/plugin/vehicleRuntime';
-import { parseVehicleWornRow, playerVehicle, vehicleDockPrompt } from '../src/shared/game/shardfile/wirePrompts';
+import { parseVehicleWornRow, parseVehicleWreckRow, playerVehicle, vehicleDockPrompt } from '../src/shared/game/shardfile/wirePrompts';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { VEHICLES_EXAMPLE } from './fixtures/vehiclesExample';
 
@@ -57,6 +57,9 @@ test('three hard hits wreck the buggy; its driver is on foot beside it; the dock
     // the driver is on foot beside it; the buggy is gone
     expect(runtime.ids()).not.toContain(buggy);
     expect(runtime.seatOf(lead)).toBe(undefined);
+    // MSZ14b: its wreck row stays up until the dock has it back, so a page breaks it apart rather than just losing it
+    const wrecked = (): boolean => runtime.seatRows().some(row => parseVehicleWreckRow(row.name) === buggy);
+    expect(wrecked()).toBe(true);
     const body = host.players.get(lead); if (body === undefined) throw new Error('No driver');
     expect(Math.hypot(body.position.x - wreck.x, body.position.z - wreck.z)).toBeLessThan(4);
     expect(body.health.alive).toBe(true);
@@ -67,6 +70,7 @@ test('three hard hits wreck the buggy; its driver is on foot beside it; the dock
     expect(left).toBeGreaterThan(55);
     stick = { throttle: 0, turn: 0, boost: false };
     for (let t = 0; runtime.respawning(buggy) !== undefined && t < 4000; t++) host.step();
+    expect(wrecked()).toBe(false);
     claim();
     expect(runtime.driver(buggy)).toBe(lead);
     expect(runtime.health(buggy)).toBe(1);
