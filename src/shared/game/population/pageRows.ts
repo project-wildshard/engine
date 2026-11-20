@@ -17,6 +17,9 @@ export function pagePopulationRows(plan: NativeRuntimePlanData): RuntimeSpawns {
       actors: rows.homes.filter(row => row.id !== owner.actor).map(body) });
   }
   const boss = rows.boss;
-  if (boss === undefined || boss.id !== owner.actor || boss.look === undefined) throw new Error('Spawned page requires its native boss row');
+  // OF19d: a spawned owner with no boss row names a declared spawn (Dunes rev 5's Matriarch): her declared encounter owns
+  // the body, and the owner row only files her flag, fact and coins, so the page draws the keeper's homes alone
+  if (boss === undefined) return parseRuntimeSpawns({ homes: rows.homes.map(row => Object.assign(body(row), { respawn: row.respawn })), bosses: [] });
+  if (boss.id !== owner.actor || boss.look === undefined) throw new Error('Spawned page requires its native boss row');
   return parseRuntimeSpawns({ homes: rows.homes.map(row => Object.assign(body(row), { respawn: row.respawn })), bosses: [boss] });
 }
