@@ -228,6 +228,13 @@ function fitBatch(batch: GrowingBatch): void {
   for (let id = 0; id < Number(Reflect.get(batch, '_geometryCount')); id++) ids.push(id);
   prepareBatchGeometryRetirement(batch, ids);
   batch.computeBoundingBox(); batch.computeBoundingSphere();
+  // r186's setInstanceCount makes new matrix, colour and indirect textures at version 0 and copies into them; nothing
+  // flags them, so they never uploaded and the celled looks (cover, palms) drew every copy at a zero matrix (the board)
+  for (const key of ['_matricesTexture', '_colorsTexture', '_indirectTexture']) {
+    const texture: unknown = Reflect.get(batch, key);
+    if (texture instanceof THREE.DataTexture) texture.needsUpdate = true;
+  }
+  Reflect.set(batch, '_visibilityChanged', true);
 }
 type ModelParts = Readonly<Record<string, readonly { readonly castShadow: boolean; readonly receiveShadow: boolean }[] | undefined>>;
 /** The look's batch, made at its first family: it casts and receives if any part does, as the families' own draws did. A

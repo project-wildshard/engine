@@ -914,7 +914,12 @@ export class CelledBatchCull {
         if (g >= 0 && slot.until2 !== null && d2 >= (slot.until2[l] ?? Number.POSITIVE_INFINITY)) g = -1;
         if (this.shown[k] === g) continue;
         if (g < 0) slot.mesh.setVisibleAt(slot.instance, false);
-        else { slot.mesh.setGeometryIdAt(slot.instance, g); slot.mesh.setVisibleAt(slot.instance, true); }
+        else {
+          slot.mesh.setGeometryIdAt(slot.instance, g); slot.mesh.setVisibleAt(slot.instance, true);
+          // a level change of a copy already shown: r186 rebuilds its draw list only on a visibility change, and a celled
+          // batch skips the per-camera rebuild, so the copy would keep drawing its old level's range
+          Reflect.set(slot.mesh, '_visibilityChanged', true);
+        }
         this.shown[k] = g;
       }
     }
