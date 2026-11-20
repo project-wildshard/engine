@@ -25,3 +25,10 @@ runs and two held-out segments within 25%.
 
 The table consumes the desktop factors. It reports the phone CPU
 profiles as provisional and leaves the phone GPU column blank.
+
+## Nightly capture coverage
+
+DF7 now requires all three cold repeats for each distinct profile
+variant. A duplicate could previously fill the total count while a
+repeat or a desktop variant was missing. The nightly remains
+report-only until DF15.

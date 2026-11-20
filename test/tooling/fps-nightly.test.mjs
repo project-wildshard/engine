@@ -43,3 +43,16 @@ test('p95 is compared only to the same GPU and calibration', () => {
   const candidate = reviewNight(makeTable({ extraUpdateMs: 10 }), build, clean);
   expect(candidate.rows[0].misses).toEqual(['floor']);
 });
+
+test('repeating a cold sample or omitting a variant cannot qualify the nightly', () => {
+  const duplicate = makeTable();
+  duplicate.runs[0] = duplicate.runs[1];
+  const sameVariant = makeTable();
+  const desktop = sameVariant.runs.filter(run => run.name === 'desktop-high');
+  for (const run of desktop.slice(3)) run.profile.width = desktop[0].profile.width;
+  for (const table of [duplicate, sameVariant]) {
+    const report = reviewNight(table, build);
+    expect(report.qualifies).toBe(false);
+    expect(report.rows.flatMap(row => row.misses)).toEqual(['incomplete or uncalibrated']);
+  }
+});

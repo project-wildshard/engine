@@ -36,11 +36,20 @@ export function reviewNight(table, build, previous = null) {
     if (observed.length === 0 || floor === null) return [];
     const fps = Math.min(...observed.map(row => row.fps));
     const p95 = Math.max(...observed.map(row => row.p95));
-    const factors = [...new Set(set.map(run => [
-      run.profile.width, run.profile.height, run.profile.dpr, run.profile.graphics, run.profile.cap, run.profile.cpu,
-    ].join('/')))].sort((a, b) => a.localeCompare(b)).join(', ');
+    /** @type {Map<string, number[]>} */
+    const repeats = new Map();
+    for (const {profile, rep} of set) {
+      const variant = [profile.width, profile.height, profile.dpr, profile.graphics, profile.cap, profile.cpu].join('/');
+      const seen = repeats.get(variant) ?? [];
+      seen.push(rep);
+      repeats.set(variant, seen);
+    }
+    const factors = [...repeats.keys()].sort((a, b) => a.localeCompare(b)).join(', ');
+    const fullMatrix = repeats.size === variants[idx] && [...repeats.values()].every(seen =>
+      seen.length === repeatCount && new Set(seen).size === repeatCount && seen.every(rep =>
+        Number.isInteger(rep) && rep >= 1 && rep <= repeatCount));
     const misses = [];
-    if (set.length !== variants[idx] * repeatCount || set.some(run =>
+    if (!fullMatrix || set.some(run =>
       run.profile.floor !== floor || !run.profile.calibrated || run.cold.verdict === 'incomplete' ||
       (run.rep === repeatCount && (run.warm === null || run.warm.verdict === 'incomplete')))) misses.push('incomplete or uncalibrated');
     if (set.some(run => run.cold.verdict === 'miss')) misses.push('floor');
