@@ -160,6 +160,12 @@ export async function installInteractablesView(ctx: ShardContext, table: Interac
   withOwner(ctx.scope, () => kit.finish());
   for (const node of world.game.scene.children) if (!before.has(node) && node instanceof BatchedMesh) ownQuestTree(node, ctx.scope);
   ctx.scope.onDispose(() => { kit.dispose({ batches: false }); });
+  // a barrel is the server's (a native world's declared prop): its `script:` row poses the drawn one (QA 2026-11-20-mini row 3)
+  for (const row of table.rows) if (row.kind === 'barrel') {
+    const view = { pose: (pose: Parameters<Interactables['followBarrel']>[1]) => { kit.followBarrel(row.id, pose); } };
+    wirePage.movers.set(row.id, view);
+    ctx.scope.onDispose(() => { if (wirePage.movers.get(row.id) === view) wirePage.movers.delete(row.id); });
+  }
   const audio = runtime.play?.audio; if (audio === undefined) throw new Error('Quest interactions require entered audio');
   return Object.assign(kit, { sfx: new InteractSfx(audio) });
 }

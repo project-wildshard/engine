@@ -104,6 +104,8 @@ export class Live {
   body: Body | null = null;
   /** barrel: when it has to go home (lost, wedged, past its leash) */
   watch: BarrelWatch | null = null;
+  /** barrel: posed by the server's row (`Interactables.followBarrel`): a kinematic stand-in, no body or watch of its own */
+  followed = false;
   /** glow tint (pickups' `color`) */
   tint: THREE.Color = new THREE.Color(1, 1, 1);
   readonly rules:ReturnType<typeof bindInteractionState>;
@@ -116,8 +118,10 @@ export class Live {
 const PLAYER_R = 0.35;
 const _m = new THREE.Matrix4(), _local = new THREE.Matrix4(), _c = new THREE.Color(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1), _v = new THREE.Vector3(), _e = new THREE.Euler();
 const OFF: Collider = { x: 0, z: 0, hw: 0, hd: 0, rot: 0, yTop: -1e6, yBottom: -1e6 + 1 };
-const _bp = { x: 0, y: 0, z: 0 }, _bq = { x: 0, y: 0, z: 0, w: 1 };
+const _bp = { x: 0, y: 0, z: 0 }, _bq = { x: 0, y: 0, z: 0, w: 1 }, _wire = new THREE.Euler(0, 0, 0, 'YXZ');
 const PARKED = { yTop: -1e6, yBottom: -1e6 - 1 };
+/** A followed barrel's box in its own frame (base centre at the origin): it rides the drawn barrel's turn, tipped or not. */
+const BARREL_LOCAL_BOX: Extract<NonNullable<Piece['colliders']>[number], { kind: 'box' }> = { ...boxDesc({ x: 0, z: 0, hw: BARREL_R, hd: BARREL_R, rot: 0, yTop: 2 * BARREL_HALF, yBottom: 0 }, 'wood'), rot: { x: 0, y: 0, z: 0, w: 1 } };
 const parked = (c: Collider): boolean => c.yTop < -1e5;
 
 // ── line of sight (PHYSICS P5): a prompt is offered only when the eye can SEE it ─────────────────────────────────────
@@ -163,11 +167,46 @@ export class Interactables {
   private unsub: (() => void) | null = null;
 
   private host: InteractHost;
+  /** A server poses this kit's barrel, so it judges the plates too: the page, which cannot weigh the server's barrel, leaves
+   *  their flags to its mirror (judging them here undid plate B the moment the server pressed it). */
+  private serverPuzzle = false;
   constructor(host: InteractHost) {
     this.host = host;
   }
 
   live(id: string): Live | undefined { return this.byId.get(id); }
+
+  /**
+   * A barrel the server owns, posed by its `script:` row (the body's centre and YXZ turn, in the row frame). Every page
+   * plays against a server, and on the grid this page's own barrel body sat in the boot's physics, out of the cell's: it
+   * never moved and the player walked through it, while the room's barrel went where the room's player pushed it, drawn
+   * nowhere (meta QA-FEEDBACK-2026-11-20-mini row 3). On its first row the page's body and watch go (the server's script
+   * sends it home); the drawn barrel and a box that rides it follow the row, as touchable props do. Prediction only.
+   */
+  followBarrel(id: string, pose: { readonly position: { readonly x: number; readonly y: number; readonly z: number }; readonly euler: { readonly x: number; readonly y: number; readonly z: number }; readonly enabled: boolean }): void {
+    const lv = this.byId.get(id);
+    if (lv === undefined || lv.def.kind !== 'barrel' || !pose.enabled) return;
+    wireBarrelPose(pose, _v, _q);
+    if (!lv.followed) {
+      lv.followed = true; this.serverPuzzle = true;
+      if (lv.body !== null) { if (lv.body.alive) app.bodies?.remove(lv.body); lv.body = null; }
+      lv.watch = null;
+      lv.position.copy(_v); lv.rot.copy(_q); lv.object.position.copy(_v); lv.object.quaternion.copy(_q);
+      if (lv.piece === null) {
+        lv.collider = this.barrelBox(lv);
+        lv.piece = app.registry.add({ id: `interact-${lv.def.id}`, name: lv.def.id, category: 'props', file: 'src/client/engine/world/interact/Interactables.ts',
+          colliders: [BARREL_LOCAL_BOX], surface: 'wood', follows: lv.object, active: () => lv.shown && lv.collider !== null && !parked(lv.collider) });
+      }
+      lv.dirty = true;
+      return;
+    }
+    if (lv.position.distanceToSquared(_v) + lv.rot.angleTo(_q) > 1e-10) { lv.position.copy(_v); lv.rot.copy(_q); lv.dirty = true; }
+  }
+
+  /** A followed barrel's box where it stands now, upright (its collider's on/off state; the box itself is BARREL_LOCAL_BOX). */
+  private barrelBox(lv: Live): Collider {
+    return { x: lv.position.x, z: lv.position.z, hw: BARREL_R, hd: BARREL_R, rot: -lv.yaw, yTop: lv.position.y + 2 * BARREL_HALF, yBottom: lv.position.y };
+  }
 
   build(table: InteractTable, placements?: unknown): this {
     const placedTable = placements === undefined ? table : bindInteractPlacements(table, placements);
@@ -508,6 +547,10 @@ export class Interactables {
   private updateColliderOn(lv: Live): void {
     const c = lv.collider; if (!c) return;
     const d = lv.def, y = lv.position.y;
+    if (lv.followed) {   // its box rides the drawn barrel: put it back round the barrel as it stands
+      Object.assign(c, this.barrelBox(lv)); if (lv.piece && lv.piece.colliders?.[0] !== BARREL_LOCAL_BOX) lv.piece.colliders = [BARREL_LOCAL_BOX];
+      return;
+    }
     const h = d.kind === 'door' ? d.h : d.kind === 'chest' ? 0.7 : d.kind === 'barrel' ? 1 : 1.2;
     c.x = lv.position.x; c.z = lv.position.z; c.yTop = y + h; c.yBottom = y - 0.5;
     if (lv.piece) {
@@ -595,7 +638,7 @@ export class Interactables {
     for (const lv of this.lives) {
       const d = lv.def;
       if (!lv.shown) { if (lv.dirty) this.pose(lv, t); continue; }
-      if (d.kind === 'plate') {
+      if (d.kind === 'plate' && !this.serverPuzzle) {
         const down = physics !== null && plateDown(physics, lv, d.size, d.by);
         if (down !== F.has(`plate:${d.id}`)) { F.set(`plate:${d.id}`, down); for (const s of d.sets ?? []) F.set(s, down); this.emit({ type: down ? 'press' : 'release', def: d, at: lv.position }); }
       } else if (d.kind === 'pickup' && d.touch === true && walkInPickup(physics, pl, lv.position)) this.take(lv);
@@ -667,6 +710,13 @@ export class Interactables {
     lv.watch?.clear();
     if (announce) this.emit({ type: 'barrel-reset', def: d, text: d.toast ?? engineString('s_fa58d2eb0c57'), at: lv.position });
   }
+}
+
+/** A barrel's `script:` row (its body's centre and YXZ turn) as the drawn barrel's pose: its base centre and its turn. */
+export function wireBarrelPose(pose: { readonly position: { readonly x: number; readonly y: number; readonly z: number }; readonly euler: { readonly x: number; readonly y: number; readonly z: number } },
+  base: THREE.Vector3, rot: THREE.Quaternion): void {
+  rot.setFromEuler(_wire.set(pose.euler.x, pose.euler.y, pose.euler.z));
+  base.set(0, -BARREL_HALF, 0).applyQuaternion(rot).add(pose.position);
 }
 
 const SEES_PLAYER: readonly GroupName[] = ['PLAYER'], SEES_ITEM: readonly GroupName[] = ['ITEM'], SEES_ANY: readonly GroupName[] = ['PLAYER', 'ITEM'];
