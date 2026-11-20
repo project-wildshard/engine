@@ -275,6 +275,8 @@ async function enterPage(): Promise<unknown> {
       // SA43: a page that owns its inline shard (`wildshard dev`, `wildshard prepare` at `?chunk=`) has no catalogue download
       // for it: that shard's spawn set isn't its download (as startSelected's `authored`)
       const inlineShard = (menu.DEVSERVER || menu.PREPARATION_ONLY) && document.getElementById('ws-shardfile') !== null;
+      // OF23a: the inline shard is admitted by its own index, never as a stale copy of a product this build pins
+      if (inlineShard) (await import('@wildshard/engine/game/shardfile/preparedCandidate')).releaseInlineCandidate(document.getElementById('ws-shardfile')?.textContent);
       if (typeof slug === 'string' && !inlineShard) {
         const mode = menu.gridMode(menu.DEVSERVER), flow = pageGridRecovery() !== null || pendingGridEntry(slug) ? 'grid' : 'client';
         spawn.setSpawnPacks(runtimePacksOn());
@@ -618,6 +620,7 @@ async function startSelected(): Promise<void> {
   // SA15: `wildshard dev`'s page carries the author's shard inline; the catalogue shard's spawn set isn't its download.
   // SA43: so does `wildshard prepare`'s, a preparation-only production build; only those two builds own an inline shard
   const inlineOwner = DEVSERVER || PREPARATION_ONLY, authored = inlineOwner && document.getElementById('ws-shardfile') !== null;
+  if (authored) (await import('@wildshard/engine/game/shardfile/preparedCandidate')).releaseInlineCandidate(document.getElementById('ws-shardfile')?.textContent);
   const spawnMode = gridMode(DEVSERVER), spawnJob = authored ? null : startSpawnDownload(arrival.slug, earlyPath === 'grid' ? 'grid' : 'client', TIER,
     `${Number(spawnMode.developer)}${Number(spawnMode.devserver)}${Number(spawnMode.nineDragon)}`);
   if (spawnJob !== null) void loading.setDownloadSource(spawnJob);

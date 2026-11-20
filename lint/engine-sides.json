@@ -1049,6 +1049,7 @@
     "src/client/game/shardfile/clientSource.ts": "client",
     "src/client/game/shardfile/declaredLook.ts": "client",
     "src/client/game/shardfile/phoneMemoryLine.ts": "client",
+    "src/client/game/shardfile/preparedCandidate.ts": "client",
     "src/client/game/shardfile/clientSpeciesProgram.ts": "client",
     "src/client/game/shardfile/clientSplatLayers.ts": "client",
     "src/client/game/shardfile/clientSplatTerrain.ts": "client",

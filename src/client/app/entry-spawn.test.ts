@@ -154,6 +154,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/core/clock': {diagnosticNow: () => reserveClock.now},
     './assetTables': {prepareAssetPackRead: () => ({ready: resolved}), adoptInlineMounts: () => Promise.resolve(0)},
     '@wildshard/engine/game/shardfile/folder': {},
+    '@wildshard/engine/game/shardfile/preparedCandidate': {releaseInlineCandidate: () => 0},
     '@wildshard/engine/boot/tables': {publicBytes: () => ({})},
     '@wildshard/engine/boot/contentRead': {readContent: () => Promise.reject(new Error('no pickup reads here'))},
   };

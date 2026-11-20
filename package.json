@@ -1074,6 +1074,7 @@
     "./game/shardfile/bakedKinds": "./src/client/game/shardfile/bakedKinds.ts",
     "./game/shardfile/homeKeeper": "./src/server/game/shardfile/homeKeeper.ts",
     "./game/shardfile/runtimeFolder": "./src/client/game/shardfile/runtimeFolder.ts",
+    "./game/shardfile/preparedCandidate": "./src/client/game/shardfile/preparedCandidate.ts",
     "./game/shardfile/clientSource": "./src/client/game/shardfile/clientSource.ts",
     "./game/shardfile/serverRoute": "./src/client/game/shardfile/serverRoute.ts",
     "./game/shardfile/shardFolder": "./src/shared/game/shardfile/shardFolder.ts",
