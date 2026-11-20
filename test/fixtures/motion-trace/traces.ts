@@ -174,7 +174,13 @@ function hostTrace(id: string, { seed, extra, install }: HostProfile): Trace {
       sample.set([p.x, p.y, p.z, v.x, v.y, v.z, player.yaw, Number(player.fall.grounded) + 2 * Number(player.board.on) + 4 * Number(player.swim.on)]);
       out.hash.update(bytes);
       for (const [mode, on] of [['air', !player.fall.grounded], ['board', player.board.on], ['swim', player.swim.on]] as const) if (on) out.seen.add(mode);
-      if ((tick + 1) % HASH_EVERY === 0) { out.hash.update(JSON.stringify(snapshotSimHostBytes(host))); out.hashes.push(out.hash.copy().digest('hex').slice(0, 16)); }
+      if ((tick + 1) % HASH_EVERY === 0) {
+        const snapshot = snapshotSimHostBytes(host);
+        // Keep the recorded v5 framing. Every state field, including pending credit, still contributes.
+        if (snapshot.version === 6) snapshot.version = 5;
+        out.hash.update(JSON.stringify(snapshot));
+        out.hashes.push(out.hash.copy().digest('hex').slice(0, 16));
+      }
     }
   } finally { side.dispose(); }
   return out;
