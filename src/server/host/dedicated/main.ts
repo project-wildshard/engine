@@ -25,7 +25,8 @@ import { fetchReleaseFile, readPulledReleaseCells, servingRelease, ReleaseWatch 
 import { savesUrl } from './saves/pgDatabase';
 import { within } from './saves/saveStore';
 import { ZoneEntries, ZONE_ENTRY_MINUTE_MS } from './zoneEntries';
-import { readZoneUploads, zoneSelectRoute } from './zoneSelect';
+import { metricsCurrentRoute } from './metricsCurrentRoute';
+import { readZoneUploads, zoneSelectRoute, zoneSelectTabs } from './zoneSelect';
 import { zoneSelectPressRoute } from './zoneSelectPress';
 import { ServerReports } from './serverReports';
 import { RoomSessions } from './roomSessions';
@@ -168,7 +169,14 @@ const zoneSelectPress = zoneSelectPressRoute({
 });
 const dailyMetrics = saves.metricsDaily === undefined || release.channel === 'preview' ? undefined
   : roomMetricsDailyRoute({ channel: release.channel, read: saves.metricsDaily, log });
+const metricsChannel = release.channel;
+const currentMetrics = arrivals === undefined || metricsChannel === 'preview' ? undefined : metricsCurrentRoute({
+  channel: metricsChannel, live: () => world.livePlayers(), entries: days => arrivals.totals(days), log,
+  selection: async entries => zoneSelectTabs(metricsChannel, { serial: release.serial, slugs: world.openShards() },
+    await readZoneUploads(catalogueAt).catch(() => []), entries),
+});
 const server = createServer((request, response) => {
+  if (currentMetrics?.(request, response) === true) return;
   if (dailyMetrics?.(request, response) === true) return;
   if (zoneSelect(request, response)) return;
   if (zoneSelectPress(request, response)) return;

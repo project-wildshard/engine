@@ -1479,6 +1479,7 @@
     "src/server/host/dedicated/doorTrust.ts": "server",
     "src/server/host/dedicated/main.ts": "server",
     "src/server/host/dedicated/metricIdentity.ts": "server",
+    "src/server/host/dedicated/metricsCurrentRoute.ts": "server",
     "src/server/host/dedicated/metricsDailyRoute.ts": "server",
     "src/server/host/dedicated/playtest.ts": "server",
     "src/server/host/dedicated/packReader.ts": "server",

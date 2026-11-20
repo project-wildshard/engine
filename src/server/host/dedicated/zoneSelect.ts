@@ -56,7 +56,7 @@ function cards(slugs: readonly string[], uploads: readonly Upload[], entries: re
   });
 }
 
-function tabs(channel: ZoneSelectOptions['channel'], live: LiveZones, uploads: readonly Upload[], counts: readonly ZoneEntryTotal[]): ZoneSelectDocument {
+export function zoneSelectTabs(channel: ZoneSelectOptions['channel'], live: LiveZones, uploads: readonly Upload[], counts: readonly ZoneEntryTotal[]): ZoneSelectDocument {
   const name = (a: ZoneSelectCard, b: ZoneSelectCard): number => a.name.localeCompare(b.name, 'en') || a.slug.localeCompare(b.slug, 'en');
   const all = cards(live.slugs, uploads, counts).sort(name);
   const visible = all.filter(card => card.status !== 'hidden');
@@ -94,7 +94,7 @@ export function zoneSelectRoute(options: ZoneSelectOptions): (request: IncomingM
   async function send(response: ServerResponse): Promise<void> {
     try {
       await update();
-      const body = tabs(options.channel, options.world(), uploads, totals);
+      const body = zoneSelectTabs(options.channel, options.world(), uploads, totals);
       response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'public, max-age=30' }).end(JSON.stringify(body));
     } catch (error) {
       options.log({ at: 'zone-select.read-failed', error: String(error) });

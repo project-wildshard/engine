@@ -3,7 +3,8 @@ import { createServer, type Server } from 'node:http';
 import { afterEach, expect, test, vi } from 'vitest';
 import { parse } from 'valibot';
 import { zoneSelectPressRoute } from '../src/server/host/dedicated/zoneSelectPress';
-import { zoneSelectRoute } from '../src/server/host/dedicated/zoneSelect';
+import { metricsCurrentRoute } from '../src/server/host/dedicated/metricsCurrentRoute';
+import { zoneSelectRoute, zoneSelectTabs } from '../src/server/host/dedicated/zoneSelect';
 import { ZoneSelectSchema, type ZoneSelectCard } from '../src/shared/game/grid/zoneSelectRows';
 
 const staging = 'https://staging.wildshard.io';
@@ -128,4 +129,25 @@ test('the press funnel drops the 31st request per address until a new minute', a
   now = 60_000;
   expect(await send()).toBe(204);
   expect(press).toHaveBeenCalledTimes(31);
+});
+
+
+test('the metrics door reads only the requested window and the live seat totals', async () => {
+  const entries = vi.fn(async (days: number) => [{ slug: 'nine-dragon-stack', humans: days, agents: 1, uniqueHumans: 2 }]);
+  const door = await open(metricsCurrentRoute({
+    channel: 'staging', now: () => 1000, entries, log: () => undefined,
+    live: () => ({ humans: 2, agents: 1, zones: { 'nine-dragon-stack': { human: 2, agent: 0 }, _road: { human: 0, agent: 1 } } }),
+    selection: async totals => zoneSelectTabs('staging', { serial: 4, slugs: ['pine-hollow', 'nine-dragon-stack', '_private'] }, [], totals),
+  }), '/metrics/current/7');
+  const responses = await Promise.all([fetch(door), fetch(door)]);
+  for (const response of responses) {
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      channel: 'staging', days: 7, at: 1000, live: { humans: 2, agents: 1 },
+      arrivals: [{ slug: 'nine-dragon-stack', humans: 7, agents: 1 }], popular: ['nine-dragon-stack', 'pine-hollow'],
+    });
+  }
+  expect(entries).toHaveBeenCalledExactlyOnceWith(7);
+  expect((await fetch(new URL('/metrics/current/2', door))).status).toBe(404);
+  expect((await fetch(door, { method: 'POST' })).status).toBe(405);
 });
