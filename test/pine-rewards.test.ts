@@ -13,7 +13,7 @@ import { declaredFolderCompendium } from '../src/shared/game/shard/declaredRows'
 import { SkinLocker } from '../src/client/game/cosmetics/locker';
 import { WirePage } from '../src/client/game/shardfile/wirePage';
 import { compendiumSave, skinSave, finishPickupSave, creatureRewardSave, syncPageRewards } from '../src/shared/game/saves';
-import { populationRoster } from '../src/server/game/population/roster';
+import { encounterRows } from '../src/shared/engine/sim/encounterRows';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import type { StandaloneGrid } from '../src/server/host/standalone/gridServer';
@@ -31,7 +31,7 @@ class PageStorage implements SaveStorage {
   setItem(key: string, value: string): void { this.items.set(key, value); }
   removeItem(key: string): void { this.items.delete(key); }
 }
-let input: HeadlessRuntimeInput, rosterStep: string;
+let input: HeadlessRuntimeInput;
 const opened = new Set<() => void>();
 let inheritedEnvironment: ReturnType<typeof saveEnvironment> | undefined;
 beforeEach(() => { inheritedEnvironment = saveEnvironment(); });
@@ -43,8 +43,23 @@ beforeAll(async () => {
   const directory = process.env['PINE_PROOF_PRODUCT'] ?? builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory);
   const assets = runtimeAssets(product, directory);
   input = { product, shard: product.shardfile, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')) };
-  rosterStep = (await product.json('actors/roster.json') as { step: string }).step;
+  // ONE-FORMAT OF23c: from r9 Pine declares every body and its roster stands none. The roster has no ghost recipe,
+  // and the one standing ghost is the elite, whose finish comes from eliteDrops. These cases prove the ordinary
+  // death drop, so they declare two ordinary ghosts past Pine's own ids.
+  const spawns = product.shardfile.creatures.spawns, elite = spawns.find(row => row.variant === 'ghost');
+  const plain = spawns.find(row => row.species === elite?.species && row.rank === undefined);
+  if (elite === undefined || plain === undefined) throw new Error('Pine declares no ghost or plain deer');
+  const top = Math.max(...spawns.flatMap(row => /^creature:(\d+)$/u.exec(row.id)?.[1] ?? []).map(Number));
+  for (const at of [1, 2]) spawns.push({ ...plain, variant: elite.variant, seed: elite.seed, scale: elite.scale, id: `creature:${String(top + at)}`, at: [5 + at * 40, elite.at[1], -225] });
 });
+/** An ordinary (not elite) standing ghost stag, moved to the reward spot. */
+function ghost(grid: StandaloneGrid) {
+  const elites = new Set([...encounterRows(grid.host).values()].map(read => read().body));
+  const body = [...grid.host.entities].find(([id, actor]) => actor.variant === 'ghost' && actor.alive && !elites.has(id))?.[1];
+  if (body === undefined) throw new Error('No ordinary ghost stag standing');
+  body.position.set(5, body.position.y, -225);
+  return body;
+}
 // Every reward case stays inside Pine. The real standalone host permits no
 // road strips for cell-local proofs; road crossings retain their own bake.
 async function boot(storage: PageStorage, lone?: true, identity?: string, refused?: (error: unknown) => void) {
@@ -65,7 +80,7 @@ function onPage<T>(storage: PageStorage, run: () => T): T {
   try { return run(); } finally { installSaveEnvironment(worker); }
 }
 function kill(grid: StandaloneGrid, player: string) {
-  const body = populationRoster(grid.host, rosterStep).spawn('deer', 5, -225, 0, 'ghost'), source = grid.host.players.get(player);
+  const body = ghost(grid), source = grid.host.players.get(player);
   if (source === undefined) throw new Error('No killer');
   expect(grid.host.combat.hit({ source: source.health, sourceTags: ['actor.player', 'cover.checked'], target: body.combatActor(), amount: body.maxHp * 10,
     point: body.position.clone(), dir: new Vector3(0, 0, 1) })?.killed).toBe(true);
@@ -152,7 +167,7 @@ test('J105 pays meaningful contributors, including when a tiny last hit comes fr
       first.grid.join({ join: id, x: 5, y: 0, z: -225 }, link.server); client.hello('test', { player: id, name: id }); link.pump();
     }
     first.grid.open();
-    let body = populationRoster(first.grid.host, rosterStep).spawn('deer', 5, -225, 0, 'ghost');
+    let body = ghost(first.grid);
     const hit = (id: string, amount: number) => {
       const source = first.grid.host.players.get(id); if (source === undefined) throw new Error('No hitter');
       return first.grid.host.combat.hit({ source: source.health, sourceTags: ['actor.player', 'cover.checked', 'dmg.legacy'], target: body.combatActor(), amount,
@@ -170,7 +185,7 @@ test('J105 pays meaningful contributors, including when a tiny last hit comes fr
     first.grid.tick(); first.grid.tick(); a.pump();
     expect(ca.owned.get('finish.ghost-stag')).toBe(1);
     first.grid.place({ x: 80, y, z, yaw: 0 }, 'pine-b');
-    body = populationRoster(first.grid.host, rosterStep).spawn('deer', 5, -225, 0, 'ghost');
+    body = ghost(first.grid);
     hit('pine-a', body.maxHp * 0.5); first.grid.tick();
     expect(hit('pine-b', body.maxHp * 0.51)?.killed).toBe(true);
     first.grid.tick(); first.grid.tick(); a.pump(); b.pump();
