@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "c919a2e036c87f954253640c52dc5da0618f7311a3661ec112d6160ccfc818de",
+  "catalogueHash": "3ec6e629fbab18bc76f958b8e50a15d818f398d9caf195002724ee1775a8fb31",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -720,8 +720,8 @@
       {
         "slug": "nine-dragon-stack",
         "name": "Nine Dragon Stack",
-        "revision": 5,
-        "hash": "d176378db6ee34a3b158a7f9735a4000727156f92b3cedba0affe6727abfcf3b"
+        "revision": 6,
+        "hash": "c112cac1b42dd7f689374b7baf92b77c4e13f9f7a988bb7e18ca13438bbbb975"
       },
       {
         "slug": "open-plot-alien-plain",
@@ -897,9 +897,9 @@
     },
     {
       "slug": "nine-dragon-stack",
-      "revision": 5,
-      "hash": "d176378db6ee34a3b158a7f9735a4000727156f92b3cedba0affe6727abfcf3b",
-      "bytes": 118967808
+      "revision": 6,
+      "hash": "c112cac1b42dd7f689374b7baf92b77c4e13f9f7a988bb7e18ca13438bbbb975",
+      "bytes": 118880256
     },
     {
       "slug": "open-plot-alien-plain",
