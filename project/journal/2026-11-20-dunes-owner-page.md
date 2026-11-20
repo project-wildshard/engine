@@ -14,3 +14,9 @@ homes alone and leaves the body to the declared encounter, as an ownerless plan 
 the wire only when the plan's owner row did not name it; Dunes rev 5's owner row names the Matriarch and the page binds
 no fight for her. `questSummonOwner` now says who answers a summon: the page's fight for a keeper boss it binds, else the
 server's declared encounter. With both fixes `wildshard prepare` passes on rev 5 locally (51 programs).
+
+**A death in her fight went to the shard spawn (opus-of19-dunes3).** On a local two-player rev 5 walk the page fought
+the Matriarch inside her arena, but every fall put the player at the shard's spawn, 150 m from the basin, not the south
+rim the encounter declares. A declared encounter (`PhaseEncounter`) placed the fallen on `actor.died` but never answered
+`death.checkpoint`, so the room's J107 respawn moved them first. It now answers it while engaged in a room, as a boss
+row does; `test/encounter-room-respawn.test.ts` failed first (the bot stood at the spawn, 5.7 m off).

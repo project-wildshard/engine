@@ -114,6 +114,9 @@ export class PhaseEncounter {
     }, sim.scope, { order: 100 });
     sim.events.on('damage.dealt', ({ req }) => { if (req.source === actor.combatActor()) party.echo(req, actor, sim.combat); }, sim.scope);
     sim.events.on('actor.died', ({ actor: dead }) => { if (sim.players.size > 1) party.fell(dead.id, this.boss); else if (sim.players.has(dead.id)) this.boss.onPlayerDeath(); }, sim.scope);
+    // OF19d: a room's death the engaged fight owns is the fight's to place (`fell`, at `respawn`), as a boss row's is; unanswered,
+    // the room's J107 respawn put the fallen at their last place or the shard's spawn instead (Dunes: 150 m from the basin).
+    sim.events.answer('death.checkpoint', (value) => value === true || (sim.players.size > 1 && this.boss.engaged), sim.scope);
     // SB51: a beaten fight whose body its spawn row brought back (`respawn`) stands again with it: a body that stands is a fight
     // a newcomer can damage and win, never a victory waiting on an empty arena. A cell's sleep spends that empty wait (SC10).
     sim.events.on('world.slept', ({ seconds }) => { party.slept(seconds); }, sim.scope);
