@@ -428,6 +428,11 @@
       "shape": "ebb68e68b6118b2e",
       "migrations": []
     },
+    "shard/vehicles": {
+      "version": 1,
+      "shape": "5b45ad050ed50e36",
+      "migrations": []
+    },
     "json:device/'debug.phoneBudget'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
