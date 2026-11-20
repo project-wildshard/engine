@@ -389,6 +389,10 @@ void test(
         assert.equal(f.lead.held, 1)
         assert.equal(f.client.owner(f.client.latest).held, 1)
         const seen = () => nativeGroundBossObservation(f.host, 'pine.king')
+        // The open ribcage is the weak point the fight's light shows (his skin's chest lock point);
+        // the head is bark and takes a quarter.
+        const chest = body =>
+          body.ribsWorld?.(new Vector3()) ?? body.lockPoints.point(0, new Vector3())
         let fired = -80
         for (
           let tick = 0;
@@ -404,8 +408,14 @@ void test(
               0,
             )
           else if (body?.alive) {
-            const x = body.position.x,
-              z = body.position.z - 12
+            // Stand 12 m before his chest, as a player does: the ribcage opens to the front, so a
+            // fixed post only hits it while he happens to face it.
+            const ribs = chest(body),
+              dx = ribs.x - body.position.x,
+              dz = ribs.z - body.position.z,
+              n = Math.hypot(dx, dz),
+              x = body.position.x + (n > 0.05 ? (dx / n) * 12 : 0),
+              z = body.position.z + (n > 0.05 ? (dz / n) * 12 : -12)
             f.lead.resetPose({ x, y: f.host.groundHeightAt(x, z), z }, 0)
           }
           const shot =
@@ -421,7 +431,7 @@ void test(
             : 0
           f.tick({
             buttons: NET_BUTTONS.skip | dodge,
-            ...(shot ? { free: body.headWorld(new Vector3()) } : {}),
+            ...(shot ? { free: chest(body) } : {}),
             ...(tick - fired === 20 ? { reload: 1 } : {}),
           })
         }
