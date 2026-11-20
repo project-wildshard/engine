@@ -25,7 +25,7 @@ import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone } from './safari.mjs';
-import { FRAME_LOG_READ, FRAME_LOG_START, nameLongFrames, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
+import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 
 const { values } = parseArgs({ options: {
@@ -138,7 +138,13 @@ async function bench() {
               const byCause = {};
               for (const n of named) byCause[n.cause] = (byCause[n.cause] ?? 0) + 1;
               console.log(`  long frames by cause: ${JSON.stringify(byCause)}`);
-              for (const n of named) console.log(`  long ${String(Math.round(n.ms))} ms at ${String(Math.round((n.at - (log?.from ?? 0)) / 100) / 10)} s: ${n.causes.join('; ') || 'other'}`);
+              const gaps = gapWork(named, log ?? {});
+              row.gaps = gaps;
+              named.forEach((n, i) => { const gap = gaps[i] ?? [];
+                console.log(`  long ${String(Math.round(n.ms))} ms at ${String(Math.round((n.at - (log?.from ?? 0)) / 100) / 10)} s: ${n.causes.join('; ') || 'other'}${gap.length === 0 ? '' : ` | ${gap.join(' | ')}`}`); });
+              // mini-driftwood13i: the systems that ran over 15 ms at least once: runs, total ms, runs over 5 / 15 ms, longest
+              for (const [id, n, sum, over5, over15, max] of log?.sys ?? []) console.log(`  system ${String(id)}: ${String(n)} runs, ${String(sum)} ms, >5 ${String(over5)}, >15 ${String(over15)}, max ${String(max)}`);
+
             } catch (error) { row.framesError = String(error); }
           }
           if (values.census === true) {

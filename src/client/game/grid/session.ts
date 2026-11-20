@@ -1181,7 +1181,11 @@ export class GridSession {
     if (this.initialFarReady && this.host.backgroundReady?.() !== false) for (const cell of this.neighbours) {
       if (cell.instance === drawn && !admitsCellTiles(cell.instance, drawn, this.clientTiles.owns(cell.instance), findShard(cell.slug)?.cellGround === 'world')) continue;
       const distance = Math.hypot(Math.max(0, Math.abs(at.x - cell.origin.x) - CHUNK_HALF), Math.max(0, Math.abs(at.z - cell.origin.z) - CHUNK_HALF));
-      if (this.assembly.approaching(distance, 400 + Math.min(speed, 60) * 4)) void this.admitNeighbour?.(cell).catch(() => undefined);
+      if (!this.assembly.approaching(distance, 400 + Math.min(speed, 60) * 4)) continue;
+      // DF8 (mini-driftwood13i): each neighbour's admission call is timed on its own, so a long step names the cell
+      if (timed) lap('grid.step neighbours');
+      void this.admitNeighbour?.(cell).catch(() => undefined);
+      if (timed) lap(`grid.admit ${cell.slug}`);
     }
     lap('grid.step neighbours');
     if (this.nearColliders !== null) { const feet = this.host.feet(); this.nearColliders.step(feet.x, feet.z, speed); lap('grid.step near colliders'); }

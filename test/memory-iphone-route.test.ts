@@ -1,7 +1,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13): the route bench's numbers. The device half runs on the iPhone 13
 // (meta project/evidence/iphone13-driftwood/).
 import { expect, test } from 'vitest';
-import { nameLongFrames, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
+import { gapWork, nameLongFrames, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
 import { linkStages, linkTable } from '../scripts/memory/iphone/link.mjs';
 import { legSummary, routeFor, routeTable, worstSegment, type LegSample } from '../scripts/memory/iphone/route.mjs';
 
@@ -96,4 +96,11 @@ test('a long frame is named by what ran in the interval before it: a collection,
   expect(named[2]?.causes).toEqual(['upload 24.0 MB', 'render 40 (draw 28 ms Scene>grid-deck)']);
   expect(named[3]?.causes).toEqual(['compile graph:material:kit']);
   expect(nameLongFrames(frames, [['partial', 1010, 1015]])[0]?.cause).toBe('other'); // under 10 ms of collection
+});
+
+test('DF8 (mini-driftwood13i): gapWork names the GPU waits and long timers inside a long frame, longest first', () => {
+  const named = [{ at: 1060, ms: 60 }, { at: 2000, ms: 55 }];
+  const log = { reads: [[1020, '2d.getImageData', 41], [1950, 'gl.readPixels', 5]] as [number, string, number][], tasks: [[1005, 'setTimeout:look', 9], [1500, 'setTimeout:far', 30]] as [number, string, number][] };
+  expect(gapWork(named, log)).toEqual([['2d.getImageData:41', 'setTimeout:look:9'], ['gl.readPixels:5']]);
+  expect(gapWork(named, {})).toEqual([[], []]);
 });

@@ -6,7 +6,7 @@
 // http on a LAN address does not. Tailnet only: this never runs `tailscale funnel`.
 //
 // --public instead opens two owned Cloudflare quick tunnels and serves the reviewed staging snapshot with in-memory saves.
-//   node scripts/memory/iphone/serve-local.mjs [--public] [--shard nine-dragon-stack] [--port N] [--socket-port N] [--dry-run]
+//   node scripts/memory/iphone/serve-local.mjs [--public [--no-watch]] [--shard nine-dragon-stack] [--port N] [--socket-port N] [--dry-run]
 //
 // It prints the URL once the world is up. dev.mjs watches src/: an edit rebuilds the client and the open page opens the new
 // build by itself. Ctrl-C stops the world and removes both serve entries.
@@ -59,10 +59,11 @@ async function waitForPublicWorld(origin, socketOrigin, signal) {
 }
 
 /** @param {string} shard @param {number} port @param {number} socketPort @param {boolean} dryRun */
-async function servePublic(shard, port, socketPort, dryRun) {
+async function servePublic(shard, port, socketPort, dryRun, noWatch = false) {
   const work = `tmp/dev-world-public-${String(port)}`;
+  // --no-watch (mini-driftwood13i): an exact build stays that build while its checkout moves on (a shared phone pair)
   const flags = ['scripts/dev.mjs', '--staging', '--saves', 'memory', '--work', work,
-    '--shard', shard, '--port', String(port), '--socket-port', String(socketPort)];
+    '--shard', shard, '--port', String(port), '--socket-port', String(socketPort), ...(noWatch ? ['--no-watch'] : [])];
   if (dryRun) {
     console.log(JSON.stringify({ tunnels: [port, socketPort].map(n => ['cloudflared'].concat(tunnelArgs(n))),
       dev: ['node', ...flags, '--public-origin', '<page HTTPS>', '--public-socket', '<socket WSS>'] }, null, 2));
@@ -162,13 +163,13 @@ async function servePublic(shard, port, socketPort, dryRun) {
 async function main() {
   const { values } = parseArgs({ options: {
     shard: { type: 'string', default: 'nine-dragon-stack' }, port: { type: 'string' },
-    'socket-port': { type: 'string' }, public: { type: 'boolean', default: false }, 'dry-run': { type: 'boolean', default: false },
+    'socket-port': { type: 'string' }, public: { type: 'boolean', default: false }, 'no-watch': { type: 'boolean', default: false }, 'dry-run': { type: 'boolean', default: false },
   } });
   if (!/^[a-z0-9_-]+$/u.test(values.shard)) throw new Error('--shard needs a slug');
   const port = Number(values.port ?? (values.public ? 4442 : 4402));
   const socketPort = Number(values['socket-port'] ?? (values.public ? 4452 : 4412));
   if ([port, socketPort].some(n => !Number.isInteger(n) || n < 1 || n > 65535) || port === socketPort) throw new Error('--port and --socket-port are two distinct ports');
-  if (values.public) { await servePublic(values.shard, port, socketPort, values['dry-run']); return; }
+  if (values.public) { await servePublic(values.shard, port, socketPort, values['dry-run'], values['no-watch']); return; }
 
   const status = spawnSync('tailscale', ['status', '--json'], { encoding: 'utf8' });
   if (status.status !== 0) throw new Error(`tailscale status failed: ${status.stderr}`);

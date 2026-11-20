@@ -9,3 +9,5 @@ export declare const FRAME_LOG_START: string;
 export declare const FRAME_LOG_READ: string;
 /** DF8: what each long frame waited on (gc, compile, upload, update, render or other). */
 export declare function nameLongFrames(frames: unknown[][], collections?: [string, number, number][], over?: number): { at: number; ms: number; cause: string; causes: string[] }[];
+/** DF8: each long frame's work outside the game tick (GPU-waiting calls, long timers), longest first. */
+export declare function gapWork(named: { at: number; ms: number }[], log: { reads?: [number, string, number][]; tasks?: [number, string, number][] }): string[][];

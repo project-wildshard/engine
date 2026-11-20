@@ -106,13 +106,40 @@ if (typeof create === 'function') setProto.createCollider = function (bodies, de
   try { return create.call(this, bodies, desc, parent); } finally {
     const tris = desc?.shape?.indices?.length ? desc.shape.indices.length / 3 : 0;
     if (log.colliders.length < 2000) log.colliders.push([Math.round(t), Math.round((performance.now() - t) * 10) / 10, tris]); } };
+// DF8 (mini-driftwood13i): calls that wait on the GPU (pixel reads, framebuffer checks, a canvas copied into a 2D canvas,
+// the game's frame captures) and page timers whose callback ran 8 ms or more: [page ms, name, ms]
+log.reads = []; log.tasks = [];
+const timed = (target, name, label, keep) => { const own = target?.[name]; if (typeof own !== 'function') return;
+  target[name] = function (...args) { const t = performance.now();
+    try { return own.apply(this, args); } finally { const ms = performance.now() - t; if (ms >= 2 && log.reads.length < 2000 && (keep === undefined || keep(args))) log.reads.push([Math.round(t), label, Math.round(ms * 10) / 10]); } }; };
+for (const n of ['readPixels', 'checkFramebufferStatus', 'finish', 'clientWaitSync', 'getBufferSubData', 'getError']) timed(gl, n, 'gl.' + n);
+const c2 = window.CanvasRenderingContext2D?.prototype;
+timed(c2, 'getImageData', '2d.getImageData');
+timed(c2, 'drawImage', '2d.drawImage(canvas)', (a) => a[0] instanceof HTMLCanvasElement);
+if (typeof g.captureFrame === 'function') { const cap = g.captureFrame; g.captureFrame = function (...args) { const t = performance.now();
+  log.reads.push([Math.round(t), 'game.captureFrame ask', 0]); return cap.apply(this, args); }; }
+const timer = (name) => { const own = window[name]; window[name] = function (fn, ...rest) {
+  if (typeof fn !== 'function') return own.call(window, fn, ...rest);
+  const label = name + ':' + (fn.name || String(fn).slice(0, 60).replace(/\\s+/g, ' '));
+  return own.call(window, function (...a) { const t = performance.now();
+    try { return fn.apply(this, a); } finally { const ms = performance.now() - t; if (ms >= 8 && log.tasks.length < 2000) log.tasks.push([Math.round(t), label, Math.round(ms)]); } }, ...rest); }; };
+timer('setTimeout'); timer('setInterval');
 // DF8: every game system's run is timed; a frame keeps the systems that took over 15 ms (id:ms)
 let slowSystems = [];
+// mini-driftwood13i: each system's runs, total ms, runs over 5 and 15 ms and its longest, so a spike reads as steady work or a one-off
+const sysHist = log.sysHist = {};
+// mini-driftwood13i: the player's predicted steps and replays (a server correction steps the buffered commands again), so a
+// long player.step says how many steps it ran
+let netSteps = 0, netReplays = 0;
+try { const pl = window.__wildshard?.world?.player, ownNet = pl?.stepNet;
+  if (typeof ownNet === 'function') pl.stepNet = function (dt, command, replay) { netSteps++; if (replay) netReplays++; return ownNet.call(this, dt, command, replay); }; } catch {}
 try { const byPhase = g.app.systemsByPhase(), wrapped = new WeakSet();
   for (const phase of Object.keys(byPhase)) for (const spec of byPhase[phase]) {
     if (wrapped.has(spec) || typeof spec.run !== 'function') continue; wrapped.add(spec);
     const own = spec.run; try { spec.run = function (...args) { const t = performance.now();
-      try { return own.apply(this, args); } finally { const ms = performance.now() - t; if (ms > 15) slowSystems.push(String(spec.id) + ':' + Math.round(ms)); } }; } catch {} } } catch {}
+      try { return own.apply(this, args); } finally { const ms = performance.now() - t; if (ms > 15) slowSystems.push(String(spec.id) + ':' + Math.round(ms) + (spec.id === 'player.step' ? '(steps ' + netSteps + ' replays ' + netReplays + ')' : ''));
+        if (spec.id === 'player.step') { netSteps = 0; netReplays = 0; }
+        const h = sysHist[spec.id] ??= [0, 0, 0, 0, 0]; h[0]++; h[1] += ms; if (ms > 5) h[2]++; if (ms > 15) h[3]++; if (ms > h[4]) h[4] = ms; } }; } catch {} } } catch {}
 // DF8: the game's own update and render ms for its last two frames (Game's rings), so a long frame says which side it was
 const gameSplit = () => { try { const ring = g.frameMs.length, a = (g.frameI - 1 + ring) % ring, b = (g.frameI - 2 + ring) % ring;
   return [Math.round(g.updateMs[a]), Math.round(g.renderMs[a]), Math.round(g.updateMs[b]), Math.round(g.renderMs[b])]; } catch { return null; } };
@@ -138,7 +165,7 @@ return 'logging';
 
 /** In the page: FRAME_LOG_START's log, and stop logging: { count, frames: [page ms, interval ms, links, tex uploads,
  * texels, buffer bytes, triangles, geometries, new programs, renderer.render calls, uniform-lookup ms, programs looked up
- * slowly, the game's update/render split, systems over 15 ms, the slowest draw [ms, parent>object] when 5 ms or more], adds: [page ms, parent>child, triangles], costs: FRAME_LOG_START's update splits }. Only the frames
+ * slowly, the game's update/render split, systems over 15 ms, the slowest draw [ms, parent>object] when 5 ms or more], adds: [page ms, parent>child, triangles], costs: FRAME_LOG_START's update splits, reads: [page ms, GPU-waiting call, ms], tasks: [page ms, timer, ms] }. Only the frames
  * that are long (over 45 ms), link, or upload more than 64k texels or 64 KB, and the frame before each, so the socket
  * holds it. */
 export const FRAME_LOG_READ = `
@@ -147,7 +174,7 @@ const fc = window.__wildshard?.frameCost; if (fc && typeof fc === 'object') { fc
 if (log === null) return null;
 const f = log.frames, keep = new Set();
 f.forEach((x, i) => { if (x[1] > 45 || x[2] > 0 || x[4] > 65536 || x[5] > 65536 || x[9] > 1 || x[10] > 5 || (x[13] ?? '') !== '') { keep.add(i); if (i > 0) keep.add(i - 1); } });
-return { count: f.length, from: f[0]?.[0] ?? 0, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders, costs: log.costs ?? [] };
+return { count: f.length, from: f[0]?.[0] ?? 0, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders, costs: log.costs ?? [], reads: log.reads ?? [], tasks: log.tasks ?? [], sys: Object.entries(log.sysHist ?? {}).filter(([, h]) => h[3] > 0).map(([id, h]) => [id, h[0], Math.round(h[1]), h[2], h[3], Math.round(h[4])]) };
 `;
 
 /**
@@ -183,4 +210,19 @@ export function nameLongFrames(frames, collections = [], over = 50) {
     named.push({ at: end, ms, cause: (causes[0] ?? 'other').split(' ')[0] ?? 'other', causes });
   });
   return named;
+}
+
+/**
+ * DF8 (mini-driftwood13i): what ran inside each long frame's interval outside the game's own tick, from FRAME_LOG_READ's
+ * GPU-waiting calls (pixel reads, canvas copies) and page timers of 8 ms or more, each `name:ms`, the longest first.
+ * @param {{ at: number, ms: number }[]} named @param {{ reads?: [number, string, number][], tasks?: [number, string, number][] }} log
+ * @returns {string[][]}
+ */
+export function gapWork(named, log) {
+  return named.map((n) => {
+    const start = n.at - n.ms, end = n.at;
+    /** @type {[number, string][]} */ const found = [];
+    for (const [t, name, ms] of [...(log.reads ?? []), ...(log.tasks ?? [])]) if (t + ms > start && t < end) found.push([ms, `${name}:${String(Math.round(ms))}`]);
+    return found.sort((a, b) => b[0] - a[0]).slice(0, 5).map((f) => f[1]);
+  });
 }
