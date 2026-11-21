@@ -483,7 +483,7 @@ async function installRingSlices(slugs: readonly string[]): Promise<number> {
     const { shards } = readJson(PINS) as PinFile;
     let bytes = 0;
     for (const slug of slugs) {
-      const row = slices.find(slice => slice.slug === slug);
+      const row = slices.find(entry => entry.slug === slug);
       if (row === undefined) throw new Error(`${slug}: missing Ring 1 slice pin`);
       if (row.from !== shards.find(pin => pin.slug === row.slug)?.hash) throw new Error(`${row.slug}: slice belongs to another head; re-cut with node scripts/pins.ts slice`);
       const body = await tarball(row, false), target = join(SLICED, row.slug);
