@@ -32,7 +32,7 @@ import { countSlots } from './declaredSpawnCount';
 import { decisionRuntime, ShardDecisions } from './decisions';
 import { installDeclaredEncounters } from '../shard/declaredEncounters';
 import { installEncounterAdds } from './encounterAdds';
-import { declaredOwnerHooks, type NativePopulationRows } from './bossRow';
+import { declaredOwnerHooks, keeperProgram, type NativePopulationRows } from './bossRow';
 import type { PhaseEncounter } from '@wildshard/engine/ai/phases';
 import { creatureFloor } from './homeKeeper';
 import { killBelowWorld } from '@wildshard/engine/entities/killHeight';
@@ -61,7 +61,7 @@ export function nameDeclaredBodies(host: SimHost, shard: Shardfile): void {
  *  brains of the kinds it stands (a program species the keeper stands no body of owns no row). */
 export function keeperOwnership(rows: Pick<NativePopulationRows, 'program' | 'homes' | 'boss'>): { actors: ReadonlySet<string>; scripts: ReadonlySet<string> } {
   const bodies = [...rows.homes, ...rows.boss === undefined ? [] : [rows.boss]], kinds = new Set(bodies.map(body => body.kind));
-  return { actors: new Set(bodies.map(body => body.id)), scripts: new Set(rows.program.species.flatMap(row =>
+  return { actors: new Set(bodies.map(body => body.id)), scripts: new Set(keeperProgram(rows).species.flatMap(row =>
     kinds.has(row.kind) && row.brain?.archetype === 'decision' ? [row.brain.data.script] : [])) };
 }
 

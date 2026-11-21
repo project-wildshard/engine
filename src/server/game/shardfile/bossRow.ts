@@ -265,10 +265,16 @@ export function installSpeciesEncounter(host: SimHost, population: SpeciesHomesS
   return { keeper, encounter: installBossOwnerRow(host, row, { body, ...ports }) };
 }
 
+/** OF30: a runtime plan's keeper programme, empty when its creatures are all declared rows (no species, no strikes). */
+export function keeperProgram(rows: Pick<NativePopulationRows, 'program'>): SpeciesProgramRows {
+  return rows.program ?? { species: [], strikes: [] };
+}
+
 /** Serializable native population policy. Ground-only deferred homes resolve
  * against the actual baked flight recipe, preserving original roster order. */
 export interface NativePopulationRows {
-  readonly program: SpeciesProgramRows;
+  /** ONE-FORMAT OF30: the keeper's own species programme; a plan whose creatures are all declared names none. */
+  readonly program?: SpeciesProgramRows;
   readonly step: string; readonly seed: number;
   readonly homes: readonly (Omit<SpeciesHomesSpec['homes'][number], 'late'> & { readonly late?: boolean | 'ground' })[];
   readonly boss?: SpeciesHomesSpec['boss'];
@@ -292,14 +298,14 @@ export function prepareNativePopulation(rows: NativePopulationRows, baked: Param
   readonly specs: ReturnType<typeof bakedSpecs>;
   readonly install: (host: SimHost, ports: Omit<BossOwnerPorts, 'body'>, saved?: Parameters<typeof installSpeciesHomes>[2], decisions?: SpeciesDecisionAuthority) => KeptPopulation;
 } {
-  const specs = bakedSpecs(baked), brains = rows.admission === 'prepare' ? admitSpeciesProgram(rows.program) : null;
+  const program = keeperProgram(rows), specs = bakedSpecs(baked), brains = rows.admission === 'prepare' ? admitSpeciesProgram(program) : null;
   const homes = rows.homes.map(row => ({ ...row, late: row.late === 'ground' ? specs.get(row.kind)?.flight === undefined : row.late ?? false }));
   // OF19c0: a plan whose boss moved to a declared encounter keeps no owner row; a keeper boss still needs the one that fights it
   if (owner === undefined && rows.boss !== undefined) throw new Error('A runtime keeper boss needs its owner row');
   return { specs, install: (host, ports, saved, decisions) => {
     const population: SpeciesHomesSpec = {
       ...(decisions === undefined ? {} : { decisions }),
-      step: rows.step, seed: rows.seed, homes, specs, species: rows.program.species, brains: brains ?? admitSpeciesProgram(rows.program),
+      step: rows.step, seed: rows.seed, homes, specs, species: program.species, brains: brains ?? admitSpeciesProgram(program),
       attackers: rows.attackers ?? Infinity, think: rows.think === 'legacy' ? { bands: { rate: () => 'legacy' } } : rows.think,
       ...(rows.boss === undefined ? {} : { boss: rows.boss }), ...(rows.killY === undefined ? {} : { killY: rows.killY }),
       ...(rows.placement === undefined ? {} : { placement: rows.placement }), ...(rows.holds === undefined ? {} : { holds: rows.holds }),
