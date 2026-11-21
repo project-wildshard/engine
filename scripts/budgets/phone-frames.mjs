@@ -30,14 +30,18 @@ export function expectPinnedZones(pins, built) {
 }
 
 /** A pinned zone with no placement or cell (a staging-only shard's first pin, meta MZ26) boots only from a cell, so the
- * page's inlined catalogue gets a measuring cell east of the grid, as `wildshard dev` gives its one shard; a placed zone's
+ * page's inlined catalogue gets a measuring cell (the nearest free one within the grid's bound of 3), as `wildshard dev` gives its one shard; a placed zone's
  * page is unchanged. @param {string} html @param {string} slug */
 export function measuringCatalogue(html, slug) {
   return html.replace(/(<script type="application\/json" id="ws-catalogue">)([^<]*)(<\/script>)/u, (all, open, json, close) => {
     const catalogue = JSON.parse(json), bare = (/** @type {{slug:string}} */ row) => row.slug.replace(/^_/u, '');
     if ([...catalogue.placements, ...catalogue.grid.cells].some(row => bare(row) === slug)) return all;
-    const east = Math.max(0, ...catalogue.grid.cells.map((/** @type {{cell:number[]}} */ row) => row.cell[0])) + 2;
-    catalogue.grid.cells.push({ instance: slug, slug, cell: [east, 0] });
+    // the grid admits cells within 3 of the centre: the nearest free one, east first
+    const taken = new Set(catalogue.grid.cells.map((/** @type {{cell:number[]}} */ row) => row.cell.join()));
+    const free = [0, 1, 2, 3].flatMap(r => [-3, -2, -1, 0, 1, 2, 3].flatMap(z => [3, 2, 1, 0, -1, -2, -3].map(x => [x, z])
+      .filter(([x, z]) => Math.max(Math.abs(x), Math.abs(z)) === r))).find(cell => !taken.has(cell.join()));
+    if (free === undefined) throw new Error(`No free grid cell to measure ${slug} in`);
+    catalogue.grid.cells.push({ instance: slug, slug, cell: free });
     return open + JSON.stringify(catalogue).replaceAll('<', String.raw`<`) + close;
   });
 }

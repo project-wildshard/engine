@@ -72,7 +72,11 @@ describe('phone Low frame budgets', () => {
     const read = (html: string): typeof catalogue => JSON.parse(/id="ws-catalogue">([^<]*)</u.exec(html)?.[1] ?? 'null');
     expect(measuringCatalogue(page(catalogue), 'driftwood-isle')).toBe(page(catalogue));
     expect(measuringCatalogue(page(catalogue), 'pine-hollow')).toBe(page(catalogue));
-    expect(read(measuringCatalogue(page(catalogue), 'mossgate')).grid.cells.at(-1)).toEqual({ instance: 'mossgate', slug: 'mossgate', cell: [5, 0] });
+    expect(read(measuringCatalogue(page(catalogue), 'mossgate')).grid.cells.at(-1)).toEqual({ instance: 'mossgate', slug: 'mossgate', cell: [1, -1] });
+    // the grid admits |x| and |z| up to 3 (budgets run 44955536233: "Expected <=3 but received 4"): a full inner grid uses ring 3
+    const full = { placements: [], grid: { cells: [-2, -1, 0, 1, 2].flatMap(x => [-2, -1, 0, 1, 2].map(z => ({ instance: `${x}${z}`, slug: `${x}${z}`, cell: [x, z] }))) } };
+    const cell = read(measuringCatalogue(page(full), 'mossgate')).grid.cells.at(-1)?.cell ?? [];
+    expect(Math.max(...cell.map(Math.abs))).toBe(3);
     expect(read(measuringCatalogue(page(catalogue), 'mossgate')).placements).toEqual(catalogue.placements);
   });
 });
