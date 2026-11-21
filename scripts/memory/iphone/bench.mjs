@@ -262,7 +262,7 @@ if (release) {
   const { releaseSuite } = await import('./release.mjs');
   process.exitCode = await releaseSuite(args.slice(2), { script: benchScript, lock: underPhoneLocks });
 } else if (values['dry-run']) {
-  console.log('Under iphone13.lock, then mini-measure.lock: doctor, Safari driver, native readers, screenshots and report');
+  console.log('Under iphone13.lock: doctor, Safari driver, native readers, screenshots and report');
   console.log(JSON.stringify({ base, mode, zone: values.zone, runs, seconds: duration, reloadAt, pair: values.pair ?? false, slots, out, trace: values.trace,
     driver: values.driver, overrides: localBodies }));
 } else if (!values['with-locks']) {

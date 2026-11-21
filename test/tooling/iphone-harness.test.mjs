@@ -128,7 +128,7 @@ test('dry-run exposes the harness modes and routes the release suite without tou
     expect(JSON.parse(output.trim().split('\n').at(-1))).toMatchObject({ mode, seconds });
   }
   const release = execFileSync(process.execPath, [bench, '--suite', 'release', '--dry-run'], { encoding: 'utf8' });
-  expect(release).toContain('iphone13.lock then mini-measure.lock');
+  expect(release).toContain('Hold iphone13.lock for all captures');
   expect(release).toContain('"--zone","nine-dragon-stack","--mode","walk"');
 });
 

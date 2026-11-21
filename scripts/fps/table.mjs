@@ -21,10 +21,12 @@ import { fpsPlan } from './plan.mjs';
 import { passBreakdownAllowed, requirePassBench } from './passes.mjs';
 import { workloadCounts } from './workload.mjs';
 import { retryColdBoot, runBatch } from './batch.mjs';
+import { lockfArgs, lockRoot } from '../memory/iphone/locks.mjs';
 
 /** @typedef {import('./plan.mjs').ProfileSpec} ProfileSpec */
 const root = resolve(import.meta.dirname, '../..');
-const lock = join(homedir(), 'projects/games/wildshard/engine/tmp/mini-measure.lock');
+// MINI-DEVEX MD2: desktop censuses hold desktop-gpu.lock (then the legacy mini-measure.lock), never the phone's lock
+const gpuLock = lockfArgs('desktop');
 const marker = join(homedir(), '.cache/wildshard/jake-playing');
 const exclusiveGPU = '^/.*(ms-playwright|[.]agent-browser/browsers)/.*(chrome-headless-shell|Chromium|Chrome for Testing|MiniBrowser|Playwright|WebKit[.]GPU[.]Development)( |$)';
 const keys = Object.keys(fpsPlan().profiles);
@@ -97,7 +99,7 @@ async function measureCell(job, signal) {
     // Join the kernel queue even while another measurement owns the GPU.
     // The worker checks for unrelated GPU users after acquiring this lease.
     signal.throwIfAborted();
-    const child = spawn('/usr/bin/lockf',['-k',lock,join(root,'scripts/browser-lane.sh'),'--max',Array.isArray(job) ? '9' : '5',
+    const child = spawn('/usr/bin/lockf',[...gpuLock,join(root,'scripts/browser-lane.sh'),'--max',Array.isArray(job) ? '9' : '5',
       process.execPath,import.meta.filename,Array.isArray(job) ? '--worker-batch' : '--worker',JSON.stringify(job)],{stdio:'inherit',detached:true,
       env:{...process.env,BROWSER_LANE_WAIT_SECONDS:'30'}});
     const stop = () => {
@@ -159,7 +161,7 @@ async function main() {
   const config = {mode:sampling.mode,build,host,base,zone,count,plan,route,warm:sampling.warm,...(passBreakdown?{passBreakdown}:{}),method:signature(source)};
   const fingerprint = signature(config);
   let out = resolve(choices.out ?? join(root,'tmp/driftwood-fps',fingerprint.slice(0,16)));
-  mkdirSync(out,{recursive:true}); mkdirSync(resolve(lock,'..'),{recursive:true});
+  mkdirSync(out,{recursive:true}); mkdirSync(lockRoot(),{recursive:true});
   if (sampling.mode === 'quick' && choices.out === undefined) out = mkdtempSync(join(out,'quick-'));
   openResume(out,fingerprint,config);
   console.error(`Build ${build}, resume ${out}`);

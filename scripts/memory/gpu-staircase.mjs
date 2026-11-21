@@ -7,7 +7,8 @@
 //
 //   node scripts/memory/gpu-staircase.mjs [--rounds=3] [--steps=a,b] [--out=<file.json>] [--settle=2000]
 //
-// Wrap it in the shared measurement lock: `lockf -k <engine>/tmp/mini-measure.lock scripts/browser-lane.sh node ...`.
+// Wrap it in the desktop GPU lock (iphone/locks.mjs, MINI-DEVEX MD2):
+// `lockf -k <engine>/tmp/desktop-gpu.lock lockf -k <engine>/tmp/mini-measure.lock scripts/browser-lane.sh node ...`.
 import { createServer } from 'node:http';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve as resolvePath } from 'node:path';

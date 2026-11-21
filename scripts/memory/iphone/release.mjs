@@ -166,7 +166,7 @@ function previousRow(path) {
 
 /** @param {string} script @param {readonly string[]} args */
 function runBench(script, args) {
-  // Release samples use fresh sessions. The outer suite already holds both locks.
+  // Release samples use fresh sessions. The outer suite already holds iphone13.lock.
   const env = { ...process.env };
   delete env.WD_SESSION;
   return new Promise((_resolve) => {
@@ -206,7 +206,7 @@ export async function releaseSuite(args, bench) {
   if (values.udid !== undefined) routeCommand.push('--udid', values.udid);
   if (values.recorded === undefined) {
     if (values['dry-run']) {
-      console.log('Report only. Hold iphone13.lock then mini-measure.lock for all captures.');
+      console.log('Report only. Hold iphone13.lock for all captures.');
       for (const command of commands) console.log(JSON.stringify(command));
       console.log(JSON.stringify([routeScript, ...routeCommand]));
       console.log(`History: ${history}`);

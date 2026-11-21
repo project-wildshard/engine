@@ -14,14 +14,11 @@
 //
 // Each run plays the route (route.mjs) once per cap, each from its own cold boot (fresh Safari on the phone, a fresh WebKit
 // on the Mac; origin storage cleared, phone Low seeded), so every pass starts at the dock; the cap order alternates run to run. The phone runs under
-// iphone13.lock then mini-measure.lock, with no WebDriver session: devicectl opens Safari and Web Inspector drives it
-// (inspector.mjs). `--driver webkit` is the desktop proxy (headless WebKit as an iPhone 13) under mini-measure.lock.
+// iphone13.lock (locks.mjs), with no WebDriver session: devicectl opens Safari and Web Inspector drives it
+// (inspector.mjs). `--driver webkit` is the desktop proxy (headless WebKit as an iPhone 13) under desktop-gpu.lock.
 // Output: <out>/route.json (every leg's samples) and <out>/route.md (one row per run, cap and segment, then the worst).
 import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { spawn } from 'node:child_process';
-import { once } from 'node:events';
 import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
@@ -29,6 +26,7 @@ import { enterZone, phoneSlots } from './safari.mjs';
 import { fenceFrames, fenceWaits, GPU_FENCE_READ, GPU_FENCE_START } from './gpuFence.mjs';
 import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, otherKind, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
+import { lockKind, underLock } from './locks.mjs';
 
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, route: { type: 'string' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
@@ -350,18 +348,13 @@ async function coolOutside(line) {
 if (values['dry-run']) {
   console.log(JSON.stringify({ zone: values.zone, runs, caps, base, driver: values.driver, slots, out, route, legs: routeFor(route).map((leg) => `${leg.name} (${leg.kind} ${String(leg.seconds)} s)`) }, null, 2));
 } else if (!values['with-locks']) {
-  // the phone holds iphone13.lock then mini-measure.lock; the desktop proxy measures on the Mac, so mini-measure.lock only
-  const root = join(homedir(), 'projects/games/wildshard/engine/tmp');
-  mkdirSync(root, { recursive: true });
-  const locks = values.driver === 'inspector' ? ['-k', join(root, 'iphone13.lock'), '/usr/bin/lockf', '-k', join(root, 'mini-measure.lock')] : ['-k', join(root, 'mini-measure.lock')];
+  // MINI-DEVEX MD2: the phone holds iphone13.lock only; the desktop proxy measures on the Mac under desktop-gpu.lock (locks.mjs)
+  const kind = lockKind(values.driver);
   // --cool-outside (DF10, the coordinator 2026-11-20: cool before the locks, never inside them): wait for --cool-to here,
   // touching nothing but the battery reading, then take the locks for one boot without cooling again
-  const cooled = values['cool-outside'] === true && values.driver === 'inspector' && values['cool-to'] !== undefined;
+  const cooled = values['cool-outside'] === true && kind === 'phone' && values['cool-to'] !== undefined;
   if (cooled) await coolOutside(Number(values['cool-to']));
-  console.log(`Waiting for ${values.driver === 'inspector' ? 'iphone13.lock, then ' : ''}mini-measure.lock`);
-  const child = spawn('/usr/bin/lockf', [...locks, process.execPath, import.meta.filename, ...process.argv.slice(2), '--out', out, '--with-locks', ...(cooled ? ['--cooled'] : [])], { stdio: 'inherit' });
-  const [code] = await once(child, 'exit');
-  process.exitCode = code ?? 1;
+  process.exitCode = await underLock(kind, import.meta.filename, [...process.argv.slice(2), '--out', out, '--with-locks', ...(cooled ? ['--cooled'] : [])]);
 } else {
   await bench();
 }

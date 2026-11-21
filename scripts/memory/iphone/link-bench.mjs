@@ -18,16 +18,14 @@
 // slower, so its times are not the stage table's.
 // --shot <s>: a devicectl screenshot <s> seconds after control (shot-<run>.png), the same spawn view for a look board (J430).
 import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { spawn } from 'node:child_process';
-import { once } from 'node:events';
 import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { coldOrigin, findButton, pageState, watchPageErrors } from './safari.mjs';
 import { bootTimelineEntries } from '../../loading-flow/stalls.mjs';
 import { linkTable } from './link.mjs';
 import { askWake } from './route.mjs';
+import { lockKind, underLock } from './locks.mjs';
 
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, runs: { type: 'string', default: '5' }, warm: { type: 'string', default: '5' },
@@ -198,12 +196,9 @@ async function bench() {
 
 if (values['dry-run']) console.log(JSON.stringify({ zone: values.zone, cold, warm, base, driver: values.driver, out }, null, 2));
 else if (!values['with-locks']) {
-  const root = join(homedir(), 'projects/games/wildshard/engine/tmp');
-  mkdirSync(root, { recursive: true });
+  // MINI-DEVEX MD2: the phone holds iphone13.lock only; the desktop proxy holds desktop-gpu.lock (locks.mjs)
+  const kind = lockKind(values.driver);
   // cool before the locks, so a cooling bench never holds the shared phone
-  if (values.driver === 'inspector') await (await phoneReads()).cool();
-  const locks = values.driver === 'inspector' ? ['-k', join(root, 'iphone13.lock'), '/usr/bin/lockf', '-k', join(root, 'mini-measure.lock')] : ['-k', join(root, 'mini-measure.lock')];
-  const child = spawn('/usr/bin/lockf', [...locks, process.execPath, import.meta.filename, ...process.argv.slice(2), '--out', out, '--with-locks'], { stdio: 'inherit' });
-  const [code] = await once(child, 'exit');
-  process.exitCode = code ?? 1;
+  if (kind === 'phone') await (await phoneReads()).cool();
+  process.exitCode = await underLock(kind, import.meta.filename, [...process.argv.slice(2), '--out', out, '--with-locks']);
 } else await bench();
