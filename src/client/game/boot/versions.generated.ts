@@ -578,7 +578,7 @@ export const ASSET_VERSIONS: Readonly<Record<string, string>> = {
   "/assets/sfx/desert-ruin/ruins-west-f765ff652fd4.m4a": 'f765ff65',
   "/assets/sfx/desert-ruin/sfx.json": '105df34b',
   "/assets/sfx/desert-ruin/tents-south-66cdbaee8b50.m4a": '66cdbaee',
-  "/assets/sfx/driftwood-isle/sfx.json": 'fab805e5',
+  "/assets/sfx/driftwood-isle/sfx.json": 'c394fa24',
   "/assets/sfx/ember-forge/ambience-04688340a792.m4a": '04688340',
   "/assets/sfx/ember-forge/anvil-strikes-e3381c76f4ab.m4a": 'e3381c76',
   "/assets/sfx/ember-forge/bellows-feccf2e42cf7.m4a": 'feccf2e4',
