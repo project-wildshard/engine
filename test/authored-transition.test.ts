@@ -140,3 +140,18 @@ test('only the attackers sentinel becomes infinity and complete art order surviv
     expect(() => parseManifestMetadata({ ...fixture, fight })).toThrow();
   }
 });
+test('a manifest with no herds, species or fauna tuning reads as none (OF9b4)', () => {
+  const { spawns: _spawns, ...rest } = fixture;
+  const data = parseManifestMetadata(rest);
+  const ground = { ...declaredGround({ terrain: { flat: 0, seed: 40234 }, trails: [], cabinSites: [], water: -1000, bodies: [] }), structures: true as const, paths: 'plugin' as const };
+  const files = ['/assets/original.glb'];
+  const chunk = { sky: [], baked: [], terrain: [], trees: [], cabins: [], physics: [], props: files, art: [], music: [], sfx: [] };
+  const sources = { modes: { phone: { img: chunk, ktx2: chunk }, desktop: { img: chunk, ktx2: chunk } } };
+  const images: Record<string, string> = {};
+  for (const path of [...Object.values(data.card), ...Object.values(data.explore.art)]) if (path.startsWith('/src/')) images[path] = path;
+  if (data.minimap.image?.startsWith('/src/') === true) images[data.minimap.image] = data.minimap.image;
+  const level = toLevelSpec(defineAuthoredShard(data, 'fixture', { accent: 'pink', bootBindings: { files, sources, explore: { art: [] } } }, { ground }, images));
+  expect(level.spawns).toEqual([]);
+  expect(level.species).toEqual([]);
+  expect(level.faunaTuning).toBeUndefined();
+});

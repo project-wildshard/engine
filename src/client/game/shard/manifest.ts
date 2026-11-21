@@ -846,8 +846,8 @@ export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: Autho
   const factory: ChunkTrees['factory'] | undefined = data.trees.treeSet === undefined ? data.trees.factory : declaredTreeSet(slug);
   if (factory === undefined) throw new Error('Manifest trees have no declared factory');
   const trees: ChunkTrees = {...data.trees, factory};
-  const spawns = data.spawns ?? bindings.spawns;
-  if (spawns === undefined) throw new Error('Manifest has no declared spawn inventory');
+  // ONE-FORMAT OF9b4: herds are declared spawns (actors/creatures), so a manifest may name none; an old product's list still reads
+  const spawns = data.spawns ?? bindings.spawns ?? [];
   const tiers = ((): TierOverrides | undefined => {
     const {grid, phone, desktop} = data.tiers ?? {};
     if (grid === undefined) return data.tiers;
