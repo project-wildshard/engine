@@ -190,7 +190,7 @@ try {
               const world = window.__wildshard?.world;
               if (world === undefined) return false;
               if (world.game.frameCount - from > frames) throw new Error(`no mount within ${frames} frames of the tap`);
-              return world.player.hover === true && world.player.hoverBlend > 0.5 &&
+              return world.player.hover && world.player.hoverBlend > 0.5 &&
                 world.weapons.tools.some(tool => tool.id === 'tool.hoverboard' && tool.enabled && 'model' in tool && tool.model instanceof Object && 'visible' in tool.model && tool.model.visible === true);
             }, {from: tappedFrame, frames: HOVER_FRAMES}, {timeout: HOVER_CEILING_MS});
             action = 'unmount';
@@ -204,7 +204,7 @@ try {
               const world = window.__wildshard?.world;
               if (world === undefined) return false;
               if (world.game.frameCount - from > frames) throw new Error(`no unmount within ${frames} frames of the tap`);
-              return world.player.hover === false;
+              return !world.player.hover;
             }, {from: unmountFrame, frames: HOVER_FRAMES}, {timeout: HOVER_CEILING_MS});
             } catch (error) {
               const after = await observeHover().catch(() => null);
