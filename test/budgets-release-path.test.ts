@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { budgetTable, judgeAll, runCli } from '../scripts/budgets/cli.mjs';
 import { readCaps } from '../scripts/budgets/files.mjs';
-import { budgetReport, budgetResultLine, budgetSourceRun, parseBudgetResults } from '../scripts/budgets/watch.mjs';
+import { budgetReport, budgetResultLine, budgetSourceRun, confirmBudgetResults, parseBudgetResults } from '../scripts/budgets/watch.mjs';
 import { checkShardSizes } from '../scripts/shard-size-gate.mjs';
 
 // BUDGET-CAPS BC9 (J444): a regression is never a red main or a release hold. ci (and the release train's green-main
@@ -62,4 +62,23 @@ test('in Actions the check prints an error annotation only for a failing row, ne
   expect(text).not.toContain('::warning');
   expect(text.match(/::error title=Budget regressed::BUDGET regressed key=download\/phone\/a /gu)).toHaveLength(1);
   expect(text).not.toContain('key=download/phone/b');
+});
+
+// MD9: soft readings need two consecutive runs measuring distinct commits.
+test('single Ink Cel and Nalati readings stay quiet; two distinct-SHA misses confirm', () => {
+  const ink = parseBudgetResults('BUDGET regressed key=ledger/ink-cel-valley/control measured=41767511 baseline=34715334 line=38186867 contentKey=ink@7');
+  const nalati = parseBudgetResults('BUDGET regressed key=render/phone-low/draws/nalati-grasslands measured=191 baseline=79 line=87 contentKey=nalati@2');
+  const first = confirmBudgetResults({ head_sha: '29e750d3a1' }, ink);
+  expect(first.confirmed).toEqual([]); expect(first.quiet).toEqual(ink);
+  expect(confirmBudgetResults({ head_sha: '29e750d3a1' }, ink, first.pending).confirmed).toEqual([]);
+  expect(confirmBudgetResults({ head_sha: 'f8873a32a5' }, ink, first.pending).confirmed).toEqual(ink);
+  const singleNalati = confirmBudgetResults({ head_sha: 'd7478463e5' }, nalati, first.pending);
+  expect(singleNalati.confirmed).toEqual([]);
+  expect(confirmBudgetResults({ head_sha: 'next' }, ink, singleNalati.pending).confirmed).toEqual([]);
+  const green = confirmBudgetResults({ head_sha: 'green' }, [], first.pending);
+  expect(confirmBudgetResults({ head_sha: 'next' }, ink, green.pending).confirmed).toEqual([]);
+  expect(confirmBudgetResults({ head_sha: 'next' }, ink.map(row => ({ ...row, contentKey: 'ink@8' })), first.pending).confirmed).toEqual([]);
+  expect(confirmBudgetResults({ head_sha: 'next' }, ink.map(row => ({ ...row, line: 50_000_000 })), first.pending).confirmed).toEqual([]);
+  const hard = ink.map(row => ({ ...row, kind: 'over-hard' as const }));
+  expect(confirmBudgetResults({ head_sha: 'first' }, hard).confirmed).toEqual(hard);
 });

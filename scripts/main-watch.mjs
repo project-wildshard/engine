@@ -28,7 +28,7 @@ import {pathToFileURL} from 'node:url';
 import {stripVTControlCharacters} from 'node:util';
 import {AMBER,parseAmber,parseAudioAmber,parseMemoryWarnings} from './test-amber.mjs';
 import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
-import {budgetReport,budgetSourceRun,parseBudgetResults} from './budgets/watch.mjs';
+import {budgetReport,budgetSourceRun,confirmBudgetResults,parseBudgetResults} from './budgets/watch.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
@@ -77,7 +77,7 @@ export const failedNames=jobs=>failedJobs(jobs).map(job=>job.name);
 /** @typedef {{commits:string[],files:string[],jobs:string[]}} RedHistory */
 /** The first red run, its alert and keeper, plus the range of each attempted prompt and the failures seen in the span.
  * @typedef {{run:number,at:number,text:string,keeper:boolean,history?:RedHistory}} RedSpan */
-/** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[],red?:RedSpan,notified?:Record<string,string[]>}} State */
+/** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[],budgetPending?:Record<string,{sha:string,contentKey:string,baseline:number|null,line:number|null}>,red?:RedSpan,notified?:Record<string,string[]>}} State */
 /** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
 
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
@@ -261,6 +261,7 @@ export function readState(file){
       ?{commits:history.commits.filter(isString),files:history.files.filter(isString),jobs:history.jobs.filter(isString)}:undefined;
     return {judged:Array.isArray(value.judged)?value.judged.filter(Number.isSafeInteger):[],dispatched:Array.isArray(value.dispatched)?value.dispatched.filter(row=>typeof row==='string'):[],
       ...(Array.isArray(value.memoryQa)?{memoryQa:value.memoryQa}:{}),
+      ...(value.budgetPending&&typeof value.budgetPending==='object'&&!Array.isArray(value.budgetPending)?{budgetPending:Object.fromEntries(Object.entries(value.budgetPending).filter(([,row])=>row&&typeof row==='object'&&typeof row.sha==='string'&&typeof row.contentKey==='string'&&(row.baseline===null||Number.isFinite(row.baseline))&&(row.line===null||Number.isFinite(row.line))))}:{}),
       ...(notified!==null&&typeof notified==='object'&&!Array.isArray(notified)?{notified}:{}),
       ...(red!==null&&typeof red==='object'&&Number.isSafeInteger(red.run)&&typeof red.at==='number'&&typeof red.text==='string'?{red:{run:red.run,at:red.at,text:red.text,keeper:red.keeper===true,...(kept===undefined?{}:{history:kept})}}:{})};
   }catch{return null;}
@@ -270,7 +271,7 @@ export function readState(file){
 function writeState(file,state){
   mkdirSync(dirname(file),{recursive:true});
   const temporary=`${file}.${process.pid}.tmp`;
-  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{}),...(state.red===undefined?{}:{red:state.red}),...(state.notified===undefined?{}:{notified:state.notified})})}\n`);renameSync(temporary,file);
+  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{}),...(state.budgetPending===undefined?{}:{budgetPending:state.budgetPending}),...(state.red===undefined?{}:{red:state.red}),...(state.notified===undefined?{}:{notified:state.notified})})}\n`);renameSync(temporary,file);
 }
 
 /** MD8: only mini routing changes. MacBook landers keep their existing prompts, including claimed runs.
@@ -652,7 +653,7 @@ export function sweep(io,hint={}){
     try{budgetRuns=io.budgetRuns?.()??[];}catch(error){
       io.receipt(`budgets status unavailable: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
     }
-    for(const run of budgetRuns.filter(row=>finished(row)&&!state.judged.includes(row.id))){
+    for(const run of budgetRuns.filter(row=>finished(row)&&!state.judged.includes(row.id)).sort(byCreated)){
       /** @type {ReturnType<typeof budgetReport>} */let report={lines:[],qa:null};
       if(run.conclusion==='failure'){
         try{
@@ -662,12 +663,19 @@ export function sweep(io,hint={}){
           const earlier=budgetRuns.filter(row=>row.id<run.id&&finished(row));
           const before=earlier.map(measured).find(other=>other!==sha)??null;
           const pushers=[...new Set(attribute(io.commits(before,sha),who).map(row=>row.lander?.lane??'').filter(Boolean))];
-          report=budgetReport({...run,head_sha:sha},parseBudgetResults(io.budgetAnnotations?.(run.id)??''),pushers);
+          const results=parseBudgetResults(io.budgetAnnotations?.(run.id)??'');
+          const observed=confirmBudgetResults({head_sha:sha},results,state.budgetPending);
+          state.budgetPending=observed.pending;
+          // Preserve infrastructure errors, but a first soft reading has no QA/fix row.
+          report=results.length===0?budgetReport({...run,head_sha:sha},[],pushers)
+            :observed.confirmed.length===0?{lines:[],qa:null}:budgetReport({...run,head_sha:sha},observed.confirmed,pushers);
+          for(const result of observed.quiet)report.lines.push(`main budget observation ${short(sha)} ${result.key} ${result.measured}, line ${result.line??'-'} (run ${run.id}; waiting for a second distinct-SHA miss)`);
         }catch(error){
           io.receipt(`budgets results unavailable for run ${run.id}: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
           continue;
         }
       }
+      if(run.conclusion==='success')state.budgetPending={};
       if(report.qa!==null)state.memoryQa.push(report.qa);
       state.judged.push(run.id);writeState(io.state,state);
       for(const line of report.lines)io.receipt(line);

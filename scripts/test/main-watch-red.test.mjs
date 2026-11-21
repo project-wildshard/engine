@@ -210,3 +210,29 @@ test('MD8 a mini-landed red still prompts its mini lander through sweep', () => 
   red(62,[testFile,freshFile]);
   expect(sent.map(row=>row.to)).toEqual(['w1:p2']);
 }));
+
+test('MD9 sweep persists observations, processes newest-first API runs in order, and queues only confirmed/hard misses', () => withRedSpan(({io,receipts})=>{
+  const base={status:'completed',event:'push',conclusion:'failure'};
+  const line='BUDGET regressed key=ledger/ink-cel-valley/control measured=41767511 baseline=34715334 line=38186867 contentKey=ink@7';
+  const budgetRuns=[],qa=[];
+  io.budgetRuns=()=>budgetRuns;
+  io.budgetAnnotations=(id)=>id===111?line.replace('regressed','over-hard'):line;
+  io.memoryQa=(rows)=>{qa.push(...rows);};
+  const add=(id,sha,conclusion='failure')=>budgetRuns.unshift({...base,id,head_sha:sha,created_at:`2026-11-21T19:${String(id-100).padStart(2,'0')}:00Z`,conclusion});
+  add(101,newer); sweep(io);
+  expect(qa).toEqual([]);
+  expect(readState(io.state)?.budgetPending?.['ledger/ink-cel-valley/control']?.sha).toBe(newer);
+  add(102,newer); sweep(io); expect(qa).toEqual([]);
+  add(103,older); sweep(io); expect(qa).toHaveLength(1);
+  expect(qa[0]?.id).toBe(103);
+  add(104,other,'success'); sweep(io);
+  add(105,incoming); sweep(io); expect(qa).toHaveLength(1);
+  // Multiple unjudged API entries arrive newest first: green 106 resets,
+  // 107 is a quiet first miss, 108 confirms it on another SHA.
+  add(106,other,'success'); add(107,newer); add(108,older); sweep(io);
+  expect(qa.map(row=>row.id)).toEqual([103,108]);
+  add(110,other,'success'); add(111,incoming); sweep(io);
+  expect(qa.map(row=>row.id)).toEqual([103,108,111]);
+  expect(receipts.filter(entry=>entry.startsWith('main BUDGET regressed'))).toHaveLength(2);
+  expect(receipts.some(entry=>entry.startsWith('main budget observation'))).toBe(true);
+}));

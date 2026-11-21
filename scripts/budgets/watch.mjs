@@ -45,3 +45,20 @@ export function budgetReport(run, results, pushers) {
   });
   return { lines, qa: { id: run.id, sha: run.head_sha, created: run.created_at, pusher, results } };
 }
+
+
+/** MD9: observe consecutive budget runs. Same-SHA reruns cannot confirm a soft miss.
+ * A green run or a missing key clears that key; changed content/lines start a new pair.
+ * @param {{head_sha:string}} run @param {ReturnType<typeof parseBudgetResults>} results
+ * @param {Record<string,{sha:string,contentKey:string,baseline:number|null,line:number|null}>} [previous] */
+export function confirmBudgetResults(run,results,previous={}){
+  const pending=/** @type {typeof previous} */({}),confirmed=[],quiet=[];
+  for(const result of results){
+    if(result.kind==='over-hard'){confirmed.push(result);continue;}
+    const old=previous[result.key];
+    pending[result.key]={sha:run.head_sha,contentKey:result.contentKey,baseline:result.baseline,line:result.line};
+    if(old!==undefined&&old.sha!==run.head_sha&&old.contentKey===result.contentKey&&old.baseline===result.baseline&&old.line===result.line)confirmed.push(result);
+    else quiet.push(result);
+  }
+  return {pending,confirmed,quiet};
+}
