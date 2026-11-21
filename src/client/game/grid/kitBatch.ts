@@ -9,6 +9,8 @@ import { BATCHED_VIEW, MERGED_VIEW } from '@wildshard/engine/core/shadowLayer';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { skipEmptyBatches } from '@wildshard/engine/render/drawGuards';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { programFoldOn } from '@wildshard/engine/render/programFold';
+import { hasShaderPatch } from '@wildshard/engine/render/shaderPatches';
 import { mergeableMaterial, sharedHook } from './staticViewMerge';
 import { FarBatch } from './farBatch';
 
@@ -41,6 +43,9 @@ export function kitBatchOn(): boolean {
   try { low = graphicsMode() === 'low'; } catch { /* no settings: not Low */ }
   return TIER === 'phone' && low && kitBatch(saved);
 }
+
+/** the patches a cell's scope gives its materials and takes back as the cell leaves (render/regionLook.ts) */
+const CELL_PATCHES: readonly string[] = ['region.look'];
 
 const DEFAULT_RENDER_HOOK: unknown = Reflect.get(THREE.Mesh.prototype, 'onBeforeRender'), DEFAULT_AFTER_HOOK: unknown = Reflect.get(THREE.Mesh.prototype, 'onAfterRender');
 /** the channels three's program keys on (presence or size): never filled for a member that lacks them */
@@ -99,9 +104,18 @@ export class KitBatch extends ChangedBatchedMesh {
   readonly members: Member[] = [];
   private hooks: (() => void)[] = [];
   private retired = false;
+  /**
+   * DF8 (mini-df8c, `debug.programFold`): the cell patches its material ran when the batch was built. A cell's look patch
+   * (`region.look`) leaves with the cell's scope, while the batch is the level's: as Driftwood
+   * left (~183 s on the route) its members still showed for a frame mid-teardown, and the batch, which no cell guard
+   * refuses, drew them with the patches gone, linking a no-look program at draw. Once one has left, the batch draws
+   * nothing again (its members go with their cell). Null: the slot is off.
+   */
+  private patches: readonly string[] | null = null;
+  private stale = false;
   /** a batch of `meshes` (one material, one keyed layout), each channel stored as `formats` has it (a custom channel a
    *  member lacks is filled with zeros) */
-  static of(meshes: readonly THREE.Mesh[], material: THREE.Material, formats: ReadonlyMap<string, Format>): KitBatch {
+  static of(meshes: readonly THREE.Mesh[], material: THREE.Material, formats: ReadonlyMap<string, Format>, cellPatches = false): KitBatch {
     const geometries = meshes.map(mesh => mesh.geometry);
     const vertices = geometries.reduce((sum, g) => sum + g.getAttribute('position').count, 0);
     const indices = geometries.reduce((sum, g) => sum + (g.index?.count ?? g.getAttribute('position').count), 0);
@@ -142,6 +156,7 @@ export class KitBatch extends ChangedBatchedMesh {
       mesh.layers.disableAll(); mesh.userData[BATCHED_VIEW] = true;
     }
     batch.hooks = [...hooks];
+    batch.patches = cellPatches ? CELL_PATCHES.filter(id => hasShaderPatch(material, id)) : null;
     // the copies follow their members' rewritten triangles: the batch's index stays on the CPU (the Memory saver keeps a
     // dynamic channel's copy)
     batch.geometry.index?.setUsage(THREE.DynamicDrawUsage);
@@ -160,7 +175,13 @@ export class KitBatch extends ChangedBatchedMesh {
   }
   /** each copy's pose, visibility and range, as its member has them now; a changed member leaves */
   sync(): void {
-    if (this.retired) return;
+    if (this.retired || this.stale) return;
+    const patches = this.patches, material = this.members[0]?.material;
+    if (patches !== null && material !== undefined && !patches.every(id => hasShaderPatch(material, id))) {
+      this.stale = true;
+      for (const member of this.members) if (!member.gone && this.getVisibleAt(member.instance)) this.setVisibleAt(member.instance, false);
+      return;
+    }
     const info: unknown = Reflect.get(this, '_geometryInfo');
     for (const member of this.members) {
       if (member.gone) continue;
@@ -211,7 +232,7 @@ export class KitBatch extends ChangedBatchedMesh {
 }
 
 /** Gather `root`'s batchable meshes by material and layout; each set of two or more becomes a batch under `root`. */
-export function buildKitBatches(root: THREE.Object3D): KitBatch[] {
+export function buildKitBatches(root: THREE.Object3D, cellPatches = false): KitBatch[] {
   const sets = new Map<string, { material: THREE.Material; keyed: string; meshes: THREE.Mesh[] }>();
   root.updateMatrixWorld(true);
   root.traverse((object) => {
@@ -244,7 +265,7 @@ export function buildKitBatches(root: THREE.Object3D): KitBatch[] {
     }
     const kept = members.filter(mesh => [...formats].every(([name, format]) => format.itemSize <= 3 || mesh.geometry.hasAttribute(name)));
     if (kept.length < 2) continue;
-    const batch = KitBatch.of(kept, material, formats);
+    const batch = KitBatch.of(kept, material, formats, cellPatches);
     batch.userData['layout'] = keyed;
     root.add(batch); batch.updateMatrixWorld(true);
     batches.push(batch);
@@ -257,10 +278,10 @@ export function buildKitBatches(root: THREE.Object3D): KitBatch[] {
  * boot calls it before the shaders step, while every channel's CPU copy is whole (the first frames upload and release
  * them), so the batched programs link and upload under the card. Returns the census the bench reads.
  */
-export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: boolean, enabled: () => boolean = kitBatchOn): { batches: number; members: number } {
+export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: boolean, enabled: () => boolean = kitBatchOn, cellPatches: () => boolean = programFoldOn): { batches: number; members: number } {
   if (!multiDraw || !enabled() || scope.disposed || scope.disposing || scene.userData['kitBatch'] !== undefined) return { batches: 0, members: 0 };
   let batches: KitBatch[];
-  try { batches = buildKitBatches(scene); }
+  try { batches = buildKitBatches(scene, cellPatches()); }
   catch (error: unknown) { console.warn('[kit-batch] not built', error instanceof Error ? error.stack : error); return { batches: 0, members: 0 }; }
   // DF10 (mini-dfload): a batch whose members all left (their cell retired at the road crossing) draws nothing, so it never
   // looks its program up again: on the iPhone 13 the empty kit batches relinked their three materials as the player

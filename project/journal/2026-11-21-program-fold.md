@@ -14,3 +14,12 @@
   play 58 -> 17 to 20, draw-time 11 -> 1 to 3 (no slots: 109 in play, 11 at draw; reuse+fold: 11 and 2).
 - Left: the first creature card shot and its card material (~36 s), and one kit-rock batch variant without the region
   look as the player leaves the cell (~183 s).
+
+## The last two draw-time links (mini-df8c)
+
+- The card programs link under the loader: the warm rigs' stage shoots each model once (one 4 px view, the real shot
+  path) and parks one card in the hidden warm group, which the first frame's parked draws draw. The shot scene is exempt
+  from the environment fold (`FOLD_EXEMPT`): folded, its key depended on whether the page had a cube height yet, so the
+  boot warm and the first shot in play were two programs.
+- A kit batch whose material lost the cell's `region.look` patch it was built with draws nothing again: as Driftwood
+  left, its members showed for one frame mid-teardown and the batch (no cell guard refuses it) linked a no-look program.

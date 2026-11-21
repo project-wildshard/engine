@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
+import { patchShader } from '@wildshard/engine/render/shaderPatches';
 import { batchableMesh, buildKitBatches, kitBatch } from './kitBatch';
 
 // DF10 (mini-df10e): the level's plain meshes of one material draw as one batch; each member stays the source of its pose,
@@ -75,4 +76,23 @@ test('members whose channels are stored differently share a batch in floats', ()
   const color = batch?.geometry.getAttribute('color');
   expect(color?.array).toBeInstanceOf(Float32Array);
   expect([color?.getX(0), color?.getX(color.count - 1)]).toEqual([1, 0.5]);
+});
+
+// DF8 (mini-df8c): a cell's look patch leaves with its cell; the level's batch then draws its members no more (it drew
+// them for a frame mid-teardown with the patch gone, a program linked at draw)
+test('a batch whose cell look patch left draws nothing again', () => {
+  const scene = new THREE.Scene(), material = new THREE.MeshLambertMaterial();
+  const undo = patchShader(material, 'region.look', 990, () => undefined, { key: (before) => `${before}|look:test`, pureKey: true });
+  const a = new THREE.Mesh(box(false), material), b = new THREE.Mesh(box(false), material);
+  b.position.set(3, 0, 0); scene.add(a, b);
+  const [batch] = buildKitBatches(scene, true);
+  if (batch === undefined) throw new Error('one batch');
+  batch.sync();
+  expect(batch.members.map(member => batch.getVisibleAt(member.instance))).toEqual([true, true]);
+  undo(); batch.sync();
+  expect(batch.members.map(member => batch.getVisibleAt(member.instance))).toEqual([false, false]);
+  // it stays dark: its members go with their cell
+  a.visible = true; batch.sync();
+  expect(batch.getVisibleAt(batch.members[0]?.instance ?? -1)).toBe(false);
+  batch.retire();
 });

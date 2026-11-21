@@ -24,6 +24,7 @@ import { publishShellLevels } from './animalShells';
 import { FarHerd, type FarMember } from './farHerd';
 import { CreatureLods, type LodTier } from './creatureLods';
 import { shootViews, type SpriteViews } from '../render/spriteViews';
+import { HerdSprites } from './herdSprites';
 import { programFoldOn } from '../render/programFold';
 import { speciesDef } from '../../../shared/engine/entities/species/registry';
 
@@ -281,12 +282,37 @@ export class AnimalHerdView implements RowBodiesDraw {
         this.warmLeases.push(leaveWithResources(mesh));
       } catch (error) { console.warn(`[warm] creature rig ${model.kind}:${model.variant} not parked`, error); }
     }
+    if (programFoldOn()) this.stageWarmCards(group, new Set(models));
     this.scene.add(group);
     // DF11: nothing poses a parked rig, so its local matrices are composed once here and left off three's per-frame
     // recompose. Each `updateMatrix` boxed about 72 B; this group's 348 nodes were 24 of the scene walk's 28 KB a call.
     group.updateMatrixWorld(true);
     group.traverse((node) => { node.matrixAutoUpdate = false; });
     this.warmRigs = group;
+  }
+
+  /**
+   * DF8 (mini-df8c, `debug.programFold`): the far cards' two programs link here, under the loader, not at the first card
+   * (~42 s into the Driftwood route, two links at draw). Each model's card shot runs once, one view of 4², through the
+   * real shot (`lodViews`: its kept material, lights and target kind), so the shot program of every rig layout exists;
+   * one parked card (a HerdSprites of one copy, hidden in `group`) is drawn by the first frame's parked draws, so the card
+   * material's program exists and is held for the level's life, as the warm rigs' are.
+   */
+  private stageWarmCards(group: THREE.Group, models: ReadonlySet<AnimalModel>): void {
+    let card: HerdSprites | null = null, kept: SpriteViews | null = null;
+    for (const model of models) {
+      let views: SpriteViews | null = null;
+      try { views = this.lodViews(model, { views: 1, size: 4 }); } catch (error) { console.warn(`[warm] card shot ${model.kind}:${model.variant} not warmed`, error); }
+      if (views === null) continue;
+      if (card === null) { card = new HerdSprites(views, 1); kept = views; } else views.texture.dispose();
+    }
+    if (card === null || kept === null) return;
+    card.place(0, new THREE.Vector3(), 0, 1);
+    card.update();
+    card.mesh.name = 'creature-warm:card';
+    group.add(card.mesh);
+    const parked = card, texture = kept.texture;
+    this.warmLeases.push(() => { parked.mesh.removeFromParent(); parked.dispose(); texture.dispose(); });
   }
 
   /** the hidden group joins the region before its herds spawn (RowBodiesView.build) */
@@ -373,7 +399,7 @@ export class AnimalHerdView implements RowBodiesDraw {
 
   /** CC55b: `model`'s card views, shot once from a rest rig in a plain lit copy of its coat (the rig's own shaders read
    *  the sky's cascades, which the shot's scene does not have) */
-  private lodViews(model: AnimalModel): SpriteViews | null {
+  private lodViews(model: AnimalModel, shot?: { readonly views: number; readonly size: number }): SpriteViews | null {
     const rig = this.factory.instantiate(model, 0.5), fur = rig.materials[0];
     const map = fur !== undefined && 'map' in fur ? fur.map : null, color = fur?.color ?? 0xffffff;
     // DF8 (`debug.programFold`): one kept plain material per map presence, so the shot's program outlives each shot (a new
@@ -383,7 +409,7 @@ export class AnimalHerdView implements RowBodiesDraw {
     if (kept !== null) { kept.map = map; kept.color.set(color); }
     rig.mesh.material = plain;
     const size = TIER === 'phone' && graphicsMode() === 'low' ? 64 : 128;
-    try { return shootViews(rig.mesh, { views: 8, size }); } finally { if (kept === null) plain.dispose(); else kept.map = null; rig.mesh.skeleton.dispose(); }
+    try { return shootViews(rig.mesh, shot ?? { views: 8, size }); } finally { if (kept === null) plain.dispose(); else kept.map = null; rig.mesh.skeleton.dispose(); }
   }
 
   /** the far draw shows `a` (true) or its rig does (false): the rig's layers go to 0 and back */

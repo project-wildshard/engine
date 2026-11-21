@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { app } from '../app/runtime';
+import { FOLD_EXEMPT } from './programFold';
 
 /** ONE-FORMAT CC55: a creature's views for its far cards (entities/herdSprites.ts), shot once into one atlas row. */
 export interface SpriteViews {
@@ -17,6 +18,7 @@ export function bakeSpriteViews(renderer: THREE.WebGLRenderer, object: THREE.Obj
   const { views, size } = opts;
   const holder = object.parent, at = object.position.clone(), turn = object.quaternion.clone();
   const scene = new THREE.Scene();
+  scene.userData[FOLD_EXEMPT] = true; // one program for the shot at boot and in play (`debug.programFold`, programFold.ts)
   scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x4a3b2a, 1.2));
   const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(30, 60, 20); scene.add(sun);
   scene.add(object); object.position.set(0, 0, 0); object.quaternion.identity(); object.updateMatrixWorld(true);

@@ -69,6 +69,16 @@ function blackEnvironment(renderer: THREE.WebGLRenderer, height: number): THREE.
   return target.texture;
 }
 
+/**
+ * A scene's `userData` flag: the fold leaves it unlit by any environment (mini-df8c). A creature's card shot (spriteViews.ts)
+ * draws its own scene with none, at boot (its warm, AnimalHerdView.stageWarmCards) and in play. Folded, its program keyed
+ * on whether the page had recorded a cube height yet, so the boot's warm linked the unfolded program and the first shot in
+ * play the folded one (31.5 s into the Driftwood route). Exempt, both are the one unfolded program; the pixels are those
+ * of an environment of zero either way.
+ */
+export const FOLD_EXEMPT = 'programFold.exempt';
+const foldExempt = (scene: THREE.Scene): boolean => scene.userData[FOLD_EXEMPT] === true;
+
 type Call = (scene: THREE.Object3D, camera: THREE.Camera, target?: THREE.Object3D | null) => unknown;
 const isScene = (value: unknown): value is THREE.Scene => value instanceof THREE.Scene;
 const usableHeight = (height: number | null): height is number => height !== null && Number.isInteger(height) && height >= 64 && height % 4 === 0;
@@ -91,7 +101,7 @@ export function installEnvironmentFold(renderer: THREE.WebGLRenderer, height: ()
     const folded: Call = function folded(scene, camera, target) {
       const lit = target ?? scene;
       const at = height();
-      if (!isScene(lit) || lit.environment !== null || !usableHeight(at)) { depth++; try { return Reflect.apply(call, renderer, [scene, camera, ...target === undefined ? [] : [target]]); } finally { depth--; } }
+      if (!isScene(lit) || lit.environment !== null || foldExempt(lit) || !usableHeight(at)) { depth++; try { return Reflect.apply(call, renderer, [scene, camera, ...target === undefined ? [] : [target]]); } finally { depth--; } }
       // the atlas is cleared between draws only, never inside another draw's state
       const environment = depth === 0 || blacks.has(at) ? blackEnvironment(renderer, at) : null;
       if (environment !== null) lit.environment = environment;
@@ -115,7 +125,7 @@ export function installEnvironmentFold(renderer: THREE.WebGLRenderer, height: ()
  */
 export function foldScene(renderer: object, scene: THREE.Object3D | null | undefined): () => void {
   const fold = folds.get(renderer);
-  if (fold === undefined || !isScene(scene) || scene.environment !== null || !(renderer instanceof THREE.WebGLRenderer)) return () => undefined;
+  if (fold === undefined || !isScene(scene) || scene.environment !== null || foldExempt(scene) || !(renderer instanceof THREE.WebGLRenderer)) return () => undefined;
   const at = fold.height();
   if (!usableHeight(at) || (fold.depth() > 0 && !blacks.has(at))) return () => undefined;
   const environment = blackEnvironment(renderer, at);

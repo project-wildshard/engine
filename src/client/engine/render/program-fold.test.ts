@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
-import { installEnvironmentFold, isFoldEnvironment, programFold, PROGRAM_FOLD_DEFAULT } from './programFold';
+import { FOLD_EXEMPT, foldScene, installEnvironmentFold, isFoldEnvironment, programFold, PROGRAM_FOLD_DEFAULT } from './programFold';
 
 // DF8 (mini-df8b): a scene with no environment draws and compiles with a black one of the page's cube height, so its lit
 // programs are the environment variant (one program for the road and the cell); restored as each call returns
@@ -53,4 +53,21 @@ test('a scene with no environment draws with a black one of the latest height, a
   scene.environment = null;
   stub.renderer.render(scene, camera);
   expect(stub.seen.pop()).toBe(null);
+});
+
+// mini-df8c: a creature's card shot draws its own scene with none at boot (before any height) and in play: exempt, both
+// draws key the one unfolded program
+test('an exempt scene draws with no environment whatever the height', () => {
+  const stub = stubRenderer();
+  const undo = installEnvironmentFold(stub.renderer, () => 256);
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  scene.userData[FOLD_EXEMPT] = true;
+  stub.renderer.render(scene, camera);
+  expect(stub.seen.pop()).toBe(null);
+  stub.renderer.compile(new THREE.Group(), camera, scene);
+  expect(stub.seen.pop()).toBe(null);
+  const unfold = foldScene(stub.renderer, scene);
+  expect(scene.environment).toBe(null);
+  unfold();
+  undo();
 });
