@@ -17,6 +17,7 @@ import { gpuOnlyAttributes, gpuOnlyTexture } from '@wildshard/engine/core/gpuOnl
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { BufferAttribute, type BufferGeometry, type Camera, DoubleSide, DynamicDrawUsage, Frustum, InstancedMesh, type InterleavedBufferAttribute, type Material, Matrix4, Mesh, type Object3D, Sphere, type Texture, Vector3 } from 'three';
 import type { PlatformRenderBytePlan } from './renderResidency';
+import { takeClipRoom } from './clipRoom';
 
 /** Drain ordered road construction without yielding (the synchronous/native callers). */
 export function finishRoadSteps<T>(steps: Generator<void, T>): T {
@@ -85,7 +86,7 @@ interface ClipReads {
 export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSize?: number): Generator<void> {
   const index = geometry.getIndex(), names = Object.keys(geometry.attributes);
   if (index === null || index.count === 0) return;
-  const attrs = names.map((name) => geometry.getAttribute(name)), sizes = attrs.map((a) => a.itemSize), stride = sizes.reduce((a, b) => a + b, 0);
+  const attrs: (Attribute | undefined)[] = names.map((name) => geometry.getAttribute(name)), sizes = attrs.map((a) => a?.itemSize ?? 0), stride = sizes.reduce((a, b) => a + b, 0);
   const count = attrs[0]?.count ?? 0, position = geometry.getAttribute('position');
   const read = (n: number, into: Float64Array, at: number): void => {
     let o = at;
@@ -110,10 +111,12 @@ export function* clipToBinsSteps(geometry: BufferGeometry, pitch: number, tileSi
   let o = 0;
   for (const [k, name] of names.entries()) {
     const a = attrs[k], size = sizes[k] ?? 0; if (a === undefined) continue;
-    const array = new Float32Array(total * size);
-    for (let i = 0; i < count * size; i++) { if (i % 4096 === 0) yield; array[i] = a.array[i] ?? 0; }
+    // DW12b: a channel the merge made with room for the cut vertices grows in place; any other is copied, as before
+    const room = takeClipRoom(a.array, total * size), array = room ?? new Float32Array(total * size);
+    if (room === null) for (let i = 0; i < count * size; i++) { if (i % 4096 === 0) yield; array[i] = a.array[i] ?? 0; }
     for (let n = 0; n < extra.length / stride; n++) { if (n % 256 === 0) yield; for (let c = 0; c < size; c++) array[(count + n) * size + c] = extra[n * stride + o + c] ?? 0; }
     geometry.setAttribute(name, new BufferAttribute(array, size)); o += size;
+    attrs[k] = undefined; // the old channel goes now, not after the last is copied
   }
   geometry.setIndex(new BufferAttribute(out.slice(), 1));
 }
@@ -509,16 +512,17 @@ export function* cullCountsSteps(sources: readonly CullSource[], pitch: number, 
 export interface RenderBytes { readonly jsBytes: number; readonly gpuBytes: number }
 
 /** Yielded byte planning remains exact and completes before an allocation can be admitted. */
-export function* meshBytesSteps(sources: readonly CullSource[], floats: number, cull?: { readonly pitch: number; readonly tileSize?: number; readonly lod?: readonly CullLod[] }, gpuOnly = false): Generator<void, RenderBytes> {
+export function* meshBytesSteps(sources: readonly CullSource[], floats: number, cull?: { readonly pitch: number; readonly tileSize?: number; readonly lod?: readonly CullLod[] }, gpuOnly = false): Generator<void, RenderBytes & { readonly clipped: number }> {
   if (cull === undefined) {
     let vertices = 0, indices = 0;
     for (const run of sources) { vertices += run.vertices; indices += run.indices.length; }
     const vertexBytes = vertices * floats * 4, indexBytes = indices * 4;
-    return { jsBytes: (gpuOnly ? 0 : vertexBytes) + indexBytes, gpuBytes: vertexBytes + indexBytes };
+    return { jsBytes: (gpuOnly ? 0 : vertexBytes) + indexBytes, gpuBytes: vertexBytes + indexBytes, clipped: vertices };
   }
   const counts = yield* cullCountsSteps(sources, cull.pitch, cull.lod, cull.tileSize);
   const vertexBytes = counts.clipped * floats * 4, indexBytes = counts.source * 4;
-  return { jsBytes: (gpuOnly ? 0 : vertexBytes) + 2 * indexBytes, gpuBytes: vertexBytes + indexBytes };
+  // `clipped`: the vertices the clip will hold (DW12b: the lean merge makes each channel that size once)
+  return { jsBytes: (gpuOnly ? 0 : vertexBytes) + 2 * indexBytes, gpuBytes: vertexBytes + indexBytes, clipped: counts.clipped };
 }
 
 /**

@@ -12,6 +12,7 @@
  */
 import { BufferAttribute, BufferGeometry, Color, DataArrayTexture, LinearFilter, LinearMipmapLinearFilter, MeshLambertMaterial, RepeatWrapping, SRGBColorSpace, Sphere, type Texture } from 'three';
 import { PATCH_ORDER, patchShader } from '@wildshard/engine/render/shaderPatches';
+import { clipRoomArray } from './clipRoom';
 
 /** The texture array's layers, in order. */
 export const GRAIN_LAYERS = ['gravel', 'stone', 'strata', 'riprap', 'white'] as const;
@@ -43,11 +44,29 @@ const SOLID_VERTICES_PER_STEP = 8192;
 /** Merge parts into one geometry (`position`, `normal`, `color`, `grainUv` = u, v, layer, unlit), pausing after every few
  *  thousand copied vertices. Pure (no GPU). */
 export function* solidGeometrySteps(parts: readonly SolidPart[]): Generator<void, BufferGeometry> {
+  return yield* mergeSteps(parts, undefined, 0);
+}
+
+/** A part that holds nothing: what a drained list keeps in a copied part's place until the merge ends. */
+const DRAINED: SolidPart = Object.freeze({ positions: new Float32Array(0), normals: new Float32Array(0), colours: new Float32Array(0),
+  uvs: new Float32Array(0), grain: new Float32Array(0), indices: new Uint32Array(0) });
+
+/** DW12b (`roadBuildLean.ts`): `solidGeometrySteps`, the same bytes, owning `parts`: each part leaves the list as soon as it
+ *  is copied (the list is empty at the end), so its arrays can go while the merge runs. With `clipped` (the clip's vertex
+ *  count, `meshBytesSteps`), each channel is made once with room for the clip's cut vertices (`clipRoom.ts`). */
+export function* solidGeometryDrainSteps(parts: SolidPart[], clipped = 0): Generator<void, BufferGeometry> {
+  try { return yield* mergeSteps(parts, (k) => { parts[k] = DRAINED; }, clipped); } finally { parts.length = 0; }
+}
+
+function* mergeSteps(parts: readonly SolidPart[], drop: ((k: number) => void) | undefined, clipped: number): Generator<void, BufferGeometry> {
   let vertices = 0, indices = 0, copied = 0;
   for (const p of parts) { vertices += p.positions.length / 3; indices += p.indices.length; }
-  const position = new Float32Array(vertices * 3), normal = new Float32Array(vertices * 3), colour = new Float32Array(vertices * 3), grain = new Float32Array(vertices * 4), index = new Uint32Array(indices);
+  // the plain merge allocates as it always did; the lean one with the clip's room (`clipRoom.ts`)
+  const channel = (size: number): Float32Array => clipped > 0 ? clipRoomArray(vertices, clipped, size) : new Float32Array(vertices * size);
+  const position = channel(3), normal = channel(3), colour = channel(3), grain = channel(4), index = new Uint32Array(indices);
   let v = 0, i = 0;
-  for (const p of parts) {
+  for (let at = 0; at < parts.length; at++) {
+    const p = parts[at]; if (p === undefined) continue;
     const n = p.positions.length / 3;
     for (let k = 0; k < n * 3; k++) { position[v * 3 + k] = p.positions[k] ?? 0; normal[v * 3 + k] = p.normals[k] ?? 0; colour[v * 3 + k] = p.colours[k] ?? 1; }
     for (let k = 0; k < n; k++) {
@@ -56,6 +75,7 @@ export function* solidGeometrySteps(parts: readonly SolidPart[]): Generator<void
     }
     for (let k = 0; k < p.indices.length; k++) index[i + k] = (p.indices[k] ?? 0) + v;
     v += n; i += p.indices.length;
+    drop?.(at);
     copied += n; if (copied >= SOLID_VERTICES_PER_STEP) { copied = 0; yield; }
   }
   const geometry = new BufferGeometry().setAttribute('position', new BufferAttribute(position, 3)).setAttribute('normal', new BufferAttribute(normal, 3))

@@ -123,6 +123,7 @@ import { startRoadGrain } from './roadGrainPreparation';
 import { roadSignWorkerSource, startRoadSigns } from './roadSignPreparation';
 import { stageRoadSignAtlas } from './roadSignUpload';
 import { roadDeckPacedOn, stageRoadDeck } from './roadDeckUpload';
+import { roadBuildLeanOn } from './roadBuildLean';
 import { RoadMapShare } from './roadResources';
 import { prepareRoadSurfaceMaps } from './roadCompressedSurfaces';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
@@ -562,7 +563,7 @@ export class GridSession {
     await waitFor('Grid road surfaces', prepareRoadSurfaceMaps(admission, maps), 'worker');
     if (roadScope.disposed || roadScope.disposing) throw new Error('Grid session left during surface preparation');
     const roadInput = { strips, home, pitch: assembly.pitch, layout, scene: host.scene,
-      scope: roadScope, camera: () => host.frame?.camera, plans, admission, tileBacking, maps,
+      scope: roadScope, camera: () => host.frame?.camera, plans, admission, tileBacking, maps, lean: roadBuildLeanOn(),
       ...(grain === undefined ? {} : { grain: grain.get }), ...(signs === undefined ? {} : { signs: signs.get }) };
     const pause = async (): Promise<void> => { await construction.check(); };
     // Spawn heap (T10): no closure here may capture `compiled`. Every closure of this scope shares one context, and the

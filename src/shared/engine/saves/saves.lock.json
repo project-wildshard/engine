@@ -657,6 +657,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/ROAD_BUILD_LEAN_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/ROAD_DECK_PACED_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

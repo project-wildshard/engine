@@ -29,7 +29,7 @@ import { installVoidLook } from './voidLook';
 import { CURTAIN_FLOATS, curtainGeometry, curtainMaterial, curtainSource, gravel, riprap, seamSolidSteps, stone, strata } from './seamLook';
 import type { SeamGeometryChannels, SeamLookState, SeamPiece } from '../../../shared/game/grid/seamGeometry';
 import { bytePlan, cullIntoSteps, finishRoadSteps, gpuOnlyRoad, meshBytesSteps, ROAD_LOD, type CullPlan, type RoadCuller } from './roadCull';
-import { GRAIN_LAYERS, GRAIN_SIZE, gpuOnlyTextureBytes, grainArray, SOLID_FLOATS, solidGeometrySteps, solidMaterial, solidSource, type SolidPart } from './roadSolid';
+import { GRAIN_LAYERS, GRAIN_SIZE, gpuOnlyTextureBytes, grainArray, SOLID_FLOATS, solidGeometryDrainSteps, solidGeometrySteps, solidMaterial, solidSource, type SolidPart } from './roadSolid';
 
 /** What the road system reads and where it draws. */
 export interface PlatformRoadInput {
@@ -60,6 +60,9 @@ export interface PlatformRoadInput {
   readonly voidFloor?: boolean;
   /** PZ24: one asphalt, junction and deck-grain upload for every build of this road (a split road's halves pass the same share) */
   readonly maps?: RoadMapShare;
+  /** DW12b (`roadBuildLean.ts`): hold less while building (parts dropped as merged, the clip filling the merge's room); the
+   *  same bytes either way */
+  readonly lean?: boolean;
 }
 /** The readouts and the roots the road budget measures. */
 export interface PlatformRoad {
@@ -170,6 +173,8 @@ function* platformRoadSteps(input: PlatformRoadInput, stageSigns?: RoadLookInput
   // the seams' materials keyed by the generator's feature ranges: the same triangles the world collides with
   const seams = yield* seamSolidSteps(strips, home, undefined, pitch, input.seamChannels);
   const parts: SolidPart[] = [...seams.parts], solid = (part: SolidPart): void => { parts.push(part); };
+  const lean = input.lean === true;
+  if (lean) seams.parts.length = 0; // DW12b: the deck's list holds them now; the merge drops each as it copies it
   const overlayLight = new RoadOverlayLight();
   const road = yield* installRoadLookSteps({ layout, home, scene, scope, solid, cull: culler, admission, overlayLight, retireGeometry,
     ...(stageSigns === undefined ? {} : { stageSigns }),
@@ -192,7 +197,7 @@ function* platformRoadSteps(input: PlatformRoadInput, stageSigns?: RoadLookInput
     const grain = held ?? grainArray({ gravel, stone, strata, riprap }), material = solidMaterial(grain);
     if (maps !== undefined && held === undefined) maps.hold(grainId, grain);
     yield;
-    const deck = new Mesh(yield* solidGeometrySteps(parts), material);
+    const deck = new Mesh(yield* (lean ? solidGeometryDrainSteps(parts, deckBytes.clipped) : solidGeometrySteps(parts)), material);
     ownRoadMesh(owner, deck, maps === undefined ? [grain] : []);
     if (maps !== undefined) owner.onDispose(() => { maps.release(grainId, grain); });
     deck.name = 'grid-deck'; deck.receiveShadow = true;
