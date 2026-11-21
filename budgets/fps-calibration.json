@@ -154,36 +154,251 @@
       },
       "gpu": {
         "qualified": false,
-        "basis": "Phone gpu~ p95 includes frame pacing and compositor waits. The Metal timer measures submitted rendering work.",
-        "phoneBuild": "cf47558efae969356af515e8148a1f91d445c78b",
-        "phoneGpuApproxP95Ms": {
-          "dock spawn": 25.7,
-          "pier to beach": 0.7,
-          "plateau climb": 3.7,
-          "castaway camp (NPC)": 0.7
+        "build": "39542d31dacaddbe56dc7988170699db78d1fbe3",
+        "rendererRevision": "c516b683948a3dfabff368383a6f4a801d852278522c72722d58ed0922575dcf",
+        "raster": {
+          "css": [
+            390,
+            658
+          ],
+          "dpr": 1
         },
-        "metalBuild": "cf47558ef-mwolyhcs",
-        "metal": [
+        "metric": "p95",
+        "training": [
+          "dock spawn",
+          "beach",
+          "village"
+        ],
+        "heldOut": [
+          "quest fire",
+          "road crossing"
+        ],
+        "ratio": 0.07930476458493925,
+        "spread": {
+          "min": 0.07926921933181483,
+          "max": 0.09819164652802753
+        },
+        "byRun": [
+          0.09819164652802753,
+          0.07930476458493925,
+          0.07926921933181483
+        ],
+        "segments": [
           {
-            "segment": "dock spawn",
-            "gpuMsPerFrame": 0.956,
-            "triangles": 710241,
-            "draws": 85
+            "name": "dock spawn",
+            "role": "training",
+            "ratio": 0.07930476458493925,
+            "spread": {
+              "min": 0.07926921933181483,
+              "max": 0.7897955584726911
+            },
+            "measurements": [
+              {
+                "run": 1,
+                "phoneMs": 6.7,
+                "macMs": 8.483208,
+                "ratio": 0.7897955584726911
+              },
+              {
+                "run": 2,
+                "phoneMs": 0.7,
+                "macMs": 8.826708,
+                "ratio": 0.07930476458493925
+              },
+              {
+                "run": 3,
+                "phoneMs": 0.7,
+                "macMs": 8.830666,
+                "ratio": 0.07926921933181483
+              }
+            ]
           },
           {
-            "segment": "pier to beach",
-            "gpuMsPerFrame": 1.024,
-            "triangles": 656127,
-            "draws": 74
+            "name": "beach",
+            "role": "training",
+            "ratio": 0.07016869958754837,
+            "spread": {
+              "min": 0.0673589693230895,
+              "max": 0.07212343658284102
+            },
+            "measurements": [
+              {
+                "run": 1,
+                "phoneMs": 0.7,
+                "macMs": 9.975958,
+                "ratio": 0.07016869958754837
+              },
+              {
+                "run": 2,
+                "phoneMs": 0.7,
+                "macMs": 9.705583,
+                "ratio": 0.07212343658284102
+              },
+              {
+                "run": 3,
+                "phoneMs": 0.7,
+                "macMs": 10.392083,
+                "ratio": 0.0673589693230895
+              }
+            ]
           },
           {
-            "segment": "plateau climb",
-            "gpuMsPerFrame": 0.718,
-            "triangles": 546371,
-            "draws": 82
+            "name": "village",
+            "role": "training",
+            "ratio": 0.09819164652802753,
+            "spread": {
+              "min": 0.09765682220794263,
+              "max": 0.10448282048687203
+            },
+            "measurements": [
+              {
+                "run": 1,
+                "phoneMs": 0.7,
+                "macMs": 7.128916,
+                "ratio": 0.09819164652802753
+              },
+              {
+                "run": 2,
+                "phoneMs": 0.7,
+                "macMs": 7.167958,
+                "ratio": 0.09765682220794263
+              },
+              {
+                "run": 3,
+                "phoneMs": 0.7,
+                "macMs": 6.699666,
+                "ratio": 0.10448282048687203
+              }
+            ]
+          },
+          {
+            "name": "quest fire",
+            "role": "held-out",
+            "ratio": 0.10487087773179272,
+            "spread": {
+              "min": 0.10070615153456032,
+              "max": 0.10654084699973365
+            },
+            "measurements": [
+              {
+                "run": 1,
+                "phoneMs": 0.7,
+                "macMs": 6.674875,
+                "ratio": 0.10487087773179272
+              },
+              {
+                "run": 2,
+                "phoneMs": 0.7,
+                "macMs": 6.950916,
+                "ratio": 0.10070615153456032
+              },
+              {
+                "run": 3,
+                "phoneMs": 0.7,
+                "macMs": 6.57025,
+                "ratio": 0.10654084699973365
+              }
+            ]
+          },
+          {
+            "name": "road crossing",
+            "role": "held-out",
+            "ratio": 0.08521041738740479,
+            "spread": {
+              "min": 0.0763674575135105,
+              "max": 0.08851702745153281
+            },
+            "measurements": [
+              {
+                "run": 1,
+                "phoneMs": 0.7,
+                "macMs": 9.166208,
+                "ratio": 0.0763674575135105
+              },
+              {
+                "run": 2,
+                "phoneMs": 0.7,
+                "macMs": 8.214958,
+                "ratio": 0.08521041738740479
+              },
+              {
+                "run": 3,
+                "phoneMs": 0.7,
+                "macMs": 7.908083,
+                "ratio": 0.08851702745153281
+              }
+            ]
           }
         ],
-        "reason": "A matched three-run Metal and phone route with two held-out segments is still owed."
+        "validation": [
+          {
+            "name": "quest fire",
+            "runs": [
+              {
+                "run": 1,
+                "measuredMs": 0.7,
+                "predictedMs": 0.5293493905088964,
+                "errorFraction": 0.2437865849872908,
+                "pass": true
+              },
+              {
+                "run": 2,
+                "measuredMs": 0.7,
+                "predictedMs": 0.5512407570296877,
+                "errorFraction": 0.21251320424330328,
+                "pass": true
+              },
+              {
+                "run": 3,
+                "measuredMs": 0.7,
+                "predictedMs": 0.5210521295141971,
+                "errorFraction": 0.2556398149797184,
+                "pass": false
+              }
+            ]
+          },
+          {
+            "name": "road crossing",
+            "runs": [
+              {
+                "run": 1,
+                "measuredMs": 0.7,
+                "predictedMs": 0.7269239675765867,
+                "errorFraction": 0.03846281082369539,
+                "pass": true
+              },
+              {
+                "run": 2,
+                "measuredMs": 0.7,
+                "predictedMs": 0.6514853102651633,
+                "errorFraction": 0.06930669962119519,
+                "pass": true
+              },
+              {
+                "run": 3,
+                "measuredMs": 0.7,
+                "predictedMs": 0.6271486606331602,
+                "errorFraction": 0.10407334195262821,
+                "pass": true
+              }
+            ]
+          }
+        ],
+        "reason": "At least one held-out prediction differs by more than 25%; do not use this ratio in the floor table.",
+        "basis": "Phone gpu~ p95 includes frame pacing and compositor waits. Metal timer queries measure submitted rendering work. The fitted ratio is unqualified and must not drive a floor prediction.",
+        "captured": "2026-11-21",
+        "routeMethodSha256": "efe80d0630dd07d7cfb1fe7a4fc12ba0801d2bafbcd33c5c294245d0828be187",
+        "phoneCaptures": [
+          "phone-qual-30",
+          "phone-qual-31",
+          "phone-qual-34"
+        ],
+        "metalCaptures": [
+          "mac-7",
+          "mac-8",
+          "mac-9"
+        ],
+        "evidence": "project-wildshard-meta:project/evidence/driftwood-fps/df5/minute-routes-2026-11-21/gpu-fit.json"
       }
     }
   }
