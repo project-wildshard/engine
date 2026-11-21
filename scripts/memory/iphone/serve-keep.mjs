@@ -174,7 +174,7 @@ async function serve(label) {
   const ports = [state.port, state.socketPort];
   /** @param {string} what @param {string} why */
   const restarted = (what, why) => { state.restarts.push({ at: new Date().toISOString(), what, why }); say(label, `restart ${what}: ${why}`); };
-  let first = true;
+  let first = true, startedAt = 0, quickDeaths = 0;
   while (!stopping.signal.aborted) {
     let changed = false;
     for (const i of [0, 1]) {
@@ -189,7 +189,12 @@ async function serve(label) {
     if (!worldAlive(state.world, state.port)) {
       if (state.world !== null || !first) restarted('world', state.world === null ? 'not running' : `pid ${String(state.world.pid)} gone`);
       else say(label, 'starting the world');
+      // a world that dies within 30 s of its start (a content error, not a kill) backs off, 2 s doubling to 60 s, so a
+      // broken build never restarts every second (2026-11-21: glowfen's missing product, 111 restarts in 2 minutes)
+      quickDeaths = startedAt !== 0 && Date.now() - startedAt < 30_000 ? quickDeaths + 1 : 0;
+      if (quickDeaths > 0) { const wait = Math.min(60, 2 ** quickDeaths); say(label, `the world died within 30 s of its start; waiting ${String(wait)} s (${join(keptDir(), `${label}.world.log`)})`); await delay(wait * 1000); }
       for (let waited = 0; waited < 20 && !(await portFree(state.port)); waited++) await delay(500);
+      startedAt = Date.now();
       state.world = startWorld(state);
       state.ready = false;
     } else if (first) say(label, `adopted world ${String(state.world?.pid)}`);
