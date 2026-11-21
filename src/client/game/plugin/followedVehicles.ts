@@ -364,7 +364,11 @@ export class FollowedVehicles {
     // each player dock's, while it stands clear and this player has none of its vehicles out
     for (const dock of this.docks.values()) if (dock.per === 'player') {
       const shown = (): number => (this.me !== null && dockUnlocked(dock, this.ownedFlags) && this.seatOf() === undefined && !this.live.has(playerVehicle(dock.id, this.me)) && this.dockClear(dock) ? SEAT_REACH : 0);
-      prompts.push(followingPrompt(new Vector3(dock.at[0], dock.at[1], dock.at[2]), this.kinds.get(dock.kind)?.labels?.drive ?? DRIVE_LABEL, shown, () => vehicleDockPrompt(dock.id)));
+      // meta MSZ43: the prompt hangs at the driver's seat height over the dock, not on its ground point. The page picks a
+      // prompt within its reach of the eye (about 1.7 m up), so a ground point showed only from 1.8 m off, and the ground
+      // could hide it; the server takes a claim from 2.5 m on the flat.
+      const kind = this.kinds.get(dock.kind), seatY = kind?.seats.find(seat => seat.role === 'driver')?.at[1] ?? 1;
+      prompts.push(followingPrompt(new Vector3(dock.at[0], dock.at[1] + seatY, dock.at[2]), kind?.labels?.drive ?? DRIVE_LABEL, shown, () => vehicleDockPrompt(dock.id)));
     }
     // one way out a kind, over this player's own seat
     for (const kind of this.kinds.values()) {

@@ -7,6 +7,7 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { actRoutes } from '../src/shared/engine/sim/actRoutes';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
 import type { Interactable } from '../src/shared/engine/world/interact/types';
+import { pickPrompt } from '../src/shared/engine/world/interact/prompts';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
@@ -131,6 +132,12 @@ describe('each install path finds both docks\' vehicles', () => {
       expect(vehicles.dockIds()).toEqual(DOCKS);
       expect(vehicles.ids()).toEqual([SAIL]);
       expect(shown(prompts)).toEqual([[vehicleDockPrompt(BUGGY), 'Drive the buggy']]);
+      // meta MSZ43: the page picks from the eye, 1.7 m up; a dock's prompt at its ground point showed only from 1.8 m off, so
+      // it hangs at the driver's seat height and shows from 2.3 m, inside the server's 2.5 m claim
+      const dock = prompts.find(row => row.wireId === vehicleDockPrompt(BUGGY)), at = dock?.position;
+      if (dock === undefined || at === undefined) throw new Error('No dock prompt');
+      expect(at.y).toBeGreaterThan(0.5);
+      expect(pickPrompt([dock], { x: at.x + 2.3, y: 1.7, z: at.z }, null)).toBe(dock);
     } finally { scope.dispose(); }
     expect(wirePage.vehicles.has('page')).toBe(false);
   });
