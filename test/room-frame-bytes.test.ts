@@ -99,5 +99,6 @@ const EXPECTED = 'd2074fab0ba6e12400d4437018b00ab8ed988ae1f239aba7aeb374c2b3eae7
  *  above (old law: 9b5c9aad). Re-taken for MP1.5b as above (old: 620028c6), and for MP5.2b as above (old: 8dd4d5a6).
  *  Restored cell positions and distance tiers as above (old: 3c9036b7). Re-taken for CC11a2c as above (old: e8e25c9d).
  *  Re-taken for NL14b1 as above (old law: c1823a44), and for CC18c as above (old: 35acd7ed). Re-taken for bb47b6afb's
- *  lip jump as above (old law: 91d1e6ce). */
-const EXPECTED_ROOM = '603a6bb5445ce3e7d029522b88c55a8f43ec7ab1c732f963bc738fda9661c7b3';
+ *  lip jump as above (old law: 91d1e6ce). Re-taken for the Nalati r5 pin (ONE-FORMAT OF24, shard main a1d9787): the wire
+ *  and bodies hold; the seats' armed state is the new revision's (old: 603a6bb5). */
+const EXPECTED_ROOM = '1f43baf30ca11257304cf1a67b2b96d40c31735e4cbe8221b18e457cac709272';
