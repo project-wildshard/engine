@@ -62,6 +62,7 @@ test('a cadence term can explain the fire residual without qualifying an unobser
     for (const [index,leg] of pair.phone.legs.entries()) {
       leg.samples = [{seconds:1,frames:30,frameMs:Array.from({length:30},(_,frame) =>
         frame === 0 ? 32-run : frame === 1 ? 32+index : frame % 3 === 0 ? 34 : 33)}];
+      leg.samples[0].gpuApproxMs = leg.samples[0].frameMs.map(ms => Math.max(0,ms-1000/30));
       leg.summary.gpuApproxP95Ms = 0.7;
       pair.mac.legs[index].metal.p95Ms = index === 3 ? 6.57 : 8.83;
     }
@@ -76,4 +77,6 @@ test('a cadence term can explain the fire residual without qualifying an unobser
   const changed = fitGpu(inputs,route,training,heldOut);
   expect(changed.observation.training).toEqual(baseline);
   expect(changed.observation.validation[0].runs[2].pass).toBe(false);
+  for (const pair of inputs) for (const leg of pair.phone.legs) leg.samples[0].gpuApproxMs.fill(0);
+  expect(fitGpu(inputs,route,training,heldOut).observation).toBeNull();
 });

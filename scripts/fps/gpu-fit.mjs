@@ -9,8 +9,9 @@ import { fpsVerdict } from './verdict.mjs';
 
 /** @typedef {{name:string,seconds:number}} Segment */
 /** @typedef {{build:string,css:number[],dpr:number,phone:boolean,low:boolean,shadowsOff:boolean,gpu?:string}} Witness */
+/** @typedef {{seconds:number,frames:number,frameMs:number[],gpuApproxMs?:number[]}} FrameSample */
 /** @typedef {{version:{build:string,rendererRevision:string},witness:Witness,
- * legs:(Parameters<typeof fpsVerdict>[0][number] & {cap:number|null,summary?:{gpuApproxP95Ms:number},
+ * legs:(Parameters<typeof fpsVerdict>[0][number] & {samples?:FrameSample[],cap:number|null,summary?:{gpuApproxP95Ms:number},
  * metal?:{frames:number,p95Ms:number|null}})[]}} Capture */
 /** @typedef {{phone:Capture,mac:Capture}} Pair */
 
@@ -30,12 +31,16 @@ function median(values) {
 function cadenceObservation(pairs, training, ratio, validation) {
   const rows = pairs.flatMap(({phone}, run) => phone.legs.filter(leg => training.includes(leg.name)).map(leg => {
     const frames = (leg.samples ?? []).flatMap(sample => sample.frameMs);
+    const residuals = (leg.samples ?? []).flatMap(sample => sample.gpuApproxMs ?? []);
     const capMs = 1000 / /** @type {number} */ (leg.cap);
     const floorMs = Math.ceil(capMs) - capMs;
-    const sorted = frames.map(ms => Math.max(0, ms - capMs)).sort((a,b) => a-b);
+    // Use the retained residual, which already subtracts CPU time when it
+    // exceeds the cap. Reconstructing from frame intervals would count CPU.
+    const sorted = residuals.toSorted((a,b) => a-b);
     const p95 = sorted[Math.floor((sorted.length - 1) * 0.95)];
     return {run:run + 1,name:leg.name,frames:frames.length,floorMs,
-      integerClock:frames.length > 0 && frames.every(Number.isInteger),p95};
+      integerClock:frames.length > 0 && frames.every(Number.isInteger) && residuals.length === frames.length &&
+        residuals.every(ms => Number.isFinite(ms) && ms >= 0),p95};
   }));
   if (!rows.every(row => row.integerClock) ||
       rows.filter(row => Math.abs(row.p95 - row.floorMs) < 1e-9).length <= rows.length / 2) return null;
