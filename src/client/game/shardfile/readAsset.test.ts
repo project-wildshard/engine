@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { readAsset } from './readAsset';
 import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 
@@ -45,4 +45,26 @@ test('storage refusal keeps online bytes usable and never creates another cache'
 test('an index without a declared size uses the source cap without inventing a length', async () => {
   expect(await readAsset(url, undefined, { fetch: () => Promise.resolve(new Response(new Uint8Array([1, 2, 3]))) }))
     .toEqual(new Uint8Array([1, 2, 3]));
+});
+
+// FS30: hosted Nine Explorer held one controllerless read open for 60 s with no request pending. The read is one branch of
+// the publication tee; Chromium can leave a tee branch's final BYOB read unsettled. That branch reads by its default reader,
+// and the publication still receives the complete body.
+test('the controllerless read branch uses its default reader; a plain read keeps BYOB', async () => {
+  const modes: unknown[] = [], getReader: unknown = Reflect.get(ReadableStream.prototype, 'getReader');
+  if (typeof getReader !== 'function') throw new Error('Missing ReadableStream getReader');
+  const spy = vi.spyOn(ReadableStream.prototype, 'getReader').mockImplementation(function recordMode(this: ReadableStream, ...args: unknown[]) {
+    modes.push((args[0] as { mode?: string } | undefined)?.mode ?? 'default');
+    return Reflect.apply(getReader, this, args) as ReturnType<ReadableStream['getReader']>;
+  });
+  try {
+    const stored: number[][] = [];
+    const bytes = await readAsset(url, 3, { fetch: () => Promise.resolve(new Response(new Uint8Array([4, 5, 6]))) },
+      { open: () => Promise.resolve({ put: async (_key: RequestInfo | URL, response: Response) => { stored.push([...new Uint8Array(await response.arrayBuffer())]); } }) });
+    expect(bytes).toEqual(new Uint8Array([4, 5, 6])); expect(stored).toEqual([[4, 5, 6]]);
+    expect(modes[0]).toBe('default');
+    modes.length = 0;
+    expect(await readAsset(url, 1, { fetch: () => Promise.resolve(new Response(new Uint8Array([1]))) })).toEqual(new Uint8Array([1]));
+    expect(modes[0]).toBe('byob');
+  } finally { spy.mockRestore(); }
 });

@@ -8,7 +8,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { clearFailure, showFailure } from '@wildshard/engine/telemetry/runtime';
 import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
-import { scratchReader } from '@wildshard/engine/boot/scratchReader';
+import { readByDefault, scratchReader } from '@wildshard/engine/boot/scratchReader';
 import { lentResponse, loadGc } from '@wildshard/engine/boot/lentBody';
 import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { CACHE_BYTE_LIMITS, ResidentByteCache } from '@wildshard/engine/core/memoryBudget';
@@ -374,6 +374,7 @@ async function readSpawnFile(url: string, maximum: number, ports: SpawnDownloadP
       }, response: response => {
         void copy?.body?.cancel().catch(() => undefined);
         copy = ports.store === undefined || response === held ? undefined : response.clone();
+        if (copy !== undefined) readByDefault(response); // the read continues on one tee branch
       }});
     return {bytes, copy};
   } catch (error) {

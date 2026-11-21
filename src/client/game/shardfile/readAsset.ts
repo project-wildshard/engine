@@ -1,4 +1,5 @@
 import { readContent, type ContentReadOptions } from '@wildshard/engine/boot/contentRead';
+import { readByDefault } from '@wildshard/engine/boot/scratchReader';
 import { assetCacheName } from '@wildshard/engine/pwa/cacheNames';
 import { SHARDFILE_ADMISSION_LIMITS as limits } from '@wildshard/format/admissionLimits';
 
@@ -32,7 +33,8 @@ export async function readAsset(url: string, bytes: number | undefined, options:
       options.response?.(response);
       void copy?.body?.cancel().catch(() => undefined); copy = undefined;
       publication = migrated ? options.legacy?.store : controllerlessStore;
-      if (publication !== undefined && response.ok) copy = response.clone();
+      // The read continues on one tee branch (scratchReader.ts `readByDefault`).
+      if (publication !== undefined && response.ok) { copy = response.clone(); readByDefault(response); }
     } });
     options.signal?.throwIfAborted();
     if (copy !== undefined && publication !== undefined) {
