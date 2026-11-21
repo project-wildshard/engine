@@ -74,16 +74,18 @@ export async function runObserver(args,root=ROOT){
   return report.status==='observed'?0:report.status==='refused'||report.status==='failed'?1:report.status==='cancelled'?130:75;
  }finally{process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);}
 }
-if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
- // The staging door requires its page Origin. Node's global WebSocket does not supply it.
- const native=globalThis.WebSocket;
- class StagingSocket extends NodeWebSocket {
-  /** @param {string} url @param {string[]} protocols */
-  constructor(url,protocols){
-   if(new URL(url).href!==new URL(CHANNELS.staging.socket).href)throw new Error('Observer socket must be the public staging door');
-   super(url,protocols,{origin:CHANNELS.staging.origin});
-  }
+// The staging door requires its page Origin. Node's global WebSocket does not supply it.
+export class StagingSocket extends NodeWebSocket {
+ /** @param {string} url @param {string[]} protocols */
+ constructor(url,protocols){
+  if(new URL(url).href!==new URL(CHANNELS.staging.socket).href)throw new Error('Observer socket must be the public staging door');
+  super(url,protocols,{origin:CHANNELS.staging.origin});
+  // The browser-style close event drives recovery. ws emits a Node error first.
+  this.on('error', () => undefined);
  }
+}
+if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
+ const native=globalThis.WebSocket;
  globalThis.WebSocket=/** @type {typeof native} */ (/** @type {unknown} */ (StagingSocket));
  try{process.exitCode=await runObserver(process.argv.slice(2));}finally{globalThis.WebSocket=native;}
 }
