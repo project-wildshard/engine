@@ -102,9 +102,13 @@ export function buildConnectionRow(owner: Scope): HTMLElement {
 
 
 /** The shell survives the disposed level. Text nodes keep raw error messages/stacks safe to display. */
+/** The shown failure's wait for the network (SB53): a new screen replaces the old one's. */
+let onlineWait: Scope | undefined;
+
 export function showLoadFailure(failure: LoadFailure): HTMLElement {
   {
     document.querySelector('.ws-load-error')?.remove();
+    onlineWait?.dispose(); onlineWait = undefined;
     const root = document.createElement('section');
     root.className = 'ws-load-error';
     root.dataset['wsShell'] = 'true';
@@ -129,8 +133,12 @@ export function showLoadFailure(failure: LoadFailure): HTMLElement {
     // document): once the network is back the page reloads by itself and goes back into the world (index.html SB44)
     if (!navigator.onLine) {
       const back = new Scope('load-failure-online', scope);
+      onlineWait = back;
       back.listen(window, 'online', () => {
-        back.dispose(); showReloading(reload);
+        back.dispose(); if (onlineWait === back) onlineWait = undefined;
+        // only the screen still on the page reloads (a dismissed or replaced one waits for nothing)
+        if (!root.isConnected) return;
+        showReloading(reload);
         leaveAfterPaint(() => { markReload('offline load failure', 'background'); location.reload(); });
       });
     }
