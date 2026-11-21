@@ -231,7 +231,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // SF28 (G87 / G104): the big item cards wear the shard's declared accent (in the grid, the cell's: grid/gridHud.ts)
   setHudAccent(accentHex(manifest.accent)); hud.cardAccent = hudAccent();
   game.levelScope.onDispose(onHudAccent((hex) => { hud.cardAccent = hex; }));
-  const owned = new Owned(manifest.slug, readOnlySave(ownedSave), keptItems(ctx.product.shardfile.items));            // E314: upgrades, cosmetics, trophies, the found iron sword (src/shared/game/loot/Owned.ts)
+  // a grid page's level product is absent (the cells hold theirs): it keeps the old table, as before OF31f2 (f304df4ce)
+  const owned = new Owned(manifest.slug, readOnlySave(ownedSave), keptItems(grid === null ? ctx.product.shardfile.items : undefined));            // E314: upgrades, cosmetics, trophies, the found iron sword (src/shared/game/loot/Owned.ts)
   const playerHealth = new PlayerHealth(app.events, {
     now: () => performance.now(), position: () => player.position,
     dodging: () => player.dodging, dodgeGuard: () => false,
