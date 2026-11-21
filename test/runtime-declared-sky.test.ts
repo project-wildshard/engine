@@ -32,9 +32,10 @@ async function sky(): Promise<HeadlessRuntimeInput> {
   const directory = builtFolder('far-reach'), product = await loadHeadlessFolder(directory), descriptor = outputDescriptor(product.shardfile);
   if (descriptor === undefined) throw new Error('Missing verified Sky Reach product');
   const plan = parseNativeRuntimePlan(product.section('sim/runtime-plan')), kept = plan.recipe.population.rows;
-  const placement = kept.placement;
+  const placement = kept.placement, program = kept.program;
+  if (program === undefined) throw new Error('Missing Sky Reach keeper programme');
   const keeper: Plan = { ...plan, recipe: { ...plan.recipe, population: { ...plan.recipe.population, rows: { ...kept,
-    program: { ...kept.program, species: kept.program.species.filter(row => row.kind === 'stormRoc') },
+    program: { ...program, species: program.species.filter(row => row.kind === 'stormRoc') },
     homes: kept.homes.filter(home => home.id === ROC),
     ...(placement === undefined ? {} : { placement: { ...placement, rows: placement.rows.filter(row => row.id === ROC) } }) } } } };
   const base = emptyShardfile({ slug: 'of20b-rows', name: 'Rows', author: 'Test', revision: 1, seed: 7 });
