@@ -31,7 +31,7 @@ export function gridPageShell(source: ShardManifest): ShardManifest {
   const { slug, api, order, status, name, label, seed, biome, blurb, card, sky, atmosphere, grade, style, weapon, spawn } = source;
   const tools = [...(source.loadout?.tools ?? [])];
   return {
-    slug, api, order, status, name, label, seed, biome, blurb, card, style, weapon, spawn: { ...spawn },
+    slug, api, order, status, name, label, seed, biome, blurb, card, style, ...(weapon === undefined ? {} : { weapon }), spawn: { ...spawn },
     treeCount: 0, ground: { structures: true }, trees: { factory: 'none', noun: 'trees' }, spawns: [], species: [],
     sky: { sunColor: sky.sunColor, sunIntensity: sky.sunIntensity, envIntensity: sky.envIntensity,
       bgIntensity: sky.bgIntensity, fogSunColor: sky.fogSunColor, cloudSunColor: sky.cloudSunColor,

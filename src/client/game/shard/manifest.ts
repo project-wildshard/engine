@@ -551,8 +551,9 @@ export interface ShardManifest {
   spawn: SpawnPose;
   /** rendering style; the former implicit PBR default is explicit in every manifest */
   style: ChunkStyle;
-  /** player weapon; the former implicit crossbow default is explicit in every manifest */
-  weapon: ChunkWeapon;
+  /** the old player weapon picker; nothing reads it (the shard's `combat/items` arms the player), and a product built
+   *  since ONE-FORMAT OF9b3 has none */
+  weapon?: ChunkWeapon;
   /** what this shard switches on in the ONE base HUD every shard shares (E154, src/client/engine/ui/hudSlots.ts); omitted = the base alone */
   hud?: ChunkHud;
   /** a painted horizon of its own (Nalati: the plateau rolling on, the snow range south); omitted = the default ridge rings */
@@ -820,6 +821,11 @@ export const PLAIN_LEVEL_LOOK: Readonly<Pick<ShardManifest, 'sky' | 'atmosphere'
   grade: { saturation: 0, brightness: 0, contrast: 0, bloomIntensity: 0, bloomThreshold: 1, shadowTint: [1, 1, 1], highTint: [1, 1, 1], lift: [0, 0, 0], gain: [1, 1, 1], gamma: 1 },
 });
 
+/** ONE-FORMAT OF9b3: the start of a discovery document with no spawn or audio, until its product admits and a declared
+ *  page reads its own (`world/spawn`, `audio.level`; `levelStart`). The old engine default audio, the origin on the ground. */
+export const UNSET_LEVEL_AUDIO: Readonly<NonNullable<ManifestMetadata['audio']>> = Object.freeze({ ambience: 'legacy', score: 'legacy' });
+export const UNSET_LEVEL_SPAWN: Readonly<SpawnPose> = Object.freeze({ x: 0, z: 0, yaw: 0 });
+
 /** Validate authored metadata, resolve literal bundled image imports and compose
  * the unchanged native boot owners. Missing source images refuse admission. */
 export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: AuthoredShardBindings,
@@ -833,7 +839,8 @@ export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: Autho
   };
   const { mapPalette: palette, audioBindings, bootBindings, forestQueries, poses, ...bindings } = rows;
   const sky = data.sky ?? PLAIN_LEVEL_LOOK.sky;
-  const { catalogue, ...audio } = data.audio;
+  // ONE-FORMAT OF9b3: a discovery document may carry no audio or spawn; a declared page reads its product's (`levelStart`)
+  const { catalogue, ...audio } = data.audio ?? UNSET_LEVEL_AUDIO;
   const compare = data.explore.compare?.map(row => ({...row, live: image(row.live), image: image(row.image)}));
   // a declared tree set (its product's rows file) builds on the game's tree set factory
   const factory: ChunkTrees['factory'] | undefined = data.trees.treeSet === undefined ? data.trees.factory : declaredTreeSet(slug);
@@ -864,7 +871,8 @@ export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: Autho
     card: { thumb: image(data.card.thumb), portrait: image(data.card.portrait), landscape: image(data.card.landscape) },
     sky: { ...sky, ...(sky.hdri === undefined ? {} : { hdri: image(sky.hdri) }) },
     atmosphere: data.atmosphere ?? PLAIN_LEVEL_LOOK.atmosphere, grade: data.grade ?? PLAIN_LEVEL_LOOK.grade,
-    minimap: { ...data.minimap, image: image(data.minimap.image), ...(palette === undefined ? {} : { palette }) },
+    spawn: data.spawn ?? UNSET_LEVEL_SPAWN,
+    minimap: { ...data.minimap, ...(data.minimap.image === undefined ? {} : { image: image(data.minimap.image) }), ...(palette === undefined ? {} : { palette }) },
     explore: { art: { world: image(data.explore.art.world), models: image(data.explore.art.models),
       sets: image(data.explore.art.sets), practice: image(data.explore.art.practice) }, ...(compare === undefined ? {} : {compare}) },
   }, native);

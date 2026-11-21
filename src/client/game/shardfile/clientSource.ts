@@ -30,6 +30,7 @@ import { folderPaintedLook } from '../looks/paintedLook';
 import { emptyLook } from './emptyLook';
 import { shardfileLook } from './look';
 import { declaredLook, withoutHorizon } from './declaredLook';
+import { declaredStart } from './declaredStart';
 import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
 import { admitFolder, readFolderInput, readFolderDescriptor, type AdmittedFolder, type FolderOptions } from './folder';
 import { manifestReader, provideManifestAdmission } from './runtimeFolder';
@@ -241,6 +242,8 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     // ONE-FORMAT OF7, OF9b2: look/look's level look (sky, atmosphere, grade, horizon) and its declared light and bloom
     // over the manifest's (declaredLook.ts)
     ...declaredLook(manifest, source, lookLightOn(), TIER),
+    // ONE-FORMAT OF9b3: the start (spawn, loadout, audio) from the product's sections, its older manifest at the door
+    ...declaredStart(manifest, source),
     boot: compiledPageBoot(manifest.boot, client.boot),
     ground: clientPageGround(source, admitted.assets), spawns: [],
     ...(client.navigation === undefined ? {} : { navigation: client.navigation }),

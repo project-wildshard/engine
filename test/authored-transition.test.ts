@@ -120,7 +120,7 @@ test('only the attackers sentinel becomes infinity and complete art order surviv
   const boot = { precache: [], barrier: true, phone: { deferExtras: true, fragile: true, trace: true }, cullBeforeFirstDraw: true };
   const data = parseManifestMetadata({ ...fixture, boot, fight: { attackers: 'unbounded' } });
   const images: Record<string, string> = {};
-  for (const path of [...Object.values(data.card), ...Object.values(data.explore.art), data.minimap.image,
+  for (const path of [...Object.values(data.card), ...Object.values(data.explore.art), ...(data.minimap.image === undefined ? [] : [data.minimap.image]),
     ...(data.explore.compare?.flatMap(row => [row.live, row.image]) ?? [])]) if (path.startsWith('/src/')) images[path] = path;
   const art = [...Object.values(data.explore.art), '/assets/extra.webp', '/assets/extra.webp'];
   const files = ['/assets/original.glb', '/assets/original.glb'];
