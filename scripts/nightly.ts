@@ -2,7 +2,7 @@
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readdirSync, writeFileSync} from 'node:fs';
 import {join, relative, resolve} from 'node:path';
-import {browsers, headGroups, markdown, plan, read, requirePublishedGreen, testGroups, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
+import {browsers, headGroups, headRunner, markdown, plan, read, requirePublishedGreen, testGroups, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
 
 interface VitestResult {numTotalTests?: number; testResults?: {name: string; status: string; assertionResults?: {status: string}[]}[]}
 
@@ -11,7 +11,7 @@ const expected = plan(), out = resolve(directory);
 const write = (name: string, value: unknown) => {mkdirSync(out, {recursive: true}); writeFileSync(join(out, name), `${JSON.stringify(value, null, 2)}\n`);};
 if (command === 'plan') {
   console.log(JSON.stringify({include: browsers.flatMap(browser => headGroups(expected.heads, browser).map((heads, group) => ({browser, group,
-    os: browser === 'webkit' ? 'macos-15' : 'ubuntu-24.04', heads: heads.map(row => row.slug).join(',')})))}));
+    os: headRunner(browser, heads), heads: heads.map(row => row.slug).join(',')})))}));
 } else if (command === 'tests') {
   const group = Number(process.env.NIGHTLY_TEST_GROUP ?? '-1');
   if (!Number.isInteger(group) || group < 0 || group >= testGroups) throw new Error('Set NIGHTLY_TEST_GROUP to 0 or 1; the verdict requires both suite partitions');

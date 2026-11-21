@@ -56,3 +56,15 @@ test('FS30 Pine Chromium gets its own job without duplicating any head', () => {
     expect(heads.sort()).toEqual(pinned);
   }
 });
+
+test('FS30 the two SwiftShader-starved heads keep Chromium on the Metal runner', () => {
+  const output = spawnSync(process.execPath, ['scripts/nightly.ts', 'plan'], { encoding: 'utf8', timeout: 5_000 });
+  expect(output.status).toBe(0);
+  const { include } = JSON.parse(output.stdout) as { include: { browser: string; heads: string; os: string }[] };
+  const chromium = include.filter(row => row.browser === 'chromium');
+  const mac = chromium.filter(row => row.os === 'macos-15');
+  expect(mac).toHaveLength(1);
+  expect(mac.flatMap(row => row.heads.split(',')).sort()).toEqual(['nalati-grasslands', 'nine-dragon-stack']);
+  expect(chromium.find(row => row.heads === 'pine-hollow')?.os).toBe('ubuntu-24.04');
+  expect(chromium.flatMap(row => row.heads.split(',').filter(Boolean)).sort()).toEqual(plan().heads.map(head => head.slug));
+});

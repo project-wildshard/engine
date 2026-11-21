@@ -20,6 +20,7 @@ export const browsers = ['chromium', 'webkit'] as const;
 export type NightlyBrowser = typeof browsers[number];
 export const phases = ['cook', 'boot', 'hover', 'draw', 'explorer'];
 const sharedGroups = 4;
+const metalHeads: ReadonlySet<string> = new Set(['nalati-grasslands', 'nine-dragon-stack']);
 export const testGroups = 2;
 export const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
@@ -38,13 +39,18 @@ export function plan(root = process.cwd()): Plan {
 }
 
 export function headGroups(heads: Head[], browser: NightlyBrowser): Head[][] {
-  // FS30: Pine's cold cook followed Nalati's 28-minute Explorer in the same
-  // Chromium job. Give Pine its own unchanged 75-minute budget and start it
-  // first. Keep the other heads in their existing groups.
+  // Pine's cold cook exceeded the shared job's budget. Nine and Nalati
+  // exercise the same Chromium phone path on Metal, where frame delivery
+  // keeps the live input and draw assertions within their existing limits.
   const pine = browser === 'chromium' ? heads.find(head => head.slug === 'pine-hollow') : undefined;
+  const metal = browser === 'chromium' ? heads.filter(head => metalHeads.has(head.slug)) : [];
   const shared = Array.from({length: sharedGroups}, (_, group) =>
-    heads.filter((head, index) => head !== pine && index % sharedGroups === group));
-  return pine === undefined ? shared : [[pine], ...shared];
+    heads.filter((head, index) => head !== pine && !metal.includes(head) && index % sharedGroups === group));
+  return [...(pine === undefined ? [] : [[pine]]), ...(metal.length === 0 ? [] : [metal]), ...shared];
+}
+
+export function headRunner(browser: NightlyBrowser, heads: readonly Head[]): 'macos-15' | 'ubuntu-24.04' {
+  return browser === 'webkit' || heads.some(head => metalHeads.has(head.slug)) ? 'macos-15' : 'ubuntu-24.04';
 }
 
 export function requireBuild(build: string, expected: Plan): void {
