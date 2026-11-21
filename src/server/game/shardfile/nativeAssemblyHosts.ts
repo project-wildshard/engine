@@ -349,9 +349,8 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     }
     case 'boss.ground': {
       const encounter = await readAssemblyInput<{ profile: unknown; kind?: unknown }>(product, row.encounter);
-      // OF30: a product with no species programme gives the boss its decision and body in its binding, its strikes in `actors/strikes`
-      const program = product.has('actors/species-programs') ? need(product.section('actors/species-programs').program, 'Native boss needs its decision programme')
-        : declaredBossProgram(shard.rows, parseRoamingEncounter(encounter, encounter.profile).kind, parse(NativeBossBindingSchema, row.binding),
+      // OF30: the boss's decision and body ride its binding, its strikes `actors/strikes`
+      const program = declaredBossProgram(shard.rows, parseRoamingEncounter(encounter, encounter.profile).kind, parse(NativeBossBindingSchema, row.binding),
           product.has('actors/strikes') ? product.section('actors/strikes') : []);
       return run => { run.boss = installGroundBoss(run.host, encounter, encounter.profile, program, row.binding, at.ports.grantItem(run.context), shard.creatures.spawns); };
     }
@@ -359,9 +358,8 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     case 'population.shelter': { const input = await readAssemblyInput(product, row.rows); return run => { installNativeHerdShelter(run.host, rows['shelterTrees'] as Parameters<typeof installNativeHerdShelter>[1], input); }; }
     case 'population.roster': {
       const input = await readAssemblyInput<{ step: string }>(product, row.rows);
-      // OF30: a roster with no species programme runs its own named declared species and hunt
-      const population = product.has('actors/species-programs') ? product.section('actors/species-programs')
-        : declaredRosterPopulation(shard.rows, shard.creatures, parseNativePopulationRows(input));
+      // OF30: a roster runs its own named declared species and hunt
+      const population = declaredRosterPopulation(shard.rows, shard.creatures, parseNativePopulationRows(input));
       return run => { installPopulationRoster(run.host, { population, bake: bake as Parameters<typeof installPopulationRoster>[1]['bake'], nav, spawnY: shard.spawn.y, saved: run.context.snapshot }, input); };
     }
     case 'population.elites': { const input = await readEliteFeature(product, row.file); return run => { run.elites = installNativeEliteFeature(run.host, dayOf(run), input, shard.creatures.spawns); }; }
