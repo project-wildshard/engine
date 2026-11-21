@@ -82,9 +82,13 @@ export class KeptItems {
   }
 }
 const LEGACY = new KeptItems(LEGACY_KEPT);
+/** Where kept rows come from: a shard's items section (its `version` makes this no weak type, so a format from before
+ *  `kept` still type-checks, P1 11-21), or bare rows. */
+export type KeptSource = { readonly version: 1; readonly kept?: readonly KeptRow[] } | { readonly kept: readonly KeptRow[] };
 /** A shard's kept items from its items section's `kept` rows, or the old `OWNED` table when it declares none (OF31f2). */
-export function keptItems(items?: { readonly kept?: readonly KeptRow[] } | null): KeptItems {
-  return items?.kept === undefined ? LEGACY : new KeptItems(items.kept);
+export function keptItems(items?: KeptSource | null): KeptItems {
+  const kept = items?.kept;
+  return kept === undefined ? LEGACY : new KeptItems(kept);
 }
 /** The old table's checks, for code with no shard in hand; OF31f5 deletes them. */
 export const isOwnedId = (v: unknown): v is OwnedId => LEGACY.has(v);
