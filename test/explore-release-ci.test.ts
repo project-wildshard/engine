@@ -48,3 +48,14 @@ test('the Cloudflare token reaches the steps only from the secret, never argv', 
   expect(tokens.length).toBe(3);
   for (const line of tokens) expect(line).toBe('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}');
 });
+
+// The first dispatch (run 44939791409, v0.1.64) timed out in heavy-lane's 30-minute build limit: staging's catalogue cooks 26
+// pins on a cold runner (preview's 22 took 1,401 s). build:game takes its limit from WS_BUILD_MAX_MINUTES, and this workflow
+// gives its build an hour.
+test('the Explore build gets an hour, and build:game honours it', () => {
+  const script = String((JSON.parse(readFileSync('package.json', 'utf8')) as {scripts: Record<string, string>}).scripts['build:game']);
+  expect(script).toMatch(/^python3 scripts\/heavy-lane\.py build --max "\$\{WS_BUILD_MAX_MINUTES:-30\}" -- /u);
+  const step = workflow.slice(workflow.indexOf('name: Build, upload and check the Explore page'), workflow.indexOf('name: Attach'));
+  expect(Number(/WS_BUILD_MAX_MINUTES: '?(\d+)/u.exec(step)?.[1])).toBeGreaterThanOrEqual(60);
+  expect(Number(/timeout-minutes: (\d+)/u.exec(workflow)?.[1])).toBeGreaterThanOrEqual(150);
+});

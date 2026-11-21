@@ -31,7 +31,7 @@ concurrency:
 jobs:
   explore:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
     steps:
@@ -66,8 +66,10 @@ jobs:
       # The Cloudflare token reaches wrangler only through the environment; page-release.mjs redacts it from all output.
       # --content publishes dist-content/ to packs.wildshard.io first; a new set copies unchanged files from the last one
       # on R2 (server side) and puts the rest through S3 with the bucket-scoped keys, as preview.yml does.
+      # staging's catalogue cooks every pin on a cold runner (over 30 minutes, run 44939791409): an hour for the build
       - name: Build, upload and check the Explore page
         env:
+          WS_BUILD_MAX_MINUTES: 60
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
