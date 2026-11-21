@@ -2818,8 +2818,8 @@ export const MUSIC_MANIFESTS: Readonly<Record<string, unknown>> = {
     "duration": 61.5467
    },
    "island": {
-    "calm": "island-calm-d256be45.m4a",
-    "tension": "island-tension-aac7c988.m4a",
+    "calm": "island-calm-d4e3ea34.m4a",
+    "tension": "island-tension-c8d2932e.m4a",
     "bpm": 76.781,
     "beatsPerBar": 4,
     "loopStart": 14.3035,

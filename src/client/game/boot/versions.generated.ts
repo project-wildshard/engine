@@ -318,7 +318,7 @@ export const ASSET_VERSIONS: Readonly<Record<string, string>> = {
   "/assets/music/patchwork-fairground/music.json": '310052c2',
   "/assets/music/patchwork-fairground/take-a-9218b66bf0b9.m4a": '9218b66b',
   "/assets/music/patchwork-fairground/take-b-0e7f6f396f9d.m4a": '0e7f6f39',
-  "/assets/music/piano/music.json": 'e266e53c',
+  "/assets/music/piano/music.json": '98e26fd3',
   "/assets/music/pine-hollow-piano/music.json": '64a1d36d',
   "/assets/music/saltwind-lighthouse/music.json": '044784de',
   "/assets/music/saltwind-lighthouse/take-a-d962afb1ace0.m4a": 'd962afb1',
