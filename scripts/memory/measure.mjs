@@ -343,13 +343,18 @@ export async function minimiseInspector(page) {
 /** Is the page still on the session minimiseInspector turned down? @param {any} page @param {any} session */
 export function sameInspectorSession(page, session) { return page?._connection?.toImpl?.(page)?.delegate?._session === session; }
 
-/** Wait for control or the error card. @param {any} page @param {number} timeoutMs @param {boolean} [requireLedger] */
-export async function untilControl(page, timeoutMs, requireLedger = false) {
-  await page.waitForFunction((/** @type {boolean} */ needCheckpoint) => (
-    Boolean(document.querySelector('#wserr .msg')?.textContent)
-    || (!document.querySelector('.ws-load') && Boolean(Reflect.get(window, '__wildshard')?.world?.game)
-      && (!needCheckpoint || Reflect.get(window, '__memoryRun')?.steps.some((/** @type {StepRow} */ row) => row[1] === 'control' && row[2])))
-  ), requireLedger, { timeout: timeoutMs, polling: 250 });
+/** Wait for control or the error card. The Chromium ledger also needs a completed draw after control-ready.
+ * @param {any} page @param {number} timeoutMs @param {boolean} [requireSettledFrame] */
+export async function untilControl(page, timeoutMs, requireSettledFrame = false) {
+  await page.waitForFunction((/** @type {boolean} */ needFrame) => {
+    if (document.querySelector('#wserr .msg')?.textContent) return true;
+    const game = Reflect.get(window, '__wildshard')?.world?.game;
+    if (!game || document.querySelector('.ws-load')) return false;
+    if (!needFrame) return true;
+    const run = Reflect.get(window, '__memoryRun');
+    return run?.controlFrame?.game.deref() === game && game.frameCount > run.controlFrame.frame
+      && run.steps.some((/** @type {StepRow} */ row) => row[1] === 'control' && row[2]);
+  }, requireSettledFrame, { timeout: timeoutMs, polling: 250 });
   return /** @type {string | null} */ (await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null));
 }
 
@@ -557,8 +562,8 @@ export function webkitCalibration() { return JSON.parse(readFileSync(new URL('ca
 /** The ledger counts a buffer until a GC clears its weak reference (memoryAttribution.ts), so a control read taken the
  * moment the card goes can still hold garbage. Nalati's array buffers read 86.3 MB at control in twelve main runs, after
  * a 22.7 MB drop whose step moved between readyFrame and audio, and 109.0 MB in v0.1.45's run 44398174924 where that
- * drop never came before control. Control is the reading after one page.requestGC(); the boot's own checkpoints stay
- * the peak. @param {readonly {step:string, ledger:any}[]} checkpoints @param {any} settled */
+ * drop never came before control. Control is the reading after a completed control draw and one page.requestGC(); keep
+ * the boot's own control checkpoint as unsettled evidence. @param {readonly {step:string, ledger:any}[]} checkpoints @param {any} settled */
 export function settleControl(checkpoints, settled) {
   const last = checkpoints.findLastIndex(row => row.step === 'control');
   if (last === -1 || settled === null || settled === undefined) return [...checkpoints];
@@ -568,27 +573,35 @@ export function settleControl(checkpoints, settled) {
 /** Read the page's checkpoint ledger without requesting browser process dumps during boot.
  * @param {import('playwright').Page} page @param {string} url @param {number} timeoutMs */
 async function chromiumLedger(page, url, timeoutMs) {
+  // Low resizes the cleared shadow maps during the next draw after this event. On SwiftShader the loading
+  // card can be gone long before that draw; reading earlier counts the full boot shadow targets at control.
+  await page.addInitScript(() => {
+    document.addEventListener('ws:control-ready', () => {
+      const game = Reflect.get(window, '__wildshard')?.world?.game;
+      const run = Reflect.get(window, '__memoryRun');
+      if (game && run) run.controlFrame = { game: new WeakRef(game), frame: game.frameCount };
+    });
+  });
   let failure = null;
   try {
     await page.goto(url, { waitUntil: 'commit' });
     failure = await untilControl(page, timeoutMs, true);
   } catch (error) {
     if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
-    failure = error.message;
+    failure = `Waiting for the completed control draw: ${error.message}`;
   }
-  const { steps, gpuDetail } = await page.evaluate(() => ({
-    steps: /** @type {StepRow[]} */ (Reflect.get(window, '__memoryRun')?.steps ?? []),
-    gpuDetail: Reflect.get(globalThis, '__wildshardMemory')?.gpu?.() ?? null,
-  }));
+  if (failure === null) await page.requestGC();
+  const { steps, settled, gpuDetail } = await page.evaluate(() => {
+    const memory = Reflect.get(globalThis, '__wildshardMemory');
+    return {
+      steps: /** @type {StepRow[]} */ (Reflect.get(window, '__memoryRun')?.steps ?? []),
+      settled: memory?.counters?.() ?? null,
+      gpuDetail: memory?.gpu?.() ?? null,
+    };
+  });
   let checkpoints = steps.map(([, step, ledger]) => ({ step, ledger, processes: [] }));
-  if (failure === null && !checkpoints.some(row => row.step === 'control' && row.ledger)) {
-    failure = 'Boot did not record a control ledger';
-  }
-  if (failure === null) {
-    await page.requestGC();
-    const settled = await page.evaluate(() => { try { return Reflect.get(globalThis, '__wildshardMemory')?.counters?.() ?? null; } catch { return null; } });
-    checkpoints = settleControl(checkpoints, settled);
-  }
+  if (failure === null && settled === null) failure = 'Missing ledger after the completed control draw';
+  if (failure === null) checkpoints = settleControl(checkpoints, settled);
   const timeline = failure === null ? undefined : await Promise.race([
     page.evaluate(bootTimelineEntries).catch(() => null),
     sleep(2000, null, { ref: false }),

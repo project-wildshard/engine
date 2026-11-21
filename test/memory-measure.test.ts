@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
-import {expect,test} from 'vitest';
+import {expect,test,vi} from 'vitest';
 import {parseGridCatalogue} from '../src/shared/game/grid/catalogue';
-import {stepCheckpoints,settleControl,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
+import {stepCheckpoints,settleControl,untilControl,refusal,ledgerByKind,stats,dumpsInOrder,bootURL,bootOf,isServerWorker,webkitLines,PROTOCOL,ladderParts,ledgerTotal,ladderLines,ledgerParity,predictFootprint,categoryRemainder,addCategories,builtGridCell,placeOffGrid,ringThree} from '../scripts/memory/measure.mjs';
 
 const procs=[{pid:1,role:'webcontent',name:'wc'},{pid:2,role:'gpu',name:'gpu'},{pid:3,role:'networking',name:'net'}];
 const sample=(seq:number,t:number,wc:[number,number],gpu:[number,number])=>({seq,t,p:{'1':wc,'2':gpu,'3':[9e9,9e9] as [number,number]}});
@@ -134,4 +134,30 @@ test('control is the ledger after a GC; the boot checkpoints stay the peak (v0.1
   // no settled read (the page published no counters) keeps the boot's own reading
   expect(settleControl(boot, null)).toEqual(boot);
   expect(settleControl([{step: 'audio', ledger: ab(1)}], ab(0))).toEqual([{step: 'audio', ledger: ab(1)}]);
+});
+
+test('Chromium control waits for a draw from the game that signalled control-ready', async () => {
+  const game = { frameCount: 4 };
+  const world = { game };
+  const run = { steps: [[0, 'control', { gpu: { texture: 18_708_564 } }]], controlFrame: null as { game: WeakRef<typeof game>; frame: number } | null };
+  vi.stubGlobal('document', { querySelector: () => null });
+  vi.stubGlobal('window', { __wildshard: { world }, __memoryRun: run });
+  try {
+    const page = {
+      waitForFunction: (ready: (requireSettledFrame: boolean) => boolean, requireSettledFrame: boolean) => {
+        expect(ready(requireSettledFrame)).toBe(false); // The card already went and boot drew warm frames.
+        run.controlFrame = { game: new WeakRef(game), frame: game.frameCount };
+        expect(ready(requireSettledFrame)).toBe(false); // The next draw has yet to resize the shadow targets.
+        world.game = { frameCount: 7 };
+        expect(ready(requireSettledFrame)).toBe(false);
+        world.game = game;
+        game.frameCount++;
+        expect(ready(requireSettledFrame)).toBe(true);
+      },
+      evaluate: (read: () => unknown) => read(),
+    };
+    await expect(untilControl(page, 1_000, true)).resolves.toBeNull();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
