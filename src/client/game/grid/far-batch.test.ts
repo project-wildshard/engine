@@ -41,3 +41,20 @@ test('proxies of one program share a batch that follows each proxy', () => {
   batches.dispose();
   expect(scene.children.filter(child => child.name === 'far-batch')).toEqual([]);
 });
+
+test('DF8 (debug.programReuse): a group keeps one material across rebuilds, so its program is never freed', () => {
+  const scene = new THREE.Scene(), batches = new FarBatches(scene, true);
+  const roots = [0, 1].map(i => { const root = new THREE.Group(); root.position.set(i * 100, 0, 0); scene.add(root); return root; });
+  const [a, b] = roots.map(root => installFarProxy(root, proxyGeometry(), look('toon')));
+  if (a === undefined || b === undefined) throw new Error('two proxies');
+  expect(batches.adopt(a, look('toon'), false)).toBe(true);
+  const first = batches.batches()[0]?.material;
+  let disposed = 0;
+  if (first instanceof THREE.Material) first.addEventListener('dispose', () => { disposed++; });
+  expect(batches.adopt(b, look('toon'), false)).toBe(true); // a rebuild: the old batch retires, its material stays
+  expect(batches.batches()[0]?.material).toBe(first);
+  expect(batches.batches()[0]?.instanceCount).toBe(2);
+  b.dispose(); a.dispose(); // the group empties: its material goes
+  expect(disposed).toBe(1);
+  batches.dispose();
+});

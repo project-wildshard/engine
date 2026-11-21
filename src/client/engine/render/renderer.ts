@@ -23,6 +23,7 @@ import { installCookedSkinUvBinding, installProvokingVertex } from './drawHooks'
 import { installPassSplit, passSplitLimit, PASS_SPLIT_VERTICES } from './passSplit';
 import { installByteTriples } from './byteTriples';
 import { installVertexPack, VERTEX_PACK_SLOT, vertexPackWanted } from './vertexPack';
+import { programReuseOn } from './programReuse';
 import { jsonSlot } from '../saves/slots';
 import { TIER } from '../core/tier';
 import { gltfOpaqueSort } from './gltfMaterialOrder';
@@ -53,6 +54,9 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   // program: 175 ms of a Nalati crossing's shader warm-up); the warm-up reads one link status instead and reports a
   // failure as three would (precompile.ts reportLinkFailure)
   renderer.debug.checkShaderErrors = false;
+  // DF8: a live custom program holds its shader stages (`debug.programReuse`, off; vite/threeHeldShaderStages.ts), so a
+  // revisited cell's graph materials reuse the programs the grid keeper pinned rather than linking identical twins
+  Reflect.set(renderer, 'wsHeldShaderStages', programReuseOn());
   renderer.setOpaqueSort(gltfOpaqueSort);
   installRenderListSort(renderer); // STR20: render lists sort in place, no work array per sort
   installUniformCacheKinds(renderer); // D180: float uniform caches keep double elements (uniformCaches.ts)

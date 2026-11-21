@@ -7,6 +7,7 @@ import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import type { FarLookRuntime } from '../../../shared/game/grid/farProxy';
 import { farProxyMaterial, type FarProxyView } from './farView';
+import { programReuseOn } from '@wildshard/engine/render/programReuse';
 
 /**
  * DF10 (mini-df10d): the far ring's proxies drawn as one multi-draw batch per program. Each neighbour cell's far proxy was
@@ -60,13 +61,14 @@ function shown(object: THREE.Object3D): boolean {
   return true;
 }
 
-/** the batched copy of a group's program: the flags and band read from the data texture by the copy's draw id */
-function batchMaterial(look: FarLookRuntime, positionalMask: boolean, data: THREE.DataTexture): THREE.Material {
+/** the batched copy of a group's program: the flags and band read from the data texture by the copy's draw id (`data`'s
+ *  value: a kept material's holder follows its group's texture) */
+function batchMaterial(look: FarLookRuntime, positionalMask: boolean, data: { value: THREE.DataTexture }): THREE.Material {
   const { material } = farProxyMaterial(look, positionalMask, false);
   const reader = `uniform highp sampler2D farBatchData;
 float farMaskAt(float id, int r) { return texelFetch(farBatchData, ivec2(r / 4, int(id)), 0)[r - (r / 4) * 4]; }`;
   patchShader(material, 'df10-far-batch', 1, (shader): void => {
-    shader.uniforms['farBatchData'] = { value: data };
+    shader.uniforms['farBatchData'] = data;
     shader.vertexShader = shader.vertexShader
       .replace(`uniform float farMask[${String(MASKS)}];`, `${reader}\nflat varying float vFarBatchId;\nfloat farBatchId;`)
       .replace('#include <batching_vertex>', '#include <batching_vertex>\nfarBatchId = getIndirectIndex(gl_DrawID);\nvFarBatchId = farBatchId;')
@@ -85,15 +87,17 @@ export class FarBatch extends ChangedBatchedMesh {
   /** the copies' flags and band (absent on a copy three's clone made: it draws what it was copied with) */
   private flags: { readonly data: THREE.DataTexture; readonly bytes: Uint8Array } | null = null;
   private retired = false;
-  /** a batch of `members`, its flags and band in `data` (whose pixels are `bytes`) */
-  static of(members: readonly Member[], data: THREE.DataTexture, bytes: Uint8Array, material: THREE.Material): FarBatch {
+  /** DF8 (`debug.programReuse`): the material is its group's, kept across rebuilds; the group disposes it */
+  private sharedMaterial = false;
+  /** a batch of `members`, its flags and band in `data` (whose pixels are `bytes`); `shared`: the material outlives it */
+  static of(members: readonly Member[], data: THREE.DataTexture, bytes: Uint8Array, material: THREE.Material, shared = false): FarBatch {
     const vertices = members.reduce((sum, member) => sum + member.geometry.getAttribute('position').count, 0);
     const indices = members.reduce((sum, member) => sum + (member.geometry.index?.count ?? 0), 0);
     // three's constructor signature, so its clone (`new this.constructor(...)`) still makes a batch
     const batch = new FarBatch(members.length, vertices, Math.max(1, indices), material);
     batch.name = 'far-batch'; batch.frustumCulled = false; batch.perObjectFrustumCulled = true; batch.sortObjects = false;
     batch.castShadow = false; batch.receiveShadow = false; batch.matrixAutoUpdate = false;
-    batch.flags = { data, bytes };
+    batch.flags = { data, bytes }; batch.sharedMaterial = shared;
     for (const member of members) {
       const geometry = batch.addGeometry(member.geometry);
       member.instance = batch.addInstance(geometry);
@@ -110,7 +114,7 @@ export class FarBatch extends ChangedBatchedMesh {
     this.retired = true;
     this.removeFromParent(); this.dispose();
     const material: unknown = this.material;
-    if (isMaterial(material)) material.dispose();
+    if (isMaterial(material) && !this.sharedMaterial) material.dispose();
   }
   /** each copy's visibility, flags and band, as its proxy has them now */
   sync(): void {
@@ -140,8 +144,12 @@ export class FarBatch extends ChangedBatchedMesh {
 
 /** The far ring's batches, one per program, under `parent` (the scene). */
 export class FarBatches {
-  private readonly groups = new Map<string, { look: FarLookRuntime; positionalMask: boolean; members: Member[]; batch: FarBatch | null; data: THREE.DataTexture | null; bytes: Uint8Array; rows: number }>();
-  constructor(private readonly parent: THREE.Object3D) {}
+  private readonly groups = new Map<string, { look: FarLookRuntime; positionalMask: boolean; members: Member[]; batch: FarBatch | null; data: THREE.DataTexture | null; bytes: Uint8Array; rows: number;
+    /** DF8 (`debug.programReuse`): the group's one material and its texture holder, kept across rebuilds */
+    material: THREE.Material | null; holder: { value: THREE.DataTexture } | null }>();
+  /** DF8 (mini-df8): a group keeps one material across rebuilds, so a ring change never frees its program and links it
+   *  again at the next draw (a new material per rebuild disposed the old one first: its program went with it) */
+  constructor(private readonly parent: THREE.Object3D, private readonly keepMaterials: boolean = programReuseOn()) {}
 
   /** Draw `view` in its group's batch, if it can be (a far ring proxy with a recorded program state); returns whether it
    *  joined. Its own mesh stops drawing; its dispose leaves the batch. */
@@ -151,7 +159,7 @@ export class FarBatches {
     const signature = Object.keys(geometry.attributes).sort().map(name => `${name}:${String(geometry.getAttribute(name).itemSize)}`).join(',');
     const key = `${look.family}|${positionalMask ? 'position' : 'region'}|${signature}|${geometry.index === null ? 'flat' : 'indexed'}`;
     let group = this.groups.get(key);
-    if (group === undefined) { group = { look, positionalMask, members: [], batch: null, data: null, bytes: EMPTY, rows: 0 }; this.groups.set(key, group); }
+    if (group === undefined) { group = { look, positionalMask, members: [], batch: null, data: null, bytes: EMPTY, rows: 0, material: null, holder: null }; this.groups.set(key, group); }
     const member: Member = { view, material, geometry, instance: -1 };
     group.members.push(member);
     view.mesh.layers.disableAll();
@@ -169,7 +177,7 @@ export class FarBatches {
     const group = this.groups.get(key);
     if (group === undefined) return;
     if (group.batch !== null) { group.batch.retire(); group.batch = null; }
-    if (group.members.length === 0) { group.data?.dispose(); group.data = null; this.groups.delete(key); return; }
+    if (group.members.length === 0) { group.data?.dispose(); group.data = null; group.material?.dispose(); group.material = null; this.groups.delete(key); return; }
     if (group.data === null || group.rows < group.members.length) {
       group.data?.dispose();
       const rows = Math.max(8, 2 ** Math.ceil(Math.log2(group.members.length)));
@@ -178,8 +186,14 @@ export class FarBatches {
       data.magFilter = THREE.NearestFilter; data.minFilter = THREE.NearestFilter; data.generateMipmaps = false; data.needsUpdate = true;
       group.data = data; group.bytes = bytes; group.rows = rows;
     }
-    const material = batchMaterial(group.look, group.positionalMask, group.data);
-    const batch = FarBatch.of(group.members, group.data, group.bytes, material);
+    let material: THREE.Material;
+    if (this.keepMaterials) {
+      group.holder ??= { value: group.data };
+      group.holder.value = group.data;
+      group.material ??= batchMaterial(group.look, group.positionalMask, group.holder);
+      material = group.material;
+    } else material = batchMaterial(group.look, group.positionalMask, { value: group.data });
+    const batch = FarBatch.of(group.members, group.data, group.bytes, material, this.keepMaterials);
     this.parent.add(batch); batch.updateMatrixWorld(true);
     group.batch = batch;
   }
@@ -188,7 +202,7 @@ export class FarBatches {
   batches(): readonly FarBatch[] { return [...this.groups.values()].flatMap(group => group.batch === null ? [] : [group.batch]); }
 
   dispose(): void {
-    for (const group of this.groups.values()) { group.batch?.retire(); group.data?.dispose(); }
+    for (const group of this.groups.values()) { group.batch?.retire(); group.data?.dispose(); group.material?.dispose(); }
     this.groups.clear();
   }
 }
