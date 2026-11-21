@@ -8,6 +8,8 @@ type CheckObservations = ShardfileEntryProof & PerformanceObservations;
 export interface ShardfileCheckOptions {
   readonly sections?: ReadonlyMap<string, unknown>;
   readonly policy?: 'warn' | 'refuse';
+  /** SHARD-COMPAT CP10: 'stored' (the cook) checks a file the API already judged at upload; its own facts only warn. */
+  readonly judged?: 'upload' | 'stored';
   readonly validate?: (shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, sections?: ReadonlyMap<string, unknown>) => Promise<CheckObservations>;
 }
 interface Evidence {
@@ -49,7 +51,9 @@ async function evidence(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array
 export async function checkShardfile(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, options: ShardfileCheckOptions = {}): Promise<ShardfileCheckReport> {
   const checked = await evidence(shard, assets, options);
   const policy = options.policy ?? (shard.runtime === null ? 'refuse' : 'warn');
-  const performance = performanceReport(shard, checked.observed, policy);
+  // Spread, so the format pin before CP10's `judged` option still types; it is inert there.
+  const stored = options.judged === 'stored' ? {judged: 'stored'} as const : {};
+  const performance = performanceReport(shard, checked.observed, options.judged === 'stored' ? {policy, sections: new Map<string, unknown>(), ...stored} : policy);
   const failures = [...checked.failures, ...performance.issues.filter(issue => issue.severity === 'refusal').map(issue => ({code: issue.code, message: `${issue.metric}: ${String(issue.actual)} over ${String(issue.limit)}`}))];
   return {slug: shard.identity.slug, pass: failures.length === 0, proof: checked.proof, performance, failures};
 }

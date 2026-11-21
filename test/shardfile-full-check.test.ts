@@ -19,6 +19,13 @@ describe('the shared full shard check (SP19a)', () => {
     expect(author.proof).toMatchObject({ticks: 240, lanes: 4, steps: 16, portalTransfers: 2});
   });
 
+  it('CP10: the cook checks a stored file, and what it measures on its build still refuses', async () => {
+    const shard = source(); shard.serverBudget.tickMicros = 1;
+    const report = await checkShardfile(shard, new Map(), {validate: () => Promise.resolve(measured()), judged: 'stored'});
+    expect(report.pass).toBe(false);
+    expect(report.failures).toContainEqual({code: 'perf-script-cpu', message: 'script CPU p95 us/tick: 2 over 1'});
+  });
+
   it('preserves a complete entry refusal instead of claiming an empty proof', async () => {
     const message = `Blocked portal route: ${'detail '.repeat(100)}`;
     const options = {validate: () => Promise.reject(new Error(message))};

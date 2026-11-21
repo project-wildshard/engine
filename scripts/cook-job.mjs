@@ -14,7 +14,8 @@ if (tarball === undefined || out === undefined) throw new Error('usage: cook-job
 try {
   const report = await runCookJob(readFileSync(tarball), resolve(out), {
     ...(expectedSlug === undefined ? {} : {expectedSlug}),
-    check: (shard, assets, sections) => checkShardfile(shard, assets, {sections}),
+    // SHARD-COMPAT CP10: the API judged this file at upload; the cook only measures what runs on its build.
+    check: (shard, assets, sections) => checkShardfile(shard, assets, {sections, judged: 'stored'}),
     now: () => performance.now(),
     onPhase: (phase, elapsedMs) => { console.log(`phase ${phase} ${elapsedMs}ms`); },
     ...(process.env.COOK_MAX_SHARDFILE_BYTES === undefined ? {} : { maxBytes: Number(process.env.COOK_MAX_SHARDFILE_BYTES) }),
