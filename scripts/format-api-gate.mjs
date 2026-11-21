@@ -95,7 +95,7 @@ if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.fi
   const { readFileSync } = await import('node:fs');
   const failures = await refsFailures(readFileSync(0, 'utf8'), process.cwd());
   for (const failure of failures) console.error(`format-api-gate: ${failure}`);
-  if (failures.length > 0) process.exit(1);
+  if (failures.length > 0) process.exitCode = 1;
 } else if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
   // `node scripts/format-api-gate.mjs`: this checkout's lock against the API, whether or not the pin moved.
   const { readFileSync } = await import('node:fs');
