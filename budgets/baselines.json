@@ -1812,6 +1812,46 @@
    "contentKey": "sunscar-dunes@5",
    "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
    "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
+  },
+  "download/phone/mirror-salt": {
+   "value": 5682852,
+   "contentKey": "mirror-salt@5",
+   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+  },
+  "download/phone/mossgate": {
+   "value": 9406001,
+   "contentKey": "mossgate@21",
+   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+  },
+  "render/phone-low/triangles/mirror-salt": {
+   "value": 195350,
+   "contentKey": "mirror-salt@5",
+   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+  },
+  "render/phone-low/draws/mirror-salt": {
+   "value": 150,
+   "contentKey": "mirror-salt@5",
+   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+  },
+  "render/phone-low/programs/mirror-salt": {
+   "value": 44,
+   "contentKey": "mirror-salt@5",
+   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+  },
+  "render/phone-low/triangles/mossgate": {
+   "value": 1397573,
+   "contentKey": "mossgate@21",
+   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+  },
+  "render/phone-low/draws/mossgate": {
+   "value": 158,
+   "contentKey": "mossgate@21",
+   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+  },
+  "render/phone-low/programs/mossgate": {
+   "value": 100,
+   "contentKey": "mossgate@21",
+   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
   }
  }
 }
