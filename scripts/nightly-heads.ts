@@ -11,7 +11,7 @@ import {captureNightlyBootFrame, nightlyDrawSamples, NIGHTLY_FRAME_LIMIT as HOVE
 import {sweepExplorer} from './parity/explorer-smoke.mjs';
 import {serve} from './parity/serve.mjs';
 import {levelDownloadFixtures, saveFixture} from './debug-settings.mjs';
-import {partition, plan, read, requireBuild, type HeadResult, type HeadsReport} from './nightly-model.ts';
+import {headGroups, plan, read, requireBuild, type HeadResult, type HeadsReport} from './nightly-model.ts';
 import type {CookIndex} from '../src/cook/game/cookWorker.ts';
 import type {StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
@@ -26,7 +26,8 @@ const {packsBookPath} = await import('../src/shared/game/shardfile/spawnManifest
 const [browserName, groupText, directory = 'tmp/nightly/reports', only, fault = 'none'] = process.argv.slice(2);
 if (browserName !== 'chromium' && browserName !== 'webkit') throw new Error('Choose chromium or webkit');
 if (fault !== 'none' && (fault !== 'hover-control' || only === undefined)) throw new Error('A hover-control fault requires a single diagnostic head');
-const expected = plan(), selected = partition(expected.heads, Number(groupText));
+const expected = plan(), selected = headGroups(expected.heads, browserName)[Number(groupText)];
+if (selected === undefined) throw new Error('Invalid nightly partition');
 if (only !== undefined && !selected.some(row => row.slug === only)) throw new Error('Head outside partition');
 const out = resolvePath(directory), root = process.cwd(), dist = join(root, 'dist');
 mkdirSync(out, {recursive: true});

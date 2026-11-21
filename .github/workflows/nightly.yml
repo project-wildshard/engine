@@ -296,7 +296,7 @@ jobs:
         id: head
         run: |
           node --test scripts/nightly-head-group.proof.ts
-          echo "group=$(node scripts/nightly-head-group.ts "$NIGHTLY_HEAD")" >> "$GITHUB_OUTPUT"
+          echo "group=$(node scripts/nightly-head-group.ts "$NIGHTLY_HEAD" "$NIGHTLY_BROWSER")" >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/ring-setup
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:

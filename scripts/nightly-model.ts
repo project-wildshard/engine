@@ -16,9 +16,10 @@ export interface Row extends Head {browser: string; phase: string; ok: boolean; 
 export interface Verdict {version: number; sha: string; pins: string; testList: string; ok: boolean; tag: string; rows: Row[]; failures: Failure[];
   tests: {group: number; ok: boolean; files: number; assertions: number}[];
   run?: string | null; baseline: {sha: string; run: string | null} | null; newFailures: string[]; resolved: string[]}
-export const browsers = ['chromium', 'webkit'];
+export const browsers = ['chromium', 'webkit'] as const;
+export type NightlyBrowser = typeof browsers[number];
 export const phases = ['cook', 'boot', 'hover', 'draw', 'explorer'];
-export const groups = 4;
+const sharedGroups = 4;
 export const testGroups = 2;
 export const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
@@ -36,9 +37,14 @@ export function plan(root = process.cwd()): Plan {
     pins: digest(shards), testList: digest(tests), heads, tests};
 }
 
-export function partition(heads: Head[], group: number): Head[] {
-  if (!Number.isInteger(group) || group < 0 || group >= groups) throw new Error('Invalid nightly partition');
-  return heads.filter((_, index) => index % groups === group);
+export function headGroups(heads: Head[], browser: NightlyBrowser): Head[][] {
+  // FS30: Pine's cold cook followed Nalati's 28-minute Explorer in the same
+  // Chromium job. Give Pine its own unchanged 75-minute budget and start it
+  // first. Keep the other heads in their existing groups.
+  const pine = browser === 'chromium' ? heads.find(head => head.slug === 'pine-hollow') : undefined;
+  const shared = Array.from({length: sharedGroups}, (_, group) =>
+    heads.filter((head, index) => head !== pine && index % sharedGroups === group));
+  return pine === undefined ? shared : [[pine], ...shared];
 }
 
 export function requireBuild(build: string, expected: Plan): void {

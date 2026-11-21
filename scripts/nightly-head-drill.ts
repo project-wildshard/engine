@@ -4,13 +4,13 @@ import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {partition, phases, plan, read, verdict, type HeadsReport} from './nightly-model.ts';
+import {headGroups, phases, plan, read, verdict, type HeadsReport} from './nightly-model.ts';
 
 const [browser, groupText, directory, slug] = process.argv.slice(2);
 assert.ok(browser === 'chromium' || browser === 'webkit');
 assert.ok(directory !== undefined && slug !== undefined);
 const expected = plan(), group = Number(groupText);
-const head = partition(expected.heads, group).find(row => row.slug === slug);
+const head = headGroups(expected.heads, browser)[group]?.find(row => row.slug === slug);
 assert.ok(head !== undefined, 'Drill requires an actual committed head in its ordinary partition');
 const out = resolve(directory); mkdirSync(out, {recursive: true});
 const records: {name: string; exit: number | null; sha256: string; file: string}[] = [];

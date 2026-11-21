@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {browsers, partition, phases, plan, read, requireBuild, requireGreen, requireLatest, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
+import {browsers, headGroups, phases, plan, read, requireBuild, requireGreen, requireLatest, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
 
 interface Execution {status: number | null; report: Verdict; summary: string}
 interface Fixture {root: string; heads: HeadsReport[]; suite: TestsReport; suites: TestsReport[]; expected: Plan;
@@ -21,8 +21,11 @@ function fixture(run: (context: Fixture) => void): void {
     write('test/pins/shardfiles.json', {shards: Array.from({length: 28}, (_, i) => ({slug: `head-${i}`, hash: String(i).padStart(64, '0')}))});
     write('test/pins/ring-2-tests.json', ['test/journey.test.ts']);
     const expected = plan(root);
-    const heads: HeadsReport[] = browsers.flatMap(browser => Array.from({length: 4}, (_, group) => ({...expected, kind: 'heads' as const, browser, group,
-      results: partition(expected.heads, group).map(head => ({slug: head.slug, hash: head.hash, phases: phases.map(name => ({name, ok: true}))}))})));
+    const heads: HeadsReport[] = [];
+    for (const browser of browsers) for (const [group, members] of headGroups(expected.heads, browser).entries()) {
+      const results = members.map(head => ({slug: head.slug, hash: head.hash, phases: phases.map(name => ({name, ok: true}))}));
+      heads.push({...expected, kind: 'heads', browser, group, results});
+    }
     const suite: TestsReport = {...expected, kind: 'tests', group: 0, groups: 2, exitCode: 0, kitExitCode: 0, totalTests: 1, files: [{path: 'test/journey.test.ts', ok: true, assertions: 1, skipped: 0}]};
     const suites: TestsReport[] = [suite, {...suite, group: 1, files: [{path: 'test/ordinary.test.ts', ok: true, assertions: 1, skipped: 0}]}];
     const execute = (baseline?: string, env: NodeJS.ProcessEnv = {}): Execution => {

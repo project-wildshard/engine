@@ -44,3 +44,15 @@ test('FS30 begins recording live draws before running the hover journey', () => 
   expect(hover).toBeGreaterThan(start);
   expect(source).toContain('await enteredProof');
 });
+
+test('FS30 Pine Chromium gets its own job without duplicating any head', () => {
+  const output = spawnSync(process.execPath, ['scripts/nightly.ts', 'plan'], { encoding: 'utf8', timeout: 5_000 });
+  expect(output.status).toBe(0);
+  const { include } = JSON.parse(output.stdout) as { include: { browser: string; heads: string }[] };
+  const pinned = plan().heads.map(head => head.slug);
+  expect(include.find(row => row.browser === 'chromium' && row.heads.includes('pine-hollow'))?.heads).toBe('pine-hollow');
+  for (const browser of ['chromium', 'webkit']) {
+    const heads = include.filter(row => row.browser === browser).flatMap(row => row.heads.split(',').filter(Boolean));
+    expect(heads.sort()).toEqual(pinned);
+  }
+});
