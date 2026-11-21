@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Scope } from '../../../shared/engine/app/scope';
+import { ownLightUniforms } from './lightUniforms';
 
 /**
  * js-heap H1: the material an instanced draw wears. three keeps one current program per material and re-selects it
@@ -18,6 +19,12 @@ import { Scope } from '../../../shared/engine/app/scope';
 const twins = new WeakMap<THREE.Material, THREE.Material>();
 const made = new WeakSet<THREE.Material>();
 const isMaterial = (value: unknown): value is THREE.Material => value instanceof THREE.Material;
+/** an empty uniform map whose prototype is `shared`: every uniform the material has, or gains, reads through */
+function inheriting(shared: Record<string, THREE.IUniform>): Record<string, THREE.IUniform> {
+  const map: Record<string, THREE.IUniform> = {};
+  Object.setPrototypeOf(map, shared);
+  return map;
+}
 
 /** `material`'s instanced twin (made once, kept while both live); a twin itself stays as it is */
 export function instancedMaterial(material: THREE.Material): THREE.Material {
@@ -30,6 +37,21 @@ export function instancedMaterial(material: THREE.Material): THREE.Material {
   Reflect.defineProperty(twin, '_listeners', { value: {}, writable: true, configurable: true, enumerable: false });
   Reflect.defineProperty(twin, 'version', { get: () => material.version, set: (value: number) => { Reflect.set(material, 'version', value); }, configurable: true });
   Reflect.defineProperty(twin, 'needsUpdate', { get: () => false, set: (value: boolean) => { material.needsUpdate = value; }, configurable: true });
+  // DF10 (mini-df10d): a shader material's twin reads the material's uniforms, but holds its own light uniforms. Shared,
+  // three pointed them at the arrays of whichever render state last selected a program for either: a precompile of the
+  // material (its own scene, lights never set up for a view) left the twin's draws with no sun (direction 0), and its
+  // early-out on an unchanged light-state version never pointed them back. Driftwood's instanced cover, ground cover,
+  // gulls and still kit drew unlit (the cove batch, drawing the material itself, did not: DF10 view 9).
+  if (material instanceof THREE.ShaderMaterial) {
+    let shared: Record<string, THREE.IUniform> | null = null, own: Record<string, THREE.IUniform> = {};
+    Reflect.defineProperty(twin, 'uniforms', {
+      get: () => {
+        if (material.uniforms !== shared) { shared = material.uniforms; own = ownLightUniforms(inheriting(shared)); }
+        return own;
+      },
+      set: (value: Record<string, THREE.IUniform>) => { material.uniforms = value; }, configurable: true,
+    });
+  }
   // the twin's own lifetime: it goes with the material, and forgets the material when it goes first (a resident's owner)
   const lifetime = new Scope('render:instanced-twin');
   lifetime.listenOnceEmitter(material, 'dispose', () => { lifetime.dispose(); twin.dispose(); });
