@@ -2,7 +2,7 @@
 // take desktop-gpu.lock, so a desktop census never queues behind a phone route. Each entry point is read for the lock it
 // takes, and two real lockf holders show the kinds never wait on each other.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
@@ -55,7 +55,10 @@ test('no script builds a lock path of its own', () => {
   expect(own.map((file) => relative(root, file))).toEqual([]);
 });
 
-test('a desktop census and a phone route hold their locks at the same time; neither waits', async () => {
+// BSD lockf(1) is macOS's: the Mac mini, the only host that measures, has /usr/bin/lockf and locks.mjs spawns it. Hosted CI
+// runs Linux, which has no /usr/bin/lockf (engine run 44943266534 went red here), so the live lock check runs on darwin only;
+// the tests above (which lock each entry point takes) run everywhere.
+test.skipIf(process.platform !== 'darwin' || !existsSync('/usr/bin/lockf'))('a desktop census and a phone route hold their locks at the same time; neither waits', async () => {
   const hold = (kind, seconds) => spawn('/usr/bin/lockf', [...lockfArgs(kind, scratch), '/bin/sleep', String(seconds)], { stdio: 'ignore' });
   const free = (file) => spawnSync('/usr/bin/lockf', ['-t', '0', file, '/usr/bin/true']).status === 0;
   const census = hold('desktop', 5);
