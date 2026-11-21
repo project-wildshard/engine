@@ -1228,10 +1228,10 @@
    "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
   },
   "memory/loading/pine-hollow": {
-   "value": 1160033983,
-   "contentKey": "pine-hollow@5",
-   "commit": "890b4833e29949727a5ded6256a7ce7902f351b4",
-   "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
+   "value": 1070884863,
+   "contentKey": "pine-hollow@9",
+   "commit": "c074eaee8ddfd9778f319f27dee824521693b94e",
+   "why": "Pine r9 phone skins (OF23f), memory-footprint run 44839577732 on c074eaee8d: takes back r8's 1.317 GB raise"
   },
   "memory/playing/sunscar-dunes": {
    "value": 522004691,
