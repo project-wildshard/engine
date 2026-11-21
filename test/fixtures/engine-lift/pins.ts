@@ -38,7 +38,14 @@ function inlineProgram(input: unknown, assets: ReadonlyMap<string, Uint8Array>) 
 }
 export const pineLife = inlineProgram(v.parse(v.object({ program: v.unknown() }), await pinePin.product.json('actors/page-life.json')).program, pinePin.assets);
 export const pineShelter = inlineProgram(v.parse(v.object({ program: v.unknown() }), await pinePin.product.json('actors/shelter.json')).program, pinePin.assets);
-export const pineSpecies = pinePin.product.section('actors/species-programs');
+// OF23e4: Pine r10 ships no species programs (its roster is declared), so this is empty from r10 on.
+import { declaredRosterPopulation } from '../../../src/server/game/population/declaredNative';
+import { parseNativePopulationRows } from '@wildshard/format/populationRoster';
+// OF23e4: Pine r10 ships no species programme; its roster names its declared species and hunt, and the engine stands the
+// same programme from them (OF30), so the fixture does too
+export const pineSpecies = pinePin.product.has('actors/species-programs') ? pinePin.product.section('actors/species-programs')
+  : JSON.parse(JSON.stringify(declaredRosterPopulation(pinePin.product.shardfile.rows, pinePin.product.shardfile.creatures,
+    parseNativePopulationRows(await pinePin.product.json('actors/roster.json')))));
 import { parseEliteFeature } from '@wildshard/format/eliteFeature';
 const eliteRows = parseEliteFeature(await pinePin.product.json('actors/elites.json'));
 export const pineElites = { ...eliteRows, fights: eliteRows.fights.map(fight => ({ ...fight, program: parseSpawnScript(fight.program) })) };
