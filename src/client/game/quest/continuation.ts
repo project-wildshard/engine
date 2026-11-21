@@ -7,6 +7,7 @@ import type { ShardContext } from '../plugin/context';
 import { requireClientPlaceSetsBound } from '../shardfile/clientPlaceSets';
 import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
 import { declaredLootEconomy } from '../../../shared/game/shard/declaredRows';
+import { keptItems } from '../../../shared/game/loot/Owned';
 import { defineWorldSceneCatalogue } from '../models/worldSceneCatalogue';
 import { sharedModelContext, type ModelDef } from '@wildshard/engine/models/model';
 import { Sword } from '../weapons/Sword';
@@ -24,7 +25,7 @@ export async function installQuestContinuation(ctx: ShardContext, input: unknown
   const catalogue = entryOwner(ctx.scope, 'collection', row.collection), shell = ctx.game.runtime, world = shell?.world, play = shell?.play;
   if (world === undefined || world === null || play === undefined || play === null) throw new Error('Quest continuation needs its entered world');
   const swords = play.weapons.list.map(({ id }) => play.weapons.get(id)).filter(weapon => weapon instanceof Sword);
-  const economy = declaredLootEconomy(ctx.product.section('economy/loot').rows.loot);
+  const economy = declaredLootEconomy(ctx.product.section('economy/loot').rows.loot, undefined, keptItems(ctx.product.shardfile.items));
   installItemEffects(ctx);
   const cosmeticRows = await ctx.product.json(row.cosmetics.file);
   if (ended(ctx)) return;

@@ -9,6 +9,7 @@ import type { WorldRegistry } from '@wildshard/engine/world/registry';
 import { InteractSfx } from '@wildshard/engine/audio/interactSfx';
 import { isJsonData } from '@wildshard/format/json';
 import { declaredLootEconomy } from '../../../shared/game/shard/declaredRows';
+import { keptItems } from '../../../shared/game/loot/Owned';
 import { enteredPurse } from '../../../shared/game/loot/Purse';
 import { Exchange } from '../../../shared/game/loot/exchange';
 import { ShopPanel, type ShopGood } from '../loot/ui/ShopPanel';
@@ -121,7 +122,7 @@ export function installQuestShop(ctx: ShardContext, input: unknown): () => ShopP
   const runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play;
   if (runtime === undefined || policy === undefined || stall === undefined || world === undefined || world === null || play === undefined || play === null || ctx.scope.disposed) throw new Error('Quest shop requires its entered trader and play owners');
   if (installedShops.has(stall)) throw new Error('Quest shop already installed');
-  const economy = policy.barter ? declaredLootEconomy(ctx.product.section('economy/loot').rows.loot, 'barter') : declaredLootEconomy(ctx.product.section('economy/loot').rows.loot);
+  const economy = policy.barter ? declaredLootEconomy(ctx.product.section('economy/loot').rows.loot, 'barter') : declaredLootEconomy(ctx.product.section('economy/loot').rows.loot, undefined, keptItems(ctx.product.shardfile.items));
   const goods: readonly QuestShopGood[] = economy.goods;
   if (goods.length !== Object.keys(policy.after).length || goods.some(good => policy.after[good.id] === undefined)) throw new Error('Quest shop requires exact purchase feedback');
   const loadout = policy.ammunition === undefined ? null : enteredHeldLoadout(ctx.scope, policy.ammunition.loadout);

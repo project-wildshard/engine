@@ -9,7 +9,7 @@ import { publishOwned } from '@wildshard/engine/sim/shardRows';
 import { addInventory, takeInventory } from '../../../shared/game/inventoryLaw';
 import { heldAmmunition } from '../loadout/nativeAmmunition';
 import { Exchange } from '../../../shared/game/loot/exchange';
-import { isCosmetic, isOwnedId, Owned } from '../../../shared/game/loot/Owned';
+import { keptItems, Owned } from '../../../shared/game/loot/Owned';
 import { Purse } from '../../../shared/game/loot/Purse';
 import { VehicleGarage } from '../../../shared/game/loot/vehicleGarage';
 import { installOwnedEffects } from '../loadout/ownedEffects';
@@ -71,8 +71,8 @@ export class PlayerOwned {
   private readonly finishIds = new Set<string>();
   private readonly purchases = new Map<number, number>();
   private readonly inventory: OwnedSlots['inventory'];
-  constructor(readonly shard: string, slots: OwnedSlots = SESSION_SLOTS, finishes: readonly string[] = []) {
-    this.purse = new Purse(shard, slots.purse); this.owned = new Owned(shard, slots.owned); this.garage = new VehicleGarage(shard, slots.vehicles ?? vehicleGarageSave); this.slot = saveSlug(shard); this.inventory = slots.inventory;
+  constructor(readonly shard: string, slots: OwnedSlots = SESSION_SLOTS, finishes: readonly string[] = [], items?: Parameters<typeof keptItems>[0]) {
+    this.purse = new Purse(shard, slots.purse); this.owned = new Owned(shard, slots.owned, keptItems(items)); this.garage = new VehicleGarage(shard, slots.vehicles ?? vehicleGarageSave); this.slot = saveSlug(shard); this.inventory = slots.inventory;
     const saved = slots.inventory.read(this.slot);
     this.counts = { ...saved.counts }; this.order = [...saved.order];
     for (const id of finishes) this.finishIds.add(id);
@@ -90,7 +90,7 @@ export class PlayerOwned {
   /** One grant the tick filed: coins to the purse, an item to the gear it names or the pack. */
   file(filing: Pick<LedgerFiling, 'grant' | 'name' | 'amount'>): void {
     if (filing.grant === 'coins') this.purse.add(filing.amount);
-    else if (filing.grant === 'item') { if (this.finishIds.has(filing.name)) return; if (isOwnedId(filing.name)) this.owned.grant(filing.name); else this.add(filing.name, filing.amount); }
+    else if (filing.grant === 'item') { if (this.finishIds.has(filing.name)) return; if (this.owned.kept.has(filing.name)) this.owned.grant(filing.name); else this.add(filing.name, filing.amount); }
   }
   /** Death rewards belong to the server, including a drop no page has drawn yet. */
   creatures(host: SimHost, source: Shardfile, profiles?: CreatureRewardStore): void {
@@ -207,7 +207,7 @@ export class PlayerOwned {
     for (const [good, count] of this.purchases) out.set(`${OWNED_ROW.purchase}${String(good)}`, count);
     out.set(OWNED_ROW.coins, this.purse.coins);
     if (pack) for (const id of this.order) out.set(`${OWNED_ROW.item}${id}`, this.counts[id] ?? 0);
-    for (const id of this.owned.all) out.set(`${OWNED_ROW.owned}${id}`, isCosmetic(id) && this.owned.worn(id) ? WORN_LINE : 1);
+    for (const id of this.owned.all) out.set(`${OWNED_ROW.owned}${id}`, this.owned.kept.cosmetic(id) && this.owned.worn(id) ? WORN_LINE : 1);
   }
 }
 
@@ -218,13 +218,13 @@ export interface OwnedBook { readonly of: (player: string) => PlayerOwned; /** A
 export function installPlayerOwned(host: SimHost, shard: string, economy: unknown, pack: boolean, stores?: OwnedStores, source?: Shardfile, profiles?: CreatureRewardStore): OwnedBook {
   const routes = actRoutes(host), seats = new Map<string, PlayerOwned>(), effects = new Map<string, () => void>(), shopped = economy !== null && economy !== undefined && routes.buy === null;
   const open = (slots?: OwnedSlots): PlayerOwned => {
-    const owned = new PlayerOwned(shard, slots, Object.keys(source?.items.pickups ?? {}));
+    const owned = new PlayerOwned(shard, slots, Object.keys(source?.items.pickups ?? {}), source?.items);
     if (shopped) owned.trade(economy, new Map<string, unknown>([['skins', { owns: (id: string) => owned.owned.has(id), own: (id: string) => { owned.owned.grant(id); } }], ['ammo', { capacity: (kind: string, n: number) => heldAmmunition(host)?.room(kind, n) ?? false, addBolts: (n: number) => { heldAmmunition(host)?.addBolts(n); }, grant: (kind: string, n: number) => { heldAmmunition(host)?.add(kind, n); } }]]));
     return owned;
   };
   const session = stores === undefined ? open() : null;
   if (source !== undefined && session !== null) installOwnedEffects(host, session.owned, source);
-  if (source !== undefined) (session ?? new PlayerOwned(shard)).creatures(host, source, profiles);
+  if (source !== undefined) (session ?? new PlayerOwned(shard, undefined, [], source.items)).creatures(host, source, profiles);
   const of = (player: string): PlayerOwned => {
     if (session !== null) return session;
     let seat = seats.get(player);
@@ -238,7 +238,7 @@ export function installPlayerOwned(host: SimHost, shard: string, economy: unknow
   const keepsakes = source === undefined ? null : installKeepsakeProgression(host, source, () => session !== null
     ? [[questBooks(host).lead.player, session.owned] as const] : [...seats].map(([player, seat]) => [player, seat.owned] as const));
   publishOwned(host, 'player', (player, out) => { of(player).read(out, pack); });
-  routes.wear = (player, id) => { const { owned } = of(player); if (isOwnedId(id) && isCosmetic(id) && owned.has(id)) owned.toggleWorn(id); };
+  routes.wear = (player, id) => { const { owned } = of(player); if (owned.kept.cosmetic(id) && owned.has(id)) owned.toggleWorn(id); };
   if (shopped) routes.buy = (player, good) => { of(player).buy(good); };
   return { of, drop: player => { keepsakes?.(player); effects.get(player)?.(); effects.delete(player); seats.delete(player); } };
 }

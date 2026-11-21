@@ -65,7 +65,7 @@ export class PlayerStore {
  * Fact identities that cannot be reconstructed are quarantined rather than guessed. */
 export function recoverPlayer(doc: PlayerDoc, receipts: readonly SaveReceipt[], input: HeadlessRuntimeInput, shard: string): PlayerDoc {
   if (receipts.length === 0) return doc;
-  const store = new PlayerStore(doc.store, () => undefined), goods = new PlayerOwned(shard, store.slots, Object.keys(input.shard.items.pickups ?? {}));
+  const store = new PlayerStore(doc.store, () => undefined), goods = new PlayerOwned(shard, store.slots, Object.keys(input.shard.items.pickups ?? {}), input.shard.items);
   const rows = [...doc.ledger.rows]; let serial = doc.ledger.serial;
   for (const receipt of receipts) {
     if (receipt.serial <= serial) throw new Error('Recovery receipts are out of order');

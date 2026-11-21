@@ -1,6 +1,6 @@
 import type { FindsCatalogueRows } from '../bag/findsCatalogue';
 import { parseLootEconomy, parseBarterEconomy, type BarterEconomy, type LootEconomy } from '@wildshard/format/lootEconomy';
-import { isOwnedId, isCosmetic, type OwnedId, type CosmeticId } from '../loot/Owned';
+import { keptItems, type KeptItems, type OwnedId, type CosmeticId } from '../loot/Owned';
 import { Weather, type WeatherProfile } from '@wildshard/engine/world/weather';
 import { DayCycle } from '@wildshard/engine/world/dayCycle';
 import type { Rng } from '@wildshard/format/seededRng';
@@ -99,14 +99,14 @@ export interface DeclaredLootEconomy extends Omit<LootEconomy, 'goods' | 'grants
 }
 /** Resolve portable economy rows before any live state is touched. The current Owned service remains authoritative. */
 export function declaredLootEconomy(rows: ShardRows['loot'], kind: 'barter'): BarterEconomy;
-export function declaredLootEconomy(rows: ShardRows['loot']): DeclaredLootEconomy;
-export function declaredLootEconomy(rows: ShardRows['loot'], kind?: 'barter'): DeclaredLootEconomy | BarterEconomy {
+export function declaredLootEconomy(rows: ShardRows['loot'], kind?: undefined, kept?: KeptItems): DeclaredLootEconomy;
+export function declaredLootEconomy(rows: ShardRows['loot'], kind?: 'barter', kept: KeptItems = keptItems()): DeclaredLootEconomy | BarterEconomy {
   const sources = rows.filter(row => row.economy !== undefined);
   if (sources.length !== 1) throw new Error('Exactly one admitted economy payload is required');
   if (kind === 'barter') return parseBarterEconomy(sources[0]?.economy);
   const economy = parseLootEconomy(sources[0]?.economy);
-  const owned = (id: string): OwnedId => { if (!isOwnedId(id)) throw new Error('Unknown economy ownership'); return id; };
-  const worn = (id: string): CosmeticId => { const key = owned(id); if (!isCosmetic(key)) throw new Error('Economy worn grant requires a cosmetic'); return key; };
+  const owned = (id: string): OwnedId => { if (!kept.has(id)) throw new Error('Unknown economy ownership'); return id; };
+  const worn = (id: string): CosmeticId => { const key = owned(id); if (!kept.cosmetic(key)) throw new Error('Economy worn grant requires a cosmetic'); return key; };
   const grants = <K extends OwnedId>(entries: LootEconomy['grants']['player'], key: (id: string) => K) => entries.map(({ key: id, unless, ...row }) => ({ ...row, key: key(id), ...(unless === undefined ? {} : { unless: unless.map(key) }) }));
   const progression = economy.progression;
   if (progression === undefined) throw new Error('Missing economy progression');

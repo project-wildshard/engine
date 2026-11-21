@@ -14,7 +14,7 @@ import type { Inventory } from '../Inventory';
 import { boardFromLines, OWNED_ROW, WORN_LINE } from '../../../shared/game/loot/ownedRows';
 import type { ContractBoard } from '../../../shared/game/quest/contractBoard';
 import { sandWireName, type ArenaRoomGround } from '../../../shared/game/boss/arenaGround';
-import { isCosmetic, isOwnedId, type Owned } from '../../../shared/game/loot/Owned';
+import type { KeptItems, Owned } from '../../../shared/game/loot/Owned';
 import type { Purse } from '../../../shared/game/loot/Purse';
 import { QuestViewFeed } from '@wildshard/engine/quest/view/replica';
 import type { QuestDef } from '@wildshard/engine/quest/core';
@@ -63,7 +63,7 @@ export const moverLookKey = (instance: string, id: string): string => `${instanc
 export interface WireHoldings {
   /** The shard these lines are this page's for, on a grid page that holds several: the entered one's reach the page. */
   readonly shard?: string;
-  readonly purse?: Pick<Purse, 'mirror'>; readonly inventory?: Pick<Inventory, 'mirror'>; readonly gear?: Pick<Owned, 'grant' | 'worn' | 'toggleWorn'>; readonly board?: Pick<ContractBoard, 'mirror'>;
+  readonly purse?: Pick<Purse, 'mirror'>; readonly inventory?: Pick<Inventory, 'mirror'>; readonly gear?: Pick<Owned, 'grant' | 'worn' | 'toggleWorn'> & { readonly kept?: Pick<KeptItems, 'cosmetic'> }; readonly board?: Pick<ContractBoard, 'mirror'>;
   /** Kill totals from the server; discoveries remain the page's. */
   readonly journal?: { readonly mirrorKills: (id: string, taken: number, best: number) => void };
   /** Pending finish pickups, with their authoritative positions. */
@@ -294,7 +294,7 @@ export class WirePage {
     for (const { shard, purse, inventory, gear, board, finishes, journal, drops, said } of this.holdings) {
       if (shard !== undefined && level !== null && shard !== level) continue;
       purse?.mirror(owned.get(OWNED_ROW.coins) ?? 0); inventory?.mirror(pack);
-      for (const [name, value] of owned) if (name.startsWith(OWNED_ROW.owned)) { const id = name.slice(OWNED_ROW.owned.length); gear?.grant(id); if (isOwnedId(id) && isCosmetic(id) && gear?.worn(id) !== (value === WORN_LINE)) gear?.toggleWorn(id); }
+      for (const [name, value] of owned) if (name.startsWith(OWNED_ROW.owned)) { const id = name.slice(OWNED_ROW.owned.length); gear?.grant(id); if (gear?.kept?.cosmetic(id) === true && gear.worn(id) !== (value === WORN_LINE)) gear.toggleWorn(id); }
       if (journal !== undefined) for (const [name, value] of owned) if (name.startsWith(OWNED_ROW.journal) && name.endsWith('.taken')) {
         const id = name.slice(OWNED_ROW.journal.length, -'.taken'.length); journal.mirrorKills(id, value - 1, (owned.get(`${OWNED_ROW.journal}${id}.best`) ?? 1) - 1);
       }

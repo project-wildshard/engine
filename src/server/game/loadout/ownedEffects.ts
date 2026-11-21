@@ -3,7 +3,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
-import { isOwnedId, isCosmetic, type Owned } from '../../../shared/game/loot/Owned';
+import type { Owned } from '../../../shared/game/loot/Owned';
 
 type Grants = NonNullable<Shardfile['items']['loadout']['effects']>['player'];
 const weaponEffects = new WeakMap<SimHost, Map<PlayerSim, (weapon: string, attr: string, base: number) => number>>();
@@ -22,8 +22,8 @@ export function installOwnedEffects(host: SimHost, owned: Owned, source: Shardfi
   const select=(grants:Grants,worn=false): {def:typeof economy.effects[number];stacks:number}[] => {
     const active=new Map<string,{def:typeof economy.effects[number];stacks:number}>();
     for(const grant of grants) {
-      if(!isOwnedId(grant.key)||!owned.has(grant.key)||worn&&(!isCosmetic(grant.key)||!owned.worn(grant.key))
-        ||grant.unless?.some(key=>isOwnedId(key)&&owned.has(key))===true) continue;
+      if(!owned.kept.has(grant.key)||!owned.has(grant.key)||worn&&(!owned.kept.cosmetic(grant.key)||!owned.worn(grant.key))
+        ||grant.unless?.some(key=>owned.kept.has(key)&&owned.has(key))===true) continue;
       const def=definitions.get(grant.id);if(def===undefined) throw new Error('Missing owned effect definition');
       for(const [id,prior] of active) if(def.removes?.includes(prior.def.id)===true||def.group!==undefined&&prior.def.group===def.group) active.delete(id);
       active.set(def.id,{def,stacks:typeof def.stacking==='object'?Math.min(def.stacking.max,grant.stacks??1):1});

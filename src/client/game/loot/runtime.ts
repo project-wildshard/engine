@@ -13,7 +13,7 @@ import { coinsOn, type LootGate } from './coins';
 import type { LootFeed } from './feed';
 import { readOnlySave, wirePage } from '../shardfile/wirePage';
 import { purseSave } from '../../../shared/game/saves';
-import { OWNED,isCosmetic, isOwnedId, type Owned, type OwnedId } from '../../../shared/game/loot/Owned';
+import type { Owned, OwnedId } from '../../../shared/game/loot/Owned';
 import { declaredLootPresentation } from '../../../shared/game/shard/declaredRows';
 import { createFindsCatalogue } from '../../../shared/game/bag/findsCatalogue';
 import { boundQuestState } from '../../../shared/game/quest/boundState';
@@ -92,7 +92,7 @@ export function installLoot<A extends LootBody>(h: ScopedLootHost<A>): ScopedLoo
   installEnteredRuntimeService(ctx, (scope) => {
     if (!live) return;
     const shown = new CoinChip(purse.coins), offBag = bagMenu(h.menu).addLoot('loot', { gear: () => view.gear(purse), finds: view.finds,
-      wear: (id) => { if (!isOwnedId(id) || !isCosmetic(id)) return; wirePage.wear(id); } });
+      wear: (id) => { if (!owned.kept.has(id) || !owned.kept.cosmetic(id)) return; wirePage.wear(id); } });
     chip = shown; entered = true; applyChart();
     const off = (): void => {
       if (chip !== shown) return;
@@ -127,18 +127,18 @@ export function enteredLootPresentation(ctx:ShardContext,id:string,bag?:unknown)
   const economy=admitted,view=economy.presentation,health=ctx.app.player;
   if(health===null)throw new Error('Loot Bag needs its admitted view and native health');
   const flags=boundQuestState(ctx.scope,view.quest).flags,owned=play.owned,audio=play.audio;
-  const ownedId=(key:string):void=>{if(!isOwnedId(key))throw new Error('Unknown Bag ownership');};
+  const ownedId=(key:string):void=>{if(!owned.kept.has(key))throw new Error('Unknown Bag ownership');};
   ownedId(view.chart);ownedId(economy.progression.glow.owned);
   for(const state of economy.progression.states)for(const earned of state.earned)ownedId(earned.id);
   for(const section of economy.finds.sections)for(const item of section.items)if('owned'in item)ownedId(item.owned);
-  const cosmetics=view.cosmetics.map(entry=>{const cosmeticId=entry.id;if(!isOwnedId(cosmeticId)||!isCosmetic(cosmeticId))throw new Error('Loot cosmetic must name its native ownership');return {id:cosmeticId,icon:entry.icon,how:entry.how};});
+  const cosmetics=view.cosmetics.map(entry=>{const cosmeticId=entry.id;if(!owned.kept.has(cosmeticId)||!owned.kept.cosmetic(cosmeticId))throw new Error('Loot cosmetic must name its native ownership');return {id:cosmeticId,icon:entry.icon,how:entry.how};});
   const finds=createFindsCatalogue(economy.finds),sfx=new InteractSfx(audio);
   return {debugName:row.id,lateKinds:view.lateKinds,
     charted:()=>owned.has(view.chart),marks:()=>economy.marks.filter(mark=>!flags.has(mark.flag)).map(({x,z,color})=>({x,z,color})),
     chime:()=>{sfx.interact(view.chime.sound,undefined,{gain:view.chime.gain});},finds:()=>finds({flags,owned}),
     gear:purse=>({sharpen:owned.sharpen,health:{max:health.attributes.maxHealth,hearts:owned.hearts},
       charms:{owned:owned.charms,next:economy.progression.states[economy.progression.flags.filter(flag=>flags.has(flag)).length]?.next??null},
-      cosmetics:cosmetics.map(entry=>({id:entry.id,icon:entry.icon,how:entry.how,name:OWNED[entry.id].label,owned:owned.has(entry.id),worn:owned.worn(entry.id)})),coins:purse.coins}),
+      cosmetics:cosmetics.map(entry=>({id:entry.id,icon:entry.icon,how:entry.how,name:owned.kept.label(entry.id),owned:owned.has(entry.id),worn:owned.worn(entry.id)})),coins:purse.coins}),
   };
 }
 

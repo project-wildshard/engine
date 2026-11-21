@@ -45,7 +45,7 @@ import { Progress } from '../Progress';
 import { Inventory } from '../Inventory';
 import { ownedSave } from '../../../shared/game/saves';
 import { readOnlySave, wirePage } from '../shardfile/wirePage';
-import { Owned } from '../../../shared/game/loot/Owned';
+import { keptItems, Owned } from '../../../shared/game/loot/Owned';
 import type { EnteredEquipment } from './enteredEquipment';
 import { regionalKitOnWire } from './regionalKitWire';
 import { hasDeclaredHud } from '../shardfile/declaredHud';
@@ -411,7 +411,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
                 kit.install?.(weapons); app.registerEquipment(weapons, world.game.levelScope);
                 if (preparing) { weapons.enabled = false; weapons.visible = false; weapons.stowed = true; }
                 // J130: a cell's pack and gear are the server's, and its lines reach whichever cell the page has entered.
-                const progress = new Progress(request.cell.instance), inventory = new Inventory(request.cell.instance), owned = new Owned(request.cell.instance, readOnlySave(ownedSave));
+                const progress = new Progress(request.cell.instance), inventory = new Inventory(request.cell.instance), owned = new Owned(request.cell.instance, readOnlySave(ownedSave), keptItems(request.admitted.source.items));
                 inventory.writes = false;
                 const skins = new SkinLocker(request.cell.instance, skinRows, request.admitted.source.migrations);
                 wirePage.hold({ shard: request.cell.slug, inventory, gear: owned, finishes: skins }, owner);

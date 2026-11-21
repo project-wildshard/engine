@@ -7,7 +7,6 @@ import { StatusIcons } from '../systems/effects/view';
 import { bindPlayerEffects, selectEffectGrants, type EffectService } from '@wildshard/engine/combat/effects/EffectService';
 import type { ShardContext } from '../plugin/context';
 import { installEnteredRuntimeService, installRetainedPlayerEffects, retainsRuntimeServices } from '../shard/retainedHooks';
-import { isOwnedId, isCosmetic } from '../../../shared/game/loot/Owned';
 import type { EffectDef } from '@wildshard/engine/combat/effects/types';
 import { wirePage } from '../shardfile/wirePage';
 
@@ -28,8 +27,8 @@ export function installItemEffects(context: ShardContext): void {
     throw new Error('Item effects need native player and equipment services');
   const { player } = world, owned = play.owned, retained = retainsRuntimeServices(context);
   const grants = [...row.player, ...row.worn, ...row.weapons.flatMap(entry => entry.grants)];
-  if (grants.some(grant => !isOwnedId(grant.key) || grant.unless?.some(key => !isOwnedId(key)) === true)
-    || row.worn.some(grant => !isOwnedId(grant.key) || !isCosmetic(grant.key))) throw new Error('Unknown item effect ownership');
+  if (grants.some(grant => !owned.kept.has(grant.key) || grant.unless?.some(key => !owned.kept.has(key)) === true)
+    || row.worn.some(grant => !owned.kept.has(grant.key) || !owned.kept.cosmetic(grant.key))) throw new Error('Unknown item effect ownership');
   const targets = row.weapons.map(entry => ({ grants: entry.grants, items: entry.items.map(id => {
     const item = items.rows.find(value => value.id === id);
     if (item?.kind !== 'weapon' || item.equipment?.legacySlot === undefined) throw new Error('Item effect needs a native equipment slot');
@@ -39,8 +38,8 @@ export function installItemEffects(context: ShardContext): void {
   else bindPlayerEffects({ effects, target: health, movement: player, combat: context.app.combat, position: () => player.position, scope: context.scope });
   if (row.statuses) installStarterEffects(context, { player, health, effects }, retained ? install => { installEnteredRuntimeService(context, install); } : undefined);
   for (const entry of targets) for (const target of entry.items) effects.bind(target, () => { target.attributes['damage'] = Math.round(target.attributes['damage'] ?? 0); }, context.scope);
-  const has = (id: string): boolean => isOwnedId(id) && owned.has(id);
-  const worn = (id: string): boolean => isOwnedId(id) && isCosmetic(id) && owned.worn(id);
+  const has = (id: string): boolean => owned.kept.has(id) && owned.has(id);
+  const worn = (id: string): boolean => owned.kept.has(id) && owned.kept.cosmetic(id) && owned.worn(id);
   const apply = (): void => {
     if (context.scope.disposed) return;
     const keys = grants.flatMap(grant => [grant.key].concat(grant.unless ?? []));

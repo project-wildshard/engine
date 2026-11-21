@@ -13,7 +13,7 @@ import type { CollectionKeepsakes } from '@wildshard/format/collectionDisplay';
 import { curveAt } from '@wildshard/format/materials';
 import type { BodyShadow } from '../cosmetics/bodyShadow';
 import { ClaimedPickupRoster } from '../loot/runtime';
-import { isOwnedId, isCosmetic, type Owned } from '../../../shared/game/loot/Owned';
+import type { Owned } from '../../../shared/game/loot/Owned';
 import { wirePage } from '../shardfile/wirePage';
 import { rollLoot } from '../loot/tables';
 import { onCreatureDeath } from '../../../shared/game/loot/deaths';
@@ -78,22 +78,22 @@ export function installCollectionKeepsakes<A extends { kind: string; variant?: s
   scope?.onDispose(offFlags);
   const apply = (): void => {
     view.dress(Object.entries(rows.trophies).map(([id, item]) => {
-      if (!isOwnedId(item)) throw new Error(`Unknown collection item: ${item}`);
+      if (!owned.kept.has(item)) throw new Error(`Unknown collection item: ${item}`);
       return [id, owned.has(item)] as const;
     }), rows.wardrobe.map(row => {
-      if (!isOwnedId(row.owned) || !isCosmetic(row.owned)) throw new Error(`Unknown collection cosmetic: ${row.owned}`);
+      if (!owned.kept.has(row.owned) || !owned.kept.cosmetic(row.owned)) throw new Error(`Unknown collection cosmetic: ${row.owned}`);
       return { slot: row.slot, model: row.model, on: owned.worn(row.owned) };
     }));
   };
   apply(); const offOwned = owned.onChange(apply); scope?.onDispose(offOwned);
   const awarded = new Set<string>(), restored = new Set<string>();
   const roster = new ClaimedPickupRoster<string>(h.pickups, {
-    scene: h.game.scene, has: id => !awarded.has(id) && isOwnedId(id) && owned.has(id),
+    scene: h.game.scene, has: id => !awarded.has(id) && owned.kept.has(id) && owned.has(id),
     model: id => { const row = rows.drops[id]; if (row === undefined) throw new Error(`Missing collection drop: ${id}`); return view.loose(row.model, row.trophy); },
     random: view.random, enter: (_id, drop) => { scope?.own(drop); },
     take: id => {
       const text = h.pickups[id]?.toast, row = rows.drops[id];
-      if (!isOwnedId(id) || text === undefined || row === undefined) throw new Error(`Unknown collection pickup: ${id}`);
+      if (!owned.kept.has(id) || text === undefined || row === undefined) throw new Error(`Unknown collection pickup: ${id}`);
       // a restore is the page's own save's: in a room (now, whenever the wire bound) the server's book keeps the reward
       awarded.delete(id); if (restored.delete(id) && room() !== null) return;
       takeKeepsake(owned, id, row.wear, room());
@@ -117,7 +117,7 @@ export function installCollectionKeepsakes<A extends { kind: string; variant?: s
   });
   for (const row of rows.restore) {
     const at = h.rewardAt();
-    if (flags.has(row.flag) && isOwnedId(row.item) && !owned.has(row.item) && at !== undefined) { restored.add(row.item); roster.spawn(row.item, at, false); }
+    if (flags.has(row.flag) && owned.kept.has(row.item) && !owned.has(row.item) && at !== undefined) { restored.add(row.item); roster.spawn(row.item, at, false); }
   }
   h.game.onUpdate((dt, t) => {
     clock += dt;

@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { CatalogueEconomySchema } from '@wildshard/format/catalogueEconomy';
-import { isOwnedId } from '../../../shared/game/loot/Owned';
+import { keptItems } from '../../../shared/game/loot/Owned';
 import { isJsonData } from '@wildshard/format/json';
 import type { ClientFeatureRow } from '@wildshard/format/clientPlan';
 import type { ShardContext } from '../plugin/context';
@@ -22,7 +22,8 @@ export function installClientCatalogue(ctx: ShardContext, row: ClientFeatureRow)
   const finishes = row.finishes || row.effects.includes('finishes') ? HeldFinishes.current(ctx.product.slug) : null;
   const journals = row.compendiums.map(id => Object.assign(declaredFolderCompendium(ctx.product, id), { id }));
   const economy = row.economy === undefined ? undefined : v.parse(CatalogueEconomySchema, row.economy);
-  if (economy?.goods.some(good => !isOwnedId(good.id) || good.needs !== undefined && !isOwnedId(good.needs)) === true) throw new Error('Unknown catalogue economy ownership');
+  const kept = keptItems(ctx.product.section('combat/items').items);
+  if (economy?.goods.some(good => !kept.has(good.id) || good.needs !== undefined && !kept.has(good.needs)) === true) throw new Error('Unknown catalogue economy ownership');
   const effects = row.effects.flatMap(kind => kind === 'starter' ? STARTER_EFFECTS
     : finishes?.cards.map(({ id }) => heldFinishEffect(id, finishes.get(id).weapon)) ?? []);
   if (row.quests) installQuestCatalogue(ctx);

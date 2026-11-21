@@ -1,7 +1,7 @@
 /** The keepsakes' law, shared by the page (compendium/keepsakes.ts) and the room (server/game/loot/keepsakeProgression.ts,
  *  SERVER-PARITY SS3b): how many of the economy's progression flags a player holds picks one admitted state, and that state
  *  names everything earned so far (Driftwood's sea glass charms). And whose book a taken pickup lands in (HS4). */
-import { isCosmetic, type CosmeticId, type Owned, type OwnedId } from '../loot/Owned';
+import type { CosmeticId, Owned, OwnedId } from '../loot/Owned';
 
 /** The admitted state for a player who holds `has`'s flags. A table with no state for that count is refused. */
 export function progressionState<S>(progression: { readonly flags: readonly string[]; readonly states: readonly S[] }, has: (flag: string) => boolean): S {
@@ -19,6 +19,6 @@ export interface KeepsakeRoom { readonly worn: (id: CosmeticId) => boolean; read
  * what is worn (SERVER-PARITY HS4), so the page grants nothing and asks the room to put a worn drop on, unless its book already has.
  */
 export function takeKeepsake(owned: Owned, id: OwnedId, wear: boolean, room: KeepsakeRoom | null): void {
-  if (room === null) { owned.grant(id); if (wear && isCosmetic(id)) owned.wear(id); return; }
-  if (wear && isCosmetic(id) && !room.worn(id)) room.wear(id);
+  if (room === null) { owned.grant(id); if (wear && owned.kept.cosmetic(id)) owned.wear(id); return; }
+  if (wear && owned.kept.cosmetic(id) && !room.worn(id)) room.wear(id);
 }

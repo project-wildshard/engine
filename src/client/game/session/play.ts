@@ -58,7 +58,7 @@ import type { PlaygroundId } from '@wildshard/engine/practice/playground/catalog
 import type { Playground } from '@wildshard/engine/practice/playground/Playground';
 import type { Feedback } from '@wildshard/engine/ui/Feedback';
 import { installBodyShadow } from '../cosmetics/bodyShadow';
-import { isOwnedId, Owned } from '../../../shared/game/loot/Owned';
+import { keptItems, Owned } from '../../../shared/game/loot/Owned';
 import { bindTravelInventory, applyTravelCarry } from '../travel/travel';
 import * as THREE from 'three';
 import { BagButton } from '../bag/BagButton';
@@ -231,7 +231,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // SF28 (G87 / G104): the big item cards wear the shard's declared accent (in the grid, the cell's: grid/gridHud.ts)
   setHudAccent(accentHex(manifest.accent)); hud.cardAccent = hudAccent();
   game.levelScope.onDispose(onHudAccent((hex) => { hud.cardAccent = hex; }));
-  const owned = new Owned(manifest.slug, readOnlySave(ownedSave));            // E314: upgrades, cosmetics, trophies, the found iron sword (src/shared/game/loot/Owned.ts)
+  const owned = new Owned(manifest.slug, readOnlySave(ownedSave), keptItems(ctx.product.shardfile.items));            // E314: upgrades, cosmetics, trophies, the found iron sword (src/shared/game/loot/Owned.ts)
   const playerHealth = new PlayerHealth(app.events, {
     now: () => performance.now(), position: () => player.position,
     dodging: () => player.dodging, dodgeGuard: () => false,
@@ -376,8 +376,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // (cabin local frame: door on +X, chimney end -Z — Cabin.ts); "[E] Take AR-15" through the door / harvest prompt path
   if (params.get('weapon') === 'rifle' || params.get('weapon') === 'lever') { weapons.unlock('rifle'); weapons.select('rifle', true); boot.runtime.hooks.disposeRifleDrop?.(); } // dev: start with it
   if (!exploreApp) weapons.placePickups(chunk.loadout ?? {}, { prompts: boot.runtime.interactables, owned: {
-    has: (id) => { if (!isOwnedId(id)) throw new Error(`Unknown owned equipment: ${id}`); return owned.has(id); },
-    grant: (id) => { if (!isOwnedId(id)) throw new Error(`Unknown owned equipment: ${id}`); owned.grant(id); },
+    has: (id) => { if (!owned.kept.has(id)) throw new Error(`Unknown owned equipment: ${id}`); return owned.has(id); },
+    grant: (id) => { if (!owned.kept.has(id)) throw new Error(`Unknown owned equipment: ${id}`); owned.grant(id); },
   },
     onNear: (inside) => audio.pickupHum(inside),
     onPickup: (row) => { audio.hitMarker(); music.sting('pickup'); hud.pickupCard({ name: row.ui.name, icon: row.ui.icon }); },
