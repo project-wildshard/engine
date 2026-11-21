@@ -32,8 +32,8 @@ export function frameFailure(sample) {
 
 /** @param {import('playwright').Page} page @param {string} label @param {number} deadline
  * @param {(import('./black-frame.mjs').BootFrameSample)[]} frames
- * @param {typeof captureViewportPng} [capture] */
-export async function captureBootFrame(page, label, deadline, frames, capture = captureViewportPng) {
+ * @param {typeof captureViewportPng} [capture] @param {number} [captureLimitMs] */
+export async function captureBootFrame(page, label, deadline, frames, capture = captureViewportPng, captureLimitMs = 30_000) {
   const remaining = deadline - Date.now();
   if (remaining <= 0) throw new Error(`Boot deadline: ${label} screenshot`);
   const stopTrace = await beginCaptureTrace(page, label);
@@ -43,7 +43,7 @@ export async function captureBootFrame(page, label, deadline, frames, capture = 
   // Software-composited phone captures on CI spent >10 s reaching a frame,
   // then 7.4 s in native PNG capture. Keep one bounded attempt within the
   // existing boot deadline; this is tooling time, never a gameplay allowance.
-  const captureDeadline = Math.min(deadline, Date.now() + 30000);
+  const captureDeadline = Math.min(deadline, Date.now() + captureLimitMs);
   const bytes = await (async () => { try {
     const captured = await capture(page, label, captureDeadline);
     state = 'complete'; return captured;

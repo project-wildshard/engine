@@ -147,6 +147,19 @@ test('native refusal stays red even when diagnostic session cleanup fails', asyn
   expect(f.screenshot).not.toHaveBeenCalled();
 });
 
+test('an in-flight native screenshot exits at the nightly frame limit', async () => {
+  const f = fixture();
+  f.capture.mockReturnValueOnce(new Promise(() => undefined));
+  let refuse = (_error: Error): void => undefined;
+  const frameLimit = new Promise<never>((_resolve, reject) => { refuse = reject; });
+  const result = captureViewportPng(f.page, 'nightly gameplay', Date.now() + 90_000, f.newCDPSession, frameLimit);
+  const rejected = expect(result).rejects.toThrow('120 rendered frames');
+  await vi.waitFor(() => { expect(f.capture).toHaveBeenCalledOnce(); });
+  refuse(new Error('Exceeded 120 rendered frames'));
+  await rejected;
+  expect(f.detach).toHaveBeenCalledOnce();
+});
+
 test.each([0,Number.NaN,Infinity])('invalid visual scale %s refuses without capturing another surface', async scale => {
   const f=fixture(); f.metrics.visualViewport.scale=scale;
   await expect(captureViewportPng(f.page,'title',Date.now()+10000,f.newCDPSession)).rejects.toThrow('Invalid screenshot viewport');

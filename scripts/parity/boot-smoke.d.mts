@@ -1,5 +1,6 @@
 import type { FloorGridPlan, FloorGridWitness } from '../frame-floor-grid.mjs';
 import type { Browser, BrowserContext, Page } from 'playwright';
+import type { BootFrameSample } from './black-frame.mjs';
 
 /** Require both actual warm owners before the native title capture clock starts. */
 export function titleCaptureReady(observation:{appState:string;titlePreparation:unknown},catalogueOnly?:boolean):boolean;
@@ -50,6 +51,6 @@ export function gameplayProbeTime(probe:()=>Promise<void>, now?:()=>number):Prom
 
 /** Run an actual built title through gameplay; reused by the cooked-store proof.
  * afterGameplay observes ten live frames before the independent native capture. */
-export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy"|"arrival",out:string,shard?:string,developer?:boolean,afterGameplay?:((page:Page)=>Promise<void>)|null,configureContext?:((context:BrowserContext)=>Promise<void>)|null):Promise<{elapsedMs:number;frame:number;gameplayFrames?:{initial:number|null;final:number|null};faults:string[];fatal:string[]}>;
+export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy"|"arrival",out:string,shard?:string,developer?:boolean,afterGameplay?:((page:Page)=>Promise<void>)|null,configureContext?:((context:BrowserContext)=>Promise<void>)|null,captureGameplay?:((page:Page,label:string,frames:BootFrameSample[])=>Promise<void>)|null):Promise<{elapsedMs:number;frame:number;gameplayFrames?:{initial:number|null;final:number|null};faults:string[];fatal:string[]}>;
 
 export function gameplayRenderer():{renderer:string;vendor:string;unmaskedRenderer:string|null;unmaskedVendor:string|null;version:string;lost:boolean};

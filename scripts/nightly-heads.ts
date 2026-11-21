@@ -7,6 +7,7 @@ import {homedir} from 'node:os';
 import {join, resolve as resolvePath} from 'node:path';
 import {chromium, webkit, type Browser} from "./browser-playwright.mjs";
 import {bootCase} from './parity/boot-smoke.mjs';
+import {captureNightlyBootFrame, nightlyDrawSamples, NIGHTLY_FRAME_LIMIT as HOVER_FRAMES, NIGHTLY_WALL_MS as HOVER_CEILING_MS} from './parity/nightly-frames.mjs';
 import {sweepExplorer} from './parity/explorer-smoke.mjs';
 import {serve} from './parity/serve.mjs';
 import {levelDownloadFixtures, saveFixture} from './debug-settings.mjs';
@@ -17,10 +18,6 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 await import('./bake-loader.mjs');
 const {BOOST_TAP_MS} = await import('../src/client/engine/ui/hoverBoost.ts');
-/** The board mounts or leaves within this many of the page's own frames of a tap (its blend passes 0.5 in ~10 at any rate). */
-const HOVER_FRAMES = 120;
-/** A page that stops drawing still fails: the frame-bounded hover waits give up after this much wall clock. */
-const HOVER_CEILING_MS = 90_000;
 const {folderStore} = await import('../src/cook/game/packStore.ts');
 const {objectHeaders, DEFAULT_LIMITS} = await import('../src/cook/game/cookWorker.ts');
 const {addStoredShards} = await import('./app-build/catalogue.ts');
@@ -219,18 +216,7 @@ try {
           await phase('draw', async () => {
             // Observe completed engine frames, including shadow/post/held passes.
             // Software-hosted timing and the advisory 150 threshold never gate.
-            const samples = await page.evaluate(() => new Promise<number[]>((resolve, reject) => {
-              const values: number[] = []; let frame = -1;
-              const timer = setTimeout(() => reject(new Error('No 30 completed draw frames in 60s')), 60000);
-              const tick = () => {
-                const game = window.__wildshard?.world?.game;
-                if (game !== undefined && game.frameCount !== frame && game.lastFrame?.calls > 0) {
-                  frame = game.frameCount; values.push(game.lastFrame.calls);
-                }
-                if (values.length < 30) requestAnimationFrame(tick);
-                else {clearTimeout(timer); resolve(values);}
-              }; requestAnimationFrame(tick);
-            }));
+            const samples = await nightlyDrawSamples(page);
             return {reportOnly: true, frames: samples.length, maxCalls: Math.max(...samples), advisory: 150, samples};
           });
         }, async context => {
@@ -238,7 +224,7 @@ try {
           if (mode === 'arrival') await saveFixture(context, {scope: 'session', key: 'travel.handoff', data: {
             v: 1, from: null, to: route, mode: 'enter', arrive: null, carry: [], at: Date.now(),
           }});
-        });
+        }, browserName === 'chromium' && process.platform === 'linux' ? captureNightlyBootFrame : null);
         const clientKeys = new Set(index.keys.filter(key => !key.startsWith('assets/spawn/server/')));
         const used = [...fetched].filter(key => clientKeys.has(key));
         if (!used.some(key => /^assets\/spawn\/parts\/[a-f0-9]+\.pack\.br$/u.test(key))) throw new Error('No client part from this cold cook reached gameplay');

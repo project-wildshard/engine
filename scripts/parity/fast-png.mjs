@@ -17,8 +17,9 @@ const openProtocolSession = async page => {
 /** Capture the composited viewport PNG within the original deadline.
  * Chromium uses fast lossless CDP encoding; WebKit uses its supported screenshot API.
  * @param {import('playwright').Page} page @param {string} label @param {number} deadline
- * @param {import('./fast-png.mjs').OpenCaptureSession} [openSession] */
-export async function captureViewportPng(page, label, deadline, openSession = openProtocolSession) {
+ * @param {import('./fast-png.mjs').OpenCaptureSession} [openSession] @param {Promise<never>} [frameLimit] */
+export async function captureViewportPng(page, label, deadline, openSession, frameLimit) {
+  const open = openSession ?? openProtocolSession;
   /** @template T @param {string} name @param {()=>Promise<T>} run @returns {Promise<T>} */
   const stage = async (name, run) => {
     const remaining = deadline - Date.now();
@@ -28,7 +29,9 @@ export async function captureViewportPng(page, label, deadline, openSession = op
       /** @type {Promise<never>} */ const expired = new Promise((_resolve, reject) => {
         timer = setTimeout(() => reject(new Error(`Boot deadline: ${label} ${name}`)), remaining);
       });
-      const value = await Promise.race([run(), expired]);
+      const pending = [run(), expired];
+      if (frameLimit !== undefined) pending.push(frameLimit);
+      const value = await Promise.race(pending);
       if (Date.now() >= deadline) throw new Error(`Boot deadline: ${label} ${name}`);
       state = 'complete'; return value;
     } finally {
@@ -38,7 +41,7 @@ export async function captureViewportPng(page, label, deadline, openSession = op
   };
   // WebKit has no CDP session. Keep its real composited PNG and the same
   // readiness/deadline contract through Playwright's public browser port.
-  if (openSession === openProtocolSession && page.context().browser()?.browserType().name() === 'webkit') {
+  if (open === openProtocolSession && page.context().browser()?.browserType().name() === 'webkit') {
     await stage('fonts-ready', () => page.evaluate(async () => { await document.fonts.ready; }));
     await stage('compositor-frame', () => page.evaluate(() => new Promise(resolve => {
       requestAnimationFrame(() => resolve(true));
@@ -46,7 +49,7 @@ export async function captureViewportPng(page, label, deadline, openSession = op
     return stage('native-capture', () => page.screenshot({type: 'png', fullPage: false, scale: 'device',
       timeout: Math.max(1, deadline - Date.now())}));
   }
-  const session = await stage('cdp-session', () => openSession(page));
+  const session = await stage('cdp-session', () => open(page));
   try {
     await stage('fonts-ready', () => page.evaluate(async () => { await document.fonts.ready; }));
     await stage('compositor-frame', () => page.evaluate(() => new Promise(resolve => {

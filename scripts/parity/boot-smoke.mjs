@@ -400,8 +400,9 @@ export async function gameplayProbeTime(probe, now = () => performance.now()) {
  * `arrival` consumes the real travel handoff for a grid-only product with no picker card.
  * @param {import('playwright').Browser} browser @param {string} base @param {'standalone'|'grid'|'public-policy'|'arrival'} mode @param {string} out @param {string} [shard] @param {boolean} [developer]
  * @param {((page:import('playwright').Page)=>Promise<void>)|null} [afterGameplay]
- * @param {((context:import('playwright').BrowserContext)=>Promise<void>)|null} [configureContext] */
-export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle', developer = false, afterGameplay = null, configureContext = null) {
+ * @param {((context:import('playwright').BrowserContext)=>Promise<void>)|null} [configureContext]
+ * @param {((page:import('playwright').Page,label:string,frames:import('./black-frame.mjs').BootFrameSample[])=>Promise<void>)|null} [captureGameplay] */
+export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle', developer = false, afterGameplay = null, configureContext = null, captureGameplay = null) {
   // CI's macOS runner renders the phone tier at ~0.3 fps, so a case needs more than a minute of wall clock.
   const started = Date.now();
   let deadline = started + 150000;
@@ -577,7 +578,9 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
       deadline += phases.gameplayProbeMs;
     }
     if (faults.length > 0) throw new Error(JSON.stringify(faults));
-    await captureBootFrame(page, mode === 'grid' ? 'grid HOME' : `${shard} gameplay`, deadline, frames);
+    await (captureGameplay === null || mode === 'grid'
+      ? captureBootFrame(page, mode === 'grid' ? 'grid HOME' : `${shard} gameplay`, deadline, frames)
+      : captureGameplay(page, `${shard} gameplay`, frames));
     const roadDeadline = Date.now() + 90000;
     const cellRoad = mode === 'grid' ? await bootCellRoad(page, faults, frames, roadDeadline) : null;
     const road = mode === 'grid' ? await bootSignalRoad(page, faults, frames, roadDeadline) : null;
