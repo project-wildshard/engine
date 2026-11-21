@@ -26,12 +26,12 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { homedir } from 'node:os';
 
-const ENGINE = resolve(import.meta.dirname, '../../..');
+const ENGINE = absolute(import.meta.dirname, '../../..');
 export const keptDir = () => process.env.WS_KEPT_DIR ?? join(homedir(), '.cache/wildshard/kept');
 const statePath = (label) => join(keptDir(), `${label}.json`);
 const PORTS = { first: 4600, last: 4798 };
@@ -75,7 +75,7 @@ export const worldAlive = (world, port) => world !== null && (commandOf(world.pi
 async function portFree(port) {
   const server = createServer();
   try {
-    await new Promise((ok, fail) => { server.once('error', fail); server.listen(port, '127.0.0.1', () => { ok(undefined); }); });
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', () => { resolve(undefined); }); });
     return true;
   } catch { return false; } finally { server.close(); }
 }
@@ -163,8 +163,8 @@ async function ready(state) {
 async function serve(label) {
   const state = readState(label);
   if (state === null) throw new Error(`serve-keep: no state for ${label}; run --install`);
-  let stopping = false;
-  const stop = () => { stopping = true; };
+  const stopping = new AbortController();
+  const stop = () => { stopping.abort(); };
   process.once('SIGTERM', stop);
   process.once('SIGINT', stop);
   state.keeper = process.pid;
@@ -172,7 +172,7 @@ async function serve(label) {
   /** @param {string} what @param {string} why */
   const restarted = (what, why) => { state.restarts.push({ at: new Date().toISOString(), what, why }); say(label, `restart ${what}: ${why}`); };
   let first = true;
-  while (!stopping) {
+  while (!stopping.signal.aborted) {
     let changed = false;
     for (const i of [0, 1]) {
       if (tunnelAlive(state.tunnels[i] ?? null, ports[i])) { if (first) say(label, `adopted tunnel ${String(state.tunnels[i]?.pid)} ${String(state.tunnels[i]?.origin)}`); continue; }
@@ -206,7 +206,7 @@ async function serve(label) {
 /** The launchd plist for a label. @param {string} label */
 function plist(label) {
   const path = [dirname(process.execPath), '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'].join(':');
-  const xml = (/** @type {string} */ s) => s.replace(/&/gu, '&amp;').replace(/</gu, '&lt;');
+  const xml = (/** @type {string} */ s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
   const args = [process.execPath, join(ENGINE, 'scripts/memory/iphone/serve-keep.mjs'), '--serve', '--label', label];
   const log = join(keptDir(), `${label}.log`);
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -251,9 +251,10 @@ export async function install({ shard, root = ENGINE, launch = true, timeoutMs =
       if (boot.status !== 0) throw new Error(`launchctl bootstrap ${file}: ${boot.stderr.trim()}`);
     }
   }
-  for (const deadline = Date.now() + timeoutMs; Date.now() < deadline; await delay(1000)) {
+  for (const deadline = Date.now() + timeoutMs; Date.now() < deadline;) {
     const now = readState(label);
     if (now?.ready === true && now.url !== null) return now;
+    await delay(1000);
   }
   throw new Error(`serve-keep: ${label} not ready in ${String(timeoutMs / 1000)} s (log ${join(keptDir(), `${label}.log`)})`);
 }
