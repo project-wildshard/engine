@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { bootCaseBrowser, bootCases, bootJobs } from '../scripts/parity/boot-smoke.mjs';
+import { bootCaseBrowser, bootCases, bootJobs, gameplayProbeTime } from '../scripts/parity/boot-smoke.mjs';
 
 const catalogue = [
   { slug: 'driftwood-isle', status: 'live', legacy: false },
@@ -39,4 +39,12 @@ test('BB2: boot cases run on their own slots, the grid retires only its own slot
   expect(bootJobs(undefined)).toBe(1);
   expect(bootJobs('3')).toBe(3);
   for (const bad of ['0', '9', '2.5', '', ' 3', 'three']) expect(() => bootJobs(bad)).toThrow('--jobs=1..8');
+});
+
+test('FS30 an independent gameplay probe leaves the boot capture budget intact', async () => {
+  const deadline = 140_000;
+  let now = 90_000;
+  const probeMs = await gameplayProbeTime(async () => { now += 97_000; }, () => now);
+  expect(deadline + probeMs - now).toBe(50_000);
+  await expect(gameplayProbeTime(() => Promise.reject(new Error('probe failed')), () => now)).rejects.toThrow('probe failed');
 });

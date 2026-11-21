@@ -2,7 +2,7 @@
 // Ring 1 cooks actual pins through the production bounded worker and folder store.
 // The resulting receipt is consumed by the store boot; a cook is not a detached check.
 import { mkdirSync, readFileSync, writeFileSync, readdirSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { availableParallelism, homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -35,13 +35,19 @@ const inputs=ringCookInputs(selected,shards,cache),heads=inputs.heads;
 const store = folderStore(join(out,'store'));
 // Ring 2 qualifies the production worker, including its heap/resident limits.
 // Keep Ring 1's established smaller envelope; neither path extends its clock.
-const limits = values.ring2 ? {...DEFAULT_LIMITS, seconds: timeout / 1000} : {seconds:timeout/1000,memoryMB:4096,heapMB:2048};
+// The hosted cook has the runner to itself until the browser starts. Give
+// that CPU allowance to the worker so it reserves one core instead of two.
+// A live broker grant still bounds the allowance inside runJob.
+const limits = values.ring2 ? {...DEFAULT_LIMITS, seconds: timeout / 1000,
+  ...(process.env.GITHUB_ACTIONS === 'true' ? {cpuSlots: availableParallelism()} : {}),
+} : {seconds:timeout/1000,memoryMB:4096,heapMB:2048};
 console.log(`cook limits: ${JSON.stringify(limits)}`);
 // A fresh run owns its empty cache. At least its first product always encodes cold.
 const worker = createCookWorker({ build: values.build, store, serverPacks: join(out,'server'), scratch: join(out,'jobs'), validator: shardfileValidationRevision(root),
   source: { heads: () => Promise.resolve(heads.map(row => ({...row, revision:1}))), download: hash => Promise.resolve(inputs.read(hash)) },
   launcher: { root, execPath: process.execPath, loader:join(root,'scripts/bake-loader.mjs'), script:join(root,'scripts/cook-job.mjs'),
-    wrap:[], limits, renderer: rendererRevision(root) } });
+    wrap:[], limits, renderer: rendererRevision(root) },
+  log: line => console.log(line) });
 const recipe = cookRevision(), indexes = [];
 for (const head of heads) {
   const started = performance.now(), row = await worker.cook(head);

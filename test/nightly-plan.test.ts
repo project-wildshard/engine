@@ -24,3 +24,12 @@ test('FS30 the Ring 2 CLI accepts the nightly cook allowance and refuses anythin
   expect(cook(maximum).stderr).toContain('Cook output must be empty');
   expect(cook(maximum + 1).stderr).toContain(`Cook timeout must be in (0, ${maximum}] ms`);
 }, 25_000);
+
+test('FS30 the browser lease cannot end a hosted head job before its own deadline', () => {
+  const workflow = readFileSync('.github/workflows/nightly.yml', 'utf8');
+  const heads = /\n  heads:\n([\s\S]+?)\n  report:/u.exec(workflow)?.[1] ?? '';
+  const jobMinutes = /timeout-minutes: (\d+)/u.exec(heads)?.[1];
+  const leaseMinutes = /scripts\/browser-lane\.sh --max (\d+) node scripts\/nightly-heads\.ts/u.exec(heads)?.[1];
+  expect(jobMinutes).toBeDefined();
+  expect(leaseMinutes).toBe(jobMinutes);
+});

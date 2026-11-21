@@ -387,6 +387,14 @@ export function spawnOverhead() {
   return hit === null ? null : { feet, overheadY: from + hit.timeOfImpact };
 }
 
+/** Time a separate gameplay proof without spending the boot capture allowance.
+ * @param {() => Promise<void>} probe @param {() => number} [now] */
+export async function gameplayProbeTime(probe, now = () => performance.now()) {
+  const started = now();
+  await probe();
+  return now() - started;
+}
+
 /** `developer`: a standalone case with Developer on, for a shard that is still Developer-only (Signal Dunes: SF57's composer
  * coverage broke its boot on main, 9fb0cca1d, and no public case could see it).
  * `arrival` consumes the real travel handoff for a grid-only product with no picker card.
@@ -562,8 +570,12 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     phases.framesCompleteMs = Date.now() - started;
     // Exercise entered gameplay before a software-composited PNG can consume
     // tens of wall seconds while the real simulation and its enemies keep running.
-    // Capture still runs under its original deadline and can independently fail.
-    if (afterGameplay !== null) await afterGameplay(page);
+    // The probe has its own waits. Preserve only the time already left for
+    // capture, and still fail on real page faults observed during the probe.
+    if (afterGameplay !== null) {
+      phases.gameplayProbeMs = await gameplayProbeTime(() => afterGameplay(page));
+      deadline += phases.gameplayProbeMs;
+    }
     if (faults.length > 0) throw new Error(JSON.stringify(faults));
     await captureBootFrame(page, mode === 'grid' ? 'grid HOME' : `${shard} gameplay`, deadline, frames);
     const roadDeadline = Date.now() + 90000;

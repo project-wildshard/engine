@@ -212,7 +212,9 @@ jobs:
       # PAGE-SIZE PZ4: build:game splits dist/ from dist-content/; this job serves the whole game from dist.
       - run: node scripts/app-build/splitOutput.mjs dist --join
       - name: Cold cook and real phone UI on each pinned head
-        run: scripts/browser-lane.sh node scripts/nightly-heads.ts "${BROWSER}" "${GROUP}"
+        # The job's 75-minute limit includes setup. The shared Mac's 60-minute
+        # default stopped the hosted Chromium lane during a bounded Pine cook.
+        run: scripts/browser-lane.sh --max 75 node scripts/nightly-heads.ts "${BROWSER}" "${GROUP}"
         env:
           BROWSER: ${{ matrix.browser }}
           GROUP: ${{ matrix.group }}
