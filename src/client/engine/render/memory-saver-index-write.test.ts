@@ -20,10 +20,14 @@ class FakeGL {
     const buffer = this.bindings.get(target);
     if (buffer !== undefined && buffer !== null) this.uploads.set(buffer, new Uint8Array(new Uint8Array(data.buffer, data.byteOffset, data.byteLength)));
   }
-  bufferSubData(target: number, offset: number, data: ArrayBufferView): void {
+  subWrites = 0;
+  bufferSubData(target: number, offset: number, data: ArrayBufferView, srcOffset = 0, length?: number): void {
     const buffer = this.bindings.get(target), into = buffer === undefined || buffer === null ? undefined : this.uploads.get(buffer);
     if (into === undefined) throw new Error('No buffer bound');
-    new Uint8Array(into.buffer, into.byteOffset + offset, data.byteLength).set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+    this.subWrites++;
+    // WebGL2's overload: `srcOffset` and `length` in elements of a typed array
+    const size = 'BYTES_PER_ELEMENT' in data ? Number(data.BYTES_PER_ELEMENT) : 1, bytes = length === undefined ? data.byteLength - srcOffset * size : length * size;
+    new Uint8Array(into.buffer, into.byteOffset + offset, bytes).set(new Uint8Array(data.buffer, data.byteOffset + srcOffset * size, bytes));
   }
   getParameter(binding: number): FakeBuffer | null {
     const target = binding === this.ARRAY_BUFFER_BINDING ? this.ARRAY_BUFFER : binding === this.ELEMENT_ARRAY_BUFFER_BINDING ? this.ELEMENT_ARRAY_BUFFER : binding;
@@ -118,4 +122,34 @@ test('an index never turned takes the triangles as sent; a disposed buffer takes
   gl.uploads.clear();
   expect(writeIndexTriangles(otherIndex, [{ at: 0, triangles: Uint32Array.of(0, 2, 3, 0, 1, 2) }], false)).toBe(false);
   geometry.dispose(); other.dispose(); done();
+});
+
+// DF9b (mini-df9b): far copies stage every rewrite in one reused array of the index's type and send only its first `length`
+// elements, so a band change makes no new array
+test('a write of the index\'s own type with a length goes up as it is, only its first elements, turned in place', () => {
+  const { gl, draw, release, done } = setup();
+  const geometry = quad(3), index = geometry.index;
+  if (index === null) throw new Error('Expected an index');
+  draw(geometry, true);
+  expect(release()).toBeGreaterThan(0);
+  const stage = Uint16Array.of(0, 2, 3, 0, 1, 2, 9, 9, 9);
+  const from = vi.spyOn(Uint16Array, 'from');
+  expect(writeIndexTriangles(index, [{ at: 0, triangles: stage, length: 6 }], false)).toBe(true);
+  expect(from).not.toHaveBeenCalled();
+  from.mockRestore();
+  expect(gl.readbacks).toBe(0);
+  // the staged elements past `length` are neither sent nor turned
+  expect(Array.from(stage)).toEqual([3, 0, 2, 2, 0, 1, 9, 9, 9]);
+  expect(Array.from(index.array)).toEqual([3, 0, 2, 2, 0, 1, 0, 0, 0]);
+  geometry.dispose(); done();
+});
+
+test('an index still on the CPU takes only a write\'s first `length` elements', () => {
+  const { draw, done } = setup();
+  const geometry = quad(3), index = geometry.index;
+  if (index === null) throw new Error('Expected an index');
+  draw(geometry, false);
+  expect(writeIndexTriangles(index, [{ at: 0, triangles: Uint32Array.of(0, 2, 3, 7, 7, 7), length: 3 }], false)).toBe(true);
+  expect(Array.from(index.array)).toEqual([0, 2, 3, 0, 2, 3, 0, 0, 0]);
+  geometry.dispose(); done();
 });

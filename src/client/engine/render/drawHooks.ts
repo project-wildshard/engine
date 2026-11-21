@@ -330,9 +330,10 @@ export function rotateTriangles(index: BufferAttribute): boolean {
  *  triangles without a version change (`writeReleasedArray`) writes them turned too (`turnTriangles`) */
 export function indexRotated(index: BufferAttribute): boolean { return rotated.get(index) === index.version; }
 
-/** MG10: turn each triangle of `array` as `rotateTriangles` does (`a b c` -> `c a b`), or back with `back` */
-export function turnTriangles(array: Uint16Array | Uint32Array, back = false): void {
-  for (let i = 0; i + 2 < array.length; i += 3) {
+/** MG10: turn each triangle of `array` as `rotateTriangles` does (`a b c` -> `c a b`), or back with `back`; only its first
+ *  `length` elements (DF9b) */
+export function turnTriangles(array: Uint16Array | Uint32Array, back = false, length: number = array.length): void {
+  for (let i = 0; i + 2 < length; i += 3) {
     const a = array[i] ?? 0, b = array[i + 1] ?? 0, c = array[i + 2] ?? 0;
     if (back) { array[i] = b; array[i + 1] = c; array[i + 2] = a; } else { array[i] = c; array[i + 1] = a; array[i + 2] = b; }
   }

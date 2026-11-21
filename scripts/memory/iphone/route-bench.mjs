@@ -99,6 +99,14 @@ const lowGuard = (fixtures) => `(() => {
   proto.setItem = function (name, value) { return set.call(this, name, this === localStorage ? hold(name, value) : value); };
 })();`;
 
+/** DF9 (mini-df9b): the far copies' report at the route's end (a page-function body), or null with the slot off. */
+const FAR_LOD_READ = `
+const r = window.__wsFarLod;
+if (r === undefined) return null;
+return { meshes: r.meshes, tiled: r.tiled, squares: r.squares, ready: r.ready, reused: r.reused, writes: r.writes, full: r.full, drawn: r.drawn,
+  captureMs: Math.round(r.captureMs), buildMs: Math.round(r.buildMs), refused: r.refused, whole: r.whole, log: r.log };
+`;
+
 async function bench() {
   mkdirSync(out, { recursive: true });
   /** @type {any[]} */
@@ -117,7 +125,7 @@ async function bench() {
       const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, [values.ab]: ab };
       const temperature = tools === null ? null : await tools.cool();
       const { webkitDriver, driver } = phone ? { webkitDriver: null, driver: await /** @type {NonNullable<typeof tools>} */ (tools).fresh() }
-        : await (async () => { const { startWebKit } = await import('./webkit.mjs'); const started = await startWebKit(); return { webkitDriver: started, driver: started }; })();
+        : await (async () => { if (values.frames === true) process.env.WS_WEBKIT_GC_LOG = '1'; const { startWebKit } = await import('./webkit.mjs'); const started = await startWebKit({ gcLog: values.frames === true }); return { webkitDriver: started, driver: started }; })();
       const directory = join(out, `run-${String(run)}-cap${String(cap)}${ab === null ? '' : `-${String(ab)}`}`);
       mkdirSync(directory, { recursive: true });
       /** @type {Promise<void> | null} */
@@ -170,6 +178,9 @@ async function bench() {
           }
           if ('quiet' in driver && typeof driver.quiet === 'function') await driver.quiet();
           row.legs = await playRoute(driver, { slug: route, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+          // DF9 (mini-df9b): what the far copies did on the route (farLod.ts `__wsFarLod`), when the slot is on
+          row.farLod = await driver.evaluate(FAR_LOD_READ).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
+          if (row.farLod !== null) console.log(`  farLod: ${JSON.stringify(row.farLod).slice(0, 1500)}`);
           if (values.voices === true) {
             try {
               const log = /** @type {[string, number, number, number, number][] | null} */ (await driver.evaluate(VOICE_LOG_READ));
@@ -197,6 +208,9 @@ async function bench() {
                 row.gc = await driver.heapStop().catch((/** @type {unknown} */ error) => ({ error: String(error), collections: [] }));
                 const gcs = /** @type {[string, number, number][]} */ (row.gc?.collections ?? []);
                 console.log(`  gc: ${String(gcs.length)} collections (${String(gcs.filter((c) => c[0] === 'full').length)} full), ${String(gcs.filter((c) => c[2] - c[1] >= 10).length)} of 10 ms or more, anchor ±${String((row.gc?.anchorMs ?? 0) / 2)} ms`);
+                // DF9 (mini-df9b): the desktop proxy's JSC log also has each collection's stop-the-world pause
+                const pauses = /** @type {number[] | undefined} */ (row.gc?.pauses);
+                if (pauses !== undefined) console.log(`  gc pauses: ${String(pauses.filter((ms) => ms >= 10).length)} of 10 ms or more, ${String(pauses.filter((ms) => ms >= 5).length)} of 5, total ${pauses.reduce((a, b) => a + b, 0).toFixed(0)} ms`);
               }
               const named = nameLongFrames(log?.frames ?? [], row.gc?.collections ?? []);
               row.named = named;

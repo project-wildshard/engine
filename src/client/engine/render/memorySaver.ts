@@ -164,11 +164,12 @@ export function indexTurned(index: THREE.BufferAttribute): boolean { return inde
  * draw as the index draws now (`indexTurned`). When the Memory saver let the CPU copy go they go straight into the GPU
  * buffer: no read-back from the GPU, no CPU copy kept, nothing uploaded again (the phone's slab trees landing,
  * `slabLibrary.ts`). Otherwise into the array, uploaded again at the next draw. False: the buffer is gone (its geometry
- * disposed) and nothing was written. The arrays given are turned in place.
+ * disposed) and nothing was written. The arrays given are turned in place. A write's `length` (DF9b) takes only the
+ * first `length` elements of its `triangles` (a staging array reused from write to write).
  */
-export function writeIndexTriangles(index: THREE.BufferAttribute, writes: readonly { readonly at: number; readonly triangles: Uint32Array }[], sentTurned: boolean): boolean {
+export function writeIndexTriangles(index: THREE.BufferAttribute, writes: readonly { readonly at: number; readonly triangles: Uint16Array | Uint32Array; readonly length?: number }[], sentTurned: boolean): boolean {
   const turned = indexRotated(index);
-  if (turned !== sentTurned) for (const { triangles } of writes) turnTriangles(triangles, !turned);
+  if (turned !== sentTurned) for (const { triangles, length } of writes) turnTriangles(triangles, !turned, length);
   if (arrayReleased(index)) {
     const held = releasedBuffers.get(index);
     if (held === undefined || !held.gl.isBuffer(held.buffer)) return false;
@@ -176,15 +177,18 @@ export function writeIndexTriangles(index: THREE.BufferAttribute, writes: readon
     const previous: unknown = gl.getParameter(gl.COPY_WRITE_BUFFER_BINDING);
     gl.bindBuffer(gl.COPY_WRITE_BUFFER, buffer);
     try {
-      for (const { at, triangles } of writes) {
-        const data = wide ? triangles : Uint16Array.from(triangles);
+      for (const { at, triangles, length = triangles.length } of writes) {
+        // DF9b (mini-df9b): triangles already of the buffer's type go up as they are, only their first `length`
+        if (wide === triangles instanceof Uint32Array) { gl.bufferSubData(gl.COPY_WRITE_BUFFER, at * triangles.BYTES_PER_ELEMENT, triangles, 0, length); continue; }
+        const part = length === triangles.length ? triangles : triangles.subarray(0, length);
+        const data = wide ? Uint32Array.from(part) : Uint16Array.from(part);
         gl.bufferSubData(gl.COPY_WRITE_BUFFER, at * data.BYTES_PER_ELEMENT, data);
       }
     } finally { gl.bindBuffer(gl.COPY_WRITE_BUFFER, previous instanceof WebGLBuffer ? previous : null); }
     return true;
   }
   const array = index.array as Uint16Array | Uint32Array;
-  for (const { at, triangles } of writes) array.set(triangles, at);
+  for (const { at, triangles, length = triangles.length } of writes) array.set(length === triangles.length ? triangles : triangles.subarray(0, length), at);
   index.needsUpdate = true;
   if (turned) keepRotated(index);
   return true;

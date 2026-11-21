@@ -86,12 +86,14 @@ interface Tracked {
   looks: Looks | null;
   readonly scale: number;
   ready: boolean; readonly last: THREE.Vector3; looked: boolean;
+  /** DF9b: its content's key (`built`) */
+  readonly key: string;
   /** draw the squares at their levels; false: the mesh can no longer take them */
   readonly apply: () => boolean;
 }
 
 /** What the far copies did on this page (the bench reads it as `__wsFarLod`). */
-export const farLodReport = { meshes: 0, tiled: 0, squares: 0, ready: 0, writes: 0, full: 0, drawn: 0, captureMs: 0, buildMs: 0, refused: 0,
+export const farLodReport = { meshes: 0, tiled: 0, squares: 0, ready: 0, reused: 0, writes: 0, full: 0, drawn: 0, captureMs: 0, buildMs: 0, refused: 0,
   whole: {} as Record<string, number>, log: [] as [string, number, number][] };
 
 const tracked = new WeakMap<THREE.BufferGeometry, Tracked | null>();
@@ -155,9 +157,14 @@ function floats(position: THREE.BufferAttribute | THREE.InterleavedBufferAttribu
 /** The squares of `groups` (each a list of triangle starts into `corners`), with their boxes. */
 function squaresOf(positions: Float32Array, corners: ArrayLike<number>, groups: readonly Uint32Array[]): Square[] {
   const squares: Square[] = [];
+  // DF9b: one kept array for the mesh's lists, each square's a view of it. A buffer the ledger counts carries a weak
+  // reference and a finalizer, and JavaScriptCore visits those at every collection: a buffer a square (5,400 lists and
+  // 27,000 copies on the route) put the desktop's eden pauses up by a third
+  const pool = ownedArray(Uint32Array, groups.reduce((n, starts) => n + starts.length * 3, 0), KEPT);
+  let pooled = 0;
   for (const starts of groups) {
     if (starts.length === 0) continue;
-    const full = ownedArray(Uint32Array, starts.length * 3, KEPT);
+    const full = pool.subarray(pooled, pooled + starts.length * 3); pooled += starts.length * 3;
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
     for (let i = 0; i < starts.length; i++) {
       const t = starts[i] ?? 0;
@@ -172,15 +179,66 @@ function squaresOf(positions: Float32Array, corners: ArrayLike<number>, groups: 
   return squares;
 }
 
-function track(mesh: THREE.Mesh, squares: Square[], positions: Float32Array, apply: () => boolean): Tracked {
+function track(mesh: THREE.Mesh, squares: Square[], positions: Float32Array | null, apply: () => boolean, key: string): Tracked {
   mesh.updateWorldMatrix(true, false);
-  const entry: Tracked = { mesh, squares, positions, looks: looksOf(mesh.geometry), scale: mesh.matrixWorld.getMaxScaleOnAxis(), ready: false,
-    last: new THREE.Vector3(Infinity, Infinity, Infinity), looked: false, apply };
+  // DF9b: squares taken back from `built` (positions null) are ready at once, nothing to build
+  const entry: Tracked = { mesh, squares, positions, looks: positions === null ? null : looksOf(mesh.geometry), scale: mesh.matrixWorld.getMaxScaleOnAxis(),
+    ready: positions === null, last: new THREE.Vector3(Infinity, Infinity, Infinity), looked: false, apply, key };
   farLodReport.meshes++; farLodReport.squares += squares.length;
   if (farLodReport.log.length < 64) farLodReport.log.push([mesh.name, Math.round(diagnosticNow()), squares.reduce((n, square) => n + square.full.length / 3, 0)]);
   for (const square of squares) farLodReport.full += square.full.length / 3;
-  queue.push(entry); startBuilding();
+  if (positions === null) { farLodReport.ready++; farLodReport.reused++; } else { queue.push(entry); startBuilding(); }
   return entry;
+}
+
+/**
+ * DF9b (mini-df9b): built squares by content, so the copies are built once a page. On the route's road return the grid
+ * admits Driftwood again and every wide mesh comes back as a new geometry with the same arrays (the desktop census caught 20
+ * captures at ~201 s); each one was cut and built again, its old copies garbage. Its key hashes the mesh's positions, index,
+ * look channels, tiles and scale; squares are kept here once built, up to BUILT_TRIANGLES of them, the oldest dropped first.
+ */
+const built = new Map<string, readonly Square[]>();
+const BUILT_TRIANGLES = 2_000_000;
+let builtTriangles = 0;
+const trianglesOf = (squares: readonly Square[]): number => squares.reduce((n, square) => n + square.full.length / 3, 0);
+function remember(key: string, squares: readonly Square[]): void {
+  if (built.has(key)) return;
+  built.set(key, squares); builtTriangles += trianglesOf(squares);
+  for (const [old, held] of built) {
+    if (builtTriangles <= BUILT_TRIANGLES || old === key) break;
+    built.delete(old); builtTriangles -= trianglesOf(held);
+  }
+}
+/** A mesh's squares again, each at the finest level (its lists and copies shared: they never change once built). */
+const again = (known: readonly Square[]): Square[] => known.map(square => ({ lo: square.lo, hi: square.hi, full: square.full, copies: square.copies, level: 0 }));
+
+let h1 = 0, h2 = 0;
+/** Hash `values`' first `n` (integers, or a float array's bits) into h1 and h2. */
+function hashValues(values: ArrayLike<number>, n: number): void {
+  const bits = values instanceof Float32Array || values instanceof Int32Array ? new Uint32Array(values.buffer, values.byteOffset, Math.min(n, values.length)) : null;
+  const scaled = bits === null && (values instanceof Float64Array || !ArrayBuffer.isView(values));
+  const source = bits ?? values, length = Math.min(n, source.length);
+  for (let i = 0; i < length; i++) {
+    const raw = source[i] ?? 0, x = scaled ? Math.round(raw * 1048576) | 0 : raw | 0;
+    h1 = Math.imul(h1 ^ x, 16777619); h2 = Math.imul(h2 + x, 2246822519) ^ (h2 >>> 15);
+  }
+  h1 = Math.imul(h1 ^ length, 16777619); h2 = Math.imul(h2 + length, 2246822519) ^ (h2 >>> 15);
+}
+/** The key of a mesh's content: its positions, `source` index (the geometry's own when omitted), look channels, extra
+ *  integer lists (a tiled mesh's tiles), whether its index draws turned, and its scale. */
+function contentKey(geometry: THREE.BufferGeometry, source: ArrayLike<number> | null, extra: readonly ArrayLike<number>[], turned: boolean, scale: number): string {
+  h1 = 2166136261; h2 = 3266489917;
+  const position = geometry.attributes['position'];
+  if (position instanceof THREE.BufferAttribute) hashValues(position.array, position.count * position.itemSize);
+  const index = geometry.index;
+  if (source !== null) hashValues(source, source.length);
+  else if (index !== null) hashValues(index.array, index.count);
+  for (const [name, a] of Object.entries(geometry.attributes)) {
+    if (UNLOOKED.has(name) || a.itemSize > 4 || !(a instanceof THREE.BufferAttribute) || arrayReleased(a)) continue;
+    hashValues(a.array, a.count * a.itemSize);
+  }
+  for (const list of extra) hashValues(list, list.length);
+  return `${String(h1 >>> 0)}.${String(h2 >>> 0)}.${String(turned)}.${String(Math.round(scale * 1e6))}`;
 }
 
 /** The square's triangles at `level` (0: its own); a level not built falls back to the finer one. */
@@ -189,11 +247,56 @@ function trianglesAt(square: Square, level: number): Uint32Array {
   return square.full;
 }
 
+const STAGE = { owner: 'engine/farLod', asset: 'index-stage', kind: 'geometry-cpu' } as const;
+let stage16 = new Uint16Array(0), stage32 = new Uint32Array(0);
+/** DF9b: the page's staging index of the mesh's element type, at least `count` long: one for every mesh (one rewrite a
+ *  frame, used at once), grown to the widest mesh and kept. */
+function staging(narrow: boolean, count: number): Uint16Array | Uint32Array {
+  if (narrow) { if (stage16.length < count) stage16 = ownedArray(Uint16Array, count, STAGE); return stage16; }
+  if (stage32.length < count) stage32 = ownedArray(Uint32Array, count, STAGE);
+  return stage32;
+}
+
 /** Sort `mesh`'s triangles into SQUARE m squares now (its arrays are still here); its copies are built later, in slices. */
 function capture(mesh: THREE.Mesh, geometry: THREE.BufferGeometry): Tracked {
   const t0 = diagnosticNow();
-  const position = geometry.attributes['position'] as THREE.BufferAttribute | THREE.InterleavedBufferAttribute, vertices = position.count, positions = floats(position);
+  const position = geometry.attributes['position'] as THREE.BufferAttribute | THREE.InterleavedBufferAttribute, vertices = position.count;
   const index = geometry.index, count = index === null ? vertices : index.count;
+  mesh.updateWorldMatrix(true, false);
+  const key = contentKey(geometry, null, [], index !== null && indexTurned(index), mesh.matrixWorld.getMaxScaleOnAxis()), known = built.get(key);
+  const sorted = known === undefined ? cut(geometry, position, count) : { squares: again(known), positions: null };
+  let drawn = count;
+  // DF9b: the index's element type, read now (once the Memory saver lets the array go, reading it brings it back from the
+  // GPU); a soup's own index is 16-bit when its vertices allow
+  const narrow = index === null ? vertices <= 65535 : index.array instanceof Uint16Array;
+  const write = { at: 0, triangles: staging(narrow, count), length: 0 }, writes = [write];
+  const apply = (): boolean => {
+    let total = 0;
+    for (const square of sorted.squares) total += trianglesAt(square, square.level).length;
+    // DF9b: the squares go into the page's one staging index (no new array a band change: on the iPhone 13 a whole index
+    // each write doubled the full collections), then into the mesh's index from its start
+    const out = staging(narrow, count);
+    let at = 0;
+    for (const square of sorted.squares) { const part = trianglesAt(square, square.level); out.set(part, at); at += part.length; }
+    if (geometry.index === null) {
+      // a soup: its first index, as large as all its faces, so a finer pick later still fits
+      const array = narrow ? ownedArray(Uint16Array, count, SOUP) : ownedArray(Uint32Array, count, SOUP); array.set(out.subarray(0, total));
+      geometry.setIndex(new THREE.BufferAttribute(array, 1));
+    } else {
+      write.triangles = out; write.length = total;
+      if (!writeIndexTriangles(geometry.index, writes, false)) return false;
+    }
+    geometry.setDrawRange(0, total);
+    farLodReport.drawn += (total - drawn) / 3; drawn = total;
+    return true;
+  };
+  farLodReport.captureMs += diagnosticNow() - t0;
+  return track(mesh, sorted.squares, sorted.positions, apply, key);
+}
+
+/** `geometry`'s triangles sorted into SQUARE m squares, with its local positions for the build. */
+function cut(geometry: THREE.BufferGeometry, position: THREE.BufferAttribute | THREE.InterleavedBufferAttribute, count: number): { squares: Square[]; positions: Float32Array } {
+  const positions = floats(position), index = geometry.index;
   const corners = ownedArray(Uint32Array, count, SCRATCH);
   if (index === null) for (let i = 0; i < count; i++) corners[i] = i;
   else {
@@ -209,27 +312,12 @@ function capture(mesh: THREE.Mesh, geometry: THREE.BufferGeometry): Tracked {
     let id = byKey.get(key); if (id === undefined) { id = sizes.length; byKey.set(key, id); sizes.push(0); }
     ids[t] = id; sizes[id] = (sizes[id] ?? 0) + 1;
   }
-  const groups = sizes.map(n => ownedArray(Uint32Array, n, SCRATCH)), fill = ownedArray(Int32Array, sizes.length, SCRATCH);
+  const startsPool = ownedArray(Uint32Array, triangles, SCRATCH), groups: Uint32Array[] = [];
+  let grouped = 0;
+  for (const n of sizes) { groups.push(startsPool.subarray(grouped, grouped + n)); grouped += n; }
+  const fill = ownedArray(Int32Array, sizes.length, SCRATCH);
   for (let t = 0; t < triangles; t++) { const id = ids[t] ?? 0, at = fill[id] ?? 0; const group = groups[id]; if (group !== undefined) group[at] = t * 3; fill[id] = at + 1; }
-  const squares = squaresOf(positions, corners, groups);
-  let drawn = count;
-  const apply = (): boolean => {
-    let total = 0;
-    for (const square of squares) total += trianglesAt(square, square.level).length;
-    const out = ownedArray(Uint32Array, total, SCRATCH);
-    let at = 0;
-    for (const square of squares) { const part = trianglesAt(square, square.level); out.set(part, at); at += part.length; }
-    if (geometry.index === null) {
-      // a soup: its first index, as large as all its faces, so a finer pick later still fits
-      const array = vertices > 65535 ? ownedArray(Uint32Array, count, SOUP) : ownedArray(Uint16Array, count, SOUP); array.set(out);
-      geometry.setIndex(new THREE.BufferAttribute(array, 1));
-    } else if (!writeIndexTriangles(geometry.index, [{ at: 0, triangles: out }], false)) return false;
-    geometry.setDrawRange(0, total);
-    farLodReport.drawn += (total - drawn) / 3; drawn = total;
-    return true;
-  };
-  farLodReport.captureMs += diagnosticNow() - t0;
-  return track(mesh, squares, positions, apply);
+  return { squares: squaresOf(positions, corners, groups), positions };
 }
 
 /** What a tiled mesh draws for a resident tile: the tile's copy at its level, or null for its own triangles. */
@@ -247,16 +335,23 @@ export function farTiles(mesh: THREE.Mesh, source: ArrayLike<number>, ranges: { 
   if (!(position instanceof THREE.BufferAttribute) || arrayReleased(position) || Array.isArray(mesh.material) || mesh.material.transparent) return null;
   if (source.length < MIN_TRIS * 3) return null;
   const t0 = diagnosticNow();
-  const positions = floats(position), tiles: number[] = [], groups: Uint32Array[] = [];
+  mesh.updateWorldMatrix(true, false);
+  const key = contentKey(geometry, source, [ranges.order, ranges.start, ranges.count], false, mesh.matrixWorld.getMaxScaleOnAxis()), known = built.get(key);
+  const tiles: number[] = [], groups: Uint32Array[] = [];
+  const startsPool = known === undefined ? ownedArray(Uint32Array, source.length / 3, SCRATCH) : null;
+  let grouped = 0;
   for (let tile = 0; tile < ranges.count.length; tile++) {
     const n = ranges.count[tile] ?? 0; if (n === 0) continue;
-    const starts = ownedArray(Uint32Array, n, SCRATCH), from = ranges.start[tile] ?? 0;
+    tiles.push(tile);
+    if (startsPool === null) continue;
+    const starts = startsPool.subarray(grouped, grouped + n), from = ranges.start[tile] ?? 0; grouped += n;
     for (let k = 0; k < n; k++) starts[k] = (ranges.order[from + k] ?? 0) * 3;
-    tiles.push(tile); groups.push(starts);
+    groups.push(starts);
   }
-  const squares = squaresOf(positions, source, groups), bySquare = new Map<number, Square>();
+  const positions = known === undefined ? floats(position) : null;
+  const squares = positions === null ? again(known ?? []) : squaresOf(positions, source, groups), bySquare = new Map<number, Square>();
   squares.forEach((square, i) => { const tile = tiles[i]; if (tile !== undefined) bySquare.set(tile, square); });
-  const entry = track(mesh, squares, positions, () => { redraw(); return true; });
+  const entry = track(mesh, squares, positions, () => { redraw(); return true; }, key);
   farLodReport.tiled++; farLodReport.captureMs += diagnosticNow() - t0;
   tracked.set(geometry, entry);
   return { copy: (tile) => {
@@ -269,6 +364,29 @@ export function farTiles(mesh: THREE.Mesh, source: ArrayLike<number>, ranges: { 
 
 type Simplifier = typeof MeshoptSimplifier;
 
+/** DF9b: the build's working arrays, kept from square to square and grown, never shrunk: the per-square maps, lists and
+ *  copies of the first build were the garbage that doubled the iPhone 13's full collections. Each `*Gen` array marks an
+ *  entry written in this call (`gen`), so nothing is cleared between squares. */
+const work = {
+  gen: 0,
+  /** by mesh vertex: the call that welded it, its welded vertex, the next vertex welded to the same one, its face's call */
+  weldGen: new Int32Array(0), weldOf: new Int32Array(0), next: new Int32Array(0), faceGen: new Int32Array(0),
+  /** by mesh vertex: its first face's direction */
+  face: new Float64Array(0),
+  /** by welded vertex: its first and last original (a list in welding order), its key (mm from the square's first corner) */
+  head: new Int32Array(0), tail: new Int32Array(0), keys: new Float64Array(0),
+  /** the weld's open table: a welded vertex per slot, and the call that wrote the slot */
+  slots: new Int32Array(0), slotGen: new Int32Array(0),
+  widx: new Uint32Array(0), wpos: new Float32Array(0), hue: new Float64Array(0),
+  /** a square's copy; a level's copies of one mesh, end to end, and each square's place and length there (-1: none) */
+  copy: new Uint32Array(0), level: new Uint32Array(0), at: new Int32Array(0), length: new Int32Array(0),
+};
+/** `current` if it holds `n`, else a new zeroed array of at least `n` (twice the old length). */
+function grown<T extends Int32Array | Uint32Array | Float32Array | Float64Array>(current: T, n: number, Type: { new (length: number): T; readonly BYTES_PER_ELEMENT: number }): T {
+  return current.length >= n ? current : ownedArray(Type, Math.max(n, current.length * 2), SCRATCH);
+}
+const SIMPLIFY_FLAGS: ('LockBorder' | 'ErrorAbsolute' | 'Prune')[] = ['LockBorder', 'ErrorAbsolute', 'Prune'];
+
 /**
  * A square's copy within `error` (local units): its corners welded by position, simplified with its border locked, and
  * each corner of each new face mapped back to one of the original vertices there. With `looks` (colour, cover...) the
@@ -277,59 +395,95 @@ type Simplifier = typeof MeshoptSimplifier;
  * face turns most like the new face (a merged face keeps a neighbour's normal).
  */
 export function squareCopy(simplify: Simplifier['simplify'], positions: Float32Array, full: Uint32Array, error: number, looks: Looks | null = null): Uint32Array {
-  const weldOf = new Map<number, number>(), byKey = new Map<number | string, number>(), welded: number[] = [], originals: number[][] = [];
+  const length = copyOf(simplify, positions, full, error, looks, () => true);
+  return work.copy.slice(0, Math.max(0, length));
+}
+
+/** squareCopy into the build's working array `work.copy`: its length, or -1 (nothing mapped) when `keep` refuses it. */
+function copyOf(simplify: Simplifier['simplify'], positions: Float32Array, full: Uint32Array, error: number, looks: Looks | null,
+  keep: (length: number) => boolean): number {
+  const vertices = Math.floor(positions.length / 3), n = full.length;
+  const w = work;
+  w.weldGen = grown(w.weldGen, vertices, Int32Array); w.weldOf = grown(w.weldOf, vertices, Int32Array); w.next = grown(w.next, vertices, Int32Array);
+  w.faceGen = grown(w.faceGen, vertices, Int32Array); w.face = grown(w.face, vertices * 3, Float64Array);
+  w.head = grown(w.head, n, Int32Array); w.tail = grown(w.tail, n, Int32Array); w.keys = grown(w.keys, n * 3, Float64Array);
+  let capacity = 16; while (capacity < n * 2) capacity *= 2;
+  w.slots = grown(w.slots, capacity, Int32Array); w.slotGen = grown(w.slotGen, capacity, Int32Array);
+  w.widx = grown(w.widx, n, Uint32Array); w.wpos = grown(w.wpos, n * 3, Float32Array);
+  const gen = ++w.gen, mask = capacity - 1;
+  const { weldGen, weldOf, next, faceGen, face, head, tail, keys, slots, slotGen, widx, wpos } = w;
   const at = (v: number, j: number): number => positions[v * 3 + j] ?? 0;
-  const widx = ownedArray(Uint32Array, full.length, SCRATCH);
-  // a position's key: millimetres from the square's first corner, packed exactly in a double (x and z within 65 m, y
-  // within 262 m of it), else as text
+  // a position's key: whole millimetres from the square's first corner; equal keys weld
   const first = full[0] ?? 0, ox = at(first, 0), oy = at(first, 1), oz = at(first, 2);
-  const keyOf = (v: number): number | string => {
-    const x = Math.round((at(v, 0) - ox) * 1000) + 65536, y = Math.round((at(v, 1) - oy) * 1000) + 262144, z = Math.round((at(v, 2) - oz) * 1000) + 65536;
-    if (x >= 0 && x < 131072 && z >= 0 && z < 131072 && y >= 0 && y < 524288) return x + 131072 * (z + 131072 * y);
-    return `${String(x)},${String(y)},${String(z)}`;
-  };
-  for (let i = 0; i < full.length; i++) {
+  let welded = 0;
+  for (let i = 0; i < n; i++) {
     const v = full[i] ?? 0;
-    let w = weldOf.get(v);
-    if (w === undefined) {
-      const key = keyOf(v);
-      w = byKey.get(key);
-      if (w === undefined) { w = welded.length / 3; byKey.set(key, w); welded.push(at(v, 0), at(v, 1), at(v, 2)); originals.push([]); }
-      weldOf.set(v, w); originals[w]?.push(v);
+    let found = -1;
+    if (weldGen[v] === gen) found = weldOf[v] ?? 0;
+    else {
+      const x = Math.round((at(v, 0) - ox) * 1000), y = Math.round((at(v, 1) - oy) * 1000), z = Math.round((at(v, 2) - oz) * 1000);
+      let slot = (Math.imul(x | 0, 73856093) ^ Math.imul(y | 0, 19349663) ^ Math.imul(z | 0, 83492791)) & mask;
+      while (slotGen[slot] === gen) {
+        const c = slots[slot] ?? 0;
+        if (keys[c * 3] === x && keys[c * 3 + 1] === y && keys[c * 3 + 2] === z) { found = c; break; }
+        slot = (slot + 1) & mask;
+      }
+      if (found < 0) {
+        found = welded++; slotGen[slot] = gen; slots[slot] = found;
+        keys[found * 3] = x; keys[found * 3 + 1] = y; keys[found * 3 + 2] = z;
+        wpos[found * 3] = at(v, 0); wpos[found * 3 + 1] = at(v, 1); wpos[found * 3 + 2] = at(v, 2);
+        head[found] = -1; tail[found] = -1;
+      }
+      weldGen[v] = gen; weldOf[v] = found;
+      // v joins its welded vertex's originals, in welding order
+      next[v] = -1;
+      const last = tail[found] ?? -1;
+      if (last < 0) head[found] = v; else next[last] = v;
+      tail[found] = v;
     }
-    widx[i] = w;
+    widx[i] = found;
   }
   // each original vertex's face direction (its first face in this square)
-  const faceOf = new Map<number, [number, number, number]>();
-  const normal = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, cx: number, cy: number, cz: number): [number, number, number] => {
-    const ux = bx - ax, uy = by - ay, uz = bz - az, vx = cx - ax, vy = cy - ay, vz = cz - az;
-    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1;
-    return [nx / l, ny / l, nz / l];
-  };
-  for (let t = 0; t < full.length; t += 3) {
+  for (let t = 0; t < n; t += 3) {
     const a = full[t] ?? 0, b = full[t + 1] ?? 0, c = full[t + 2] ?? 0;
-    const f = normal(at(a, 0), at(a, 1), at(a, 2), at(b, 0), at(b, 1), at(b, 2), at(c, 0), at(c, 1), at(c, 2));
-    for (const v of [a, b, c]) if (!faceOf.has(v)) faceOf.set(v, f);
+    if (faceGen[a] === gen && faceGen[b] === gen && faceGen[c] === gen) continue;
+    const ux = at(b, 0) - at(a, 0), uy = at(b, 1) - at(a, 1), uz = at(b, 2) - at(a, 2), vx = at(c, 0) - at(a, 0), vy = at(c, 1) - at(a, 1), vz = at(c, 2) - at(a, 2);
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1;
+    for (let k = 0; k < 3; k++) {
+      const v = k === 0 ? a : k === 1 ? b : c;
+      if (faceGen[v] === gen) continue;
+      faceGen[v] = gen; face[v * 3] = nx / l; face[v * 3 + 1] = ny / l; face[v * 3 + 2] = nz / l;
+    }
   }
-  const wpos = ownedArray(Float32Array, welded.length, SCRATCH); wpos.set(welded);
-  const [out] = simplify(widx, wpos, 3, 0, error, ['LockBorder', 'ErrorAbsolute', 'Prune']);
-  const copy = ownedArray(Uint32Array, out.length, SCRATCH);
-  const w3 = (w: number, j: number): number => wpos[w * 3 + j] ?? 0;
-  const size = looks?.size ?? 0, hue = ownedArray(Float64Array, size, SCRATCH);
+  const [out] = simplify(widx.subarray(0, n), wpos.subarray(0, welded * 3), 3, 0, error, SIMPLIFY_FLAGS);
+  if (!keep(out.length)) return -1;
+  w.copy = grown(w.copy, out.length, Uint32Array);
+  const copy = w.copy;
+  const w3 = (q: number, j: number): number => wpos[q * 3 + j] ?? 0;
+  const size = looks?.size ?? 0;
+  w.hue = grown(w.hue, size, Float64Array);
+  const hue = w.hue;
   for (let t = 0; t < out.length; t += 3) {
     const a = out[t] ?? 0, b = out[t + 1] ?? 0, c = out[t + 2] ?? 0;
-    const f = normal(w3(a, 0), w3(a, 1), w3(a, 2), w3(b, 0), w3(b, 1), w3(b, 2), w3(c, 0), w3(c, 1), w3(c, 2));
+    const ux = w3(b, 0) - w3(a, 0), uy = w3(b, 1) - w3(a, 1), uz = w3(b, 2) - w3(a, 2), vx = w3(c, 0) - w3(a, 0), vy = w3(c, 1) - w3(a, 1), vz = w3(c, 2) - w3(a, 2);
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.hypot(nx, ny, nz) || 1;
+    const f0 = nx / l, f1 = ny / l, f2 = nz / l;
     if (looks !== null) {
       // the new face's look: the mean over its corners' originals
-      hue.fill(0); let n = 0;
-      for (const w of [a, b, c]) for (const v of originals[w] ?? []) { for (let j = 0; j < size; j++) hue[j] = (hue[j] ?? 0) + (looks.values[v * size + j] ?? 0); n++; }
-      for (let j = 0; j < size; j++) hue[j] = (hue[j] ?? 0) / Math.max(1, n);
+      hue.fill(0, 0, size); let count = 0;
+      for (let k = 0; k < 3; k++) {
+        for (let v = head[k === 0 ? a : k === 1 ? b : c] ?? -1; v >= 0; v = next[v] ?? -1) {
+          for (let j = 0; j < size; j++) hue[j] = (hue[j] ?? 0) + (looks.values[v * size + j] ?? 0);
+          count++;
+        }
+      }
+      for (let j = 0; j < size; j++) hue[j] = (hue[j] ?? 0) / Math.max(1, count);
     }
     for (let k = 0; k < 3; k++) {
-      const list = originals[out[t + k] ?? 0] ?? [];
-      let best = list[0] ?? 0, score = -Infinity;
-      if (list.length > 1) for (const v of list) {
-        const g = faceOf.get(v); let s = g === undefined ? -2 : g[0] * f[0] + g[1] * f[1] + g[2] * f[2];
+      const h = head[out[t + k] ?? 0] ?? -1;
+      let best = Math.max(0, h), score = -Infinity;
+      if (h >= 0 && (next[h] ?? -1) >= 0) for (let v = h; v >= 0; v = next[v] ?? -1) {
+        let s = faceGen[v] === gen ? (face[v * 3] ?? 0) * f0 + (face[v * 3 + 1] ?? 0) * f1 + (face[v * 3 + 2] ?? 0) * f2 : -2;
         if (looks !== null) {
           let d = 0;
           for (let j = 0; j < size; j++) { const e = (looks.values[v * size + j] ?? 0) - (hue[j] ?? 0); d += e * e; }
@@ -340,7 +494,7 @@ export function squareCopy(simplify: Simplifier['simplify'], positions: Float32A
       copy[t + k] = best;
     }
   }
-  return copy;
+  return out.length;
 }
 
 let simplifier: Simplifier | null = null, loading: Promise<void> | null = null, building = false, started = false;
@@ -355,12 +509,12 @@ function startBuilding(): void {
       await loaded.ready; simplifier = loaded;
     } catch { farLodReport.refused++; }
   })();
-  const work = builds();
+  const steps = builds();
   const slice = (): void => {
     if (simplifier === null) { pageScope.timeout(250, slice); return; }
     const t0 = diagnosticNow();
     let done = false;
-    while (diagnosticNow() - t0 < SLICE_MS) if (work.next().done === true) { done = true; break; }
+    while (diagnosticNow() - t0 < SLICE_MS) if (steps.next().done === true) { done = true; break; }
     farLodReport.buildMs += diagnosticNow() - t0;
     if (done) { building = false; if (queue.length > 0) startBuilding(); return; }
     pageScope.timeout(SLICE_GAP_MS, slice);
@@ -379,15 +533,33 @@ function* builds(): Generator<void, void> {
     // again as each level lands
     for (let l = FAR_LEVELS.length - 1; l >= 0; l--) {
       const level = FAR_LEVELS[l]; if (level === undefined) continue;
-      for (const square of entry.squares) {
-        const copy = squareCopy(simplifier.simplify, positions, square.full, level.error / entry.scale, entry.looks);
+      // DF9b: the level's copies go end to end into the working arrays, then into one kept array (squaresOf's pool)
+      const squares = entry.squares;
+      work.at = grown(work.at, squares.length, Int32Array); work.length = grown(work.length, squares.length, Int32Array);
+      let filled = 0;
+      for (let i = 0; i < squares.length; i++) {
+        const square = squares[i]; if (square === undefined) continue;
         // a copy no smaller than its square's own is left out (trianglesAt falls back to the finer one)
-        if (copy.length < square.full.length * 0.95) { const kept = ownedArray(Uint32Array, copy.length, KEPT); kept.set(copy); square.copies[l] = kept; }
+        const limit = square.full.length * 0.95;
+        const length = copyOf(simplifier.simplify, positions, square.full, level.error / entry.scale, entry.looks, (n) => n < limit);
+        work.length[i] = length; work.at[i] = filled;
+        if (length > 0) {
+          if (work.level.length < filled + length) { const wider = ownedArray(Uint32Array, Math.max(filled + length, work.level.length * 2), SCRATCH); wider.set(work.level.subarray(0, filled)); work.level = wider; }
+          work.level.set(work.copy.subarray(0, length), filled); filled += length;
+        }
         yield;
+      }
+      const pool = ownedArray(Uint32Array, filled, KEPT);
+      pool.set(work.level.subarray(0, filled));
+      for (let i = 0; i < squares.length; i++) {
+        const square = squares[i], at = work.at[i] ?? 0, length = work.length[i] ?? -1;
+        if (square !== undefined && length >= 0) square.copies[l] = pool.subarray(at, at + length);
       }
       entry.ready = true; entry.looked = false;
     }
-    entry.positions = null; entry.looks = null; farLodReport.ready++;
+    entry.positions = null; entry.looks = null;
+    farLodReport.ready++;
+    remember(entry.key, entry.squares);
   }
 }
 
@@ -425,14 +597,18 @@ function look(entry: Tracked, camera: THREE.Camera, frame: number): boolean {
 export function installFarLod(renderer: Renderer, camera: () => THREE.Camera): void {
   if (!farLodOn()) return;
   Reflect.set(globalThis, '__wsFarLod', farLodReport);
+  // DF9b: a geometry refused for its draw range, by the range it had (a range that stays short was refused every draw)
+  const ranged = new WeakMap<THREE.BufferGeometry, number>();
   drawHooks(renderer).lod = (drawer, geometry, object) => {
     let entry = tracked.get(geometry);
     if (entry === undefined) {
+      const range = geometry.drawRange.start === 0 ? geometry.drawRange.count : -1 - geometry.drawRange.start;
+      if (ranged.get(geometry) === range) return;
       const why = refusal(object, geometry);
       entry = why === null && isMesh(object) ? capture(object, geometry) : null;
       if (why !== null && why !== 'small' && why !== 'kind') farLodReport.whole[why] = (farLodReport.whole[why] ?? 0) + 1;
       // a range still growing (the dressing's clipped reveal) is looked at again at its next draw
-      if (why !== 'range') tracked.set(geometry, entry);
+      if (why === 'range') ranged.set(geometry, range); else tracked.set(geometry, entry);
     }
     if (entry !== null && entry.ready && drawer === camera() && !look(entry, drawer, renderCount(renderer))) tracked.set(geometry, null);
   };
