@@ -17,9 +17,11 @@ existing document belongs to its current-epoch writers; malformed
 content still goes through SaveStore's existing quarantine path.
 The whitelist and progress reset for a genuine epoch move stay intact.
 Three direct suites pass, nine tests, including a fresh epoch move.
-The broader epoch-cut suite cannot import in this checkout's stale
-format 0.63.0 install (main requires 0.65.0); the normal push gate uses
-its clean install and is the authoritative related-test check.
+The broader epoch-cut suite initially could not import with this
+checkout's stale format 0.63.0 install. A frozen offline refresh to
+0.65.0 and current pinned products resolved it: all five epoch-cut
+tests pass. Engine1075f28f58 passed the normal typecheck, related-test
+and lint gate in225 seconds and is pushed; no bypass was used.
 
 This is a proven key-loss bug, not proof that it caused the earlier
 whole-origin disappearance. The frozen traces had a global document
