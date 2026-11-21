@@ -6,6 +6,7 @@ import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { isGpuOnlyAttribute } from '@wildshard/engine/core/gpuOnly';
 import { MERGED_VIEW } from '@wildshard/engine/core/shadowLayer';
+import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { mergeableMaterial, sharedHook } from './staticViewMerge';
 
 /**
@@ -53,8 +54,7 @@ const sameFormat = (a: Format, b: Format): boolean => a.itemSize === b.itemSize 
 function inFormat(a: Attribute, format: Format): Attribute {
   if (sameFormat(formatOf(a), format)) return a;
   const out = new THREE.BufferAttribute(new format.Typed(a.count * a.itemSize), a.itemSize, format.normalized);
-  const read = [a.getX, a.getY, a.getZ, a.getW] as const;
-  for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out.setComponent(i, c, (read[c] ?? a.getX).call(a, i));
+  for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out.setComponent(i, c, a.getComponent(i, c));
   return out;
 }
 
@@ -87,7 +87,7 @@ interface Member {
 /** whether `object` and every ancestor are visible, up to a scene */
 function shown(object: THREE.Object3D): boolean {
   let node: THREE.Object3D | null = object;
-  for (; node !== null; node = node.parent) { if (!node.visible) return false; if (node.parent === null) return (node as THREE.Scene).isScene === true; }
+  for (; node !== null; node = node.parent) { if (!node.visible) return false; if (node.parent === null) return Reflect.get(node, 'isScene') === true; }
   return false;
 }
 
@@ -116,7 +116,7 @@ export class KitBatch extends ChangedBatchedMesh {
         copy.setAttribute(name, own === undefined ? new THREE.BufferAttribute(new format.Typed(position.count * format.itemSize), format.itemSize, format.normalized) : inFormat(own, format));
       }
       if (geometry.index !== null) copy.setIndex(geometry.index);
-      else { const identity = new Uint32Array(position.count); for (let i = 0; i < identity.length; i++) identity[i] = i; copy.setIndex(new THREE.BufferAttribute(identity, 1)); }
+      else { const identity = ownedArray(Uint32Array, position.count, { owner: 'game/kit-batch', asset: 'identity-index', kind: 'geometry-cpu' }); for (let i = 0; i < identity.length; i++) identity[i] = i; copy.setIndex(new THREE.BufferAttribute(identity, 1)); }
       if (geometry.boundingBox === null) geometry.computeBoundingBox();
       if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
       copy.boundingBox = geometry.boundingBox; copy.boundingSphere = geometry.boundingSphere;
@@ -135,7 +135,7 @@ export class KitBatch extends ChangedBatchedMesh {
       batch.members.push({ mesh, geometry, material, attributes, versions: attributes.map(a => a?.version ?? 0), released, mask: mesh.layers.mask,
         drawn: geometry.index?.count ?? position.count, instance, geometryId, gone: false, at: Float64Array.from(mesh.matrixWorld.elements) });
       // a channel that gives its CPU copy up at upload goes now: the member never uploads, and the batch holds its copy
-      for (const attribute of attributes) if (attribute !== null && isGpuOnlyAttribute(attribute)) attribute.onUploadCallback.call(attribute);
+      for (const attribute of attributes) if (attribute !== null && isGpuOnlyAttribute(attribute)) attribute.onUploadCallback();
       mesh.layers.disableAll();
     }
     batch.hooks = [...hooks];
@@ -262,6 +262,6 @@ export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: 
   scope.onDispose(() => { for (const batch of batches) batch.retire(); Reflect.deleteProperty(scene.userData, 'kitBatch'); });
   scene.userData['kitBatch'] = (): { batches: number; members: number; gone: number; names: string[] } => ({ batches: batches.length,
     members: batches.reduce((sum, batch) => sum + batch.members.length, 0), gone: batches.reduce((sum, batch) => sum + batch.members.filter(m => m.gone).length, 0),
-    names: batches.map(batch => `${batch.name} [${String(batch.userData['layout'])}] x${String(batch.members.length)}: ${batch.members.map(m => `${m.mesh.name || m.mesh.parent?.name || '?'}${m.left === undefined ? '' : ` (left: ${m.left})`}`).join(', ')}`) });
+    names: batches.map(batch => `${batch.name} [${String(batch.userData['layout'])}] x${String(batch.members.length)}: ${batch.members.map(m => `${m.mesh.name !== '' ? m.mesh.name : (m.mesh.parent?.name ?? '?')}${m.left === undefined ? '' : ` (left: ${m.left})`}`).join(', ')}`) });
   return { batches: batches.length, members: batches.reduce((sum, batch) => sum + batch.members.length, 0) };
 }

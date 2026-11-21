@@ -36,7 +36,7 @@ export class CollectionDisplay extends THREE.Mesh<THREE.BufferGeometry, THREE.Ma
    *  material and pose. */
   override clone(recursive?: boolean): this {
     const copy = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(this.geometry, this.material);
-    return Reflect.apply(THREE.Mesh.prototype.copy, copy, [this, recursive]) as this;
+    return Reflect.apply(Reflect.get(THREE.Mesh.prototype, 'copy') as (source: THREE.Object3D, recursive?: boolean) => THREE.Mesh, copy, [this, recursive]) as this;
   }
   get pieces(): number { return this.n; }
   setCount(n: number): void {
