@@ -28,9 +28,10 @@ releases (J184).
 
 ## Work and evidence
 
-- Three Linux jobs install all pins, generate inputs, run the kit checks
-  and partition the full admitted Vitest suite with `--shard=1/3` through
-  `--shard=3/3`, including the slow Ring 2 list.
+- Four Linux jobs install all pins, generate inputs and run the kit checks.
+  Three partition ordinary Vitest files with `--shard=1/3` through
+  `--shard=3/3`. The fourth runs the three native contention files with
+  one worker. Together they run the full suite, including the Ring 2 list.
   Every listed file must actually execute at least one passing assertion.
   All partition receipts are required; a missing or duplicate partition,
   overlapping test files, skipped listed assertions or a nonzero exit is

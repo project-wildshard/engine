@@ -140,7 +140,7 @@ jobs:
           retention-days: 7
   # EV6: run the three original-file contention rehearsals under one outer
   # machine grant on a dedicated runner. Their nested proofs stay out of the
-  # local full gate and out of the Ring 2 matrix that feeds the release verdict.
+  # local full gate. Ring 2 requires the actual cases in its serial partition.
   native-contention:
     if: ${{ github.event_name == 'schedule' || inputs.suite_only }}
     runs-on: ubuntu-24.04

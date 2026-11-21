@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {browsers, headGroups, phases, plan, read, requireBuild, requireGreen, requireLatest, testGroups, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
+import {browsers, headGroups, parallelTestGroups, phases, plan, read, requireBuild, requireGreen, requireLatest, testGroups, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
+import {NATIVE_CONTENTION_SUITES} from './vitest-ci-files.ts';
 
 interface Execution {status: number | null; report: Verdict; summary: string}
 interface Fixture {root: string; heads: HeadsReport[]; suite: TestsReport; suites: TestsReport[]; expected: Plan;
@@ -27,8 +28,10 @@ function fixture(run: (context: Fixture) => void): void {
       heads.push({...expected, kind: 'heads', browser, group, results});
     }
     const suite: TestsReport = {...expected, kind: 'tests', group: 0, groups: testGroups, exitCode: 0, kitExitCode: 0, totalTests: 1, files: [{path: 'test/journey.test.ts', ok: true, assertions: 1, skipped: 0}]};
-    const suites: TestsReport[] = [suite, ...Array.from({length: testGroups - 1}, (_, index) => ({...suite, group: index + 1,
-      files: [{path: `test/ordinary-${index}.test.ts`, ok: true, assertions: 1, skipped: 0}]}))];
+    const suites: TestsReport[] = [suite, ...Array.from({length: parallelTestGroups - 1}, (_, index) => ({...suite, group: index + 1,
+      files: [{path: `test/ordinary-${index}.test.ts`, ok: true, assertions: 1, skipped: 0}]})),
+    {...suite, group: parallelTestGroups, totalTests: NATIVE_CONTENTION_SUITES.length,
+      files: NATIVE_CONTENTION_SUITES.map(path => ({path, ok: true, assertions: 1, skipped: 0}))}];
     const execute = (baseline?: string, env: NodeJS.ProcessEnv = {}): Execution => {
       rmSync(join(root, 'reports'), {recursive: true, force: true});
       for (const report of heads) write(`reports/heads-${report.browser}-${report.group}.json`, report);
@@ -40,10 +43,28 @@ function fixture(run: (context: Fixture) => void): void {
   } finally {rmSync(root, {recursive: true, force: true});}
 }
 
-await test('nightly schedules all three suite partitions', () => fixture(({root}) => {
+await test('nightly keeps the cold native files in a one-worker partition', () => fixture(({root}) => {
   const result = spawnSync(process.execPath, [cli, 'test-plan'], {cwd: root, encoding: 'utf8'});
   assert.equal(result.status, 0, result.stderr);
-  assert.deepEqual(JSON.parse(result.stdout), {group: [0, 1, 2]});
+  assert.deepEqual(JSON.parse(result.stdout), {group: [0, 1, 2, 3]});
+  const bin = join(root, 'bin');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n', {mode: 0o700});
+  writeFileSync(join(bin, 'python3'), '#!/bin/sh\nprintf "%s\\n" "$WS_NIGHTLY_TEST_PHASE" "$@" > invocation.txt\n', {mode: 0o700});
+  for (const group of [0, 1, 2, 3]) {
+    spawnSync(process.execPath, [cli, 'tests', join(root, 'reports')], {cwd: root, env: {...process.env,
+      PATH: `${bin}:${process.env.PATH}`, NIGHTLY_TEST_GROUP: String(group)}});
+    const invocation = readFileSync(join(root, 'invocation.txt'), 'utf8').trim().split('\n');
+    if (group === 3) {
+      assert.equal(invocation[0], 'serial');
+      assert.ok(invocation.includes('--maxWorkers=1'));
+      assert.ok(!invocation.some(arg => arg.startsWith('--shard=')));
+    } else {
+      assert.equal(invocation[0], 'parallel');
+      assert.ok(invocation.includes('--maxWorkers=2'));
+      assert.ok(invocation.includes(`--shard=${group + 1}/3`));
+    }
+  }
 }));
 await test('complete real report files admit the exact commit, but never another commit or repeated row', () => fixture(({expected, execute}) => {
   const result = execute(); assert.equal(result.status, 0); requireGreen(result.report, expected);
@@ -109,6 +130,14 @@ kill -TERM "$$"
 await test('ordinary suite skips retain existing policy while listed journeys must all run', () => fixture(({suite, execute}) => {
   suite.files.push({path: 'test/ordinary-platform.test.ts', ok: true, assertions: 0, skipped: 1});
   assert.equal(execute().status, 0);
+}));
+await test('the verdict holds if a native file runs in the parallel partition', () => fixture(({suite, suites, execute}) => {
+  const serial = suites[parallelTestGroups];
+  suite.files.push(...serial.files.splice(0, 1));
+  const result = execute();
+  assert.equal(result.status, 1);
+  assert.match(result.report.failures.find(failure => failure.key === 'shared/tests/0')?.error ?? '', /serial file ran in a parallel partition/u);
+  assert.match(result.report.failures.find(failure => failure.key === `shared/tests/${parallelTestGroups}`)?.error ?? '', /serial partition inventory differs/u);
 }));
 await test('missing, duplicate, malformed or overlapping suite partitions hold an otherwise green night', () => {
   const mutations: ((suites: TestsReport[]) => void)[] = [suites => {suites.pop();}, suites => {suites[1].group = 0;}, suites => {suites[1].groups = 1;}, suites => {suites[1].files = [...suites[0].files];}, suites => {suites[1].files = [];}];

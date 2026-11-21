@@ -2,7 +2,7 @@
 import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {join, relative, resolve} from 'node:path';
-import {browsers, headGroups, headRunner, markdown, plan, read, requirePublishedGreen, testGroups, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
+import {browsers, headGroups, headRunner, markdown, parallelTestGroups, plan, read, requirePublishedGreen, testGroups, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
 
 interface VitestResult {numTotalTests?: number; testResults?: {name: string; status: string; assertionResults?: {status: string}[]}[]}
 
@@ -24,9 +24,12 @@ if (command === 'plan') {
   const kit = spawnSync('pnpm', ['test:kit'], {stdio: 'inherit', timeout: 120000});
   // The jobs cover the entire admitted suite once, including every slow
   // Ring 2 entry. Keep each job's existing 25-minute process limit.
+  const serial = group === parallelTestGroups;
+  const selection = serial ? ['--maxWorkers=1'] : ['--maxWorkers=2', `--shard=${group + 1}/${parallelTestGroups}`];
   const child = spawnSync('python3', ['scripts/heavy-lane.py', 'full-test', '--', process.execPath, 'scripts/vitest-tmp.ts', 'run',
-    '--maxWorkers=2', `--shard=${group + 1}/${testGroups}`, '--reporter=default', '--reporter=json', `--outputFile.json=${json}`],
-  {stdio: 'inherit', timeout: 1500000, env: {...process.env, WS_FULL_SUITE: '1', WILDSHARD_RING: '2'}});
+    ...selection, '--reporter=default', '--reporter=json', `--outputFile.json=${json}`],
+  {stdio: 'inherit', timeout: 1500000, env: {...process.env, WS_FULL_SUITE: '1', WILDSHARD_RING: '2',
+    WS_NIGHTLY_TEST_PHASE: serial ? 'serial' : 'parallel'}});
   const interruptions: string[] = [];
   for (const [name, processResult] of [['Vitest', child], ['kit', kit]] as const) {
     const reason = processResult.error?.message ?? processResult.signal;
@@ -47,7 +50,7 @@ if (command === 'plan') {
   const report: TestsReport = {...expected, kind: 'tests', group, groups: testGroups, exitCode: child.status ?? 1,
     kitExitCode: kit.status ?? 1, totalTests: raw.numTotalTests ?? 0, files, ...(interruptions.length === 0 ? {} : {interruptions})};
   write(`tests-${group}.json`, report);
-  // Listed journeys in either partition are checked together by report;
+  // Listed journeys in all partitions are checked together by report;
   // a partition must still fail for any ordinary or listed test failure.
   if (report.exitCode !== 0 || report.kitExitCode !== 0 || report.totalTests < 1 || files.some(file => !file.ok)) process.exitCode = 1;
 } else if (command === 'report') {

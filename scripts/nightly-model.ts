@@ -2,6 +2,7 @@
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
+import {NATIVE_CONTENTION_SUITES} from './vitest-ci-files.ts';
 
 export interface Head {slug: string; hash: string}
 export interface Plan {version: number; sha: string; pins: string; testList: string; heads: Head[]; tests: string[]}
@@ -21,7 +22,9 @@ export type NightlyBrowser = typeof browsers[number];
 export const phases = ['cook', 'boot', 'hover', 'draw', 'explorer'];
 const sharedGroups = 4;
 const metalHeads: ReadonlySet<string> = new Set(['nalati-grasslands', 'nine-dragon-stack', 'pine-hollow']);
-export const testGroups = 3;
+export const parallelTestGroups = 3;
+export const testGroups = parallelTestGroups + 1;
+const serialTests: ReadonlySet<string> = new Set(NATIVE_CONTENTION_SUITES);
 export const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 
@@ -95,6 +98,8 @@ export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict, 
     else if (suite.interruptions?.length) error = `Incomplete suite: ${suite.interruptions.join(', ')}`;
     else if (suite.kitExitCode !== 0 || suite.files.some(file => !file.ok)) error = `Suite failed: Vitest exit ${suite.exitCode}, kit exit ${suite.kitExitCode}`;
     else if (suite.totalTests < 1 || suite.files.length === 0 || assertions < 1) error = `Incomplete suite: no executable test evidence (Vitest exit ${suite.exitCode}, ${suite.totalTests} tests, ${assertions} passing assertions)`;
+    else if (group === parallelTestGroups && (suite.files.length !== serialTests.size || suite.files.some(file => !serialTests.has(file.path)))) error = 'Incomplete suite: serial partition inventory differs';
+    else if (group < parallelTestGroups && suite.files.some(file => serialTests.has(file.path))) error = 'Incomplete suite: a serial file ran in a parallel partition';
     else if (suite.exitCode !== 0) error = `Suite failed: Vitest exit ${suite.exitCode}`;
     tests.push({group, ok: error === undefined, files: suite?.files.length ?? 0, assertions});
     if (error !== undefined) failures.push({key: `shared/tests/${group}`, error});
