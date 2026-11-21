@@ -88,18 +88,29 @@ jobs:
           test "$(git rev-parse HEAD)" = "$RELEASE_BUILD"
           branch="release/v$version"
           test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$branch" --jq .object.sha)" = "$RELEASE_BUILD"
-          run=$(gh run list --workflow ci --branch "$branch" --commit "$RELEASE_BUILD" \
-            --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
           attempt=()
-          if [[ -z "$run" ]]; then
-            read -r run queue_attempt < <(jq -er '.ciJ381 | [.run, .attempt] | @tsv' <<< "$STAGING_QUALIFICATION")
-            [[ "$run" =~ ^[1-9][0-9]*$ && "$queue_attempt" =~ ^[1-9][0-9]*$ ]]
-            attempt=(--attempt "$queue_attempt")
+          j475=$(jq -r 'has("j475")' <<< "$STAGING_QUALIFICATION")
+          if [[ "$j475" = true ]]; then
+            # The Actions success index can lag the exact completed run.
+            run=$(jq -er '.j475.releaseCi | select(type == "number" and floor == . and . > 0)' <<< "$STAGING_QUALIFICATION")
+          else
+            # Older qualification receipts did not record a green run id.
+            run=$(gh run list --workflow ci --branch "$branch" --commit "$RELEASE_BUILD" \
+              --event push --limit 100 --json databaseId,conclusion \
+              --jq '[.[] | select(.conclusion == "success")][0].databaseId // empty')
+            if [[ -z "$run" ]]; then
+              queue=$(jq -er '.ciJ381 | [.run, .attempt] | @tsv' <<< "$STAGING_QUALIFICATION")
+              read -r run queue_attempt <<< "$queue"
+              [[ "$queue_attempt" =~ ^[1-9][0-9]*$ ]]
+              attempt=(--attempt "$queue_attempt")
+            fi
           fi
+          [[ "$run" =~ ^[1-9][0-9]*$ ]]
           export RELEASE_BRANCH="$branch" RELEASE_CI_RUN="$run" QUEUE_ATTEMPT="${queue_attempt:-}"
-          gh run view "$run" "${attempt[@]}" --json headSha,headBranch,event,workflowName,attempt,status,conclusion,jobs | node -e '
+          gh run view "$run" "${attempt[@]}" --json databaseId,headSha,headBranch,event,workflowName,attempt,status,conclusion,jobs | node -e '
             const assert = require("node:assert/strict");
             const ci = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
+            assert.equal(ci.databaseId, Number(process.env.RELEASE_CI_RUN));
             assert.equal(ci.headSha, process.env.RELEASE_BUILD);
             assert.equal(ci.headBranch, process.env.RELEASE_BRANCH);
             assert.equal(ci.event, "push");
