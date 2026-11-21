@@ -8,7 +8,8 @@ import { questBooks } from '../src/shared/engine/quest/players';
 import { shardRows } from '../src/shared/engine/sim/shardRows';
 import { DeclaredQuests } from '../src/shared/game/quest/declared';
 import { RACE_CHIP } from '../src/shared/game/quest/raceWire';
-import { rivalVehicle, VehicleRuntime } from '../src/server/game/plugin/vehicleRuntime';
+import { VehicleRuntime } from '../src/server/game/plugin/vehicleRuntime';
+import { rivalVehicle } from '../src/shared/game/shardfile/wirePrompts';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { VEHICLES_EXAMPLE } from './fixtures/vehiclesExample';
 

@@ -14,7 +14,7 @@ import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, Vehicles } from '@wildshard/format/vehicles';
 import { dockHulls, dockUnlocked, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
 import type { AudioData } from '@wildshard/format/audio';
-import { parseVehicleHornRow, parseVehicleSeatRow, parseVehicleWornRow, parseVehicleWreckRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
+import { isRivalVehicle, parseVehicleHornRow, parseVehicleSeatRow, parseVehicleWornRow, parseVehicleWreckRow, playerVehicle, vehicleDockOf, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../../../shared/game/shardfile/wirePrompts';
 import { vehiclePoint, type MoverView } from './followedMovers';
 import { rowState, statePose, VehiclePrediction, type VehicleRow } from './vehiclePrediction';
 import { vehicleSoundSources, VehicleSounds, type VehicleHearing, type VehicleSoundOut, type VehicleSoundState } from './vehicleSounds';
@@ -42,7 +42,11 @@ export interface VehicleFxPort {
   readonly frame: (dt: number, smoking: ReadonlySet<string>) => void;
 }
 /** One vehicle this page follows: its collider in the page's physics, its drawn look, and its last row. */
-interface Followed { readonly id: string; readonly dock: VehicleDock; readonly kind: VehicleKind; readonly body: KinematicMover; look: VehicleLook | null; pose: MoverPose; readonly view: MoverView }
+interface Followed {
+  readonly id: string; readonly dock: VehicleDock; readonly kind: VehicleKind; readonly body: KinematicMover; look: VehicleLook | null; pose: MoverPose; readonly view: MoverView;
+  /** MSZ44: its newest row's pose, kept while this page drives it and draws its prediction instead */
+  row: MoverPose;
+}
 
 /** MSZ16: what the wire says of a driven vehicle as a command goes: its row in the newest frame (when that frame carried one),
  *  and how many of the commands this page sent the server has not stepped yet, this one among them. */
@@ -181,9 +185,20 @@ export class FollowedVehicles {
   }
   /** Pose a vehicle off its row: its collider and its look. The vehicle this page drives stands where it predicts it. */
   follow(id: string, pose: MoverPose): void {
-    if (this.predicted?.id === id) return;
-    const vehicle = this.live.get(id) ?? this.make(id, pose); if (vehicle === null) return;
-    vehicle.pose = pose; vehicle.body.setPose(pose); vehicle.look?.pose(pose);
+    const known = this.live.get(id);
+    if (this.predicted?.id === id) { if (known !== undefined) known.row = pose; return; }
+    const vehicle = known ?? this.make(id, pose); if (vehicle === null) return;
+    vehicle.row = pose; vehicle.pose = pose; vehicle.body.setPose(pose); vehicle.look?.pose(pose);
+  }
+  /**
+   * MSZ16, MSZ44: this page stops driving: the vehicle stands where its newest row has it again. Its rows were kept while the
+   * prediction drew it, and one at rest sends no new row, so without this it stayed at the last prediction (after a knock the
+   * page never saw, metres off), and the seat it offered was not where the server judges the press.
+   */
+  private unpredict(): void {
+    const id = this.predicted?.id; this.predicted = null;
+    const vehicle = id === undefined ? undefined : this.live.get(id); if (vehicle === undefined) return;
+    vehicle.pose = vehicle.row; vehicle.body.setPose(vehicle.row); vehicle.look?.pose(vehicle.row);
   }
   /**
    * Once a frame, the wire's entity ids: the vehicles out (a per-player one whose row left goes) and the seats taken. `me` is
@@ -211,7 +226,7 @@ export class FollowedVehicles {
       if (this.wrecks.has(id)) this.fx?.burst(vehicle.pose, vehicle.look?.colours?.() ?? []);
     }
     // MSZ16: out of the driver's seat (left, set down, wrecked), the vehicle follows its rows again
-    if (this.predicted !== null && !this.driving(this.predicted.id)) this.predicted = null;
+    if (this.predicted !== null && !this.driving(this.predicted.id)) this.unpredict();
   }
   /**
    * MSZ16: one command this page sent, as the server will read it: when this page's player drives a vehicle here, it steps the
@@ -219,7 +234,7 @@ export class FollowedVehicles {
    */
   command(command: SimCommand, wire: VehicleWire): void {
     const held = this.seatOf(), vehicle = held === undefined ? undefined : this.live.get(held.vehicle);
-    if (held === undefined || vehicle === undefined || !this.driving(vehicle.id)) { this.predicted = null; return; }
+    if (held === undefined || vehicle === undefined || !this.driving(vehicle.id)) { this.unpredict(); return; }
     if (this.predicted?.id !== vehicle.id) {
       const row = wire.row(vehicle.id);
       this.predicted = { id: vehicle.id, run: new VehiclePrediction(vehicle.kind.handling, this.worldOf(vehicle), rowState(row ?? { pose: vehicle.pose }, { forward: 0, slip: 0 })) };
@@ -330,7 +345,7 @@ export class FollowedVehicles {
   private make(id: string, pose: MoverPose): Followed | null {
     const dock = this.docks.get(vehicleDockOf(id)), kind = dock === undefined ? undefined : this.kinds.get(dock.kind), boxes = dock === undefined ? undefined : this.hulls.get(dock.id);
     if (dock === undefined || kind === undefined || boxes === undefined) return null;
-    const vehicle: Followed = { id, dock, kind, body: new KinematicMover(this.ports.physics, boxes, pose, id), look: this.lookFor(kind, id), pose,
+    const vehicle: Followed = { id, dock, kind, body: new KinematicMover(this.ports.physics, boxes, pose, id), look: this.lookFor(kind, id), pose, row: pose,
       view: { pose: next => { this.follow(id, next); } } };
     this.live.set(id, vehicle);
     return vehicle;
@@ -351,7 +366,7 @@ export class FollowedVehicles {
         if (this.me === null || this.seatOf() !== undefined) return 0;
         let near = Infinity;
         for (const vehicle of this.live.values()) {
-          if (vehicle.kind !== kind || (this.seats.get(vehicle.id)?.[seat] ?? null) !== null) continue;
+          if (vehicle.kind !== kind || (this.seats.get(vehicle.id)?.[seat] ?? null) !== null || isRivalVehicle(vehicle.id)) continue; // MSZ44: a rival's seat is no one's
           if (row.role === 'driver' && vehicle.dock.per === 'player' && vehicle.id !== playerVehicle(vehicle.dock.id, this.me)) continue;
           const at = vehiclePoint(vehicle.pose, row.at), d = Math.hypot(at[0] - this.feet.x, at[2] - this.feet.z);
           if (d < near) { near = d; chosen = vehicle; position.set(...at); }

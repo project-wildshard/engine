@@ -16,7 +16,7 @@ import type { MoverBox, MoverPose } from '@wildshard/format/moverPose';
 import type { VehicleDock, VehicleKind, VehicleSeat, Vehicles } from '@wildshard/format/vehicles';
 import type { Race } from '../../../shared/game/quest/declared';
 import { dockHulls, dockUnlocked, vehicleGrip } from '../../../shared/game/shardfile/shardVehicles';
-import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleHornRow, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow, vehicleWreckRow } from '../../../shared/game/shardfile/wirePrompts';
+import { playerVehicle, rivalVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleHornRow, vehicleMotionRow, vehicleSeatPrompt, vehicleSeatRow, vehicleWornRow, vehicleWreckRow } from '../../../shared/game/shardfile/wirePrompts';
 
 /**
  * MIRROR-SALT-ZONE MSZ8 and MSZ9: the vehicles a cell's server runs, beside `MoverRuntime`. It spawns each kind from its
@@ -108,8 +108,6 @@ const RIVAL_BESIDE = 3.5, RIVAL_FINISH = 3;
 const RIVAL_SEES = 60;
 /** MSZ33: m of catch-up band a rival keeps when his race names none. */
 export const RIVAL_BAND = 40;
-/** MSZ33: a rival's vehicle id: his dock's, for the player and race he races. */
-export const rivalVehicle = (dock: string, race: string, player: string): string => playerVehicle(dock, `rival.${race}.${player}`);
 
 const finite = v.pipe(v.number(), v.finite());
 const Saved = v.strictObject({
@@ -358,6 +356,16 @@ export class VehicleRuntime {
       if (vehicle.idle >= vehicle.dock.respawn && Math.hypot(vehicle.state.x - x, vehicle.state.z - z) > HOME_RADIUS) this.home(vehicle);
     }
     for (const vehicle of this.live.values()) if (vehicle.health <= 0) this.wreck(vehicle); // a Map iterates on past a deleted entry
+    this.dropLoneRivals();
+  }
+  /** MSZ44: a rival races for one player's run: he goes home once that player has left the cell (or is parked at a gate), or
+   *  he would stay out for good, toward `VEHICLE_CAP` (staging had 7 out at once from players long gone). */
+  private dropLoneRivals(): void {
+    const host = this.host; if (host === null) return;
+    for (const vehicle of this.live.values()) {
+      const rival = vehicle.rival;
+      if (rival !== undefined && (!host.players.has(rival.player) || host.parked.has(rival.player))) this.despawn(vehicle.id);
+    }
   }
   /** MSZ14: a hit's wear on one vehicle: its change of speed past `VEHICLE_WEAR.from`. */
   private wear(vehicle: Live, change: number): void {

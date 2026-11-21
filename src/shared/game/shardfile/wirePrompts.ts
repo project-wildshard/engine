@@ -10,6 +10,10 @@ export const vehicleLeavePrompt = (vehicle: string): string => `${vehicle}.leave
 /** A per-player vehicle's id: its dock's, a colon, then its owner's (an act's id takes only `[a-zA-Z0-9._:-]`, and a dock's
  * id has no colon). A shared dock's vehicle goes by the dock's own id. */
 export const playerVehicle = (dock: string, player: string): string => `${dock}:${player}`;
+/** MIRROR-SALT-ZONE MSZ33: a race's rival's vehicle id: his dock's, for the race and the player he races. He takes no seat. */
+export const rivalVehicle = (dock: string, race: string, player: string): string => playerVehicle(dock, `rival.${race}.${player}`);
+/** MSZ44: whether a vehicle id is a rival's: a page offers none of his seats (the server refuses them). */
+export const isRivalVehicle = (vehicle: string): boolean => { const cut = vehicle.indexOf(':'); return cut !== -1 && vehicle.startsWith('rival.', cut + 1); };
 /** The dock a vehicle id came from. */
 export const vehicleDockOf = (vehicle: string): string => { const cut = vehicle.indexOf(':'); return cut === -1 ? vehicle : vehicle.slice(0, cut); };
 const SEAT_ROW = 'vehicle.seat|';
