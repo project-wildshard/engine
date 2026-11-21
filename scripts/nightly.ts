@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import {spawnSync} from 'node:child_process';
-import {existsSync, mkdirSync, readdirSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {join, relative, resolve} from 'node:path';
 import {browsers, headGroups, headRunner, markdown, plan, read, requirePublishedGreen, testGroups, verdict, type Receipt, type TestsReport, type Verdict} from './nightly-model.ts';
 
@@ -17,18 +17,33 @@ if (command === 'plan') {
   if (!Number.isInteger(group) || group < 0 || group >= testGroups) throw new Error('Set NIGHTLY_TEST_GROUP to 0 or 1; the verdict requires both suite partitions');
   mkdirSync(out, {recursive: true});
   const json = join(out, `vitest-${group}.json`);
+  rmSync(json, {force: true});
+  rmSync(join(out, `tests-${group}.json`), {force: true});
   const kit = spawnSync('pnpm', ['test:kit'], {stdio: 'inherit', timeout: 120000});
   // The two jobs cover the entire admitted suite once, including every slow
   // Ring 2 entry. Keep each job's existing 25-minute process limit.
   const child = spawnSync('python3', ['scripts/heavy-lane.py', 'full-test', '--', process.execPath, 'scripts/vitest-tmp.ts', 'run',
     '--maxWorkers=2', `--shard=${group + 1}/${testGroups}`, '--reporter=default', '--reporter=json', `--outputFile.json=${json}`],
   {stdio: 'inherit', timeout: 1500000, env: {...process.env, WS_FULL_SUITE: '1', WILDSHARD_RING: '2'}});
-  const raw: VitestResult = existsSync(json) ? (read(json) as VitestResult) : {};
+  const interruptions: string[] = [];
+  for (const [name, processResult] of [['Vitest', child], ['kit', kit]] as const) {
+    const reason = processResult.error?.message ?? processResult.signal;
+    if (reason !== null) interruptions.push(`${name}: ${reason}`);
+  }
+  let raw: VitestResult = {};
+  if (existsSync(json)) {
+    try {raw = read(json) as VitestResult;}
+    catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      interruptions.push('Vitest: unreadable JSON report');
+    }
+  }
   const files = (raw.testResults ?? []).map(file => ({path: relative(process.cwd(), file.name).replaceAll('\\', '/'),
     ok: file.status !== 'failed' && file.assertionResults?.every(row => row.status !== 'failed') === true,
     assertions: file.assertionResults?.filter(row => row.status === 'passed').length ?? 0,
     skipped: file.assertionResults?.filter(row => row.status !== 'passed' && row.status !== 'failed').length ?? 0}));
-  const report: TestsReport = {...expected, kind: 'tests', group, groups: testGroups, exitCode: child.status ?? 1, kitExitCode: kit.status ?? 1, totalTests: raw.numTotalTests ?? 0, files};
+  const report: TestsReport = {...expected, kind: 'tests', group, groups: testGroups, exitCode: child.status ?? 1,
+    kitExitCode: kit.status ?? 1, totalTests: raw.numTotalTests ?? 0, files, ...(interruptions.length === 0 ? {} : {interruptions})};
   write(`tests-${group}.json`, report);
   // Listed journeys in either partition are checked together by report;
   // a partition must still fail for any ordinary or listed test failure.

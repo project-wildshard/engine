@@ -61,12 +61,45 @@ await test('missing head, duplicate receipt and receipt from another SHA each ho
     fixture(({heads, execute}) => {mutate(heads); const result = execute(); assert.equal(result.status, 1); assert.equal(result.report.tag, 'HOLD');});
   }
 });
-await test('Vitest success cannot hide a missing, skipped, empty or failed listed journey', () => {
-  const mutations: ((suite: TestsReport) => void)[] = [suite => {suite.files = [];}, suite => {suite.files[0].ok = false;}, suite => {suite.files[0].assertions = 0;}, suite => {suite.files[0].skipped = 1;}, suite => {suite.exitCode = 1;}];
-  for (const mutate of mutations) {
-    fixture(({suite, execute}) => {mutate(suite); assert.equal(execute().status, 1);});
+await test('the verdict separates incomplete execution from reported test failures', () => {
+  const cases: {mutate: (suite: TestsReport) => void; key: string; error: RegExp}[] = [
+    {mutate: suite => {suite.files = [];}, key: 'shared/tests/0', error: /Incomplete suite: no executable test evidence/u},
+    {mutate: suite => {suite.files[0].ok = false; suite.files[0].assertions = 0; suite.exitCode = 1;}, key: 'shared/test/journey.test.ts', error: /Listed test failed/u},
+    {mutate: suite => {suite.files[0].assertions = 0;}, key: 'shared/test/journey.test.ts', error: /No passing assertions/u},
+    {mutate: suite => {suite.files[0].skipped = 1;}, key: 'shared/test/journey.test.ts', error: /Listed test skipped/u},
+    {mutate: suite => {suite.exitCode = 1;}, key: 'shared/tests/0', error: /Suite failed: Vitest exit 1/u},
+    {mutate: suite => {suite.exitCode = 1; suite.interruptions = ['Vitest: SIGTERM'];}, key: 'shared/tests/0', error: /Incomplete suite: Vitest: SIGTERM/u},
+  ];
+  for (const {mutate, key, error} of cases) {
+    fixture(({suite, execute}) => {
+      mutate(suite);
+      const result = execute();
+      assert.equal(result.status, 1);
+      assert.match(result.report.failures.find(failure => failure.key === key)?.error ?? '', error);
+    });
   }
 });
+await test('the suite writes fresh interruption evidence even if Vitest leaves partial JSON', () => fixture(({root, write}) => {
+  const bin = join(root, 'bin'), reports = join(root, 'reports');
+  mkdirSync(bin);
+  writeFileSync(join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n', {mode: 0o700});
+  writeFileSync(join(bin, 'python3'), `#!/bin/sh
+for arg do output=$arg; done
+if [ "$NIGHTLY_PROOF_PARTIAL" = 1 ]; then
+  printf '{"numTotalTests":' > "\${output#--outputFile.json=}"
+fi
+kill -TERM "$$"
+`, {mode: 0o700});
+  for (const partial of ['0', '1']) {
+    write('reports/vitest-0.json', {numTotalTests: 1});
+    const result = spawnSync(process.execPath, [cli, 'tests', reports], {cwd: root, env: {...process.env,
+      PATH: `${bin}:${process.env.PATH}`, NIGHTLY_TEST_GROUP: '0', NIGHTLY_PROOF_PARTIAL: partial}});
+    assert.equal(result.status, 1);
+    const receipt = read(join(reports, 'tests-0.json')) as TestsReport;
+    assert.equal(receipt.totalTests, 0);
+    assert.deepEqual(receipt.interruptions, partial === '1' ? ['Vitest: SIGTERM', 'Vitest: unreadable JSON report'] : ['Vitest: SIGTERM']);
+  }
+}));
 await test('ordinary suite skips retain existing policy while listed journeys must all run', () => fixture(({suite, execute}) => {
   suite.files.push({path: 'test/ordinary-platform.test.ts', ok: true, assertions: 0, skipped: 1});
   assert.equal(execute().status, 0);

@@ -9,7 +9,7 @@ export interface Phase {name: string; ok: boolean; error?: string; ms?: number; 
 export interface HeadResult extends Head {phases: Phase[]}
 export interface HeadsReport extends Plan {kind: 'heads'; browser: string; group: number; results: HeadResult[]}
 export interface TestFile {path: string; ok: boolean; assertions: number; skipped: number}
-export interface TestsReport extends Plan {kind: 'tests'; group: number; groups: number; exitCode: number; kitExitCode: number; totalTests: number; files: TestFile[]}
+export interface TestsReport extends Plan {kind: 'tests'; group: number; groups: number; exitCode: number; kitExitCode: number; totalTests: number; files: TestFile[]; interruptions?: string[]}
 export type Receipt = HeadsReport | TestsReport;
 export interface Failure {key: string; error: string}
 export interface Row extends Head {browser: string; phase: string; ok: boolean; error?: string}
@@ -89,9 +89,15 @@ export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict, 
   for (let group = 0; group < testGroups; group++) {
     const matching = suites.filter(suite => suite.group === group), suite = matching[0];
     const assertions = suite?.files.reduce((sum, file) => sum + file.assertions, 0) ?? 0;
-    tests.push({group, ok: matching.length === 1 && suite?.groups === testGroups && suite.exitCode === 0 && suite.kitExitCode === 0 && suite.totalTests > 0 && assertions > 0 && suite.files.length > 0 && suite.files.every(file => file.ok), files: suite?.files.length ?? 0, assertions});
-    if (matching.length !== 1 || suite === undefined) failures.push({key: `shared/tests/${group}`, error: `Expected one partition receipt, got ${matching.length}`});
-    else if (suite.exitCode !== 0 || suite.kitExitCode !== 0 || suite.totalTests < 1 || suite.files.length === 0 || assertions < 1) failures.push({key: `shared/tests/${group}`, error: `Vitest exit ${suite.exitCode}, kit exit ${suite.kitExitCode}, ${suite.totalTests} tests, ${assertions} passing assertions`});
+    let error: string | undefined;
+    if (matching.length !== 1 || suite === undefined) error = `Incomplete suite: expected one partition receipt, got ${matching.length}`;
+    else if (suite.groups !== testGroups) error = `Incomplete suite: expected ${testGroups} partitions, got ${suite.groups}`;
+    else if (suite.interruptions?.length) error = `Incomplete suite: ${suite.interruptions.join(', ')}`;
+    else if (suite.kitExitCode !== 0 || suite.files.some(file => !file.ok)) error = `Suite failed: Vitest exit ${suite.exitCode}, kit exit ${suite.kitExitCode}`;
+    else if (suite.totalTests < 1 || suite.files.length === 0 || assertions < 1) error = `Incomplete suite: no executable test evidence (Vitest exit ${suite.exitCode}, ${suite.totalTests} tests, ${assertions} passing assertions)`;
+    else if (suite.exitCode !== 0) error = `Suite failed: Vitest exit ${suite.exitCode}`;
+    tests.push({group, ok: error === undefined, files: suite?.files.length ?? 0, assertions});
+    if (error !== undefined) failures.push({key: `shared/tests/${group}`, error});
   }
   const files = suites.flatMap(suite => suite.files);
   if (new Set(files.map(file => file.path)).size !== files.length) failures.push({key: 'shared/tests/duplicates', error: 'A test file appeared in more than one suite partition'});
@@ -99,7 +105,12 @@ export function verdict(expected: Plan, reports: Receipt[], previous?: Verdict, 
     for (const path of expected.tests) {
       const executions = files.filter(row => row.path === path);
       const [run] = executions;
-      if (executions.length !== 1 || run === undefined || !run.ok || run.assertions < 1 || run.skipped !== 0) failures.push({key: `shared/${path}`, error: 'Listed test missing, skipped or failed'});
+      let error: string | undefined;
+      if (executions.length !== 1 || run === undefined) error = `Incomplete suite: expected one listed test receipt, got ${executions.length}`;
+      else if (!run.ok) error = 'Listed test failed';
+      else if (run.skipped !== 0) error = `Incomplete suite: Listed test skipped ${run.skipped} assertions`;
+      else if (run.assertions < 1) error = 'Incomplete suite: No passing assertions for listed test';
+      if (error !== undefined) failures.push({key: `shared/${path}`, error});
     }
     for (const file of files.filter(row => !row.ok)) {
       if (!failures.some(row => row.key === `shared/${file.path}`)) failures.push({key: `shared/${file.path}`, error: 'Suite failure outside the slow-test list'});
