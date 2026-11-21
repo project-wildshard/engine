@@ -28,6 +28,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { EdgeProfilesSchema } from '@wildshard/format/edgeProfiles';
 import { EntrywaysSchema } from '@wildshard/format/entryways';
 import * as v from 'valibot';
+import type { KeptRow } from '../../../shared/game/loot/Owned';
 
 import { GridAdmissionPriority } from './admissionPriority';
 import { timeClientPreparation } from '../shardfile/preparationTiming';
@@ -40,6 +41,10 @@ const farRows = { tiles: v.looseObject({ far: FarSchema }), props: v.looseObject
   look: v.looseObject({ look: v.looseObject({ keys: v.array(v.looseObject({ fog: v.looseObject({ colour: v.tuple([v.number(), v.number(), v.number()]) }) })) }) }),
   collision: v.looseObject({ meshCollision: v.unknown() }) };
 const nearRow = v.looseObject({ near: v.optional(NearPlaceholderSchema) });
+/** OF31f2b: the kept rows of a cell's `combat/items` (format 0.67.0 `items.kept`); absent on an older product. */
+const keptRow = v.strictObject({ id: v.string(), kind: v.picklist(['upgrade', 'cosmetic', 'charm', 'trophy', 'gear']), label: v.string(),
+  gauge: v.exactOptional(v.strictObject({ name: v.picklist(['sharpen', 'hearts', 'charms']), level: v.number() })) });
+const keptRows = v.looseObject({ items: v.looseObject({ kept: v.exactOptional(v.array(keptRow)) }) });
 type GridEdges = Pick<Shardfile, 'edge' | 'entryways'>;
 const edges = new WeakMap<ResidencyAllocator, {
   ready: ResidentByteCache<string, GridEdges>;
@@ -174,6 +179,19 @@ async function readGridEdges(url: string, identity: string, options: FolderOptio
   const rows = await readGridSection(at, section.name);
   if (rows === null) throw new Error('Grid edge index lacks world/edge');
   return { value: v.parse(edgeRows, rows), bytes: section.bytes * 4 };
+}
+/** OF31f2b: a cell's kept rows from its bounded index and its hash-verified `combat/items` section, nothing admitted
+ *  (null: the product declares none, so its Owned reads the old table). */
+export async function readGridFolderKept(url: string, identity: string, options: FolderOptions): Promise<readonly KeptRow[] | null> {
+  const rows = await readGridFolderSection(url, identity, 'combat/items', options);
+  return rows === null ? null : v.parse(keptRows, rows).items.kept ?? null;
+}
+/** OF31f2b: the grid page's kept rows for one cell's shard, read like its edges (null: no shardfile descriptor). */
+export function gridShardfileKept(slug: string): Promise<readonly KeptRow[] | null> | null {
+  const descriptor = farDescriptor(slug);
+  if (descriptor === undefined) return null;
+  const url = new URL(descriptor, location.href);
+  return readGridFolderKept(url.href, slug, browserShardfileOptions(new URL('.', url).href, true));
 }
 /** A head added after this build has title metadata but no prepared native
  * manifest. Its verified product owns the far view just like a built world. */

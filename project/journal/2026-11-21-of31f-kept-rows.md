@@ -21,3 +21,10 @@ The dedicated server now reads each released cell's `shard.json` header before i
 `admission.serverBudget` carries `awakeMicros` or `shareWorker` (format 0.68.0) beats the measured `COST` row and the
 `TOGETHER` pairing; a header that says nothing, or can't be read, keeps the tables. The header is read raw, so this works
 before the engine pins a format that admits the fields.
+
+## OF31f2b: the grid page keeps its home cell's rows (opus-of-close)
+
+A grid page has no level product, so mini-dw12's stopgap `4da6ceeed` left its `Owned` on the old table. It now reads
+the home cell's `kept` rows from that cell's shard file (index plus the hash-verified `combat/items` section, nothing
+admitted, `grid/homeKept.ts`); each entered cell's `Owned` already read its admitted source. The old table stays only
+for a cell that declares none or can't be read.
