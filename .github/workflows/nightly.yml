@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       suite_only:
-        description: Diagnose both suite partitions only (no head or release qualification)
+        description: Diagnose the suite partitions only (no head or release qualification)
         type: boolean
         default: false
       ring3_only:
@@ -69,6 +69,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
+      test_matrix: ${{ steps.plan.outputs.test_matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -81,14 +82,15 @@ jobs:
       - if: env.WILDSHARD_PIN_CHANNEL == 'staging'
         run: node scripts/pins-staging.ts select
       - id: plan
-        run: echo "matrix=$(node scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "matrix=$(node scripts/nightly.ts plan)" >> "$GITHUB_OUTPUT"
+          echo "test_matrix=$(node scripts/nightly.ts test-plan)" >> "$GITHUB_OUTPUT"
   tests:
     if: ${{ !inputs.cook_cache_only && !inputs.api_health_only && !inputs.diagnostic_head && !inputs.diagnostic_drill }}
     needs: plan
     strategy:
       fail-fast: false
-      matrix:
-        group: [0, 1]
+      matrix: ${{ fromJSON(needs.plan.outputs.test_matrix) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:

@@ -12,15 +12,17 @@ const write = (name: string, value: unknown) => {mkdirSync(out, {recursive: true
 if (command === 'plan') {
   console.log(JSON.stringify({include: browsers.flatMap(browser => headGroups(expected.heads, browser).map((heads, group) => ({browser, group,
     os: headRunner(browser, heads), heads: heads.map(row => row.slug).join(',')})))}));
+} else if (command === 'test-plan') {
+  console.log(JSON.stringify({group: Array.from({length: testGroups}, (_, index) => index)}));
 } else if (command === 'tests') {
   const group = Number(process.env.NIGHTLY_TEST_GROUP ?? '-1');
-  if (!Number.isInteger(group) || group < 0 || group >= testGroups) throw new Error('Set NIGHTLY_TEST_GROUP to 0 or 1; the verdict requires both suite partitions');
+  if (!Number.isInteger(group) || group < 0 || group >= testGroups) throw new Error(`Set NIGHTLY_TEST_GROUP to a zero-based index below ${testGroups}; the verdict requires every suite partition`);
   mkdirSync(out, {recursive: true});
   const json = join(out, `vitest-${group}.json`);
   rmSync(json, {force: true});
   rmSync(join(out, `tests-${group}.json`), {force: true});
   const kit = spawnSync('pnpm', ['test:kit'], {stdio: 'inherit', timeout: 120000});
-  // The two jobs cover the entire admitted suite once, including every slow
+  // The jobs cover the entire admitted suite once, including every slow
   // Ring 2 entry. Keep each job's existing 25-minute process limit.
   const child = spawnSync('python3', ['scripts/heavy-lane.py', 'full-test', '--', process.execPath, 'scripts/vitest-tmp.ts', 'run',
     '--maxWorkers=2', `--shard=${group + 1}/${testGroups}`, '--reporter=default', '--reporter=json', `--outputFile.json=${json}`],
@@ -60,4 +62,4 @@ if (command === 'plan') {
 } else if (command === 'guard') {
   requirePublishedGreen(read(directory) as Verdict, expected);
   console.log(`J167: exact-SHA nightly green for ${expected.sha}`);
-} else throw new Error('Use nightly.mjs plan|tests|report|guard [report directory/file] [previous verdict]');
+} else throw new Error('Use nightly.ts plan|test-plan|tests|report|guard [report directory/file] [previous verdict]');

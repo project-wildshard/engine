@@ -21,7 +21,7 @@ export type NightlyBrowser = typeof browsers[number];
 export const phases = ['cook', 'boot', 'hover', 'draw', 'explorer'];
 const sharedGroups = 4;
 const metalHeads: ReadonlySet<string> = new Set(['nalati-grasslands', 'nine-dragon-stack']);
-export const testGroups = 2;
+export const testGroups = 3;
 export const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 

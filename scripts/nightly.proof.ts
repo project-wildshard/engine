@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
-import {browsers, headGroups, phases, plan, read, requireBuild, requireGreen, requireLatest, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
+import {browsers, headGroups, phases, plan, read, requireBuild, requireGreen, requireLatest, testGroups, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
 
 interface Execution {status: number | null; report: Verdict; summary: string}
 interface Fixture {root: string; heads: HeadsReport[]; suite: TestsReport; suites: TestsReport[]; expected: Plan;
@@ -26,8 +26,9 @@ function fixture(run: (context: Fixture) => void): void {
       const results = members.map(head => ({slug: head.slug, hash: head.hash, phases: phases.map(name => ({name, ok: true}))}));
       heads.push({...expected, kind: 'heads', browser, group, results});
     }
-    const suite: TestsReport = {...expected, kind: 'tests', group: 0, groups: 2, exitCode: 0, kitExitCode: 0, totalTests: 1, files: [{path: 'test/journey.test.ts', ok: true, assertions: 1, skipped: 0}]};
-    const suites: TestsReport[] = [suite, {...suite, group: 1, files: [{path: 'test/ordinary.test.ts', ok: true, assertions: 1, skipped: 0}]}];
+    const suite: TestsReport = {...expected, kind: 'tests', group: 0, groups: testGroups, exitCode: 0, kitExitCode: 0, totalTests: 1, files: [{path: 'test/journey.test.ts', ok: true, assertions: 1, skipped: 0}]};
+    const suites: TestsReport[] = [suite, ...Array.from({length: testGroups - 1}, (_, index) => ({...suite, group: index + 1,
+      files: [{path: `test/ordinary-${index}.test.ts`, ok: true, assertions: 1, skipped: 0}]}))];
     const execute = (baseline?: string, env: NodeJS.ProcessEnv = {}): Execution => {
       rmSync(join(root, 'reports'), {recursive: true, force: true});
       for (const report of heads) write(`reports/heads-${report.browser}-${report.group}.json`, report);
@@ -39,6 +40,11 @@ function fixture(run: (context: Fixture) => void): void {
   } finally {rmSync(root, {recursive: true, force: true});}
 }
 
+await test('nightly schedules all three suite partitions', () => fixture(({root}) => {
+  const result = spawnSync(process.execPath, [cli, 'test-plan'], {cwd: root, encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {group: [0, 1, 2]});
+}));
 await test('complete real report files admit the exact commit, but never another commit or repeated row', () => fixture(({expected, execute}) => {
   const result = execute(); assert.equal(result.status, 0); requireGreen(result.report, expected);
   assert.throws(() => requireGreen({...result.report, version: 1}, expected), /J167/u);

@@ -28,11 +28,11 @@ releases (J184).
 
 ## Work and evidence
 
-- Two Linux jobs install all pins, generate inputs, run the kit checks
-  and partition the full admitted Vitest suite with `--shard=1/2` and
-  `--shard=2/2`, including the slow Ring 2 list.
+- Three Linux jobs install all pins, generate inputs, run the kit checks
+  and partition the full admitted Vitest suite with `--shard=1/3` through
+  `--shard=3/3`, including the slow Ring 2 list.
   Every listed file must actually execute at least one passing assertion.
-  Both partition receipts are required; a missing or duplicate partition,
+  All partition receipts are required; a missing or duplicate partition,
   overlapping test files, skipped listed assertions or a nonzero exit is
   red. Verdict version 2 includes each partition's file/assertion counts;
   old verdicts remain usable only as failure-diff baselines. Each process
@@ -300,7 +300,7 @@ scheduled or ordinary push job.
 The `nightly-head-diagnostic` artifact holds raw phase receipts. Diagnostic
 mode skips the suites, full head matrix, verdict report and Ring 3;
 it has no tag or release step and cannot qualify a full night. Full qualification still requires every
-head/browser and both complete suite partitions in `nightly.yml`.
+head/browser and all complete suite partitions in `nightly.yml`.
 
 A failed hover phase keeps its original error plus before/after player
 hover/blend, equipment ownership/enabled state, installed board/model,
