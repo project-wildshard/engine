@@ -8,6 +8,7 @@
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
 //   node scripts/pins.ts install --staging  install the reviewed staging snapshot for a public dev build
 //   node scripts/pins.ts install --ring 1   Ring 1: pinned Brasscap Mesa and Dunes (J434), and server slices
+//   node scripts/pins.ts install --ring-slices 1  add Ring 1 server slices beside installed full pins
 //   node scripts/pins.ts install --from-format <slug>  a frozen dependency product (brasscap-mesa),
 //                                                      without network or cook
 //   node scripts/pins.ts slice              cut Ring 1's server slices from the pinned heads into test/pins/slices.json
@@ -471,9 +472,34 @@ function ringCatalogue(pins: readonly Pin[]): void {
   writeFileSync(RING_CATALOGUE, json({ ...catalogue, shards, placements: catalogue.placements.filter(row => kept.has(row.slug)), grid: { ...catalogue.grid, cells } }));
 }
 
-async function installRing(name: string, extra: readonly string[]): Promise<void> {
+/** Materialize the same verified server slices for Ring 1 and the full-pin push gate. */
+async function installRingSlices(slugs: readonly string[]): Promise<number> {
   const { readTar } = await import('@wildshard/format/tar');
   const { checkSlice } = await import('./slice-inputs.ts');
+  const release = lockPins(process.cwd());
+  try {
+    rmSync(SLICED, { recursive: true, force: true });
+    const { slices } = readJson(SLICES) as { slices: readonly Slice[] };
+    const { shards } = readJson(PINS) as PinFile;
+    let bytes = 0;
+    for (const slug of slugs) {
+      const row = slices.find(slice => slice.slug === slug);
+      if (row === undefined) throw new Error(`${slug}: missing Ring 1 slice pin`);
+      if (row.from !== shards.find(pin => pin.slug === row.slug)?.hash) throw new Error(`${row.slug}: slice belongs to another head; re-cut with node scripts/pins.ts slice`);
+      const body = await tarball(row, false), target = join(SLICED, row.slug);
+      checkSlice(body, row.slug);
+      bytes += body.length;
+      for (const [path, file] of readTar(body)) {
+        if (path.endsWith('/')) continue;
+        mkdirSync(dirname(join(target, path)), { recursive: true });
+        writeFileSync(join(target, path), file);
+      }
+    }
+    return bytes;
+  } finally { release?.(); }
+}
+
+async function installRing(name: string, extra: readonly string[]): Promise<void> {
   const ring = ringOf(name), started = performance.now();
   const pins = await install([...new Set([...ring.products, ...extra])], 'ring');
   // A tree that held every head keeps none of the others: their mounts just left public/.
@@ -482,20 +508,7 @@ async function installRing(name: string, extra: readonly string[]): Promise<void
     const receipt = join('out', folder, 'validation.json');
     if (existsSync(receipt) && !wanted.has((readJson(receipt) as { pin?: Pin }).pin?.hash ?? '')) rmSync(join('out', folder), { recursive: true });
   }
-  rmSync(SLICED, { recursive: true, force: true });
-  const { slices } = readJson(SLICES) as { slices: readonly Slice[] };
-  let bytes = 0;
-  for (const row of slices.filter(({ slug }) => ring.slices.includes(slug))) {
-    if (row.from !== (readJson(PINS) as PinFile).shards.find(pin => pin.slug === row.slug)?.hash) throw new Error(`${row.slug}: slice belongs to another head; re-cut with node scripts/pins.ts slice`);
-    const body = await tarball(row, false), target = join(SLICED, row.slug);
-    checkSlice(body, row.slug);
-    bytes += body.length;
-    for (const [path, file] of readTar(body)) {
-      if (path.endsWith('/')) continue;
-      mkdirSync(dirname(join(target, path)), { recursive: true });
-      writeFileSync(join(target, path), file);
-    }
-  }
+  const bytes = await installRingSlices(ring.slices);
   ringCatalogue(pins);
   await installSaves(ring.slices);
   const products = pins.reduce((sum, row) => sum + row.bytes, 0);
@@ -538,6 +551,7 @@ if (command === 'refresh') {
 }
 else if (command === 'install' && rest.length === 1 && rest[0] === '--staging') await install([], 'staging');
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1', rest.slice(2));
+else if (command === 'install' && rest.length === 2 && rest[0] === '--ring-slices') await installRingSlices(ringOf(rest[1] ?? '1').slices);
 else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), 'format');
 else if (command === 'install' && rest[0] === '--from-dir') {
   if (rest.length !== 2 || !rest[1]) throw new Error('usage: pins.ts install --from-dir <built out/slug directory>');
@@ -549,4 +563,4 @@ else if (command === 'verify-slices') await slice(true);
 else if (command === 'install-saves') await installSaves(rest);
 else if (command === 'keep') await keep(rest[0] ?? 'tmp/pins-release');
 else if (command === 'status') status();
-else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --staging | install --ring 1 [extra slug...] | install-saves [slug...] | slice | verify-slices | keep <dir> | status');
+else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --staging | install --ring 1 [extra slug...] | install --ring-slices 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');

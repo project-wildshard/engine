@@ -61,7 +61,10 @@ it('steps only the Ring 1 slugs a pin or digest change moves', () => {
   expect(movedRingSlugs({ pins: pins(1), digests: digests('a') }, { pins: pins(1), digests: digests('b') }, 'linux-x64')).toEqual(['pine-hollow']);
   expect(movedRingSlugs({ pins: pins(1), digests: digests('a') }, { pins: pins(1), digests: digests('a') }, 'linux-x64')).toEqual([]);
   const plan = fs27Plan({ mode: 'full', files: ['test/pins/shardfiles.json'] }, { split: true, slugs: ['far-reach'] });
-  expect(plan.tasks.at(-1)?.commands[0]?.slice(-3)).toEqual(['scripts/ring-step.ts', '--only', 'far-reach']);
+  expect(plan.tasks.at(-1)?.commands.map(command => command.slice(1))).toEqual([
+    ['scripts/pins.ts', 'install', '--ring-slices', '1'],
+    ['--experimental-transform-types', '--no-warnings', 'scripts/ring-step.ts', '--only', 'far-reach'],
+  ]);
 });
 
 mkdirSync(resolve('tmp'), { recursive: true });

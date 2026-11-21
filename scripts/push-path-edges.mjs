@@ -96,6 +96,9 @@ export function fs27Plan(selection, options) {
   // A non-split full gate runs the whole suite already.
   const tests = !options.split && selection.mode === 'full' ? [] : [...new Set([...TABLE_TESTS, ...edgeTests(selection.files)])].sort((a, b) => a.localeCompare(b));
   const ring = options.slugs.length === 0 ? [] : [{ name: `ring1 digests (${options.slugs.join(', ')})`,
-    commands: [[process.execPath, '--experimental-transform-types', '--no-warnings', 'scripts/ring-step.ts', '--only', options.slugs.join(',')]] }];
+    commands: [
+      [process.execPath, 'scripts/pins.ts', 'install', '--ring-slices', '1'],
+      [process.execPath, '--experimental-transform-types', '--no-warnings', 'scripts/ring-step.ts', '--only', options.slugs.join(',')],
+    ] }];
   return { tasks: [...FS27_STATIC, ...ring], tests };
 }

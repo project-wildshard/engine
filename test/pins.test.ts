@@ -198,6 +198,13 @@ test('a missing mirrored slice rebuilds exact pinned bytes and refuses changed d
   const address = server.address(); if (address === null || typeof address === 'string') throw new Error('No fixture port');
   const origin = `http://127.0.0.1:${address.port}`, cache = join(root, 'cache');
   const env = {...process.env, WILDSHARD_API: origin, WILDSHARD_PIN_MIRROR: `${origin}/mirror`, WILDSHARD_PIN_CACHE: cache, GIT_CEILING_DIRECTORIES: root};
+  expect(await install(root, env)).toBe('');
+  const full = join(root, 'out', row.slug, 'validation.json'), before = readFileSync(full);
+  expect(existsSync(join(root, 'out/.slices', row.slug))).toBe(false);
+  expect(await pinsTool(root, env, 'install', '--ring-slices', '1')).toBe('');
+  expect(readFileSync(join(root, 'out/.slices', row.slug, 'shard.json'))).toEqual(Buffer.from(shard.header));
+  expect(readFileSync(full)).toEqual(before);
+  expect(existsSync(join(root, 'out/.ring-catalogue.json'))).toBe(false);
   expect(await pinsTool(root, env, 'install', '--ring', '1')).toBe('');
   expect(readFileSync(join(cache, `${hash}.tar`))).toEqual(Buffer.from(body));
   expect(readFileSync(join(root, 'out/.slices', row.slug, 'shard.json'))).toEqual(Buffer.from(shard.header));
