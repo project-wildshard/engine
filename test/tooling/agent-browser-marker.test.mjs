@@ -32,7 +32,8 @@ test('launch, attach and persistent contexts are marked exactly once', async () 
     /** @param {string} _dir @param {import('playwright').BrowserContextOptions} options */
     launchPersistentContext: (_dir, options) => attempt(options),
   };
-  const instance = { chromium: engine };
+  // A WebKit stand-in: a Chromium start also reads its build's default UA, which the real-Chromium tests below cover.
+  const instance = { webkit: engine };
   installBrowserActorMarker(instance);
   installBrowserActorMarker(instance);
   const options = { userAgent: 'Phone UA', extraHTTPHeaders: { 'X-Proof': 'yes', 'X-Wildshard-Agent': 'old' }, isMobile: true };
@@ -85,7 +86,9 @@ test.skipIf(!existsSync(executablePath))('phone and default pages keep their mar
       const plainReply = await plainPage.goto(own.url);
       const plainHeaders = await plainReply?.json();
       assert.equal(plainHeaders?.['x-wildshard-agent'], undefined);
-      assert.equal(await plainPage.evaluate(() => navigator.userAgent), agentUserAgent(plainHeaders?.['user-agent']));
+      // METRICS MT16: a context with no device UA marks its network UA too, or Cloudflare counts its requests unmarked.
+      assert.match(String(plainHeaders?.['user-agent']), /HeadlessChrome\/.* WildshardAgent\/1\b/u);
+      assert.equal(await plainPage.evaluate(() => navigator.userAgent), plainHeaders?.['user-agent']);
       for (const tab of [page, plainPage]) {
         const cross = await tab.evaluate(async url => (await fetch(url)).json(), content.url);
         assert.equal(cross['x-wildshard-agent'], undefined);
@@ -93,6 +96,26 @@ test.skipIf(!existsSync(executablePath))('phone and default pages keep their mar
       assert.deepEqual(methods, ['GET', 'GET']);
     } finally { await browser.close(); }
   } finally { await Promise.all([own.close(), content.close()]); }
+});
+
+test.skipIf(!existsSync(executablePath))('a service worker script carries the marker in Chromium (METRICS MT16)', async () => {
+  /** @type {Record<string, string | undefined>} */
+  const seen = {};
+  const own = await origin((request, response) => {
+    seen[request.url ?? ''] = request.headers['user-agent'];
+    if (request.url === '/sw.js') { response.setHeader('content-type', 'text/javascript'); response.end("self.addEventListener('install', e => e.waitUntil(fetch('/from-sw')));"); return; }
+    response.setHeader('content-type', 'text/html'); response.end("<script>navigator.serviceWorker.register('/sw.js')</script>");
+  });
+  try {
+    const browser = await chromium.launch({ executablePath, headless: true, args: [...KEYCHAIN_ARGS] });
+    try {
+      const page = await (await browser.newContext()).newPage();
+      await page.goto(own.url);
+      await page.waitForFunction(() => navigator.serviceWorker.controller !== null || navigator.serviceWorker.ready.then(() => true));
+      for (let tries = 0; tries < 50 && seen['/from-sw'] === undefined; tries++) await page.waitForTimeout(100);
+      for (const path of ['/', '/sw.js', '/from-sw']) assert.match(String(seen[path]), /WildshardAgent\/1\b/u, path);
+    } finally { await browser.close(); }
+  } finally { await own.close(); }
 });
 
 test('native game URL launchers import the agent marker', () => {
