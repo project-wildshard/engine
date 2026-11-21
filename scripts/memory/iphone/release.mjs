@@ -6,6 +6,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { median } from '../calibration.mjs';
+import { DRIFTWOOD, DRIFTWOOD_CAPS, driftwoodTable, readDriftwood } from './release-driftwood.mjs';
 
 const STAGING = 'https://staging.wildshard.io/';
 const HISTORY = 'docs/plans/MULTI-REPO-SAGA/MEMORY-SAGA/iphone13/history.jsonl';
@@ -31,7 +32,7 @@ const METRICS = /** @type {const} */ ([
 /** @typedef {ReturnType<typeof observedAttempt>} Attempt */
 /** @typedef {{status: string, attempts: number, control: number, metrics: Record<Metric, number | null>, observations?: Attempt[]}} Stage */
 /** @typedef {{date: string, source: 'phone' | 'recorded', base: string, build: string | null, builds: string[],
- * stages: Record<(typeof TASKS)[number]['key'], Stage>}} HistoryRow */
+ * stages: Record<(typeof TASKS)[number]['key'], Stage>, driftwood?: ReturnType<typeof readDriftwood>}} HistoryRow */
 
 /** @param {string} directory @returns {Trial[]} */
 function readTrials(directory) {
@@ -102,7 +103,7 @@ export function releaseReading(directory, info) {
   const build = builds.length === 1 ? builds[0] : null;
   const stages = /** @type {HistoryRow['stages']} */ (Object.fromEntries(results.map(({ task, trials }) =>
     [task.key, stageOf(trials, task, build)])));
-  return { ...info, build, builds, stages };
+  return { ...info, build, builds, stages, driftwood: readDriftwood(join(directory, 'driftwood'), builds) };
 }
 
 /** @param {number|null} previous @param {number|null} current */
@@ -148,6 +149,7 @@ export function releaseTable(reading, previous) {
     return `- ${key} ${index + 1}, ${attempt.zone}, build ${attempt.build ?? 'unconfirmed'} · ${attempt.outcome}${time}${detail === '' ? '' : ` · ${detail}`}`;
   }));
   if (observations.length > 0) lines.push('', 'Captured attempts', ...observations);
+  if (reading.driftwood !== undefined) lines.push(...driftwoodTable(reading.driftwood, previous?.driftwood));
   return lines.join('\n');
 }
 
@@ -197,10 +199,16 @@ export async function releaseSuite(args, bench) {
     .flatMap(([key, value]) => value === undefined ? [] : [`--${key}`, value]);
   const commands = TASKS.map(task => ['--base', base, '--zone', task.zone, '--mode', task.mode, '--runs',
     String(task.runs), '--out', join(out, task.key)].concat(pass));
+  const routeScript = join(import.meta.dirname, 'route-bench.mjs');
+  const routeOut = join(out, 'driftwood');
+  const routeCommand = ['--base', base, '--zone', DRIFTWOOD, '--driver', 'inspector', '--runs', '3',
+    '--caps', DRIFTWOOD_CAPS.join(','), '--out', routeOut, '--lock-log', join(routeOut, 'lockstate.log')];
+  if (values.udid !== undefined) routeCommand.push('--udid', values.udid);
   if (values.recorded === undefined) {
     if (values['dry-run']) {
-      console.log('Report only. Hold iphone13.lock then mini-measure.lock for all three commands.');
+      console.log('Report only. Hold iphone13.lock then mini-measure.lock for all captures.');
       for (const command of commands) console.log(JSON.stringify(command));
+      console.log(JSON.stringify([routeScript, ...routeCommand]));
       console.log(`History: ${history}`);
       return 0;
     }
@@ -217,6 +225,8 @@ export async function releaseSuite(args, bench) {
       const status = await runBench(bench.script, command);
       if (status !== 0) console.log(`Bench ended with ${String(status)} for ${command[3]} ${command[5]}. Keeping its available report.`);
     }
+    const routeStatus = await runBench(routeScript, routeCommand);
+    if (routeStatus !== 0) console.log(`Driftwood route bench ended with ${String(routeStatus)}. Keeping its available report.`);
   }
   const reading = releaseReading(out, { date: new Date().toISOString(), source: values.recorded === undefined ? 'phone' : 'recorded', base });
   const last = previousRow(history);

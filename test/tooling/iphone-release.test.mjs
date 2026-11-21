@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { join, resolve } from 'node:path';
 import { expect, test, vi } from 'vitest';
 import { memoryChange, releaseReading, releaseSuite, releaseTable } from '../../scripts/memory/iphone/release.mjs';
+import driftwood from '../fixtures/iphone-memory/driftwood-route.json';
 import recorded from '../fixtures/iphone-memory/recorded-boots.json';
 
 /** @param {number} peak @param {string} [build] @param {number} [seconds] */
@@ -35,6 +36,12 @@ const write = (directory, task, attempts) => {
 };
 
 const info = /** @type {const} */ ({ source: 'recorded', date: '2026-11-19T08:00:00.000Z', base: 'https://staging.wildshard.io/' });
+
+/** @param {string} directory @param {typeof driftwood} trials */
+function writeDriftwood(directory, trials) {
+  mkdirSync(join(directory, 'driftwood'), { recursive: true });
+  writeFileSync(join(directory, 'driftwood/route.json'), JSON.stringify(trials));
+}
 
 test('uses all three cold readings and the full walk for the release row', async () => {
   await withRecording(path => {
@@ -108,6 +115,53 @@ test('reports both sides of the J431 noise margin', () => {
   expect(memoryChange(1_000_000_000, 1_021_000_000)).toBe('higher');
   expect(memoryChange(500_000_000, 489_000_000)).toBe('lower');
   expect(memoryChange(null, 500_000_000)).toBe('unavailable');
+});
+
+test('the DW1 replay reports measured spreads and an FPS drop without failing', async () => {
+  await withRecording(async path => {
+    writeDriftwood(path, driftwood);
+    const history = join(path, 'history.jsonl');
+    const args = ['--recorded', path, '--history', history];
+    const print = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      expect(await releaseSuite(args)).toBe(0);
+      const first = print.mock.calls.at(-1)?.[0];
+      expect(first).toContain('Driftwood Isle route (report only). Build 30eab98a8.');
+      expect(first).toContain('| 30 | dock spawn | 2 | 25.20 (24.50–25.90) | 102.5 (90.0–115.0) |');
+      expect(first).toContain('| 60 | boar fight | 2 |');
+
+      const next = structuredClone(driftwood);
+      for (const trial of next) {
+        trial.boot.build = 'next-build';
+        if (trial.cap !== 30) continue;
+        for (const leg of trial.legs) {
+          if (leg.name === 'castaway camp (NPC)') leg.summary.fps = 26.9;
+          if (leg.name === 'dock spawn') leg.summary.fps = 22.68;
+        }
+      }
+      writeDriftwood(path, next);
+      expect(await releaseSuite(args)).toBe(0);
+      const second = print.mock.calls.at(-1)?.[0];
+      expect(second).toContain('| -10.33% | FLAG: FPS down more than 10% |');
+      expect(second).toMatch(/\| 30 \| dock spawn \| .* \| -10\.00% \| reported \|/u);
+      expect(second).toMatch(/\| 60 \| castaway camp \(NPC\) \| .* \| 0\.00% \| reported \|/u);
+      const lines = readFileSync(history, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      expect(lines.map(line => line.driftwood.build)).toEqual(['30eab98a8', 'next-build']);
+      expect(lines[1].driftwood.segments).toHaveLength(22);
+    } finally { print.mockRestore(); }
+  });
+});
+
+test('a partial route is excluded and a different release build makes Driftwood unavailable', async () => {
+  await withRecording(path => {
+    const partial = structuredClone(driftwood);
+    partial[0].legs.pop();
+    writeDriftwood(path, partial);
+    const reading = releaseReading(path, info);
+    expect(reading.driftwood.segments[0]).toMatchObject({ cap: 30, name: 'dock spawn', runs: 1 });
+    write(path, 'nine', [trial(500_000_000, 'other-build')]);
+    expect(releaseTable(releaseReading(path, info), reading)).toContain('Route build differs from the release suite');
+  });
 });
 
 test('compares the second replay and keeps a dry replay out of history', async () => {

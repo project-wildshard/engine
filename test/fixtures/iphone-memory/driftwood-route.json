@@ -1,0 +1,86 @@
+[
+  {
+    "run": 2,
+    "cap": 30,
+    "ab": null,
+    "temperature": 38.29,
+    "boot": {"outcome": "control", "controlS": 18.6, "build": "30eab98a8"},
+    "error": null,
+    "legs": [
+      {"name": "dock spawn", "cap": 30, "error": null, "summary": {"seconds": 30.0, "fps": 25.9, "over50": 90, "over50Per30s": 90.1}},
+      {"name": "pier to beach", "cap": 30, "error": null, "summary": {"seconds": 16.6, "fps": 23.7, "over50": 43, "over50Per30s": 77.9}},
+      {"name": "plateau climb", "cap": 30, "error": null, "summary": {"seconds": 20.3, "fps": 28.5, "over50": 15, "over50Per30s": 22.2}},
+      {"name": "castaway camp (NPC)", "cap": 30, "error": null, "summary": {"seconds": 19.1, "fps": 30.0, "over50": 1, "over50Per30s": 1.6}},
+      {"name": "west path", "cap": 30, "error": null, "summary": {"seconds": 48.6, "fps": 28.0, "over50": 50, "over50Per30s": 30.9}},
+      {"name": "altar arena", "cap": 30, "error": null, "summary": {"seconds": 19.3, "fps": 28.7, "over50": 2, "over50Per30s": 3.1}},
+      {"name": "west path back", "cap": 30, "error": null, "summary": {"seconds": 44.9, "fps": 27.0, "over50": 36, "over50Per30s": 24.1}},
+      {"name": "central path", "cap": 30, "error": null, "summary": {"seconds": 19.4, "fps": 28.9, "over50": 12, "over50Per30s": 18.6}},
+      {"name": "wreck beach", "cap": 30, "error": null, "summary": {"seconds": 28.6, "fps": 26.8, "over50": 33, "over50Per30s": 34.7}},
+      {"name": "boar field", "cap": 30, "error": null, "summary": {"seconds": 34.8, "fps": 25.8, "over50": 45, "over50Per30s": 38.8}},
+      {"name": "boar fight", "cap": 30, "error": null, "summary": {"seconds": 19.5, "fps": 24.5, "over50": 27, "over50Per30s": 41.5}}
+    ]
+  },
+  {
+    "run": 2,
+    "cap": 60,
+    "ab": null,
+    "temperature": 39.5,
+    "boot": {"outcome": "control", "controlS": 21.3, "build": "30eab98a8"},
+    "error": null,
+    "legs": [
+      {"name": "dock spawn", "cap": 60, "error": null, "summary": {"seconds": 29.6, "fps": 27.3, "over50": 103, "over50Per30s": 104.5}},
+      {"name": "pier to beach", "cap": 60, "error": null, "summary": {"seconds": 16.0, "fps": 21.6, "over50": 67, "over50Per30s": 126.0}},
+      {"name": "plateau climb", "cap": 60, "error": null, "summary": {"seconds": 20.3, "fps": 31.2, "over50": 15, "over50Per30s": 22.2}},
+      {"name": "castaway camp (NPC)", "cap": 60, "error": null, "summary": {"seconds": 19.3, "fps": 37.8, "over50": 7, "over50Per30s": 10.9}},
+      {"name": "west path", "cap": 60, "error": null, "summary": {"seconds": 48.8, "fps": 31.4, "over50": 53, "over50Per30s": 32.6}},
+      {"name": "altar arena", "cap": 60, "error": null, "summary": {"seconds": 19.3, "fps": 29.8, "over50": 2, "over50Per30s": 3.1}},
+      {"name": "west path back", "cap": 60, "error": null, "summary": {"seconds": 44.9, "fps": 27.4, "over50": 41, "over50Per30s": 27.4}},
+      {"name": "central path", "cap": 60, "error": null, "summary": {"seconds": 19.4, "fps": 31.6, "over50": 17, "over50Per30s": 26.3}},
+      {"name": "wreck beach", "cap": 60, "error": null, "summary": {"seconds": 28.6, "fps": 28.6, "over50": 33, "over50Per30s": 34.6}},
+      {"name": "boar field", "cap": 60, "error": null, "summary": {"seconds": 34.9, "fps": 27.3, "over50": 42, "over50Per30s": 36.1}},
+      {"name": "boar fight", "cap": 60, "error": null, "summary": {"seconds": 19.5, "fps": 25.3, "over50": 24, "over50Per30s": 36.9}}
+    ]
+  },
+  {
+    "run": 3,
+    "cap": 30,
+    "ab": null,
+    "temperature": 39.69,
+    "boot": {"outcome": "control", "controlS": 21.1, "build": "30eab98a8"},
+    "error": null,
+    "legs": [
+      {"name": "dock spawn", "cap": 30, "error": null, "summary": {"seconds": 29.5, "fps": 24.5, "over50": 115, "over50Per30s": 116.8}},
+      {"name": "pier to beach", "cap": 30, "error": null, "summary": {"seconds": 15.4, "fps": 24.0, "over50": 31, "over50Per30s": 60.5}},
+      {"name": "plateau climb", "cap": 30, "error": null, "summary": {"seconds": 20.3, "fps": 26.9, "over50": 36, "over50Per30s": 53.1}},
+      {"name": "castaway camp (NPC)", "cap": 30, "error": null, "summary": {"seconds": 19.2, "fps": 30.0, "over50": 1, "over50Per30s": 1.6}},
+      {"name": "west path", "cap": 30, "error": null, "summary": {"seconds": 49.8, "fps": 27.7, "over50": 50, "over50Per30s": 30.1}},
+      {"name": "altar arena", "cap": 30, "error": null, "summary": {"seconds": 19.3, "fps": 28.8, "over50": 6, "over50Per30s": 9.3}},
+      {"name": "west path back", "cap": 30, "error": null, "summary": {"seconds": 44.9, "fps": 26.7, "over50": 35, "over50Per30s": 23.4}},
+      {"name": "central path", "cap": 30, "error": null, "summary": {"seconds": 19.3, "fps": 28.8, "over50": 15, "over50Per30s": 23.3}},
+      {"name": "wreck beach", "cap": 30, "error": null, "summary": {"seconds": 29.4, "fps": 27.4, "over50": 29, "over50Per30s": 29.6}},
+      {"name": "boar field", "cap": 30, "error": null, "summary": {"seconds": 37.2, "fps": 26.5, "over50": 37, "over50Per30s": 29.9}},
+      {"name": "boar fight", "cap": 30, "error": null, "summary": {"seconds": 19.6, "fps": 25.4, "over50": 29, "over50Per30s": 44.5}}
+    ]
+  },
+  {
+    "run": 3,
+    "cap": 60,
+    "ab": null,
+    "temperature": 39.69,
+    "boot": {"outcome": "control", "controlS": 20.4, "build": "30eab98a8"},
+    "error": null,
+    "legs": [
+      {"name": "dock spawn", "cap": 60, "error": null, "summary": {"seconds": 29.7, "fps": 27.2, "over50": 106, "over50Per30s": 107.1}},
+      {"name": "pier to beach", "cap": 60, "error": null, "summary": {"seconds": 15.7, "fps": 22.0, "over50": 62, "over50Per30s": 118.7}},
+      {"name": "plateau climb", "cap": 60, "error": null, "summary": {"seconds": 20.4, "fps": 32.8, "over50": 14, "over50Per30s": 20.6}},
+      {"name": "castaway camp (NPC)", "cap": 60, "error": null, "summary": {"seconds": 19.2, "fps": 37.7, "over50": 7, "over50Per30s": 10.9}},
+      {"name": "west path", "cap": 60, "error": null, "summary": {"seconds": 48.8, "fps": 31.3, "over50": 57, "over50Per30s": 35.0}},
+      {"name": "altar arena", "cap": 60, "error": null, "summary": {"seconds": 19.3, "fps": 29.7, "over50": 4, "over50Per30s": 6.2}},
+      {"name": "west path back", "cap": 60, "error": null, "summary": {"seconds": 45.2, "fps": 26.5, "over50": 68, "over50Per30s": 45.1}},
+      {"name": "central path", "cap": 60, "error": null, "summary": {"seconds": 19.3, "fps": 32.2, "over50": 15, "over50Per30s": 23.3}},
+      {"name": "wreck beach", "cap": 60, "error": null, "summary": {"seconds": 28.5, "fps": 29.1, "over50": 31, "over50Per30s": 32.6}},
+      {"name": "boar field", "cap": 60, "error": null, "summary": {"seconds": 34.9, "fps": 27.8, "over50": 46, "over50Per30s": 39.6}},
+      {"name": "boar fight", "cap": 60, "error": null, "summary": {"seconds": 19.6, "fps": 25.6, "over50": 22, "over50Per30s": 33.6}}
+    ]
+  }
+]
