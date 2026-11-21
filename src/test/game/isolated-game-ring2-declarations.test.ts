@@ -143,10 +143,11 @@ test('game owners retain exact borrowed fields and mutable contents',()=>{
  expect(diagnostics()).toEqual([]);
  source+="flock.group=flock.group;\njournal.scope=journal.scope;\nlocker.owned=locker.owned;\nexport const wrongGroup:number=flock.group;\nexport const wrongCount:string=locker.owned.size;\nexport const missing=body.registries.undeclared;\n";
  const refused=diagnostics().map(diagnostic=>diagnostic.code);
- expect(refused.filter(code=>code===2322)).toHaveLength(2);
+ // ONE-FORMAT OF31f2: a cosmetic's id is the shard's own kept row now (`CosmeticId` is a string), so no literal id is refused.
+ expect(refused.filter(code=>code===2322)).toHaveLength(1);
  expect(refused.filter(code=>code===2339)).toHaveLength(1);
  expect(refused.filter(code=>code===2540)).toHaveLength(3);
- expect(refused).toHaveLength(6);
+ expect(refused).toHaveLength(5);
 });
 });
 
@@ -165,12 +166,13 @@ test('game registries retain literal identities, readonly rows and live singleto
   types:[],skipLibCheck:true,noEmit:true};
  const diagnostics=():readonly ts.Diagnostic[]=>consumerDiagnostics(consumer,source,options);
  expect(diagnostics()).toEqual([]);
- source+="export const wrongSlots:13=PACK_SLOTS;\nexport const wrongCosmetic:CosmeticId=\"iron-sword\";\nMOVER_FIELDS.pitch=1;\nBONES.right[0]=\"R_shoulder\";\nOWNED.cape.kind=\"cosmetic\";\nexport const missing=pageGridCells.undeclared;\n";
+ source+="export const wrongSlots:13=PACK_SLOTS;\nMOVER_FIELDS.pitch=1;\nBONES.right[0]=\"R_shoulder\";\nOWNED.cape.kind=\"cosmetic\";\nexport const missing=pageGridCells.undeclared;\n";
  const refused=diagnostics().map(diagnostic=>diagnostic.code);
- expect(refused.filter(code=>code===2322)).toHaveLength(2);
+ // ONE-FORMAT OF31f2: a cosmetic's id is the shard's own kept row now (`CosmeticId` is a string), so no literal id is refused.
+ expect(refused.filter(code=>code===2322)).toHaveLength(1);
  expect(refused.filter(code=>code===2339)).toHaveLength(1);
  expect(refused.filter(code=>code===2540)).toHaveLength(3);
- expect(refused).toHaveLength(6);
+ expect(refused).toHaveLength(5);
 });
 });
 
