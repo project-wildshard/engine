@@ -10,8 +10,8 @@ import { Scope } from '../../../shared/engine/app/scope';
 // half of WebKit's high-mode walk peak; the pull now recycles its packet planes and answers in its own scratch.
 it('recycles packet planes and answers every read in the same scratch planes', async () => {
   const raw: unknown = JSON.parse(readFileSync('public/assets/music/piano/music.json', 'utf8'));
-  const spec = parseManifest(raw)?.slots['island'];
-  if (!spec) throw new Error('Missing island score');
+  const spec = parseManifest(raw)?.slots['title'];
+  if (!spec) throw new Error('Missing tracked title score');
   const bytes = new Uint8Array(readFileSync(`public/assets/music/piano/${spec.calm}`));
   const index = indexRecordingAac(bytes), planes = new Set<ArrayBufferLike>();
   let packet = 0;
