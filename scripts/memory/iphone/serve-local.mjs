@@ -6,7 +6,9 @@
 // http on a LAN address does not. Tailnet only: this never runs `tailscale funnel`.
 //
 // --public instead opens two owned Cloudflare quick tunnels and serves the reviewed staging snapshot with in-memory saves.
-//   node scripts/memory/iphone/serve-local.mjs [--public [--no-watch]] [--shard nine-dragon-stack] [--port N] [--socket-port N] [--dry-run]
+//   node scripts/memory/iphone/serve-local.mjs [--public [--no-watch | --keep]] [--shard nine-dragon-stack] [--port N] [--socket-port N] [--dry-run]
+// --public --keep (meta MINI-DEVEX MD3) hands this build's world to launchd (serve-keep.mjs): it outlives the lane's shell
+// and a forced kill, restarts on the same port behind the same quick tunnels, prints the URL and returns at once.
 //
 // It prints the URL once the world is up. dev.mjs watches src/: an edit rebuilds the client and the open page opens the new
 // build by itself. Ctrl-C stops the world and removes both serve entries.
@@ -164,7 +166,17 @@ async function main() {
   const { values } = parseArgs({ options: {
     shard: { type: 'string', default: 'nine-dragon-stack' }, port: { type: 'string' },
     'socket-port': { type: 'string' }, public: { type: 'boolean', default: false }, 'no-watch': { type: 'boolean', default: false }, 'dry-run': { type: 'boolean', default: false },
+    keep: { type: 'boolean', default: false },
   } });
+  // --keep (meta MINI-DEVEX MD3): launchd keeps the public world for this build (serve-keep.mjs); prints the URL and exits
+  if (values.keep) {
+    if (!values.public) throw new Error('--keep keeps a --public world');
+    if (!/^[a-z0-9_-]+$/u.test(values.shard)) throw new Error('--shard needs a slug');
+    const { install } = await import('./serve-keep.mjs');
+    const kept = await install({ shard: values.shard });
+    console.log(`serve-local: ${String(kept.url)} (public, kept by launchd as ${kept.label}; stop: node scripts/memory/iphone/serve-keep.mjs --stop --label ${kept.label})`);
+    return;
+  }
   if (!/^[a-z0-9_-]+$/u.test(values.shard)) throw new Error('--shard needs a slug');
   const port = Number(values.port ?? (values.public ? 4442 : 4402));
   const socketPort = Number(values['socket-port'] ?? (values.public ? 4452 : 4412));
