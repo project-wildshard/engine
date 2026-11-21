@@ -1,0 +1,26 @@
+// FS28: staging npm admission uses only exact CI and alias evidence.
+import { provesCode } from './ci-proof-jobs.mjs';
+
+export const trainSha = /^[a-f0-9]{40}$/u;
+export const trainTag = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
+
+/** @param {string} build @param {string} tag @param {number} ci
+ * @param {import('./release-train-proof.mjs').Alias} [alias] @param {import('./release-train-proof.mjs').Leg} [candidate] */
+export function nextAdmission(build, tag, ci, alias, candidate) {
+  const serial = alias?.serial;
+  if (!trainSha.test(build) || !trainTag.test(tag) || !Number.isSafeInteger(ci) || ci <= 0 ||
+      alias?.build !== build || alias.channel !== 'staging' || typeof serial !== 'number' ||
+      !Number.isSafeInteger(serial) || serial <= 0 || candidate?.build !== build ||
+      candidate.release !== tag || candidate.kind !== 'candidate' || candidate.status !== 'pass' ||
+      candidate.hold !== false || candidate.roomsSerial !== serial ||
+      !alias.deployment?.id || alias.deployment.id !== candidate.deploymentId) return undefined;
+  return { staging_build: build, staging_qualification: JSON.stringify({ build, serial, j475: { releaseCi: ci } }) };
+}
+
+/** @param {import('./release-train-proof.mjs').Run} run @param {string} build */
+export function provesTrainCi(run, build) {
+  return run.headSha === build && run.status === 'completed' && run.conclusion === 'success' &&
+    provesCode('ci.yml', run.jobs) &&
+    ['boundaries', 'nine-ring1-build', 'memory-client-build'].every(name =>
+      run.jobs.some(job => job.name === name && job.status === 'completed' && job.conclusion === 'success'));
+}

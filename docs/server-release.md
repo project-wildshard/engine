@@ -53,6 +53,28 @@ in.
 
 ## Page release
 
+From the MacBook's canonical engine checkout, the train command cuts the
+newest exact green main, runs local QA, prepares the branch, waits for
+release CI and runs staging go-live.
+
+```bash
+scripts/release.sh vX.Y.Z --notes <notes-file>
+```
+
+Use `--dry-run` to check the source and cadence before cutting.
+`--on-demand` opens an early cut when the coordinator requests one.
+Repeat `--require <sha>` to select a green main containing every commit
+in a coordinated batch.
+The train starts npm next as soon as candidate QA and the signed staging
+alias agree. The live smoke and J451 continue during publication. It verifies
+both immutable client archives and the public npm tarball. Build and QA
+evidence is under `tmp/release-train-vX.Y.Z`.
+
+Run the same command to continue a partial delivery from the same lane
+session. It reuses the published branch and any existing exact npm run.
+It resumes a held J451 tour from the failed crossings. Tag, production
+and npm latest use their normal release gates.
+
 The channel pages ship with one committed script, in four phases, from
 one clean release clone per channel at the exact SHA (never a worktree
 with untracked pins, never the canonical checkout):
@@ -204,7 +226,7 @@ moves it through `wildshard-agent` and `wildshard-config cook` (J355).
 Finish from primary main with `release.sh vX.Y.Z --merge-back`: merge
 without fast-forward, retry against moving main, then remove the
 published branch/tree. The next prepare requires this tag in main
-history. Release cadence is daily plus on demand (J362).
+history. The train cuts every four hours plus on demand (J391, FS28).
 
 Pack writes use `wrangler r2 object put` with wrangler's login.
 
