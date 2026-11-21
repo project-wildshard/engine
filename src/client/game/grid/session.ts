@@ -583,7 +583,7 @@ export class GridSession {
         const outerSlice = workSlice(OUTER_RING_SLICE_MS, roadScope), renderer = host.renderer;
         const stageSigns = TIER === 'desktop' && renderer !== undefined
           ? (atlas: DataTexture) => stageRoadSignAtlas(renderer, atlas, roadScope) : undefined;
-        // DW12: the outer deck (~20 MB at Driftwood) goes up a band a frame instead of in one burst
+        // DW12: with debug.roadDeckPaced on, the outer deck (~20 MB at Driftwood) goes up a band a frame (off: no peak change)
         const stageDeck = roadDeckPacedOn() ? async (deck: Mesh): Promise<void> => {
           await stageRoadDeck(deck, host.scene, async () => {
             await nextDrawnFrame(roadScope);

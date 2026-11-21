@@ -7,4 +7,6 @@ mesh uploaded every channel and the drawn index in a single frame. `roadDeckUplo
 the scene: a stand-in mesh with the deck's material and a zero draw range carries one band of the deck's own attributes
 per drawn frame (at most 8 MiB; three keys buffers by attribute object and the empty draw still points named attributes,
 so the vertex pack packs them as the deck's own first draw would). The deck then draws buffers that are already there.
-Device slot `debug.roadDeckPaced` turns it off.
+Device slot `debug.roadDeckPaced`, off by default: three alternating pairs of the SB38a WebKit probe (local dev
+--staging Driftwood, phone tier, 30 s still) staged the deck in 4 bands of at most 8.2 MB and the WebContent + GPU peak
+did not move (off 1,614 / 1,553 / 1,566 MB, on 1,596 / 1,598 / 1,631). The outer road's transient is its construction.

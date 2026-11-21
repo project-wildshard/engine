@@ -14,7 +14,10 @@
  * uploaded again and the same bytes are drawn. The stand-in is emptied before it is disposed, so disposing it frees only
  * its vertex-array state, never the deck's buffers.
  *
- * The device slot `debug.roadDeckPaced` set to false keeps the single-frame upload.
+ * Off by default (`debug.roadDeckPaced` true turns it on): three alternating pairs of the SB38a WebKit probe (402x874 @3,
+ * phone tier, local dev --staging Driftwood, 30 s still after control) put the deck up in 4 bands of at most 8.2 MB
+ * (24.6 MB in all), and the WebContent + GPU peak did not move: off 1,614 / 1,553 / 1,566 MB, on 1,596 / 1,598 /
+ * 1,631 MB (mini-dw12, 2026-11-21). The transient the outer road's install adds is its construction, not this upload.
  */
 import { BufferGeometry, InterleavedBufferAttribute, Mesh, Sphere, type BufferAttribute, type Object3D } from 'three';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
@@ -83,8 +86,8 @@ export async function stageRoadDeck(deck: Mesh, scene: Object3D, frame: () => Pr
 }
 
 export const ROAD_DECK_PACED_SLOT = 'debug.roadDeckPaced';
-/** Unset: on (DW12). */
-export const ROAD_DECK_PACED_DEFAULT = true;
+/** Unset: off (DW12's pairs: no peak change, see above). */
+export const ROAD_DECK_PACED_DEFAULT = false;
 /** The slot's value: a boolean (or `false`/`off`/0 from a capture) wins; unset, ROAD_DECK_PACED_DEFAULT. */
 export function roadDeckPaced(saved: unknown): boolean {
   if (saved === false || saved === 'false' || saved === 'off' || saved === 0) return false;

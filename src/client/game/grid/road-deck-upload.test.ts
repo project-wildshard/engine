@@ -95,8 +95,8 @@ test('bands keep geometry order, never split a channel and put an oversized chan
   expect(() => deckUploadBands(geometry, 0)).toThrow(RangeError);
 });
 
-test('the slot: unset or true paces, false (or a capture\'s off) keeps the one-frame upload', () => {
-  expect(roadDeckPaced(null)).toBe(true);
+test('the slot: off unless true (DW12 measured no peak change)', () => {
+  expect(roadDeckPaced(null)).toBe(false);
   expect(roadDeckPaced(true)).toBe(true);
   for (const off of [false, 'false', 'off', 0]) expect(roadDeckPaced(off)).toBe(false);
 });
