@@ -4,6 +4,7 @@
 // warns and passes: an offline lane is never blocked. Escape hatch (J381): ALLOW_FORMAT_AHEAD=1.
 import { resolve } from 'node:path';
 import { lockedFormatVersion } from './format-lock.mjs';
+import { markedFetch } from './agent-requests.mjs';
 
 export const FORMAT_API = 'https://api.wildshard.io';
 const FETCH_MS = 4000;
@@ -22,7 +23,8 @@ export function compareRelease(left, right) {
 /** The shard-format npm version the deployed API pins. @param {string} api @param {number} timeoutMs */
 export async function observeApiPackage(api = FORMAT_API, timeoutMs = FETCH_MS) {
   for (const [path, key] of [['/api/format', 'package'], ['/api/health', 'shardFormat']]) {
-    const response = await fetch(new URL(path, api), { signal: AbortSignal.timeout(timeoutMs), redirect: 'error', cache: 'no-store' });
+    // METRICS MT2: an agent's read of our hosted API carries the Node actor marker.
+    const response = await markedFetch(globalThis.fetch)(new URL(path, api), { signal: AbortSignal.timeout(timeoutMs), redirect: 'error', cache: 'no-store' });
     if (response.status === 404 && path === '/api/format') continue;
     if (!response.ok) throw new Error(`${path} HTTP ${response.status}`);
     /** @type {unknown} */
