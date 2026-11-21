@@ -14,6 +14,7 @@ import * as v from 'valibot';
 import { Scope } from '@wildshard/engine/app/scope';
 import type { Json, jsonSlot } from '@wildshard/engine/saves/slots';
 import { GRID_RADIUS } from '@wildshard/format/contentBounds';
+import { adoptSlugAliases } from '../../../shared/game/slugNames';
 import { PLACEMENT_PUBLIC_KEY, PlacementSchema, SignedPlacementSchema, placementsURL, type PlacementFile } from '../../../shared/game/grid/placementRows';
 import { installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
 import { findTitleManifest, installTitleManifests, titleManifests, type TitleManifest } from '../shard/titleList';
@@ -178,6 +179,7 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
       if (held === null || fresh) return;
       try {
         const file = await believe(held), kept = addPlacedCells(document, file, known);
+        if (!fresh && !wentOn()) adoptSlugAliases(file.aliases);
         if (!fresh && !wentOn() && kept.added.length > 0) { installCatalogue(kept.document); cached = { added: kept.added, left: kept.left, serial: file.serial }; }
       } catch { await keep.write(url, null); } // a kept file this build no longer believes is dropped
     })().catch(() => undefined));
@@ -210,6 +212,7 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     else await keep.write(url, text);
     if (wentOn()) return await fallBack('the page went on before the placement file was read');
     fresh = true;
+    adoptSlugAliases(file.aliases); // OF31i: the file's retired slugs beat the build's slugNames.json
     // from the build's own catalogue, so the fresh file replaces the kept one's cells
     if (placed.added.length > 0 || cached !== undefined) installCatalogue(placed.document);
     // SA46: a cell the box would open whose slug this build has no card for (an upload after the build) is carded from its catalogue

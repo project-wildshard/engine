@@ -28,3 +28,11 @@ A grid page has no level product, so mini-dw12's stopgap `4da6ceeed` left its `O
 the home cell's `kept` rows from that cell's shard file (index plus the hash-verified `combat/items` section, nothing
 admitted, `grid/homeKept.ts`); each entered cell's `Owned` already read its admitted source. The old table stays only
 for a cell that declares none or can't be read.
+
+## OF31i: the featured list and slug aliases ride the placement file (opus-of-close)
+
+Zone Select's featured order and the retired-slug map are world data, not engine data. The signed placement file now
+takes optional `featured` and `aliases`; a box from before reads it with `v.object` and drops them. The box's watch
+keeps the newest file's order for `zoneSelectTabs` and lays the aliases over `slugNames.json`; a page does the same
+when it believes a file. The build's lists stay as the fallback until the API writes the fields (its own row) and the
+offline grid file moves (its own row).

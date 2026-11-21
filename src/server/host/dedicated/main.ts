@@ -161,7 +161,7 @@ const accounts = exporting === undefined || deleting === undefined ? undefined :
 const catalogueAt = zoneCatalogueUrl(placementAt);
 const zoneSelect = zoneSelectRoute({
   channel: release.channel, allowedOrigins: trust.allowedOrigins,
-  world: () => ({ serial: release.serial, slugs: world.openShards() }),
+  world: () => ({ serial: release.serial, slugs: world.openShards(), featured: placements?.featured }),
   uploads: () => readZoneUploads(catalogueAt),
   totals: () => arrivals?.totals() ?? Promise.resolve([]),
   log,
@@ -176,7 +176,7 @@ const dailyMetrics = saves.metricsDaily === undefined || release.channel === 'pr
 const metricsChannel = release.channel;
 const currentMetrics = arrivals === undefined || metricsChannel === 'preview' ? undefined : metricsCurrentRoute({
   channel: metricsChannel, markers: () => world.markerReading(), live: () => world.livePlayers(), entries: days => arrivals.totals(days), log,
-  selection: async entries => zoneSelectTabs(metricsChannel, { serial: release.serial, slugs: world.openShards() },
+  selection: async entries => zoneSelectTabs(metricsChannel, { serial: release.serial, slugs: world.openShards(), featured: placements?.featured },
     await readZoneUploads(catalogueAt).catch(() => []), entries),
 });
 const server = createServer((request, response) => {

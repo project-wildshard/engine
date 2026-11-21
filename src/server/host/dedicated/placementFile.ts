@@ -6,6 +6,7 @@
 import { Scope } from '@wildshard/engine/app/scope';
 import { fetchSignedText, readSigned } from './releaseFile';
 import { PlacementSchema, type PlacementFile } from '@wildshard/engine/game/grid/placementRows';
+import { adoptSlugAliases } from '@wildshard/engine/game/slugNames';
 import type { PlacedCell } from './gridCells';
 
 /** How often the server looks, in ms: the release file's minute, so a placement is open inside SA33's two minutes. */
@@ -39,12 +40,15 @@ export class PlacementWatch {
   private readonly opened = new Set<string>();
   private looking = false;
   private seen = -1;
+  private featuredOrder: readonly string[] | undefined;
   constructor(options: PlacementWatchOptions) {
     this.options = options;
     this.scope.interval(options.everyMs ?? POLL_MS, () => { void this.look(); });
   }
   /** The newest serial this server has believed, or -1. */
   get serial(): number { return this.seen; }
+  /** OF31i: the newest believed file's featured order, or undefined when it names none (the build's list stands). */
+  get featured(): readonly string[] | undefined { return this.featuredOrder; }
   /** One look. An older file than one already believed changes nothing. */
   async look(): Promise<void> {
     if (this.looking) return;
@@ -54,6 +58,7 @@ export class PlacementWatch {
       if (file.channel !== this.options.channel) throw new Error(`A ${file.channel} placement file on a ${this.options.channel} server`);
       if (file.serial < this.seen) throw new Error(`Placement serial ${String(file.serial)} is older than ${String(this.seen)}`);
       this.seen = file.serial;
+      this.featuredOrder = file.featured; adoptSlugAliases(file.aliases);
       for (const instance of this.options.keep?.(file.cells) ?? []) this.opened.delete(instance);
       const fresh = file.cells.filter(cell => !this.opened.has(cell.instance));
       if (fresh.length > 0) for (const instance of await this.options.open(fresh, file.cells)) this.opened.add(instance);
