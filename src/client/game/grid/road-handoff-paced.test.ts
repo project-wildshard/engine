@@ -6,5 +6,6 @@ test('a saved boolean wins; unset, phone Low takes its default and everything el
   expect(roadHandoffPaced(true)).toBe(true);
   expect(roadHandoffPaced(false, true)).toBe(false);
   expect(roadHandoffPaced(null, true)).toBe(ROAD_HANDOFF_PACED_PHONE_LOW);
+  expect(ROAD_HANDOFF_PACED_PHONE_LOW).toBe(true); // DF8 (mini-driftwood13n): on at phone Low after the pairs
   expect(roadHandoffPaced(undefined)).toBe(ROAD_HANDOFF_PACED_DEFAULT);
 });

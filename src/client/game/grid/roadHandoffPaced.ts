@@ -5,6 +5,8 @@
  * `grid.road tiles` lap in the grid's late step, a 32 ms render, then about 170 ms with the main thread held and no
  * callback running (a 245 ms frame). With the device slot `debug.roadHandoffPaced` on, the handoff takes one material a
  * step: its pool shows, then its whole mesh retires. What is drawn before and after is unchanged.
+ * mini-driftwood13n: the dock's 31 to 35 ms `grid.road tiles` laps were the stream's publishes re-merging each hidden pool
+ * (two a step); paced, the hidden pools only record their tiles and merge once, in slices, at the handoff (RoadTilePool.settle).
  */
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { TIER } from '@wildshard/engine/core/tier';
@@ -12,8 +14,10 @@ import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 
 export const ROAD_HANDOFF_PACED_SLOT = 'debug.roadHandoffPaced';
 export const ROAD_HANDOFF_PACED_DEFAULT = false;
-/** Unset at phone Low: off until cooled iPhone 13 pairs decide. */
-export const ROAD_HANDOFF_PACED_PHONE_LOW = false;
+/** Unset at phone Low: on (mini-driftwood13n, 2026-11-20). With the hidden pools merging once (engine 9e587428f), three
+ *  cooled iPhone 13 dock pairs had no road lap over 18 ms on (off: 9 to 28 ms laps) and 3/3/3 frames over 50 ms against
+ *  6/3/3 (meta project/evidence/driftwood-fps/df8-road-pools-2026-11-20.md). */
+export const ROAD_HANDOFF_PACED_PHONE_LOW = true;
 
 /** The slot's value: a boolean wins; unset, ROAD_HANDOFF_PACED_PHONE_LOW at phone Low, else ROAD_HANDOFF_PACED_DEFAULT. */
 export function roadHandoffPaced(saved: unknown, phoneLow = false): boolean {
