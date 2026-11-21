@@ -46,6 +46,16 @@ const slots = Object.fromEntries(Object.entries(deviceSavePicks(values.slots ?? 
   try { return [key, JSON.parse(text)]; } catch { return [key, text]; }
 }));
 const out = resolve(values.out ?? join('tmp/iphone13', `route-${values.zone}-${String(Date.now())}`));
+/** The raster witness, read once the zone has control: what the phone really renders at (a page-function body). */
+const RASTER_WITNESS = `
+const g = window.__wildshard?.world?.game, r = g?.renderer;
+if (r === undefined) return 'no game';
+const gl = r.getContext();
+let batches = 0;
+g.scene?.traverse?.(o => { if (o.isBatchedMesh) batches++; });
+return { dpr: r.getPixelRatio(), buffer: [gl.drawingBufferWidth, gl.drawingBufferHeight], css: [innerWidth, innerHeight],
+  phoneGraphics: g.phoneGraphics ?? null, multiDraw: gl.getExtension('WEBGL_multi_draw') !== null, batches };
+`;
 
 async function bench() {
   mkdirSync(out, { recursive: true });
@@ -81,6 +91,10 @@ async function bench() {
         tools?.lockState(`run ${String(run)} cap ${String(cap)} after boot`);
         console.log(`run ${String(run)} cap ${String(cap)}${ab === null ? '' : ` ${String(values.ab)}=${String(ab)}`}: ${boot.outcome} in ${String(row.boot.controlS)} s (${String(row.boot.version)})`);
         if (boot.outcome === 'control') {
+          // DF10 (mini-df10d): the raster witness (codex-tc48 found the Low seeding could come up at High): the drawing
+          // buffer's DPR and size, the tier, the multi-draw extension and the slots the page actually read
+          row.raster = await driver.evaluate(RASTER_WITNESS).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
+          console.log(`  raster: ${JSON.stringify(row.raster)}`);
           if ('gesture' in driver && typeof driver.gesture === 'function') await driver.gesture(askWake).catch(() => undefined);
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
