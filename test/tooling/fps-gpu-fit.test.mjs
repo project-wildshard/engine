@@ -55,3 +55,25 @@ test('changing a derived summary cannot turn the same raw capture into a repeat'
   inputs[2].phone.legs[0].summary.gpuApproxP95Ms = 99;
   expect(() => fitGpu(inputs,route,training,heldOut)).toThrow('independent');
 });
+
+test('a cadence term can explain the fire residual without qualifying an unobserved GPU cost', () => {
+  const inputs = pairs();
+  for (const [run,pair] of inputs.entries()) {
+    for (const [index,leg] of pair.phone.legs.entries()) {
+      leg.samples = [{seconds:1,frames:30,frameMs:Array.from({length:30},(_,frame) =>
+        frame === 0 ? 32-run : frame === 1 ? 32+index : frame % 3 === 0 ? 34 : 33)}];
+      leg.summary.gpuApproxP95Ms = 0.7;
+      pair.mac.legs[index].metal.p95Ms = index === 3 ? 6.57 : 8.83;
+    }
+  }
+  const report = fitGpu(inputs,route,training,heldOut);
+  expect(report.validation[0].runs.every(run => !run.pass)).toBe(true);
+  expect(report.observation).toMatchObject({floorMs:34-1000/30,gpuRatioIdentifiable:false});
+  expect(report.observation.validation.flatMap(leg => leg.runs).every(run => run.pass)).toBe(true);
+  expect(report.qualified).toBe(false);
+  const baseline = structuredClone(report.observation.training);
+  inputs[2].phone.legs[3].summary.gpuApproxP95Ms = 9;
+  const changed = fitGpu(inputs,route,training,heldOut);
+  expect(changed.observation.training).toEqual(baseline);
+  expect(changed.observation.validation[0].runs[2].pass).toBe(false);
+});

@@ -20,6 +20,37 @@ function median(values) {
   return sorted.length % 2 === 1 ? sorted[at] : (sorted[at - 1] + sorted[at]) / 2;
 }
 
+/** Diagnose the observation floor separately from rendering cost. The phone's
+ * gpu~ is max(0, frame interval - max(CPU, cap interval)), not a GPU timer.
+ * An integer-ms clock at 30 fps produces 34 - 1000/30 ms with idle GPU time.
+ * Train this term without looking at either held-out segment. It can explain
+ * a residual, but cannot identify a GPU speed ratio below the cap.
+ * @param {Pair[]} pairs @param {string[]} training @param {number} ratio
+ * @param {{name:string,runs:{run:number,measuredMs:number,predictedMs:number,errorFraction:number|null,pass:boolean}[]}[]} validation */
+function cadenceObservation(pairs, training, ratio, validation) {
+  const rows = pairs.flatMap(({phone}, run) => phone.legs.filter(leg => training.includes(leg.name)).map(leg => {
+    const frames = (leg.samples ?? []).flatMap(sample => sample.frameMs);
+    const capMs = 1000 / /** @type {number} */ (leg.cap);
+    const floorMs = Math.ceil(capMs) - capMs;
+    const sorted = frames.map(ms => Math.max(0, ms - capMs)).sort((a,b) => a-b);
+    const p95 = sorted[Math.floor((sorted.length - 1) * 0.95)];
+    return {run:run + 1,name:leg.name,frames:frames.length,floorMs,
+      integerClock:frames.length > 0 && frames.every(Number.isInteger),p95};
+  }));
+  if (!rows.every(row => row.integerClock) ||
+      rows.filter(row => Math.abs(row.p95 - row.floorMs) < 1e-9).length <= rows.length / 2) return null;
+  const floorMs = median(rows.map(row => row.floorMs));
+  return {kind:'capped-frame-residual',floorMs,training:rows,
+    gpuRatioIdentifiable:false,
+    reason:'Most training observations equal the integer-clock cadence floor; sub-cap GPU cost is unobserved.',
+    validation:validation.map(leg => ({name:leg.name,runs:leg.runs.map(row => {
+      const predictedMs = Math.max(floorMs,row.predictedMs);
+      const errorMs = Math.abs(predictedMs-row.measuredMs);
+      return {...row,predictedMs,errorFraction:row.measuredMs === 0 ? null : errorMs/row.measuredMs,
+        pass:errorMs <= row.measuredMs*0.25};
+    })})),ratio};
+}
+
 /** The hold-outs never contribute to the fitted ratio. Every run must pass.
  * @param {Pair[]} pairs @param {Segment[]} route @param {string[]} training @param {string[]} heldOut */
 export function fitGpu(pairs, route, training, heldOut) {
@@ -71,11 +102,13 @@ export function fitGpu(pairs, route, training, heldOut) {
       return {run, measuredMs:phoneMs, predictedMs, errorFraction:phoneMs === 0 ? null : errorMs / phoneMs,
         pass:errorMs <= phoneMs * 0.25};
     })}));
-  const qualified = validation.every(leg => leg.runs.every(run => run.pass));
+  const observation = cadenceObservation(pairs,training,ratio,validation);
+  const qualified = observation === null && validation.every(leg => leg.runs.every(run => run.pass));
   return {qualified, build:first.version.build, rendererRevision:first.version.rendererRevision,
     raster:{css:first.witness.css,dpr:first.witness.dpr}, metric:'p95', training, heldOut, ratio,
-    spread:{min:Math.min(...byRun),max:Math.max(...byRun)}, byRun, segments, validation,
-    reason:qualified ? 'All held-out predictions are within 25% in every matched run.' :
+    spread:{min:Math.min(...byRun),max:Math.max(...byRun)}, byRun, segments, validation, observation,
+    reason:observation !== null ? 'Phone observations are dominated by cadence; these capped frames cannot qualify a GPU ratio.' :
+      qualified ? 'All held-out predictions are within 25% in every matched run.' :
       'At least one held-out prediction differs by more than 25%; do not use this ratio in the floor table.'};
 }
 

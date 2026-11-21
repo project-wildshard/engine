@@ -384,8 +384,8 @@
             ]
           }
         ],
-        "reason": "At least one held-out prediction differs by more than 25%; do not use this ratio in the floor table.",
-        "basis": "Phone gpu~ p95 includes frame pacing and compositor waits. Metal timer queries measure submitted rendering work. The fitted ratio is unqualified and must not drive a floor prediction.",
+        "reason": "Phone observations are dominated by cadence; these capped frames cannot qualify a GPU ratio.",
+        "basis": "Phone gpu~ is a capped frame-interval residual. Fourteen of fifteen segment p95s round the 34 - 1000/30 ms cadence floor to 0.7 ms. A cadence term explains the held-out discrepancy but cannot identify sub-cap GPU cost or a fire-specific term.",
         "captured": "2026-11-21",
         "routeMethodSha256": "efe80d0630dd07d7cfb1fe7a4fc12ba0801d2bafbcd33c5c294245d0828be187",
         "phoneCaptures": [
@@ -398,7 +398,142 @@
           "mac-8",
           "mac-9"
         ],
-        "evidence": "project-wildshard-meta:project/evidence/driftwood-fps/df5/minute-routes-2026-11-21/gpu-fit.json"
+        "evidence": "project-wildshard-meta:project/evidence/driftwood-fps/df5/cadence-model-2026-11-21/gpu-fit.json",
+        "observation": {
+          "kind": "capped-frame-residual",
+          "floorMs": 0.6666666666666643,
+          "training": [
+            {
+              "run": 1,
+              "name": "dock spawn",
+              "frames": 895,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 6.666666666666664
+            },
+            {
+              "run": 1,
+              "name": "beach",
+              "frames": 1201,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 0.6666666666666643
+            },
+            {
+              "run": 1,
+              "name": "village",
+              "frames": 1801,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 0.6666666666666643
+            },
+            {
+              "run": 2,
+              "name": "dock spawn",
+              "frames": 896,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 1.6666666666666643
+            },
+            {
+              "run": 2,
+              "name": "beach",
+              "frames": 1200,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 0.6666666666666643
+            },
+            {
+              "run": 2,
+              "name": "village",
+              "frames": 1799,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 0.6666666666666643
+            },
+            {
+              "run": 3,
+              "name": "dock spawn",
+              "frames": 895,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 0.6666666666666643
+            },
+            {
+              "run": 3,
+              "name": "beach",
+              "frames": 1201,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 0.6666666666666643
+            },
+            {
+              "run": 3,
+              "name": "village",
+              "frames": 1800,
+              "floorMs": 0.6666666666666643,
+              "integerClock": true,
+              "p95": 0.6666666666666643
+            }
+          ],
+          "gpuRatioIdentifiable": false,
+          "reason": "Most training observations equal the integer-clock cadence floor; sub-cap GPU cost is unobserved.",
+          "validation": [
+            {
+              "name": "quest fire",
+              "runs": [
+                {
+                  "run": 1,
+                  "measuredMs": 0.7,
+                  "predictedMs": 0.6666666666666643,
+                  "errorFraction": 0.04761904761905094,
+                  "pass": true
+                },
+                {
+                  "run": 2,
+                  "measuredMs": 0.7,
+                  "predictedMs": 0.6666666666666643,
+                  "errorFraction": 0.04761904761905094,
+                  "pass": true
+                },
+                {
+                  "run": 3,
+                  "measuredMs": 0.7,
+                  "predictedMs": 0.6666666666666643,
+                  "errorFraction": 0.04761904761905094,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "name": "road crossing",
+              "runs": [
+                {
+                  "run": 1,
+                  "measuredMs": 0.7,
+                  "predictedMs": 0.7269239675765867,
+                  "errorFraction": 0.03846281082369539,
+                  "pass": true
+                },
+                {
+                  "run": 2,
+                  "measuredMs": 0.7,
+                  "predictedMs": 0.6666666666666643,
+                  "errorFraction": 0.04761904761905094,
+                  "pass": true
+                },
+                {
+                  "run": 3,
+                  "measuredMs": 0.7,
+                  "predictedMs": 0.6666666666666643,
+                  "errorFraction": 0.04761904761905094,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "ratio": 0.07930476458493925
+        }
       }
     }
   }
