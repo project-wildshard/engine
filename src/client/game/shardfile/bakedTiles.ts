@@ -181,8 +181,9 @@ function markBakedLook(look: THREE.Material): void { look.userData[NO_VIEW_MERGE
 
 export const COVE_BATCH_SLOT = 'debug.coveBatch';
 export const COVE_BATCH_DEFAULT = false;
-/** Unset at phone Low: off until an iPhone 13 pair decides (DF10, mini-df10c). */
-export const COVE_BATCH_PHONE_LOW = false;
+/** Unset at phone Low: on (DF10, mini-df10d: the cooled iPhone 13 pair at DPR 1 cut route draws p95 86-94 -> 53-67 with
+ *  the same long frames, none from the batch; the blind board passed). */
+export const COVE_BATCH_PHONE_LOW = true;
 const coveBatchSlot = jsonSlot(COVE_BATCH_SLOT, 'device');
 /** The slot's value: a boolean wins; unset, COVE_BATCH_PHONE_LOW at phone Low, else COVE_BATCH_DEFAULT. */
 export function coveBatch(saved: unknown, phoneLow = false): boolean {

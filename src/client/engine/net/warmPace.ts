@@ -32,8 +32,8 @@ export function warmPace(saved: unknown, phoneLow = false): boolean {
  */
 export const WARM_SETTLE_SLOT = 'debug.warmSettle';
 export const WARM_SETTLE_DEFAULT = false;
-/** Unset at phone Low: off until an iPhone 13 pair decides. */
-export const WARM_SETTLE_PHONE_LOW = false;
+/** Unset at phone Low: on (DF10, mini-df10d: decided with `debug.coveBatch` by one cooled iPhone 13 pair). */
+export const WARM_SETTLE_PHONE_LOW = true;
 /** frames drawn every frame after the road warm-up finishes, before the pace starts (the slot on) */
 export const WARM_AFTER = 60;
 /** The slot's value: a boolean wins; unset, WARM_SETTLE_PHONE_LOW at phone Low, else WARM_SETTLE_DEFAULT. */
