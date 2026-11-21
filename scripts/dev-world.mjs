@@ -97,12 +97,17 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     let pageOrigin = '', stamp = { release: '', key: key.public };
     let serial = 0, signed = '', revision = 0, build = '', served = 0;
     const origin = join(work, 'origin'), server = join(work, 'server');
-    const shards = staging?.map(row => ({ slug: row.slug, revision: row.revision })) ?? [{ slug: shard, revision: 1 }];
+    // a staging row with no local product (staging listed glowfen before this checkout's pins held it, 2026-11-21: every
+    // --staging world died at start) is left off this grid with a warning; the world's own --shard still has to exist
+    const read = product === undefined ? JSON.parse(run(['--input-type=module', '-e',
+      "const {readBuiltShardfile} = await import('./scripts/built-folder.mjs'); const books = [], missing = []; for (const slug of process.argv.slice(1)) { try { books.push(slug + '=' + readBuiltShardfile(process.cwd(), slug)); } catch (error) { if (!String(error).includes('no pinned product')) throw error; missing.push(slug); } } console.log(JSON.stringify({ books, missing }));",
+      '--', ...staging?.map(row => row.slug) ?? [shard]], 'the product read').trim()) : { books: [`${shard}=${absolute(product)}`], missing: [] };
+    if (read.missing.includes(shard)) throw new Error(`No shard source and no pinned product: ${shard}`);
+    if (read.missing.length > 0) console.warn(`dev world: no local product for ${read.missing.join(', ')}; left off this grid (node scripts/pins.ts install)`);
+    const books = /** @type {string[]} */ (read.books);
+    const shards = staging?.filter(row => !read.missing.includes(row.slug)).map(row => ({ slug: row.slug, revision: row.revision })) ?? [{ slug: shard, revision: 1 }];
     const cells = staging === undefined ? shard : [shard, ...shards.map(row => row.slug).filter(slug => slug !== shard)].join(',');
     const secret = staging === undefined ? 'dev-world' : randomBytes(32).toString('hex');
-    const books = product === undefined ? JSON.parse(run(['--input-type=module', '-e',
-      "const {readBuiltShardfile} = await import('./scripts/built-folder.mjs'); console.log(JSON.stringify(process.argv.slice(1).map(slug => slug + '=' + readBuiltShardfile(process.cwd(), slug))));",
-      '--', ...shards.map(row => row.slug)], 'the product read').trim()) : [`${shard}=${absolute(product)}`];
     /** The server book and bundle for a client build. @param {string} id @param {string} built */
     const serverFor = (id, built) => {
       run(['scripts/server-origin.mjs', origin, id, `--grid=${absolute(gridRoot)}`, ...books], 'the server book');
