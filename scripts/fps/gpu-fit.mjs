@@ -11,7 +11,7 @@ import { fpsVerdict } from './verdict.mjs';
 /** @typedef {{build:string,css:number[],dpr:number,phone:boolean,low:boolean,shadowsOff:boolean,gpu?:string}} Witness */
 /** @typedef {{seconds:number,frames:number,frameMs:number[],gpuApproxMs?:number[]}} FrameSample */
 /** @typedef {{version:{build:string,rendererRevision:string},witness:Witness,
- * legs:(Parameters<typeof fpsVerdict>[0][number] & {samples?:FrameSample[],cap:number|null,summary?:{gpuApproxP95Ms:number},
+ * legs:(Omit<Parameters<typeof fpsVerdict>[0][number],'samples'> & {samples?:FrameSample[],cap:number|null,summary?:{gpuApproxP95Ms:number},
  * metal?:{frames:number,p95Ms:number|null}})[]}} Capture */
 /** @typedef {{phone:Capture,mac:Capture}} Pair */
 
@@ -36,7 +36,7 @@ function cadenceObservation(pairs, training, ratio, validation) {
     const floorMs = Math.ceil(capMs) - capMs;
     // Use the retained residual, which already subtracts CPU time when it
     // exceeds the cap. Reconstructing from frame intervals would count CPU.
-    const sorted = residuals.toSorted((a,b) => a-b);
+    const sorted = residuals.sort((a,b) => a-b);
     const p95 = sorted[Math.floor((sorted.length - 1) * 0.95)];
     return {run:run + 1,name:leg.name,frames:frames.length,floorMs,
       integerClock:frames.length > 0 && frames.every(Number.isInteger) && residuals.length === frames.length &&
