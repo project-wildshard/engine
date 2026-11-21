@@ -7,6 +7,8 @@ import {delimiter, join, resolve} from 'node:path';
 import {releaseTagPush, requireNoNewFailures} from './release-nightly.ts';
 
 const latest = {id: 42, head_sha: 'a'.repeat(40), status: 'completed', conclusion: 'failure', event: 'schedule'};
+const dispatched = {...latest, id: 43, event: 'workflow_dispatch', display_title: 'nightly release proof'};
+const diagnostic = {...dispatched, id: 44, display_title: 'nightly'};
 const old = 'chromium/old@hash/hover', planted = 'webkit/planted@hash/boot';
 const report = {version: 2, run: '42', sha: latest.head_sha, pins: 'b'.repeat(64), testList: 'c'.repeat(64),
   ok: false, tag: 'HOLD', failures: [{key: old}], newFailures: []};
@@ -19,6 +21,8 @@ await test('existing failures retain J167 manual hold; new failures refuse relea
     assert.throws(() => requireNoNewFailures(bad, latest), /release held/u);
   assert.throws(() => requireNoNewFailures(report, {...latest, conclusion: 'cancelled'}), /release held/u);
   assert.throws(() => requireNoNewFailures(report, {...latest, event: 'workflow_dispatch'}), /release held/u);
+  requireNoNewFailures({...report, run: '43'}, dispatched);
+  assert.throws(() => requireNoNewFailures({...report, run: '44'}, diagnostic), /release held/u);
   const zero = '0'.repeat(40), sha = latest.head_sha;
   assert.equal(releaseTagPush(`refs/tags/v1.2.3 ${sha} refs/tags/v1.2.3 ${zero}`), true);
   for (const ref of ['refs/heads/main', 'refs/heads/release/v1.2.3', 'refs/tags/dryrun-v1.2.3'])
@@ -37,12 +41,12 @@ await test('real release entry downloads the latest verdict and refuses before a
 import {copyFileSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 const args=process.argv.slice(2);
-if(args[0]==='api'&&args.some(arg=>arg.includes('event=schedule')))console.log(process.env.TC22_LATEST);
-else if(args.slice(0,3).join(' ')==='run download 42'&&args.includes('nightly-verdict')) {
+if(args[0]==='api'&&args.some(arg=>arg.includes('branch=main&status=completed')))console.log(process.env.TC22_RUNS);
+else if(args.slice(0,2).join(' ')==='run download'&&['42','43'].includes(args[2])&&args.includes('nightly-verdict')) {
   if(process.env.TC22_MISSING==='1')process.exit(1);
   const folder=args[args.indexOf('--dir')+1];
   copyFileSync(process.env.TC22_REPORT,join(folder,'verdict.json'));
-  writeFileSync(join(folder,'downloaded'),'42');
+  writeFileSync(join(folder,'downloaded'),args[2]);
 }else throw Error('unexpected gh call '+args.join(' '));
 `);
     chmodSync(gh, 0o755);
@@ -51,17 +55,23 @@ else if(args.slice(0,3).join(' ')==='run download 42'&&args.includes('nightly-ve
     mkdirSync(join(root, '.githooks'));
     writeFileSync(join(root, '.githooks/run-checks.mjs'), 'console.error("LOCAL_GATE_REACHED");process.exitCode=37;');
     const file = join(root, 'report.json');
-    const execute = (value: unknown, missing = false) => {
+    const execute = (value: unknown, missing = false, runs = [diagnostic, latest]) => {
       writeFileSync(file, JSON.stringify(value));
       return spawnSync(process.execPath, [entry], {cwd: root, encoding: 'utf8', timeout: 5000,
         env: {...process.env, CI: '1', PATH: `${join(root, 'bin')}${delimiter}${process.env.PATH ?? ''}`,
-          TC22_LATEST: JSON.stringify(latest), TC22_REPORT: file, TC22_MISSING: missing ? '1' : '0'}});
+          TC22_RUNS: JSON.stringify(runs), TC22_REPORT: file, TC22_MISSING: missing ? '1' : '0'}});
     };
     const red = execute({...report, failures: [{key: planted}], newFailures: [planted]});
     assert.notEqual(red.status, 0); assert.match(red.stderr, /TC22: new nightly failures.*planted/u);
     assert.doesNotMatch(red.stderr, /LOCAL_GATE_REACHED/u);
     const existing = execute(report);
     assert.equal(existing.status, 37, existing.stderr); assert.match(existing.stderr, /LOCAL_GATE_REACHED/u);
+    const manual = execute({...report, run: '43'}, false, [diagnostic, dispatched, latest]);
+    assert.equal(manual.status, 37, manual.stderr); assert.match(manual.stdout, /TC22: nightly 43/u);
+    const newerScheduled = execute(report, false, [latest, diagnostic, dispatched]);
+    assert.equal(newerScheduled.status, 37, newerScheduled.stderr); assert.match(newerScheduled.stdout, /TC22: nightly 42/u);
+    const missingManual = execute(report, true, [diagnostic, dispatched, latest]);
+    assert.notEqual(missingManual.status, 0); assert.doesNotMatch(missingManual.stderr, /LOCAL_GATE_REACHED/u);
     const absent = execute(report, true);
     assert.notEqual(absent.status, 0); assert.doesNotMatch(absent.stderr, /LOCAL_GATE_REACHED/u);
     const stale = execute({...report, run: '41'});
@@ -71,7 +81,7 @@ else if(args.slice(0,3).join(' ')==='run download 42'&&args.includes('nightly-ve
     // The current repo-kit branch-release helper pushes a version tag;
     // it no longer calls release-check. Exercise that actual Git hook.
     const env = {...process.env, CI: '1', PATH: `${join(root, 'bin')}${delimiter}${process.env.PATH ?? ''}`,
-      TC22_LATEST: JSON.stringify(latest), TC22_REPORT: file, TC22_MISSING: '0'};
+      TC22_RUNS: JSON.stringify([diagnostic, dispatched, latest]), TC22_REPORT: file, TC22_MISSING: '0'};
     for (const key of Object.keys(env)) if (key.startsWith('GIT_')) Reflect.deleteProperty(env, key);
     const git = (...args: string[]) => execFileSync('git', ['-c', 'user.name=TC22 proof', '-c', 'user.email=tc22@example.invalid', ...args], {cwd: root, env, encoding: 'utf8', stdio: 'pipe'}).trim();
     git('init', '--quiet', '--initial-branch=main');
@@ -89,14 +99,14 @@ else if(args.slice(0,3).join(' ')==='run download 42'&&args.includes('nightly-ve
     const marker = join(root, 'full-gate');
     writeFileSync(join(root, '.githooks/run-checks.mjs'), `import{writeFileSync}from'node:fs';writeFileSync(${JSON.stringify(marker)},'reached');`);
     git('tag', '-a', 'v1.2.3', '-m', 'release fixture');
-    writeFileSync(file, JSON.stringify({...report, failures: [{key: planted}], newFailures: [planted]}));
+    writeFileSync(file, JSON.stringify({...report, run: '43', failures: [{key: planted}], newFailures: [planted]}));
     const push = spawnSync('git', ['push', 'origin', 'v1.2.3'], {cwd: root, env, encoding: 'utf8', timeout: 5000});
     assert.notEqual(push.status, 0); assert.match(push.stderr, /TC22: new nightly failures.*planted/u);
     assert.equal(git('ls-remote', '--tags', 'origin'), ''); assert.equal(existsSync(marker), false);
     // Ordinary pushes do not consult the nightly and keep their normal gate.
     git('push', '--quiet', 'origin', 'main'); assert.equal(existsSync(marker), true);
     rmSync(marker);
-    writeFileSync(file, JSON.stringify(report));
+    writeFileSync(file, JSON.stringify({...report, run: '43'}));
     git('push', '--quiet', 'origin', 'v1.2.3');
     assert.match(git('ls-remote', '--tags', 'origin'), /refs\/tags\/v1.2.3/u);
     assert.equal(existsSync(marker), true);

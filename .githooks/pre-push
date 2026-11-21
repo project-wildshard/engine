@@ -9,7 +9,7 @@
 #    (.githooks/pin-provenance.mjs). Escape hatch: ALLOW_PIN_PUSH=1.
 # 5. Push lane (full `pnpm check`): .githooks/run-checks.mjs.
 #    Bypass: SKIP_CHECK=1.
-# Release tags first read the latest scheduled nightly (TC22), even when
+# Release tags first read the latest qualifying production nightly (TC22), even when
 # the branch-based release helper or a cached gate skips release-check.
 # Enable once per clone: git config core.hooksPath .githooks
 set -euo pipefail

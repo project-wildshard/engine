@@ -1,6 +1,11 @@
 # Ring 2 / J167: one exact SHA, all pinned heads. Ring 3 follows a green report.
 # Promotion owns tags (J184); a red or incomplete verdict holds the tag.
 name: nightly
+# TC22 also accepts an on-demand run of the same production Ring 2.
+run-name: >-
+  ${{ github.event_name == 'workflow_dispatch' && inputs.pins_channel == 'production'
+  && !inputs.suite_only && !inputs.ring3_only && !inputs.cook_cache_only && !inputs.api_health_only
+  && !inputs.diagnostic_head && !inputs.diagnostic_drill && 'nightly release proof' || 'nightly' }}
 on:
   schedule:
     - cron: '17 7 * * *'

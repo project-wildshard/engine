@@ -5,14 +5,18 @@ import {mkdirSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-interface Latest {id: number; head_sha: string; status: string; conclusion: string; event: string}
+interface Latest {id: number; head_sha: string; status: string; conclusion: string; event: string; display_title?: string}
 interface Report {version: number; run: string; sha: string; pins: string; testList: string;
   failures: {key: string}[]; newFailures: string[]}
+
+function isReleaseNightly(run: Latest | null): boolean {
+  return run?.event === 'schedule' || (run?.event === 'workflow_dispatch' && run.display_title === 'nightly release proof');
+}
 
 export function requireNoNewFailures(value: unknown, latest: Latest): void {
   const report = value as Partial<Report> | null;
   if (report === null || typeof report !== 'object' || report.version !== 2 ||
-    !Number.isSafeInteger(latest.id) || latest.id < 1 || latest.status !== 'completed' || latest.event !== 'schedule' ||
+    !Number.isSafeInteger(latest.id) || latest.id < 1 || latest.status !== 'completed' || !isReleaseNightly(latest) ||
     !['success', 'failure'].includes(latest.conclusion) || !/^[a-f0-9]{40}$/u.test(latest.head_sha) ||
     report.run !== String(latest.id) || report.sha !== latest.head_sha ||
     typeof report.pins !== 'string' || !/^[a-f0-9]{64}$/u.test(report.pins) ||
@@ -25,10 +29,13 @@ export function requireNoNewFailures(value: unknown, latest: Latest): void {
 }
 
 export function checkReleaseNightly(): void {
-  const latest = JSON.parse(execFileSync('gh', ['api',
-    'repos/project-wildshard/engine/actions/workflows/nightly.yml/runs?branch=main&event=schedule&status=completed&per_page=1',
-    '--jq', '.workflow_runs[0]'], {encoding: 'utf8', timeout: 20000, maxBuffer: 1024 * 1024})) as Latest | null;
-  if (latest === null || typeof latest !== 'object' || !Number.isSafeInteger(latest.id) || latest.id < 1)
+  const runs = JSON.parse(execFileSync('gh', ['api',
+    'repos/project-wildshard/engine/actions/workflows/nightly.yml/runs?branch=main&status=completed&per_page=100',
+    '--jq', '.workflow_runs | map({id, head_sha, status, conclusion, event, display_title})',
+  ], {encoding: 'utf8', timeout: 20000, maxBuffer: 1024 * 1024})) as (Latest | null)[];
+  // Diagnostics and staging dispatches cannot replace the current production proof.
+  const latest = runs.find(isReleaseNightly);
+  if (latest === undefined || latest === null || !Number.isSafeInteger(latest.id) || latest.id < 1)
     throw new Error('TC22: no completed hosted nightly; release held');
   const parent = resolve('tmp/release-nightly');
   mkdirSync(parent, {recursive: true});
