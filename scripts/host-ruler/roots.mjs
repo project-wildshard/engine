@@ -40,6 +40,7 @@ export const SECTION_HOSTS = Object.freeze({
   'world/movers': ['src/server/game/plugin/mover.ts#createComposedMoverHost', 'src/client/game/shardfile/clientMoverOwners.ts#installClientMoverOwners'],
   // MIRROR-SALT-ZONE MSZ9b: the server runs its docks' vehicles and every page path follows them off the wire.
   'world/vehicles': ['src/server/game/plugin/vehicleRuntime.ts#installVehicles', 'src/client/game/plugin/followedVehicles.ts#FollowedVehicles'],
+  'world/field': ['src/server/game/shardfile/fieldWater.ts#fieldWater'],
   'world/traversal': ['src/shared/game/shardfile/portalTraversal.ts#createPortalTraversal'],
   'world/spawn': [], // Level admission metadata.
   'world/physics': [], // Handed to the runtime's explicitly imported native host.
