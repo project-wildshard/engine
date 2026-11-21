@@ -69,8 +69,8 @@ test('a started Chromium takes its own UA, never a context default (engine red 4
   process.env.HOME = home;
   try {
     installBrowserActorMarker({ chromium: engine });
-    await engine.launch({ args: ['--mute-audio'] });
-    assert.deepEqual(started.at(-1), ['--mute-audio', `--user-agent=${agentUserAgent(own)}`]);
+    await engine.launch({ args: [...KEYCHAIN_ARGS] });
+    assert.deepEqual(started.at(-1), [...KEYCHAIN_ARGS, `--user-agent=${agentUserAgent(own)}`]);
   } finally {
     if (before === undefined) delete process.env.HOME; else process.env.HOME = before;
     rmSync(home, { recursive: true, force: true });
