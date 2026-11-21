@@ -34,6 +34,7 @@ if (!existsSync(outDir)) throw new Error(`preview-server: no build in ${outDir}`
 const telemetryDirectory = resolve(option('telemetry-dir', fileURLToPath(new URL(`../tmp/preview-telemetry/${process.pid}-${Date.now()}/`, import.meta.url))));
 if (telemetryDirectory === outDir || telemetryDirectory.startsWith(outDir + sep)) throw new Error('preview-server: telemetry must be outside the served build');
 const receiveTelemetry = await createPreviewTelemetrySink(telemetryDirectory);
+const acceptErrorReports = args.includes('--error-reports');
 
 /** The build's `_headers` (public/_headers, which the build copies into dist; else the tree's own public/_headers), read
  *  the way the page's Workers static assets read it: a line at the left margin opens a rule for a path, an indented
@@ -170,6 +171,13 @@ const server = createServer((req, res) => {
   if (req.method === 'OPTIONS') { res.statusCode = 204; res.end(); return; }
   replayHeaders(pathname, res);
   if (pathname === '/api/telemetry') { void receiveTelemetry(req, res); return; }
+  // The proof records the body without browser routing, which would disable its native asset cache.
+  if (acceptErrorReports && pathname === '/api/errors' && req.method === 'POST') {
+    req.resume();
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.statusCode = 405; res.end(); return; }
 
   const acceptEncoding = req.headers['accept-encoding'] ?? '';

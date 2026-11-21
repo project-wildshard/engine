@@ -5,7 +5,7 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { browserPool } from './pool.mjs';
 import { serve } from './serve.mjs';
-import { bootCases, discoverCatalogue } from './boot-smoke.mjs';
+import { bootCases, bootErrorReport, discoverCatalogue } from './boot-smoke.mjs';
 import { saveFixtureCode, harnessPinCode } from '../debug-settings.mjs';
 
 /** Browser-side, read-only: the existing card canvases after the ordinary Explorer has drawn every one.
@@ -146,6 +146,18 @@ export function explorerDiagnostics(){
 
 const CONTEXT_CATALOGUES=4;
 
+/** The boot watchdog reports a slow-progress advisory while loading continues.
+ * A fatal, disabled or unrecognized report must still refuse the proof.
+ * @param {unknown} report */
+function slowBootReport(report) {
+  return typeof report === 'object' && report !== null
+    && 'system' in report && report.system === 'boot.slow'
+    && 'fatal' in report && report.fatal === false
+    && 'disabled' in report && report.disabled === false
+    && 'message' in report && typeof report.message === 'string'
+    && /^Error: Loading slow at step "[^"]+" \(no progress for \d+ s\)$/u.test(report.message);
+}
+
 /** Retain native HTTP/shader caches across a bounded group of world documents.
  * Retiring the native context bounds document/isolate ownership; origin
  * storage deletion alone does not collect the previous document's Wasm banks.
@@ -202,12 +214,22 @@ async function openExplorerContext(browser,base,faults,lifetime,generation,isola
       await storage?.send('Storage.clearDataForOrigin',{origin:new URL(base).origin,
         storageTypes:'cache_storage,indexeddb,local_storage,service_workers,file_systems,websql,storage_buckets,cookies,shared_storage,interest_groups'});
     };
+    /** @type {unknown[]} */ const reports=[];
+    const origin=new URL(base).origin;
+    page.on('request',request=>{
+      const url=new URL(request.url());
+      if(url.origin!==origin || url.pathname!=='/api/errors' || request.method()!=='POST')return;
+      const report=bootErrorReport(url.href,request.method(),request.postData());
+      reports.push(report);
+      if(!slowBootReport(report))faults.push('Game error report during Explorer proof');
+    });
     page.on('pageerror',error=>faults.push(error.message));
     page.on('crash',()=>faults.push('Page crashed'));
     page.on('console',message=>{if(message.type()==='error')faults.push(message.text());});
     page.on('response',response=>{if(response.status()>=400)faults.push(`HTTP ${response.status()}: ${response.url()}`);});
     return {sweep:async(/** @type {string} */slug,/** @type {string} */out,/** @type {number} */catalogue,/** @type {number} */started)=>{
-      await sweepPage(page,faults,base,slug,out,lifetime,reset,{generation,catalogue,maxCatalogues:isolated?1:CONTEXT_CATALOGUES},started);
+      reports.length=0;
+      await sweepPage(page,faults,reports,base,slug,out,lifetime,reset,{generation,catalogue,maxCatalogues:isolated?1:CONTEXT_CATALOGUES},started);
     },close:()=>context.close()};
   }catch(error){await context.close();throw error;}
 }
@@ -219,10 +241,11 @@ export async function sweepExplorer(browser,base,slug,out,isolated=false){
   try{await session.sweep(slug,out);}finally{await session.close();}
 }
 
-/** @param {import('playwright').Page} page @param {string[]} faults @param {string} base @param {string} slug
+/** @param {import('playwright').Page} page @param {string[]} faults @param {unknown[]} reports
+ * @param {string} base @param {string} slug
  * @param {string} out @param {{previous:number|undefined}} lifetime @param {()=>Promise<void>} reset
  * @param {{generation:number,catalogue:number,maxCatalogues:number}} session @param {number} started */
-async function sweepPage(page,faults,base,slug,out,lifetime,reset,session,started){
+async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,session,started){
   const hangMs=180000;
   let progressAt=started;
   /** @type {Map<string,number>} */ const firstReady=new Map();
@@ -273,7 +296,7 @@ async function sweepPage(page,faults,base,slug,out,lifetime,reset,session,starte
     verifyExplorerDocument(diagnostics.document,base,slug,lifetime.previous);
     if(diagnostics.document.timeOrigin!==final.document.timeOrigin)failures.push('Explorer document changed during final capture');
     if(faults.length>0)failures.push(...faults);
-    const result={slug,session,elapsedMs:Date.now()-started,hangMs,empty,cards,failures,document:final.document,captureBefore:captured.before,captureAfter:final,diagnostics,firstReadyMs:Object.fromEntries(firstReady)};
+    const result={slug,session,elapsedMs:Date.now()-started,hangMs,empty,cards,failures,reports,document:final.document,captureBefore:captured.before,captureAfter:final,diagnostics,firstReadyMs:Object.fromEntries(firstReady)};
     writeFileSync(join(out,`${slug}.json`),`${JSON.stringify(result,null,2)}\n`);
     if(failures.length>0)throw new Error(`${slug}: ${failures.join('; ')}`);
     lifetime.previous=final.document.timeOrigin;
@@ -282,7 +305,7 @@ async function sweepPage(page,faults,base,slug,out,lifetime,reset,session,starte
     await page.screenshot({path:join(out,`${slug}-failure.jpg`),type:'jpeg',quality:70,timeout:5000}).catch(()=>undefined);
     // Keep the last completed observation. A second unbounded renderer read
     // after the hang refusal would hide the very stall this receipt records.
-    writeFileSync(join(out,`${slug}-failure.json`),`${JSON.stringify({slug,session,elapsedMs:Date.now()-started,hangMs,idleMs:Date.now()-progressAt,error:String(error),faults,cards,firstReadyMs:Object.fromEntries(firstReady)},null,2)}\n`);
+    writeFileSync(join(out,`${slug}-failure.json`),`${JSON.stringify({slug,session,elapsedMs:Date.now()-started,hangMs,idleMs:Date.now()-progressAt,error:String(error),faults,reports,cards,firstReadyMs:Object.fromEntries(firstReady)},null,2)}\n`);
     throw error;
   }
 }
@@ -295,7 +318,7 @@ async function main(){
   explorerPartition([],group); // Refuse an unknown group before owning a preview or browser.
   const external=option('url');
   if(external===undefined && !existsSync(join(root,'dist/index.html')))throw new Error('Build dist before Explorer smoke');
-  const preview=external===undefined?await serve(root,'',true):null,base=external??preview?.url;
+  const preview=external===undefined?await serve(root,'',true,{errorReports:true}):null,base=external??preview?.url;
   if(base===undefined)throw new Error('Missing exact built dist');
   // CI's software GPU is shared: two simultaneous catalogues contend during
   // shader compilation. Each case retains a bounded no-progress hang guard.

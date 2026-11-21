@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
 import { explorerCards, explorerCapture, explorerCases, explorerPartition, explorerFailures, explorerState, sweepExplorer, openExplorerSession, verifyExplorerDocument, explorerDiagnostics } from '../scripts/parity/explorer-smoke.mjs';
-import type { Browser, BrowserContext, CDPSession, Page } from 'playwright';
+import type { Browser, BrowserContext, CDPSession, Page, Request } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the actual required workflow leg, without dispatching it.
 import { readFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -21,9 +21,16 @@ function storageFixture() {
   const send=vi.spyOn(storage,'send').mockResolvedValue({});return {storage,send};
 }
 
-function fixtureBrowser(evaluate: Page['evaluate']): { browser: Browser; close: ReturnType<typeof vi.fn<BrowserContext['close']>> } {
-  const page: Page = legacyDouble<Page>({ evaluate, on: () => page,
-    goto: vi.fn<Page['goto']>().mockResolvedValue(null),
+function fixtureBrowser(evaluate: Page['evaluate'], report?: Request): { browser: Browser; close: ReturnType<typeof vi.fn<BrowserContext['close']>> } {
+  let onRequest: ((request: Request) => void) | undefined;
+  const page: Page = legacyDouble<Page>({ evaluate, on: (event: string, listener: (request: Request) => void) => {
+    if (event === 'request') onRequest = listener;
+    return page;
+  },
+    goto: vi.fn<Page['goto']>().mockImplementation(url => {
+      if (url !== 'about:blank' && report !== undefined) onRequest?.(report);
+      return Promise.resolve(null);
+    }),
     screenshot: vi.fn<Page['screenshot']>().mockRejectedValue(new Error('No browser capture in the unit fixture')) });
   const close = vi.fn<BrowserContext['close']>().mockResolvedValue(undefined);
   const disposable = { dispose: (): Promise<void> => Promise.resolve(), [Symbol.asyncDispose]: (): Promise<void> => Promise.resolve() };
@@ -73,6 +80,29 @@ test.each(['progress', 'stalled', 'fatal', 'black'] as const)('Explorer no-progr
     }
     expect(close).toHaveBeenCalledOnce();
   } finally { clock.mockRestore(); rmSync(out, { recursive: true, force: true }); }
+});
+
+test.each(['slow', 'fatal', 'unknown', 'malformed'] as const)('Explorer reads game reports without treating an advisory as a failed draw (%s)', async mode => {
+  mkdirSync('tmp/sp-x7-live', { recursive: true });
+  const out = mkdtempSync('tmp/sp-x7-live/explorer-report-');
+  const payload = { system: mode === 'unknown' ? 'render.upload' : 'boot.slow',
+    fatal: mode === 'fatal', disabled: false, message: 'Error: Loading slow at step "finish" (no progress for 20 s)' };
+  const report = legacyDouble<Request>({ url: () => 'https://test.example/api/errors', method: () => 'POST',
+    postData: () => mode === 'malformed' ? '{' : JSON.stringify(payload) });
+  const evaluate = vi.fn<Page['evaluate']>();
+  const state = { document: currentDocument, fatal: [], empty: false, ready: true, readyIds: ['one'] };
+  evaluate.mockResolvedValueOnce(state)
+    .mockResolvedValueOnce({ before: state, after: state, cards: [{ id: 'one', ready: true, pixels: 100, darkShare: .2 }] })
+    .mockResolvedValue(diagnostics);
+  const { browser } = fixtureBrowser(evaluate, report);
+  try {
+    const sweep = sweepExplorer(browser, 'https://test.example/', 'fixture', out);
+    if (mode === 'slow') await sweep;
+    else await expect(sweep).rejects.toThrow('Game error report');
+    const suffix = mode === 'slow' ? '' : '-failure';
+    const receipt: unknown = JSON.parse(readFileSync(`${out}/fixture${suffix}.json`, 'utf8'));
+    expect(receipt).toMatchObject({ reports: [mode === 'malformed' ? { malformed: '{' } : payload] });
+  } finally { rmSync(out, { recursive: true, force: true }); }
 });
 
 test('progress records only appended canvases and still requires the whole displayed catalogue', () => {

@@ -43,3 +43,21 @@ if(process.argv[1]?.endsWith('/preview-server.mjs'))appendFileSync(process.env.W
     rmSync(work, { recursive: true, force: true });
   }
 }, 15_000);
+
+test('the proof preview acknowledges POST error reports when enabled', async () => {
+  const base = resolve(process.env['VITEST_TMP_ROOT'] ?? 'tmp/codex-pagesize', 'preview-ephemeral');
+  mkdirSync(base, { recursive: true });
+  const root = mkdtempSync(join(base, 'error-report-'));
+  mkdirSync(join(root, 'dist'));
+  writeFileSync(join(root, 'dist/index.html'), 'fixture');
+  try {
+    for (const errorReports of [false, true]) {
+      const host = await serve(root, '', true, { errorReports });
+      try {
+        const post = { method: 'POST', body: '{"system":"boot.slow"}' };
+        expect((await fetch(new URL('/api/errors', host.url), post)).status).toBe(errorReports ? 204 : 405);
+        expect((await fetch(new URL('/api/other', host.url), post)).status).toBe(405);
+      } finally { host.close(); await host.closed; }
+    }
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}, 15_000);

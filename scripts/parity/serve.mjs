@@ -55,13 +55,16 @@ export function previewReady(url, timeoutMs=1000) {
   });
 }
 /** @param {string} tree @param {string} sha @param {boolean} [built]
- * @param {{signal?:AbortSignal,telemetryDir?:string}} [options] */
-export async function serve(tree,sha,built=false,{signal,telemetryDir}={}) {
+ * @param {{signal?:AbortSignal,telemetryDir?:string,errorReports?:boolean}} [options] */
+export async function serve(tree,sha,built=false,{signal,telemetryDir,errorReports=false}={}) {
   signal?.throwIfAborted();
   if(!built)buildTree(tree,sha);
   // the host's plain preview server serves any tree's built bytes with that tree's _headers (D24)
   const server=fileURLToPath(new URL('../preview-server.mjs',import.meta.url));
-  const child=spawn(process.execPath,[server,'--root',tree,'--host','127.0.0.1','--port','0',...(telemetryDir === undefined ? [] : ['--telemetry-dir',telemetryDir])],{cwd:tree,stdio:['ignore','pipe','pipe','ipc'],detached:true});
+  const args=[server,'--root',tree,'--host','127.0.0.1','--port','0'];
+  if(telemetryDir!==undefined)args.push('--telemetry-dir',telemetryDir);
+  if(errorReports)args.push('--error-reports');
+  const child=spawn(process.execPath,args,{cwd:tree,stdio:['ignore','pipe','pipe','ipc'],detached:true});
   let startup='';child.stdout.on('data',(chunk)=>{startup+=String(chunk);});child.stderr.on('data',(chunk)=>{startup+=String(chunk);});
   let url='';
   child.on('message', message => {

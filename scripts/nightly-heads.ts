@@ -43,7 +43,7 @@ const originalHTML = readFileSync(join(dist, 'index.html'), 'utf8');
 const work = mkdtempSync(join(out, '.heads-'));
 let preview: Awaited<ReturnType<typeof serve>> | undefined;
 try {
-  preview = await serve(root, '', true);
+  preview = await serve(root, '', true, { errorReports: true });
   for (const head of selected.filter(row => only === undefined || row.slug === only)) {
     const result: HeadResult = {slug: head.slug, hash: head.hash, phases: []};
     report.results.push(result); checkpoint();
