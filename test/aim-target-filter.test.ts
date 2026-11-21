@@ -1,5 +1,5 @@
-import { expect, test } from 'vitest';
-import { filterCombatAimTargets, type AimTargetExclusion } from '../src/shared/game/shardfile/aimTargetFilter';
+import { describe, expect, it, test } from 'vitest';
+import { declaredAimExclusions, filterCombatAimTargets, ownedCombatTargets, type AimTargetExclusion } from '../src/shared/game/shardfile/aimTargetFilter';
 
 // CI12: the extracted aim filter keeps exactly the targets, order and memory reads of clientTargets' original inline filter.
 function original<T extends object>(list: readonly T[], exclude: readonly AimTargetExclusion[]): T[] {
@@ -20,4 +20,22 @@ test('keeps the same targets in the same order, reading memory the same way', ()
     reads.length = 0; const actual = filterCombatAimTargets(list, exclude);
     expect(actual).toEqual(expected); expect(actual.every((target, i) => target === expected[i])).toBe(true); expect(reads).toEqual(expectedReads);
   }
+});
+
+describe('OF38c: owners and creatures declare the targets', () => {
+  const shields = [{ field: 'hidden', equals: 1 }, { field: 'owned', equals: 1 }];
+  const species = [{ attackable: { unless: shields } }, { attackable: { unless: [shields[1]!, shields[0]!] } }, {}, { attackable: false as const }];
+  it('aims past each declared shield once, in species order', () => {
+    expect(declaredAimExclusions(species)).toEqual(shields);
+  });
+  it("derives Nalati's old list: the night's riders and the open arena, never the room arena", () => {
+    const features = [{ kind: 'timed.encounters', owner: 'nalati.night' }, { kind: 'arena-room.entry', owner: 'nalati.titan', equipment: 'held-finishes' },
+      { kind: 'arena-room.entry', owner: 'nalati.king' }, { kind: 'population.wildlife' }];
+    expect(ownedCombatTargets(features, species)).toEqual({
+      rows: { ray: { sources: ['nalati.night', 'nalati.titan'], result: 'copy', requires: 'population.wildlife' }, aim: { exclude: shields, append: ['nalati.titan'] } },
+      bindings: [{ id: 'nalati.night', kind: 'timed-encounters', owner: 'nalati.night' }, { id: 'nalati.titan', kind: 'arena-room', owner: 'nalati.titan' }] });
+  });
+  it('draws nothing when nothing is declared', () => {
+    expect(ownedCombatTargets([{ kind: 'arena-room.entry', owner: 'room' }], [{}])).toBeNull();
+  });
 });

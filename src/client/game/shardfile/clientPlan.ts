@@ -22,6 +22,7 @@ import type { PlatformSectionName } from '@wildshard/format/sections';
 import { constructionCheckpoint } from './constructionCheckpoint';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { ClientFeatureKind, ClientFeatureRow } from '@wildshard/format/clientPlan';
+import { ownedCombatTargets } from '../../../shared/game/shardfile/aimTargetFilter';
 import { readClientPlan } from './cookedDocument';
 import { clientOwnershipRules } from '@wildshard/format/clientOwnership';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
@@ -499,7 +500,14 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
       }
     }
     checkClientPlanModules(plan);
-    return { features: plan.features };
+    // ONE-FORMAT OF38c: held arms with no `combat.targets` list aim by their owners' and creatures' own declarations
+    const listless = plan.features.some(row => row.kind === 'held.claims.install') && !plan.features.some(row => row.kind === 'combat.targets');
+    const owners = plan.features.map(row => ({ kind: row.kind, owner: 'owner' in row && typeof row.owner === 'string' ? row.owner : undefined,
+      equipment: 'equipment' in row && typeof row.equipment === 'string' ? row.equipment : undefined }));
+    const owned = listless ? ownedCombatTargets(owners, product.shardfile.rows.species) : null;
+    if (owned === null) return { features: plan.features };
+    const targets = readClientPlan(product.shardfile, { version: 1, features: [{ kind: 'combat.targets', rows: owned.rows, bindings: owned.bindings }] }).features;
+    return { features: [...plan.features, ...targets] };
   } catch (error) { throw new FolderError(product.slug, 'client/plan', 'schema', error instanceof Error ? error.message : 'Invalid client plan'); }
 }
 const folderPlans = new WeakMap<ShardFolder, AdmittedClientPlan>();

@@ -25,7 +25,7 @@ import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { publishOwned } from '@wildshard/engine/sim/shardRows';
-import { filterCombatAimTargets } from '../../../shared/game/shardfile/aimTargetFilter';
+import { declaredAimExclusions, filterCombatAimTargets } from '../../../shared/game/shardfile/aimTargetFilter';
 import { heldBowBase } from '../../../shared/game/weapons/heldBowBase';
 import { HeldDecision } from '../../../shared/game/weapons/heldDecision';
 import { JavelinFlight, type JavelinSlot } from '../../../shared/game/weapons/javelinFlight';
@@ -85,8 +85,9 @@ export function heldArmsOf(host: SimHost): PlayerSeats<HeldSeat> | undefined { r
 /** Read the arms' rows now; the returned step installs them on one host. */
 export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'section' | 'shardfile'>, arms: HeldArmsRow): Promise<(host: SimHost, context: HeldArmsContext) => void> {
   const slots=parseHeldSlots(await product.json(arms.slots));
-  const aimRows=v.parse(ClientPlanSchema,product.section('client/plan')).features.find(row=>row.kind==='combat.targets')?.rows.aim;
-  if(aimRows===undefined)throw new Error('Weapons require their admitted aim exclusions');
+  // OF38c: a product without the old `combat.targets` list aims by its creatures' own `attackable.unless` shields
+  const listed=v.parse(ClientPlanSchema,product.section('client/plan')).features.find(row=>row.kind==='combat.targets')?.rows.aim;
+  const aimRows=listed??{exclude:declaredAimExclusions(product.shardfile.rows.species),append:[]};
   const bowSlot=slots.slots.find(row=>row.kind==='bow'),bladeSlot=slots.slots.find(row=>row.kind==='blade'),spearSlot=slots.slots.find(row=>row.kind==='polearm');
   if(bowSlot?.kind!=='bow'||bladeSlot?.kind!=='blade'||spearSlot?.kind!=='polearm'||bladeSlot.source.kind!=='passes')throw new Error('Missing admitted native weapon slots');
   const blade=v.parse(BladeRowsSchema,await product.json(bladeSlot.source.file)),spear=v.parse(PolearmRowsSchema,await product.json(spearSlot.file));
