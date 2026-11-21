@@ -93,7 +93,16 @@ export class NearPlaceholders {
     for (const [instance, distance] of wanted) {
       const slot = this.slots.get(instance);
       if (slot === undefined) {
-        if (this.deferred.get(instance) !== this.host.allocator.revision) this.start(instance, distance);
+        const revision = this.host.allocator.revision;
+        if (this.deferred.get(instance) === revision) continue;
+        // DF11: a view refused for room is not fetched and decoded again until its known size fits (Driftwood's route
+        // re-read four neighbours' near GLBs ~50 times, each refused: ~400 MB of promoted garbage, most full collections)
+        const known = this.sizes.get(instance);
+        if (known !== undefined && this.host.root(instance) !== undefined
+          && !this.host.allocator.wouldFit({ id: `near:${instance}`, category: 'near', bytes: known, owner: instance, distance, needed: false })) {
+          this.deferred.set(instance, revision); continue;
+        }
+        this.start(instance, distance);
       } else slot.lease?.update({ distance });
     }
     this.lastPlan = lean ? { x: eye.x, z: eye.z, entered, updates: 0, stamp: this.stamp() } : null;
@@ -152,6 +161,8 @@ export class NearPlaceholders {
   }
 
   private readonly bytes = new Map<string, number>();
+  /** each cell's near view size, from its first load (its bytes are immutable, so a refused view is sized without a reload) */
+  private readonly sizes = new Map<string, number>();
 
   private start(instance: string, distance: number): void {
     this.deferred.delete(instance);
@@ -165,6 +176,7 @@ export class NearPlaceholders {
         return;
       }
       const { prepared, bytes, owns = false } = loaded;
+      this.sizes.set(instance, bytes);
       // cancel-safe: a cell that left the plan (or a disposed owner) discards what arrived
       if (this.disposed || this.slots.get(instance)?.generation !== generation) { prepared.geometry.dispose(); prepared.light?.dispose(); prepared.colour?.dispose(); return; }
       const root = this.host.root(instance);

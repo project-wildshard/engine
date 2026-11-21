@@ -115,6 +115,13 @@ export class ResidencyAllocator {
   reserve(claim: ResidencyClaim): ResidencyLease | null { return this.reserveClaim(claim, 0); }
   /** Speculative IO may use existing headroom, never evict another owner's ready world. */
   reserveIfFits(claim: ResidencyClaim): ResidencyLease | null { return this.reserveClaim(claim, 0, false); }
+  /** DF11: would `reserveIfFits` admit this claim now? Read-only: no lease, no eviction, no revision. Optional work whose
+   *  size it already knows asks first, so a claim that cannot fit is never fetched and decoded only to be refused. */
+  wouldFit(claim: ResidencyClaim): boolean {
+    if (claim.id.length === 0 || claim.owner.length === 0 || !Number.isSafeInteger(claim.bytes) || claim.bytes < 0 || !Number.isFinite(claim.distance) || claim.distance < 0) throw new RangeError('Invalid residency claim');
+    if (this.entries_.has(claim.id)) return true;
+    return this.fits({ ...claim, baseCredit: 0 });
+  }
 
   /** Split an evidenced renderer component out of the fixed engine baseline. Only the calibrated credit is removed;
    * larger current allocations increase the envelope, and the component remains a visible page-owned claim.

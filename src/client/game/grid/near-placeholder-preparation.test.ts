@@ -150,3 +150,33 @@ test('optional near refinement preserves a kept world and retries after headroom
     near.dispose(); expect(disposed).toHaveBeenCalledTimes(6); expect(allocator.entries()).toEqual([]);
   } finally { near.dispose(); required?.release(); kept.release(); }
 });
+
+test('DF11: a near view refused for room is not reloaded until its known size fits', async () => {
+  const base = new ResidencyAllocator().cost().playing;
+  const allocator = new ResidencyAllocator({ playing: base + 1000 });
+  const held = allocator.reserve({ id: 'held-world', category: 'sim', owner: 'held', bytes: 800, distance: 0, needed: true });
+  if (held === null) throw new Error('Missing held world');
+  const root = new Group(), cover = vi.fn();
+  const load = vi.fn<NearPlaceholderHost['load']>(() => Promise.resolve({ prepared: { geometry: new BoxGeometry(), look: { family: 'toon', haze: { colour: [1, 1, 1] } } }, bytes: 200 }));
+  const near = new NearPlaceholders({ allocator, root: () => root, pitch: 555,
+    cells: [{ instance: 'cell', slug: 'content', cell: [0, 0], origin: { x: 0, y: 0, z: 0 } }],
+    load, mask: () => new Set<number>(), cover: (instance, covered) => { cover(instance, covered); } });
+  const churn: NonNullable<ReturnType<ResidencyAllocator['reserve']>>[] = [];
+  try {
+    near.update({ x: 0, z: 0 }, null); await Promise.resolve(); await Promise.resolve();
+    expect(load).toHaveBeenCalledOnce(); expect(near.shows('cell')).toBe(false);
+    expect(allocator.wouldFit({ id: 'near:cell', category: 'near', bytes: 200, owner: 'cell', distance: 0, needed: false })).toBe(false);
+    // other claims come and go (tile admissions move the revision) while the view still cannot fit: no reload
+    for (let i = 0; i < 5; i++) {
+      const tile = allocator.reserveIfFits({ id: `tile-${String(i)}`, category: 'library', owner: 'tiles', bytes: 1, distance: 0, needed: false });
+      if (tile !== null) churn.push(tile);
+      near.update({ x: 0, z: 0 }, null); await Promise.resolve(); await Promise.resolve();
+    }
+    expect(load).toHaveBeenCalledOnce(); expect(root.children).toHaveLength(0); expect(cover).not.toHaveBeenCalled();
+    // room appears: the view loads and draws as before
+    held.release(); for (const tile of churn.splice(0)) tile.release();
+    near.update({ x: 0, z: 0 }, null); await Promise.resolve(); await Promise.resolve();
+    expect(load).toHaveBeenCalledTimes(2); expect(near.shows('cell')).toBe(true);
+    expect(cover).toHaveBeenCalledExactlyOnceWith('cell', true);
+  } finally { near.dispose(); held.release(); for (const tile of churn) tile.release(); }
+});
