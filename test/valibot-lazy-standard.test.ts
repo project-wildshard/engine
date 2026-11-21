@@ -41,7 +41,9 @@ test('DF11: lazy ~standard keeps every schema parse and Standard Schema result t
     // Same props on demand, then a plain data property; spreads and key walks no longer copy or list them.
     const fresh = lazy.string();
     expect(Object.keys(fresh)).not.toContain('~standard');
-    expect(Object.getOwnPropertyDescriptor(fresh, '~standard')?.get).toBeTypeOf('function');
+    expect(Object.getOwnPropertyDescriptor(fresh, '~standard')).toBeUndefined();
+    expect(Object.getPrototypeOf(lazy.string())).toBe(Object.getPrototypeOf(lazy.number()));
+    expect({ ...lazy.pipe(lazy.string(), lazy.minLength(1)) }).not.toHaveProperty('~standard', expect.anything());
     expect({ version: fresh['~standard'].version, vendor: fresh['~standard'].vendor }).toEqual({ version: 1, vendor: 'valibot' });
     expect(Object.getOwnPropertyDescriptor(fresh, '~standard')?.value).toBe(fresh['~standard']);
     const assigned = lazy.number(), replacement = { version: 1 as const, vendor: 'other', validate: () => ({ value: 0 }) };

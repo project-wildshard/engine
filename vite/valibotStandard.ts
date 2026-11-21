@@ -2,9 +2,10 @@
  * DF11 (meta DRIFTWOOD-FPS, mini-df11g): valibot 1.5 eagerly attaches Standard Schema props to every schema it makes
  * (`_standardSchema`: an object, a `validate` closure and its scope, three heap cells per schema). The client holds ~18k
  * schemas, mostly the shard format's, and nothing in the bundle reads `~standard`; WebKit's full collection pays per live
- * cell. This transform makes `~standard` a lazy, non-enumerable accessor that builds the same object on first read (and
- * then stores it as a data property), so every schema keeps its behaviour and drops two of the three cells.
- * Non-enumerable keeps object spreads (`v.pipe` copies its first schema) from materialising it. A valibot upgrade that
+ * cell. This transform gives every schema a shared prototype whose lazy, non-enumerable `~standard` accessor builds the
+ * same object on first read (and then stores it as the schema's own data property), so every schema keeps its behaviour
+ * and drops all three cells. Inherited and non-enumerable, it is never copied by object spreads (`v.pipe` copies its
+ * first schema) and never materialised by them. A valibot upgrade that
  * changes `_standardSchema` fails the build here rather than silently keeping the eager glue.
  */
 import type { Plugin } from 'vite';
@@ -19,22 +20,27 @@ export const EAGER_STANDARD = `function _standardSchema(schema) {
 	return schema;
 }`;
 
-/** The lazy replacement: one shared getter and setter; the first read defines the same props as a data property. */
-export const LAZY_STANDARD = `function _standardSchemaProps() {
-	const schema = this;
-	const props = {
-		version: 1,
-		vendor: "valibot",
-		validate: (value$1) => schema["~run"]({ value: value$1 }, /* @__PURE__ */ getGlobalConfig())
-	};
-	Object.defineProperty(schema, "~standard", { value: props, writable: true, configurable: true, enumerable: false });
-	return props;
-}
-function _standardSchemaSet(value) {
-	Object.defineProperty(this, "~standard", { value, writable: true, configurable: true, enumerable: false });
-}
+/** The lazy replacement: every schema inherits one accessor from a shared prototype (no per-schema accessor cell); the
+ * first read, or a write, defines the props as the schema's own data property. */
+export const LAZY_STANDARD = `const _standardSchemaPrototype = Object.create(Object.prototype, { "~standard": {
+	get() {
+		const schema = this;
+		const props = {
+			version: 1,
+			vendor: "valibot",
+			validate: (value$1) => schema["~run"]({ value: value$1 }, /* @__PURE__ */ getGlobalConfig())
+		};
+		Object.defineProperty(schema, "~standard", { value: props, writable: true, configurable: true, enumerable: false });
+		return props;
+	},
+	set(value) {
+		Object.defineProperty(this, "~standard", { value, writable: true, configurable: true, enumerable: false });
+	},
+	configurable: true,
+	enumerable: false
+} });
 function _standardSchema(schema) {
-	Object.defineProperty(schema, "~standard", { get: _standardSchemaProps, set: _standardSchemaSet, configurable: true, enumerable: false });
+	Object.setPrototypeOf(schema, _standardSchemaPrototype);
 	return schema;
 }`;
 
