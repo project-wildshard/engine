@@ -20,7 +20,7 @@ import { capFor, readCaps } from '../budgets/files.mjs';
 import { fpsPlan } from './plan.mjs';
 import { passBreakdownAllowed, requirePassBench } from './passes.mjs';
 import { workloadCounts } from './workload.mjs';
-import { runBatch } from './batch.mjs';
+import { retryColdBoot, runBatch } from './batch.mjs';
 
 /** @typedef {import('./plan.mjs').ProfileSpec} ProfileSpec */
 const root = resolve(import.meta.dirname, '../..');
@@ -180,6 +180,8 @@ async function main() {
       output:cellPath(out,id), build, base, zone, fingerprint };
   }));
   let resumedCells = 0;
+  /** @type {{id:string, failedAttempt:string}[]} */
+  const coldBootRetries = [];
   try {
     if (sampling.mode === 'quick') {
       // A short table queues once. Each worker still opens and closes its own browser.
@@ -190,6 +192,18 @@ async function main() {
       // Five 95-second routes leave 65 seconds for cold boots inside one
       // nine-minute capture watchdog. Slow boots still fail within the caps.
       if (pending.length > 0) await measureCell(pending,stop.signal);
+      // Retry once only if control never started and no route frames exist.
+      // Preserve the failed cold boot before a fresh browser replaces its cell.
+      const retry = pending.filter(job => {
+        if (!existsSync(job.output) || readCell(job.output,fingerprint,build,job) !== null) return false;
+        const failed = JSON.parse(readFileSync(job.output,'utf8'));
+        if (!retryColdBoot(failed.report)) return false;
+        const failedAttempt = `cell-${job.id}-boot-attempt-1.json`;
+        atomicJson(join(out,failedAttempt),failed);
+        coldBootRetries.push({id:job.id,failedAttempt});
+        return true;
+      });
+      if (retry.length > 0) await measureCell(retry,stop.signal);
     } else {
       for (let rep=0; rep<count; rep++) {
         for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
@@ -218,10 +232,11 @@ async function main() {
   const scope = sampling.scope === 'dock' ? 'dock only' : sampling.mode === 'quick' ? 'quick: dock, beach, village' : sampling.scope === 'subset' ? 'qualification diagnostic: reduced windows' : 'qualification: full route';
   const markdown = [`## Driftwood FPS (${scope})`, '',table(measured),'',
     `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; consecutive dock/beach/village legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
+    `Pre-control cold boot retries: ${coldBootRetries.length} (failed reports preserved; wall clock unchanged).`,
     'Phone GPU estimates await DF5.'].join('\n');
   writeFileSync(join(out,'table.md'),`${markdown}\n`);
   atomicJson(join(out,'table.json'),{schema:1,mode:sampling.mode,host,base,zone,scope:sampling.scope,
-    seconds:(Date.now()-started)/1000,fresh:resumedCells===0,resumedCells,progress,runs:measured});
+    seconds:(Date.now()-started)/1000,fresh:resumedCells===0,resumedCells,coldBootRetries,progress,runs:measured});
   console.log(markdown);
   if (stop.signal.aborted || measured.some(run=>run.cold.verdict==='incomplete'||run.warm?.verdict==='incomplete')) return 3;
   if (measured.some(run=>run.cold.verdict==='miss')) return 2;

@@ -7,7 +7,7 @@ import { fpsVerdict } from './verdict.mjs';
 /** @typedef {{name:string, seconds:number}} Leg */
 /** @typedef {Parameters<typeof fpsVerdict>[0][number]} Frames */
 /** @typedef {{version?:{build:string}, witness?:{build:string, gpu:string|null}, legs?:Frames[],
- * costs?:unknown[], verdict:string, error?:string}} Capture */
+ * costs?:unknown[], verdict:string, error?:string, boot?:{routeStarted?:boolean}}} Capture */
 /** @typedef {{browser:string,cold:Capture,warm:Capture|null}} CellReport */
 /** @typedef {{id:string,interval:Leg,route?:Leg[],floor:number,warm:boolean}} Cell */
 

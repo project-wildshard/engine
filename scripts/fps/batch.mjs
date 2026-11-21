@@ -18,3 +18,10 @@ export async function runBatch(jobs, work, report, interrupted) {
   }
   return result;
 }
+
+/** Only an unmeasured boot may be retried; route and frame failures stay final.
+ * @param {import('./matrix.mjs').CellReport|null} report */
+export function retryColdBoot(report) {
+  return report?.cold.verdict === 'incomplete' && report.cold.boot?.routeStarted === false &&
+    (report.cold.legs?.length ?? 0) === 0 && report.warm === null;
+}

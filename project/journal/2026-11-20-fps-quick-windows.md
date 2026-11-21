@@ -31,3 +31,11 @@ windows/variants/repeats, all quick waypoints and the original dwell.
 The ordinary push gate runs types, related tests and lint.
 
 Lane: codex-tc48
+
+The first one-lease run completed 4/5 in 701.670 seconds, zero overlap:
+Desktop High again hit its pre-control 90-second Home-region timeout.
+Quick now retries that unmeasured boot once in a fresh browser, after
+preserving its exact failed report. No route/frame failure is retried.
+The same twenty-minute clock includes both attempts and queue waits;
+output explicitly records every cold boot retry. There is no timeout
+raise, sample reuse across invocations or frame selection.

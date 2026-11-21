@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { runBatch } from '../../scripts/fps/batch.mjs';
+import { retryColdBoot, runBatch } from '../../scripts/fps/batch.mjs';
 
 test('an interrupted capture never starts the next cold profile', async () => {
   let stopped = false;
@@ -28,4 +28,15 @@ test('a failed profile preserves subsequent independent captures and fails the b
     (job,result) => recorded.push([job,result]), () => false);
   expect(status).toBe(3);
   expect(recorded).toEqual([['low',0],['high',3],['native',0]]);
+});
+
+
+test('only a failed boot with no control or route samples gets one fresh chance', () => {
+  const boot = {browser:'Chromium',cold:{verdict:'incomplete',boot:{routeStarted:false}},warm:null};
+  expect(retryColdBoot(boot)).toBe(true);
+  expect(retryColdBoot({...boot,cold:{...boot.cold,boot:{routeStarted:true}}})).toBe(false);
+  expect(retryColdBoot({...boot,cold:{...boot.cold,legs:[{name:'dock spawn',error:'lost frames'}]}})).toBe(false);
+  expect(retryColdBoot({...boot,cold:{verdict:'miss'}})).toBe(false);
+  expect(retryColdBoot({...boot,cold:{verdict:'incomplete'}})).toBe(false);
+  expect(retryColdBoot(null)).toBe(false);
 });
