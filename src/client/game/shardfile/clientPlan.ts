@@ -21,7 +21,7 @@ import { clientNativeBook } from './clientNativeBook';
 import type { PlatformSectionName } from '@wildshard/format/sections';
 import { constructionCheckpoint } from './constructionCheckpoint';
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { ClientFeatureKind, ClientFeatureRow } from '@wildshard/format/clientPlan';
+import { parseClientPlan, type ClientFeatureKind, type ClientFeatureRow } from '@wildshard/format/clientPlan';
 import { ownedCombatTargets } from '../../../shared/game/shardfile/aimTargetFilter';
 import { readClientPlan } from './cookedDocument';
 import { clientOwnershipRules } from '@wildshard/format/clientOwnership';
@@ -378,10 +378,24 @@ function stageCpuMicros(product: ShardFolder): number {
   const source = product.shardfile;
   return (source.runtime === null ? budgetTierLimits(source.budgets) : runtimeTierLimits(source)).cpuMicrosPerFrame;
 }
+/** ONE-FORMAT OF29e (Nalati): the wildlife population's declared files, at the names Nalati ships them. */
+export const WILDLIFE_FILES = { file: 'actors/wildlife.json', crowd: { json: 'actors/sheep.json', binary: 'actors/sheep.bin' } } as const;
+/** The engine's own frame for a wildlife population no plan row names: before the creatures, as Nalati's ran. */
+export const WILDLIFE_FRAME = 'engine.population.wildlife';
+/** ONE-FORMAT OF29e: a plan that names no `population.wildlife` row stands it from the product's declared wildlife files
+ *  (published as `wildlife`, steering on the nav grid, before the creatures), as OF29e1 stands the server's population
+ *  family. A plan naming the row keeps its own (J486). */
+function withDeclaredWildlife<P extends AdmittedClientPlan>(product: ShardFolder, plan: P): P {
+  if (plan.features.some(row => row.kind === 'population.wildlife')) return plan;
+  if (![WILDLIFE_FILES.file, WILDLIFE_FILES.crowd.json, WILDLIFE_FILES.crowd.binary].every(file => product.hasFile(file))) return plan;
+  const row = { kind: 'population.wildlife', file: WILDLIFE_FILES.file, crowd: { ...WILDLIFE_FILES.crowd }, navSteer: true, publish: 'wildlife',
+    frame: { id: WILDLIFE_FRAME, after: [], before: ['engine.creatures.update'] } };
+  return { ...plan, features: [...plan.features, ...parseClientPlan({ version: 1, features: [row] }).features] };
+}
 /** Validate the whole plan and all required sections before the first feature can mutate the page. */
 export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedClientPlan {
   try {
-    const plan = readClientPlan(product.shardfile, input);
+    const plan = withDeclaredWildlife(product, readClientPlan(product.shardfile, input));
     const limit = stageCpuMicros(product);
     // A row is the smallest host installer we can pace between drawn frames.
     for (const row of plan.features) {
