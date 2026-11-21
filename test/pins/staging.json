@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "f8fbba62d4a74b2569b062db5a65466bddb4368b5e985825f274c7c1adf03209",
+  "catalogueHash": "482d38d0a52689bdbadb57fbfa8745d2628f49f2e301042aa753b9f64cd63992",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -708,8 +708,8 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "revision": 21,
-        "hash": "aa5ae84c3a9e26b633cd8ab8569ed1b9034b699e20d6aac49a2be31895c86316"
+        "revision": 22,
+        "hash": "70f67c74ced2823dfc12cb87c93503e12ea0e07467815f817c7af03e0071f7b8"
       },
       {
         "slug": "nalati-grasslands",
@@ -834,8 +834,8 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 9,
-        "hash": "e2110ad8a481a922b5423b8212632572677ccc23c37840c2a8a2607a2faee687"
+        "revision": 10,
+        "hash": "0022c95d9fbdaa1fa503e1ae986cf13dab32dac05f50813eb56d5e1b2ea83647"
       },
       {
         "slug": "sunscar-dunes",
@@ -885,9 +885,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 21,
-      "hash": "aa5ae84c3a9e26b633cd8ab8569ed1b9034b699e20d6aac49a2be31895c86316",
-      "bytes": 35365888
+      "revision": 22,
+      "hash": "70f67c74ced2823dfc12cb87c93503e12ea0e07467815f817c7af03e0071f7b8",
+      "bytes": 35377152
     },
     {
       "slug": "nalati-grasslands",
@@ -1011,9 +1011,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 9,
-      "hash": "e2110ad8a481a922b5423b8212632572677ccc23c37840c2a8a2607a2faee687",
-      "bytes": 321171968
+      "revision": 10,
+      "hash": "0022c95d9fbdaa1fa503e1ae986cf13dab32dac05f50813eb56d5e1b2ea83647",
+      "bytes": 322743296
     },
     {
       "slug": "sunscar-dunes",
