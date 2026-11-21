@@ -36,6 +36,8 @@ import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { shardArea } from '../grid/area';
 import { primeStaticMerges } from '../grid/staticViewMerge';
+import { primeKitBatches } from '../grid/kitBatch';
+import { multiDraws } from '../grid/farBatch';
 import { admittedRuntimeFolder, completeManifestCache, releaseManifestTransport } from '../shardfile/runtimeFolder';
 import { enterSkyClock } from './clockSettings';
 import { settleEntryPrograms } from './settlePrograms';
@@ -165,6 +167,10 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // pipeline reaches the GPU, which iOS charges to the page). The parts the store already holds leave memory first (Nine:
   // 48 parts, 106.5 MB); a later read of their files is the store's checked copy.
   bootMark('download:members-dropped', { count: dropStoredSpawnMembers(), held: heldSpawnMembers() });
+  // DF10 (mini-df10e): with `debug.kitBatch` at phone Low, the kit's plain meshes draw as one batch per material from here,
+  // before anything uploads their channels (and lets their CPU copies go), so the shaders step links and uploads the batches
+  const kit = primeKitBatches(game.rootScene, game.levelScope, multiDraws(game.renderer));
+  if (kit.batches > 0) bootMark('render:kit-batches', kit);
   // and every geometry drawn so far lets its CPU copy go after each drawing step (play waits 240 renders, which the boot
   // never reaches: Nine's phone held 88-147 MB of attribute arrays beside their GPU copies through its peak)
   // IP30: under the phone byte budget each step's uploaded batch frees its staging arrays and then its garbage, before the

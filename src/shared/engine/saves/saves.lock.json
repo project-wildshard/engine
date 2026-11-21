@@ -597,6 +597,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/KIT_BATCH_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/LEAN_CARD_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

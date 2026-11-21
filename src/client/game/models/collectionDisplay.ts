@@ -31,6 +31,13 @@ export class CollectionDisplay extends THREE.Mesh<THREE.BufferGeometry, THREE.Ma
     if (row.count !== undefined) this.setCount(Number(params[row.count.parameter] ?? 0));
     for (const id of Object.keys(row.trophies?.full ?? {})) this.setFilled(id, params[id] === true);
   }
+  /** DF10 (mini-df10e): three's clone calls this constructor with no rows. The precompile's warm draws clone a material's
+   *  stand-in (with the kit batched, the plaques became the kit's): a draw-only copy is a plain mesh of the same geometry,
+   *  material and pose. */
+  override clone(recursive?: boolean): this {
+    const copy = new THREE.Mesh<THREE.BufferGeometry, THREE.Material>(this.geometry, this.material);
+    return Reflect.apply(THREE.Mesh.prototype.copy, copy, [this, recursive]) as this;
+  }
   get pieces(): number { return this.n; }
   setCount(n: number): void {
     const count = this.row.count;
