@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.66 (2026-11-21)
+
+- The game reloads when your connection comes back during startup.
+- Mossgate Hollow gets its latest zone update.
+- Distant herds keep drawing as they move out of range.
+- Pine Hollow and Nalati can draw their wildlife from their own zone files.
+- The game keeps each zone's item rules when you enter from the grid.
+
 ## v0.1.64 (2026-11-21)
 
 - Nalati's new eagle and balbal can use their authored bodies and coats.
