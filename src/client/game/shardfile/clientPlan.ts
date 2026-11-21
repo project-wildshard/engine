@@ -21,7 +21,7 @@ import { clientNativeBook } from './clientNativeBook';
 import type { PlatformSectionName } from '@wildshard/format/sections';
 import { constructionCheckpoint } from './constructionCheckpoint';
 import type { Scope } from '@wildshard/engine/app/scope';
-import { parseClientPlan, type ClientFeatureKind, type ClientFeatureRow } from '@wildshard/format/clientPlan';
+import type { ClientFeatureKind, ClientFeatureRow } from '@wildshard/format/clientPlan';
 import { ownedCombatTargets } from '../../../shared/game/shardfile/aimTargetFilter';
 import { readClientPlan } from './cookedDocument';
 import { clientOwnershipRules } from '@wildshard/format/clientOwnership';
@@ -390,7 +390,7 @@ function withDeclaredWildlife<P extends AdmittedClientPlan>(product: ShardFolder
   if (![WILDLIFE_FILES.file, WILDLIFE_FILES.crowd.json, WILDLIFE_FILES.crowd.binary].every(file => product.hasFile(file))) return plan;
   const row = { kind: 'population.wildlife', file: WILDLIFE_FILES.file, crowd: { ...WILDLIFE_FILES.crowd }, navSteer: true, publish: 'wildlife',
     frame: { id: WILDLIFE_FRAME, after: [], before: ['engine.creatures.update'] } };
-  return { ...plan, features: [...plan.features, ...parseClientPlan({ version: 1, features: [row] }).features] };
+  return { ...plan, features: [...plan.features, ...readClientPlan(product.shardfile, { version: 1, features: [row] }).features] };
 }
 /** Validate the whole plan and all required sections before the first feature can mutate the page. */
 export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedClientPlan {
