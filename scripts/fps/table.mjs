@@ -97,7 +97,7 @@ async function measureCell(job, signal) {
     // Join the kernel queue even while another measurement owns the GPU.
     // The worker checks for unrelated GPU users after acquiring this lease.
     signal.throwIfAborted();
-    const child = spawn('/usr/bin/lockf',['-k',lock,join(root,'scripts/browser-lane.sh'),'--max',Array.isArray(job) ? '20' : '5',
+    const child = spawn('/usr/bin/lockf',['-k',lock,join(root,'scripts/browser-lane.sh'),'--max',Array.isArray(job) ? '10' : '5',
       process.execPath,import.meta.filename,Array.isArray(job) ? '--worker-batch' : '--worker',JSON.stringify(job)],{stdio:'inherit',detached:true});
     const stop = () => {
       try { if (child.pid !== undefined) process.kill(-child.pid, 'SIGTERM'); }
@@ -186,7 +186,9 @@ async function main() {
         if (readCell(job.output,fingerprint,build,job) === null) return true;
         resumedCells++; return false;
       });
-      if (pending.length > 0) await measureCell(pending,stop.signal);
+      // Each cold worker is bounded to four minutes. Two workers fit a
+      // ten-minute lease; rejoin the shared queue before the next pair.
+      for (let i=0; i<pending.length; i+=2) await measureCell(pending.slice(i,i+2),stop.signal);
     } else {
       for (let rep=0; rep<count; rep++) {
         for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
@@ -214,7 +216,7 @@ async function main() {
   const progress = {completed,total:groups.reduce((sum,group) => sum+group.length,0)};
   const scope = sampling.scope === 'dock' ? 'dock only' : sampling.mode === 'quick' ? 'quick: dock, beach, village' : sampling.scope === 'subset' ? 'qualification diagnostic: reduced windows' : 'qualification: full route';
   const markdown = [`## Driftwood FPS (${scope})`, '',table(measured),'',
-    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; consecutive shorter legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
+    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; consecutive original-duration legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
     'Phone GPU estimates await DF5.'].join('\n');
   writeFileSync(join(out,'table.md'),`${markdown}\n`);
   atomicJson(join(out,'table.json'),{schema:1,mode:sampling.mode,host,base,zone,scope:sampling.scope,

@@ -33,8 +33,9 @@ export function fpsPlan({ qualify = false, runs, dockOnly = false, coldOnly = fa
   const route = [];
   for (const [index,leg] of fullRoute.entries()) {
     if (index >= (qualify ? windowCount : dockOnly ? 1 : 3)) break;
-    route.push(qualify ? leg : {...leg,seconds:[15,30,35][index],
-      dwell:leg.dwell ? {...leg.dwell,seconds:10} : undefined});
+    // Keep the original windows: shortened turns overweight first-use work and
+    // change the proportion of walking and dwelling between quick and qualify.
+    route.push(leg);
   }
   const profiles = Object.fromEntries(Object.entries(fullProfiles).map(([name, specs]) =>
     [name, qualify ? specs : specs.slice(0, 1)]));
