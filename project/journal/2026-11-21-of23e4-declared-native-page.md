@@ -8,3 +8,7 @@ stopped at `level.kit` with "unknown animal kind 'deer' (registered: boar, bear)
 are only its declared rows now registers them itself (`declarePageCreatures`) and keeps the rest of that kit: the held
 equipment and each socket card's rows. With it r10 loads its crossbow HUD and reaches "Joining the world", where the
 pinned r9 control also sits on the same headless dev world.
+
+In play the declared skins' glTF bodies share one interleaved vertex buffer, and the far herd refused them
+("farHerd: attribute 'normal' is interleaved") on the first frame a herd went far. The far herd now copies such an
+attribute flat. Headless shots of r10 then show its elk, deer and boar drawn, with the crossbow held.

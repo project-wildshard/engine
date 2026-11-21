@@ -5,6 +5,13 @@ import { presenting } from '../../../shared/engine/core/framePacing';
 import { releaseOwned } from '../../../shared/engine/core/ownedBuffer';
 import { trackSkeletonTextureUploads } from '../render/changedTextureUploads';
 
+/** A plain copy of an interleaved attribute: a declared skin's glTF body (Pine r10, OF23e4) shares one vertex buffer. */
+function flatAttribute(a: THREE.InterleavedBufferAttribute): THREE.BufferAttribute {
+  const n = a.itemSize, Ctor = a.array.constructor as new (length: number) => THREE.TypedArray, arr = new Ctor(a.count * n);
+  for (let i = 0; i < a.count; i++) for (let k = 0; k < n; k++) arr[i * n + k] = a.getComponent(i, k);
+  return new THREE.BufferAttribute(arr, n, a.normalized);
+}
+
 /**
  * The far herd: every animal past TIER_CONFIG.animalFarBatchDist drawn in ONE draw per model (a kind:variant: its own
  * coat), PINE-HOLLOW-REMASTER PH-P2. Past animalOneDrawDist a rig is already one draw (its whole body in its fur material,
@@ -242,9 +249,9 @@ class FarBatch {
   private grow(cap: number): void {
     const { src, verts, indices, bones: B } = this;
     const g = new THREE.BufferGeometry();
-    for (const [name, a] of Object.entries(src.attributes)) {
+    for (const [name, source] of Object.entries(src.attributes)) {
       if (this.shadow && !SHADOW_ATTRS.has(name)) continue;
-      if (!(a instanceof THREE.BufferAttribute)) throw new Error(`farHerd: attribute '${name}' is interleaved`);
+      const a = source instanceof THREE.BufferAttribute ? source : flatAttribute(source);
       const n = a.itemSize;
       if (name === 'skinIndex') {
         const arr = new Uint16Array(cap * verts * n);
