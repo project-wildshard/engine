@@ -183,9 +183,11 @@ async function main(args: string[]) {
   if (!unlock) throw new Error('Another train command is active');
   let stagingVerdict: string | undefined;
   try {
-    const out = scratchDir(`release-train-${tag}`, `FS28 ${tag} from green main to npm next`, { root, env: { ...process.env, WS_LANE_NAME: lane } });
-    const local = join(out, `local-${source.headSha}`, 'verdict.json');
-    const localDir = dirname(local);
+    const scratch = { root, env: { ...process.env, WS_LANE_NAME: lane } };
+    const out = scratchDir(`release-train-${tag}`, `FS28 ${tag} from green main to npm next`, scratch);
+    // PGlite binds a Unix socket below this directory. Keep its macOS path short.
+    const localDir = scratchDir(`qa-${tag}-${source.headSha.slice(0, 8)}`, `FS28 ${tag} local QA`, scratch);
+    const local = join(localDir, 'verdict.json');
     if (!existsSync(local)) await runLogged(root, join(out, 'local.log'), 'bash', [
       'scripts/browser-lane.sh', '--max', '20', process.execPath, 'scripts/staging-qa.mjs',
       '--local', '--release', tag, '--build', source.headSha, '--out', localDir,

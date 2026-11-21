@@ -15,3 +15,7 @@ delivery can continue from the existing branch and candidate evidence.
 The train also permits a newer cut when an earlier staging release was
 abandoned. The existing signed staging ancestry check owns that decision,
 and the train's local lock prevents simultaneous operator runs.
+
+M8 cut A's first local run exposed the macOS Unix socket length limit.
+The local rig now uses a short owned scratch path. The verdict continues
+to validate the full source SHA before it can qualify a cut.

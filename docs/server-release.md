@@ -67,8 +67,9 @@ Repeat `--require <sha>` to select a green main containing every commit
 in a coordinated batch.
 The train starts npm next as soon as candidate QA and the signed staging
 alias agree. The live smoke and J451 continue during publication. It verifies
-both immutable client archives and the public npm tarball. Build and QA
-evidence is under `tmp/release-train-vX.Y.Z`.
+both immutable client archives and the public npm tarball. Delivery
+evidence is under `tmp/release-train-vX.Y.Z`. The local rig keeps its QA
+verdict in `tmp/qa-vX.Y.Z-<short-sha>` beside its short Unix socket path.
 
 Run the same command to continue a partial delivery from the same lane
 session. It reuses the published branch and any existing exact npm run.
