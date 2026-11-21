@@ -99,7 +99,7 @@ import { yieldGridAdmission, yieldGridConstruction } from './admissionYield';
 import { RuntimePageSession, type RuntimePageResident } from '../shardfile/runtimePage';
 
 import { enterDataCellKit, holdsItems } from './dataCellKit';
-import { dataCellPlanRows, enterDataCellPlan } from './dataCellPlan';
+import { DATA_CELL_PLAN_ENTRIES, dataCellPlanFrame, dataCellPlanRows, enterDataCellPlan } from './dataCellPlan';
 import { enterPlotAudio, pagePlotAudioPorts, plotAudioScene, type PlotAudioPorts, type PlotAudioScene } from './plotAudio';
 import { shardFolderFromAdmission } from '../shardfile/runtimeFolder';
 import { createRegionalRuntimeFactory, regionalRuntimeAccountedBytes, type PreparedRegionalRuntime, type RegionalRuntimePage, type RegionalRuntimeTextures } from './regionalRuntime';
@@ -987,9 +987,12 @@ export class LiveGridSession {
     if (declaredAudio !== null) this.enterDataStay('audio', instance, (stay, here) => { enterDataCellAudio(declaredAudio, page, stay, here, play?.quests.races); });
     if (plumbing !== null) this.enterDataStay('plumbing', instance, (stay, here) => { enterDataCellPlumbing(plumbing, page, stay, instance, here); });
     if (loot !== null) this.enterDataStay('loot', instance, async (stay) => { await enterDataCellLoot(loot.source, loot.row, loot.folder, page, stay, instance); });
-    // OF22e2: the client plan features a data cell's own installs do not cover (Nine's city, sets, movers' views, portal veil),
-    // in the home cell only: the scene keeps the home's frame (C39), and the plan's features draw in the page context's frame
-    if (region.plan !== null && instance === this.ports.home.instance) { const { folder } = region.plan; this.enterDataStay('plan', instance, async (stay) => { await enterDataCellPlan(folder(), page, stay); }); }
+    // OF22e2, OF22n: the client plan features a data cell's own installs do not cover (Nine's city, sets, movers' views, portal
+    // veil). The scene keeps the home's frame (C39): the home draws in the page context's frame, a road entry at its offset
+    if (region.plan !== null) {
+      const { folder } = region.plan, frame = dataCellPlanFrame(this.ports.assembly.cell(instance), this.ports.home);
+      if (DATA_CELL_PLAN_ENTRIES.has(frame === null ? 'home' : 'road')) this.enterDataStay('plan', instance, async (stay) => { await enterDataCellPlan(folder(), page, stay, frame); });
+    }
     if (compendium !== null) this.enterDataStay('compendium', instance, async (stay) => { await enterDataCellCompendium(compendium.source, compendium.assets, compendium.folder, page, stay, instance); });
   }
   /** One play install of the entered cell, by kind: its stay scope ends when the feet leave. `here` says whether the wire is this cell's. */
