@@ -63,8 +63,7 @@ try {
     };
     try {
       if (!await phase('cook', () => {
-        // Exercise the production worker's time allowance, including cold phone
-        // ASTC encodes. The old private 300 s cap was half its current limit.
+        // Use the same production worker limit as the Ring 2 CLI, including cold phone ASTC encodes.
         const timeout = DEFAULT_LIMITS.seconds * 1000;
         execFileSync(process.execPath, ['scripts/ring-cook.mjs', '--ring2', `--only=${head.slug}`, `--out=${cooked}`, `--build=${build}`, `--timeout-ms=${timeout}`],
           {stdio: 'inherit', timeout: timeout + 30_000});

@@ -16,7 +16,10 @@ const { shardfileValidationRevision } = await import('./shardfile-validation-rev
 const { values } = parseArgs({ options: { out: {type:'string',default:'tmp/ring-cook'}, build: {type:'string',default:'ring-local'},
   only: {type:'string'}, ring2: {type:'boolean',default:false}, 'timeout-ms': {type:'string',default:'120000'} } });
 const timeout = Number(values['timeout-ms']);
-if (!Number.isFinite(timeout) || timeout <= 0 || timeout > 600000) throw new Error('Cook timeout must be in (0, 600000] ms');
+const maximumTimeout = DEFAULT_LIMITS.seconds * 1000;
+if (!Number.isFinite(timeout) || timeout <= 0 || timeout > maximumTimeout) {
+  throw new Error(`Cook timeout must be in (0, ${maximumTimeout}] ms`);
+}
 const root = process.cwd(), out = resolve(values.out);
 mkdirSync(out, { recursive: true });
 if (readdirSync(out).length > 0) throw new Error(`Cook output must be empty: ${out}`);
