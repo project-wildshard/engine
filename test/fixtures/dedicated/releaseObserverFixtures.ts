@@ -35,13 +35,13 @@ export function releaseObserverFixtures(){
 
  const closers:(()=>Promise<void>)[]=[];
  afterEach(async()=>{for(const close of closers.splice(0).reverse())await close();});
- async function fixture(durable=false,loseProgress=false,shard=durable?'blender-template':'driftwood-isle',changeProgress=false,staleCheckpoint=false){
+ async function fixture(durable=false,loseProgress=false,shard=durable?'blender-template':'driftwood-isle',changeProgress=false,staleCheckpoint=false,seedProgress=true){
   const saveShard=cellShard(shard);
   let restart:()=>void=()=>{throw Error('No promotion installed');};
   const database=durable?await openPglite():null;
   if(database!==null){closers.push(database.close);await migrate(database);}
   const saves=database===null?memoryPlayerSaves():playerSavesOver(database,0,()=>{});
-  if(durable){
+  if(durable&&seedProgress){
    const seed=await roomBench({saves,cells:[shard],load});
    const bots=['device:observer-probe-0','device:observer-probe-1'].map((device,index)=>new RoomBot(seed.url,'bench',device,`seed-${index}`));
    try{

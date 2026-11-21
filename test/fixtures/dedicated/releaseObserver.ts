@@ -79,7 +79,8 @@ export async function observeRelease(options:ObserverOptions){
    if(session.first.stand!==null&&session.first.tick!==read.tick&&Math.hypot(read.stand.x-session.first.stand.x,read.stand.z-session.first.stand.z)>.05)
     session.moved=true;
   }
-  if(read.closed!==null&&session.generation===baseline?.release.serial){
+  // A fresh bot may leave to write its first checkpoint before the baseline is armed.
+  if(read.closed!==null&&session.before!==null&&session.generation===baseline?.release.serial){
    session.closeAt??=read.closedAt??performance.now();session.closeReason??=read.closed;
   }
   if(target!==null&&session.generation===target.release.serial&&session.moved&&session.backMs===null&&session.closeAt!==null)

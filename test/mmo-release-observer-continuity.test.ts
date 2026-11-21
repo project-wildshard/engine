@@ -26,6 +26,18 @@ test('a signed grace restores both durable checkpoints with native progress',{ti
  assert.equal(result.peerWorkers.kind,'whole-release');assert.equal(result.peerWorkers.untouchedWorkerEvidence,null);
 });
 
+test('a signed restart is timed from the release close after priming both checkpoints',{timeout:120000},async()=>{
+ const f=await fixture(true,false,'blender-template',false,false,false);
+ const observed=observeRelease({...f.options,requireDurableBaseline:true});
+ await Promise.race([f.playing,observed.then(result=>{throw Error(`No playing baseline: ${result.reason}`);})]);
+ const advanceAt=performance.now();await f.advance();const result=await observed;
+ const elapsedSinceAdvance=Math.ceil(performance.now()-advanceAt);
+ assert.deepEqual(result.bots.map(bot=>bot.attempts),[3,3]);
+ assert.deepEqual(result.bots.map(bot=>bot.closeReason),['restart','restart']);
+ assert.ok(result.bots.every(bot=>bot.backToMovingObservedMs!==null&&bot.backToMovingObservedMs<=elapsedSinceAdvance));
+ assert.deepEqual(f.counts(),{disposed:true,connections:6,closed:6});
+});
+
 test('actual loss in a persisted checkpoint fails the signed native observation',{timeout:120000},async()=>{
  const f=await fixture(true,true),observed=observeRelease(f.options);
  await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);await f.advance();
