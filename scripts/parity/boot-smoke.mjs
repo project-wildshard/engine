@@ -461,6 +461,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
   const gridWaits = gridBootWaitHistory();
   const observeGridWait = (/** @type {string} */ label, /** @type {Awaited<ReturnType<typeof bootObservation>>} */ observation) => gridWaits.observe(label, Date.now() - started, observation);
   let lifecycleReports = 0;
+  /** @type {Awaited<ReturnType<typeof finishStallProfile>> | null} */ let bootProfile = null;
   page.on('request', request => {
     const report = bootErrorReport(request.url(), request.method(), request.postData());
     if (new URL(request.url()).pathname !== '/api/errors' || request.method() !== 'POST') return;
@@ -536,7 +537,6 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     }
     }
     let revealSkipped = false;
-    /** @type {Awaited<ReturnType<typeof finishStallProfile>>['stalls'] | null} */ let stalls = null;
     const gameplay = async (/** @type {boolean} */ requireRings) => {
       const value = await page.evaluate(bootObservation);
       // Skip the grid's sky-down reveal with the player's own tap: it still waits for the rings and the home handoff,
@@ -564,7 +564,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     const enteredProof = gameplayEvidence?.onEnter?.(page);
     // The context still closes on a boot failure before it reaches this proof.
     void enteredProof?.catch(() => undefined);
-    if (stallProfile !== null) { const read = await finishStallProfile(page, stallProfile); stallProfile = null; stalls = read.stalls; faults.push(...read.faults); }
+    if (stallProfile !== null) { bootProfile = await finishStallProfile(page, stallProfile); stallProfile = null; faults.push(...bootProfile.faults); }
     const initial = await page.evaluate(bootObservation);
     gameplayFrames.initial = initial.frame;
     phases.framesStartMs = Date.now() - started;
@@ -606,7 +606,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     const roadDeadline = Date.now() + 90000;
     const cellRoad = mode === 'grid' ? await bootCellRoad(page, faults, frames, roadDeadline) : null;
     const road = mode === 'grid' ? await bootSignalRoad(page, faults, frames, roadDeadline) : null;
-    const result = { mode, phases, frames, gameplayFrames, stalls, playStall, gridWaits: gridWaits.samples, cellRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
+    const result = { mode, phases, frames, gameplayFrames, stalls: bootProfile?.stalls ?? null, playStall, gridWaits: gridWaits.samples, cellRoad, road, telemetryPosts, lifecycleReports, gridNavigationObserved, elapsedMs: Date.now() - started, ...await page.evaluate(bootObservation), faults, reports };
     if (faults.length > 0 || result.fatal.length > 0) throw new Error(JSON.stringify(result));
     writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify(result, null, 2)}\n`);
     return result;
@@ -618,7 +618,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
       resources: performance.getEntriesByType('resource').map(row => row.toJSON()) })).catch(() => null);
     gameplayFrames.final = observation?.frame ?? null;
     phases.failedMs = Date.now() - started;
-    writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify({ mode, phases, frames, gameplayFrames, gridWaits: gridWaits.samples, elapsedMs: Date.now() - started, faults, reports, lifecycleReports, gridNavigationObserved, error: String(error), observation, loading }, null, 2)}\n`);
+    writeFileSync(join(out, `${receipt}.json`), `${JSON.stringify({ mode, phases, frames, gameplayFrames, gridWaits: gridWaits.samples, elapsedMs: Date.now() - started, faults, reports, lifecycleReports, gridNavigationObserved, error: String(error), observation, loading, bootProfile }, null, 2)}\n`);
     throw error;
   } finally { await context.close(); }
 }

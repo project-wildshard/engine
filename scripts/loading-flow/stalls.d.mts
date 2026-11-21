@@ -38,7 +38,7 @@ export function bootTimelineEntries(): StallEntry[];
 /** Start a stall profile of the page (Chromium only, else null). */
 export function startStallProfile(page: Page): Promise<CDPSession | null>;
 /** End a stall profile at control: the ratcheted stages' worst windows and their faults. */
-export function finishStallProfile(page: Page, session: CDPSession): Promise<{ stalls: StageStall[]; faults: string[] }>;
+export function finishStallProfile(page: Page, session: { send: (method: 'Profiler.stop') => Promise<{ profile: CpuProfile }>; detach: () => Promise<void> }): Promise<{ stalls: StageStall[]; faults: string[]; entries: StallEntry[] }>;
 /** NB6, play: a stretch of live frames' worst window of unbroken main-thread work (ms), where it starts, and play's length. */
 export interface PlayStall { from: number; busyMs: number; playMs: number }
 /** The share of the window unbroken main-thread work must reach to be a play stall. */

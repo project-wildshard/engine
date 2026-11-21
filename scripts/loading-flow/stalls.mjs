@@ -154,13 +154,14 @@ export async function startStallProfile(page) {
 }
 
 /** End a stall profile at control: pin its clock with the mark, then the ratcheted stages' worst windows and their faults.
- * @param {import('playwright').Page} page @param {import('playwright').CDPSession} session */
+ * @param {import('playwright').Page} page
+ * @param {{ send: (method: 'Profiler.stop') => Promise<{ profile: CpuProfile }>; detach: () => Promise<void> }} session */
 export async function finishStallProfile(page, session) {
   const markPageMs = Number(await page.evaluate(clockMarkExpression()));
   const { profile } = await session.send('Profiler.stop');
   await session.detach().catch(() => undefined);
   const entries = await page.evaluate(bootTimelineEntries), idle = profileIdle(profile, profileAnchor(profile, markPageMs));
-  return { stalls: stageStalls(entries, idle), faults: stallFaults(entries, idle) };
+  return { stalls: stageStalls(entries, idle), faults: stallFaults(entries, idle), entries };
 }
 
 // NINE-DRAGON-BENCHMAX NB6, widened to play (meta QA-FEEDBACK-2026-11-14 rows 2, 3, 5): a play stall is a stretch of live

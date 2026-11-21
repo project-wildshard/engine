@@ -1,5 +1,7 @@
-import { expect, test } from 'vitest';
-import { busiestLeaves, busiestWindow, CLOCK_MARK, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stageGaps, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
+import { expect, test, vi } from 'vitest';
+import type { Page } from 'playwright';
+import { legacyDouble } from '@wildshard/engine/test/FakeGame';
+import { busiestLeaves, busiestWindow, CLOCK_MARK, finishStallProfile, idleWithin, PLAY_BUSY_SHARE, playStall, playStallFaults, profileAnchor, profileBusy, profileIdle, stageStalls, stageGaps, stallFaults, STALL_IDLE_SHARE, STALL_WINDOW_MS } from '../scripts/loading-flow/stalls.mjs';
 
 test('NB13: home gaps ignore broad parents and union actual waits at the stage edges', () => {
   const row = (operation: string, start: number, end: number | null, realm = 'page') => ({operation, start, end, realm});
@@ -18,6 +20,18 @@ test('NB13: home gaps ignore broad parents and union actual waits at the stage e
 // NINE-DRAGON-BENCHMAX NB6: the ring-1 boot smoke's props stall ratchet (scripts/loading-flow/stalls.mjs)
 const props = (start: number, ms: number) => ({ operation: 'stage:props', realm: 'page', start, end: start + ms });
 const limit = STALL_WINDOW_MS * STALL_IDLE_SHARE;
+
+test('a refused props stall retains the original timed entries for diagnosis', async () => {
+  const entries = [props(1000, 2000)];
+  const profile = { nodes: [{ id: 1, callFrame: { functionName: '(idle)' } }, { id: 2, callFrame: { functionName: CLOCK_MARK } }],
+    samples: [1, 2], timeDeltas: [0, 2_000_000], startTime: 0, endTime: 2_005_000 };
+  const page = legacyDouble<Page>({ evaluate: vi.fn<Page['evaluate']>().mockResolvedValueOnce(3000).mockResolvedValueOnce(entries) });
+  const session = { send: vi.fn(async () => ({ profile })), detach: async () => {} };
+  const report = await finishStallProfile(page, session);
+  expect(report.faults[0]).toMatch(/^Load stall: props/u);
+  expect(report.entries).toEqual(entries);
+  expect(session.send).toHaveBeenCalledWith('Profiler.stop');
+});
 
 test('a 2 s idle stretch with no named wait is a props stall', () => {
   const faults = stallFaults([props(1000, 4000), { operation: 'game-stage:props', realm: 'page', start: 1000, end: 5000 }], [{ start: 2000, end: 4000 }]);

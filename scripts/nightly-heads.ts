@@ -234,7 +234,7 @@ try {
         const used = [...fetched].filter(key => clientKeys.has(key));
         if (!used.some(key => /^assets\/spawn\/parts\/[a-f0-9]+\.pack\.br$/u.test(key))) throw new Error('No client part from this cold cook reached gameplay');
         if ([...fetched].some(key => !index.keys.includes(key))) throw new Error('Page fetched an object outside this head cook');
-        return {route, entry: mode, gameplayFrames: boot.frame, ms: boot.elapsedMs, fetched: used};
+        return {route, entry: mode, gameplayFrames: boot.frame, ms: boot.elapsedMs, stalls: 'stalls' in boot ? boot.stalls : null, fetched: used};
       });
       await phase('explorer', async () => {await sweepExplorer(activeBrowser, url, route, explorerEvidence, true); return {route, rendered: true};});
     } catch (error) {
