@@ -20,11 +20,6 @@ permissions:
   contents: read
   actions: read
 
-# Duplicate CI completion events for one SHA serialize; different SHAs use R2 CAS.
-concurrency:
-  group: server-release-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.event_name == 'workflow_dispatch' && inputs.build || github.ref }}
-  cancel-in-progress: false
-
 jobs:
   source:
     if: >-
@@ -70,6 +65,10 @@ jobs:
   publish:
     needs: source
     if: needs.source.outputs.ready == 'true'
+    # Serialize publication for an exact build and channel. Different builds use R2 CAS.
+    concurrency:
+      group: server-release-sign-${{ needs.source.outputs.channel }}-${{ needs.source.outputs.sha }}
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -167,6 +166,10 @@ jobs:
   devserver-client:
     needs: [source, publish]
     if: ${{ !cancelled() && needs.source.outputs.ready == 'true' }}
+    # Both server-release entry points may attach archives to the same tag.
+    concurrency:
+      group: server-release-clients-${{ needs.source.outputs.tag }}
+      cancel-in-progress: false
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     permissions:

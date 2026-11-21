@@ -258,6 +258,19 @@ test('J234: every run signs with main\'s publisher and builds in the source\'s o
   expect(sign).toContain('node scripts/server-release/publish.mjs');
 });
 
+test('FS28: signing and client archives queue independently for the exact release', () => {
+  const workflow = readFileSync('.github/workflows/server-release.yml', 'utf8');
+  const jobs = workflow.indexOf('\njobs:'), publish = workflow.indexOf('\n  publish:');
+  const clients = workflow.indexOf('\n  devserver-client:');
+  expect(workflow.slice(0, jobs)).not.toMatch(/^concurrency:/mu);
+  expect(workflow.slice(publish, clients)).toContain(
+    'group: server-release-sign-${{ needs.source.outputs.channel }}-${{ needs.source.outputs.sha }}',
+  );
+  expect(workflow.slice(publish, clients)).toContain('cancel-in-progress: false');
+  expect(workflow.slice(clients)).toContain('group: server-release-clients-${{ needs.source.outputs.tag }}');
+  expect(workflow.slice(clients)).toContain('cancel-in-progress: false');
+});
+
 test('production release creation needs only the already-pushed tag and cannot create metadata for a different tag', () => {
   const repo = createTempRepo();
   try {
