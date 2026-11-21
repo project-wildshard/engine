@@ -426,6 +426,10 @@ export function spawnApproach(slug, at, center, dx, dz) {
   if (slug === DRIFTWOOD) {
     if (dx !== 0) lead = [[dx*235,-194]];
     else if (dz > 0) lead = [[-235,-194],[-235,0],[-200,20],[-200,235]];
+  } else if (slug === 'open-plot-fossil-badlands' && dz > 0) {
+    // The spawn faces the centre block (x -31..31, z -30..34) with posts at its south corners: v0.1.60's smoke held at
+    // (4.4, -29.1) on the north line. Back off south of the posts, take the clear x 62.5 column north, then join the line.
+    lead = [[0,-60],[62.5,-60],[62.5,125],[0,125]];
   } else if (slug === 'brasscap-mesa' && dx > 0) {
     // From the depot, go south of the canyon wall before turning east onto the gate's line.
     lead = [[4,2.6],[4,45],[75,45],[125,0]];
