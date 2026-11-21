@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { shardfileValidationRevision } from './scripts/shardfile-validation-revision.mjs';
 import { join, basename } from 'node:path';
 import { rapierAlias } from './vite/rapier';
+import { valibotStandardPlugin } from './vite/valibotStandard';
 import { viteTmpRoot } from './scripts/vite-tmp.mjs';
 import { assertHeavyLease } from './scripts/heavy-lane-lease.mjs';
 import { buildValidationReceipts } from './scripts/app-build/validationReceipts.mjs';
@@ -32,7 +33,8 @@ export default defineConfig(({ mode, command }) => {
   const validationRevision = shardfileValidationRevision();
   buildValidationReceipts(validationRevision); // Fail before bundling on any stale or missing product.
   return {
-    plugins: [viteTmpRoot({ janitor: join(process.cwd(), 'scripts/temp-janitor.mjs') })],
+    // DF11 (mini-df11g): valibot's Standard Schema glue is built on first read, two fewer heap cells per schema
+    plugins: [viteTmpRoot({ janitor: join(process.cwd(), 'scripts/temp-janitor.mjs') }), valibotStandardPlugin()],
     // DS11: plan worktrees under .worktrees/ are other checkouts; the dev watcher never follows them
     server: { port: 5173, host: true, watch: { ignored: worktreeWatchIgnored() } },
     // js-payload D2 (Jake): on-phone stacks show Rolldown's mangled names; hidden source maps resolve them on desktop

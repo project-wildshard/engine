@@ -277,6 +277,7 @@
     "../scripts/frame-floor-timeline-session.ts",
     "../scripts/app-build/worldMapAtlas.ts",
     "../vite/rapier.ts",
+    "../vite/valibotStandard.ts",
     "../scripts/app-build/controlChunks.ts",
     "../scripts/pin-packs.ts",
     "../scripts/pin-assets.ts",
