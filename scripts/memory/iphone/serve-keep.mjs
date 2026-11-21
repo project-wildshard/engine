@@ -135,7 +135,8 @@ function startWorld(state) {
   const log = join(keptDir(), `${state.label}.world.log`);
   const fd = openSync(log, 'a');
   const script = process.env.WS_KEEP_WORLD ?? 'scripts/dev.mjs';
-  const work = `tmp/dev-world-public-${String(state.port)}`;
+  // one work folder per build, so a restart never serves a client an older build left behind
+  const work = `tmp/kept-world-${state.sha.slice(0, 12)}`;
   // a restart serves the client this keeper already built (an exact build: --no-watch), so the world is back in seconds,
   // not the minute a fresh pins install and client build take
   const built = existsSync(join(state.root, work)) ? readdirSync(join(state.root, work)).filter((name) => name.startsWith('client-') && existsSync(join(state.root, work, name, 'index.html')))
