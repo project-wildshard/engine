@@ -5,6 +5,7 @@ import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {installTitleManifests, titleManifests, type TitleManifest} from '../src/client/game/shard/titleList';
 import {Scope} from '../src/shared/engine/app/scope';
 import {saves} from '../src/shared/engine/saves/runtime';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 afterEach(() => {vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs();});
 
@@ -13,11 +14,11 @@ test('Download everything reads every product past Save-Data in a fresh run, and
   const bodies = [new Uint8Array([1, 2]), new Uint8Array([3, 4, 5])], hashes = bodies.map(body => hashImmutableBytes(body));
   const indexOf = (slug: string, file: number) => {
     const source = emptyShardfile({slug, name: slug, author: 'Test', revision: 1, seed: 1});
-    return parseOutputIndex({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
+    return parseOutputIndex(outputIndexEnvelope({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
       identity: source.identity, requires: source.requires, build: {sourceHash: '0'.repeat(64), validator: 'test'},
       admission: {budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library},
       sections: [], schemas: [], runtime: null, files: [{hash: hashes[file] ?? '', kind: 'bin', path: `blobs/bin/${hashes[file] ?? ''}.bin`,
-        compressed: bodies[file]?.length ?? 0, decoded: bodies[file]?.length ?? 0, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false}]});
+        compressed: bodies[file]?.length ?? 0, decoded: bodies[file]?.length ?? 0, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false}]}));
   };
   const indexes = new Map([['home', indexOf('download-home', 0)], ['far', indexOf('download-far', 1)]]);
   // no build index hashes (as in dev): the phone path keeps each checked index without rebuilding its whole product

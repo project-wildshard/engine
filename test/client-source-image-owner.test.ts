@@ -12,6 +12,7 @@ import { OUTPUT_SECTIONS, outputSectionPayloads } from '@wildshard/format/output
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { toLevelSpec } from '../src/client/game/shard/spec';
 import { bakedMapUrl } from '../src/client/game/shard/manifest';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 const original = Uint8Array.from(readFileSync('test/fixtures/world-source/image.png'));
 function fixture() {
@@ -35,10 +36,10 @@ function fixture() {
   if (file === undefined) throw new Error('Missing image file');
   const path = `blobs/image/${hash}.png`;
   wires.set(path, original);
-  const index = parseOutputIndex({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
+  const index = parseOutputIndex(outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
     identity: source.identity, build: { sourceHash: hashImmutableBytes(encode(source)), validator: 'test' }, requires: source.requires,
     admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
-    sections, schemas: [], files: [{ ...file, path }], runtime: null });
+    sections, schemas: [], files: [{ ...file, path }], runtime: null }));
   return { index, wires };
 }
 function bindings(imageOwner?: Scope): ShardfileClientBindings {

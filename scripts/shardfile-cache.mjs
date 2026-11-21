@@ -105,7 +105,7 @@ export function publishFolder(from, to) {
     clonePaths([[from,temporary]]);
     let index;
     try{index=JSON.parse(readFileSync(join(temporary,'shard.json'),'utf8'));}catch{ /* Legacy cache fixtures may contain plain text. */ }
-    if(index?.format==='wildshard.shardfile'&&index.formatVersion===2&&existsSync(join(temporary,KEY_FILE))){
+    if(index?.format==='wildshard.shardfile'&&(index.formatVersion===2||typeof index.formatVersion==='string')&&existsSync(join(temporary,KEY_FILE))){
       const key=readFileSync(join(temporary,KEY_FILE),'utf8').trim(),receipt=JSON.parse(readFileSync(join(temporary,'validation.json'),'utf8'));
       const ordered=Object.fromEntries(Object.entries({...receipt,buildKey:key}).sort(([a],[b])=>a.localeCompare(b)));
       writeFileSync(join(temporary,'validation.json'),`${JSON.stringify(ordered)}\n`);rmSync(join(temporary,KEY_FILE));

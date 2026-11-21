@@ -14,6 +14,7 @@ import { mkdir, mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native import evaluates the bundled browser entry without a browser or eval shim.
 import { pathToFileURL } from 'node:url';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 function resolverModule(input: unknown): input is { resolveOutputDescriptor: typeof resolveOutputDescriptor; admitFolder: typeof admitFolder;
   createShardFolder: typeof createShardFolder; readCheckedOutputIndex: typeof readCheckedOutputIndex } {
@@ -27,13 +28,13 @@ test('browser products need a build proof and bundle no checked host intake', as
   const encode = (input: unknown): Uint8Array => new TextEncoder().encode(encodeCanonicalJson(input));
   const source = emptyShardfile({ slug: 'browser-descriptor', name: 'Browser', author: 'Test', revision: 1, seed: 1 });
   const values = outputSectionPayloads(source), wires = new Map([...values].map(([name, value]) => [`sections/${name}.json`, encode(value)]));
-  const index = { format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity,
+  const index = outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity,
     requires: source.requires, build: { sourceHash: hashImmutableBytes(encode(source)), validator: 'browser-boundary' },
     admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
     sections: [...values].map(([name]) => {
       const path = `sections/${name}.json`, bytes = wires.get(path); if (bytes === undefined) throw new Error('Missing section');
       return { name, path, bytes: bytes.length, hash: hashImmutableBytes(bytes), schema: `wildshard:${name}@1` };
-    }), schemas: [], files: [], runtime: null };
+    }), schemas: [], files: [], runtime: null });
   const entry = new URL('../descriptor-check-boundary', import.meta.url).pathname;
   const folderEntry = new URL('../src/client/game/shardfile/folder.ts', import.meta.url).pathname;
   const metadataEntry = new URL('../src/shared/game/shardfile/outputIndexChecks.ts', import.meta.url).pathname;

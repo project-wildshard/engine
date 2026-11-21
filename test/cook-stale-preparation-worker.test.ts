@@ -11,6 +11,7 @@ import {outputSectionPayloads} from '@wildshard/format/outputFields';
 import {FIRST_VERSION} from '@wildshard/format/sectionVersions';
 import {writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
+import {outputIndexEnvelope} from '@wildshard/format/version';
 import {createCookWorker, indexKey} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
 import {cookedMapPath} from '../src/shared/game/shardfile/cookedMapPath';
@@ -32,10 +33,10 @@ function workerProduct(): Map<string, Uint8Array> {
   const {identity, version, requires, budgets, serverBudget, authorCaps, critical, library} = source;
   const cook = validationSourceBytes({version: 1, mounts: []});
   files.set('cook.json', cook);
-  files.set('shard.json', validationSourceBytes({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2',
+  files.set('shard.json', validationSourceBytes(outputIndexEnvelope({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2',
     version, identity, requires, admission: {budgets, serverBudget, authorCaps, critical, library},
     build: {sourceHash: digest(validationSourceBytes(source)), validator: 'fixture'}, sections, schemas: [], files: [], runtime: null,
-    cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
+    cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}})));
   return files;
 }
 

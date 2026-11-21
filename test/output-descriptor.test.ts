@@ -33,6 +33,7 @@ import { installCatalogueFixture } from './fixtures/bootSetup';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
 import { setPageMode } from '../src/shared/game/grid/pageMode';
 import { PageResidency } from '../src/client/game/grid/pageResidency';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 await installCatalogueFixture();
 
@@ -58,11 +59,11 @@ function fixture(blob = false, spawnX = 0, revision = 1, slug = 'loader-fixture'
     wires.set(path, bytes);
     return { name, path, schema: `wildshard:${name}@1`, hash: hashImmutableBytes(bytes), bytes: bytes.length };
   });
-  const index = parseOutputIndex({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
+  const index = parseOutputIndex(outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
     identity: source.identity, build: { sourceHash: hashImmutableBytes(encodeCanonicalJson(source)), validator: 'test' }, requires: source.requires,
     admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library, ...(source.late === undefined ? {} : {late:source.late}) },
     ...(texture === undefined ? {} : {ktx2Costs:{[hashImmutableBytes(texture)]:ktx2DeviceCosts(texture)}}),
-    sections, schemas: [], files: source.files.map(file => ({ ...file, kind: texture === undefined ? 'bin' : 'ktx2', ...(declaredLate ? {name:'late.bin'} : {}), path: texture === undefined ? `blobs/bin/${file.hash}.bin` : `blobs/ktx2/${file.hash}.ktx2` })), runtime: null });
+    sections, schemas: [], files: source.files.map(file => ({ ...file, kind: texture === undefined ? 'bin' : 'ktx2', ...(declaredLate ? {name:'late.bin'} : {}), path: texture === undefined ? `blobs/bin/${file.hash}.bin` : `blobs/ktx2/${file.hash}.ktx2` })), runtime: null }));
   wires.set('shard.json', encodeCanonicalJson(index));
   return { source, index, wires };
 }
@@ -636,7 +637,7 @@ test('a slow descriptor cache never excuses corrupt fallback pack bytes', async 
 
 test('packed sections and files come from one read of each pack (iPhone downloads I5)', async () => {
   const { wires, index } = fixture(true), packs: NonNullable<OutputIndex['packs']> = [];
-  for (const members of [[...index.sections, ...index.schemas].map(entry => ({ path: entry.path, hash: entry.hash })), index.files.map(file => ({ path: file.path, hash: file.hash }))]) {
+  for (const members of [[...index.sections, ...index.schemas ?? []].map(entry => ({ path: entry.path, hash: entry.hash })), index.files.map(file => ({ path: file.path, hash: file.hash }))]) {
     const parts = members.map(member => { const part = wires.get(member.path); if (part === undefined) throw new Error('Missing fixture member'); return { hash: member.hash, part }; });
     const bytes = new Uint8Array(parts.reduce((total, row) => total + row.part.length, 0)), entries: { hash: string; offset: number; bytes: number }[] = [];
     let offset = 0;
@@ -1313,7 +1314,7 @@ test('build-owned client sections assemble exact hosts without hashing or downlo
   const f=fixture(),path='sections/ui/strings.json',schemaPath='schemas/custom/forbidden.schema.json';
   const value={enabled:'true'},wire=encodeCanonicalJson(value);
   const measured=(name:string,bytes:Uint8Array)=>({path:name,bytes:bytes.length,hash:hashImmutableBytes(bytes)});
-  const index=parseOutputIndex({...f.index,sections:[...f.index.sections,{name:'ui/strings',schema:'wildshard:ui/strings@1',...measured(path,wire)}],schemas:[]});
+  const index=parseOutputIndex({...f.index,sections:[...f.index.sections,{name:'ui/strings',schema:'wildshard:ui/strings@1',...measured(path,wire)}]});
   f.wires.set(path,wire);
   const reads:string[]=[],digest=vi.fn<(bytes:Uint8Array)=>Promise<string>>(()=>{throw new Error('No client digest');});
   let active=0,maximum=0;

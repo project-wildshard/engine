@@ -158,7 +158,7 @@ export async function coreMemoryFolderIdentity(base, shard, version, read = fetc
     const path = `/shardfiles/${shard}/shard.json`, bytes = await wire(path, 1048576);
     // Identify the wire envelope only. Admission remains with the production
     // validator; no blob or section bodies enter this diagnostic.
-    const index = v.parse(v.object({format: v.literal('wildshard.shardfile'), formatVersion: v.literal(2),
+    const index = v.parse(v.object({format: v.literal('wildshard.shardfile'), formatVersion: v.union([v.literal(2), v.string()]),
       identity: v.object({slug: v.literal(shard)}),
       build: v.object({sourceHash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u))})}), JSON.parse(decoder.decode(bytes)));
     const after = v.parse(buildSchema, JSON.parse(decoder.decode(await wire('/version.json', 65536))));

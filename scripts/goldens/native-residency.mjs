@@ -34,7 +34,7 @@ export async function goldenRefinementBinding(base,source) {
   if(version.build!==source.build)throw new Error('Native reader dist differs from served version');
   const index=readFileSync(join(root,'shardfiles','nine-dragon-stack','shard.json'));
   const product=JSON.parse(index.toString('utf8'));
-  if(product.format!=='wildshard.shardfile'||product.formatVersion!==2||product.identity?.slug!=='nine-dragon-stack')
+  if(product.format!=='wildshard.shardfile'||(product.formatVersion!==2&&typeof product.formatVersion!=='string')||product.identity?.slug!=='nine-dragon-stack')
     throw new Error('Native reader requires the served Nine product');
   const servedIndex=Buffer.from(await(await fetch(new URL('/shardfiles/nine-dragon-stack/shard.json',base))).arrayBuffer());
   if(!servedIndex.equals(index))throw new Error('Served Nine index differs from exact preview');

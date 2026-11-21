@@ -10,6 +10,7 @@ import {outputSectionPayloads} from '@wildshard/format/outputFields';
 import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
 import {writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 const require=createRequire(import.meta.url),engine=dirname(require.resolve('@wildshard/engine/package.json'));
 const basis=await require(join(engine,'scripts/vendor/basisu/basis_encoder.cjs'))({wasmBinary:new Uint8Array(readFileSync(join(engine,'scripts/vendor/basisu/basis_encoder.wasm'))),print:()=>{},printErr:()=>{}});
@@ -23,7 +24,7 @@ const master=encoded.slice(0,length),json=validationSourceBytes,hash=bytes=>crea
 const files=new Map(),source=emptyShardfile({slug:'installed-cook',name:'Installed cook',author:'Test',revision:1,seed:1});
 const measured=(path,bytes)=>({path,hash:hash(bytes),bytes:bytes.length});
 const sections=[...outputSectionPayloads(source)].map(([name,value])=>{const path=`sections/${name}.json`,bytes=json(value);files.set(path,bytes);return {name,schema:`wildshard:${name}@1`,...measured(path,bytes)};});
-const index={format:'wildshard.shardfile',formatVersion:2,sdk:'0.3',version:source.version,identity:source.identity,build:{sourceHash:'0'.repeat(64),validator:'fixture'},requires:source.requires,admission:{budgets:source.budgets,serverBudget:source.serverBudget,authorCaps:source.authorCaps,critical:source.critical,library:source.library},sections,schemas:[],files:[],runtime:null};
+const index=outputIndexEnvelope({format:'wildshard.shardfile',formatVersion:2,sdk:'0.3',version:source.version,identity:source.identity,build:{sourceHash:'0'.repeat(64),validator:'fixture'},requires:source.requires,admission:{budgets:source.budgets,serverBudget:source.serverBudget,authorCaps:source.authorCaps,critical:source.critical,library:source.library},sections,schemas:[],files:[],runtime:null});
 const texture='/assets/gpu/installed-master.ktx2',discovery=json({native:{ktx2:{phone:{'/assets/rock.png':texture},desktop:{'/assets/rock.png':texture}}}});
 const mount=(url,path,bytes)=>{files.set(path,bytes);return {url,...measured(path,bytes)};};
 const programs={version:2,build:'fixture',lines:['void main() {}'],shaders:[[0]],programs:[[0,0]]};

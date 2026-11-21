@@ -49,12 +49,14 @@ export async function cachedBodyEvidence(input, descriptor) {
         text += decoder.decode(chunk.value, { stream: true });
       }
       const stored = JSON.parse(text + decoder.decode()), index = stored?.source;
-      if (stored?.firstParty !== true || index?.format !== 'wildshard.shardfile' || index.formatVersion !== 2
+      if (stored?.firstParty !== true || index?.format !== 'wildshard.shardfile' || (index.formatVersion !== 2 && typeof index.formatVersion !== 'string')
         || index.identity?.slug !== selected.pathname.split('/')[2]) throw new Error('Invalid selected product record');
       const inventory = [], paths = new Set();
       for (const [kind, size] of [['sections', 'bytes'], ['schemas', 'bytes'], ['files', 'compressed']]) {
-        if (!Array.isArray(index[kind]) || index[kind].length > limits.urls) throw new Error('Invalid product inventory');
-        for (const row of index[kind]) {
+        // format 0.1.0.2 drops the always-empty schemas list (SHARD-COMPAT CP14)
+        const rows = kind === 'schemas' ? index[kind] ?? [] : index[kind];
+        if (!Array.isArray(rows) || rows.length > limits.urls) throw new Error('Invalid product inventory');
+        for (const row of rows) {
           if (row === null || typeof row !== 'object' || typeof row.path !== 'string'
             || !/^(?:[a-zA-Z0-9_-][a-zA-Z0-9_.-]*\/)*[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$/u.test(row.path)
             || paths.has(row.path) || typeof row.hash !== 'string' || !/^[a-f0-9]{64}$/u.test(row.hash)

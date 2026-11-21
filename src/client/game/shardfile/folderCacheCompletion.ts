@@ -27,7 +27,7 @@ export function folderCacheCompletion(source: Shardfile, options: FolderOptions,
         const bytes = await cache.asset(base, hash);
         return bytes !== null && bytes.length === size && await options.hash(bytes) === hash;
       };
-      const sections = [...descriptor.index.sections, ...descriptor.index.schemas];
+      const sections = [...descriptor.index.sections, ...descriptor.index.schemas ?? []];
       const release = cache.pin?.([...selected.map(file => file.hash), ...source.requires.commons, ...sections.map(section => section.hash)]);
       try {
         for (const file of remaining) {

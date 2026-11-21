@@ -251,7 +251,7 @@ export async function resolveOutputDescriptor(input: unknown, reader: OutputDesc
   const current = historical === null ? pinned?.index ?? (await descriptorChecks(reader)).parseIndex(input) : null;
   const inventory = historical ?? current;
   if (inventory === null) return input;
-  for (const file of [...inventory.sections, ...inventory.schemas]) reader.declare?.(file.path, file.bytes);
+  for (const file of [...inventory.sections, ...inventory.schemas ?? []]) reader.declare?.(file.path, file.bytes);
   // General readers declare the immutable bank before their first section read.
   // Admission defers blobs until its verified sections select a device tier;
   // the boot compiler reserves that same selected bank before section reads.
@@ -259,7 +259,7 @@ export async function resolveOutputDescriptor(input: unknown, reader: OutputDesc
   if (current !== null && reader.deferAssetDeclarations !== true) for (const file of current.files) reader.declare?.(outputBlobPath(file), file.compressed);
   const sections = new Map<string, unknown>();
   const packed = current === null || reader.pack === undefined || reader.offline ? undefined
-    : packReads(current.packs, new Set([...current.sections, ...current.schemas].map(entry => entry.hash)), reader.pack, reader.hash);
+    : packReads(current.packs, new Set([...current.sections, ...current.schemas ?? []].map(entry => entry.hash)), reader.pack, reader.hash);
   let cached = reader.cached !== undefined || reader.verified !== undefined;
   const cachedSection = async (section: OutputIndex['sections'][number], inPack: boolean): Promise<Uint8Array | { readonly verified: Uint8Array } | null | undefined> => {
     if (reader.cached === undefined) return undefined;

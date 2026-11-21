@@ -13,7 +13,7 @@ export function entryReadSet(source: Shardfile, tier: 'phone' | 'desktop', index
   sections: ReadonlyMap<string, unknown>, whole = false, fence: ReadonlySet<string> = new Set()): ReadonlySet<string> {
   const required = controlFileHashes(source), steps = entryFileSteps(source, tier, {index, sections});
   let turn = steps.next(); while (turn.done !== true) turn = steps.next();
-  const wanted = new Set([...index.sections, ...index.schemas].map(row => row.hash));
+  const wanted = new Set([...index.sections, ...index.schemas ?? []].map(row => row.hash));
   // `turn.value` is what this tier streams after control today: still required, so the whole level keeps it.
   for (const file of index.files) if (required.has(file.hash) && (whole ? file.tier === undefined || file.tier === tier : !turn.value.has(file.hash))) wanted.add(file.hash);
   // `late` only schedules a library member after control (controlFileHashes leaves it out); the level still loads it

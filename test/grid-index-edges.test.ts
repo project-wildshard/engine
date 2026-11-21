@@ -11,15 +11,16 @@ import { readGridFolderEdges, readGridFolderFar, readGridFolderNear, readGridSha
 import { loadShardfileFar } from '../src/client/game/grid/shardfileFar';
 import { memoryAttribution } from '../src/shared/engine/core/memoryAttribution';
 import type { FolderCache } from '../src/client/game/shardfile/folder';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 function fixture(slug = 'edge-fixture') {
   const source = emptyShardfile({ slug, name: 'Edges', author: 'Test', revision: 1, seed: 9 });
   const encode = (value: unknown) => new TextEncoder().encode(encodeCanonicalJson(value));
   const payloads = outputSectionPayloads(source), url = `https://game.test/shardfiles/${slug}/shard.json`;
   const sectionBytes = new Map([...payloads].map(([name, value]) => [name, encode(value)]));
-  const index = { format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity, requires: source.requires,
+  const index = outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity, requires: source.requires,
     build: { sourceHash: '0'.repeat(64), validator: 'test' }, admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
-    sections: [...sectionBytes].map(([name, bytes]) => ({ name, path: `sections/${name}.json`, schema: `wildshard:${name}@1`, hash: hashImmutableBytes(bytes), bytes: bytes.length })), schemas: [], files: [], runtime: null };
+    sections: [...sectionBytes].map(([name, bytes]) => ({ name, path: `sections/${name}.json`, schema: `wildshard:${name}@1`, hash: hashImmutableBytes(bytes), bytes: bytes.length })), schemas: [], files: [], runtime: null });
   const edgeUrl = new URL('sections/world/edge.json', url).href;
   const edge = sectionBytes.get('world/edge'); if (edge === undefined) throw new Error('Missing test edges');
   const wires = new Map([[url, encode(index)], [edgeUrl, edge]]);
@@ -237,10 +238,10 @@ test('G608: a near view reads its index, tiles and look sections and only its de
   const base = emptyShardfile({ slug: 'near-fixture', name: 'Near', author: 'Test', revision: 1, seed: 9 });
   const source = { ...base, files: [file], near: { version: 1 as const, terrain: [], content: [hash] } }, url = 'https://game.test/shardfiles/near-fixture/shard.json';
   const sections = new Map([...outputSectionPayloads(source)].map(([name, value]) => [name, encode(value)]));
-  const index = { format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity, requires: source.requires,
+  const index = outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity, requires: source.requires,
     build: { sourceHash: '0'.repeat(64), validator: 'test' }, admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
     sections: [...sections].map(([name, bytes]) => ({ name, path: `sections/${name}.json`, schema: `wildshard:${name}@1`, hash: hashImmutableBytes(bytes), bytes: bytes.length })), schemas: [],
-    files: [{ ...file, path: `blobs/glb/${hash}.glb` }], runtime: null };
+    files: [{ ...file, path: `blobs/glb/${hash}.glb` }], runtime: null });
   const at = (path: string) => new URL(path, url).href, wires = new Map([[url, encode(index)], [at(`blobs/glb/${hash}.glb`), glb], ...[...sections].map(([name, bytes]) => [at(`sections/${name}.json`), bytes] as const)]);
   const fetch = vi.fn((path: string): Promise<Response> => {
     const bytes = wires.get(path); if (bytes === undefined) return Promise.reject(new Error(`Unexpected read: ${path}`));

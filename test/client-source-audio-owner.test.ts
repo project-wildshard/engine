@@ -10,6 +10,7 @@ import { installManifestShardfile, shardfileSource } from '../src/client/game/sh
 import type { ShardfileClientBindings } from '../src/client/game/shardfile/client';
 import type { FolderOptions } from '../src/client/game/shardfile/folder';
 import { NO_AUDIO } from '../src/client/engine/audio/levelAudio';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 await installCatalogueFixture();
 
@@ -26,10 +27,10 @@ function fixture(scene: boolean): { options: FolderOptions; index: ReturnType<ty
     const bytes = encode(payload), path = `sections/${name}.json`; wires.set(path, bytes);
     return { name, path, schema: `wildshard:${name}@1`, hash: hashImmutableBytes(bytes), bytes: bytes.length };
   });
-  const index = parseOutputIndex({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
+  const index = parseOutputIndex(outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
     identity: source.identity, build: { sourceHash: hashImmutableBytes(encode(source)), validator: 'test' }, requires: source.requires,
     admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
-    sections, schemas: [], files: [], runtime: null });
+    sections, schemas: [], files: [], runtime: null }));
   wires.set('shard.json', encode(index));
   return { index, options: { base: 'https://example.test/', offline: false,
     fetch: url => {

@@ -90,7 +90,7 @@ async function readGridFolderIndex(url: string, identity: string, options: Folde
   }
   const { slug: declaredIdentity } = index.identity;
   if (declaredIdentity !== identity.replace(/^_/u, '')) throw new Error('Grid product index identity differs from its cell');
-  const packed = packReads(options.directFiles === true ? undefined : index.packs, new Set([...index.sections, ...index.schemas].map(row => row.hash)), async (path, maximum) => {
+  const packed = packReads(options.directFiles === true ? undefined : index.packs, new Set([...index.sections, ...index.schemas ?? []].map(row => row.hash)), async (path, maximum) => {
 
     const response = await options.fetch(new URL(path, url).href);
     if (response.status === 206) { await response.body?.cancel(); throw new Error('Grid pack requires a whole response'); }

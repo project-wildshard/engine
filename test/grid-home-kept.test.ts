@@ -6,6 +6,7 @@ import { encodeCanonicalJson, hashImmutableBytes } from '../src/shared/host/immu
 import { readGridFolderKept } from '../src/client/game/grid/folders';
 import { gridHomeKept } from '../src/client/game/grid/homeKept';
 import { Owned, type KeptRow } from '../src/shared/game/loot/Owned';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 const KEPT: KeptRow[] = [
   { id: 'warden-longbow', kind: 'gear', label: "The Warden's Longbow" },
@@ -19,9 +20,9 @@ function fixture(slug: string, kept?: KeptRow[]) {
   const encode = (value: unknown) => new TextEncoder().encode(encodeCanonicalJson(value));
   const url = `https://game.test/shardfiles/${slug}/shard.json`;
   const sectionBytes = new Map([...outputSectionPayloads(declared)].map(([name, value]) => [name, encode(value)]));
-  const index = { format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity, requires: source.requires,
+  const index = outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity, requires: source.requires,
     build: { sourceHash: '0'.repeat(64), validator: 'test' }, admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
-    sections: [...sectionBytes].map(([name, bytes]) => ({ name, path: `sections/${name}.json`, schema: `wildshard:${name}@1`, hash: hashImmutableBytes(bytes), bytes: bytes.length })), schemas: [], files: [], runtime: null };
+    sections: [...sectionBytes].map(([name, bytes]) => ({ name, path: `sections/${name}.json`, schema: `wildshard:${name}@1`, hash: hashImmutableBytes(bytes), bytes: bytes.length })), schemas: [], files: [], runtime: null });
   const items = sectionBytes.get('combat/items'); if (items === undefined) throw new Error('Missing combat/items');
   const wires = new Map([[url, encode(index)], [new URL('sections/combat/items.json', url).href, items]]);
   const fetch = vi.fn((path: string): Promise<Response> => {

@@ -13,7 +13,8 @@ import { createHash } from 'node:crypto';
 
 const source = emptyShardfile({ slug: 'total-test', name: 'Total', author: 'Test', revision: 1, seed: 9 });
 const hash = '0'.repeat(64);
-const index = { format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity,
+// A legacy (0.1.0.1) index on purpose: it keeps the custom-schema row that format 0.1.0.2 drops (SHARD-COMPAT CP14).
+const index = { format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: '0.1.0.1', identity: source.identity,
   requires: source.requires, build: { sourceHash: hash, validator: 'test' },
   admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
   sections: [{ name: 'custom/first', path: 'sections/custom/first.json', schema: 'schemas/custom/first.schema.json', hash, bytes: 40 }],

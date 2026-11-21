@@ -25,7 +25,9 @@ export async function preparePrefetchIndex(request:PrefetchIndexRequest, authorC
   const bytes=await read(request.url,limits.sourceBytes);
   if(request.indexHashes!==null&&(nativeRead===undefined ? !request.indexHashes.includes(await contentHash(bytes)) : known.length!==1))return null;
   const input:unknown=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
-  const index=request.indexHashes===null?await readCheckedOutputIndex(input):readOutputDownloadIndex(input);
+  // SHARD-COMPAT CP14: format 0.1.0.2 drops the always-empty schemas list; the download index keeps it as [].
+  const checked=request.indexHashes===null?await readCheckedOutputIndex(input):undefined;
+  const index:OutputDownloadIndex=checked===undefined?readOutputDownloadIndex(input):{...checked,schemas:checked.schemas??[]};
   if(!request.phone||request.indexHashes===null)return index;
   const [{isBuildValidatedOutput,resolveOutputDescriptor},{tierFolderFilesPaced}]=await Promise.all([
     import('../../../shared/game/shardfile/outputDescriptor'),import('../shardfile/folderCost'),

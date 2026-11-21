@@ -198,11 +198,13 @@ function transportRelease(source: Shardfile, assets: Map<string, Uint8Array>, op
     return released;
   };
 }
+/** Format 0.1.0.2 writes its version as `formatVersion`; older files carry the layout marker 2 there and `version` beside it (SHARD-COMPAT CP14). */
 function version(input: unknown): string {
-  if (typeof input !== 'object' || input === null || !('version' in input)) throw new Error('Shardfile needs a format version');
-  parseShardfileVersion(input.version);
-  if (typeof input.version !== 'string') throw new Error('Shardfile needs a format version');
-  return input.version;
+  if (typeof input !== 'object' || input === null) throw new Error('Shardfile needs a format version');
+  const declared = 'formatVersion' in input && typeof input.formatVersion === 'string' ? input.formatVersion : 'version' in input ? input.version : undefined;
+  parseShardfileVersion(declared);
+  if (typeof declared !== 'string') throw new Error('Shardfile needs a format version');
+  return declared;
 }
 /** Stream bounded wire bytes, including responses without a trustworthy Content-Length header. */
 export function boundedResponse(response: Response, maximum: number, read?: (bytes: number) => void): Promise<Uint8Array> {
@@ -335,7 +337,7 @@ export async function readFolderDescriptor(options: FolderOptions, declaredUrl?:
     await options.pause?.();
     const input:unknown=options.parseJson===undefined?JSON.parse(descriptorDecoder.decode(bytes)):await options.parseJson(bytes);
     if (indexHash !== null && (!isOutputIndex(input) || typeof input !== 'object' || input === null
-      || !('formatVersion' in input) || input.formatVersion !== 2)) throw new Error('Shardfile requires a format-2 output');
+      || !('formatVersion' in input) || (input.formatVersion !== 2 && typeof input.formatVersion !== 'string'))) throw new Error('Shardfile requires a format-2 output');
     const source=await resolveDescriptor(input,options,{ verifiedIndex: indexHash !== null });
     if(!isBuildValidatedOutput(source))throw new Error('Built-in reader did not assemble its build output');
     return source;
@@ -470,7 +472,7 @@ function currentOutputLineage(input: unknown, source: Shardfile): unknown {
   const descriptor = outputDescriptor(source);
   if (descriptor === undefined) return undefined;
   const historical = parseOutputLineageIndex(input);
-  const current = new Map([...descriptor.index.sections, ...descriptor.index.schemas].map(row => [row.path, row]));
+  const current = new Map([...descriptor.index.sections, ...descriptor.index.schemas ?? []].map(row => [row.path, row]));
   for (const row of [...historical.sections, ...historical.schemas]) {
     const verified = current.get(row.path);
     if (verified === undefined || verified.hash !== row.hash || verified.bytes !== row.bytes) return undefined;
@@ -683,7 +685,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   if (!options.offline && options.cache !== undefined) {
     progress('cache', `Saving verified offline assets · ${reference}`);
     const cache = options.cache, descriptor = outputDescriptor(source);
-    const sectionFiles = descriptor === undefined ? [] : [...descriptor.index.sections, ...descriptor.index.schemas];
+    const sectionFiles = descriptor === undefined ? [] : [...descriptor.index.sections, ...descriptor.index.schemas ?? []];
     const release = cache.pin?.([...assets.keys()].map((ref) => ref.replace(/^commons:/u, '')).concat(sectionFiles.map(section => section.hash)));
     try {
       let complete = descriptor?.cacheStored === undefined ? descriptor?.cached ?? true : await waitFor(`Persist product sections · ${reference}`, descriptor.cacheStored, 'file');

@@ -27,7 +27,7 @@ export function bootTierFolderTotals(root:string): Readonly<Record<string,Total>
     }
     // Only transport metadata is reconstructed in Node. The browser still
     // admits every section through the complete format contract.
-    const metadata=v.parse(v.object({version:v.unknown(),identity:v.looseObject({slug:v.string()}),requires:v.unknown(),
+    const metadata=v.parse(v.object({version:v.exactOptional(v.unknown()),identity:v.looseObject({slug:v.string()}),requires:v.unknown(),
       files:v.array(v.object({hash:v.string(),kind:v.string(),decoded:v.number(),dependencies:v.array(v.string())})),
       admission:v.looseObject({library:v.array(v.string()),critical:v.array(v.string())})}),input);
     const pair=v.object({day:v.string(),night:v.string()});

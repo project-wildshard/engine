@@ -19,6 +19,7 @@ import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import {parseShardfile} from '@wildshard/format/shardSchema';
 import {resolveOutputDescriptor,carryOutputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
 import {shardFolderData} from '../src/shared/game/shardfile/folderData';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 const hash=sha256(chargeModule);
 const inline={...charge,bytes:btoa(String.fromCodePoint(...chargeModule))};
@@ -30,10 +31,10 @@ async function product() {
     const bytes=new TextEncoder().encode(JSON.stringify(value)),path=`sections/${name}.json`;wires.set(path,bytes);
     return {name,path,schema:`wildshard:${name}@1`,hash:sha256(bytes),bytes:bytes.length};
   });
-  const index=parseOutputIndex({format:'wildshard.shardfile',formatVersion:2,sdk:'0.2',version:source.version,identity:source.identity,
+  const index=parseOutputIndex(outputIndexEnvelope({format:'wildshard.shardfile',formatVersion:2,sdk:'0.2',version:source.version,identity:source.identity,
     build:{sourceHash:sha256(new TextEncoder().encode(JSON.stringify(source))),validator:'test'},requires:source.requires,
     admission:{budgets:source.budgets,serverBudget:source.serverBudget,authorCaps:source.authorCaps,critical:source.critical,library:source.library},
-    sections,schemas:[],files:[{...file,path:charge.script.module,name:'behaviour/charge.wasm'}],runtime:null});
+    sections,schemas:[],files:[{...file,path:charge.script.module,name:'behaviour/charge.wasm'}],runtime:null}));
   const assembled=await resolveOutputDescriptor(index,{offline:false,hash:bytes=>Promise.resolve(sha256(bytes)),read:path=>{
     const bytes=wires.get(path);if(bytes===undefined)throw new Error('Missing fixture section');return Promise.resolve(bytes);
   }});

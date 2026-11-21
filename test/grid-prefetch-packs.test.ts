@@ -8,6 +8,7 @@ import {startSpawnDownload, adoptCompletedSpawnDownload} from '../src/client/gam
 import {installEntryDownloadTap, startEntryDownload} from '../src/client/game/shardfile/entryTransport';
 import {jsonSlot} from '../src/client/engine/saves/slots';
 import {LEVEL_DOWNLOAD_SLOT, runtimePacksOn} from '../src/client/engine/boot/loadingPacks';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 // These title transports read loose files (DL16 made Runtime packs the shipped default; the packs book has its own
 // tests): pin the harness slot to Shardfile before the page's first, frozen read
@@ -24,13 +25,13 @@ test.each(['play', 'title', 'title-stop', 'grid-title', 'title-adopt'] as const)
   const hashes = [hashImmutableBytes(first), hashImmutableBytes(second)];
   const packBytes = new Uint8Array([...first, ...second]), packHash = hashImmutableBytes(packBytes), packPath = `blobs/pack/${packHash}.pack`;
   const source = emptyShardfile({slug: 'prefetch-packs', name: 'Packs', author: 'Test', revision: 1, seed: 1});
-  const index = parseOutputIndex({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
+  const index = parseOutputIndex(outputIndexEnvelope({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
     identity: source.identity, requires: source.requires, build: {sourceHash: '0'.repeat(64), validator: 'test'},
     admission: {budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library},
     sections: [], schemas: [], runtime: null, files: [first, second].map((bytes, i) => ({hash: hashes[i] ?? '', kind: 'bin', path: `blobs/bin/${hashes[i] ?? ''}.bin`,
       compressed: bytes.length, decoded: bytes.length, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false})),
     packs: [{path: packPath, hash: packHash, bytes: 3, entries: [{hash: hashes[0] ?? '', offset: 0, bytes: 2}, {hash: hashes[1] ?? '', offset: 2, bytes: 1}]}],
-  });
+  }));
   vi.stubEnv('DEV', false);
   vi.stubGlobal('__SHARDFILE_VERDICTS__', [{path: '/alpha/index.json', indexHash: hashImmutableBytes(new TextEncoder().encode(JSON.stringify(index)))}]);
   const title: TitleManifest = {slug: 'mossgate', name: 'mossgate', biome: 'test', status: 'hidden',

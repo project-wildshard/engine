@@ -2,7 +2,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 import { parseShardfile } from '@wildshard/format/shardSchema';
-import { SHARDFILE_VERSION } from '@wildshard/format/version';
+import { SHARDFILE_VERSION, outputIndexEnvelope } from '@wildshard/format/version';
 import { ClientAssets } from './clientAssets';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { isBuildValidatedOutput, resolveOutputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
@@ -37,12 +37,12 @@ function fixture() {
 
 test('native built-in demand uses the canonical URL and no page cache or hash', async () => {
   const f = fixture(), requests: { url: string; bytes: number | undefined; hash: string | undefined; priority: 'low' | undefined }[] = [];
-  const index = parseOutputIndex({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: f.source.version,
+  const index = parseOutputIndex(outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: f.source.version,
     identity: f.source.identity, requires: f.source.requires, build: { sourceHash: '0'.repeat(64), validator: 'test' },
     admission: { budgets: f.source.budgets, serverBudget: f.source.serverBudget, authorCaps: f.source.authorCaps, critical: [], library: [] },
     sections: [], schemas: [], runtime: null, files: [{ hash: f.ref, kind: 'bin', path: `blobs/bin/${f.ref}.bin`, compressed: 3,
       decoded: 3, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false }],
-  });
+  }));
   const read = (): Promise<Uint8Array> => Promise.reject(new Error('No section in this emitted index'));
   const source = await resolveOutputDescriptor(index, { offline: false, read, hash: f.options.hash,
     built: { indexHash: 'b'.repeat(64), read } });

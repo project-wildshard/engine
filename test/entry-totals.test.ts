@@ -13,6 +13,7 @@ import {createHash} from 'node:crypto';
 import {brotliCompressSync, constants} from 'node:zlib';
 import {readBuiltSpawnManifest} from '../src/cook/game/engineHalf';
 import {downloadSpawnManifest} from '../src/client/game/boot/spawnDownload';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 test('spawn manifests prioritize code stably without changing bytes or the complete download barrier', async () => {
   mkdirSync('tmp/entry-totals', {recursive: true});
@@ -27,10 +28,10 @@ test('spawn manifests prioritize code stably without changing bytes or the compl
       mkdirSync(resolve(product, path, '..'), {recursive: true}); writeFileSync(resolve(product, path), text);
       return {name, path, bytes: Buffer.byteLength(text), hash: digest(text), schema: `wildshard:${name}@1`};
     });
-    const index = JSON.stringify({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity,
+    const index = JSON.stringify(outputIndexEnvelope({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity,
       build: {sourceHash: digest('source'), validator: 'test'}, requires: source.requires,
       admission: {budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps,
-        critical: source.critical, library: source.library, late: source.late}, sections, schemas: [], files: [], runtime: null});
+        critical: source.critical, library: source.library, late: source.late}, sections, schemas: [], files: [], runtime: null}));
     writeFileSync(resolve(product, 'shard.json'), index);
     const metadata = Buffer.byteLength(index) + sections.reduce((sum, row) => sum + row.bytes, 0);
     for (const [name, bytes] of [['shared.js', 10], ['client.js', 20], ['grid.js', 30], ['model.js', 5], ['seam.bin', 9]] as const)

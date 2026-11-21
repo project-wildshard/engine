@@ -4,6 +4,7 @@ import {hashImmutableBytes} from '../src/shared/host/immutable';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {installTitleManifests, titleManifests, type TitleManifest} from '../src/client/game/shard/titleList';
 import {startGridPrefetch, gridPrefetchStatus} from '../src/client/game/grid/prefetch';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 afterEach(() => {vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs();});
 
@@ -11,12 +12,12 @@ test('completed prefetch releases dedupe hashes after their last live reader', a
   const first = new Uint8Array([1]), second = new Uint8Array([2]);
   const hashes = [hashImmutableBytes(first), hashImmutableBytes(second)];
   const source = emptyShardfile({slug: 'prefetch-history', name: 'History', author: 'Test', revision: 1, seed: 1});
-  const index = parseOutputIndex({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
+  const index = parseOutputIndex(outputIndexEnvelope({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
     identity: source.identity, requires: source.requires, build: {sourceHash: '0'.repeat(64), validator: 'test'},
     admission: {budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library},
     sections: [], schemas: [], runtime: null, files: hashes.map(hash => ({hash, kind: 'bin', path: `blobs/bin/${hash}.bin`,
       compressed: 1, decoded: 1, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false})),
-  });
+  }));
   vi.stubEnv('DEV', false);
   vi.stubGlobal('__SHARDFILE_VERDICTS__', ['alpha', 'beta'].map(path => ({ path: `/${path}/index.json`, indexHash: hashImmutableBytes(new TextEncoder().encode(JSON.stringify(index))) })));
   const title = (slug: 'mossgate' | 'blender-template', path: string): TitleManifest => ({slug, name: slug, biome: 'test', status: 'hidden',

@@ -14,6 +14,7 @@ import { emptyShardfile } from '../src/shared/host/author';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 const digest = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
@@ -41,10 +42,10 @@ async function fixture(): Promise<{ directory: string; admitted: Awaited<ReturnT
     source.library = files.map(file => file.hash);
     source.budgets.library = { resident: files.reduce((sum, file) => sum + file.decoded + file.gpu, 0),
       compressed: files.reduce((sum, file) => sum + file.compressed, 0) };
-    const index = parseOutputIndex({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
+    const index = parseOutputIndex(outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
       identity: source.identity, build: { sourceHash: digest(encode(source)), validator: 'test' }, requires: source.requires,
       admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps,
-        critical: source.critical, library: source.library }, sections, schemas: [], files, runtime: null });
+        critical: source.critical, library: source.library }, sections, schemas: [], files, runtime: null }));
     put('shard.json', encode(index));
     return { directory, admitted: await loadHeadlessFolder(directory) };
   } catch (error) { rmSync(directory, { recursive: true, force: true }); throw error; }

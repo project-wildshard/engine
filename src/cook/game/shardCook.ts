@@ -264,7 +264,7 @@ export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (lin
     folderRows: (tier, set) => {
       const selected: SpawnFile[] = [header, ...discovery];
       for (const row of index.sections) selected.push(folderFile(row.path, row.bytes, row.hash, `section:${row.name}`));
-      for (const row of index.schemas) selected.push(folderFile(row.path, row.bytes, row.hash, `schema:${row.path}`));
+      for (const row of index.schemas ?? []) selected.push(folderFile(row.path, row.bytes, row.hash, `schema:${row.path}`));
       const wanted = entryReadSet(source, tier, index, sections, wholeSet(tier, set), fence.hashes);
       for (const row of index.files) if ((wanted.has(row.hash) || row.name?.startsWith('ui/images/card-') === true) && (tier !== 'phone' || !layerRows.has(row.hash))) selected.push(folderFile(row.path, row.compressed, row.hash, row.name));
       return selected;
@@ -316,7 +316,7 @@ export function serverRows(shard: OpenShardfile): readonly ServerRow[] {
   const {index, source} = shard, rows = new Map<string, ServerRow>();
   const add = (row: ServerRow): void => { if (!rows.has(row.path)) rows.set(row.path, row); };
   add({path: 'shard.json', hash: sha256(shard.header), bytes: shard.header.length});
-  for (const row of [...index.sections, ...index.schemas, ...index.admission.server ?? []]) add({path: row.path, hash: row.hash, bytes: row.bytes});
+  for (const row of [...index.sections, ...index.schemas ?? [], ...index.admission.server ?? []]) add({path: row.path, hash: row.hash, bytes: row.bytes});
   const rigs = serverSkinRigs(source); // AP36c: a spawned creature's skin rig, for its hit volumes and height
   for (const row of index.files) if (serverReadsFile(row, source.terrain?.collider) || rigs.has(row.commons === true ? `commons:${row.hash}` : row.hash)) add({path: row.path, hash: row.hash, bytes: row.compressed, name: row.name});
   return [...rows.values()];

@@ -5,17 +5,18 @@ import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { installTitleManifests, titleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
 import { startGridPrefetch, gridPrefetchStatus } from '../src/client/game/grid/prefetch';
 import { assetCacheName } from '../src/client/engine/pwa/cacheNames';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 test('prefetch publishes canonical URL bytes and durable progress in the worker store', async () => {
   const body = new Uint8Array([7, 8, 9]), hash = hashImmutableBytes(body);
   const source = emptyShardfile({ slug: 'native-progress', name: 'Native progress', author: 'Test', revision: 1, seed: 1 });
-  const index = parseOutputIndex({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
+  const index = parseOutputIndex(outputIndexEnvelope({ format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version,
     identity: source.identity, requires: source.requires, build: { sourceHash: '0'.repeat(64), validator: 'test' },
     admission: { budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps, critical: source.critical, library: source.library },
     sections: [], schemas: [], runtime: null, files: [{ hash, kind: 'bin', path: `blobs/bin/${hash}.bin`,
       compressed: 3, decoded: 3, gpu: 0, triangles: 0, draws: 0, dependencies: [], critical: false }],
-  });
+  }));
   const disk = new Map<string, Response>(), stores: string[] = [];
   const urlOf = (input: RequestInfo | URL): string => typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   const cache: Cache = {

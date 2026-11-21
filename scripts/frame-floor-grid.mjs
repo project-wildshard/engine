@@ -11,7 +11,7 @@ export async function readFloorGridEntryways(path) {
   if (!response.ok) throw new Error('Floor entry declaration unavailable');
   const index = await response.json();
   if (index.format === undefined) return index.entryways;
-  if (index.format !== 'wildshard.shardfile' || index.formatVersion !== 2 || !Array.isArray(index.sections) || index.sections.length > 256)
+  if (index.format !== 'wildshard.shardfile' || (index.formatVersion !== 2 && typeof index.formatVersion !== 'string') || !Array.isArray(index.sections) || index.sections.length > 256)
     throw new Error('Unsupported floor entry descriptor');
   const matches = index.sections.filter(row => row.name === 'world/edge');
   if (matches.length === 0) return undefined;

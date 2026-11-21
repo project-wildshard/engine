@@ -15,6 +15,7 @@ import {packEntryDownloads, unpackEntryDownloads} from '../src/shared/game/grid/
 import {startGridStripDownload, gridStripDownloadRows} from '../src/client/game/grid/entryDownloads';
 import {entryReadSet} from '../src/cook/game/entryReadSet';
 import {wholeGeometryInputs} from '../src/shared/game/shardfile/wholeInputs';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 test('named native assembly declares the same ordered whole inputs it actually reads', () => {
   const source = emptyShardfile({slug: 'example', name: 'Example', author: 'Test', revision: 1, seed: 1});
@@ -71,10 +72,10 @@ test('plain build publishes exact tier spawn files and rejects changed section b
       return {name, path, bytes: Buffer.byteLength(text), hash: digest(text), schema: `wildshard:${name}@1`};
     });
     const packs = hashes.map((hash, i) => ({path: `blobs/pack/${digest(`pack-${i}`)}.pack`, hash: digest(`pack-${i}`), bytes: 3, entries: [{hash, offset: 0, bytes: 3}]}));
-    const index = {format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity,
+    const index = outputIndexEnvelope({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: source.version, identity: source.identity,
       build: {sourceHash: digest('source'), validator: 'test'}, requires: source.requires,
       admission: {budgets: source.budgets, serverBudget: source.serverBudget, authorCaps: source.authorCaps,
-        critical: source.critical, library: source.library, late: source.late}, sections, schemas: [], files, packs, runtime: null};
+        critical: source.critical, library: source.library, late: source.late}, sections, schemas: [], files, packs, runtime: null});
     const indexBytes = JSON.stringify(index); writeFileSync(resolve(product, 'shard.json'), indexBytes);
     // The default (Shardfile) book: each tier's own file. The packs book (DL16, Runtime packs) is the whole level and
     // adds the untiered late library file: 'late' is only a schedule.

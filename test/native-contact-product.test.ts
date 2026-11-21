@@ -16,6 +16,7 @@ import { headlessSections } from '@wildshard/format/headlessSections';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { readFolderInput } from '../src/client/game/shardfile/folder';
 import { validateCheckedFolderAssets } from '../src/client/game/shardfile/folderChecks';
+import { outputIndexEnvelope } from '@wildshard/format/version';
 
 const hash = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 const native = { id: 'fixture.shell', kind: 'different.kind', label: 'Shell', variants: [
@@ -30,10 +31,10 @@ function product(metadata: unknown = { page: [], native: [native] }) {
     const bytes = validationSourceBytes(value), path = `sections/${name}.json`; files.set(path, bytes);
     return { name, path, schema: `wildshard:${name}@1`, hash: hash(bytes), bytes: bytes.length };
   });
-  const index = parseOutputIndex({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: shard.version,
+  const index = parseOutputIndex(outputIndexEnvelope({format: 'wildshard.shardfile', formatVersion: 2, sdk: '0.2', version: shard.version,
     identity: shard.identity, build: {sourceHash: hash(validationSourceBytes(shard)), validator: 'native-contact-test'}, requires: shard.requires,
     admission: {budgets: shard.budgets, serverBudget: shard.serverBudget, authorCaps: shard.authorCaps, critical: shard.critical, library: shard.library},
-    sections, schemas: [], files: [], runtime: null});
+    sections, schemas: [], files: [], runtime: null}));
   files.set('shard.json', validationSourceBytes(index));
   return { shard, index, files, payloads };
 }
