@@ -1388,6 +1388,7 @@
     "src/server/game/population/actors.ts": "server",
     "src/server/game/population/directedLaw.ts": "server",
     "src/server/game/population/encounterBook.ts": "server",
+    "src/server/game/population/declaredNative.ts": "server",
     "src/server/game/population/encounterIntake.ts": "server",
     "src/server/game/population/environment.ts": "server",
     "src/shared/game/population/groupNotices.ts": "shared",

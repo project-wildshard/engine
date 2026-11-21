@@ -41,6 +41,9 @@ import { installNativeCollision } from '../population/nativeBake';
 import { NativeWildEnvironment } from '../population/nativeManager';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { installPopulationRoster } from '../population/roster';
+import { declaredBossProgram, declaredRosterPopulation } from '../population/declaredNative';
+import { parseNativePopulationRows } from '@wildshard/format/populationRoster';
+import { NativeBossBindingSchema, parseRoamingEncounter } from '@wildshard/format/bossEncounter';
 import { installNativeHerdShelter } from '../population/shelter';
 import { installNativeSpawnScript, readSpawnScript } from '../population/spawnScript';
 import { ownContractCatalogue } from '../../../shared/game/quest/contracts';
@@ -345,13 +348,20 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       return run => { const ammunition = installNativeHeldAmmunition(run.host, held, shard.items); run.host.onStep(row.step, () => { ammunition.update(); }, undefined, 'afterBodies'); run.host.events.on('player.respawned', ({player}) => { if(player!==undefined)ammunition.refillFor(player,row.refill); }, run.host.scope); run.ammunition = ammunition; };
     }
     case 'boss.ground': {
-      const encounter = await readAssemblyInput<{ profile: unknown }>(product, row.encounter), program = need(product.section('actors/species-programs').program, 'Native boss needs its decision programme');
+      const encounter = await readAssemblyInput<{ profile: unknown; kind?: unknown }>(product, row.encounter);
+      // OF30: a product with no species programme gives the boss its decision and body in its binding, its strikes in `actors/strikes`
+      const program = product.has('actors/species-programs') ? need(product.section('actors/species-programs').program, 'Native boss needs its decision programme')
+        : declaredBossProgram(shard.rows, parseRoamingEncounter(encounter, encounter.profile).kind, parse(NativeBossBindingSchema, row.binding),
+          product.has('actors/strikes') ? product.section('actors/strikes') : []);
       return run => { run.boss = installGroundBoss(run.host, encounter, encounter.profile, program, row.binding, at.ports.grantItem(run.context), shard.creatures.spawns); };
     }
     case 'population.environment': { const input = await readAssemblyInput(product, row.rows); return run => { installPopulationEnvironment(run.host, need(at.grid, 'Population environment needs its grid'), input); }; }
     case 'population.shelter': { const input = await readAssemblyInput(product, row.rows); return run => { installNativeHerdShelter(run.host, rows['shelterTrees'] as Parameters<typeof installNativeHerdShelter>[1], input); }; }
     case 'population.roster': {
-      const input = await readAssemblyInput<{ step: string }>(product, row.rows), population = product.section('actors/species-programs');
+      const input = await readAssemblyInput<{ step: string }>(product, row.rows);
+      // OF30: a roster with no species programme runs its own named declared species and hunt
+      const population = product.has('actors/species-programs') ? product.section('actors/species-programs')
+        : declaredRosterPopulation(shard.rows, shard.creatures, parseNativePopulationRows(input));
       return run => { installPopulationRoster(run.host, { population, bake: bake as Parameters<typeof installPopulationRoster>[1]['bake'], nav, spawnY: shard.spawn.y, saved: run.context.snapshot }, input); };
     }
     case 'population.elites': { const input = await readEliteFeature(product, row.file); return run => { run.elites = installNativeEliteFeature(run.host, dayOf(run), input, shard.creatures.spawns); }; }

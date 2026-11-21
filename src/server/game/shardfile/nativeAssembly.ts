@@ -15,6 +15,8 @@ import { NativePopulationField } from '../population/environment';
 import { need, readAssemblyInput, type AssemblyGround, type AssemblyPrepared, type NativeAssemblyContext, type NativeAssemblyPorts } from './nativeAssemblyInput';
 import { declaredWakeFight, prepareAssemblyFeature, prepareSectionMelee, prepareSectionRanged, type AssemblyRun } from './nativeAssemblyHosts';
 import { parseChapterWake } from '@wildshard/format/chapterDirector';
+import { NativeBossBindingSchema } from '@wildshard/format/bossEncounter';
+import { declaredHarvest } from '../population/declaredNative';
 import { installAssemblySolids, standsOwnSolids } from './assemblySolids';
 import { declaredBootSpawns } from '../riding/nativePopulation';
 import { readPatrolIntake } from '../boss/patrolNative';
@@ -107,9 +109,18 @@ function assemblyKeeper(shard: Shardfile, sections: ReadonlyMap<string, unknown>
 }
 /** OF23d: the decision rows a species programme's decision brain names: their body port binds them (a boss fight's
  *  declared body), so the keeper keeps them even when every actor they bind is a declared spawn. */
-function brainedScripts(product: ShardFolder): ReadonlySet<string> {
-  const program = product.has('actors/species-programs') ? product.section('actors/species-programs').program : undefined;
+function brainedScripts(product: ShardFolder, plan: NativeAssemblyPlan): ReadonlySet<string> {
+  if (!product.has('actors/species-programs')) return declaredBossScripts(plan);
+  const program = product.section('actors/species-programs').program;
   return new Set((program?.species ?? []).flatMap(row => row.brain?.archetype === 'decision' ? [row.brain.data.script] : []));
+}
+/** OF30: with no species programme a ground boss's decision rides its binding, and the keeper keeps that row too. */
+function declaredBossScripts(plan: NativeAssemblyPlan): ReadonlySet<string> {
+  return new Set(plan.features.flatMap(row => {
+    if (row.host !== 'boss.ground') return [];
+    const binding = parse(NativeBossBindingSchema, row.binding);
+    return binding.decision === undefined ? [] : [binding.decision.script];
+  }));
 }
 /**
  * OF22a1: the day and the sea a native assembly's plan names no host for, from its sections: the look's toon sky clock
@@ -186,7 +197,8 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const features = withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, plan.features)));
   const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
-  const harvest = species === undefined ? [] : [...species.native, ...species.program?.species ?? []];
+  // OF30: with no species programme an older pending carcass restores by the declared rows' harvest
+  const harvest = species === undefined ? declaredHarvest(shard.rows) : [...species.native, ...species.program?.species ?? []];
   const heightAt = ground.heightAt, speed = plan.level.authorCap === true ? clamp(shard.authorCaps.speed, 0, plan.level.speed) : plan.level.speed;
   const level = shardLevel(shard, { at: { x: shard.spawn.x, y: Math.max(shard.spawn.y, plan.level.stand ?? heightAt(shard.spawn.x, shard.spawn.z) + 0.1), z: shard.spawn.z }, yaw: shard.spawn.yaw, speed }, plan.level.ground);
   // OF22b0: the declared spawns stand in the native level as in an ordinary upload's, beside the assembly's hosts, and the
@@ -195,7 +207,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   // The ordinary creature host only stands the remaining declarations.
   const ordinary = declaredRoster.size === 0 ? shard : { ...shard, creatures: { ...shard.creatures,
     spawns: shard.creatures.spawns.filter(row => !declaredRoster.has(row.id)) } };
-  const counted = countedShard(ordinary), sections = outputDescriptor(shard)?.sections ?? new Map<string, unknown>(), keeper = assemblyKeeper(counted, sections, brainedScripts(product));
+  const counted = countedShard(ordinary), sections = outputDescriptor(shard)?.sections ?? new Map<string, unknown>(), keeper = assemblyKeeper(counted, sections, brainedScripts(product, plan));
   admitRuntimeCreatures(counted, sections, keeper);
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   // OF22c1: a chapter wake row's declared fight waits, as a quest page's summoned one does, for its wake cue
