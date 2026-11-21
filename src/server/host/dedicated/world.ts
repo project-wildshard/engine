@@ -32,7 +32,7 @@ import { SOCKET_SERVER_OPTIONS, SocketTransport } from './socketTransport';
 import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/saveStore';
 import type { ClaimResult } from './saves/claim';
 import type { AccountExport } from './saves/account';
-import { workerTable } from './workerTable';
+import { workerTable, type DeclaredCells } from './workerTable';
 import { cellName, cellShard, gridAssembly, placedCells, roadHome } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, clientAddress, type TrustProxy } from './doorTrust';
@@ -171,6 +171,8 @@ export interface WorldOptions {
   readonly secret: string;
   /** J182, J185: workers, and the most players the grid holds, a held body counted, in every cell together. Startup settings. */
   readonly workers: number; readonly seats: number;
+  /** ONE-FORMAT OF31h2: what each cell's own shard file declares about its worker; a cell with none keeps the table's measured row. */
+  readonly declared?: DeclaredCells;
   /** Start one worker on one row of the table. */
   readonly boot: (slugs: readonly string[]) => WorkerLink;
   readonly saves: PlayerSaves;
@@ -317,7 +319,7 @@ export class World {
   /** Start every worker on its row and wait for all of them. Nothing changes after this. */
   static async open(options: WorldOptions): Promise<World> {
     const world = new World(options);
-    await Promise.all(workerTable(options.cells, options.workers).map(slugs => world.bootWorker(slugs)));
+    await Promise.all(workerTable(options.cells, options.workers, options.declared).map(slugs => world.bootWorker(slugs)));
     return world;
   }
   /** A worker on its row. At startup its cells are in the table at once, and any failure ends the process (Q77). SA33: a `late` worker's cells

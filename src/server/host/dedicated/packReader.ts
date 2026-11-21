@@ -9,7 +9,7 @@ import { brotliDecompressSync } from 'node:zlib';
 import type { Rapier } from '@wildshard/engine/physics/rapier';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
 import type { GridCollisionStrip } from '@wildshard/engine/game/grid/gridCollision';
-import { readGridCollisionPack, readServerFolder, type ServerRead } from '../standalone/serverFolder';
+import { readGridCollisionPack, readServerFolder, readServerHeader, type ServerRead } from '../standalone/serverFolder';
 import type { ReleaseFile } from '../../../shared/host/releaseRows';
 import { readPlatformItemCatalogue, type PlatformItemCatalogue } from '@wildshard/engine/game/loot/platformCatalogue';
 import { admitLedgerRewards, type LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
@@ -64,6 +64,10 @@ export function packRead(options: PackReaderOptions, reads: PackReads): ServerRe
 /** GC15: the road's strips, from its build's grid pack. */
 export function readPackGrid(build: string, options: PackReaderOptions, reads: PackReads): Promise<readonly GridCollisionStrip[]> {
   return readGridCollisionPack(new URL('shards/', options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
+}
+/** ONE-FORMAT OF31h2: one shard's header through its build's book, read before any worker boots for what it declares about its worker. */
+export function readPackHeader(slug: string, build: string, options: PackReaderOptions, reads: PackReads): Promise<unknown> {
+  return readServerHeader(new URL(`shards/${slug}/`, options.origin.endsWith('/') ? options.origin : `${options.origin}/`).href, build, packRead(options, reads));
 }
 /** One shard's server inputs, through its build's book, or for a placed slug the book lacks, the cook's index of `hash` (SA47). */
 export async function readPackFolder(slug: string, build: string, rapier: Rapier, options: PackReaderOptions, reads: PackReads, hash?: string, catalogue: readonly LedgerCatalogueItem[] = [], exactHash?: boolean): Promise<HeadlessRuntimeInput> {

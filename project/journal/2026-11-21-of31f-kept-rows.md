@@ -14,3 +14,10 @@
   `runtime-declared-sky.test.ts` guards a plan with none.
 - OF31g2: `currency.ts` reads a shard's `economy/loot` currency row; the purse and kill bursts turn on for a declared
   currency, and for any loot row only until OF31g4 (Driftwood's doubloon is declared in OF31g3).
+
+## OF31h2: a shard says what its worker costs
+
+The dedicated server now reads each released cell's `shard.json` header before it lays out its workers. A header whose
+`admission.serverBudget` carries `awakeMicros` or `shareWorker` (format 0.68.0) beats the measured `COST` row and the
+`TOGETHER` pairing; a header that says nothing, or can't be read, keeps the tables. The header is read raw, so this works
+before the engine pins a format that admits the fields.

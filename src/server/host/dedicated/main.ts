@@ -14,7 +14,7 @@ import { Worker } from 'node:worker_threads';
 import { loadRapier } from '@wildshard/engine/physics/rapier';
 import type { WorkerNews } from './cellProtocol';
 import type { CellWorkerData } from './cellWorker';
-import { readPackFolder, readReleaseItems, type PackReads } from './packReader';
+import { readPackFolder, readPackHeader, readReleaseItems, type PackReads } from './packReader';
 import { openPlayerSaves, memoryPlayerSaves } from './playerSaves';
 import { guestExpiryDays, startGuestExpiry } from './saves/expiry';
 import { accountRoutes } from './accountRoutes';
@@ -37,9 +37,9 @@ import { sendSentryTest, serverSentry } from './serverSentry';
 import {PlaytestFile} from './playtest';
 import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
-import { worldSettings } from './workerTable';
+import { declaredCells, worldSettings, type DeclaredCells } from './workerTable';
 import { doorTrust } from './doorTrust';
-import { WHOLE_GRID, catalogueCell, homeCell, keepPlacedCells, placeCell, placedCells, placementSlots, releasedWorldShards, worldCells } from './gridCells';
+import { WHOLE_GRID, catalogueCell, cellShard, homeCell, keepPlacedCells, placeCell, placedCells, placementSlots, releasedWorldShards, worldCells } from './gridCells';
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
 import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
 import { DEV_CONTROL_PATH, devRoute } from './devControl';
@@ -138,7 +138,11 @@ const trust = doorTrust(process.env);
 // are root's (`wildshard-config`), and the boot log says when the pin is overridden.
 const ticketKey = setting('PLAYER_TICKET_PUBLIC_KEY');
 if (ticketKey !== undefined) log({ at: 'tickets.key', pinned: false, key: ticketKey.slice(-16) });
-const world: World = await World.open({ build, cells, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, ...(ticketKey === undefined ? {} : { ticketKey }), secret: seatSecret, saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
+// ONE-FORMAT OF31h2: each cell's own shard file may say what it costs awake and whose worker it shares; one that says nothing keeps
+// the measured table's row. An author's local product has one cell and no book to read.
+const declared: DeclaredCells = authorProduct === undefined ? await declaredCells(cells, cell => readPackHeader(cellShard(cell), build, { origin, cache }, itemReads)) : new Map();
+if (declared.size > 0) log({ at: 'world.declared', cells: Object.fromEntries(declared) });
+const world: World = await World.open({ build, cells, declared, roads: crossing, ...worldSettings(release.channel, process.env), ...trust, ...(ticketKey === undefined ? {} : { ticketKey }), secret: seatSecret, saves, log, boot: bootWorker, ...(grace === undefined ? {} : { graceMs: Number(grace) }),
   ...(arrivals === undefined ? {} : { entered: (seat, slug, actor) => { if (arrivals.entered(seat, slug, actor)) metrics?.entered(slug, actor.actor); } }),
   ...(sessions === undefined ? {} : { sessions }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.

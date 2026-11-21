@@ -132,6 +132,13 @@ function serverPackReader(root: string, slug: string, build: () => string, sourc
   };
 }
 
+/** ONE-FORMAT OF31h2: a shard's header (`shard.json`) from its build's server pack, unchecked: what the worker table reads before any worker boots. */
+export async function readServerHeader(root: string, build: string, source: ServerRead): Promise<unknown> {
+  const slug = new URL('.', root).pathname.split('/').at(-2) ?? '';
+  const header: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await serverPackReader(root, slug, () => build, source)('shard.json').catch(() => source(new URL('shard.json', root), 'shard.json'))));
+  return header;
+}
+
 /**
  * P1-E5.2: the worker's product reader, loadHeadlessFolder over `fetch`. It verifies the same index, sizes and SHA-256
  * addresses with the same checks; only where the bytes come from differs.

@@ -25,19 +25,65 @@ export function worldSettings(channel: string, env: Readonly<Record<string, stri
   return { workers: Number(env['WORLD_WORKERS'] ?? start.workers), seats: Number(env['WORLD_SEATS'] ?? start.seats) };
 }
 
-/** SC8: a cell's awake cost in ms per tick (measured, or an Open Plot's when it has none). */
-export function cellCost(slug: string): number { return COST.get(slug) ?? UNMEASURED; }
+/** ONE-FORMAT OF31h2: what a cell's own shard file says about its worker: its awake cost in ms per tick, and the shard it shares one with. */
+export interface DeclaredCell { readonly awakeMs?: number; readonly shares?: string }
+/** OF31h2: each cell that declared anything, by cell. A cell missing here keeps `COST` and `TOGETHER`, the fallback until every shard declares. */
+export type DeclaredCells = ReadonlyMap<string, DeclaredCell>;
+const MICROS_PER_MS = 1000, SLUG = /^[a-z][a-z0-9.-]*$/u;
+/** A field of an object, or nothing. */
+const field = (row: unknown, key: string): unknown => (typeof row === 'object' && row !== null && key in row ? (row as Record<string, unknown>)[key] : undefined);
+
+/** OF31h2: what a shard header (`shard.json`) declares in `admission.serverBudget` (`awakeMicros`, `shareWorker`); nothing when it declares neither. */
+export function declaredCell(header: unknown): DeclaredCell | undefined {
+  const budget = field(field(header, 'admission'), 'serverBudget'), micros = field(budget, 'awakeMicros'), shares = field(budget, 'shareWorker');
+  const awakeMs = typeof micros === 'number' && Number.isFinite(micros) && micros > 0 ? micros / MICROS_PER_MS : undefined;
+  const sharing = typeof shares === 'string' && SLUG.test(shares) ? shares : undefined;
+  if (awakeMs === undefined && sharing === undefined) return undefined;
+  return { ...(awakeMs === undefined ? {} : { awakeMs }), ...(sharing === undefined ? {} : { shares: sharing }) };
+}
+
+/** OF31h2: every cell's declaration, from its shard header; a header that can't be read declares nothing, and its worker says why at boot. */
+export async function declaredCells(cells: readonly string[], header: (cell: string) => Promise<unknown>): Promise<DeclaredCells> {
+  const rows = await Promise.all([...new Set(cells)].map(async cell => [cell, declaredCell(await header(cell).catch(() => undefined))] as const));
+  return new Map(rows.flatMap(([cell, row]) => (row === undefined ? [] : [[cell, row] as const])));
+}
+
+/** SC8: a cell's awake cost in ms per tick: its own declared one (OF31h2), else measured, else an Open Plot's. */
+export function cellCost(slug: string, declared?: DeclaredCells): number { return declared?.get(slug)?.awakeMs ?? COST.get(slug) ?? UNMEASURED; }
+
+/** The groups of open cells that share a worker: a declared `shares` joins two, and `TOGETHER` joins only cells that declared nothing. */
+function sharedUnits(open: readonly string[], declared: DeclaredCells): string[][] {
+  const parent = new Map(open.map(slug => [slug, slug]));
+  const root = (slug: string): string => {
+    let at = slug;
+    for (let up = parent.get(at); up !== undefined && up !== at; up = parent.get(at)) at = up;
+    return at;
+  };
+  const join = (a: string, b: string): void => { if (parent.has(a) && parent.has(b)) parent.set(root(a), root(b)); };
+  for (const [slug, row] of declared) if (row.shares !== undefined) join(slug, row.shares);
+  for (const group of TOGETHER) {
+    const quiet = group.filter(slug => !declared.has(slug));
+    for (const slug of quiet.slice(1)) join(quiet[0] ?? slug, slug);
+  }
+  const units = new Map<string, string[]>();
+  for (const slug of new Set([...TOGETHER.flat(), ...open])) {
+    if (!parent.has(slug)) continue;
+    const key = root(slug), unit = units.get(key);
+    if (unit === undefined) units.set(key, [slug]); else unit.push(slug);
+  }
+  return [...units.values()];
+}
 
 /**
  * The table for the cells this server opens: one row a worker, at most `workers` rows, no empty row. SC8: heaviest first, each cell (or
  * group that shares a worker) goes to the row whose awake cost is lowest so far (fewest cells on a tie, then the first row), so the
  * busiest worker carries as little awake cost as the cells allow. One cell is one worker; GC31: one worker holds every cell. A crossing
- * between workers is GC15's move, so no cell needs a neighbour's worker.
+ * between workers is GC15's move, so no cell needs a neighbour's worker. OF31h2: a cell's own declaration (`declared`) wins over both
+ * tables.
  */
-export function workerTable(cells: readonly string[], workers: number): readonly (readonly string[])[] {
-  const open = [...new Set(cells)].sort(), grouped = new Set(TOGETHER.flat());
-  const units = [...TOGETHER.map(group => group.filter(slug => open.includes(slug))).filter(group => group.length > 0), ...open.filter(slug => !grouped.has(slug)).map(slug => [slug])];
-  const weight = (unit: readonly string[]): number => unit.reduce((total, slug) => total + cellCost(slug), 0);
+export function workerTable(cells: readonly string[], workers: number, declared: DeclaredCells = new Map()): readonly (readonly string[])[] {
+  const units = sharedUnits([...new Set(cells)].sort(), declared);
+  const weight = (unit: readonly string[]): number => unit.reduce((total, slug) => total + cellCost(slug, declared), 0);
   if (units.length === 0) return [];
   units.sort((a, b) => weight(b) - weight(a) || (a[0] ?? '').localeCompare(b[0] ?? ''));
   const rows = Array.from({ length: Math.max(1, Math.min(workers, units.length)) }, () => ({ cells: [] as string[], cost: 0 }));
