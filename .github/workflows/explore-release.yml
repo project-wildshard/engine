@@ -1,0 +1,89 @@
+# Meta EXPLORE-MODE EX9 (Jake, 2026-11-21 ~12:45 Cancún: "yes approved"; J482): explore.wildshard.io follows every staging
+# release, published from Actions so nobody runs it by hand and either machine can start it. It replaces the hand steps in
+# project/journal/2026-11-19-explore-release.md. On a release tag (and on a dispatch naming one) it checks out that tag's
+# commit, waits until staging serves that build, takes staging's own catalogue.json, and releases the Explore Worker
+# (pages/wrangler.jsonc --env explore) with scripts/page-release.mjs in order: build, upload, check (the version URL's
+# bytes equal the local build), then `wrangler triggers deploy --env explore` (the explore.wildshard.io custom domain),
+# then go-live. test/explore-release-ci.test.ts holds that order: go-live never runs before check.
+# Explore signs no world, moves no rooms and publishes no server packs.
+name: explore-release
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The release tag staging serves (vX.Y.Z)
+        type: string
+        required: true
+
+env:
+  WS_AGENT_UA: WildshardAgent/1 (ci-explore-release)
+
+permissions:
+  contents: read
+
+concurrency:
+  group: explore-release
+  cancel-in-progress: false
+
+jobs:
+  explore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Refuse anything but a release tag
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::$TAG is not a release tag (vX.Y.Z)"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 0
+          fetch-tags: true
+          filter: blob:none
+          persist-credentials: false
+      # page-release's explore check confirms staging's signed release and live page name this commit: wait for staging
+      # to serve the tag (a tag can land before the staging page moves), then take staging's exact catalogue
+      - name: Wait for staging to serve the tag, and take its catalogue
+        run: |
+          build=$(git rev-parse HEAD)
+          for attempt in $(seq 1 30); do
+            live=$(curl -A "$WS_AGENT_UA" -fsS -m 20 "https://staging.wildshard.io/version.json?t=$(date +%s)" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).build)}catch{console.log('')}})" || true)
+            [ "$live" = "$build" ] && break
+            echo "staging serves ${live:-unknown}, not $TAG ($build): waiting ($attempt of 30)"
+            sleep 60
+          done
+          [ "$live" = "$build" ] || { echo "::error::staging never served $TAG ($build)"; exit 1; }
+          mkdir -p tmp/explore-release
+          curl -A "$WS_AGENT_UA" -fsS -m 60 -o tmp/explore-release/catalogue.json "https://staging.wildshard.io/catalogue.json?t=$(date +%s)"
+          echo "staging serves $TAG ($build); its catalogue is $(wc -c < tmp/explore-release/catalogue.json) bytes"
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      # The Cloudflare token reaches wrangler only through the environment; page-release.mjs redacts it from all output.
+      # --content publishes dist-content/ to packs.wildshard.io first; a new set copies unchanged files from the last one
+      # on R2 (server side) and puts the rest through S3 with the bucket-scoped keys, as preview.yml does.
+      - name: Build, upload and check the Explore page
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
+          R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
+        run: node scripts/page-release.mjs explore build,upload,check --catalogue=tmp/explore-release/catalogue.json --content
+      - name: Attach explore.wildshard.io
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: pnpm exec wrangler triggers deploy --config pages/wrangler.jsonc --env explore
+      - name: Go live
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_PACKS_ACCESS_KEY_ID: ${{ secrets.R2_PACKS_ACCESS_KEY_ID }}
+          R2_PACKS_SECRET_ACCESS_KEY: ${{ secrets.R2_PACKS_SECRET_ACCESS_KEY }}
+        run: |
+          node scripts/page-release.mjs explore go-live --content
+          echo "explore.wildshard.io serves $TAG ($(git rev-parse HEAD))" >> "$GITHUB_STEP_SUMMARY"
