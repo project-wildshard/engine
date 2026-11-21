@@ -193,6 +193,13 @@ export async function committedFastChecks(root,base,tip,phase,paths) {
           failures.push(...local,...(local.length>0?[]:formatTagFailures(read)));
         }
       }
+      // SHARD-COMPAT CP3 (J486 Q46): API first. A push that moves the format pin above what the API serves is refused.
+      if(paths.includes('pnpm-lock.yaml')&&view.files.has('scripts/format-api-gate.mjs')) {
+        const {formatApiFailures}=/** @type {typeof import('./format-api-gate.mjs')} */(await module('scripts/format-api-gate.mjs'));
+        const before=gitSourceView(root,base),lock='pnpm-lock.yaml';
+        failures.push(...await formatApiFailures(before.files.has(lock)?before.read(lock).toString('utf8'):undefined,
+          view.files.has(lock)?view.read(lock).toString('utf8'):undefined));
+      }
       // GS5 (G798): each committed gen:source table the push touches (an input or the table) equals a fresh run over
       // the tip's own inputs.
       if(view.files.has('scripts/gen-source.mjs')&&paths.length>0) {
