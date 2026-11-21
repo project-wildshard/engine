@@ -33,9 +33,9 @@ export function fpsPlan({ qualify = false, runs, dockOnly = false, coldOnly = fa
   const route = [];
   for (const [index,leg] of fullRoute.entries()) {
     if (index >= (qualify ? windowCount : dockOnly ? 1 : 3)) break;
-    // Keep the original windows: shortened turns overweight first-use work and
-    // change the proportion of walking and dwelling between quick and qualify.
-    route.push(leg);
+    // Keep the full dock rotation and village dwell. Fit all five cold
+    // profiles in one bounded lease, with every waypoint still required.
+    route.push(qualify ? leg : {...leg,seconds:[30,25,40][index]});
   }
   const profiles = Object.fromEntries(Object.entries(fullProfiles).map(([name, specs]) =>
     [name, qualify ? specs : specs.slice(0, 1)]));

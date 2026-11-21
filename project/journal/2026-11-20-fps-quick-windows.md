@@ -1,38 +1,33 @@
-# Quick FPS keeps the qualification windows
+# Quick FPS fits one bounded GPU lease
 
 > Written by: Codex
-> **State:** source fix, 2026-11-20; fresh paired proof owed.
+> **State:** source fix, 2026-11-20; paired live proof owed.
 
 The old fresh pair missed two p50 comparisons: desktop High village
-13.3 to 11.9 ms and native dock 6.6 to 7.3 ms. The quick dock lasted
-15 seconds, less than a full turn at 0.4 radians/second, and contained
-57–58 post-control program links. Village halved the qualified dwell.
-These windows change view weighting and overweight first-use work.
-Cooling and foreign GPU overlap are not established causes for those
-particular complete captures; earlier incomplete runs did see overlap.
+13.3 to 11.9 ms and native dock 6.6 to 7.3 ms. Its 15-second dock
+covers less than a full rotation and includes 57–58 post-control
+program links. Its village halves the original 20-second dwell.
+Startup and view weighting are plausible causes (inference); cooling
+and GPU overlap are not established for those complete captures.
 
-Quick now preserves the original 30/40/60-second first three windows,
-including the 20-second village dwell. It still uses one fresh browser
-per profile and records every cold frame from control. Five routes take
-650 seconds before boot and queue time, within the 1,200-second limit.
-No frame floor, loss check, quantile or comparison tolerance changes.
-Qualification keeps its complete matrix and reduced command-proof mode.
+Quick now samples 30/25/40-second dock, beach and village legs and
+keeps the original 20-second village dwell. Every waypoint remains
+required, with unchanged navigation and raw-frame checks. The five
+cold routes take 475 seconds, leaving 65 seconds for boots inside
+one nine-minute capture watchdog. Browser admission is bounded to
+30 seconds. The twenty-minute table wall clock includes queue time.
+No warm-up frames are discarded. Qualification remains unchanged.
 
-Quick rejoins the canonical queue once, after the first three profiles.
-Three 130-second routes leave 150 seconds for cold boots in its nine-
-minute capture watchdog. Browser admission has a 30-second bound.
-Each worker retains its four-minute abort. A slow boot still produces
-an incomplete table; neither watchdog nor the wall cap is extended.
-The existing Linux dry-plan test still exercises the portable path.
+Longer original 30/40/60-second trials were preserved as incomplete:
+4/5 in 842.208 seconds (desktop High's 90-second Home-region timeout),
+2/5 in 793.551 seconds and 3/5 in 1046.497 seconds (cancelled after
+excess shared-queue time). No GPU overlap was detected. Splitting
+650 seconds of work across two or three leases displaced the desktop
+batch behind repeated peer work. One lease removes those admissions
+while retaining the full dock window and village dwell.
 
-Validation: 16 related FPS planning/batching/matrix/verdict checks pass.
-The ordinary push gate and fresh quiet repeated measurements follow.
+Validation: planning regressions retain all original qualification
+windows/variants/repeats, all quick waypoints and the original dwell.
+The ordinary push gate runs types, related tests and lint.
 
 Lane: codex-tc48
-
-The first long-window attempt was 4/5 in 842.208 seconds: Desktop High
-hit the existing 90-second Home-region timeout, with no GPU overlap.
-The next was interrupted at 793.551 seconds, 2/5, after over five
-minutes queued between batches. Those original two-worker leases
-required three admissions. Preserve both attempts and use two leases
-for the fresh pair. No partial table is accepted or compared.

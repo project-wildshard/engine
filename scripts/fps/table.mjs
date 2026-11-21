@@ -187,10 +187,9 @@ async function main() {
         if (readCell(job.output,fingerprint,build,job) === null) return true;
         resumedCells++; return false;
       });
-      // Three 130-second routes leave room for cold boots inside the nine-
-      // minute watchdog. Rejoin the queue once for the final two profiles.
-      // Slow or stuck boots still fail within the same lease and wall caps.
-      for (let i=0; i<pending.length; i+=3) await measureCell(pending.slice(i,i+3),stop.signal);
+      // Five 95-second routes leave 65 seconds for cold boots inside one
+      // nine-minute capture watchdog. Slow boots still fail within the caps.
+      if (pending.length > 0) await measureCell(pending,stop.signal);
     } else {
       for (let rep=0; rep<count; rep++) {
         for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
@@ -218,7 +217,7 @@ async function main() {
   const progress = {completed,total:groups.reduce((sum,group) => sum+group.length,0)};
   const scope = sampling.scope === 'dock' ? 'dock only' : sampling.mode === 'quick' ? 'quick: dock, beach, village' : sampling.scope === 'subset' ? 'qualification diagnostic: reduced windows' : 'qualification: full route';
   const markdown = [`## Driftwood FPS (${scope})`, '',table(measured),'',
-    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; consecutive original-duration legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
+    `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; consecutive dock/beach/village legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
     'Phone GPU estimates await DF5.'].join('\n');
   writeFileSync(join(out,'table.md'),`${markdown}\n`);
   atomicJson(join(out,'table.json'),{schema:1,mode:sampling.mode,host,base,zone,scope:sampling.scope,

@@ -4,17 +4,18 @@ import { resolve } from 'node:path';
 import { fpsPlan } from '../../scripts/fps/plan.mjs';
 import { routeFor } from '../../scripts/memory/iphone/route.mjs';
 
-test('quick mode covers five profiles in one cold route each, with the qualification windows', () => {
+test('quick mode covers five profiles in one cold route each, with complete turns, waypoints and the original village dwell', () => {
   const quick = fpsPlan();
   expect(Object.keys(quick.profiles)).toHaveLength(5);
   expect(Object.values(quick.profiles).map(specs => specs.length)).toEqual([1, 1, 1, 1, 1]);
   expect(quick).toMatchObject({ mode:'quick', scope:'quick', count:1, warm:false, limitMs:1_200_000 });
   expect(quick.route.map(({name, seconds}) => [name, seconds])).toEqual([
-    ['dock spawn', 30], ['beach', 40], ['village', 60],
+    ['dock spawn', 30], ['beach', 25], ['village', 40],
   ]);
-  expect(quick.route).toEqual(routeFor('driftwood-fps').slice(0,3));
-  // Five routes leave 550 seconds for boots and admission inside the wall cap.
-  expect(quick.route.reduce((sum,leg)=>sum+leg.seconds,0)*5).toBe(650);
+  expect(quick.route.map(({seconds:_seconds,...leg})=>leg)).toEqual(
+    routeFor('driftwood-fps').slice(0,3).map(({seconds:_seconds,...leg})=>leg));
+  // All five cold routes fit one nine-minute capture lease with boot headroom.
+  expect(quick.route.reduce((sum,leg)=>sum+leg.seconds,0)*5).toBe(475);
   expect(quick.route[2]).toMatchObject({points:routeFor('driftwood-fps')[2].points, dwell:{seconds:20}});
 });
 
