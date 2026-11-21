@@ -1,6 +1,8 @@
 // Meta EXPLORE-MODE EX9: explore-release.yml releases the Explore Worker in page-release's order. Its go-live moves
 // explore.wildshard.io, so it must come after the check that the uploaded version's bytes equal the local build, and after
 // the custom domain is attached. A reordered workflow fails here before it can publish an unchecked page.
+// oxlint-disable-next-line import/no-nodejs-modules -- The test runs the workflow's own tag check in bash.
+import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- The test reads the workflow file it guards.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
@@ -62,4 +64,15 @@ test('the Explore build gets an hour, and build:game honours it', () => {
   const patch = workflow.indexOf("name: Give an older tag's build the same limit");
   expect(patch).toBeGreaterThan(-1);
   expect(patch).toBeLessThan(workflow.indexOf('name: Build, upload and check the Explore page'));
+});
+
+// Run 44943273158 built and uploaded v0.1.64, then staging moved to the v0.1.65 release head (server-staging-9c91846e…) before
+// that release was tagged: a dispatch names the staging tag, and anything else is still refused.
+test('a dispatch names a release tag or a staging tag, nothing else', () => {
+  const refuse = /\[\[ "\$TAG" =~ (\S+) \]\]/u.exec(workflow)?.[1];
+  expect(refuse).toBeDefined();
+  const ok = (tag: string): boolean => spawnSync('bash', ['-c', `TAG='${tag}'; [[ "$TAG" =~ ${String(refuse)} ]]`]).status === 0;
+  expect(ok('v0.1.65')).toBe(true);
+  expect(ok(`server-staging-${'9c91846e65e62e4d39e0437e082ff90ae094c4ca'}`)).toBe(true);
+  for (const bad of ['main', 'v0.1', 'server-staging-9c91846e', 'v0.1.65; rm -rf /', 'server-production-9c91846e65e62e4d39e0437e082ff90ae094c4ca']) expect(ok(bad)).toBe(false);
 });

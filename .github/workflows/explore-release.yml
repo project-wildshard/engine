@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: The release tag staging serves (vX.Y.Z)
+        description: The tag staging serves (vX.Y.Z, or server-staging-<sha> before the release is tagged)
         type: string
         required: true
 
@@ -35,9 +35,10 @@ jobs:
     env:
       TAG: ${{ inputs.tag || github.ref_name }}
     steps:
+      # staging serves a release branch's head (tagged server-staging-<sha>) before finish tags it vX.Y.Z: a dispatch may name either
       - name: Refuse anything but a release tag
         run: |
-          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::$TAG is not a release tag (vX.Y.Z)"; exit 1; }
+          [[ "$TAG" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+|server-staging-[0-9a-f]{40})$ ]] || { echo "::error::$TAG is not a release tag (vX.Y.Z or server-staging-<sha>)"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: refs/tags/${{ env.TAG }}
