@@ -154,6 +154,12 @@ export function roadName(first: string): string { return `${ROAD}${first}`; }
 export function roadHome(name: string): string | null { return name.startsWith(ROAD) ? name.slice(ROAD.length) : null; }
 /** The frame id a cell's rows go out in: its place in the catalogue after the road's 0, as a grid page numbers them (`GridNetRooms`). */
 export function cellFrame(cell: string): number { return roadHome(cell) !== null ? 0 : gridNames().frames.get(cell) ?? UNPLACED_FRAME; }
+/** ONE-FORMAT OF31h1: what an unset `WORLD_CELLS` opens: the grid's home cell (0, 0), read from the placement, never a slug in code. */
+export function homeCell(): string {
+  const home = gridNames().home;
+  if (home === undefined) throw new Error('WORLD_CELLS is unset and the grid has no home cell at (0, 0)');
+  return home;
+}
 /**
  * The cells a server opens, from `WORLD_CELLS`. `grid` opens every grid cell whose shard the release names, the home cell (0, 0) first
  * because a player with no save lands in the first. A list names cells by instance or slug, in its own order. Unknown or doubled

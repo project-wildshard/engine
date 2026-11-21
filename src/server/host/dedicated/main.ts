@@ -39,7 +39,7 @@ import { World, type PlayerSaves, type WorkerLink } from './world';
 import { cloudflareTurn } from './voiceRelay';
 import { worldSettings } from './workerTable';
 import { doorTrust } from './doorTrust';
-import { WHOLE_GRID, catalogueCell, keepPlacedCells, placeCell, placedCells, placementSlots, releasedWorldShards, worldCells } from './gridCells';
+import { WHOLE_GRID, catalogueCell, homeCell, keepPlacedCells, placeCell, placedCells, placementSlots, releasedWorldShards, worldCells } from './gridCells';
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
 import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
 import { DEV_CONTROL_PATH, devRoute } from './devControl';
@@ -76,7 +76,7 @@ const itemReads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 
 const catalogue = await readReleaseItems(release.items, { origin, cache }, itemReads);
 // C5, C11, GO3: the cells, by grid instance, fixed at startup; a player with no save lands in the first. `grid` opens every grid cell
 // the release names, home first. A cell runs its shard's pack, and the release must name that shard.
-const listed = process.env['WORLD_CELLS'] ?? 'driftwood-isle', cells = worldCells(listed, release.shards.map(shard => shard.slug));
+const listed = process.env['WORLD_CELLS'] ?? homeCell(), cells = worldCells(listed, release.shards.map(shard => shard.slug));
 const hold = process.env['HOLD_MS'], empty = process.env['EMPTY_MS'], grace = process.env['GRACE_MS'], poll = process.env['RELEASE_POLL_MS'], recordEvery = process.env['RECORD_MS'];
 // An env file's blank row means unset.
 const setting = (name: string): string | undefined => { const value = process.env[name]; return value === '' ? undefined : value; };
