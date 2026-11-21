@@ -186,7 +186,8 @@ export async function clientMaterials(shard: Shardfile, input: ReadonlyMap<strin
       if (texture instanceof CompressedTexture && !splatRefs.has(ref)) releaseAfterUpload(texture);
       // a raw-texel file (uncompressed KTX2) arrives as a DataTexture: its decoded texels go once it is on the GPU too
       else if (texture instanceof DataTexture) releaseRawAfterUpload(texture);
-      scope.own(texture); textures.set(ref, texture);
+      // Later specimens may borrow the texture after its decoded pixels have been released.
+      ownSceneResource(texture, scope); textures.set(ref, texture);
       units(++unitsDone, 'textures transcoded');
     }
     } finally {
