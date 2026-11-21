@@ -296,7 +296,7 @@ function notifyRed(io,state,run,recipient,text,commits=[]){
   const pane=recipient.key.startsWith('pane:'),aliases=[...recipient.lanes].map(lane=>`agent:${lane}`);
   if(previous.includes(recipient.key)||aliases.some(alias=>previous.includes(alias)
     ||(!pane&&previous.some(key=>key.startsWith(`${alias}@pane:`)))))return null;
-  if(io.redAllowed?.(run,commits.length>0?commits:state.red?.history?.commits??[],[...recipient.lanes])===false)return null;
+  if(io.redAllowed!==undefined&&!io.redAllowed(run,commits.length>0?commits:state.red?.history?.commits??[],[...recipient.lanes]))return null;
   const keys=[recipient.key,...pane?aliases.map(alias=>`${alias}@${recipient.key}`):[]];
   seen[run]=[...new Set([...previous,...keys])];
   const history=state.red?.history;
@@ -491,7 +491,7 @@ export function liveIo(env=process.env){
       const trailers=new Map();
       if(commits.length>0){
         const log=run('git',['show','-s','--format=%H%x00%(trailers:key=Lane,valueonly)%x1e',...commits]);
-        for(const entry of log.split('\x1e')){
+        for(const entry of log.split('\u001E')){
           const [sha,lanes]=entry.trim().split('\0');
           if(sha&&lanes!==undefined)trailers.set(sha,lanes.split(/\s+/u).filter(Boolean));
         }
