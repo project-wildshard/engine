@@ -16,7 +16,7 @@ import {builtFolder,runtimeAssets} from './fixtures/engine-lift/folder';
 
 const ring=JSON.parse(readFileSync('test/pins/rings.json','utf8')) as {'1':{products:string[];slices:string[]}};
 const digest=(text:string):string=>createHash('sha256').update(text).digest('hex');
-interface World {step:(command:HeadlessCommand)=>Promise<void>;save:()=>string;close:()=>Promise<void>}
+interface World {walk:(id:string,frames:HeadlessCommand[][])=>Promise<string>;close:()=>Promise<void>}
 // TEST-SPEED TS11: one Rapier module for the file, as every room shares one; each world still gets its own physics.
 let rapierModule:ReturnType<typeof loadRapier>|undefined;
 const rapier=():ReturnType<typeof loadRapier>=>rapierModule??=loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
@@ -32,21 +32,30 @@ for(const slug of [...ring['1'].products,...ring['1'].slices])test(`a saved ${sl
   const assets=declared?new Map(descriptor.index.files.map(file=>[file.commons===true?`commons:${file.hash}`:file.hash,readFileSync(`${directory}/${file.path}`)])):runtimeAssets(product,directory);
   const open=async(saved?:string):Promise<World>=>{
     if(declared){
-      const sim=await HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'});let current=saved??'';
-      return {step:async command=>{current=(await sim.step([{source:'restore-proof',commands:[command]}])).snapshot;},save:()=>current,close:()=>sim.dispose()};
+      const sim=await HeadlessSimulation.create(shard,assets,saved,{deadline:'advisory'});
+      // The same worker ticks each input. Only the save at the end of each
+      // walk leg needs to cross the worker boundary.
+      return {walk:async (id,frames)=>{
+        const part=await sim.verbTapePart({version:1,observe:[],segments:[{id,ticks:frames.length,commands:[],frames}]});
+        expect(part.report.ticks).toBe(frames.length);
+        return part.commit.snapshot;
+      },close:()=>sim.dispose()};
     }
     const live=await createNativeHeadlessResident({shard,assets,product,rapier:await rapier()},saved);
-    return {step:command=>{live.step([command]);return Promise.resolve();},save:()=>serializeSimSnapshot(snapshotSimHostBytes(live.host)),close:()=>{live.dispose();return Promise.resolve();}};
+    return {walk:(_id,frames)=>{
+      for(const commands of frames)live.step(commands);
+      return Promise.resolve(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
+    },close:()=>{live.dispose();return Promise.resolve();}};
   };
   let straight:World|null=null,restored:World|null=null;
   try {
     straight=await open();
     const command=(tick:number):HeadlessCommand=>({kind:'player',moveX:tick<8?.2:-.2,moveZ:-1,yaw:0,...tick===3?{jump:true}:{}});
-    for(let tick=0;tick<8;tick++)await straight.step(command(tick));
-    const saved=straight.save();expect(saved.length).toBeGreaterThan(0);
-    for(let tick=8;tick<16;tick++)await straight.step(command(tick));
-    const expected=digest(straight.save());await straight.close();straight=null;
-    restored=await open(saved);for(let tick=8;tick<16;tick++)await restored.step(command(tick));
-    expect(digest(restored.save())).toBe(expected);
+    const prefix=Array.from({length:8},(_,tick)=>[command(tick)]);
+    const suffix=Array.from({length:8},(_,tick)=>[command(tick+8)]);
+    const saved=await straight.walk('prefix',prefix);expect(saved.length).toBeGreaterThan(0);
+    const expected=digest(await straight.walk('suffix',suffix));await straight.close();straight=null;
+    restored=await open(saved);
+    expect(digest(await restored.walk('suffix',suffix))).toBe(expected);
   } finally {await restored?.close();await straight?.close();}
 },budgets[slug]??10_000);
