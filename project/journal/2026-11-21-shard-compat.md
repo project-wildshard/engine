@@ -10,3 +10,5 @@
 - CP3 gap: the format API gate sat in committed-fast-checks' guards phase,
   which only sort-sides runs, so 675819e90's pin move to 0.67.0 landed past
   an API on 0.66.0. Pre-push (land.mjs and main-push both) now runs it.
+- CP3 step 2: engine pins shard-format 0.68.1 after the API serves it
+  (api-server v0.33.1). 0.68.0 was skipped: it shadowed ./migrations.
