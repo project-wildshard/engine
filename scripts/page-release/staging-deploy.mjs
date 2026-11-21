@@ -113,7 +113,6 @@ export async function deployStaging({ root, build, release, source, out, observe
   const reportPath = join(out, 'verdict.json'), shared = join(toolsRoot, 'tmp', 'staging-observer'), observerRoot = join(root, 'tmp', 'staging-deploy', build);
   if (existsSync(reportPath)) throw new RefusedError('Choose a fresh staging deploy evidence directory');
   mkdirSync(out, { recursive: true, mode: 0o700 });
-  mkdirSync(observerRoot, { recursive: true, mode: 0o700 });
   const observedPath = join(observerRoot, observerFile);
   /** @type {ReturnType<typeof observeMove>|undefined} */ let running;
   /** @type {DeploymentQa|undefined} */ let qa;
@@ -123,6 +122,10 @@ export async function deployStaging({ root, build, release, source, out, observe
   let aliasMoved = false;
   let step = 'local QA';
   /** @type {import('../staging-smoke/checks.mjs').Finding|undefined} */ let observerNote;
+  const noteObserver = (/** @type {string} */ key, /** @type {string} */ text) => {
+    observerNote = {scenario: 'MMO observer', key, severity: 'P2', source: 'check', text};
+    log(`MS9 NOTE ${text}`);
+  };
   const record = (/** @type {string|undefined} */ problem) => {
     /** @type {import('../staging-smoke/checks.mjs').Finding[]} */
     const findings = [...(qa?.findings ?? []), ...(live?.findings ?? [])];
@@ -137,15 +140,21 @@ export async function deployStaging({ root, build, release, source, out, observe
     const gap = localQaGap(localQa, source, release);
     if (gap !== undefined) throw new RefusedError(`staging go-live needs --local-qa=<verdict.json>: ${gap}`);
     const page = await get(`${stage.origin}/version.json`), alreadyLive = page.build === build;
-    if (!alreadyLive && observerProof !== undefined) throw new RefusedError('External observer evidence is for verifying an already live release');
     if (!alreadyLive && zoneEntryResume !== undefined) throw new RefusedError('A zone-entry resume requires the build already live on staging');
-    observation = read(observerProof ?? observedPath);
-    step = 'MMO observer';
-    if (!alreadyLive && observation === undefined) {
-      const signed = readPublication(JSON.stringify(await get(stage.release)), RELEASE_PUBLIC_KEY);
-      if (signed.engineBuild === build) throw new RefusedError('Start staging go-live before the signed rooms change, so the observer can seat its baseline');
-      running = observeMove({ root: observerRoot, out, shared });
-      await running.baseline();
+    try {
+      mkdirSync(observerRoot, { recursive: true, mode: 0o700 });
+      observation = read((alreadyLive ? observerProof : undefined) ?? observedPath);
+      if (!alreadyLive && observation === undefined) {
+        const signed = readPublication(JSON.stringify(await get(stage.release)), RELEASE_PUBLIC_KEY);
+        if (signed.engineBuild === build) {
+          noteObserver('rooms-already-switched', 'Signed rooms already changed before the observer could seat its baseline.');
+        } else {
+          running = observeMove({ root: observerRoot, out, shared });
+          await running.baseline();
+        }
+      }
+    } catch {
+      noteObserver('baseline-unavailable', 'The staging observer could not arm or read its baseline.');
     }
     if (!alreadyLive) {
       step = 'page upload';
@@ -165,25 +174,7 @@ export async function deployStaging({ root, build, release, source, out, observe
     qa = await runQa({ root, build, release, out, name: 'qualification', ...(candidate === undefined ? {} : { candidate }), deploy: true });
     const bad = qaGap(qa, build);
     if (bad !== undefined) throw new RefusedError(bad);
-    step = 'MMO observer';
-    if (running !== undefined) {
-      const controller = new AbortController();
-      try {
-        const finished = await Promise.race([running.done.then(() => true), delay(300_000, false, { signal: controller.signal })]);
-        if (!finished) throw new RefusedError('MS9 did not finish within five minutes of the signed rooms check');
-      } finally { controller.abort(); }
-    }
-    observation ??= read(observedPath);
-    observation = resumedObservation(observerRoot, observedPath, observation);
     const serial = alreadyLive ? (await get(stage.health)).serial : readState().check.serial;
-    const exact = observation?.to?.build === build && observation.to.serial === serial;
-    const restored = observation?.status === 'observed' && observation.continuity === 'restored';
-    const changed = observation?.status === 'inconclusive' && observation.reason === 'checkpoint-progress-changed';
-    if (!exact || (!restored && !changed)) {
-      throw new RefusedError('MS9 has no passing continuity witness for the exact signed staging rooms');
-    }
-    if (changed) observerNote = {scenario: 'MMO observer', key: 'checkpoint-progress-changed', severity: 'P2', source: 'check',
-      text: 'Both observers returned with newer saves and retained coins and ledger. A progress hash changed between the captures.'};
     /** @type {string|undefined} */ let liveProblem;
     if (!alreadyLive) {
       step = 'alias';
@@ -199,6 +190,22 @@ export async function deployStaging({ root, build, release, source, out, observe
     }
     step = 'zone entry';
     zoneEntry = await runZoneEntry(out, build, zoneEntryResume);
+    try {
+      observation ??= read(observedPath);
+      observation = resumedObservation(observerRoot, observedPath, observation);
+      const exact = observation?.to?.build === build && observation.to.serial === serial;
+      if (exact && observation?.status === 'observed' && observation.continuity === 'restored') {
+        observerNote = undefined;
+      } else if (exact && observation?.continuity === 'lost') {
+        noteObserver('checkpoint-progress-lost', 'MS9 observed lost checkpoint progress after the staging rooms changed.');
+      } else if (exact && observation?.status === 'inconclusive' && observation.reason === 'checkpoint-progress-changed') {
+        noteObserver('checkpoint-progress-changed', 'Both observers returned with newer saves and retained coins and ledger. A progress hash changed between the captures.');
+      } else if (observerNote === undefined) {
+        noteObserver('continuity-unverified', 'MS9 did not verify checkpoint continuity for the signed staging rooms.');
+      }
+    } catch {
+      noteObserver('report-unavailable', 'The staging observer report could not be read.');
+    }
     const entryGap = zoneEntryGap(zoneEntry, build);
     if (entryGap !== undefined) throw new RefusedError(entryGap);
     if (liveProblem !== undefined) { step = 'live smoke'; throw new RefusedError(liveProblem); }

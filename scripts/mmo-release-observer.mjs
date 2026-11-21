@@ -10,6 +10,7 @@ import {observationInputs,ObservationRefusedError} from './mmo-release-observer-
 import {prepareObserverClient} from './mmo-observer-client.mjs';
 import {observeRelease} from '../test/fixtures/dedicated/releaseObserver.ts';
 import {CHANNELS} from './page-release/flow.mjs';
+import {agentHeaders} from './agent-marker.mjs';
 
 const ROOT=resolve(import.meta.dirname,'..');
 /** @param {string[]} args @param {string} [root] */
@@ -79,7 +80,7 @@ export class StagingSocket extends NodeWebSocket {
  /** @param {string} url @param {string[]} protocols */
  constructor(url,protocols){
   if(new URL(url).href!==new URL(CHANNELS.staging.socket).href)throw new Error('Observer socket must be the public staging door');
-  super(url,protocols,{origin:CHANNELS.staging.origin});
+  super(url,protocols,{origin:CHANNELS.staging.origin,headers:agentHeaders()});
   // The browser-style close event drives recovery. ws emits a Node error first.
   this.on('error', () => undefined);
  }

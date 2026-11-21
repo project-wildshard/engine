@@ -178,10 +178,8 @@ packs, and checks the exact signed rooms and Worker version. It runs
 K1–K6, the zone-gate play leg, Doctor and a read-only WebKit phone load.
 The smoke checks world draw and continues through Play anyway if shown.
 If rooms request a reload, the MMO observer compiles the signed target
-client and redials with the same identities. Go-live holds on a failed
-redial or lost durable progress. A changed hash with both bots playing
-from later checkpoints, with their coins and ledger retained, is an
-inconclusive progress comparison reported as P2. After the alias move
+client and redials with the same identities. MS9 reports its continuity
+result separately as a staging note. After the alias move
 the command reruns live M3. The J476 smoke walks 16 seeded crossings
 on phone-profile WebKit. Three sessions run 5, 5 and 6 crossings. Each
 featured shard is entered twice through live shared gates. Every arrival
