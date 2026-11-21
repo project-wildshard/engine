@@ -5,10 +5,9 @@ import { TIER } from '@wildshard/engine/core/tier';
 import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
+import { skipEmptyBatches } from '@wildshard/engine/render/drawGuards';
 import type { FarLookRuntime } from '../../../shared/game/grid/farProxy';
 import { farProxyMaterial, type FarProxyView } from './farView';
-import { programReuseOn } from '@wildshard/engine/render/programReuse';
-import { programFoldOn } from '@wildshard/engine/render/programFold';
 
 /**
  * DF10 (mini-df10d): the far ring's proxies drawn as one multi-draw batch per program. Each neighbour cell's far proxy was
@@ -152,8 +151,14 @@ interface Group { look: FarLookRuntime; positionalMask: boolean; members: Member
 export class FarBatches {
   private readonly groups = new Map<string, Group>();
   /** DF8 (mini-df8): a group keeps one material across rebuilds, so a ring change never frees its program and links it
-   *  again at the next draw (a new material per rebuild disposed the old one first: its program went with it) */
-  constructor(private readonly parent: THREE.Object3D, private readonly keepMaterials: boolean = programReuseOn() || programFoldOn()) {}
+   *  again at the next draw (a new material per rebuild disposed the old one first: its program went with it).
+   *  DF10 (mini-dfload): always, with or without DF8's slots, so the ring's preparation also links each batch's program
+   *  through its stand-in (`stand`) before the batch replaces its proxies: on the iPhone 13 a far batch linked its program
+   *  inside a draw after control (a 1.1 s frame). */
+  constructor(private readonly parent: THREE.Object3D, private readonly keepMaterials = true) {
+    // DF10 (mini-dfload): a batch whose proxies are all hidden draws nothing, so it never looks a program up for nothing
+    skipEmptyBatches(true);
+  }
 
   /** the group key `view` would join, or null when it cannot be batched */
   private keyOf(view: FarProxyView, look: FarLookRuntime, positionalMask: boolean): string | null {

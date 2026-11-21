@@ -31,13 +31,14 @@ import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { bootRoadPrograms, liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
 import { textureBytes } from '@wildshard/engine/render/textureBytes';
+import { beginFarCopies, farLodOn, settleFarCopies } from '@wildshard/engine/render/farLod';
 import { budgetCollection, budgetCollectionEnabled, collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { shardArea } from '../grid/area';
 import { primeStaticMerges } from '../grid/staticViewMerge';
-import { primeKitBatches } from '../grid/kitBatch';
-import { multiDraws } from '../grid/farBatch';
+import { kitBatchOn, primeBatchPrograms, primeKitBatches } from '../grid/kitBatch';
+import { farBatchOn, multiDraws } from '../grid/farBatch';
 import { admittedRuntimeFolder, completeManifestCache, releaseManifestTransport } from '../shardfile/runtimeFolder';
 import { enterSkyClock } from './clockSettings';
 import { settleEntryPrograms } from './settlePrograms';
@@ -234,6 +235,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     if (fragileBoot && /WebGLShader|WebGL context lost|shaderSource/i.test(message)) failGpuBoot(message.slice(0, 120), error instanceof Error ? error.stack ?? '' : '');
     throw error;
   }
+  // DF9 (mini-dfload): with `debug.farLod`, the far copies build at the loading pace from here (beside the card's waits on
+  // GPU links and tiles), after the first frame's plan is measured so its timing is unchanged
+  beginFarCopies();
   loading.setTextureBytes(textureBytes(game.rootScene));
   // Phone staged worlds finish their product and server work before decoding
   // the downloaded bank. The loader still waits for it before control.
@@ -360,6 +364,24 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       void launchServer().catch(() => undefined);
       await loadingStage('worldPrograms', () => linkWorldUnderLoader(game)); releaseDrawn('worldPrograms');
     }
+  }
+  // DF10 (mini-dfload): with `debug.kitBatch` or `debug.farBatch`, every batch's programs link here with their road variants
+  // (one per page environment): a batch is on the page scene, outside the entered roots whose road warm-ups cover the rest
+  if (kitBatchOn() || farBatchOn()) {
+    await loadingStage('batchPrograms', async () => {
+      const current = (): boolean => !game.levelScope.disposed && !game.levelScope.disposing;
+      const at = diagnosticNow(), batches = await primeBatchPrograms(game.rootScene, roots => game.warmRootsNow(roots, current));
+      bootMark('render:batch-programs', { count: batches, ms: Math.round(diagnosticNow() - at) });
+    });
+  }
+  // DF9 (mini-dfload): and what is left builds here, before control: on the iPhone 13 the far copies built for 5.7 s after
+  // control (the dock's long frames and full collections); a wide mesh no loading frame drew is captured here too
+  if (farLodOn()) {
+    await loadingStage('farCopies', async () => {
+      let units: ((done: number) => void) | undefined;
+      const settled = await settleFarCopies({ scene: game.rootScene, progress: (done, total) => { units ??= loadingUnits('Far copies', total); units(done); } });
+      bootMark('render:far-copies', { ms: Math.round(settled.ms), built: settled.built, left: settled.left, captured: settled.captured });
+    });
   }
   // DL11: setup overlapped the spawn download; control still waits for the whole set
   // FM6 modes 36 and 44: a part out of its reads refuses the job (a broken or unreachable pack). The load runs the same download

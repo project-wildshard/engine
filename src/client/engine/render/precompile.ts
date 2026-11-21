@@ -377,8 +377,9 @@ function programCount(renderer: Renderer): number {
 
 /** the object lives on the shadow pass's layer alone (no view camera ever draws it) */
 const shadowOnly = (o: THREE.Object3D): boolean => o.layers.mask === 1 << SHADOW_LAYER
-  // DF8 (`debug.programFold`): a member a batch draws in its place never draws itself while its layers are off
-  || (o.layers.mask === 0 && o.userData[BATCHED_VIEW] === true && programFoldOn());
+  // DF8 (`debug.programFold`), DF10 (mini-dfload: with or without the fold): a member a batch draws in its place never
+  // draws itself while its layers are off (one that leaves the batch gets its layers and its own warm back)
+  || (o.layers.mask === 0 && o.userData[BATCHED_VIEW] === true);
 /** DF8 (`debug.programFold`): the channels a prop merge's member's merged mesh leaves out (core/shadowLayer.ts
  *  MERGED_PROGRAM), or null when `o` is no such member: the warm-up builds the merged mesh's program from it */
 function mergedProgram(o: THREE.Object3D): readonly string[] | null {

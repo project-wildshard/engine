@@ -1312,6 +1312,20 @@ export class Game {
   }
 
   /**
+   * DRIFTWOOD-FPS DF10 (mini-dfload): link `roots`' programs now, unpaced, under the loading card: their scene programs and
+   * their exterior (road) variants, one per page environment height. The far ring's and the kit's batches draw in place of
+   * entered content but hang on the page scene, outside every entered root, so no root's warm-up linked their road variants:
+   * on the iPhone 13 they linked in one draw each after control (1.1 to 1.4 s frames, the kit's three materials twice).
+   */
+  async warmRootsNow(roots: readonly THREE.Object3D[], current: () => boolean): Promise<void> {
+    const composer = this._composer;
+    if (composer === null || roots.length === 0) return;
+    const { prepareSceneRoots } = await import('../render/precompile');
+    await prepareSceneRoots(this.renderer, this.camera, this.rootScene, composer.inputBuffer, roots, current, undefined, undefined, true,
+      undefined, undefined, true, this.camera.getWorldPosition(new THREE.Vector3()));
+  }
+
+  /**
    * RP4: link the road (exterior) variants of an entered grid cell's content, as the boot's entry roots' are
    * (`warmDeferredEntryRoots`: nearest first, spaced by drawn frames, dropped once `owner` leaves). Past its sky layer's half
    * weight the road draws the cell with the page's own environment (none on a grid page), not the cell's PMREM: without

@@ -3,7 +3,7 @@ import { Bone, BoxGeometry, InstancedMesh, Mesh, MeshBasicMaterial, MeshDepthMat
 import { LINK_WAIT_MS, runPrecompile, sceneJobs, shadowJobs } from './precompile';
 import type { ProgramLike } from '../boot/perflog';
 import { noteFrameDrawn, setBuildHeld } from '../../../shared/engine/core/framePacing';
-import { SHADOW_LAYER } from '../core/shadowLayer';
+import { BATCHED_VIEW, SHADOW_LAYER } from '../core/shadowLayer';
 import { linkedGl } from '../../../test/engine/linkedGl';
 import { compileClassicGraph } from './graph/glslMaterial';
 
@@ -318,4 +318,15 @@ test('every colourless instanced twin of a colour-reading graph takes its white 
     expect(clones[0]).toBeInstanceOf(InstancedMesh);
     expect(clones.every(clone => clone instanceof InstancedMesh && clone.instanceColor !== null)).toBe(true);
   } finally { for (const twin of twins) twin.dispose(); geometry.dispose(); material.dispose(); }
+});
+
+test('DF10 (mini-dfload): a member a kit batch draws gets no view program of its own, fold or not', () => {
+  const scene = new Scene(), geometry = new BoxGeometry(), material = new MeshStandardMaterial();
+  const view = new Mesh(geometry, material), member = new Mesh(geometry, material);
+  member.receiveShadow = true; member.layers.disableAll(); member.userData[BATCHED_VIEW] = true;
+  scene.add(view, member);
+  const copies = sceneJobs(scene, null).jobs.flatMap(job => job.root.children);
+  expect(copies).toHaveLength(1);
+  expect(copies[0]?.receiveShadow).toBe(false); // the plain view's program only
+  geometry.dispose(); material.dispose();
 });

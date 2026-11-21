@@ -94,9 +94,13 @@ interface Tracked {
 
 /** What the far copies did on this page (the bench reads it as `__wsFarLod`). */
 export const farLodReport = { meshes: 0, tiled: 0, squares: 0, ready: 0, reused: 0, writes: 0, full: 0, drawn: 0, captureMs: 0, buildMs: 0, refused: 0,
+  /** DF9 (mini-dfload): build ms at the loading pace, the settle step's ms, what it left for play and captured itself */
+  loadingBuildMs: 0, settleMs: -1, settleLeft: -1, settleCaptured: 0, buildAtSettle: -1,
   whole: {} as Record<string, number>, log: [] as [string, number, number][] };
 
 const tracked = new WeakMap<THREE.BufferGeometry, Tracked | null>();
+/** DF9 (mini-dfload): square-levels still to build (each a yield of `builds`) */
+let pending = 0;
 const queue: Tracked[] = [];
 
 const isMesh = (o: THREE.Object3D): o is THREE.Mesh => (o as Partial<THREE.Mesh>).isMesh === true;
@@ -187,7 +191,7 @@ function track(mesh: THREE.Mesh, squares: Square[], positions: Float32Array | nu
   farLodReport.meshes++; farLodReport.squares += squares.length;
   if (farLodReport.log.length < 64) farLodReport.log.push([mesh.name, Math.round(diagnosticNow()), squares.reduce((n, square) => n + square.full.length / 3, 0)]);
   for (const square of squares) farLodReport.full += square.full.length / 3;
-  if (positions === null) { farLodReport.ready++; farLodReport.reused++; } else { queue.push(entry); startBuilding(); }
+  if (positions === null) { farLodReport.ready++; farLodReport.reused++; } else { queue.push(entry); pending += squares.length * FAR_LEVELS.length; startBuilding(); }
   return entry;
 }
 
@@ -499,35 +503,109 @@ function copyOf(simplify: Simplifier['simplify'], positions: Float32Array, full:
 
 let simplifier: Simplifier | null = null, loading: Promise<void> | null = null, building = false, started = false;
 
+/**
+ * DRIFTWOOD-FPS DF9 (mini-dfload): the loading card's pace. On the iPhone 13 the copies built for 5.7 s after control (1.2 s
+ * on the desktop) and their slices sat in the dock's long frames. From `beginFarCopies` (the boot, once its first frame is
+ * planned) the builder runs LOAD_SLICE_MS slices with no gap and no start delay, beside the card's waits on GPU links and
+ * tiles, and `settleFarCopies` (the boot's last step before control) builds what is left before the card goes. After it,
+ * a later capture (a cell admitted in play) builds at the play pace as before.
+ */
+let loadingPace = false;
+const LOAD_SLICE_MS = 12, LOAD_GAP_MS = 0;
+let drained: (() => void)[] = [];
+
 /** Build the queued meshes' copies in slices of SLICE_MS, a gap between, from START_MS after the first capture. */
 function startBuilding(): void {
   if (building) return;
   building = true;
+  void loadSimplifier();
+  const steps = builds();
+  const slice = (): void => {
+    if (simplifier === null) { pageScope.timeout(250, slice); return; }
+    const t0 = diagnosticNow(), sliceMs = loadingPace ? LOAD_SLICE_MS : SLICE_MS;
+    let done = false;
+    while (diagnosticNow() - t0 < sliceMs) if (steps.next().done === true) { done = true; break; }
+    const ms = diagnosticNow() - t0;
+    farLodReport.buildMs += ms; if (loadingPace) farLodReport.loadingBuildMs += ms;
+    if (done) {
+      building = false;
+      if (queue.length > 0) { startBuilding(); return; }
+      const waiting = drained; drained = [];
+      for (const resolve of waiting) resolve();
+      return;
+    }
+    pageScope.timeout(loadingPace ? LOAD_GAP_MS : SLICE_GAP_MS, slice);
+  };
+  // the boot's captures wait out its first frames; a later one (a merge's rebuilt block) starts at once
+  pageScope.timeout(started || loadingPace ? 0 : START_MS, slice);
+  started = true;
+}
+
+function loadSimplifier(): Promise<void> {
   loading ??= (async (): Promise<void> => {
     try {
       const loaded = (await import('three/examples/jsm/libs/meshopt_simplifier.module.js')).MeshoptSimplifier;
       await loaded.ready; simplifier = loaded;
     } catch { farLodReport.refused++; }
   })();
-  const steps = builds();
-  const slice = (): void => {
-    if (simplifier === null) { pageScope.timeout(250, slice); return; }
-    const t0 = diagnosticNow();
-    let done = false;
-    while (diagnosticNow() - t0 < SLICE_MS) if (steps.next().done === true) { done = true; break; }
-    farLodReport.buildMs += diagnosticNow() - t0;
-    if (done) { building = false; if (queue.length > 0) startBuilding(); return; }
-    pageScope.timeout(SLICE_GAP_MS, slice);
-  };
-  // the boot's captures wait out its first frames; a later one (a merge's rebuilt block) starts at once
-  pageScope.timeout(started ? 0 : START_MS, slice);
-  started = true;
+  return loading;
+}
+
+/** Square-levels of far copies still to build (0: every captured mesh has its copies). */
+export function farCopiesPending(): number { return pending; }
+
+/** The boot from its first planned frame to control: build at the loading pace (no start delay, long slices, no gap). */
+export function beginFarCopies(): void {
+  if (!farLodOn() || loadingPace) return;
+  loadingPace = true;
+  void loadSimplifier();
+}
+
+/** The far-copy step's budget (ms): past it the rest builds in play. The iPhone 13's whole build was 5.7 s of slices. */
+export const SETTLE_BUDGET_MS = 8000;
+/** What `settleFarCopies` did: its ms, the square-levels it built and those it left for play (over its budget). */
+export interface FarSettle { readonly ms: number; readonly built: number; readonly left: number; readonly captured: number }
+
+/**
+ * Before control: capture every eligible mesh `scene` shows that no draw has captured yet (a wide mesh out of the spawn
+ * view, first drawn on the route), then build every queued copy, reporting square-levels done of the total. Gives up
+ * after `budgetMs`, leaving the rest to the play pace. Afterwards the builder keeps the play pace.
+ */
+export async function settleFarCopies(options: { readonly scene?: THREE.Object3D; readonly budgetMs?: number; readonly progress?: (done: number, total: number) => void } = {}): Promise<FarSettle> {
+  if (!farLodOn()) return { ms: 0, built: 0, left: 0, captured: 0 };
+  const t0 = diagnosticNow(), budget = options.budgetMs ?? SETTLE_BUDGET_MS;
+  let captured = 0;
+  loadingPace = true;
+  options.scene?.traverseVisible(object => {
+    if (!isMesh(object) || object.layers.mask === 0 || tracked.has(object.geometry)) return;
+    if (refusal(object, object.geometry) !== null) return;
+    tracked.set(object.geometry, capture(object, object.geometry)); captured++;
+  });
+  const total = pending, progress = options.progress;
+  progress?.(0, total);
+  if (pending > 0 || building) {
+    if (!building && queue.length > 0) startBuilding();
+    const done = new Promise<void>(resolve => { drained.push(resolve); });
+    // the card's count moves at least every half second (the bar's 2 s rule) and the budget is kept
+    for (;;) {
+      const left = budget - (diagnosticNow() - t0);
+      if (left <= 0) break;
+      const finished = await Promise.race([done.then(() => true), new Promise<boolean>(resolve => { pageScope.timeout(Math.min(500, left), () => { resolve(false); }); })]);
+      progress?.(total - pending, total);
+      if (finished || (pending === 0 && !building)) break;
+    }
+  }
+  loadingPace = false;
+  const ms = diagnosticNow() - t0;
+  farLodReport.settleMs = Math.round(ms); farLodReport.settleLeft = pending; farLodReport.settleCaptured = captured; farLodReport.buildAtSettle = Math.round(farLodReport.buildMs);
+  return { ms, built: total - pending, left: pending, captured };
 }
 
 function* builds(): Generator<void, void> {
   while (queue.length > 0) {
     const entry = queue.shift();
-    if (entry === undefined || entry.positions === null || simplifier === null) continue;
+    if (entry === undefined) continue;
+    if (entry.positions === null || simplifier === null) { pending -= entry.squares.length * FAR_LEVELS.length; continue; }
     const positions = entry.positions;
     // the coarsest copies first (the far squares hold most triangles), then each finer level; the squares are picked
     // again as each level lands
@@ -538,7 +616,8 @@ function* builds(): Generator<void, void> {
       work.at = grown(work.at, squares.length, Int32Array); work.length = grown(work.length, squares.length, Int32Array);
       let filled = 0;
       for (let i = 0; i < squares.length; i++) {
-        const square = squares[i]; if (square === undefined) continue;
+        const square = squares[i]; pending--;
+        if (square === undefined) continue;
         // a copy no smaller than its square's own is left out (trianglesAt falls back to the finer one)
         const limit = square.full.length * 0.95;
         const length = copyOf(simplifier.simplify, positions, square.full, level.error / entry.scale, entry.looks, (n) => n < limit);

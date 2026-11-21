@@ -101,8 +101,12 @@ const lowGuard = (fixtures) => `(() => {
 const FAR_LOD_READ = `
 const r = window.__wsFarLod;
 if (r === undefined) return null;
+// DF9/DF10 (mini-dfload): the loading step's far-copy settle (its ms, what it left for play, the build ms by then) and the
+// batches whose programs it linked
 return { meshes: r.meshes, tiled: r.tiled, squares: r.squares, ready: r.ready, reused: r.reused, writes: r.writes, full: r.full, drawn: r.drawn,
-  captureMs: Math.round(r.captureMs), buildMs: Math.round(r.buildMs), refused: r.refused, whole: r.whole, log: r.log };
+  captureMs: Math.round(r.captureMs), buildMs: Math.round(r.buildMs), loadingBuildMs: Math.round(r.loadingBuildMs ?? -1), settleMs: r.settleMs ?? null,
+  settleLeft: r.settleLeft ?? null, settleCaptured: r.settleCaptured ?? null, buildAtSettle: r.buildAtSettle ?? null,
+  batchPrograms: window.__wsBatchPrograms ?? null, refused: r.refused, whole: r.whole, log: r.log };
 `;
 
 async function bench() {
@@ -115,12 +119,13 @@ async function bench() {
     routeName: route, route: routeFor(route), phone: tools?.facts ?? null, idleCelsius: tools?.idle ?? null };
   writeFileSync(join(out, 'environment.json'), JSON.stringify(environment, null, 2));
   try {
-    // --ab <slot>: each run plays the slot off and on, in alternating order (ABBA), so the pairs share one idle reading
+    // --ab <slot>[,<slot>]: each run plays the slots off and on, in alternating order (ABBA), so the pairs share one idle reading
     const sides = values.ab === undefined ? [null] : [false, true];
     const trials = Array.from({ length: runs }, (_, i) => (i % 2 === 0 ? sides : [...sides].reverse())
       .flatMap((ab) => (i % 2 === 0 ? caps : [...caps].reverse()).map((cap) => ({ run: i + 1, cap, ab })))).flat();
     for (const { run, cap, ab } of trials) {
-      const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, [values.ab]: ab };
+      // DF10 (mini-dfload): `--ab a,b` turns several slots off and on together (farBatch and kitBatch are one trial)
+      const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, ...Object.fromEntries(values.ab.split(',').map((key) => [key, ab])) };
       const temperature = tools === null ? null : await tools.cool();
       const { webkitDriver, driver } = phone ? { webkitDriver: null, driver: await /** @type {NonNullable<typeof tools>} */ (tools).fresh() }
         : await (async () => { if (values.frames === true) process.env.WS_WEBKIT_GC_LOG = '1'; const { startWebKit } = await import('./webkit.mjs'); const started = await startWebKit({ gcLog: values.frames === true }); return { webkitDriver: started, driver: started }; })();

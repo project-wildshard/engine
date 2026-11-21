@@ -7,7 +7,10 @@ import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { isGpuOnlyAttribute } from '@wildshard/engine/core/gpuOnly';
 import { BATCHED_VIEW, MERGED_VIEW } from '@wildshard/engine/core/shadowLayer';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
+import { skipEmptyBatches } from '@wildshard/engine/render/drawGuards';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { mergeableMaterial, sharedHook } from './staticViewMerge';
+import { FarBatch } from './farBatch';
 
 /**
  * DF10 (mini-df10e): the level's plain meshes drawn as one multi-draw batch per material. After the static merge, the
@@ -259,9 +262,34 @@ export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: 
   let batches: KitBatch[];
   try { batches = buildKitBatches(scene); }
   catch (error: unknown) { console.warn('[kit-batch] not built', error instanceof Error ? error.stack : error); return { batches: 0, members: 0 }; }
+  // DF10 (mini-dfload): a batch whose members all left (their cell retired at the road crossing) draws nothing, so it never
+  // looks its program up again: on the iPhone 13 the empty kit batches relinked their three materials as the player
+  // crossed the road and came back (1.1 to 1.4 s frames). A batch with no copy to draw draws no pixel either way.
+  if (batches.length > 0) skipEmptyBatches(true);
   scope.onDispose(() => { for (const batch of batches) batch.retire(); Reflect.deleteProperty(scene.userData, 'kitBatch'); });
   scene.userData['kitBatch'] = (): { batches: number; members: number; gone: number; names: string[] } => ({ batches: batches.length,
     members: batches.reduce((sum, batch) => sum + batch.members.length, 0), gone: batches.reduce((sum, batch) => sum + batch.members.filter(m => m.gone).length, 0),
     names: batches.map(batch => `${batch.name} [${String(batch.userData['layout'])}] x${String(batch.members.length)}: ${batch.members.map(m => `${m.mesh.name !== '' ? m.mesh.name : (m.mesh.parent?.name ?? '?')}${m.left === undefined ? '' : ` (left: ${m.left})`}`).join(', ')}`) });
   return { batches: batches.length, members: batches.reduce((sum, batch) => sum + batch.members.length, 0) };
+}
+
+/** DF10 (mini-dfload): the page's batches, the kit's and the far ring's (not a ring stand-in, which leaves at once). */
+export function sceneBatches(scene: THREE.Object3D): THREE.Object3D[] {
+  const batches: THREE.Object3D[] = [];
+  scene.traverse((object) => { if (object instanceof KitBatch || (object instanceof FarBatch && object.name === 'far-batch')) batches.push(object); });
+  return batches;
+}
+
+/**
+ * DF10 (mini-dfload): link every batch's programs under the loading card, its road (exterior) variants with them (`warm`:
+ * Game.warmRootsNow). A batch hangs on the page scene, outside the entered roots whose warm-ups link those variants, so on
+ * the iPhone 13 each linked in a draw after control: the far batch's and the kit's three materials, 1.1 to 1.4 s frames.
+ * Returns how many batches it linked.
+ */
+export async function primeBatchPrograms(scene: THREE.Object3D, warm: (roots: readonly THREE.Object3D[]) => Promise<void>): Promise<number> {
+  const batches = sceneBatches(scene), at = diagnosticNow();
+  if (batches.length > 0) await warm(batches);
+  // the route bench reads it (`__wsBatchPrograms`)
+  Reflect.set(globalThis, '__wsBatchPrograms', { batches: batches.length, ms: Math.round(diagnosticNow() - at) });
+  return batches.length;
 }
