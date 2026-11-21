@@ -17,6 +17,10 @@ import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 await import('./bake-loader.mjs');
 const {BOOST_TAP_MS} = await import('../src/client/engine/ui/hoverBoost.ts');
+/** The board mounts or leaves within this many of the page's own frames of a tap (its blend passes 0.5 in ~10 at any rate). */
+const HOVER_FRAMES = 120;
+/** A page that stops drawing still fails: the frame-bounded hover waits give up after this much wall clock. */
+const HOVER_CEILING_MS = 90_000;
 const {folderStore} = await import('../src/cook/game/packStore.ts');
 const {objectHeaders, DEFAULT_LIMITS} = await import('../src/cook/game/cookWorker.ts');
 const {addStoredShards} = await import('./app-build/catalogue.ts');
@@ -177,18 +181,31 @@ try {
             if (fault === 'hover-control') await control.evaluate(button => { button.remove(); });
             await control.tap({timeout: 5000});
             const tappedAt = await page.evaluate(() => performance.now());
-            await page.waitForFunction(() => {
+            // FS30 (opus-drift6): a runner that draws ~2 frames a second spent its whole 10 s wall-clock wait on 22 frames
+            // (run 44863911819), while the board's blend needs ~10 frames past the tap at any rate (local Chromium at 20x CPU
+            // throttle and WebKit mount Driftwood r8 on a real tap). Wait on the page's own frames: HOVER_FRAMES of them past
+            // the tap, under a wall-clock ceiling for a page that stops drawing.
+            const tappedFrame = await page.evaluate(() => window.__wildshard?.world?.game.frameCount ?? 0);
+            await page.waitForFunction(({from, frames}) => {
               const world = window.__wildshard?.world;
-              return world?.player.hover === true && world.player.hoverBlend > 0.5 &&
+              if (world === undefined) return false;
+              if (world.game.frameCount - from > frames) throw new Error(`no mount within ${frames} frames of the tap`);
+              return world.player.hover === true && world.player.hoverBlend > 0.5 &&
                 world.weapons.tools.some(tool => tool.id === 'tool.hoverboard' && tool.enabled && 'model' in tool && tool.model instanceof Object && 'visible' in tool.model && tool.model.visible === true);
-            }, undefined, {timeout: 10000});
+            }, {from: tappedFrame, frames: HOVER_FRAMES}, {timeout: HOVER_CEILING_MS});
             action = 'unmount';
             // Developer mode makes a second tap within the production gesture
             // window BOOST. This journey intends two separate single taps.
             await page.waitForFunction(({since, windowMs}) => performance.now() - since > windowMs,
               {since: tappedAt, windowMs: BOOST_TAP_MS}, {timeout: 5000});
+            const unmountFrame = await page.evaluate(() => window.__wildshard?.world?.game.frameCount ?? 0);
             await control.tap({timeout: 5000});
-            await page.waitForFunction(() => window.__wildshard?.world?.player.hover === false, undefined, {timeout: 10000});
+            await page.waitForFunction(({from, frames}) => {
+              const world = window.__wildshard?.world;
+              if (world === undefined) return false;
+              if (world.game.frameCount - from > frames) throw new Error(`no unmount within ${frames} frames of the tap`);
+              return world.player.hover === false;
+            }, {from: unmountFrame, frames: HOVER_FRAMES}, {timeout: HOVER_CEILING_MS});
             } catch (error) {
               const after = await observeHover().catch(() => null);
               throw new Error(`${head.slug}: hover ${action} failed: ${String(error)}; ${JSON.stringify({before, after})}`, {cause: error});
