@@ -29,6 +29,7 @@ export const KEEPER_MS: number;
 export function advisory(job:Job):boolean;
 export function failedNames(jobs:readonly Job[]):string[];
 export function blockingRun(run:Run,jobs:readonly Job[]):Run;
+export function cancelledJobs(jobs:readonly Job[]):{started:boolean,blockingFailed:boolean};
 export function judge(runs:readonly Run[],state:State,tip:string|null):Verdict[];
 export function verdictFor(runs:readonly Run[],sha:string,contains:(ancestor:string,descendant:string)=>boolean):{state:'green'|'red';run:Run}|null;
 export function landers(text:string):Map<string,{lane:string;slug:string;pane?:string;count?:number}>;
