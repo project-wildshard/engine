@@ -33,7 +33,7 @@ import { homedir } from 'node:os';
 
 const ENGINE = absolute(import.meta.dirname, '../../..');
 export const keptDir = () => process.env.WS_KEPT_DIR ?? join(homedir(), '.cache/wildshard/kept');
-const statePath = (label) => join(keptDir(), `${label}.json`);
+const statePath = (/** @type {string} */ label) => join(keptDir(), `${label}.json`);
 const PORTS = { first: 4600, last: 4798 };
 
 /** @typedef {{ pid: number, origin: string }} Tunnel */
