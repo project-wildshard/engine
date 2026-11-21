@@ -13,7 +13,7 @@ import { PopulationFieldSchema, type PopulationFieldRows } from '@wildshard/form
 import { parse } from 'valibot';
 import { NativePopulationField } from '../population/environment';
 import { need, readAssemblyInput, type AssemblyGround, type AssemblyPrepared, type NativeAssemblyContext, type NativeAssemblyPorts } from './nativeAssemblyInput';
-import { declaredWakeFight, prepareAssemblyFeature, prepareSectionMelee, type AssemblyRun } from './nativeAssemblyHosts';
+import { declaredWakeFight, prepareAssemblyFeature, prepareSectionMelee, prepareSectionRanged, type AssemblyRun } from './nativeAssemblyHosts';
 import { parseChapterWake } from '@wildshard/format/chapterDirector';
 import { installAssemblySolids, standsOwnSolids } from './assemblySolids';
 import { declaredBootSpawns } from '../riding/nativePopulation';
@@ -207,6 +207,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const world = sectionWorld(product, plan, meadow ? prepared.field : null);
   // OF22a3: with no collision host the bake lends its ground alone and the shard's prop solids stand beside it
   const ownSolids = standsOwnSolids(plan.features.map(row => row.host)), melee = prepareSectionMelee<C>(product, plan.features.map(row => row.host));
+  const ranged = prepareSectionRanged<C>(product, plan.features.map(row => row.host));
   const ownGround = ownSolids && plan.bake !== undefined && plan.collision !== undefined ? { bake, resolution: plan.collision.resolution } : null;
   const hosts = features.map(row => row.host);
   if (meadow && !hosts.some(name => name.startsWith('water.'))) hosts.push('water.field');
@@ -225,6 +226,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     // OF22a3: the ground and prop solids stand first, where a plan's `collision` host stood, before any host reads them
     if (ownSolids) installAssemblySolids(host, shard, assets, ownGround, context.restoring);
     melee?.(run); // OF22d2: the held/melee section's sword, where a plan names no item.swept host
+    ranged?.(run); // OF38d: the held.ranged family from combat/items and held/loadout, where a plan names no held host
     for (const step of steps) step(run);
     // The arena finishes a borrowed patrol before installing the fight. A patrol can also own its room alone.
     run.finishPatrol?.();

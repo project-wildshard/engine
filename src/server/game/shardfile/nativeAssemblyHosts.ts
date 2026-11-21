@@ -106,6 +106,59 @@ export function prepareSectionMelee<C extends NativeAssemblyContext>(product: Sh
   return run => { installSweptMelee(run, items, policy); };
 }
 
+/** The held hosts whose families (format `primitiveOfHost`: `held.melee`, `held.ranged`) a section now stands. */
+const HELD_HOSTS: ReadonlySet<string> = new Set(['item.swept', 'held.arms', 'item.ranged', 'loadout', 'combat.motion', 'ammunition']);
+/** The engine's sprint speed (`walkingSpeed`), the motion a held ranged kit scales its spread and sway against. */
+const SPRINT_SPEED = 7.2;
+interface RangedRow { readonly id: string; readonly ranged?: unknown; readonly profile?: { readonly family: string; readonly action?: string } }
+/** A ranged weapon's install kind, from its admitted profile: a bow draws, a lever rifle cycles, any other firearm bolts. */
+export function rangedKind(row: RangedRow): 'bolt' | 'cycle' | 'bow' {
+  const profile = need(row.profile, `Missing ranged profile for ${row.id}`);
+  return profile.family === 'bow' ? 'bow' : profile.action === 'lever' ? 'cycle' : 'bolt';
+}
+/**
+ * ONE-FORMAT OF38d: a native plan that names no held host stands the `held.ranged` family from its sections, before any
+ * host, in the order the hosts it replaces stood: the equip route (`combat/items` loadout), combat motion, each
+ * `combat/items` weapon that carries `ranged` (in row order), then the `held/loadout` pouch, refilled with its fallback
+ * on respawn. A plan that still names a held host keeps it, so a product built before the move boots unchanged.
+ */
+export function prepareSectionRanged<C extends NativeAssemblyContext>(product: ShardFolder, hosts: readonly string[]): ((run: AssemblyRun<C>) => void) | null {
+  const shard = product.shardfile, weapons = (shard.items.rows as readonly RangedRow[]).filter(row => row.ranged !== undefined);
+  if (weapons.length === 0 || hosts.some(name => HELD_HOSTS.has(name))) return null;
+  const kits = weapons.map(row => ({ kind: rangedKind(row), policy: row.ranged, profile: need(row.profile, `Missing ranged profile for ${row.id}`) }));
+  const native = shard.items.loadout.native, melee = product.has('held/melee');
+  const held = product.has('held/loadout') ? product.section('held/loadout') : undefined;
+  return run => {
+    const combat = combatOf(run);
+    // the swept kit (OF22d2) owns the equip route when the shard also holds a melee section
+    if (native !== undefined && !melee) bindLoadout(run, native);
+    installCombatMotion(run.host, run.context, SPRINT_SPEED);
+    for (const { kind, policy, profile } of kits) {
+      if (kind === 'bow') installNativeItems(run.host, combat, { kind, policy, profile });
+      else if (kind === 'cycle') installNativeItems(run.host, combat, { kind, policy, profile });
+      else installNativeItems(run.host, combat, { kind, policy, profile });
+    }
+    registerInstalled(run.host, 'heldRanged');
+    if (held === undefined) return;
+    const ammunition = installNativeHeldAmmunition(run.host, held, shard.items);
+    run.host.onStep('held.ammunition', () => { ammunition.update(); }, undefined, 'afterBodies');
+    run.host.events.on('player.respawned', ({ player }) => { if (player !== undefined) ammunition.refillFor(player, held.pouch.fallback); }, run.host.scope);
+    run.ammunition = ammunition;
+  };
+}
+type NativeLoadout = NonNullable<Shardfile['items']['loadout']['native']>;
+function bindLoadout<C extends NativeAssemblyContext>(run: AssemblyRun<C>, policy: NativeLoadout): void {
+  const combat = combatOf(run), input = need(policy.input, 'Missing native equipment input policy');
+  registerInstalled(run.host, 'loadout');
+  bindNativeLoadout(run.host, policy, { flags: run.host.flags, frame: combat,
+    locked: () => run.boss?.locked() === true || run.quest?.riding() === true || run.quest?.talking() === true,
+    others: { frame: player => otherCombatFrame(combat, player.id), locked: () => run.boss?.locked() === true },
+    step: { id: input.step, phase: input.phase, pick: (player, first) => {
+      if (!first) return otherCombatFrame(combat, player.id).scripts.get(input.command) ?? null;
+      const taken = run.quest?.takePickup() === true ? 1 : null; return combat.scripts.get(input.command) ?? taken;
+    } } });
+}
+
 async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<NativeAssemblyFeature, { host: 'quest.composition' }>, at: AssemblyPrepared<C>): Promise<Step<C>> {
   const { product } = at, shard = product.shardfile, read = <T>(input: Parameters<typeof readAssemblyInput>[1]): Promise<T> => readAssemblyInput<T>(product, input);
   const counters = parseAchievementCounterData(await read(row.counters)), content = row.document === undefined ? undefined : parse(QuestRuntimeDocumentSchema, await read(row.document));
@@ -283,14 +336,9 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     }
     case 'item.swept': { const policy = await readAssemblyInput(product, row.policy); return run => { installSweptMelee(run, shard.items.rows, policy); }; }
     case 'loadout': {
-      const policy = need(shard.items.loadout.native, 'Missing native loadout'), input = need(policy.input, 'Missing native equipment input policy');
-      return run => { const combat = combatOf(run); registerInstalled(run.host, 'loadout'); bindNativeLoadout(run.host, policy, { flags: run.host.flags, frame: combat,
-        locked: () => run.boss?.locked() === true || run.quest?.riding() === true || run.quest?.talking() === true,
-        others: { frame: player => otherCombatFrame(combat, player.id), locked: () => run.boss?.locked() === true },
-        step: { id: input.step, phase: input.phase, pick: (player, first) => {
-          if (!first) return otherCombatFrame(combat, player.id).scripts.get(input.command) ?? null;
-          const taken = run.quest?.takePickup() === true ? 1 : null; return combat.scripts.get(input.command) ?? taken;
-        } } }); };
+      const policy = need(shard.items.loadout.native, 'Missing native loadout');
+      need(policy.input, 'Missing native equipment input policy');
+      return run => { bindLoadout(run, policy); };
     }
     case 'ammunition': {
       const held = product.section('held/loadout');
