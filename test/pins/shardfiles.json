@@ -162,6 +162,12 @@
       "revision": 21,
       "hash": "aa5ae84c3a9e26b633cd8ab8569ed1b9034b699e20d6aac49a2be31895c86316",
       "bytes": 35365888
+    },
+    {
+      "slug": "mirror-salt",
+      "revision": 5,
+      "hash": "4265cae597ff5b2b508b243ed06ed946470c99d6aad8db4ab4d13efa2f616eb3",
+      "bytes": 14881792
     }
   ]
 }

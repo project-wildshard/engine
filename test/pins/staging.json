@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "1dd3063e7df5ee662ba97b50720a87bffc9e7aef2618ef5ba45a80736effb175",
+  "catalogueHash": "4d67e3627037e2e3b49fdd635bc3cf9d3113736d60c694b24d7013d769427ccf",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -702,8 +702,8 @@
       {
         "slug": "mirror-salt",
         "name": "Mirror Salt",
-        "revision": 4,
-        "hash": "fe79c9485b9b3026d058c75da365400f7be54327c9fdf48fc9eb46a6b35e3f3a"
+        "revision": 5,
+        "hash": "4265cae597ff5b2b508b243ed06ed946470c99d6aad8db4ab4d13efa2f616eb3"
       },
       {
         "slug": "mossgate",
@@ -738,8 +738,8 @@
       {
         "slug": "open-plot-coral-drift",
         "name": "Open Plot · Coral Drift",
-        "revision": 2,
-        "hash": "c90659dba8b4b0a66d7d14c20bbb3a7b48dbd5b265bb8d8a8462fdc4149df3c3"
+        "revision": 3,
+        "hash": "351ec764be010d0bd091c8681aa4ebbb9a2546126c4d0aa16f8a2422a34a6d00"
       },
       {
         "slug": "open-plot-desert-ruin",
@@ -879,9 +879,9 @@
     },
     {
       "slug": "mirror-salt",
-      "revision": 4,
-      "hash": "fe79c9485b9b3026d058c75da365400f7be54327c9fdf48fc9eb46a6b35e3f3a",
-      "bytes": 16299520
+      "revision": 5,
+      "hash": "4265cae597ff5b2b508b243ed06ed946470c99d6aad8db4ab4d13efa2f616eb3",
+      "bytes": 14881792
     },
     {
       "slug": "mossgate",
@@ -915,9 +915,9 @@
     },
     {
       "slug": "open-plot-coral-drift",
-      "revision": 2,
-      "hash": "c90659dba8b4b0a66d7d14c20bbb3a7b48dbd5b265bb8d8a8462fdc4149df3c3",
-      "bytes": 14657536
+      "revision": 3,
+      "hash": "351ec764be010d0bd091c8681aa4ebbb9a2546126c4d0aa16f8a2422a34a6d00",
+      "bytes": 14665216
     },
     {
       "slug": "open-plot-desert-ruin",
