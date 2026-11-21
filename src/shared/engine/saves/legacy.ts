@@ -46,6 +46,9 @@ export function resetLegacy(local: SaveStorage | null, session: SaveStorage | nu
     // Completion is the global document, written last. Failed writes retry on
     // the next boot, without a reload; successful boots never wipe again.
     const copy = (scope: string, allowed: readonly string[]): void => {
+      // A partial boot or another writer may already own this epoch's device
+      // document. Carry old preferences only into an absent document.
+      if (local.getItem(`${app.savePrefix}${scope}`) !== null) return;
       let keys: Record<string, unknown> = {};
       try {
         const raw: unknown = JSON.parse(local.getItem(`${app.previousSavePrefix ?? ''}${scope}`) ?? '{}');
