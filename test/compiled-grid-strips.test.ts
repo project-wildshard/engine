@@ -7,7 +7,7 @@ import { generatePlatform, type GeneratedStrip, type PlatformCell, type StripPro
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { decodeCompiledGridBlock, mergeGridBlocks, parseCompiledGridHeader, platformGeometrySource, readCompiledGridStrips, type CompiledGridAddress } from '../src/shared/game/grid/compiledStrips';
 import { seamLookGeometrySteps } from '../src/client/game/grid/seamLook';
-import { encodeGridStripBlock, gridStripBlockKey, gridStripSetBudget, writeGridStripBlocks, type CompiledGridBlockFile } from '../src/cook/game/gridStripPages';
+import { encodeGridStripBlock, gridStripBlockKey, gridStripOverRoom, gridStripSetBudget, writeGridStripBlocks, type CompiledGridBlockFile } from '../src/cook/game/gridStripPages';
 import { gridSeamAsset, readGridSeams, writeGridSeams } from '../scripts/app-build/gridSeams.mjs';
 // oxlint-disable-next-line import/no-nodejs-modules -- This artifact fixture owns and removes only its bounded tmp directory.
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -324,6 +324,19 @@ test('the strip set budget is the committed room per distinct home, so staging\'
   expect(() => gridStripSetBudget({ set: 3_700_000 }, homes(1, 'a'))).toThrow('budgets/grid-strip-room.json');
 });
 
+
+test('a grid that never ships reports an over-room strip set; a shipping build fails it (FM11)', () => {
+  // A Ring build stands Brasscap road in for every shard outside the ring (pins.ts ringCatalogue): the failmodes fixture's
+  // grid is 4.02 MB against the shipping 3.55 MB room, and failed its build on every main push from 2026-11-19.
+  expect(gridStripOverRoom({ WILDSHARD_CATALOGUE: 'out/.ring-catalogue.json', WS_RELEASE: '0' })).toBe('report');
+  expect(gridStripOverRoom({ WILDSHARD_CATALOGUE: '/work/engine/out/.ring-catalogue.json' })).toBe('report');
+  expect(gridStripOverRoom({ WS_DEV_STAGING: '1' })).toBe('report');
+  // the shipping grid, a named deploy catalogue and any release keep the hard room
+  expect(gridStripOverRoom({})).toBe('fail');
+  expect(gridStripOverRoom({ WILDSHARD_CATALOGUE: 'tmp/deploy/catalogue.json' })).toBe('fail');
+  expect(gridStripOverRoom({ WILDSHARD_CATALOGUE: 'out/.ring-catalogue.json', WS_RELEASE: '1' })).toBe('fail');
+  expect(gridStripOverRoom({ WS_DEV_STAGING: '1', WS_RELEASE: '1' })).toBe('fail');
+});
 
 test('only an explicit local report handler keeps the exact over-budget strip blocks', async () => {
   await expect(baked(1)).rejects.toThrow('over the 1 in budgets/grid-strip-room.json');

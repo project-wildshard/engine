@@ -17,7 +17,7 @@ import { platformInputs } from '../src/shared/game/grid/platformInputs.ts';
 import { generatePlatform, platformShapeKeys } from '../src/shared/engine/sim/strips.ts';
 import { platformGeometrySource } from '../src/shared/game/grid/compiledStrips.ts';
 import { writeGridCollision } from '../src/cook/game/gridCollision.ts';
-import { gridStripSetBudget, writeGridStripBlocks } from '../src/cook/game/gridStripPages.ts';
+import { gridStripOverRoom, gridStripSetBudget, writeGridStripBlocks } from '../src/cook/game/gridStripPages.ts';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const root = process.cwd(), outputRoot = resolve(process.argv[2] ?? root), base = 'https://build.invalid/';
@@ -92,8 +92,8 @@ const ordered = rows => [...rows].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
 const output = JSON.stringify({ plans: ordered(plans), edges: ordered(sources) });
 if (!collisionOnly) {
   const set = gridStripSetBudget(JSON.parse(readFileSync(resolve(root, 'budgets/grid-strip-room.json'), 'utf8')), compiled);
-  // The locally shared staging snapshot can have more cells than the shipping pin. Keep the release limit and report it here.
-  const report = process.env.WS_DEV_STAGING === '1' && process.env.WS_RELEASE !== '1' ? console.warn : undefined;
+  // A grid that never ships (the shared staging snapshot, a Ring build's stand-in cells) reports; shipping builds keep the limit.
+  const report = gridStripOverRoom(process.env) === 'report' ? console.warn : undefined;
   const pages = writeGridStripBlocks(outputRoot, createHash('sha256').update(output).digest('hex'), compiled, reach, set, report);
   // Addressing only: all original strip bytes and hashes stay in writeGridStripBlocks.
   // The title can request a home's exact initial blocks.

@@ -187,6 +187,19 @@ export function gridStripSetBudget(room: unknown, sources: readonly GridStripSou
 }
 
 /**
+ * Whether a strip set over its room fails the build or is only reported. A shipping build fails. Two builds bake a grid that
+ * never ships, so they report: a dev build over the shared staging snapshot (more cells than the pin), and a Ring build,
+ * whose catalogue (scripts/pins.ts ringCatalogue, out/.ring-catalogue.json) stands Brasscap road in for every shard the
+ * ring leaves out. A release (WS_RELEASE=1) always fails.
+ */
+export function gridStripOverRoom(env: Readonly<Record<string, string | undefined>>): 'fail' | 'report' {
+  if (env['WS_RELEASE'] === '1') return 'fail';
+  if (env['WS_DEV_STAGING'] === '1') return 'report';
+  const catalogue = env['WILDSHARD_CATALOGUE'];
+  return catalogue !== undefined && basename(catalogue) === '.ring-catalogue.json' ? 'report' : 'fail';
+}
+
+/**
  * Bake every source's road as shared blocks and one directory, certify each home's two phases against native, and write
  * them under out/.app/grid-strip-pages. `reach` is the session's ring (a strip whose origin is within it of the home is
  * initial, the rest outer); `set` is the whole block set's wire ratchet (budgets/grid-strip-room.json).
