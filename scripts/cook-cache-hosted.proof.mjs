@@ -5,6 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {existsSync,mkdirSync,mkdtempSync,readFileSync,readdirSync,rmSync,statSync,writeFileSync} from 'node:fs';
 import {brotliDecompressSync} from 'node:zlib';
+import {deterministicCookIndex} from './cook-cache-model.ts';
 import {join,relative,resolve,sep} from 'node:path';
 
 if(process.env.GITHUB_ACTIONS!=='true')throw new Error('TC28 real cook proof runs on hosted CI only');
@@ -50,7 +51,7 @@ try{
   assert.ok(notes.every(line=>!/: try \d+ failed:/u.test(line)),notes.join(' | '));
   assert.equal(row.state,'cooked',JSON.stringify(row));
   const bytes=await store.get(indexKey(build,head.hash));assert.ok(bytes);
-  const index=JSON.parse(new TextDecoder().decode(bytes));
+  const index=/** @type {import('../src/cook/game/cookWorker.ts').CookIndex} */ (JSON.parse(new TextDecoder().decode(bytes)));
   const entries=cacheEntries(join(jobs,'cache'));
   assert.ok(entries.length>0);assert.ok(['proved','unmeasured'].includes(index.proof));
   /** @type {Record<string,string>} */const objects={};
@@ -69,11 +70,12 @@ try{
  assert.deepEqual(content(first.entries),content(cold.entries),'Independent cold encoding must produce the same bodies');
  assert.deepEqual(warm.storeKeys,cold.storeKeys);assert.deepEqual([...warm.index.keys].sort((a,b)=>a.localeCompare(b)),[...cold.index.keys].sort((a,b)=>a.localeCompare(b)));
  assert.deepEqual(warm.objects,cold.objects);assert.deepEqual(warm.serverFiles,cold.serverFiles);
- assert.deepEqual({...warm.index,seconds:0},{...cold.index,seconds:0});
+ assert.deepEqual(deterministicCookIndex(warm.index),deterministicCookIndex(cold.index));
+ assert.deepEqual(deterministicCookIndex(first.index),deterministicCookIndex(warm.index));
  assert.deepEqual(first.objects,warm.objects);assert.deepEqual(first.serverFiles,warm.serverFiles);
  assert.equal(cookRevision(root).revision,recipe.revision,'Cook inputs must not change during the three real cooks');
  /** @param {Awaited<ReturnType<typeof run>>} row */
- const observation=row=>({elapsedMs:row.elapsedMs,seconds:row.seconds,peakMB:row.peakMB,proof:row.index.proof,preparation:row.index.preparation,uniqueParts:row.entries.length,rawBytes:row.entries.reduce((n,e)=>n+e.rawBytes,0),wireBytes:row.entries.reduce((n,e)=>n+e.wireBytes,0)});
+ const observation=row=>({elapsedMs:row.elapsedMs,seconds:row.seconds,peakMB:row.peakMB,proof:row.index.proof,preparation:row.index.preparation,uniqueParts:row.entries.length,scriptTiming:row.index.check?.performance.scripts.scripts??null,rawBytes:row.entries.reduce((n,e)=>n+e.rawBytes,0),wireBytes:row.entries.reduce((n,e)=>n+e.wireBytes,0)});
  const report={version:1,complete:true,sha,run:process.env.GITHUB_RUN_ID,cookRevision:recipe.revision,slug:head.slug,hash:head.hash,source:product.source,quick,
   prime:observation(first),reused:observation(warm),cold:observation(cold),warmCacheUnchanged:true,objects:Object.keys(warm.objects).length,
   serverFiles:Object.keys(warm.serverFiles).length,keys:warm.storeKeys,cache:content(warm.entries),seconds:(performance.now()-started)/1000};
