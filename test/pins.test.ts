@@ -21,6 +21,8 @@ const pinsTool = (cwd: string, env: NodeJS.ProcessEnv, ...args: readonly string[
   child.on('close', () => { resolve(stderr); });
 });
 const install = (cwd: string, env: NodeJS.ProcessEnv): Promise<string> => pinsTool(cwd, env, 'install');
+/** Stderr without the format's deprecation warnings: a pinned head on an old spelling still installs (FP6, format 0.68). */
+const refusals = (stderr: string): string => stderr.split('\n').filter(line => line !== '' && !line.startsWith('warning ')).join('\n');
 const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { api: string; shards: { slug: string; revision: number; hash: string; bytes: number }[] };
 const servers: Server[] = [], folders: string[] = [];
 
@@ -198,14 +200,14 @@ test('a missing mirrored slice rebuilds exact pinned bytes and refuses changed d
   const address = server.address(); if (address === null || typeof address === 'string') throw new Error('No fixture port');
   const origin = `http://127.0.0.1:${address.port}`, cache = join(root, 'cache');
   const env = {...process.env, WILDSHARD_API: origin, WILDSHARD_PIN_MIRROR: `${origin}/mirror`, WILDSHARD_PIN_CACHE: cache, GIT_CEILING_DIRECTORIES: root};
-  expect(await install(root, env)).toBe('');
+  expect(refusals(await install(root, env))).toBe('');
   const full = join(root, 'out', row.slug, 'validation.json'), before = readFileSync(full);
   expect(existsSync(join(root, 'out/.slices', row.slug))).toBe(false);
-  expect(await pinsTool(root, env, 'install', '--ring-slices', '1')).toBe('');
+  expect(refusals(await pinsTool(root, env, 'install', '--ring-slices', '1'))).toBe('');
   expect(readFileSync(join(root, 'out/.slices', row.slug, 'shard.json'))).toEqual(Buffer.from(shard.header));
   expect(readFileSync(full)).toEqual(before);
   expect(existsSync(join(root, 'out/.ring-catalogue.json'))).toBe(false);
-  expect(await pinsTool(root, env, 'install', '--ring', '1')).toBe('');
+  expect(refusals(await pinsTool(root, env, 'install', '--ring', '1'))).toBe('');
   expect(readFileSync(join(cache, `${hash}.tar`))).toEqual(Buffer.from(body));
   expect(readFileSync(join(root, 'out/.slices', row.slug, 'shard.json'))).toEqual(Buffer.from(shard.header));
   for (const changed of [{hash: '0'.repeat(64)}, {bytes: row.bytes + 1}, {files: row.files + 1}]) {
