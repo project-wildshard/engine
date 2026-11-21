@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.65 (2026-11-21)
+
+- Creature encounters can choose targets using their own rules.
+- Zones can use their own field water settings.
+- Ranged kits can use the aim and ammo rules authored for their zone.
+- Reduced simulation work when creatures and players are moving.
+- Zones can draw their own creature species and use their own rosters and harvest rules.
+
 ## v0.1.64 (2026-11-21)
 
 - Nalati's new eagle and balbal can use their authored bodies and coats.
