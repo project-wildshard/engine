@@ -25,7 +25,7 @@ import { once } from 'node:events';
 import { setTimeout as pause } from 'node:timers/promises';
 import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
-import { enterZone } from './safari.mjs';
+import { enterZone, phoneSlots } from './safari.mjs';
 import { fenceFrames, fenceWaits, GPU_FENCE_READ, GPU_FENCE_START } from './gpuFence.mjs';
 import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, otherKind, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
@@ -54,8 +54,50 @@ const gl = r.getContext();
 let batches = 0;
 g.scene?.traverse?.(o => { if (o.isBatchedMesh) batches++; });
 return { dpr: r.getPixelRatio(), buffer: [gl.drawingBufferWidth, gl.drawingBufferHeight], css: [innerWidth, innerHeight],
-  phoneGraphics: g.phoneGraphics ?? null, multiDraw: gl.getExtension('WEBGL_multi_draw') !== null, batches };
+  phoneGraphics: g.phoneGraphics ?? null, multiDraw: gl.getExtension('WEBGL_multi_draw') !== null, batches,
+  saved: (() => { try { const keys = JSON.parse(localStorage.getItem('wildshard.save.v2@2.device') ?? '{}').keys ?? {};
+    return { graphics: keys.graphics?.data ?? null, deviceKeys: Object.keys(keys), devMode: keys.devMode?.data ?? null, storage: Object.keys(localStorage), restored: window.__wsLowGuard ?? 0 }; } catch (e) { return String(e); } })() };
 `;
+
+/** mini-phone-pairs (2026-11-21): the phone's seeded saves (Low, developer mode, the trial's slots) vanish from Safari's
+ * localStorage after the zone page loads (codex-tc48's DF5 finding; at control the device document keeps the game's own
+ * keys but not the seeds), and the 2 s mode re-read then renders High. A page bootstrap holds the seeds the way a player's
+ * saved choice would: every read or write of the device or global document gets any missing seed back, and
+ * `__wsLowGuard` counts how often a seed had to be restored. @param {unknown[]} fixtures */
+const lowGuard = (fixtures) => `(() => {
+  const fixtures = ${JSON.stringify(fixtures)}, proto = Storage.prototype, get = proto.getItem, set = proto.setItem;
+  const docs = { 'wildshard.save.v2@2.device': 'device', 'wildshard.save.v2@2.global': 'global' };
+  const seen = new Map();
+  const hold = (name, raw) => {
+    const scope = docs[name];
+    if (scope === undefined) return raw;
+    // the game re-reads these documents often (the 2 s mode check): an unchanged string returns its last answer, no parse
+    const last = seen.get(name);
+    if (last !== undefined && last[0] === raw) return last[1];
+    const out = fill(scope, raw);
+    seen.set(name, [raw, out]);
+    return out;
+  };
+  const fill = (scope, raw) => {
+    let doc; try { doc = JSON.parse(raw ?? '{"keys":{}}'); } catch { return raw; }
+    if (typeof doc !== 'object' || doc === null) return raw;
+    doc.keys ??= {};
+    let changed = false;
+    for (const f of fixtures) {
+      if (f.scope !== scope) continue;
+      const now = doc.keys[f.key]?.data;
+      if (f.merge) {
+        const base = typeof now === 'object' && now !== null ? now : {};
+        if (Object.entries(f.data).some(([k, v]) => base[k] !== v)) { doc.keys[f.key] = { v: 1, data: { ...base, ...f.data } }; changed = true; }
+      } else if (doc.keys[f.key] === undefined) { doc.keys[f.key] = { v: 1, data: f.data }; changed = true; }
+    }
+    if (!changed) return raw;
+    window.__wsLowGuard = (window.__wsLowGuard ?? 0) + 1;
+    return JSON.stringify(doc);
+  };
+  proto.getItem = function (name) { const raw = get.call(this, name); return this === localStorage ? hold(name, raw) : raw; };
+  proto.setItem = function (name, value) { return set.call(this, name, this === localStorage ? hold(name, value) : value); };
+})();`;
 
 async function bench() {
   mkdirSync(out, { recursive: true });
@@ -85,6 +127,8 @@ async function bench() {
       try {
         tools?.lockState(`run ${String(run)} cap ${String(cap)} before boot`);
         // --cache-off (DF8): Safari's resource cache off for the boot, a first load of a new build (link-bench's cold runs)
+        // mini-phone-pairs: hold the seeds through the page's storage loss (lowGuard); High runs are left alone
+        if (phone && trialSlots.graphics !== 'high' && typeof Reflect.get(driver, 'bootstrap') === 'function') await /** @type {any} */ (driver).bootstrap(lowGuard(phoneSlots(trialSlots)));
         const boot = await enterZone(/** @type {any} */ (driver), { base, slug: values.zone, slots: trialSlots, cacheOff: values['cache-off'] === true });
         row.boot = { outcome: boot.outcome, controlS: boot.controlAt !== null && boot.startedAt !== null ? (boot.controlAt - boot.startedAt) / 1000 : null,
           build: boot.state?.build ?? null, version: boot.state?.version ?? null, error: boot.state?.error ?? null };
@@ -95,6 +139,9 @@ async function bench() {
           // buffer's DPR and size, the tier, the multi-draw extension and the slots the page actually read
           row.raster = await driver.evaluate(RASTER_WITNESS).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  raster: ${JSON.stringify(row.raster)}`);
+          // mini-phone-pairs (2026-11-21): a phone boot seeded Low that renders above DPR 1 lost its Low save (codex-tc48's
+          // DF5 finding); refuse it before the route plays, so a pair never compares a High arm and the hold ends early
+          if (phone && trialSlots.graphics !== 'high' && row.raster?.dpr !== 1) throw new Error(`NOT AT LOW: raster ${JSON.stringify(row.raster)}`);
           if ('gesture' in driver && typeof driver.gesture === 'function') await driver.gesture(askWake).catch(() => undefined);
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
