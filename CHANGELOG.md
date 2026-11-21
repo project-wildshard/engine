@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.60 (2026-11-20)
+
+- Nine Dragon Stack shows its lanterns, stalls and portal when you enter from the road.
+- Boss health bars appear when you enter Far Reach or Sunscar Dunes from the road.
+- Pine Hollow loads its new revision.
+
 ## v0.1.59 (2026-11-20)
 
 - The grapple claw is available when you enter Nine Dragon Stack from the road.
