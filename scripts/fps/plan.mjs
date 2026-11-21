@@ -19,22 +19,25 @@ const fullProfiles = {
 };
 
 /** Quick routes share one cold boot per profile. Qualification keeps every original window.
- * @param {{qualify?:boolean,runs?:string,dockOnly?:boolean,coldOnly?:boolean}} [options] */
-export function fpsPlan({ qualify = false, runs, dockOnly = false, coldOnly = false } = {}) {
+ * @param {{qualify?:boolean,runs?:string,dockOnly?:boolean,coldOnly?:boolean,windows?:string}} [options] */
+export function fpsPlan({ qualify = false, runs, dockOnly = false, coldOnly = false, windows } = {}) {
   const count = Number(runs ?? (qualify ? 3 : 1));
   if (!Number.isSafeInteger(count) || count < 1) throw new Error('Use a positive run count');
   if (qualify && (count !== 3 || dockOnly || coldOnly))
     throw new Error('--qualify requires three cold runs, every route window and the final warm repeat');
+  const windowCount = windows === undefined ? 5 : Number(windows);
+  if (windows !== undefined && (!qualify || !Number.isSafeInteger(windowCount) || windowCount < 1 || windowCount > 5))
+    throw new Error('--windows requires --qualify and a count from 1 to 5');
   const fullRoute = routeFor('driftwood-fps');
   /** @type {import('../memory/iphone/route.mjs').RouteLeg[]} */
   const route = [];
   for (const [index,leg] of fullRoute.entries()) {
-    if (!qualify && index >= (dockOnly ? 1 : 3)) break;
+    if (index >= (qualify ? windowCount : dockOnly ? 1 : 3)) break;
     route.push(qualify ? leg : {...leg,seconds:[15,30,35][index],
       dwell:leg.dwell ? {...leg.dwell,seconds:10} : undefined});
   }
   const profiles = Object.fromEntries(Object.entries(fullProfiles).map(([name, specs]) =>
     [name, qualify ? specs : specs.slice(0, 1)]));
-  return { mode: qualify ? 'qualify' : 'quick', scope: qualify ? 'route' : dockOnly ? 'dock' : 'quick',
+  return { mode: qualify ? 'qualify' : 'quick', scope: qualify ? windowCount === 5 ? 'route' : 'subset' : dockOnly ? 'dock' : 'quick',
     profiles, route, count, warm: qualify, limitMs: qualify ? null : 20 * 60 * 1000 };
 }

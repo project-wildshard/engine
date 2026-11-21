@@ -49,3 +49,17 @@ test('dry planning works without a Mac hardware model on non-macOS CI', () => {
   expect(plan).toMatchObject({host:'dry-run',mode:'quick'});
   expect(plan.plan).toHaveLength(5);
 });
+
+
+test('explicit reduced qualification retains three cold runs and warm sampling with a non-nightly scope', () => {
+  const diagnostic = fpsPlan({qualify:true,windows:'1'});
+  expect(diagnostic).toMatchObject({mode:'qualify',scope:'subset',count:3,warm:true,limitMs:null});
+  expect(diagnostic.route).toEqual(routeFor('driftwood-fps').slice(0,1));
+  const plan = JSON.parse(execFileSync(process.execPath,
+    ['scripts/fps/table.mjs','--dry-run','--qualify','--profiles','phone-lpm-low','--windows','1'],{encoding:'utf8'}));
+  expect(plan).toMatchObject({mode:'qualify',count:3,warm:true});
+  expect(plan.plan).toHaveLength(1);
+  expect(plan.route).toHaveLength(1);
+  for (const options of [{windows:'1'}, {qualify:true,windows:'0'}, {qualify:true,windows:'6'}, {qualify:true,windows:'1.5'}])
+    expect(() => fpsPlan(options)).toThrow('--windows requires');
+});

@@ -5,6 +5,7 @@
 // --device key=value,... saves device slots for every profile (an A/B arm; true/false/numbers parsed).
 // --dock-only --cold-only is a short diagnostic. With WS_BENCH=1, add --pass-breakdown for CPU submit by pass.
 // The full matrix includes both desktop sizes and a warm repeat.
+// --qualify --profiles NAME --windows 1 proves reduced sampling; its subset scope never qualifies nightly.
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { once } from 'node:events';
@@ -29,10 +30,10 @@ const exclusiveGPU = '^/.*(ms-playwright|[.]agent-browser/browsers)/.*(chrome-he
 const keys = Object.keys(fpsPlan().profiles);
 const choices = parseArgs({ options: {
   zone: { type:'string', default:'driftwood-isle' }, profiles:{ type:'string', default:keys.join(',') },
-  runs:{ type:'string' }, qualify:{ type:'boolean' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
+  runs:{ type:'string' }, windows:{ type:'string' }, qualify:{ type:'boolean' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
   'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' }, 'worker-batch':{ type:'string' }, device:{ type:'string' },
 } }).values;
-const sampling = fpsPlan({qualify:choices.qualify,runs:choices.runs,dockOnly:choices['dock-only'],coldOnly:choices['cold-only']});
+const sampling = fpsPlan({qualify:choices.qualify,runs:choices.runs,dockOnly:choices['dock-only'],coldOnly:choices['cold-only'],windows:choices.windows});
 const {profiles,route,count} = sampling;
 
 function gpuBusy() {
@@ -211,7 +212,7 @@ async function main() {
       warm:warm ? assembleCapture(cells.map(cell => cell?.warm),route,profile.floor) : null };
   });
   const progress = {completed,total:groups.reduce((sum,group) => sum+group.length,0)};
-  const scope = sampling.scope === 'dock' ? 'dock only' : sampling.mode === 'quick' ? 'quick: dock, beach, village' : 'qualification: full route';
+  const scope = sampling.scope === 'dock' ? 'dock only' : sampling.mode === 'quick' ? 'quick: dock, beach, village' : sampling.scope === 'subset' ? 'qualification diagnostic: reduced windows' : 'qualification: full route';
   const markdown = [`## Driftwood FPS (${scope})`, '',table(measured),'',
     `Build ${build} · ${progress.completed}/${progress.total} measurement cells. ${sampling.mode === 'quick' ? 'One fresh boot per profile; consecutive shorter legs. Development sample only; use --qualify for nightly and DF15.' : 'Each leg starts from a fresh boot and an on-foot approach.'}`,
     'Phone GPU estimates await DF5.'].join('\n');

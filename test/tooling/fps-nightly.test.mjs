@@ -61,3 +61,8 @@ test('a quick development table cannot qualify even when its synthetic frames pa
   const table = {...makeTable(),scope:'quick',mode:'quick'};
   expect(reviewNight(table,build)).toMatchObject({exact:false,qualifies:false});
 });
+
+
+test('an explicitly reduced qualification table never qualifies nightly', () => {
+  expect(reviewNight({...makeTable(),scope:'subset',mode:'qualify'},build)).toMatchObject({exact:false,qualifies:false});
+});
