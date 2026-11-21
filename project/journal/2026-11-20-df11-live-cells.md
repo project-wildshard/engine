@@ -6,3 +6,6 @@ WebKit's full collection costs per live cell (relay 6). A dock heap snapshot hol
 - valibot Standard Schema props are built lazily in the client build (`vite/valibotStandard.ts`): ~18.4k schemas lose
   two cells each. Nothing in the bundle reads `~standard`.
 - Collision strips stop retaining seam features (~55k objects nobody reads after the presentation builders).
+- `onCellField` slots keep the prior descriptor's enumerability instead of the descriptor and hold a sole subscriber
+  without a Set (~8k watched fields at the dock, three fewer cells each). Shared per-key accessors were tried and dropped:
+  they put a symbol and dictionary lookup on every watched `position.x` read and write.
