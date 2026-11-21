@@ -50,6 +50,9 @@ function readAt(sha, file, cwd) {
   try { return JSON.parse(execFileSync('git', ['show', `${sha}:${file}`], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); } catch { return {}; }
 }
 
+/** @param {{shards?: Array<{slug:string}>}} pins */
+const pinRows = pins => new Map(Object.values(pins?.shards ?? {}).map(row => [row.slug, JSON.stringify(row)]));
+
 /**
  * The Ring 1 slugs a push moves: a changed pin row or a changed digest chain, among the slugs the pushed tree's Ring 1
  * baseline names for this platform.
@@ -58,25 +61,28 @@ function readAt(sha, file, cwd) {
  * @returns {string[]}
  */
 export function movedRingSlugs(before, after, platform) {
-  /** @param {any} pins */
-  const rows = pins => new Map(Object.values(pins?.shards ?? {}).map(row => [row.slug, JSON.stringify(row)]));
   /** @param {any} digests */
   const chains = digests => Object.assign({}, ...Object.values(digests?.[platform] ?? {}));
-  const [was, now, oldChains, newChains] = [rows(before.pins), rows(after.pins), chains(before.digests), chains(after.digests)];
+  const [was, now, oldChains, newChains] = [pinRows(before.pins), pinRows(after.pins), chains(before.digests), chains(after.digests)];
   return Object.keys(newChains).filter(slug => was.get(slug) !== now.get(slug)
     || JSON.stringify(oldChains[slug]) !== JSON.stringify(newChains[slug])).sort((a, b) => a.localeCompare(b));
 }
 
-/** Moved Ring 1 slugs over a pre-push ref list. @param {string|undefined} refs @param {string} cwd @returns {string[]} */
-export function ringSlugs(refs, cwd, platform = `${process.platform}-${process.arch}`) {
-  const slugs = new Set();
+/** Moved pin rows and Ring 1 digests over a pre-push ref list.
+ * @param {string|undefined} refs @param {string} cwd @returns {{pins:string[],ring:string[]}} */
+export function pinChanges(refs, cwd, platform = `${process.platform}-${process.arch}`) {
+  const pins = new Set(), ring = new Set();
   for (const line of (refs ?? '').trim().split('\n')) {
     const [, local, , remote] = line.trim().split(/\s+/u);
     if (!/^[a-f0-9]{40}$/u.test(local ?? '') || !/^[a-f0-9]{40}$/u.test(remote ?? '') || /^0+$/u.test(local ?? '')) continue;
     const end = /** @param {string} sha */ sha => ({ pins: readAt(sha, 'test/pins/shardfiles.json', cwd), digests: readAt(sha, 'test/pins/ring-digests.json', cwd) });
-    for (const slug of movedRingSlugs(/^0+$/u.test(remote ?? '') ? {} : end(remote ?? ''), end(local ?? ''), platform)) slugs.add(slug);
+    const before = /^0+$/u.test(remote ?? '') ? { pins: {} } : end(remote ?? '');
+    const after = end(local ?? '');
+    const was = pinRows(before.pins);
+    for (const [slug, row] of pinRows(after.pins)) if (was.get(slug) !== row) pins.add(slug);
+    for (const slug of movedRingSlugs(before, after, platform)) ring.add(slug);
   }
-  return [...slugs].sort((a, b) => a.localeCompare(b));
+  return { pins: [...pins].sort((a, b) => a.localeCompare(b)), ring: [...ring].sort((a, b) => a.localeCompare(b)) };
 }
 
 /**

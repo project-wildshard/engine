@@ -5,7 +5,8 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A real owned Git fixture for the Ring 1 slug read.
 import { join, resolve } from 'node:path';
-import { FS27_STATIC, PATH_EDGES, TABLE_TESTS, fs27Plan, movedRingSlugs, ringSlugs } from '../scripts/push-path-edges.mjs';
+import { FS27_STATIC, PATH_EDGES, TABLE_TESTS, fs27Plan, movedRingSlugs, pinChanges } from '../scripts/push-path-edges.mjs';
+import { shardPinTests } from '../scripts/gate-related-tests.mjs';
 import { staticChecks } from '../.githooks/push-checks.mjs';
 
 // FLOW-SIMPLE FS27: each row is a push that reached main untested on 2026-11-19 and went red there. The gate must
@@ -67,18 +68,38 @@ mkdirSync(resolve('tmp'), { recursive: true });
 const repo = mkdtempSync(resolve('tmp', 'push-path-edges-'));
 afterAll(() => rmSync(repo, { recursive: true, force: true }));
 
-it('reads the moved slugs from a pre-push ref list', () => {
+it('adds only tests that name the moved pin, including a shard outside Ring 1', () => {
   const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const write = (file: string, body: string): void => { writeFileSync(join(repo, file), body); };
   const commit = (revision: number) => {
-    mkdirSync(join(repo, 'test/pins'), { recursive: true });
-    writeFileSync(join(repo, 'test/pins/shardfiles.json'), JSON.stringify({ shards: { 0: { slug: 'brasscap-mesa', revision } } }));
-    writeFileSync(join(repo, 'test/pins/ring-digests.json'), JSON.stringify({ 'linux-x64': { 240: { 'brasscap-mesa': ['h'], 'far-reach': ['h'] } } }));
-    git('add', 'test/pins');
+    write('test/pins/shardfiles.json', JSON.stringify({ shards: [
+      { slug: 'brasscap-mesa', revision }, { slug: 'open-plot-4-1', revision }, { slug: 'pine-hollow', revision: 7 },
+    ] }));
+    write('test/pins/ring-digests.json', JSON.stringify({ 'linux-x64': { 240: { 'brasscap-mesa': ['h'], 'pine-hollow': ['h'] } } }));
+    git('add', 'test', 'src', 'scripts');
     git('-c', 'user.name=t', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', `r${revision}`, '--no-verify');
     return git('rev-parse', 'HEAD');
   };
   git('init', '-q');
+  mkdirSync(join(repo, 'test/pins'), { recursive: true });
+  mkdirSync(join(repo, 'scripts'));
+  mkdirSync(join(repo, 'src/client/app'), { recursive: true });
+  mkdirSync(join(repo, 'src/cli'), { recursive: true });
+  write('test/released-save.test.ts', "test('resume', () => restore('brasscap-mesa'));");
+  write('test/related-plot.test.mjs', "test('walk', () => enter('open-plot-4-1'));");
+  write('test/registered.test.ts', "test('read installed product', () => assert(true));");
+  write('scripts/test-folders.json', JSON.stringify({ 'test/registered.test.ts': ['open-plot-4-1'] }));
+  write('test/unrelated.test.ts', "test('walk', () => enter('pine-hollow'));");
+  write('test/other-plot.test.ts', "test('walk', () => enter('open-plot-4-10'));");
+  write('src/client/app/brasscap-mesa-entry.test.ts', "test('entry', () => assert(true));");
+  write('src/cli/not-vitest.test.ts', "test('open-plot-4-1', () => assert(true));");
   const [before, after] = [commit(12), commit(13)];
-  expect(ringSlugs(`refs/heads/main ${after} refs/heads/main ${before}\n`, repo, 'linux-x64')).toEqual(['brasscap-mesa']);
-  expect(ringSlugs(`refs/heads/main ${after} refs/heads/main ${after}\n`, repo, 'linux-x64')).toEqual([]);
+  const changed = pinChanges(`refs/heads/main ${after} refs/heads/main ${before}\n`, repo, 'linux-x64');
+  expect(changed).toEqual({ pins: ['brasscap-mesa', 'open-plot-4-1'], ring: ['brasscap-mesa'] });
+  expect(shardPinTests(repo, changed.pins)).toEqual([
+    'src/client/app/brasscap-mesa-entry.test.ts', 'test/registered.test.ts', 'test/related-plot.test.mjs', 'test/released-save.test.ts',
+  ]);
+  const unchanged = pinChanges(`refs/heads/main ${after} refs/heads/main ${after}\n`, repo, 'linux-x64');
+  expect(unchanged).toEqual({ pins: [], ring: [] });
+  expect(shardPinTests(repo, unchanged.pins)).toEqual([]);
 });

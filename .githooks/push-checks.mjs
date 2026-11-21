@@ -5,13 +5,14 @@ import {dirname,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../scripts/push-budget.mjs';
-import {logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../scripts/push-local-split.mjs';
+import {BROWSER_TESTS,TIMING_TESTS,logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../scripts/push-local-split.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
 import {capturePushTree,pushProofDisposition,readPushProof,writePushProof} from '../scripts/push-proof-cache.mjs';
 import {gateEnvironment} from '../scripts/push-environment.mjs';
 import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
 import {discoverLocalDeltaPlan,localDeltaPlan} from '../scripts/local-land-delta.mjs';
-import {fs27Plan,ringSlugs} from '../scripts/push-path-edges.mjs';
+import {fs27Plan,pinChanges} from '../scripts/push-path-edges.mjs';
+import {shardPinTests} from '../scripts/gate-related-tests.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
@@ -189,17 +190,25 @@ async function main(){
     selection=await completePushSelection(selection);
     console.error(`  - verified tests: ${selection.mode}; ${selection.reason}`);
   }
+  const refs=split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS;
+  const pins=selection.mode==='docs'?{pins:[],ring:[]}:pinChanges(refs,process.cwd());
   /** @type {string[]|null} */let local=null;
   if(split){
     const plan=splitLocalTests(selection);
-    local=plan.local;
-    for(const row of plan.hosted)console.error(`  - hosted-only (${row.reason}): ${row.file}`);
-    logHostedOnly(plan.hosted,{sha:context?.commit??'unknown',lane:process.env.WS_LANE_NAME});
-    console.error(`  - split gate: ${local.length} local Vitest file(s), ${plan.hosted.length} sent to hosted CI`);
+    // Browser and exclusive timing proofs keep their hosted runners. Pin
+    // readers bypass the normal file-cost cutoff: a replay can be slow and
+    // still need to catch a stale save or physics digest before the push.
+    const pinReaders=shardPinTests(process.cwd(),pins.pins)
+      .filter(file=>!BROWSER_TESTS.includes(file)&&!TIMING_TESTS.includes(file));
+    local=[...new Set([...plan.local,...pinReaders])];
+    if(pinReaders.length>0)console.error(`  - shard pin readers: ${pinReaders.length} Vitest file(s) for ${pins.pins.join(', ')}`);
+    const hosted=plan.hosted.filter(row=>!pinReaders.includes(row.file));
+    for(const row of hosted)console.error(`  - hosted-only (${row.reason}): ${row.file}`);
+    logHostedOnly(hosted,{sha:context?.commit??'unknown',lane:process.env.WS_LANE_NAME});
+    console.error(`  - split gate: ${local.length} local Vitest file(s), ${hosted.length} sent to hosted CI`);
   }
   // FS27: declared readers with no import edge, CI static's cheap checks, and the Ring 1 slugs a pin push moves.
-  const refs=split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS;
-  const fs27=fs27Plan(selection,{split,slugs:selection.mode==='docs'?[]:ringSlugs(refs,process.cwd())});
+  const fs27=fs27Plan(selection,{split,slugs:pins.ring});
   if(local!==null)local=[...new Set([...local,...fs27.tests])].sort();
   const readers=local===null&&fs27.tests.length>0?[{name:`vitest (FS27 readers: ${fs27.tests.length})`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...fs27.tests]]}]:[];
   if(fs27.tests.length>0||fs27.tasks.length>0)console.error(`  - FS27: ${fs27.tests.length} declared reader file(s); ${fs27.tasks.map(task=>task.name).join(', ')}`);

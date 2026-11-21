@@ -10,10 +10,12 @@
 // and runs in CI. A changed test file always runs. Today the whole suite (~115 files) estimates under the budget at the
 // gate's 4 workers, so the cap only bites once the suite grows. Wasm scenarios have explicit source/row edges
 // below because the test imports the built bytes; those required tests run even beyond the estimate.
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { basename, relative, resolve } from 'node:path';
 import { createVitest } from 'vitest/node';
 import { liveTestSelection } from './push-inputs.mjs';
+import { vitestFile } from './push-selection.mjs';
 import { readWeights } from './test-timings.mjs';
 
 // The tree under test is the working directory (the gate runs the checkout's copy of this script in the build mirror).
@@ -95,6 +97,23 @@ export function folderReaderTests(changed, registry) {
   return Object.entries(registry).filter(([, slugs]) => shared || changed.some(file => slugs.some(slug =>
     file.startsWith(`src/shards/${slug}/`) || file.startsWith(`public/assets/${slug}/`))))
     .map(([test]) => test).sort((a, b) => a.localeCompare(b));
+}
+
+/** A test may read a pinned shard without importing any file in its product.
+ * @param {string} root @param {readonly string[]} slugs @returns {string[]} */
+export function shardPinTests(root, slugs) {
+  if (slugs.length === 0) return [];
+  if (slugs.some(slug => !/^[a-z0-9_-]+$/u.test(slug))) throw new Error('Invalid shard pin slug');
+  const names = new RegExp(`(?<![\\w-])(?:${slugs.join('|')})(?![\\w-])`, 'u');
+  const registryPath = resolve(root, 'scripts/test-folders.json');
+  /** @type {Record<string, string[]>} */
+  const products = existsSync(registryPath) ? JSON.parse(readFileSync(registryPath, 'utf8')) : {};
+  const files = execFileSync('git', ['ls-files', '-z', '--', 'src', 'test'], { cwd: root, encoding: 'utf8' }).split('\0');
+  return files.filter(file => vitestFile.test(file) && (
+    products[file]?.some(slug => slugs.includes(slug))
+    || slugs.some(slug => basename(file).startsWith(`${slug}-`) || basename(file).startsWith(`${slug}.`))
+    || names.test(readFileSync(resolve(root, file), 'utf8'))
+  )).sort((a, b) => a.localeCompare(b));
 }
 
 /**

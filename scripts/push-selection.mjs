@@ -44,7 +44,7 @@ export function pushSelection(refs,cwd=process.cwd(),options={}) {
  * scripts/changelog.mjs is not one (vite.config.ts builds CHANGELOG.md into the title screen), so a changelog push runs full. */
 export const DOC_READER_CHECKS=Object.freeze({'scripts/agent-parity.mjs':'check:parity'});
 /** vitest.config.ts's include globs; any other test file reading a doc (a node:test kit file) is an unknown reader. */
-const vitestFile=/^(?:test\/.+\.test\.(?:ts|mjs)|src\/(?:client|shared|server|cook)\/(?:engine|game|host)\/.+\.test\.ts|src\/client\/app\/.+\.test\.ts|src\/test\/(?:engine|game)\/.+\.test\.ts)$/u;
+export const vitestFile=/^(?:test\/.+\.test\.(?:ts|mjs)|src\/(?:client|shared|server|cook)\/(?:engine|game|host)\/.+\.test\.ts|src\/client\/app\/.+\.test\.ts|src\/test\/(?:engine|game)\/.+\.test\.ts)$/u;
 
 /** Who reads a Markdown file: code that names its path as a whole string literal, or as a string's last path segments
  * (`${root}/docs/x.md`, `--file=docs/x.md`, `cat docs/x.md`, `../docs/x.md?raw`). Prose and comments (AGENTS.md "Disk") never read it. Reading tests run in the docs lane; a
