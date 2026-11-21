@@ -18,7 +18,9 @@ import { jumpOwnerClock } from './fixtures/ownerClock';
 // P1-E3.1b: Nalati Grasslands' population on the shipped headless host, from its built product alone. The world's every
 // server input is a server-class file (J91); no test fixture lends a row. The worker case is nalati-headless-worker.test.ts.
 
-const SLUG = 'nalati-grasslands', Roster = v.looseObject({ roster: v.looseObject({ bodies: v.array(v.looseObject({ id: v.string(), kind: v.string(), variant: v.looseObject({ id: v.string() }) })) }) });
+const SLUG = 'nalati-grasslands', Roster = v.looseObject({ roster: v.looseObject({ adoption: v.array(v.looseObject({ id: v.string() })) }) });
+// Since Nalati r5 (OF24, shard c054096) the boot document holds the baked roster: adoption streams by id, kinds and variants
+// in the physics bake's ordered placements. The census's ids must be the roster's; its kinds are counted below.
 
 async function shipped(): Promise<{ directory: string; product: Awaited<ReturnType<typeof loadHeadlessFolder>>; assets: Map<string, Uint8Array>; rapier: Rapier; resident: (snapshot?: string) => Promise<NativeHeadlessResident> }> {
   const directory = builtFolder(SLUG), product = await loadHeadlessFolder(directory), shard = product.shardfile;
@@ -44,14 +46,14 @@ const kill = (resident: NativeHeadlessResident, id: string): void => {
 test('Nalati runs its whole population headless from the product: roster, wolves, night, a raid and a snapshot', async () => {
   const { product, resident } = await shipped();
   expect(product.hasFile(NATIVE_ASSEMBLY_FILE)).toBe(true);
-  const roster = v.parse(Roster, await product.json('server/boot.json')).roster.bodies;
+  const roster = v.parse(Roster, await product.json('server/boot.json')).roster.adoption;
   const live = await resident();
   let restored: NativeHeadlessResident | undefined;
   try {
     // spawning: the install stands every declared body, in place of the direct fixture's rows
     const born = populationCensus(live.host);
-    const identity = (rows: readonly (readonly [string, string, string])[]): string[] => rows.map(row => row.join(':')).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
-    expect(identity(born.bodies.map(body => [body.id, body.kind, body.variant]))).toEqual(identity(roster.map(body => [body.id, body.kind, body.variant.id])));
+    const ids = (rows: readonly { readonly id: string }[]): string[] => rows.map(row => row.id).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+    expect(ids(born.bodies)).toEqual(ids(roster));
     expect(born.kinds).toEqual({ wolf: { alive: 5, fallen: 0 }, horse: { alive: 27, fallen: 0 }, sheepdog: { alive: 1, fallen: 0 }, leopard: { alive: 1, fallen: 0 }, argymaq: { alive: 1, fallen: 0 } });
     expect(born.bodies.every(body => body.state === 'idle' && body.alive)).toBe(true);
     expect(structuredClone(born)).toEqual(born);
