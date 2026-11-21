@@ -7,6 +7,7 @@
 # 4. J375 pin provenance (meta MINI-FLOW MF4): a push to main that changes
 #    test/pins/ must match a green origin/plan/* tip, as land's pushes do
 #    (.githooks/pin-provenance.mjs). Escape hatch: ALLOW_PIN_PUSH=1.
+# 4b. SHARD-COMPAT CP3: scripts/format-api-gate.mjs refs (ALLOW_FORMAT_AHEAD=1).
 # 5. Push lane (full `pnpm check`): .githooks/run-checks.mjs.
 #    Bypass: SKIP_CHECK=1.
 # Release tags first read the latest qualifying production nightly (TC22), even when
@@ -20,6 +21,9 @@ refs="$(cat)"
 if [ -f "$top/scripts/local-candidates.ts" ]; then node "$top/scripts/local-candidates.ts"; fi
 printf '%s\n' "$refs" | node "$hooks/check-push.mjs" "$2"
 if [ -f "$top/scripts/changelog.mjs" ]; then printf '%s\n' "$refs" | node "$top/scripts/changelog.mjs" refs; fi
+# SHARD-COMPAT CP3 (J486): API first. A main push that moves the shard-format pin above the API's is refused
+# (scripts/format-api-gate.mjs). Escape hatch: ALLOW_FORMAT_AHEAD=1.
+if [ -f "$top/scripts/format-api-gate.mjs" ]; then (cd "$top" && printf '%s\n' "$refs" | node scripts/format-api-gate.mjs refs); fi
 printf '%s\n' "$refs" | node "$hooks/agents-md.mjs" push
 printf '%s\n' "$refs" | node "$hooks/pin-provenance.mjs"
 # Avoid loading release-only tooling for ordinary pushes (generic hook

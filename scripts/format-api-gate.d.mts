@@ -10,3 +10,12 @@ export function formatApiFailures(
     env?: Record<string, string | undefined>;
   },
 ): Promise<string[]>;
+export function refsFailures(
+  refs: string,
+  root: string,
+  options?: {
+    observe?: () => Promise<string>;
+    warn?: (line: string) => void;
+    env?: Record<string, string | undefined>;
+  },
+): Promise<string[]>;
