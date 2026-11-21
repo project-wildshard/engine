@@ -10,3 +10,8 @@
   their own process groups: a killed world restarts on the same port behind the same tunnels (16 s, reusing its built
   client), a killed keeper is restarted by launchd in about a second and adopts them by pid. The exit 144 killer was
   meta's SubagentStop hook (meta 2e02b5c1), which now spares kept pids.
+- MD1: the phone queue. `phone-queue.mjs` (a queue directory beside the locks) and `phone-runner.mjs` (kept by launchd
+  as io.wildshard.phone-runner, holding runner.lock): lanes submit, the runner cools outside the lock, holds iphone13.lock,
+  parks Safari, retries a voided run once after the origin answers, writes the result and a receipt. route-bench,
+  link-bench and bench.mjs submit for you; other scripts use `phone-queue.mjs submit -- <script>`. Order: DRIFTWOOD-FPS,
+  frame-rate walks, zone boots, then other; first come first served within each.

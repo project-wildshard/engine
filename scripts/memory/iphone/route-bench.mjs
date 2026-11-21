@@ -333,28 +333,17 @@ async function phoneTools() {
   };
 }
 
-/** Wait (at most 30 min) for the battery to reach `line` °C, outside the locks. @param {number} line */
-async function coolOutside(line) {
-  const { batteryTemperature, command, doctor } = await import('./doctor.mjs');
-  const facts = doctor({ udid: values.udid, sharedPort: '4444' });
-  const reading = () => batteryTemperature(command('idevicediagnostics', ['-u', facts.udid, 'ioregentry', 'AppleSmartBattery']).output)?.celsius ?? null;
-  const deadline = Date.now() + 30 * 60_000;
-  for (let now = reading(); now !== null && now > line && Date.now() < deadline; now = reading()) {
-    console.log(`cooling outside the locks: ${String(now)} °C against ${String(line)} °C`);
-    await pause(30_000);
-  }
-}
-
 if (values['dry-run']) {
   console.log(JSON.stringify({ zone: values.zone, runs, caps, base, driver: values.driver, slots, out, route, legs: routeFor(route).map((leg) => `${leg.name} (${leg.kind} ${String(leg.seconds)} s)`) }, null, 2));
 } else if (!values['with-locks']) {
   // MINI-DEVEX MD2: the phone holds iphone13.lock only; the desktop proxy measures on the Mac under desktop-gpu.lock (locks.mjs)
   const kind = lockKind(values.driver);
-  // --cool-outside (DF10, the coordinator 2026-11-20: cool before the locks, never inside them): wait for --cool-to here,
-  // touching nothing but the battery reading, then take the locks for one boot without cooling again
-  const cooled = values['cool-outside'] === true && kind === 'phone' && values['cool-to'] !== undefined;
-  if (cooled) await coolOutside(Number(values['cool-to']));
-  process.exitCode = await underLock(kind, import.meta.filename, [...process.argv.slice(2), '--out', out, '--with-locks', ...(cooled ? ['--cooled'] : [])]);
+  // MD1: a phone run is a job for the phone runner, which cools the phone outside the lock (DF10, the coordinator
+  // 2026-11-20: never inside it) to --cool-to (36 °C by default) and then runs this bench with --cooled, so it never cools
+  // while holding the phone. --cool-outside is what every phone run now does.
+  process.exitCode = kind === 'phone'
+    ? await underLock(kind, import.meta.filename, [...process.argv.slice(2), '--out', out, '--with-locks'], { coolTo: Number(values['cool-to'] ?? 36), cooledFlag: '--cooled' })
+    : await underLock(kind, import.meta.filename, [...process.argv.slice(2), '--out', out, '--with-locks']);
 } else {
   await bench();
 }

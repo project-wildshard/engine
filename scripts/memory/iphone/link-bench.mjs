@@ -198,7 +198,7 @@ if (values['dry-run']) console.log(JSON.stringify({ zone: values.zone, cold, war
 else if (!values['with-locks']) {
   // MINI-DEVEX MD2: the phone holds iphone13.lock only; the desktop proxy holds desktop-gpu.lock (locks.mjs)
   const kind = lockKind(values.driver);
-  // cool before the locks, so a cooling bench never holds the shared phone
-  if (kind === 'phone') await (await phoneReads()).cool();
-  process.exitCode = await underLock(kind, import.meta.filename, [...process.argv.slice(2), '--out', out, '--with-locks']);
+  // MD1: a phone run is a job for the phone runner, which cools to --cool-to before it takes the lock, so a cooling bench
+  // never holds the shared phone
+  process.exitCode = await underLock(kind, import.meta.filename, [...process.argv.slice(2), '--out', out, '--with-locks'], { coolTo: Number(values['cool-to']) });
 } else await bench();

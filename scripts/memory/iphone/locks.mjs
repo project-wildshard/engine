@@ -2,7 +2,8 @@
 // entry point takes its lock through it, so test/tooling/measure-locks.test.mjs can read which lock each one takes.
 //
 //   iphone13.lock     the iPhone 13 only: route-bench and link-bench with the inspector driver, bench.mjs and the
-//                     release suite. A phone run holds no desktop lock (Jake 2026-11-21: "split the locks").
+//                     release suite. A phone run holds no desktop lock (Jake 2026-11-21: "split the locks"). Only the
+//                     phone runner takes it (MD1, phone-runner.mjs); a phone entry point submits a job and waits.
 //   desktop-gpu.lock  the Mac's GPU: desktop WebKit (route-bench and link-bench --driver webkit), the fps table's
 //                     Chromium and WebKit censuses, the Metal GPU staircase. Desktop censuses no longer queue behind
 //                     phone routes.
@@ -45,9 +46,18 @@ export function lockfArgs(kind, root = lockRoot()) {
 /** A line saying what a run waits for. @param {'phone' | 'desktop'} kind */
 export const waitLine = (kind) => `Waiting for ${kind === 'phone' ? PHONE_LOCK : `${DESKTOP_GPU_LOCK} (then ${LEGACY_DESKTOP})`}`;
 
-/** Run `node script ...args` holding a kind's locks; resolves to its exit code.
- * @param {'phone' | 'desktop'} kind @param {string} script @param {string[]} args */
-export async function underLock(kind, script, args) {
+/** Run `node script ...args` holding a kind's locks; resolves to its exit code. A phone run is a job for the phone runner
+ * (MINI-DEVEX MD1, phone-queue.mjs): the runner cools the phone to `coolTo` outside the lock, appends `cooledFlag` when it
+ * did, and holds iphone13.lock itself; this process only streams the job's log. A desktop run holds its locks here.
+ * @param {'phone' | 'desktop'} kind @param {string} script @param {string[]} args
+ * @param {{ coolTo?: number | null, cooledFlag?: string | null }} [phone] */
+export async function underLock(kind, script, args, phone = {}) {
+  if (kind === 'phone') {
+    const { submitAndWait } = await import('./phone-queue.mjs');
+    const flag = (/** @type {string} */ name) => { const at = args.lastIndexOf(name); return at === -1 ? null : args[at + 1] ?? null; };
+    return submitAndWait({ argv: [process.execPath, script, ...args], coolTo: phone.coolTo ?? 36, cooledFlag: phone.cooledFlag ?? null,
+      base: flag('--base'), out: flag('--out') });
+  }
   mkdirSync(lockRoot(), { recursive: true });
   console.log(waitLine(kind));
   const child = spawn('/usr/bin/lockf', [...lockfArgs(kind), process.execPath, script, ...args], { stdio: 'inherit' });
@@ -55,8 +65,8 @@ export async function underLock(kind, script, args) {
   return code ?? (signal === 'SIGINT' ? 130 : 1);
 }
 
-/** @param {string} script @param {string[]} args */
-export const underPhoneLocks = (script, args) => underLock('phone', script, args);
+/** @param {string} script @param {string[]} args @param {{ coolTo?: number | null, cooledFlag?: string | null }} [phone] */
+export const underPhoneLocks = (script, args, phone) => underLock('phone', script, args, phone);
 
 /** @param {string} script @param {string[]} args */
 export const underDesktopGpuLock = (script, args) => underLock('desktop', script, args);
