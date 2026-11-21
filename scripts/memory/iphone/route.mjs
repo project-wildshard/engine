@@ -37,7 +37,9 @@ export const ROUTES = Object.freeze({
     // questSteps has no completion steps. The camp's lit fire is at hut + (0.7, -9.8) in questPageComposition.
     { name: 'quest fire', kind: 'walk', seconds: 30, points: [[-21, -70], [-24, -80], [-30, -104], [-30, -120]],
       dwell: { point: 0, seconds: 20, face: [-21.3, -73.8] }, sprint: true, reach: 1.5, grid: true, fixed: true },
-    { name: 'road crossing', kind: 'walk', seconds: 40, sprint: true, reach: 2, grid: true, fixed: true,
+    // DF5: the phone reaches re-entry at ~35 s, then rebuilds and warms the retired home (~6.6 s).
+    // Keep one fixed minute on every host, including all admission frames and the unchanged road dwell.
+    { name: 'road crossing', kind: 'walk', seconds: 60, sprint: true, reach: 2, grid: true, fixed: true,
       points: [[-30, -142], [0, -152], [0, -205], [0, -263], [0, -248]],
       dwell: { point: 3, seconds: 10, face: [0, -194], road: true } },
   ]),
