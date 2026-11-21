@@ -80,4 +80,13 @@ test('a killed world restarts behind the same URL; a killed keeper is replaced a
   expect(adopted?.url).toBe(up.url);
   const pids = (await import('node:fs')).readFileSync(join(kept, `${label}.pids`), 'utf8').trim().split('\n').map(Number);
   expect(pids).toEqual(expect.arrayContaining([second.pid, worldBefore, ...tunnels]));
+
+  // --stop: the keeper goes first, so a keeper mid-pass can't write its state back (2026-11-21: a stopped world's state
+  // came back and the next --install adopted the old shard); then the world and the tunnels go
+  process.env.WS_KEEP_LAUNCHD = 'off';
+  const { stopKept } = await import('../../scripts/memory/iphone/serve-keep.mjs');
+  stopKept(label);
+  await delay(3000);
+  expect(readState(label)).toBeNull();
+  expect([second.pid, worldBefore, ...tunnels].filter((pid) => pid !== undefined && alive(pid))).toEqual([]);
 }, 60_000);

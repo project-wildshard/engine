@@ -100,6 +100,9 @@ function killGroup(pid, signal = 'SIGTERM') {
   try { process.kill(-pid, signal); } catch { try { process.kill(pid, signal); } catch { /* gone */ } }
 }
 
+/** @param {number} pid */
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+
 /** @param {string} label @param {string} line */
 const say = (label, line) => { console.log(`${new Date().toISOString()} ${label} ${line}`); };
 
@@ -195,6 +198,8 @@ async function serve(label) {
       state.url = new URL(`/slug/${state.shard}`, /** @type {Tunnel} */ (state.tunnels[0]).origin).href;
       say(label, `ready ${state.url}`);
     }
+    // a keeper told to stop mid-pass never writes: --stop has removed its state, and a write here would bring it back
+    if (stopping.signal.aborted) break;
     writeState(state);
     first = false;
     await delay(state.ready ? 2000 : 1000);
@@ -261,8 +266,17 @@ export async function install({ shard, root = ENGINE, launch = true, timeoutMs =
 
 /** Stop a kept world: launchd lets go of the keeper, then its tunnels and world stop. @param {string} label */
 export function stopKept(label) {
-  spawnSync('launchctl', ['bootout', `${domain()}/${label}`], { stdio: 'ignore' });
-  const state = readState(label);
+  const before = readState(label);
+  // WS_KEEP_LAUNCHD=off (the test): the test's label is the checkout's real one, so never boot out a live kept world
+  if (process.env.WS_KEEP_LAUNCHD !== 'off') spawnSync('launchctl', ['bootout', `${domain()}/${label}`], { stdio: 'ignore' });
+  // wait for the keeper to go (bootout sends SIGTERM) before its state goes, so a keeper mid-pass can't write it back
+  const keeper = before?.keeper ?? null;
+  if (keeper !== null && alive(keeper)) process.kill(keeper, 'SIGTERM'); // a keeper launchd never ran (a test, a hand start)
+  if (keeper !== null) {
+    for (let tries = 0; tries < 50 && alive(keeper); tries++) spawnSync('/bin/sleep', ['0.2']);
+    if (alive(keeper)) killGroup(keeper, 'SIGKILL');
+  }
+  const state = readState(label) ?? before;
   for (const pid of [state?.keeper, state?.world?.pid, ...(state?.tunnels ?? []).map((t) => t?.pid)]) killGroup(pid ?? undefined);
   for (const suffix of ['.json', '.pids', '.plist']) rmSync(join(keptDir(), `${label}${suffix}`), { force: true });
   return state;
