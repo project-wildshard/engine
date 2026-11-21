@@ -114,6 +114,18 @@ export function bootLifecycleDiagnostic(report, observedGridNavigation) {
     /^boot after the last page ended on "hide" \(nav navigate\): \d+ frames \/ 6s$/u.test(report.message);
 }
 
+/** The boot watchdog reports a slow-progress advisory while loading continues.
+ * A fatal, disabled or unrecognized report must still refuse the proof.
+ * @param {unknown} report */
+export function bootSlowDiagnostic(report) {
+  return typeof report === 'object' && report !== null
+    && 'system' in report && report.system === 'boot.slow'
+    && 'fatal' in report && report.fatal === false
+    && 'disabled' in report && report.disabled === false
+    && 'message' in report && typeof report.message === 'string'
+    && /^Error: Loading slow at step "[^"]+" \(no progress for \d+ s\)$/u.test(report.message);
+}
+
 /** Read the actual built title's installed catalogue, without loading or injecting a world. */
 export function bootCatalogue() {
   // Cold titles install complete scalar metadata; selected discovery may contain
@@ -416,7 +428,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
   await saveFixture(context, { scope: 'device', key: 'devMode', data: mode === 'grid' || developer }); await saveFixture(context, NAME_ASKED);
   // Existing probe permission for the one initial road pose; no scheduler or service is replaced.
   if (mode === 'grid') await context.addInitScript(() => { window.__wildshardHarness = { seed: 357, capture: null }; });
-  // Static dist has no serverless API. Acknowledge telemetry and recorded nonfatal lifecycle diagnostics only.
+  // Static dist has no serverless API. Acknowledge telemetry and the explicitly admitted diagnostics.
   let telemetryPosts = 0;
   await context.route('**/api/telemetry', async route => {
     const method = route.request().method();
@@ -425,11 +437,13 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     telemetryPosts++; await answerApi(route);
   });
   let gridNavigationIntent = false, gridNavigationObserved = false;
+  const slowBootNotice = (/** @type {unknown} */ report) =>
+    gameplayEvidence?.allowSlowBootReport === true && bootSlowDiagnostic(report);
   await context.route('**/api/errors', async route => {
     const request = route.request();
     if (request.method() === 'OPTIONS') { await answerApi(route); return; }
     const report = bootErrorReport(request.url(), request.method(), request.postData());
-    if (bootLifecycleDiagnostic(report, gridNavigationObserved)) { await answerApi(route); return; }
+    if (bootLifecycleDiagnostic(report, gridNavigationObserved) || slowBootNotice(report)) { await answerApi(route); return; }
     // Same-origin, the static server answers (the old transport failure); cross-origin it would be the real API.
     const from = request.headers().origin;
     if (from === undefined || from === new URL(request.url()).origin) { await route.continue(); return; }
@@ -452,7 +466,7 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     if (new URL(request.url()).pathname !== '/api/errors' || request.method() !== 'POST') return;
     reports.push(report);
     if (bootLifecycleDiagnostic(report, gridNavigationObserved)) lifecycleReports++;
-    else faults.push(`Game error report: ${JSON.stringify(report)}`);
+    else if (!slowBootNotice(report)) faults.push(`Game error report: ${JSON.stringify(report)}`);
   });
   page.on('pageerror', error => faults.push(`pageerror: ${error.message}`));
   page.on('console', message => {

@@ -5,7 +5,7 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { browserPool } from './pool.mjs';
 import { serve } from './serve.mjs';
-import { bootCases, bootErrorReport, discoverCatalogue } from './boot-smoke.mjs';
+import { bootCases, bootErrorReport, bootSlowDiagnostic, discoverCatalogue } from './boot-smoke.mjs';
 import { saveFixtureCode, harnessPinCode } from '../debug-settings.mjs';
 
 /** Browser-side, read-only: the existing card canvases after the ordinary Explorer has drawn every one.
@@ -146,18 +146,6 @@ export function explorerDiagnostics(){
 
 const CONTEXT_CATALOGUES=4;
 
-/** The boot watchdog reports a slow-progress advisory while loading continues.
- * A fatal, disabled or unrecognized report must still refuse the proof.
- * @param {unknown} report */
-function slowBootReport(report) {
-  return typeof report === 'object' && report !== null
-    && 'system' in report && report.system === 'boot.slow'
-    && 'fatal' in report && report.fatal === false
-    && 'disabled' in report && report.disabled === false
-    && 'message' in report && typeof report.message === 'string'
-    && /^Error: Loading slow at step "[^"]+" \(no progress for \d+ s\)$/u.test(report.message);
-}
-
 /** Retain native HTTP/shader caches across a bounded group of world documents.
  * Retiring the native context bounds document/isolate ownership; origin
  * storage deletion alone does not collect the previous document's Wasm banks.
@@ -221,7 +209,7 @@ async function openExplorerContext(browser,base,faults,lifetime,generation,isola
       if(url.origin!==origin || url.pathname!=='/api/errors' || request.method()!=='POST')return;
       const report=bootErrorReport(url.href,request.method(),request.postData());
       reports.push(report);
-      if(!slowBootReport(report))faults.push('Game error report during Explorer proof');
+      if(!bootSlowDiagnostic(report))faults.push('Game error report during Explorer proof');
     });
     page.on('pageerror',error=>faults.push(error.message));
     page.on('crash',()=>faults.push('Page crashed'));

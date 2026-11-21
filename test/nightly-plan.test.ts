@@ -68,3 +68,13 @@ test('FS30 the two SwiftShader-starved heads keep Chromium on the Metal runner',
   expect(chromium.find(row => row.heads === 'pine-hollow')?.os).toBe('ubuntu-24.04');
   expect(chromium.flatMap(row => row.heads.split(',').filter(Boolean)).sort()).toEqual(plan().heads.map(head => head.slug));
 });
+
+test('FS30 separates the two trusted hover taps even when the renderer stops presenting frames', () => {
+  const source = readFileSync('scripts/nightly-heads.ts', 'utf8');
+  const firstTap = source.indexOf('await control.tap');
+  const gap = source.indexOf('await delay(BOOST_TAP_MS + 1)');
+  const secondTap = source.indexOf('await control.tap', firstTap + 1);
+  expect(firstTap).toBeGreaterThan(0);
+  expect(gap).toBeGreaterThan(firstTap);
+  expect(secondTap).toBeGreaterThan(gap);
+});

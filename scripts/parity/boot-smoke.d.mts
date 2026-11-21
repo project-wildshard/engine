@@ -11,6 +11,7 @@ export function titleViewVisible():boolean;
 export function bootErrorReport(url: string, method: string, body: string | null): unknown;
 /** Only nonfatal boot-after-hide/nav-navigate diagnostics following observed grid navigation are acknowledged. */
 export function bootLifecycleDiagnostic(report: unknown, observedGridNavigation: boolean): boolean;
+export function bootSlowDiagnostic(report: unknown): boolean;
 /** Read the installed catalogue in the actual built title document. */
 export function bootCatalogue(): { slug: string; status: string; legacy: boolean; shardSelect: boolean }[];
 /** Public-policy admission observes a hydrated title, an unwaived public mode and a locked experimental card. */
@@ -50,6 +51,7 @@ export function bootRoadFailure(read:()=>Promise<unknown>, primary:unknown):Prom
 export function gameplayProbeTime(probe:()=>Promise<void>, now?:()=>number):Promise<number>;
 
 export interface GameplayEvidence {
+  allowSlowBootReport?: boolean;
   onEnter?: (page: Page) => Promise<void>;
   capture?: (page: Page, label: string, frames: BootFrameSample[]) => Promise<void>;
 }

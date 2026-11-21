@@ -4,6 +4,7 @@ import {execFileSync} from 'node:child_process';
 import {cpSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync} from 'node:fs';
 import {createServer} from 'node:http';
 import {homedir} from 'node:os';
+import {setTimeout as delay} from 'node:timers/promises';
 import {join, resolve as resolvePath} from 'node:path';
 import {chromium, webkit, type Browser} from "./browser-playwright.mjs";
 import {bootCase} from './parity/boot-smoke.mjs';
@@ -178,7 +179,6 @@ try {
             // input control. The ordinary tap/oracle must catch this regression.
             if (fault === 'hover-control') await control.evaluate(button => { button.remove(); });
             await control.tap({timeout: HOVER_CEILING_MS});
-            const tappedAt = await page.evaluate(() => performance.now());
             // FS30 (opus-drift6): a runner that draws ~2 frames a second spent its whole 10 s wall-clock wait on 22 frames
             // (run 44863911819), while the board's blend needs ~10 frames past the tap at any rate (local Chromium at 20x CPU
             // throttle and WebKit mount Driftwood r8 on a real tap). Wait on the page's own frames: HOVER_FRAMES of them past
@@ -192,10 +192,9 @@ try {
                 world.weapons.tools.some(tool => tool.id === 'tool.hoverboard' && tool.enabled && 'model' in tool && tool.model instanceof Object && 'visible' in tool.model && tool.model.visible === true);
             }, {from: tappedFrame, frames: HOVER_FRAMES}, {timeout: HOVER_CEILING_MS});
             action = 'unmount';
-            // Developer mode makes a second tap within the production gesture
-            // window BOOST. This journey intends two separate single taps.
-            await page.waitForFunction(({since, windowMs}) => performance.now() - since > windowMs,
-              {since: tappedAt, windowMs: BOOST_TAP_MS}, {timeout: 5000});
+            // The gesture gap is wall time. Both witness checks still require
+            // real frames, but a slow renderer need not service a cooldown probe.
+            await delay(BOOST_TAP_MS + 1);
             const unmountFrame = await page.evaluate(() => window.__wildshard?.world?.game.frameCount ?? 0);
             await control.tap({timeout: HOVER_CEILING_MS});
             await page.waitForFunction(({from, frames}) => {
@@ -220,6 +219,7 @@ try {
             v: 1, from: null, to: route, mode: 'enter', arrive: null, carry: [], at: Date.now(),
           }});
         }, {
+          allowSlowBootReport: true,
           ...(browserName === 'chromium' && process.platform === 'linux' ? {capture: captureNightlyBootFrame} : {}),
           onEnter: async page => {
             await phase('draw', async () => {
