@@ -5,6 +5,7 @@ import { resolve, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { browserPool } from './pool.mjs';
 import { serve } from './serve.mjs';
+import { bootTimelineEntries } from '../loading-flow/stalls.mjs';
 import { bootCases, bootErrorReport, bootSlowDiagnostic, discoverCatalogue } from './boot-smoke.mjs';
 import { saveFixtureCode, harnessPinCode } from '../debug-settings.mjs';
 
@@ -203,9 +204,11 @@ async function openExplorerContext(browser,base,faults,lifetime,generation,isola
         storageTypes:'cache_storage,indexeddb,local_storage,service_workers,file_systems,websql,storage_buckets,cookies,shared_storage,interest_groups'});
     };
     /** @type {unknown[]} */ const reports=[];
+    /** @type {Map<import('playwright').Request,{path:string,requestedAt:number,status:number|null}>} */ const pending=new Map();
     const origin=new URL(base).origin;
     page.on('request',request=>{
       const url=new URL(request.url());
+      if(request.method()==='GET')pending.set(request,{path:url.pathname,requestedAt:Date.now(),status:null});
       if(url.origin!==origin || url.pathname!=='/api/errors' || request.method()!=='POST')return;
       const report=bootErrorReport(url.href,request.method(),request.postData());
       reports.push(report);
@@ -214,10 +217,18 @@ async function openExplorerContext(browser,base,faults,lifetime,generation,isola
     page.on('pageerror',error=>faults.push(error.message));
     page.on('crash',()=>faults.push('Page crashed'));
     page.on('console',message=>{if(message.type()==='error')faults.push(message.text());});
-    page.on('response',response=>{if(response.status()>=400)faults.push(`HTTP ${response.status()}: ${response.url()}`);});
+    /** @param {import('playwright').Request} request */
+    const settled=request=>{pending.delete(request);};
+    page.on('requestfinished',settled);page.on('requestfailed',settled);
+    page.on('response',response=>{
+      const status=response.status(), request=pending.size===0?undefined:pending.get(response.request());
+      if(request!==undefined)request.status=status;
+      if(status>=400)faults.push(`HTTP ${status}: ${response.url()}`);
+    });
     return {sweep:async(/** @type {string} */slug,/** @type {string} */out,/** @type {number} */catalogue,/** @type {number} */started)=>{
       reports.length=0;
-      await sweepPage(page,faults,reports,base,slug,out,lifetime,reset,{generation,catalogue,maxCatalogues:isolated?1:CONTEXT_CATALOGUES},started);
+      await sweepPage(page,faults,reports,base,slug,out,lifetime,async()=>{await reset();pending.clear();},
+        {generation,catalogue,maxCatalogues:isolated?1:CONTEXT_CATALOGUES},started,()=>[...pending.values()].map(({path,requestedAt,status})=>({path,status,ageMs:Date.now()-requestedAt})));
     },close:()=>context.close()};
   }catch(error){await context.close();throw error;}
 }
@@ -232,8 +243,9 @@ export async function sweepExplorer(browser,base,slug,out,isolated=false){
 /** @param {import('playwright').Page} page @param {string[]} faults @param {unknown[]} reports
  * @param {string} base @param {string} slug
  * @param {string} out @param {{previous:number|undefined}} lifetime @param {()=>Promise<void>} reset
- * @param {{generation:number,catalogue:number,maxCatalogues:number}} session @param {number} started */
-async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,session,started){
+ * @param {{generation:number,catalogue:number,maxCatalogues:number}} session @param {number} started
+ * @param {()=>{path:string,status:number|null,ageMs:number}[]} readPending */
+async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,session,started,readPending){
   const hangMs=180000;
   let progressAt=started;
   /** @type {Map<string,number>} */ const firstReady=new Map();
@@ -290,10 +302,14 @@ async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,sessio
     lifetime.previous=final.document.timeOrigin;
     console.info(`Explorer ${slug}: ${empty?'explicit empty catalogue':`${cards.length} real thumbnails`} PASS`);
   }catch(error){
-    await page.screenshot({path:join(out,`${slug}-failure.jpg`),type:'jpeg',quality:70,timeout:5000}).catch(()=>undefined);
-    // Keep the last completed observation. A second unbounded renderer read
-    // after the hang refusal would hide the very stall this receipt records.
-    writeFileSync(join(out,`${slug}-failure.json`),`${JSON.stringify({slug,session,elapsedMs:Date.now()-started,hangMs,idleMs:Date.now()-progressAt,error:String(error),faults,reports,cards,firstReadyMs:Object.fromEntries(firstReady)},null,2)}\n`);
+    const failedAt=Date.now(), pending=readPending(), evidenceMs=Math.min(2000,hangMs-(failedAt-progressAt));
+    // The last completed observation survives a dead renderer. A fresh timeline
+    // read can explain a live page's admission failure, but must be bounded.
+    const [bootEntries]=await Promise.all([
+      evidenceMs>0?withinProgressBudget(page.evaluate(bootTimelineEntries),evidenceMs).catch(()=>null):Promise.resolve(null),
+      page.screenshot({path:join(out,`${slug}-failure.jpg`),type:'jpeg',quality:70,timeout:5000}).catch(()=>undefined),
+    ]);
+    writeFileSync(join(out,`${slug}-failure.json`),`${JSON.stringify({slug,session,elapsedMs:failedAt-started,hangMs,idleMs:failedAt-progressAt,error:String(error),faults,reports,cards,firstReadyMs:Object.fromEntries(firstReady),bootEntries,pending},null,2)}\n`);
     throw error;
   }
 }

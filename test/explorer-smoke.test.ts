@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { expect, test, vi } from 'vitest';
 import { explorerCards, explorerCapture, explorerCases, explorerPartition, explorerFailures, explorerState, sweepExplorer, openExplorerSession, verifyExplorerDocument, explorerDiagnostics } from '../scripts/parity/explorer-smoke.mjs';
-import type { Browser, BrowserContext, CDPSession, Page, Request } from 'playwright';
+import type { Browser, BrowserContext, CDPSession, Page, Request, Response } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the actual required workflow leg, without dispatching it.
 import { readFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
@@ -23,14 +23,23 @@ function storageFixture() {
   const send=vi.spyOn(storage,'send').mockResolvedValue({});return {storage,send};
 }
 
-function fixtureBrowser(evaluate: Page['evaluate'], report?: Request): { browser: Browser; close: ReturnType<typeof vi.fn<BrowserContext['close']>> } {
+function fixtureBrowser(evaluate: Page['evaluate'], report?: Request, requests: readonly {
+  readonly request: Request; readonly response?: Response; readonly settled?: 'requestfinished' | 'requestfailed';
+}[] = []): { browser: Browser; close: ReturnType<typeof vi.fn<BrowserContext['close']>> } {
   const events = new EventEmitter();
   const page: Page = legacyDouble<Page>({ evaluate, on: (event, listener) => {
     events.on(event, listener);
     return page;
   },
     goto: vi.fn<Page['goto']>().mockImplementation(url => {
-      if (url !== 'about:blank' && report !== undefined) events.emit('request', report);
+      if (url !== 'about:blank') {
+        if (report !== undefined) events.emit('request', report);
+        for (const { request, response, settled } of requests) {
+          events.emit('request', request);
+          if (response !== undefined) events.emit('response', response);
+          if (settled !== undefined) events.emit(settled, request);
+        }
+      }
       return Promise.resolve(null);
     }),
     screenshot: vi.fn<Page['screenshot']>().mockRejectedValue(new Error('No browser capture in the unit fixture')) });
@@ -104,6 +113,33 @@ test.each(['slow', 'fatal', 'unknown', 'malformed'] as const)('Explorer reads ga
     const suffix = mode === 'slow' ? '' : '-failure';
     const receipt: unknown = JSON.parse(readFileSync(`${out}/fixture${suffix}.json`, 'utf8'));
     expect(receipt).toMatchObject({ reports: [mode === 'malformed' ? { malformed: '{' } : payload] });
+  } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
+test('an Explorer admission refusal retains the boot wait and pending asset transfers', async () => {
+  mkdirSync('tmp/sp-x7-live', { recursive: true });
+  const out = mkdtempSync('tmp/sp-x7-live/explorer-admission-');
+  const bootEntries = [{ operation: 'wait:Read blob', realm: 'page', start: 40, end: null }];
+  const evaluate = vi.fn<Page['evaluate']>().mockResolvedValueOnce({
+    document: currentDocument, fatal: ['stuck reading build files'], empty: false, ready: false, readyIds: [],
+  }).mockResolvedValueOnce(bootEntries);
+  const asset = (path: string): Request => legacyDouble<Request>({
+    url: () => `https://test.example/assets/${path}?proof=omit-this`, method: () => 'GET',
+  });
+  const body = asset('body'), waiting = asset('waiting');
+  const response = legacyDouble<Response>({ request: () => body, status: () => 200, url: () => body.url() });
+  const { browser } = fixtureBrowser(evaluate, undefined, [
+    { request: body, response }, { request: waiting },
+    { request: asset('finished'), settled: 'requestfinished' }, { request: asset('failed'), settled: 'requestfailed' },
+  ]);
+  try {
+    await expect(sweepExplorer(browser, 'https://test.example/', 'fixture', out)).rejects.toThrow('Explorer fatal');
+    const receipt = readFileSync(`${out}/fixture-failure.json`, 'utf8');
+    const result: unknown = JSON.parse(receipt);
+    expect(result).toMatchObject({ bootEntries, pending: [
+      { path: '/assets/body', status: 200 }, { path: '/assets/waiting', status: null },
+    ] });
+    expect(receipt).not.toContain('omit-this');
   } finally { rmSync(out, { recursive: true, force: true }); }
 });
 
