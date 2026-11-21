@@ -23,7 +23,7 @@ async function retry(sessionStorage) {
   try {
   runInNewContext(script('data-loading-first-paint'), {
     document: window.document, HTMLTemplateElement: window.HTMLTemplateElement,
-    sessionStorage, location: { reload: () => { reloads++; } },
+    sessionStorage, location: { reload: () => { reloads++; } }, navigator: { onLine: true }, addEventListener: () => undefined,
     setTimeout: callback => { timer = callback; },
   });
   timer();
@@ -46,6 +46,7 @@ test('QA 11-19 row 19: the self-reload waits while responses still arrive, and r
     runInNewContext(script('data-loading-first-paint'), {
       document: window.document, HTMLTemplateElement: window.HTMLTemplateElement, PerformanceObserver,
       performance: { now: () => now }, sessionStorage: session, location: { reload: () => { reloads++; } },
+      navigator: { onLine: true }, addEventListener: () => undefined,
       setTimeout: callback => { timer = callback; },
     });
     observed({ getEntries: () => [{ responseEnd: 10_500 }] });

@@ -125,6 +125,15 @@ export function showLoadFailure(failure: LoadFailure): HTMLElement {
     const button = 'flex:none;min-height:52px;padding:14px 28px;border:1px solid #8fe3ff;color:#e8f5fa;background:#0d1b26;font:inherit;text-transform:uppercase;cursor:pointer;touch-action:manipulation';
     reload.style.cssText = button;
     scope.listen(reload, 'click', () => { showReloading(reload); leaveAfterPaint(() => { markReload('load failure reload'); location.reload(); }); });
+    // STAGING-BUGBASH SB53: shown offline, the failure is the network's (a lazy module's fetch, which never loads again in this
+    // document): once the network is back the page reloads by itself and goes back into the world (index.html SB44)
+    if (!navigator.onLine) {
+      const back = new Scope('load-failure-online', scope);
+      back.listen(window, 'online', () => {
+        back.dispose(); showReloading(reload);
+        leaveAfterPaint(() => { markReload('offline load failure', 'background'); location.reload(); });
+      });
+    }
     // LS4 (J188): this screen covers the loading card, so Copy diagnostics moves here, beside Reload, in flow after the
     // stack: the failure stays on screen and the one Copy stays tappable. The report is the card's own.
     const actions = document.createElement('div');

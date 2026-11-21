@@ -5,7 +5,7 @@ import { showLoadFailure } from './errorScreen';
 import { setDiagnosticsSource } from './diagnosticsCopy';
 import type { LoadFailure } from '../core/errorReport';
 
-afterEach(() => { vi.unstubAllGlobals(); document.body.replaceChildren(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); document.body.replaceChildren(); });
 
 const failure: LoadFailure = { kind: 'load', context: {}, tags: {} as LoadFailure['tags'], name: 'Error', build: 'abc1234-test',
   stage: 'server', message: 'Standalone server worker failed to load', stack: 'Error: Standalone server worker failed to load\n  at boot' };
@@ -30,4 +30,25 @@ it('moves Copy diagnostics onto the fatal screen beside Reload and copies the ca
   expect(copied).toContain('705 resources');
   expect(copied).not.toContain('"entries"');
   expect(copy.textContent).toBe('Copied');
+});
+
+// STAGING-BUGBASH SB53: offline mid load, a lazy module's fetch failed and this screen stayed after the network came back.
+it('SB53: a load failure shown offline reloads this page once the network returns', () => {
+  const reload = vi.fn<() => void>();
+  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=driftwood-isle', origin: 'https://boot.test', pathname: '/', search: '?chunk=driftwood-isle', reload });
+  vi.stubGlobal('requestAnimationFrame', (run: FrameRequestCallback) => { run(0); return 0; });
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+  showLoadFailure({ ...failure, stage: 'level.play', message: 'Failed to fetch dynamically imported module: https://boot.test/b/c/late.js' });
+  expect(reload).not.toHaveBeenCalled();
+  window.dispatchEvent(new Event('online'));
+  return vi.waitFor(() => { expect(reload).toHaveBeenCalledTimes(1); });
+});
+
+it('SB53: a load failure shown online waits for the player', async () => {
+  const reload = vi.fn<() => void>();
+  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=driftwood-isle', origin: 'https://boot.test', pathname: '/', search: '?chunk=driftwood-isle', reload });
+  showLoadFailure(failure);
+  window.dispatchEvent(new Event('online'));
+  await new Promise(resolve => { setTimeout(resolve, 50); });
+  expect(reload).not.toHaveBeenCalled();
 });

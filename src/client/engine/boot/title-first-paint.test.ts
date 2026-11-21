@@ -150,8 +150,35 @@ test('RL3: a page whose entry graph never arrived reloads once at 12 s; a runnin
   later[0]?.(); expect(reload).toHaveBeenCalledTimes(1); // the title arrived: nothing to do
   timers.mockRestore();
   const inline = /<script data-loading-first-paint>([\s\S]*?)<\/script>/u.exec(html)?.[1] ?? '';
-  // the inline first-paint script stays small; QA 11-19 row 19 (b000479f2) added its wait while responses still arrive
-  expect(inline.trim().split('\n').length).toBeLessThanOrEqual(21);
+  // the inline first-paint script stays small; QA 11-19 row 19 (b000479f2) added its wait while responses still arrive,
+  // STAGING-BUGBASH SB53 its reload when the network returns to a page that never booted
+  expect(inline.trim().split('\n').length).toBeLessThanOrEqual(29);
+});
+
+test('SB53: a page offline before its entry graph ran reloads when the network returns, its one retry spent or not', () => {
+  const page = (offline: boolean): { window: Window; reload: ReturnType<typeof vi.fn<() => void>> } => {
+    const window = new Window({ url: 'https://launch.test/?chunk=driftwood-isle', settings: { enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true,
+      disableCSSFileLoading: true, enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true } });
+    windows.push(window);
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => !offline });
+    window.sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify({ keys: { 'boot.selfReload': { v: 1, data: '1' } } }));
+    const reload = vi.fn<() => void>();
+    vi.spyOn(window.location, 'reload').mockImplementation(() => { reload(); });
+    window.document.write(html);
+    return { window, reload };
+  };
+  const away = page(true);
+  away.window.dispatchEvent(new away.window.Event('online'));
+  expect(away.reload).toHaveBeenCalledTimes(1);
+  const near = page(false); // never offline: a network event alone reloads nothing
+  near.window.dispatchEvent(new near.window.Event('online'));
+  expect(near.reload).not.toHaveBeenCalled();
+  near.window.dispatchEvent(new near.window.Event('offline')); near.window.document.documentElement.dataset['booted'] = '';
+  near.window.dispatchEvent(new near.window.Event('online'));
+  expect(near.reload).not.toHaveBeenCalled(); // the entry graph ran: guardBoot owns any later failure
+  delete near.window.document.documentElement.dataset['booted'];
+  near.window.dispatchEvent(new near.window.Event('online'));
+  expect(near.reload).toHaveBeenCalledTimes(1); // offline mid fetch, before the graph ran
 });
 
 test('the first-paint panel survives failed title start and retires only after the real deck is mounted', () => {
@@ -332,7 +359,7 @@ function reloadedDocument(search: string, left: { reason: string; ago: number; r
 const titleFirst = (window: Window): boolean => window.document.documentElement.classList.contains('title-first');
 
 test('SB44: the engine\'s own update reload of a bare world page goes back into the world its tap named', () => {
-  for (const reason of ['stale deployment code', 'stale build: its files are gone from the server', 'new build panel']) {
+  for (const reason of ['stale deployment code', 'stale build: its files are gone from the server', 'new build panel', 'offline load failure']) {
     const window = reloadedDocument('', { reason, ago: 800 }, { slug: 'driftwood-isle', ago: 900 });
     expect(window.location.search, reason).toBe('?chunk=driftwood-isle');
     expect(titleFirst(window), reason).toBe(false);

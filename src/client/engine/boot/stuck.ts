@@ -20,6 +20,7 @@ import { ErrorReporter, safeUrl, sendReport } from '../core/errorReport';
 import { countReload, recentReloads } from '../core/reloadGuard';
 import { markReload } from './lastEnd';
 import { recordDrop } from './dropNotice';
+import { pageScope } from '../../../shared/engine/app/resources';
 
 
 declare const __BUILD_ID__: string; // vite.config.ts define
@@ -82,6 +83,16 @@ export const recoverStaleClient: () => Promise<boolean> = staleClientRecovery(()
 function failed(error: unknown): void {
   detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
   report(error);
+  // STAGING-BUGBASH SB53: offline, the reload cannot load the page either. It spent the one retry, its own entry modules
+  // failed, and the card sat at START 0 % once the network was back. Wait for the network, then recover as ever.
+  if (!navigator.onLine) {
+    const owner = pageScope.child('boot.offline');
+    owner.listen(window, 'online', () => { owner.dispose(); settle(error); });
+    return;
+  }
+  settle(error);
+}
+function settle(error: unknown): void {
   if (recentReloads().length === 0 && !retriedThisSession()) {
     // the common case (a build the host no longer serves): one automatic recovery, no tap and no card (RL4). The reload
     // lands on the title: the drop modal there says why (Jake, 11-12: "where's my error modal at?")

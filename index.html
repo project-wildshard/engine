@@ -245,7 +245,7 @@
       if (!globalThis.__WS_EXPLORE__ && homeParams.size === 0 && location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
         const saved = (store, scope, key) => { const item = JSON.parse(store.getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; };
         const left = saved(localStorage, 'device', 'life.lastUnload'), tap = saved(sessionStorage, 'session', 'titleArrival'), now = Date.now();
-        if (left && left.reload !== true && now - left.t >= 0 && now - left.t < 10000 && /^(?:stale deployment code|stale build|new build panel)/u.test(left.reason)
+        if (left && left.reload !== true && now - left.t >= 0 && now - left.t < 10000 && /^(?:stale deployment code|stale build|new build panel|offline load failure)/u.test(left.reason)
           && tap && now - tap.at >= 0 && now - tap.at < 60000 && /^[a-z0-9_-]+$/u.test(tap.slug)) {
           const next = new URLSearchParams(location.search);
           next.set('chunk', tap.slug); homeParams.set('chunk', tap.slug);
@@ -769,18 +769,26 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       // finished in the last 4 s the page is still arriving, so the check looks again a second later; only 4 s with nothing
       // arriving reloads (a reload drops the worker and starts every fetch over: the slowest thing a slow line can do).
       (() => {
-        let arrived = 0;
+        // SB53: a page offline before its entry graph ran never boots (a failed module stays failed in this document), and
+        // the one retry may be spent on a reload made offline: when the network returns, it reloads, retry spent or not.
+        let arrived = 0, away = navigator.onLine === false;
         try { new PerformanceObserver(list => { for (const row of list.getEntries()) arrived = Math.max(arrived, row.responseEnd); }).observe({ type: 'resource', buffered: true }); } catch { /* no observer: the 12 s rule alone */ }
-        const check = () => {
+        const waiting = () => {
           const pending = document.getElementById('ws-loading-shell');
-          if (document.documentElement.hasAttribute('data-booted') || !document.querySelector('[data-title-shell]') || !(document.querySelector('.ws-load[data-shell]') || pending instanceof HTMLTemplateElement && pending.content.querySelector('.ws-load[data-shell]'))) return;
+          return !document.documentElement.hasAttribute('data-booted') && !!document.querySelector('[data-title-shell]') && !!(document.querySelector('.ws-load[data-shell]') || pending instanceof HTMLTemplateElement && pending.content.querySelector('.ws-load[data-shell]'));
+        };
+        const reload = () => (globalThis.__wsShellReload || location.reload.bind(location))();
+        addEventListener('offline', () => { away = true; });
+        addEventListener('online', () => { if (away && waiting()) reload(); });
+        const check = () => {
+          if (!waiting()) return;
           if (arrived > 0 && performance.now() - arrived < 4000) { setTimeout(check, 1000); return; }
           try { // the session save key boot.selfReload (src/client/engine/saves/slots.ts), shared with stuck.ts's one retry
             const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') || '{"keys":{}}');
             if (doc.keys?.['boot.selfReload']) return;
             (doc.keys ??= {})['boot.selfReload'] = { v: 1, data: String(Date.now()) }; sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify(doc));
           } catch { return; }
-          (globalThis.__wsShellReload || location.reload.bind(location))();
+          reload();
         };
         setTimeout(check, 12000);
       })();
