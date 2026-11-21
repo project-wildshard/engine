@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "59da53d8813c2ae7d91c854c298d0571baa6dc69b5cff0e6ba5337a429b35dca",
+  "catalogueHash": "1dd3063e7df5ee662ba97b50720a87bffc9e7aef2618ef5ba45a80736effb175",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -708,8 +708,8 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "revision": 20,
-        "hash": "dc06fe5ea2562e0be199f8a2c85e522e57a101e27630d4687fb49e76549772a0"
+        "revision": 21,
+        "hash": "aa5ae84c3a9e26b633cd8ab8569ed1b9034b699e20d6aac49a2be31895c86316"
       },
       {
         "slug": "nalati-grasslands",
@@ -885,9 +885,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 20,
-      "hash": "dc06fe5ea2562e0be199f8a2c85e522e57a101e27630d4687fb49e76549772a0",
-      "bytes": 35212800
+      "revision": 21,
+      "hash": "aa5ae84c3a9e26b633cd8ab8569ed1b9034b699e20d6aac49a2be31895c86316",
+      "bytes": 35365888
     },
     {
       "slug": "nalati-grasslands",

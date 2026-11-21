@@ -786,6 +786,12 @@
       "name": "Signal Dunes",
       "revision": 5,
       "hash": "8d9f9754aea8230a3aa7809010a89a3c9538f1eb2f8c47383c8da6501b78801d"
+    },
+    {
+      "slug": "mossgate",
+      "name": "Mossgate Hollow",
+      "revision": 21,
+      "hash": "aa5ae84c3a9e26b633cd8ab8569ed1b9034b699e20d6aac49a2be31895c86316"
     }
   ],
   "missing": []
