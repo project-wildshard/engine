@@ -7,7 +7,7 @@ name: shard-pin
 # pins reach main by land, never by pull request (Jake, 2026-11-19).
 # Engine releases stay the MacBook's (J369); a pin bump is code.
 #   gh workflow run shard-pin.yml -R project-wildshard/engine \
-#     -f slug=<slug> -f revision=<N> -f hash=<sha256> -f channel=staging
+#     -f slug=<slug> -f revision=<N> -f hash=<sha256> -f channel=staging [-f first=true]
 on:
   workflow_dispatch:
     inputs:
@@ -28,6 +28,10 @@ on:
         type: choice
         options: [staging, prod]
         default: staging
+      first:
+        description: A first pin of a slug engine never pinned (a staging-only shard, meta MZ26)
+        type: boolean
+        default: false
   repository_dispatch:
     types: [shard-published]
 
@@ -59,7 +63,7 @@ jobs:
         with:
           node-version-file: package.json
       - name: Move the slug's pin and the staging snapshot
-        run: node scripts/pin-shard.ts "$SLUG" "$REVISION" "$HASH" "$CHANNEL"
+        run: node scripts/pin-shard.ts "$SLUG" "$REVISION" "$HASH" "$CHANNEL" ${{ inputs.first && '--first' || '' }}
       # A Ring 1 slug's server slice is cut from its pinned head: a new head
       # needs a new slice in the same commit, or `pins.ts install --ring 1`
       # refuses it ("slice belongs to another head"; main red at dfb768cd0).

@@ -16,6 +16,30 @@ test('refuses a slug engine never pinned', () => {
   expect(() => movePin(pins, document, {slug: 'new', revision: 1, hash: b, bytes: 1})).toThrow(/no pin to move/u);
 });
 
+// Meta MOSSGATE-ZONE MZ26: a staging-only shard (production live: null) takes its first preview pin only when the
+// dispatch asks for it (`first`), named from staging's catalogue row; without it a new slug is still refused.
+test('a first pin appends the slug to both files when asked', () => {
+  const moved = movePin(pins, document, {slug: 'moss', revision: 21, hash: b, bytes: 5}, {name: 'Moss Hollow'});
+  expect(moved.pins.shards).toEqual([...pins.shards, {slug: 'moss', revision: 21, hash: b, bytes: 5}]);
+  expect(moved.document.shards).toEqual([...document.shards, {slug: 'moss', name: 'Moss Hollow', revision: 21, hash: b}]);
+});
+
+test('a first pin of a slug already pinned just moves it', () => {
+  const moved = movePin(pins, document, {slug: 'nine', revision: 2, hash: b, bytes: 30}, {name: 'Nine'});
+  expect(moved.pins.shards).toEqual([pins.shards[0], {slug: 'nine', revision: 2, hash: b, bytes: 30}]);
+});
+
+test('a first pin refuses a slug half pinned', () => {
+  const half = {...pins, shards: [...pins.shards, {slug: 'moss', revision: 1, hash: a, bytes: 1}]};
+  expect(() => movePin(half, document, {slug: 'moss', revision: 2, hash: b, bytes: 1}, {name: 'Moss'})).toThrow(/no pin to move/u);
+});
+
+test('shard-pin passes a first input through to pin-shard.ts', () => {
+  const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
+  expect(flow).toMatch(/first:\n\s+description:[^\n]+\n\s+type: boolean/u);
+  expect(flow).toMatch(/node scripts\/pin-shard\.ts "\$SLUG" "\$REVISION" "\$HASH" "\$CHANNEL" \$\{\{ inputs\.first && '--first' \|\| '' \}\}/u);
+});
+
 test('refuses to move a pin backwards', () => {
   const ahead = {...pins, shards: [{slug: 'nine', revision: 5, hash: a, bytes: 1}]};
   expect(() => movePin(ahead, document, {slug: 'nine', revision: 2, hash: b, bytes: 1})).toThrow(/newer than 2/u);

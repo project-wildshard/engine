@@ -4,10 +4,11 @@
 // snapshot by refresh. Only that slug's pin moves: a full `pins.ts refresh` would pull every other pin to its live head
 // and drop the staging revisions pinned by hand. Node built-ins only; .github/workflows/shard-pin.yml runs it.
 //
-//   node scripts/pin-shard.ts <slug> <revision> <hash> [staging|prod]
+//   node scripts/pin-shard.ts <slug> <revision> <hash> [staging|prod] [--first]
 //
 // It refuses unless the API's channel document names exactly that revision and hash for the slug, and a slug engine
-// never pinned (a first pin is a reviewed `pins.ts refresh`, DEL9).
+// never pinned (a first pin is a reviewed `pins.ts refresh`, DEL9) unless `--first` asks for one: meta MOSSGATE-ZONE MZ26,
+// a staging-only shard (production `live: null`, so `pins.ts refresh` skips it) joins the preview pins under staging's name.
 import { agentFetch as fetch } from './agent-requests.mjs';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
@@ -23,9 +24,13 @@ const PINS = 'test/pins/shardfiles.json', CATALOGUE = 'test/pins/catalogue.json'
 const HASH = /^[a-f0-9]{64}$/u, SLUG = /^[a-z0-9-]+$/u, REVISION = /^[1-9][0-9]*$/u;
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
-/** The pins and the pinned document with `slug` moved to `pin`; throws for a slug neither names. */
-export function movePin(pins: PinFile, document: PinnedDocument, pin: Pin): {pins: PinFile; document: PinnedDocument} {
+/** The pins and the pinned document with `slug` moved to `pin`; throws for a slug neither names, unless `first` names it,
+ *  which appends it to both. */
+export function movePin(pins: PinFile, document: PinnedDocument, pin: Pin, first?: {name: string}): {pins: PinFile; document: PinnedDocument} {
   const at = pins.shards.findIndex(row => row.slug === pin.slug), doc = document.shards.findIndex(row => row.slug === pin.slug);
+  if (first !== undefined && at === -1 && doc === -1) {
+    return {pins: {...pins, shards: [...pins.shards, pin]}, document: {...document, shards: [...document.shards, {slug: pin.slug, name: first.name, revision: pin.revision, hash: pin.hash}]}};
+  }
   if (at === -1 || doc === -1) throw new Error(`${pin.slug} has no pin to move (${PINS} or ${CATALOGUE}): a first pin is a reviewed pins.ts refresh`);
   const held = pins.shards[at];
   if (held !== undefined && held.revision > pin.revision) throw new Error(`${pin.slug}: engine pins revision ${held.revision}, newer than ${pin.revision}`);
@@ -41,10 +46,12 @@ async function getJson(path: string): Promise<unknown> {
   return response.json();
 }
 
-async function main([slug = '', revisionText = '', hash = '', channel = 'staging']: readonly string[]): Promise<void> {
+async function main(argv: readonly string[]): Promise<void> {
+  const first = argv.includes('--first');
+  const [slug = '', revisionText = '', hash = '', channel = 'staging'] = argv.filter(arg => arg !== '--first');
   const revision = Number(revisionText);
   if (!SLUG.test(slug) || !REVISION.test(revisionText) || !Number.isSafeInteger(revision) || revision < 1 || !HASH.test(hash) || !['staging', 'prod'].includes(channel)) {
-    throw new Error('usage: pin-shard.ts <slug> <revision> <sha256> [staging|prod]');
+    throw new Error('usage: pin-shard.ts <slug> <revision> <sha256> [staging|prod] [--first]');
   }
   // A prod upload moves staging too (J301), so staging names the revision either way.
   const [document, listing] = await Promise.all([getJson('/api/catalogue.json?channel=staging'), getJson('/api/shardfiles')]);
@@ -54,11 +61,11 @@ async function main([slug = '', revisionText = '', hash = '', channel = 'staging
   }
   const bytes = (listing as {shardfiles: {hash: string; bytes: number}[]}).shardfiles.find(file => file.hash === hash)?.bytes;
   if (bytes === undefined || bytes <= 0) throw new Error(`GET /api/shardfiles does not list ${hash.slice(0, 8)}`);
-  const moved = movePin(JSON.parse(readFileSync(PINS, 'utf8')) as PinFile, JSON.parse(readFileSync(CATALOGUE, 'utf8')) as PinnedDocument, {slug, revision, hash, bytes});
+  const moved = movePin(JSON.parse(readFileSync(PINS, 'utf8')) as PinFile, JSON.parse(readFileSync(CATALOGUE, 'utf8')) as PinnedDocument, {slug, revision, hash, bytes}, first ? {name: row.name ?? slug} : undefined);
   writeFileSync(PINS, json(moved.pins));
   writeFileSync(CATALOGUE, json(moved.document));
   await refreshStaging(API);
-  console.log(`pinned ${slug} rev ${revision} ${hash.slice(0, 8)} (${bytes} bytes) from ${channel}`);
+  console.log(`pinned ${slug} rev ${revision} ${hash.slice(0, 8)} (${bytes} bytes) from ${channel}${first ? ' (first pin)' : ''}`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) await main(process.argv.slice(2));
