@@ -718,6 +718,7 @@
     "src/client/game/grid/entryReadPrefetch.ts": "client",
     "src/client/game/grid/farImpostorDecodeWorker.ts": "client",
     "src/client/game/grid/farImpostorPack.ts": "client",
+    "src/client/game/grid/farBatch.ts": "client",
     "src/client/game/grid/farImpostorView.ts": "client",
     "src/client/game/grid/farView.ts": "client",
     "src/client/game/grid/frame.ts": "client",

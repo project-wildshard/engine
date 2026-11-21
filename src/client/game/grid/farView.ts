@@ -108,6 +108,8 @@ if (vFarCliff > 0.5) {
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\nif (vFarCliff > 0.5) totalEmissiveRadiance += diffuseColor.rgb * ${f(FAR_CLIFF_FLOOR)};`)
       .replace('#include <fog_fragment>', `#include <fog_fragment>\ngl_FragColor.rgb = mix(gl_FragColor.rgb, farHazeColour, smoothstep(${f(GRID_HAZE.near)}, ${f(GRID_HAZE.far)}, vFarDepth) * ${f(GRID_HAZE.max)});\ngl_FragColor.a = 1.0;`);
   }, { key: `sf23-far-${look.family}${positionalMask ? '-position' : ''}${grain ? '-grain' : ''}${cells === 8 ? '-tiles' : ''}` });
+  // DF10 (mini-df10d): the far batch (`farBatch.ts`) reads each proxy's flags and band from here
+  material.userData['farMask'] = mask; material.userData['farBand'] = uniforms.farBand;
   return { material, setMask: (excluded) => { for (let r = 0; r < flags; r++) mask[r] = excluded.has(r) ? 1 : 0; }, setBand: (share) => { uniforms.farBand.value = share; } };
 }
 
@@ -172,7 +174,9 @@ export interface FarPreparationWait { readonly instance: string; readonly phase:
  * an instance's far.glb off the frame (GLTF parse, region in uv.x) with its far.json look. Optional `prepare` borrows
  * the admitted view while hidden; `upload` exposes that same view after preparation, and `discard` retires it.
  */
-export function farRingPorts(options: { root: (instance: string) => Object3D; load: (instance: string) => Promise<FarPrepared>; prepare?: (view: FarProxyView, data: FarPrepared) => Promise<void>; decorate?: (material: Material) => void }): {
+export function farRingPorts(options: { root: (instance: string) => Object3D; load: (instance: string) => Promise<FarPrepared>; prepare?: (view: FarProxyView, data: FarPrepared) => Promise<void>; decorate?: (material: Material) => void;
+  /** DF10: an uploaded view joins its program's far batch (`farBatch.ts`), where one is kept */
+  adopt?: (view: FarProxyView, data: FarPrepared) => void }): {
   waiting: () => readonly FarPreparationWait[];
   fetch: (tile: { instance: string }, done: (result: FarPrepared | Error) => void) => void;
   upload: (tile: { instance: string }, data: FarPrepared) => FarProxyView;
@@ -216,8 +220,13 @@ export function farRingPorts(options: { root: (instance: string) => Object3D; lo
     },
     upload: (tile, data) => {
       const view = staged.get(data);
-      if (view === undefined) return installFarProxy(options.root(tile.instance), data.geometry, data.look, data.positionalMask, options.decorate, false, data.impostor ?? null, data.light ?? null, data.colour ?? null);
+      if (view === undefined) {
+        const installed = installFarProxy(options.root(tile.instance), data.geometry, data.look, data.positionalMask, options.decorate, false, data.impostor ?? null, data.light ?? null, data.colour ?? null);
+        options.adopt?.(installed, data);
+        return installed;
+      }
       staged.delete(data); view.mesh.visible = true;
+      options.adopt?.(view, data);
       return view;
     },
     discard: (_tile, data) => {

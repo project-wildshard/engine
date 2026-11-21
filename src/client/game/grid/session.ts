@@ -67,6 +67,7 @@ import { PlatformRenderResidency } from './renderResidency';
 import { TileStreamer, levelPorts, type FarPlan, type LevelPrepared, type RingPorts, type RingTile, type RingWait } from '@wildshard/engine/world/tileStreamer';
 import { GhostWorlds, type GhostRegion } from '../../../shared/game/grid/ghosts';
 import { farRingPorts, type FarPreparationWait, type FarPrepared, type FarProxyView } from './farView';
+import { FarBatches, farBatchOn, multiDraws } from './farBatch';
 import { decodeFarImpostor, farBandShare } from './farImpostorView';
 import { FarImpostorSchema, type FarImpostor } from '@wildshard/format/shardSections';
 import { bindCellCover, cellCoverPort } from './cellCover';
@@ -821,7 +822,11 @@ export class GridSession {
       host.scope.onDispose(() => { holder.removeFromParent(); });
       return holder;
     };
+    // DF10 (mini-df10d): at phone Low with `debug.farBatch`, the ring's proxies draw as one batch per program
+    const farBatches = farBatchOn() && multiDraws(host.renderer) ? new FarBatches(host.scene) : null;
+    if (farBatches !== null) host.scope.onDispose(() => { farBatches.dispose(); });
     const far = farRingPorts({
+      ...(farBatches === null ? {} : { adopt: (view: FarProxyView, data: FarPrepared) => { farBatches.adopt(view, data.look, data.positionalMask === true); } }),
       ...(host.prepareView === undefined ? {} : { prepare: async (view: FarProxyView, data: FarPrepared) => {
         const root = view.mesh.parent;
         if (root === null) throw new Error('Far view left before preparation');

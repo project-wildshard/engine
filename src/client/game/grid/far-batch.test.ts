@@ -1,0 +1,43 @@
+import * as THREE from 'three';
+import { expect, test } from 'vitest';
+import { FarBatches, farBatch } from './farBatch';
+import { installFarProxy } from './farView';
+import type { FarLookRuntime } from '../../../shared/game/grid/farProxy';
+
+// DF10 (mini-df10d): the far ring's proxies draw as one batch per program; each proxy's own mesh stays the source of its
+// visibility, flags and band, and leaves the batch when it goes.
+const look = (family: FarLookRuntime['family']): FarLookRuntime => ({ family, haze: { colour: [0.5, 0.6, 0.7] } });
+function proxyGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.PlaneGeometry(10, 10, 2, 2);
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(geometry.getAttribute('position').count * 3).fill(1), 3));
+  return geometry;
+}
+
+test('the slot is off unless set', () => {
+  expect(farBatch(null)).toBe(false);
+  expect(farBatch(true)).toBe(true);
+  expect(farBatch(false)).toBe(false);
+});
+
+test('proxies of one program share a batch that follows each proxy', () => {
+  const scene = new THREE.Scene(), batches = new FarBatches(scene);
+  const roots = [0, 1, 2].map(i => { const root = new THREE.Group(); root.position.set(i * 100, 0, 0); scene.add(root); return root; });
+  const [a, b, c] = roots.map((root, i) => installFarProxy(root, proxyGeometry(), look(i === 2 ? 'pbr' : 'toon')));
+  if (a === undefined || b === undefined || c === undefined) throw new Error('three proxies');
+  for (const view of [a, b, c]) expect(batches.adopt(view, look(view === c ? 'pbr' : 'toon'), false)).toBe(true);
+  const drawn = batches.batches();
+  expect(drawn.length).toBe(2); // toon (two cells) and pbr (one)
+  expect(a.mesh.layers.mask).toBe(0); // the proxy itself no longer draws
+  const toon = drawn.find(batch => batch.instanceCount === 2);
+  if (toon === undefined) throw new Error('the toon batch');
+  // a proxy's cover (its root hidden) reaches its copy at the next draw's sync; a proxy that goes leaves the batch
+  if (roots[1] !== undefined) roots[1].visible = false;
+  toon.sync();
+  expect([toon.getVisibleAt(0), toon.getVisibleAt(1)]).toEqual([true, false]);
+  b.dispose();
+  const after = batches.batches().find(batch => batch.material !== c.mesh.material && batch.instanceCount === 1 && batch !== toon);
+  expect(batches.batches().length).toBe(2);
+  expect(after).toBeDefined();
+  batches.dispose();
+  expect(scene.children.filter(child => child.name === 'far-batch')).toEqual([]);
+});

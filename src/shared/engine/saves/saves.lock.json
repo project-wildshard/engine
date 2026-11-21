@@ -582,6 +582,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/FAR_BATCH_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/IDLE_HUD_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
