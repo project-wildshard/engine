@@ -45,6 +45,7 @@ import { directorDayRange, directorDataHostIssues } from '@wildshard/format/dire
 import { DEFAULT_NORMALIZED_DAY, normalizedDayClock, inNormalizedDayRange, type DayCycle } from '@wildshard/engine/world/dayCycle';
 import { SIM_API_VERSION } from '@wildshard/engine/sim/apiVersion';
 import { waveHeight } from '@wildshard/engine/world/waves';
+import { fieldWater } from '../shardfile/fieldWater';
 import { createSimHost, type SimHost, type SimCommand, type SimHostPorts, type SimLevel, type SimStrike, type SimValue } from "@wildshard/engine/sim";
 import { addBakedTerrainCollider } from "@wildshard/engine/physics/terrainTiles";
 import { decodeTerrainTile, terrainTileHeight, type TerrainTileData } from "@wildshard/format/terrainTileBytes";
@@ -525,6 +526,10 @@ export function bindShardfileSim(host: SimHost, source: Shardfile, assets: Reado
     // swim, the swell), as Driftwood's native host does; a native product keeps installing its own.
     const sea = ports.water === undefined && shard.runtime === null && !host.embedded && !host.hasWater ? water.sea : null;
     if (sea !== null) { const waves = shard.water.some(row => row.kind === 'sea' && row.waves); host.useWater({ surfaceAt: sea.restAt, ...(waves ? { bob: (x: number, z: number) => waveHeight(x, z, host.clock.now) } : {}) }); }
+    // ONE-FORMAT OF40b: the `water.field` primitive from a plain upload. A `world/field` pond raster stands its water where
+    // the pond samples above zero, as Nalati's native population field does; a native product keeps its own.
+    const fieldRows = ports.water === undefined && shard.runtime === null && !host.embedded && !host.hasWater ? ports.sections?.get('world/field') : undefined;
+    if (fieldRows !== undefined) host.useWater(fieldWater(fieldRows, assets));
     const ids = shardfileColliderIds(shard);
     if (portals.length > 0) {
       const safe = () => { if (portalTransitioning(host.physics)) throw new Error('Cannot step or snapshot during a portal transfer'); };
