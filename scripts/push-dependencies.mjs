@@ -56,6 +56,16 @@ export function pushDependencyIdentity(root,env=process.env){
  return installedIdentity(root,env);
 }
 
+/** A `.bin` shim's bytes, minus which checkout installed it. pnpm's global virtual store keeps one shim per package
+ * for every checkout, and each install rewrites its NODE_PATH to name the installing checkout's hoisted
+ * `node_modules/.pnpm/node_modules`, so another clone's `pnpm install` during the gate moved this checkout's proof
+ * inputs (opus-format-prune, 324e55a6f, 2026-11-21: 17 shims, no package byte). The shim's target stays bound.
+ * @param {string} text @param {string} base */
+export function shimIdentity(text,base){
+ return text.replaceAll(base,'<checkout>')
+  .replaceAll(/[^:"'\s]*\/node_modules\/\.pnpm\/node_modules(?=[:"'\s]|$)/gmu,'<checkout>/node_modules/.pnpm/node_modules');
+}
+
 /** pnpm annotates fetched Git archives in its installed snapshot. Bind every
  * resolution/path/commit and tolerate only that generated true flag.
  * @param {Buffer} body */
@@ -158,7 +168,7 @@ function installedIdentity(root,env,managedBy){
     try{body=readInstalledBytes(fd,before);}finally{closeSync(fd);}
     const after=lstatSync(file,{bigint:true});
     if(before.ino!==after.ino||before.size!==after.size||before.mtimeNs!==after.mtimeNs||before.ctimeNs!==after.ctimeNs)throw new Error('Installed proof input moved');
-    if(key.includes('/.bin/')&&body.subarray(0,2).toString()==='#!')body=Buffer.from(body.toString('utf8').replaceAll(base,'<checkout>'));
+    if(key.includes('/.bin/')&&body.subarray(0,2).toString()==='#!')body=Buffer.from(shimIdentity(body.toString('utf8'),base));
     hash.update(`file\0${body.length}\0`).update(body).update('\0');
    }else throw new Error('Unsupported installed proof input');
   }

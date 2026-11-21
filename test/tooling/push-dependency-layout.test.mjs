@@ -142,3 +142,12 @@ test('hidden generated packages remain bound even beside disposable module metad
  f.put(source,'module.exports=2;');expect(load()).toBe('2');
  expect(pushDependencyIdentity(consumer,f.env)).not.toBe(before);
 },30000);
+
+test('a shared-store shim rewritten by another checkout install keeps the identity; its target still binds',()=>{
+ const f=fixture(),bin=join(f.root,'store/links/fixture/hash/node_modules/fixture/node_modules/.bin/tool');
+ const shim=(checkout,target)=>`#!/bin/sh\nexport NODE_PATH="${join(f.root,'store/links/leaf/hash/node_modules')}:${checkout}/node_modules/.pnpm/node_modules"\nexec node "$basedir/../${target}/index.cjs" "$@"\n`;
+ f.put(bin,shim(join(f.root,'clone-a'),'leaf'));const before=pushDependencyIdentity(f.root,f.env);expect(before).not.toBeNull();
+ f.put(bin,shim(join(f.root,'clone-b'),'leaf'));expect(pushDependencyIdentity(f.root,f.env)).toBe(before);
+ f.put(bin,shim(f.root,'leaf'));expect(pushDependencyIdentity(f.root,f.env)).toBe(before);
+ f.put(bin,shim(join(f.root,'clone-b'),'other'));expect(pushDependencyIdentity(f.root,f.env)).not.toBe(before);
+},30000);
