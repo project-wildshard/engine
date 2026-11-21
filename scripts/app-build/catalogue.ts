@@ -218,13 +218,17 @@ export function appendValidationVerdicts(html: string, verdicts: readonly unknow
   throw new Error('Unclosed validation verdicts');
 }
 
+// SHARD-COMPAT CP10 (J486): a pinned or stored shard file was judged at its upload; memory policy only reports here.
+// Spread, so a format before CP10 (which has no `judged` port) still types.
+const STORED = {judged: 'stored'} as const;
+
 /** What a page takes on trust for one tarball: a verdict is earned here, by this build's format validator, whichever validator
  *  stamped its receipt, because a page trusts it by its index hash. */
 export async function folderVerdict(tarball: Uint8Array, out: string): Promise<{readonly verdict: unknown; readonly discovery?: Uint8Array}> {
   await prepareAssetDecoders();
   const files = readTar(tarball);
   validateShardfileFolder({read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path}`); return bytes; }, paths: () => files.keys()},
-    {hash: bytes => createHash('sha256').update(bytes).digest('hex')});
+    {hash: bytes => createHash('sha256').update(bytes).digest('hex'), ...STORED});
   // S11: a deploy's added shard serves its KTX2 targets itself, or the build already holds them.
   assertKtx2TableTargets({paths: () => files.keys(), read: path => { const bytes = files.get(path); if (bytes === undefined) throw new Error(`No ${path}`); return bytes; }},
     url => { const file = join(out, url); return !url.split('/').includes('..') && existsSync(file) && statSync(file).isFile(); });

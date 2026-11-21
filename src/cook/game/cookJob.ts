@@ -66,6 +66,9 @@ export interface CookJobReport {
 export interface CookReceipt {readonly sourceHash: string; readonly indexHash: string; readonly residentBytes: number; readonly postCost: unknown; readonly worst?: unknown}
 
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+// SHARD-COMPAT CP10 (J486): a pinned or stored shard file was judged at its upload; memory policy only reports here.
+// Spread, so a format before CP10 (which has no `judged` port) still types.
+const STORED = {judged: 'stored'} as const;
 
 function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedShardfile; readonly receipt?: CookReceipt} {
   if (tarball.length > cap) throw new ShardfileRefusedError(`Shardfile is ${tarball.length} bytes, past the ${cap} cap`);
@@ -74,7 +77,7 @@ function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedSh
     const product = validateShardfileFolder({
       read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path} within ${maximum} bytes`); return bytes; },
       paths: () => files.keys(),
-    }, {hash: sha256});
+    }, {hash: sha256, ...STORED});
     const receipt = cookReceipt(files);
     return {product, ...(receipt === undefined ? {} : {receipt})};
   } catch (error) { throw new ShardfileRefusedError(error instanceof Error ? error.message : 'Shardfile refused', {cause: error}); }

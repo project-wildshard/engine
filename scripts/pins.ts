@@ -287,6 +287,8 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   const digest = (bytes: Uint8Array): string => { let held = digests.get(bytes); if (held === undefined) { held = sha256(bytes); digests.set(bytes, held); } return held; };
   const { prepareAssetDecoders } = await import('@wildshard/format/shardfileAssets');
   const { validateShardfileFolder } = await import('@wildshard/format/shardfileValidation');
+  // SHARD-COMPAT CP10 (J486): a pin was judged at its upload; memory policy only reports here (spread: pre-CP10 formats type).
+  const STORED = { judged: 'stored' } as const;
   const { readTar } = await import('@wildshard/format/tar');
   const { restorePacks } = await import('./pin-packs.ts');
   if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly one product: brasscap-mesa');
@@ -346,7 +348,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       try {
         const { warnings } = validateShardfileFolder(
           { read: (path, maximum) => { const body = fileNamed(path); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => files.keys() },
-          { hash: digest },
+          { hash: digest, ...STORED },
         );
         // SS12: a grandfathered product (Pine's page.life, SERVER-PARITY SS11) is admitted with a warning; say it.
         for (const warning of warnings) console.warn(`warning ${pin.slug}: ${warning}`);
