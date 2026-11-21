@@ -143,11 +143,11 @@ test('game owners retain exact borrowed fields and mutable contents',()=>{
  expect(diagnostics()).toEqual([]);
  source+="flock.group=flock.group;\njournal.scope=journal.scope;\nlocker.owned=locker.owned;\nexport const wrongGroup:number=flock.group;\nexport const wrongCount:string=locker.owned.size;\nexport const missing=body.registries.undeclared;\n";
  const refused=diagnostics().map(diagnostic=>diagnostic.code);
- // ONE-FORMAT OF31f2: a cosmetic's id is the shard's own kept row now (`CosmeticId` is a string), so no literal id is refused.
- expect(refused.filter(code=>code===2322)).toHaveLength(1);
+ // wrongGroup and wrongCount: two 2322s (OF31f2's cosmetic change applies only to the registry test below).
+ expect(refused.filter(code=>code===2322)).toHaveLength(2);
  expect(refused.filter(code=>code===2339)).toHaveLength(1);
  expect(refused.filter(code=>code===2540)).toHaveLength(3);
- expect(refused).toHaveLength(5);
+ expect(refused).toHaveLength(6);
 });
 });
 
