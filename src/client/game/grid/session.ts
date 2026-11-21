@@ -103,7 +103,7 @@ import { clientTileViews, type ClientTileViews } from '../shardfile/clientViews'
 import type { ClientSkin } from '../shardfile/clientSkins';
 import { exteriorLightingState, setParkedMatricesFrozen, setWarmUpHeld } from '@wildshard/engine/render/precompile';
 import { setBuildHeldTimed } from '@wildshard/engine/core/heldTiming';
-import { setBuildUrgent } from '@wildshard/engine/core/framePacing';
+import { nextDrawnFrame, setBuildUrgent } from '@wildshard/engine/core/framePacing';
 import { NeighbourLife, type NeighbourLifeCell } from './neighbourLife';
 import { CellSceneLife, type CellSceneLifeCell, type CellScenePresentation } from './cellSceneLife';
 import { NeighbourPanels } from './neighbourPanels';
@@ -122,6 +122,7 @@ import { OUTER_BLOCK_READS, readGridStripsOrSeeds } from '../../../shared/game/g
 import { startRoadGrain } from './roadGrainPreparation';
 import { roadSignWorkerSource, startRoadSigns } from './roadSignPreparation';
 import { stageRoadSignAtlas } from './roadSignUpload';
+import { roadDeckPacedOn, stageRoadDeck } from './roadDeckUpload';
 import { RoadMapShare } from './roadResources';
 import { prepareRoadSurfaceMaps } from './roadCompressedSurfaces';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
@@ -582,9 +583,16 @@ export class GridSession {
         const outerSlice = workSlice(OUTER_RING_SLICE_MS, roadScope), renderer = host.renderer;
         const stageSigns = TIER === 'desktop' && renderer !== undefined
           ? (atlas: DataTexture) => stageRoadSignAtlas(renderer, atlas, roadScope) : undefined;
+        // DW12: the outer deck (~20 MB at Driftwood) goes up a band a frame instead of in one burst
+        const stageDeck = roadDeckPacedOn() ? async (deck: Mesh): Promise<void> => {
+          await stageRoadDeck(deck, host.scene, async () => {
+            await nextDrawnFrame(roadScope);
+            if (roadScope.disposed || roadScope.disposing) throw new Error('Grid session left during outer deck upload');
+          });
+        } : undefined;
         return await installPlatformRoadSliced({ ...roadInput, ...(outerSigns === undefined ? {} : { signs: outerSigns.get }),
           allocationKey: 'road.outer', within: (x, z) => !ring(x, z), voidFloor: false }, async () => { await outerSlice.check(); },
-        { budgetMs: OUTER_RING_STRETCH_MS, ...(stageSigns === undefined ? {} : { stageSigns }) });
+        { budgetMs: OUTER_RING_STRETCH_MS, ...(stageSigns === undefined ? {} : { stageSigns }), ...(stageDeck === undefined ? {} : { stageDeck }) });
       } finally { outerSigns?.release(); grain?.release(); strips.length = 0; } // Collision views retain positions/indices, never render-only colours.
     };
     road.catch(() => { grain?.release(); roadScope.dispose(); });
