@@ -1,3 +1,4 @@
+import sharp from 'sharp';
 import { captureBootFrame } from './black-frame.mjs';
 import { captureViewportPng } from './fast-png.mjs';
 
@@ -76,6 +77,23 @@ export function nightlyDrawSamples(page) {
   });
 }
 
+/** Judge the real screenshot bytes without a round trip through the loaded renderer.
+ * Match the boot check's 192px analysis width, sparse RGB samples and near-black threshold.
+ * @param {import('node:buffer').Buffer} bytes
+ * @returns {Promise<import('./black-frame.mjs').FrameSample>} */
+export async function nightlyCapturePixels(bytes) {
+  const image = sharp(bytes);
+  const { width, height } = await image.metadata();
+  const { data } = await image.resize({ width: Math.min(192, width), kernel: 'linear' }).ensureAlpha()
+    .raw().toBuffer({ resolveWithObject: true });
+  let pixels = 0, dark = 0;
+  for (let at = 0; at < data.length; at += 16) {
+    pixels++;
+    if (Math.max(data[at] ?? 0, data[at + 1] ?? 0, data[at + 2] ?? 0) < 16) dark++;
+  }
+  return { width, height, pixels, darkShare: dark / pixels };
+}
+
 /** Keep the real composited PNG and its pixel check, with the nightly frame budget.
  * @param {import('playwright').Page} page @param {string} label
  * @param {import('./black-frame.mjs').BootFrameSample[]} frames */
@@ -86,6 +104,6 @@ export function captureNightlyBootFrame(page, label, frames) {
     // The monitor can refuse while capture tracing is still opening.
     void limit.catch(() => undefined);
     return captureBootFrame(page, label, deadline, frames,
-      (target, name, end) => captureViewportPng(target, name, end, undefined, limit), NIGHTLY_WALL_MS);
+      (target, name, end) => captureViewportPng(target, name, end, undefined, limit), NIGHTLY_WALL_MS, nightlyCapturePixels);
   });
 }

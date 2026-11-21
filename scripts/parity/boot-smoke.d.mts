@@ -49,8 +49,13 @@ export function bootRoadFailure(read:()=>Promise<unknown>, primary:unknown):Prom
 /** Time a separate gameplay proof without spending the boot capture allowance. */
 export function gameplayProbeTime(probe:()=>Promise<void>, now?:()=>number):Promise<number>;
 
+export interface GameplayEvidence {
+  onEnter?: (page: Page) => Promise<void>;
+  capture?: (page: Page, label: string, frames: BootFrameSample[]) => Promise<void>;
+}
+
 /** Run an actual built title through gameplay; reused by the cooked-store proof.
  * afterGameplay observes ten live frames before the independent native capture. */
-export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy"|"arrival",out:string,shard?:string,developer?:boolean,afterGameplay?:((page:Page)=>Promise<void>)|null,configureContext?:((context:BrowserContext)=>Promise<void>)|null,captureGameplay?:((page:Page,label:string,frames:BootFrameSample[])=>Promise<void>)|null):Promise<{elapsedMs:number;frame:number;gameplayFrames?:{initial:number|null;final:number|null};faults:string[];fatal:string[]}>;
+export function bootCase(browser:Browser,base:string,mode:"standalone"|"grid"|"public-policy"|"arrival",out:string,shard?:string,developer?:boolean,afterGameplay?:((page:Page)=>Promise<void>)|null,configureContext?:((context:BrowserContext)=>Promise<void>)|null,gameplayEvidence?:GameplayEvidence|null):Promise<{elapsedMs:number;frame:number;gameplayFrames?:{initial:number|null;final:number|null};faults:string[];fatal:string[]}>;
 
 export function gameplayRenderer():{renderer:string;vendor:string;unmaskedRenderer:string|null;unmaskedVendor:string|null;version:string;lost:boolean};

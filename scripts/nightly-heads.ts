@@ -176,7 +176,7 @@ try {
             // Manual negative control only: the real page loses its actual
             // input control. The ordinary tap/oracle must catch this regression.
             if (fault === 'hover-control') await control.evaluate(button => { button.remove(); });
-            await control.tap({timeout: 5000});
+            await control.tap({timeout: HOVER_CEILING_MS});
             const tappedAt = await page.evaluate(() => performance.now());
             // FS30 (opus-drift6): a runner that draws ~2 frames a second spent its whole 10 s wall-clock wait on 22 frames
             // (run 44863911819), while the board's blend needs ~10 frames past the tap at any rate (local Chromium at 20x CPU
@@ -196,7 +196,7 @@ try {
             await page.waitForFunction(({since, windowMs}) => performance.now() - since > windowMs,
               {since: tappedAt, windowMs: BOOST_TAP_MS}, {timeout: 5000});
             const unmountFrame = await page.evaluate(() => window.__wildshard?.world?.game.frameCount ?? 0);
-            await control.tap({timeout: 5000});
+            await control.tap({timeout: HOVER_CEILING_MS});
             await page.waitForFunction(({from, frames}) => {
               const world = window.__wildshard?.world;
               if (world === undefined) return false;
@@ -213,18 +213,22 @@ try {
             }
             return {mounted: true, unmounted: true, input: 'real touch', actualCap, expectedCap};
           });
-          await phase('draw', async () => {
-            // Observe completed engine frames, including shadow/post/held passes.
-            // Software-hosted timing and the advisory 150 threshold never gate.
-            const samples = await nightlyDrawSamples(page);
-            return {reportOnly: true, frames: samples.length, maxCalls: Math.max(...samples), advisory: 150, samples};
-          });
         }, async context => {
           for (const fixture of levelDownloadFixtures('packs')) await saveFixture(context, fixture);
           if (mode === 'arrival') await saveFixture(context, {scope: 'session', key: 'travel.handoff', data: {
             v: 1, from: null, to: route, mode: 'enter', arrive: null, carry: [], at: Date.now(),
           }});
-        }, browserName === 'chromium' && process.platform === 'linux' ? captureNightlyBootFrame : null);
+        }, {
+          ...(browserName === 'chromium' && process.platform === 'linux' ? {capture: captureNightlyBootFrame} : {}),
+          onEnter: async page => {
+            await phase('draw', async () => {
+              // Observe completed engine frames, including shadow/post/held passes.
+              // Software-hosted timing and the advisory 150 threshold never gate.
+              const samples = await nightlyDrawSamples(page);
+              return {reportOnly: true, frames: samples.length, maxCalls: Math.max(...samples), advisory: 150, samples};
+            });
+          },
+        });
         const clientKeys = new Set(index.keys.filter(key => !key.startsWith('assets/spawn/server/')));
         const used = [...fetched].filter(key => clientKeys.has(key));
         if (!used.some(key => /^assets\/spawn\/parts\/[a-f0-9]+\.pack\.br$/u.test(key))) throw new Error('No client part from this cold cook reached gameplay');

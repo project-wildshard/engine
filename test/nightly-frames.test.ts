@@ -1,7 +1,9 @@
 import { afterAll, afterEach, expect, test, vi } from 'vitest';
+import sharp from 'sharp';
+import { frameFailure } from '../scripts/parity/black-frame.mjs';
 import type { Page } from 'playwright';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import { nightlyDrawSamples, NIGHTLY_FRAME_LIMIT, NIGHTLY_WALL_MS, observeNightlyFrames } from '../scripts/parity/nightly-frames.mjs';
+import { nightlyCapturePixels, nightlyDrawSamples, NIGHTLY_FRAME_LIMIT, NIGHTLY_WALL_MS, observeNightlyFrames } from '../scripts/parity/nightly-frames.mjs';
 
 const watchFrames = (draws: number) => observeNightlyFrames({draws, frames: NIGHTLY_FRAME_LIMIT, wallMs: NIGHTLY_WALL_MS});
 
@@ -60,4 +62,14 @@ test('enforces the wall ceiling when the page cannot start the observer', async 
   await vi.advanceTimersByTimeAsync(90_000);
   await refused;
   expect(vi.getTimerCount()).toBe(0);
+});
+
+test('samples the captured gameplay PNG off-page and refuses the same black frame', async () => {
+  const pixels = (red: number) => sharp({
+    create: { width: 390, height: 844, channels: 4, background: { r: red, g: 0, b: 0, alpha: 1 } },
+  }).png().toBuffer();
+  const black = await nightlyCapturePixels(await pixels(0));
+  expect(black).toMatchObject({ width: 390, height: 844, darkShare: 1 });
+  expect(frameFailure(black)).toBe('frame is at least 90% near-black');
+  expect(frameFailure(await nightlyCapturePixels(await pixels(16)))).toBeNull();
 });

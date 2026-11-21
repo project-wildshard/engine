@@ -30,10 +30,14 @@ export function frameFailure(sample) {
   return sample.darkShare >= .9 ? 'frame is at least 90% near-black' : null;
 }
 
+const readPagePixels = (/** @type {import('node:buffer').Buffer} */ bytes, /** @type {import('playwright').Page} */ page) =>
+  page.evaluate(screenshotPixels, Array.from(bytes));
+
 /** @param {import('playwright').Page} page @param {string} label @param {number} deadline
  * @param {(import('./black-frame.mjs').BootFrameSample)[]} frames
- * @param {typeof captureViewportPng} [capture] @param {number} [captureLimitMs] */
-export async function captureBootFrame(page, label, deadline, frames, capture = captureViewportPng, captureLimitMs = 30_000) {
+ * @param {typeof captureViewportPng} [capture] @param {number} [captureLimitMs]
+ * @param {typeof readPagePixels} [readPixels] */
+export async function captureBootFrame(page, label, deadline, frames, capture = captureViewportPng, captureLimitMs = 30_000, readPixels = readPagePixels) {
   const remaining = deadline - Date.now();
   if (remaining <= 0) throw new Error(`Boot deadline: ${label} screenshot`);
   const stopTrace = await beginCaptureTrace(page, label);
@@ -51,7 +55,7 @@ export async function captureBootFrame(page, label, deadline, frames, capture = 
     console.log(`boot-capture ${JSON.stringify({ label, stage: 'screenshot-roundtrip', state, ms: performance.now() - started })}`);
     await stopTrace();
   } })();
-  const sample = { label, ...await page.evaluate(screenshotPixels, Array.from(bytes)) };
+  const sample = { label, ...await readPixels(bytes, page) };
   frames.push(sample);
   const failure = frameFailure(sample);
   if (failure !== null) throw new Error(`${label}: ${failure} (${JSON.stringify(sample)})`);

@@ -33,3 +33,14 @@ test('FS30 the browser lease cannot end a hosted head job before its own deadlin
   expect(jobMinutes).toBeDefined();
   expect(leaseMinutes).toBe(jobMinutes);
 });
+
+test('FS30 begins recording live draws before running the hover journey', () => {
+  const source = readFileSync('scripts/parity/boot-smoke.mjs', 'utf8');
+  const ready = source.indexOf('await until(page, faults, () => gameplay(true)');
+  const start = source.indexOf('const enteredProof = gameplayEvidence?.onEnter?.(page)');
+  const hover = source.indexOf('gameplayProbeTime(() => afterGameplay(page))');
+  expect(ready).toBeGreaterThan(-1);
+  expect(start).toBeGreaterThan(ready);
+  expect(hover).toBeGreaterThan(start);
+  expect(source).toContain('await enteredProof');
+});

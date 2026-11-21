@@ -401,8 +401,8 @@ export async function gameplayProbeTime(probe, now = () => performance.now()) {
  * @param {import('playwright').Browser} browser @param {string} base @param {'standalone'|'grid'|'public-policy'|'arrival'} mode @param {string} out @param {string} [shard] @param {boolean} [developer]
  * @param {((page:import('playwright').Page)=>Promise<void>)|null} [afterGameplay]
  * @param {((context:import('playwright').BrowserContext)=>Promise<void>)|null} [configureContext]
- * @param {((page:import('playwright').Page,label:string,frames:import('./black-frame.mjs').BootFrameSample[])=>Promise<void>)|null} [captureGameplay] */
-export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle', developer = false, afterGameplay = null, configureContext = null, captureGameplay = null) {
+ * @param {import('./boot-smoke.mjs').GameplayEvidence|null} [gameplayEvidence] */
+export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle', developer = false, afterGameplay = null, configureContext = null, gameplayEvidence = null) {
   // CI's macOS runner renders the phone tier at ~0.3 fps, so a case needs more than a minute of wall clock.
   const started = Date.now();
   let deadline = started + 150000;
@@ -547,6 +547,9 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
     }
     await until(page, faults, () => gameplay(true), `${mode} gameplay`, deadline, mode === 'grid' ? observeGridWait : undefined);
     phases.gameplayMs = Date.now() - started;
+    const enteredProof = gameplayEvidence?.onEnter?.(page);
+    // The context still closes on a boot failure before it reaches this proof.
+    void enteredProof?.catch(() => undefined);
     if (stallProfile !== null) { const read = await finishStallProfile(page, stallProfile); stallProfile = null; stalls = read.stalls; faults.push(...read.faults); }
     const initial = await page.evaluate(bootObservation);
     gameplayFrames.initial = initial.frame;
@@ -577,8 +580,13 @@ export async function bootCase(browser, base, mode, out, shard = 'driftwood-isle
       phases.gameplayProbeMs = await gameplayProbeTime(() => afterGameplay(page));
       deadline += phases.gameplayProbeMs;
     }
+    if (enteredProof !== undefined) {
+      const waited = await gameplayProbeTime(async () => { await enteredProof; });
+      deadline += waited;
+    }
     if (faults.length > 0) throw new Error(JSON.stringify(faults));
-    await (captureGameplay === null || mode === 'grid'
+    const captureGameplay = gameplayEvidence?.capture;
+    await (captureGameplay === undefined || mode === 'grid'
       ? captureBootFrame(page, mode === 'grid' ? 'grid HOME' : `${shard} gameplay`, deadline, frames)
       : captureGameplay(page, `${shard} gameplay`, frames));
     const roadDeadline = Date.now() + 90000;
