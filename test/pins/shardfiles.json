@@ -159,9 +159,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 21,
-      "hash": "aa5ae84c3a9e26b633cd8ab8569ed1b9034b699e20d6aac49a2be31895c86316",
-      "bytes": 35365888
+      "revision": 22,
+      "hash": "70f67c74ced2823dfc12cb87c93503e12ea0e07467815f817c7af03e0071f7b8",
+      "bytes": 35377152
     },
     {
       "slug": "mirror-salt",
