@@ -37,9 +37,9 @@ export function measuringCatalogue(html, slug) {
     const catalogue = JSON.parse(json), bare = (/** @type {{slug:string}} */ row) => row.slug.replace(/^_/u, '');
     if ([...catalogue.placements, ...catalogue.grid.cells].some(row => bare(row) === slug)) return all;
     // the grid admits cells within 3 of the centre: the nearest free one, east first
-    const taken = new Set(catalogue.grid.cells.map((/** @type {{cell:number[]}} */ row) => row.cell.join()));
+    const taken = new Set(catalogue.grid.cells.map((/** @type {{cell:number[]}} */ row) => row.cell.join(',')));
     const free = [0, 1, 2, 3].flatMap(r => [-3, -2, -1, 0, 1, 2, 3].flatMap(z => [3, 2, 1, 0, -1, -2, -3].map(x => [x, z])
-      .filter(([x, z]) => Math.max(Math.abs(x), Math.abs(z)) === r))).find(cell => !taken.has(cell.join()));
+      .filter(cell => Math.max(...cell.map(Math.abs)) === r))).find(cell => !taken.has(cell.join(',')));
     if (free === undefined) throw new Error(`No free grid cell to measure ${slug} in`);
     catalogue.grid.cells.push({ instance: slug, slug, cell: free });
     return open + JSON.stringify(catalogue).replaceAll('<', String.raw`<`) + close;
