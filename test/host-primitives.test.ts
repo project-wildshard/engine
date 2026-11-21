@@ -45,3 +45,12 @@ test('OF17b1: a native-assembly product names the families its native features j
   expect(productPrimitives(base(), plan.features.map(row => row.host))).toEqual(['collision', 'plumbing', 'population', 'held.melee', 'sky', 'water.sea']);
   expect(productPrimitives(base(), ['no.such.host'])).toEqual(['collision', 'plumbing']);
 });
+
+// ONE-FORMAT CC40b3: taming joins riding. Nalati's six riding hosts and the cooked taming feature its section installs
+// (`withSectionTaming`) each register under the one riding family, never a family of their own.
+test('CC40b3: Nalati\'s riding hosts and section taming register under riding', () => {
+  const riding = ['riding.roster', 'riding.trample', 'riding.environment', 'riding.groups', 'riding.hunt', 'riding.mounted'];
+  for (const host of [...riding, 'riding.taming', 'taming.entry', 'riding.session']) expect(productPrimitives(base(), [host])).toEqual(['collision', 'plumbing', 'riding']);
+  const nalati = ['collision', 'day.declared', ...riding.slice(0, 4), 'riding.elites', 'riding.hunt', 'riding.mounted', 'riding.taming', 'boss.arena', 'riding.elites-ready', 'held.arms', 'encounter.patrol', 'boss.open-arena'];
+  expect(productPrimitives(base(), nalati).filter(name => name === 'riding')).toEqual(['riding']);
+});
