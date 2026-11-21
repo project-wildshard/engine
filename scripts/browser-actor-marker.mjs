@@ -75,15 +75,20 @@ async function chromiumDefaultUA(open, engine, options) {
   const executable = options?.executablePath ?? engine.executablePath();
   let file;
   try {
-    const key = createHash('sha256').update([executable, String(statSync(executable).mtimeMs), String(headless), channel].join('\n')).digest('hex');
+    // 'cdp': files a page probe wrote may hold a context default's UA (below), so they are never read again.
+    const key = createHash('sha256').update(['cdp', executable, String(statSync(executable).mtimeMs), String(headless), channel].join('\n')).digest('hex');
     file = join(homedir(), '.cache/wildshard/browser-ua', `${key.slice(0, 16)}.txt`);
     const kept = readFileSync(file, 'utf8').trim();
     if (kept !== '') return kept;
   } catch { /* first launch of this build, or a channel with no file of its own */ }
   const probe = await open({ headless, args: options?.args ?? [],
     ...options?.executablePath === undefined ? {} : { executablePath: options.executablePath }, ...channel === '' ? {} : { channel } });
+  // The browser's own UA, never a page's: a page takes its context's defaults, and under Playwright Test those are the
+  // project's `use` (engine red 44944859967: src/e2e's Desktop Chrome UA was kept as this build's default, and every
+  // later launch in that job sent Windows Chrome as its network UA).
   let ua;
-  try { ua = await (await probe.newPage()).evaluate(() => navigator.userAgent); } finally { await probe.close(); }
+  try { ua = /** @type {{userAgent:string}} */ (await (await probe.newBrowserCDPSession()).send('Browser.getVersion')).userAgent; }
+  finally { await probe.close(); }
   if (file !== undefined) { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, `${ua}\n`); }
   return ua;
 }

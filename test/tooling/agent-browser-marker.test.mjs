@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { join, resolve } from 'node:path';
 import { test } from 'vitest';
 import { agentHeaders, agentUrl, agentUserAgent } from '../../scripts/agent-marker.mjs';
 import { installBrowserActorMarker } from '../../scripts/browser-actor-marker.mjs';
@@ -45,6 +46,35 @@ test('launch, attach and persistent contexts are marked exactly once', async () 
   }
   const { launchPersistentContext } = engine;
   assert.deepEqual(await launchPersistentContext('profile', options), expected);
+});
+
+test('a started Chromium takes its own UA, never a context default (engine red 44944859967)', async () => {
+  // Playwright Test gives every new page its project's `use`: src/e2e's Desktop Chrome UA was kept as the build's
+  // default, and every later launch in that job sent Windows Chrome as its network UA.
+  const own = 'Mozilla/5.0 (X11; Linux x86_64) HeadlessChrome/158.0.0.0 Safari/537.36';
+  const desktop = devices['Desktop Chrome']?.userAgent ?? 'Windows NT';
+  /** @type {string[][]} */
+  const started = [];
+  const browser = {
+    newContext: async () => ({}), newPage: async () => ({ evaluate: async () => desktop }), close: async () => undefined,
+    newBrowserCDPSession: async () => ({ send: async (/** @type {string} */ method) => method === 'Browser.getVersion' ? { userAgent: own } : {} }),
+  };
+  const engine = {
+    executablePath: () => process.execPath,
+    launch: async (/** @type {{args?: string[]} | undefined} */ options) => { started.push(options?.args ?? []); return browser; },
+  };
+  const parent = resolve(process.env.VITEST_TMP_ROOT ?? 'tmp/vitest');
+  mkdirSync(parent, { recursive: true });
+  const home = mkdtempSync(join(parent, 'marker-home-')), before = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    installBrowserActorMarker({ chromium: engine });
+    await engine.launch({ args: ['--mute-audio'] });
+    assert.deepEqual(started.at(-1), ['--mute-audio', `--user-agent=${agentUserAgent(own)}`]);
+  } finally {
+    if (before === undefined) delete process.env.HOME; else process.env.HOME = before;
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 // The hosted share can have full Chromium without the separate headless shell.
