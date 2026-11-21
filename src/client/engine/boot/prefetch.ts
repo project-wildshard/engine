@@ -19,6 +19,7 @@ import type { BootSpec } from '../../../shared/engine/level/spec';
 import type { ChunkFiles } from './bytes';
 import type { Scope } from '../../../shared/engine/app/scope';
 import { pageScope } from '../../../shared/engine/app/resources';
+import { bufferedResponse } from './scratchReader';
 
 let documentEnded = false, observesDocumentEnd = false;
 function ended(): boolean { return documentEnded || pageScope.disposed || pageScope.disposing; }
@@ -141,7 +142,7 @@ export function prefetch(paths: readonly string[], concurrency: number = CONCURR
     active++;
     // read to the end here: the download finishing (not its headers) is what frees the slot for the next file
     const res = fetchNow(p)
-      .then(async (r) => (r.ok ? new Response(await r.blob(), { status: r.status, statusText: r.statusText, headers: r.headers }) : r))
+      .then(async (r) => (r.ok ? bufferedResponse(await r.blob(), { status: r.status, statusText: r.statusText, headers: r.headers }) : r))
       .finally(() => { active--; landing(p).settle(); if (!closed && !ended()) pump(); });
     res.catch(() => undefined); // a failed prefetch is re-asked for (and its error surfaced) by the step that needs it
     started.set(p, res);

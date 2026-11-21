@@ -86,3 +86,21 @@ test('live read failures retain ordinary demand fallback and its exact bytes', a
   expect([...new Uint8Array(await (await borrowed).arrayBuffer())]).toEqual([1, 2, 3]);
   expect(read.mock.calls.map(([url]) => url)).toEqual(['/one', '/one']);
 });
+
+test('reading a prefetched Blob uses the default reader through EOF', async () => {
+  const path = '/prefetched-audio.m4a';
+  const fetch = vi.fn<typeof window.fetch>(() => Promise.resolve(new Response(new Uint8Array([1, 2, 3]),
+    {headers: {'content-type': 'audio/mp4', 'content-length': '3'}})));
+  window.fetch = fetch;
+  const {prefetch, whenPrefetched} = await import('./prefetch');
+  const {readContent} = await import('./contentRead');
+  prefetch([path], 1);
+  await whenPrefetched(path);
+  const buffered = await window.fetch(path);
+  if (buffered.body === null) throw new Error('Missing prefetched response body');
+  const getReader = vi.spyOn(buffered.body, 'getReader');
+  const bytes = await readContent(path, 3, {expectedBytes: 3, fetch: () => Promise.resolve(buffered)});
+  expect([...bytes]).toEqual([1, 2, 3]);
+  expect(getReader.mock.calls).toEqual([[]]);
+  expect(fetch).toHaveBeenCalledOnce();
+});

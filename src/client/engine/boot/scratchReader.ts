@@ -30,8 +30,20 @@ function give(buffer: ArrayBuffer | null): void {
   if (buffer !== null && buffer.byteLength === SCRATCH_BYTES && pool.length < POOL_KEPT) pool.push(buffer);
 }
 
+const bufferedBodies = new WeakSet<ReadableStream<Uint8Array<ArrayBuffer>>>();
+
+/** Keep the original headers and status on the Blob the prefetch has already read to EOF. */
+export function bufferedResponse(blob: Blob, init: ResponseInit): Response {
+  const response = new Response(blob, init);
+  if (response.body !== null) bufferedBodies.add(response.body);
+  return response;
+}
+
 /** The reader for `body`: through reused scratch buffers when it is a byte stream, else its default reader. */
 export function scratchReader(body: ReadableStream<Uint8Array<ArrayBuffer>>): BodyReader {
+  // Chromium can leave the final BYOB read pending on a Blob response
+  // after it has delivered every byte. Native network readers still use the pool.
+  if (bufferedBodies.has(body)) return body.getReader();
   let byob: ReadableStreamBYOBReader;
   try { byob = body.getReader({ mode: 'byob' }); }
   catch { return body.getReader(); }
