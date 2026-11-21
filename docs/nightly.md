@@ -39,8 +39,9 @@ releases (J184).
   keeps its existing 25-minute limit (jobs: 35 minutes including setup).
   A manual `suite_only=true` dispatch diagnoses just these jobs, produces
   no qualification verdict and uses its own concurrency group.
-- Eight jobs split the heads into four balanced groups for Chromium
-  on `ubuntu-24.04` and WebKit on `macos-15`. At most four jobs run at once.
+- At most four head jobs run at once. WebKit uses four macOS groups.
+  Chromium uses four Linux groups and two macOS groups. Pine Hollow
+  has its own Metal job, and Nine Dragon Stack and Nalati share the other.
   Each builds the full catalogue, then cold-cooks its heads through the
   production bounded cook worker. Failed heads do not stop later heads.
 - Each head's generated bank entry is removed before the production
@@ -292,7 +293,7 @@ in their requested repo tmp directory and clean their private exports.
 Dispatch `nightly.yml` on the candidate branch with `diagnostic_head`
 set to a committed slug and `diagnostic_browser` set to `chromium` or
 `webkit`. It validates
-the actual pin, uses its normal nightly partition, then runs the same
+the actual pin, uses its normal nightly partition and runner, then runs the same
 cold-pack and phone path for only that head. Build encodes may be reused;
 the head's cook store remains cold on the hosted worker. It adds no
 scheduled or ordinary push job.

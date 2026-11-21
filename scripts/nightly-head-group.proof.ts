@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
-import {browsers, headGroups, plan} from './nightly-model.ts';
+import {browsers, headGroups, headRunner, plan} from './nightly-model.ts';
 
 await test('the diagnostic CLI selects each actual pinned head in its ordinary nightly partition', () => {
   const heads = plan().heads;
@@ -10,7 +10,8 @@ await test('the diagnostic CLI selects each actual pinned head in its ordinary n
     const [head] = members;
     if (head === undefined) continue;
     const result = spawnSync(process.execPath, ['scripts/nightly-head-group.ts', head.slug, browser], {encoding:'utf8', timeout:3000});
-    assert.equal(result.status, 0, result.stderr); assert.equal(result.stdout.trim(), String(group));
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(result.stdout), {group, os: headRunner(browser, members)});
   }
 });
 await test('an absent, unknown or path-shaped head refuses before any browser or cook runs', () => {
