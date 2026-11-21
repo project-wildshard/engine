@@ -16,7 +16,7 @@ import { worldHit } from "@wildshard/engine/combat/view/ranged";
 import { Gunfire } from "@wildshard/engine/fx/gunfire";
 import { bodyOnRay, combatFloat } from "@wildshard/engine/ui/Combat";
 import { Tool } from "@wildshard/engine/combat/Tool";
-import type { EquipmentRow, EquipContext } from "@wildshard/engine/combat/Equipment";
+import type { EquipmentCues, EquipmentRow, EquipContext } from "@wildshard/engine/combat/Equipment";
 import type { ItemFamily, ItemFamilyPorts } from "@wildshard/engine/combat/itemFamilies";
 import type { ItemSpec } from "@wildshard/engine/combat/items";
 import { buildSword } from "../systems/items/declaredSword";
@@ -172,6 +172,9 @@ function heldFlash(size: number): { readonly group: Group; readonly dispose: () 
  *   `round` in its fingers) goes down for a round, brings it to the gate and thumbs it in as each round feeds, then
  *   takes the wrist again. A GLB without those nodes keeps the turn alone.
  */
+/** QA 11-19 row 41 (Jake on Brasscap: "Shooting the gun makes no sound."): a declared lever whose row names no cues fires,
+ *  reloads and clicks dry through the shared lever voices (`sharedCombatCues`); a row's own cues still win. */
+export const DECLARED_LEVER_CUES: EquipmentCues = { fire: 'cue.lever.fire', reload: 'cue.lever.reload', dry: 'cue.lever.dry', impact: 'cue.projectile.hit' };
 class DeclaredLever extends Weapon implements DeclaredLeverHandle {
   readonly model: Group;
   readonly state: WeaponState = { ammo: undefined, magazine: 0, reserve: 0, loaded: false, reloading: false, reloadProgress: 0, ads: false };
@@ -195,7 +198,7 @@ class DeclaredLever extends Weapon implements DeclaredLeverHandle {
   private readonly blocked = { at: new Vector3(), way: new Vector3(), left: 0 };
   constructor(row: EquipmentRow, spec: Extract<ItemSpec, { kind: 'weapon' }>, ports: ItemFamilyPorts) {
     const profile: LeverProfile = leverProfile({ id: spec.id, profile: ports.profile });
-    super({ ...row, ui: { ...row.ui, touch: 'ranged', melee: false, lockOn: false, ammo: { label: 'Rounds', segments: profile.magazine, magazine: true } } });
+    super({ ...row, cues: row.cues ?? DECLARED_LEVER_CUES, ui: { ...row.ui, touch: 'ranged', melee: false, lockOn: false, ammo: { label: 'Rounds', segments: profile.magazine, magazine: true } } });
     this.ports = ports; this.profile = profile; this.store = { reserve: profile.reserve };
     this.act = new RangedAction.Cycle(this.store, { magazine: profile.magazine, reload: profile.reload, ...profile.lever });
     this.model = itemMesh(ports); this.setAimSource(ports.aim);

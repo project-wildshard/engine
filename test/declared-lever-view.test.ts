@@ -7,7 +7,8 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { ItemRuntime } from '../src/shared/engine/combat/items';
 import type { EquipmentRow } from '../src/shared/engine/combat/Equipment';
 import type { WeaponWire } from '../src/shared/engine/combat/Weapon';
-import { declaredKitItemFamilies, declaredLever } from '../src/client/game/plugin/weaponFamily';
+import { DECLARED_LEVER_CUES, declaredKitItemFamilies, declaredLever } from '../src/client/game/plugin/weaponFamily';
+import { sharedCombatCues } from '../src/client/game/plugin/audio';
 
 // TE-ENG2, the page's half: the held lever is hidden and refuses presses until taken, fills the HUD's ammo strip from its tube,
 // sends each pull and R to the server, flashes at its muzzle, and takes the server's count when the two differ at rest.
@@ -29,6 +30,13 @@ test('the held lever: locked, a tube on the HUD, presses on the wire, the server
   if (lever === null) throw new Error('kit.lever builds a DeclaredLever');
   expect(lever.row.ui.ammo).toEqual({ label: 'Rounds', segments: 6, magazine: true });
   expect(lever.row.ui.melee).toBe(false);
+  // QA 11-19 row 41: a row with no cues of its own still sounds its shot, reload, dry click and impact.
+  expect(lever.row.cues).toEqual(DECLARED_LEVER_CUES);
+  const played: string[] = [], voice = (name: string) => () => { played.push(name); };
+  const map = sharedCombatCues({ rifleFire: voice('rifleFire'), crossbowFire: voice('crossbowFire'), swordSwing: voice('swordSwing'), swordHeavy: voice('swordHeavy'),
+    swordHit: voice('swordHit'), boltImpact: voice('boltImpact'), dryFire: voice('dryFire'), rifleReload: voice('rifleReload'), reload: voice('reload'), weaponSwap: voice('weaponSwap') }, false);
+  for (const id of [DECLARED_LEVER_CUES.fire, DECLARED_LEVER_CUES.reload, DECLARED_LEVER_CUES.dry ?? 'cue.none', DECLARED_LEVER_CUES.impact]) expect(map(id, {})).toBe(true);
+  expect(played).toEqual(['rifleFire', 'rifleReload', 'dryFire', 'boltImpact']);
   const sent: string[] = [];
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Only the calls a lever makes are recorded.
   lever.wire = { press: () => { sent.push('press'); }, reload: () => { sent.push('reload'); }, steps: () => 1 } as unknown as WeaponWire;
