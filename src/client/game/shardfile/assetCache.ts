@@ -33,12 +33,12 @@ export async function hasCachedAsset(storage: ReadStorage, url: string): Promise
 
 /** Pack members keep their canonical fetch URL, so later demand uses the same
  * service-worker entry instead of a second hash-keyed body. */
-export async function cacheAsset(storage: Pick<CacheStorage, 'open'>, url: string, bytes: Uint8Array): Promise<boolean> {
+export async function cacheAsset(storage: Pick<CacheStorage, 'open'>, url: string, bytes: Uint8Array, copy = true): Promise<boolean> {
   const path = new URL(url).pathname;
   const type = path.endsWith('.wasm') ? 'application/wasm' : path.endsWith('.json') ? 'application/json'
     : path.endsWith('.glb') ? 'model/gltf-binary' : path.endsWith('.ktx2') ? 'image/ktx2' : 'application/octet-stream';
   try {
-    await (await storage.open(assetCacheName())).put(url, new Response(Uint8Array.from(bytes), {
+    await (await storage.open(assetCacheName())).put(url, new Response(copy ? Uint8Array.from(bytes) : new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength), {
       headers: { 'content-type': type, 'content-length': String(bytes.length) },
     }));
     return true;

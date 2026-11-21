@@ -15,7 +15,7 @@ import { persistRoadTile, ROAD_TILE_ARCHIVE_BYTES, ROAD_TILE_HEADER_BYTES, type 
 import { RoadTilePool } from './roadTilePool';
 import { roadHandoffPacedOn } from './roadHandoffPaced';
 import { roadCellKey, roadTileStream, type PreparedRoadTile, type RoadTileSource } from './roadTileStream';
-import { captureJobBytes, RoadTileCaptureWorker } from './roadTileCaptureWorker';
+import { captureJobBytes, roadCaptureLeanOn, RoadTileCaptureWorker } from './roadTileCaptureWorker';
 import { captureJobTiles } from './roadTileCaptureJob';
 import type { RoadLayout } from '../../../shared/game/grid/roadLayout';
 
@@ -187,7 +187,11 @@ export class RoadTileBacking {
   }
   /** DL11: the road's construction joins its worker captures before it lands (the control fence waits for the archive,
    *  as it did while the page captured); rejects with the first failure. */
-  async joinCapture(): Promise<void> { await this.drained(); }
+  async joinCapture(): Promise<void> {
+    await this.drained();
+    // DW12 (mini-dw12c): a lean capture's idle worker keeps its jobs' garbage; a fresh one takes the next road's
+    if (roadCaptureLeanOn()) this.captureWorker?.retireIdle(true);
+  }
   /** Null when no worker capture is outstanding; else settles once every one has answered (and rejects on a failure). */
   drained(): Promise<void> | null {
     if (this.workerJobs.size === 0) return this.workerFailure === null ? null : Promise.reject(this.workerFailure);
@@ -281,6 +285,8 @@ export class RoadTileBacking {
     if (this.stream !== null || this.capturing || this.pending.length > 0 || this.flushing !== null || this.settling !== null
       || this.workerJobs.size > 0 || this.scope.disposed || this.scope.disposing) throw new Error('Road backing is not ready to seal');
     if (this.workerFailure !== null) throw this.workerFailure;
+    // DW12 (mini-dw12c): sealed, no source is captured again; a lean capture's worker goes now, with its heap
+    if (roadCaptureLeanOn()) this.captureWorker?.retireIdle();
     const sources: RoadTileSource[] = [];
     for (const source of this.sources.values()) {
       if (source.retire === null || Array.isArray(source.mesh.material)) throw new Error('Road backing lacks an admitted material');

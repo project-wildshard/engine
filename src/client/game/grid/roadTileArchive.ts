@@ -5,7 +5,7 @@ import { BufferAttribute, BufferGeometry, Sphere, Vector3, type TypedArray } fro
 import type { Scope } from '@wildshard/engine/app/scope';
 import { contentHash } from '../../../shared/game/shardfile/contentHash';
 import { cachedAsset, cacheAsset } from '../shardfile/assetCache';
-import type { RoadTileGeometry } from './roadTileGeometry';
+import type { RoadTileArena, RoadTileGeometry } from './roadTileGeometry';
 
 /** Existing per-archive bounds, also used to bound construction's in-flight scratch. */
 export const ROAD_TILE_ARCHIVE_BYTES = 25_000_000, ROAD_TILE_HEADER_BYTES = 65_536;
@@ -55,9 +55,11 @@ export function roadTileUrl(origin: string, hash: string): string {
   if (!/^[a-f0-9]{64}$/u.test(hash)) throw new Error('Invalid road tile hash');
   return new URL(`/assets/grid-road/${hash}.bin`, origin).href;
 }
-export function roadTileCache(storage: Pick<CacheStorage, 'open'>, origin: string): RoadTileStore {
+/** `lean` (DW12, the capture job's store): the put hands the body to the cache without a copy of its own; the caller does
+ *  not change it until the put settles (an arena's next tile), and the cache has read it by then. */
+export function roadTileCache(storage: Pick<CacheStorage, 'open'>, origin: string, lean = false): RoadTileStore {
   const url = (hash: string): string => roadTileUrl(origin, hash);
-  return { get: (hash, bytes) => cachedAsset(storage, url(hash), bytes), put: (hash, bytes) => cacheAsset(storage, url(hash), bytes) };
+  return { get: (hash, bytes) => cachedAsset(storage, url(hash), bytes), put: (hash, bytes) => cacheAsset(storage, url(hash), bytes, !lean) };
 }
 export interface RoadTileReference {
   readonly hash: string; readonly wireBytes: number;
@@ -104,7 +106,7 @@ function live(scope: Scope): void {
 }
 /** Pack original scalar bytes, including normalized integer attributes. The header
  * and each run are length checked before any decoded geometry is allocated. */
-export function encodeRoadTile(tile: RoadTileGeometry): Uint8Array<ArrayBuffer> {
+export function encodeRoadTile(tile: RoadTileGeometry, arena?: RoadTileArena): Uint8Array<ArrayBuffer> {
   const identity = tile.identity ?? tile.plan.bins[0]?.tile, position = tile.geometry.getAttribute('position');
   if (identity === undefined || tile.plan.bins.length === 0 || tile.plan.bins.length > 4 || position === undefined) throw new Error('Expected one owned road tile');
   if (tile.plan.bins.length > 1 && tile.plan.lod.length > 0) throw new Error('Multiple road patches must be coarse');
@@ -135,8 +137,9 @@ export function encodeRoadTile(tile: RoadTileGeometry): Uint8Array<ArrayBuffer> 
   if (tile.bytes.jsBytes !== vertexBytes + index.length * 2 || tile.bytes.gpuBytes !== vertexBytes + index.length) throw new Error('Road tile byte plan mismatch');
   const bytes = 4 + metadata.length + vertexBytes + index.length;
   if (metadata.length > MAX_HEADER || bytes > MAX_BYTES) throw new Error('Road tile archive exceeds its bound');
-  const packed = new Uint8Array(bytes);
-  new DataView(packed.buffer).setUint32(0, metadata.length, true); packed.set(metadata, 4);
+  // DW12: an arena's body is a view over its reused buffer (the capture job encodes, stores and drops each tile in turn)
+  const packed = arena === undefined ? new Uint8Array(bytes) : arena.take('packed', new Uint8Array(0), bytes);
+  new DataView(packed.buffer, packed.byteOffset, 4).setUint32(0, metadata.length, true); packed.set(metadata, 4);
   let offset = 4 + metadata.length;
   for (const block of [...blocks, index]) { packed.set(block, offset); offset += block.length; }
   return packed;
@@ -205,8 +208,9 @@ function storedWithin(scope: Scope, store: RoadTileStore, hash: string, length: 
   });
 }
 /** Pin before durable publication. A refusal leaves the caller's original geometry
- * owned and usable; only the caller may retire it after this reference returns. */
-export function persistRoadTile(scope: Scope, store: RoadTileStore, tile: RoadTileGeometry): Promise<RoadTileReference> {
+ * owned and usable; only the caller may retire it after this reference returns. With an `arena` (DW12) the body is
+ * encoded into it: the caller awaits this before the arena's next use. */
+export function persistRoadTile(scope: Scope, store: RoadTileStore, tile: RoadTileGeometry, arena?: RoadTileArena): Promise<RoadTileReference> {
   // Synchronous packet creation retains the original rejected-promise API.
   // Only the encoded writer suspends; it never captures scratch geometry.
   return new Promise(resolve => {
@@ -214,7 +218,7 @@ export function persistRoadTile(scope: Scope, store: RoadTileStore, tile: RoadTi
     const identity = tile.identity ?? tile.plan.bins[0]?.tile;
     if (identity === undefined) throw new Error('Missing road tile identity');
     const reference = { x: identity.x, z: identity.z, jsBytes: tile.bytes.jsBytes, gpuBytes: tile.bytes.gpuBytes };
-    resolve(persistEncodedRoadTile(scope, store, encodeRoadTile(tile), reference));
+    resolve(persistEncodedRoadTile(scope, store, encodeRoadTile(tile, arena), reference));
   });
 }
 async function persistEncodedRoadTile(scope: Scope, store: RoadTileStore, bytes: Uint8Array,

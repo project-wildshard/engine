@@ -6,7 +6,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import type { RingTile, RingView } from '@wildshard/engine/world/tileStreamer';
 import { finishRoadSteps, gpuOnlyRoad, publishRoadPlan, type CullPlan, type RoadCuller } from './roadCull';
-import type { RoadTileGeometry } from './roadTileGeometry';
+import type { RoadTileArena, RoadTileGeometry } from './roadTileGeometry';
 import type { RoadTileReference } from './roadTileArchive';
 
 /** Includes live decoded storage, replacement CPU/GPU buffers and the retiring
@@ -32,7 +32,9 @@ function storage(template: TypedArray, length: number): TypedArray {
 }
 /** Merge resident data only. Preserve each bin/LOD run and native scalar type;
  * the pool's culler can still choose LOD independently for every visible tile. */
-export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibility?: ReadonlyMap<CullPlan['bins'][number], { visible: boolean }>): Generator<void, { geometry: BufferGeometry; plan: CullPlan }> {
+export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibility?: ReadonlyMap<CullPlan['bins'][number], { visible: boolean }>,
+  /** DW12: the merged arrays as views over this arena's (the capture job's coarse tile, encoded before the next) */
+  arena?: RoadTileArena): Generator<void, { geometry: BufferGeometry; plan: CullPlan }> {
   const geometry = new BufferGeometry(); let completed = false;
   try {
     const first = tiles[0], names = first === undefined ? [] : Object.keys(first.geometry.attributes);
@@ -45,7 +47,7 @@ export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibili
     for (const name of names) {
       const template = first?.geometry.getAttribute(name);
       if (!(template instanceof BufferAttribute)) throw new Error('Missing road tile attribute');
-      const array = storage(template.array, vertices * template.itemSize); let at = 0;
+      const array = arena === undefined ? storage(template.array, vertices * template.itemSize) : arena.take(name, template.array, vertices * template.itemSize); let at = 0;
       for (const tile of tiles) {
         const attribute = tile.geometry.getAttribute(name);
         if (!(attribute instanceof BufferAttribute) || attribute.itemSize !== template.itemSize || attribute.normalized !== template.normalized
@@ -70,7 +72,7 @@ export function* mergeRoadTileSteps(tiles: readonly RoadTileGeometry[], visibili
     }
     // Every tile's exact index count is known. Fill the published backing
     // directly so a synchronous rebuild has no second, boxed index list to collect.
-    const index = ownedArray(Uint32Array, indexCount, { owner: 'grid/road-tile-pool', asset: 'indices' });
+    const index = arena === undefined ? ownedArray(Uint32Array, indexCount, { owner: 'grid/road-tile-pool', asset: 'indices' }) : arena.take('index', new Uint32Array(0), indexCount);
     const bins: CullPlan['bins'][number][] = [];
     let base = 0;
     for (const [i, tile] of tiles.entries()) {

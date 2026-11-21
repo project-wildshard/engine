@@ -4,6 +4,7 @@ import { pageCacheChannel } from '@wildshard/engine/pwa/cacheNames';
  * only the references come back. Until the worker says it is running, and whenever it cannot start, the backing
  * keeps its original page-thread capture. */
 import { BufferAttribute, type BufferGeometry, type Mesh, type TypedArray } from 'three';
+import { jsonSlot } from '@wildshard/engine/saves/slots';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { CullPlan } from './roadCull';
 import type { RoadTileReference } from './roadTileArchive';
@@ -14,16 +15,45 @@ export interface CaptureJob {
   readonly source: Uint32Array; readonly lod: number[];
   readonly bins: readonly (Omit<CullPlan['bins'][number], 'sphere' | 'visibility'> & { readonly sphere: readonly [number, number, number, number] })[];
   readonly parents: readonly { readonly x: number; readonly z: number }[];
+  /** DW12: capture through reused arenas (`roadCaptureLeanOn`); the worker cannot read the device slot itself */
+  readonly lean?: boolean;
 }
 export interface CaptureResult { readonly fine: readonly RoadTileReference[]; readonly coarse: readonly RoadTileReference[] }
 
+/**
+ * meta IPHONE13-DRIFTWOOD DW12 (mini-dw12c, 2026-11-21): the capture job through reused arenas (`roadTileGeometry.ts`
+ * `RoadTileArena`), its cache puts without a second copy, and its worker retired once each road's capture drains. Device
+ * slot `debug.roadCaptureLean`; unset, ROAD_CAPTURE_LEAN_DEFAULT.
+ *
+ * Off by default: alone in headless WebKit a ~35 MB job's capture went from +156..173 MB of WebContent to +37..39, but in
+ * the page the deck's capture adds only ~20 to 65 MB over its window, and three alternating pairs of the SB38a probe on
+ * Driftwood (402x874 @3, phone Low, 30 s still) did not move the WebContent + GPU peak: off 1,528 / 1,493 / 1,400 MB, on
+ * 1,512 / 1,500 / 1,440 (the outer road's own rise 195 / 195 / 140 against 182 / 179 / 133).
+ */
+export const ROAD_CAPTURE_LEAN_SLOT = 'debug.roadCaptureLean';
+export const ROAD_CAPTURE_LEAN_DEFAULT = false;
+/** The slot's value: a boolean (or `false`/`off`/0, `true`/`on`/1 from a capture) wins; unset, the default. */
+export function roadCaptureLean(saved: unknown): boolean {
+  if (saved === false || saved === 'false' || saved === 'off' || saved === 0) return false;
+  if (saved === true || saved === 'true' || saved === 'on' || saved === 1) return true;
+  return ROAD_CAPTURE_LEAN_DEFAULT;
+}
+let picked: boolean | undefined;
+/** Whether the capture job runs lean; read once per page. */
+export function roadCaptureLeanOn(): boolean {
+  if (picked !== undefined) return picked;
+  let saved: unknown = null;
+  try { saved = jsonSlot(ROAD_CAPTURE_LEAN_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
+  picked = roadCaptureLean(saved);
+  return picked;
+}
 /** The bytes a job copies to the worker (one tight copy of each array, transferred: `jobMessage`): the backpressure
  *  the page capture's scratch had. */
 export function captureJobBytes(job: CaptureJob): number {
   return job.attributes.reduce((sum, row) => sum + row.array.byteLength, 0) + job.source.byteLength;
 }
 /** The job for one source, or null when its attributes are not plain (the page path keeps those). */
-export function captureJob(id: number, origin: string, geometry: BufferGeometry, plan: CullPlan, parents: readonly { x: number; z: number }[]): CaptureJob | null {
+export function captureJob(id: number, origin: string, geometry: BufferGeometry, plan: CullPlan, parents: readonly { x: number; z: number }[], lean = false): CaptureJob | null {
   const attributes: CaptureJob['attributes'][number][] = [];
   for (const name of Object.keys(geometry.attributes)) {
     const attribute = geometry.getAttribute(name);
@@ -31,7 +61,7 @@ export function captureJob(id: number, origin: string, geometry: BufferGeometry,
     attributes.push({ name, array: attribute.array, itemSize: attribute.itemSize, normalized: attribute.normalized });
   }
   const bins = plan.bins.map(({ sphere, visibility: _visibility, ...bin }) => ({ ...bin, sphere: [sphere.center.x, sphere.center.y, sphere.center.z, sphere.radius] as const }));
-  return { id, origin, attributes, source: plan.source, lod: [...plan.lod], bins, parents };
+  return { id, origin, attributes, source: plan.source, lod: [...plan.lod], bins, parents, ...(lean ? { lean } : {}) };
 }
 
 /** ENGINE-MEMORY EM25 (design rule 4, transfer, never clone): the message for a job carries a tight copy of each of
@@ -61,7 +91,11 @@ export class RoadTileCaptureWorker {
   private deadline: ReturnType<Scope['timeout']> | undefined;
   constructor(private readonly scope: Scope) {
     scope.onDispose(() => { this.stop(new Error('Road tile capture owner retired')); });
-    if (typeof Worker !== 'function') return;
+    this.spawn();
+  }
+  private spawn(): void {
+    const scope = this.scope;
+    if (typeof Worker !== 'function' || scope.disposed || scope.disposing) return;
     try {
       const worker = new Worker(new URL('roadTileCapture.worker.ts', import.meta.url), { type: 'module', name: 'grid-road-capture' });
       this.listeners.push(scope.listen(worker, 'message', event => { this.message(event.data); }));
@@ -74,7 +108,7 @@ export class RoadTileCaptureWorker {
   usable(): boolean { return this.ready && this.worker !== undefined && !this.scope.disposed && !this.scope.disposing; }
   /** A source's job (null: not plain, the page captures it). */
   job(origin: string, mesh: Mesh, plan: CullPlan, parents: readonly { x: number; z: number }[]): CaptureJob | null {
-    return this.usable() ? captureJob(this.next++, origin, mesh.geometry, plan, parents) : null;
+    return this.usable() ? captureJob(this.next++, origin, mesh.geometry, plan, parents, roadCaptureLeanOn()) : null;
   }
   /** The worker receives transferred copies of the arrays (`jobMessage`): the page's own stay with its mesh for upload,
    *  and the job keeps referencing them until it is answered, so a job the worker refuses (ok: false) runs again on the
@@ -87,6 +121,14 @@ export class RoadTileCaptureWorker {
       const { message, transfer } = jobMessage(job, pageCacheChannel()); // OF12: the worker's cache channel
       worker.postMessage(message, { transfer });
     });
+  }
+  /** DW12 (mini-dw12c): retire the worker if it holds no job. A lean job allocates too little for the worker's collector to
+   *  run again after it, so an idle worker kept the jobs' arrays and its scratch (the inner road's ~19 MB through the
+   *  outer road's build); terminating frees that heap at once. `fresh` starts a new worker, ready (it says so in a few
+   *  ms) long before the next road's first job. */
+  retireIdle(fresh = false): void {
+    if (this.waiting.size > 0 || this.worker === undefined) return;
+    this.retire(); if (fresh) this.spawn();
   }
   private message(reply: unknown): void {
     if (typeof reply !== 'object' || reply === null) { this.stop(new Error('Invalid road tile capture reply')); return; }

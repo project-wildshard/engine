@@ -8,7 +8,7 @@ installWorkerBootTiming('road-tile-capture');
 
 /** DL11: the road tile capture worker: each job's tiles (roadTileCaptureJob.ts) into this origin's Cache Storage. */
 async function answer(job: CaptureJob): Promise<void> {
-  try { self.postMessage({ id: job.id, ok: true, ...await captureJobTiles(job, roadTileCache(caches, job.origin)) }, { transfer: [] }); }
+  try { self.postMessage({ id: job.id, ok: true, ...await captureJobTiles(job, roadTileCache(caches, job.origin, job.lean === true)) }, { transfer: [] }); }
   catch (error: unknown) { self.postMessage({ id: job.id, ok: false, error: error instanceof Error ? error.message : String(error) }, { transfer: [] }); }
 }
 // OF12: this worker has no document stamp; each job names the page's cache channel
