@@ -68,6 +68,6 @@ export function fenceFrames(named, log) {
  * @param {{ fences?: [number, number, number, number][] } | null} log @returns {Record<string, number>} */
 export function fenceWaits(log) {
   /** @type {Record<string, number>} */ const out = {};
-  for (const [, , waited] of log?.fences ?? []) out[String(waited)] = (out[String(waited)] ?? 0) + 1;
+  for (const fence of log?.fences ?? []) { const waited = String(fence[2]); out[waited] = (out[waited] ?? 0) + 1; }
   return out;
 }
