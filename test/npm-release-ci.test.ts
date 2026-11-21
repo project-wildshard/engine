@@ -14,7 +14,7 @@ const run = 44867215030;
 const proof = { build, j475: { releaseCi: run } };
 const ci = {
   databaseId: run, headSha: build, headBranch: `release/v${version}`, event: 'push',
-  workflowName: 'ci', status: 'completed', conclusion: 'success',
+  workflowName: 'ci', attempt: 1, status: 'completed', conclusion: 'success',
   jobs: Array.from({ length: 12 }, (_, i) => ({ name: `required ${i + 1}`, conclusion: 'success' })),
 };
 
