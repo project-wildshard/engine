@@ -1,4 +1,5 @@
 import { app } from '@wildshard/engine/app/runtime';
+import { declaredProjections } from '../../../shared/game/shardfile/declaredProjections';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { parseActorProjectionV2 } from '@wildshard/format/actorProjectionV2';
 import { numericCreaturePose, numericCreaturePoseFromBook } from '../../../shared/game/plugin/channelPrograms';
@@ -196,17 +197,20 @@ export function folderHullBook(product: { readonly section: (name: 'look/hull-bo
   const book = new HullLookBook(row, product); folderBooks.set(row.slug, book); return book;
 }
 
+/** OF30: a whole folder lends its declared species rows; a bare book product has none. */
+type CatalogueProduct=Parameters<typeof folderHullBook>[0]&{readonly shardfile?:{readonly rows:{readonly species:readonly object[]}}};
+const declaredOf=(product:CatalogueProduct):ReadonlyMap<string,unknown>=>declaredProjections(product.shardfile?.rows.species??[]);
 /** One product catalogue: admitted behaviour controls, packed looks and the
  * original packed-body owner, shared through world and kit installation. */
-export function folderSpeciesCatalogue(product:Parameters<typeof folderHullBook>[0],data:Pick<SpeciesPresentationRows,'lookBook'>,lookRows:unknown):SpeciesCatalogue{
+export function folderSpeciesCatalogue(product:CatalogueProduct,data:Pick<SpeciesPresentationRows,'lookBook'>,lookRows:unknown):SpeciesCatalogue{
   const book=folderHullBook(product);
-  return speciesCatalogue(book,speciesBehaviour(data.lookBook),book.packedLooks(lookRows));
+  return speciesCatalogue(book,speciesBehaviour(data.lookBook,declaredOf(product)),book.packedLooks(lookRows));
 }
 /** `folderSpeciesCatalogue` with a `pause` between its book, its behaviour rules and its packed looks: in one task they
  *  were ~102 ms of a cold Nine Dragon crossing's world step at phone 4x. Same catalogue. */
-export async function folderSpeciesCatalogueSliced(product:Parameters<typeof folderHullBook>[0],data:Pick<SpeciesPresentationRows,'lookBook'>,lookRows:unknown,pause:()=>Promise<void>):Promise<SpeciesCatalogue>{
+export async function folderSpeciesCatalogueSliced(product:CatalogueProduct,data:Pick<SpeciesPresentationRows,'lookBook'>,lookRows:unknown,pause:()=>Promise<void>):Promise<SpeciesCatalogue>{
   const book=folderHullBook(product);await pause();
-  const rules=speciesBehaviour(data.lookBook);await pause();
+  const rules=speciesBehaviour(data.lookBook,declaredOf(product));await pause();
   return speciesCatalogue(book,rules,book.packedLooks(lookRows));
 }
 function speciesCatalogue(book:HullLookBook,rules:ReturnType<typeof speciesBehaviour>,packed:ReturnType<HullLookBook['packedLooks']>):SpeciesCatalogue{
@@ -237,9 +241,14 @@ function expandCompactBodies(data:CompactSpeciesBodiesRows):unknown{
   return {file:data.file,bytes:data.bytes,bodies:data.rows.map(body=>{const skeleton=data.skeletons[body.skeleton];if(skeleton===undefined)throw new Error('Missing packed skeleton');
     return {kind:body.kind,variant:body.variant,bones:skeleton.bones,dims:skeleton.dims,fur:parts(body.fur),hard:parts(body.hard),eye:parts(body.eye)};})};
 }
-/** The book's species as a page draws them, and the programmes their views run. Behaviour is the server's. */
-export function speciesBehaviour(book: Pick<NativeSpeciesLookBookRows, 'rows' | 'program'>): { readonly rows: readonly SpeciesRow[]; readonly programs: ReadonlyMap<string, unknown> } {
-  const driven = (row: NativeSpeciesLookBookRows['rows'][number]): boolean => row.control !== undefined || row.projection?.step !== undefined || row.group !== undefined || row.directed !== undefined || row.guard === true || row.elite === true;
-  return { rows: book.rows.map(row => driven(row) ? { ...row.metadata, phased: true } : row.metadata),
-    programs: new Map(book.rows.flatMap(row => row.projection === undefined ? [] : [[row.metadata.kind, parseActorProjectionV2(row.projection).program] as const])) };
+/** The book's species as a page draws them, and the programmes their views run. Behaviour is the server's.
+ *  OF30: a declared row's projection is preferred over the look book's, which stays the fallback. */
+type BehaviourRow = Pick<NativeSpeciesLookBookRows['rows'][number], 'metadata' | 'control' | 'projection' | 'group' | 'directed' | 'guard' | 'elite'>;
+export function speciesBehaviour(book: { readonly rows: readonly BehaviourRow[] }, declared: ReadonlyMap<string, unknown> = new Map()): { readonly rows: readonly SpeciesRow[]; readonly programs: ReadonlyMap<string, unknown> } {
+  const parsed = book.rows.map(row => { const source = declared.get(row.metadata.kind) ?? row.projection; return source === undefined ? undefined : parseActorProjectionV2(source); });
+  const programs = new Map<string, unknown>();
+  book.rows.forEach((row, i) => { const projection = parsed[i]; if (projection !== undefined) programs.set(row.metadata.kind, projection.program); });
+  for (const [kind, source] of declared) if (!programs.has(kind)) programs.set(kind, parseActorProjectionV2(source).program);
+  const driven = (row: BehaviourRow, i: number): boolean => row.control !== undefined || parsed[i]?.step !== undefined || row.group !== undefined || row.directed !== undefined || row.guard === true || row.elite === true;
+  return { rows: book.rows.map((row, i) => driven(row, i) ? { ...row.metadata, phased: true } : row.metadata), programs };
 }

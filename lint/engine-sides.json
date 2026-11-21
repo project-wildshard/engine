@@ -1997,6 +1997,7 @@
     "src/shared/game/shardfile/customSchema.ts": "shared",
     "src/shared/game/shardfile/dangerousGates.ts": "shared",
     "src/shared/game/shardfile/dataCreaturePorts.ts": "shared",
+    "src/shared/game/shardfile/declaredProjections.ts": "shared",
     "src/shared/game/shardfile/entryOwners.ts": "shared",
     "src/shared/game/shardfile/fileInputs.ts": "shared",
     "src/shared/game/shardfile/gates.ts": "shared",

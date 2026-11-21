@@ -17,6 +17,7 @@ import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { EncounterSitesSchema, TimedEncountersSchema } from '@wildshard/format/encounterRows';
 import { SceneDressingSchema } from '@wildshard/format/sceneDressing';
 import { SpeciesActorsFileSchema } from '@wildshard/format/speciesBookRows';
+import { declaredProjections } from '../../../shared/game/shardfile/declaredProjections';
 import { SlotEncounterLaw, slotAwakeRows, type SlotTell } from '../../../shared/game/boss/slotLaw';
 import { attachNativeCreaturePose, type NativeCreaturePose } from '../../../shared/game/plugin/animation';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
@@ -67,7 +68,7 @@ export interface SlotPlan {
   readonly install: (host: SimHost, elite: NativeEliteBindings, restoring: boolean, heldBy?: SlotHeld) => void;
 }
 /** Read the encounter's rows now; nothing here touches a host. Null for rows with no slot actors. */
-export async function prepareSlots(product: Pick<ShardFolder, 'json' | 'section' | 'file'>, files: SlotFiles): Promise<SlotPlan | null> {
+export async function prepareSlots(product: Pick<ShardFolder, 'json' | 'section' | 'file'> & Partial<Pick<ShardFolder, 'shardfile'>>, files: SlotFiles): Promise<SlotPlan | null> {
   const timing = v.parse(TimedEncountersSchema, await product.json<unknown>(files.rows)), declared = timing.slots.actors;
   if (declared === undefined) return null;
   const plan = parseClientPlan(product.section('client/plan')), timed = plan.features.find(row => row.kind === 'timed.encounters'), view = plan.features.find(row => row.kind === 'view.program' && row.id === 'creature-views');
@@ -75,8 +76,10 @@ export async function prepareSlots(product: Pick<ShardFolder, 'json' | 'section'
   const scenes = v.parse(v.object({ dressing: v.object({ phone: v.string() }) }), product.section('world/scenes'));
   const [poses, actors, dressing, module] = await Promise.all([readEncounterPoses(product, [declared.kind], files),
     product.json<unknown>(files.actors).then(input => v.parse(SpeciesActorsFileSchema, input)), product.json<unknown>(scenes.dressing.phone).then(input => v.parse(SceneDressingSchema, input)), product.file(view.module)]);
-  const entry = actors.species.lookBook.rows.find(row => row.metadata.kind === declared.kind), rows = entry?.projection, sites = dressing.sites.find(row => row.name === timed.sites)?.rows;
-  if (entry === undefined || rows === undefined || sites === undefined) throw new Error('Slots are missing their projection or their standing sites');
+  // ONE-FORMAT OF30: the guest's declared species row carries its projection; the look book's stays the fallback
+  const entry = actors.species.lookBook.rows.find(row => row.metadata.kind === declared.kind), sites = dressing.sites.find(row => row.name === timed.sites)?.rows;
+  const rows = declaredProjections(product.shardfile?.rows.species ?? []).get(declared.kind) ?? entry?.projection;
+  if (rows === undefined || sites === undefined) throw new Error('Slots are missing their projection or their standing sites');
   const projected = parseActorProjectionV2(rows), { damage } = projected, placed = v.parse(EncounterSitesSchema, sites);
   if (damage === undefined || projected.step === undefined) throw new Error('Slots require their think and damage requests');
   const updates = new WeakMap<SimHost, (dt: number) => void>();
