@@ -167,6 +167,29 @@ function withProgramWeather(shard: ShardFolder['shardfile'], features: readonly 
   const at = features.findIndex(row => row.host.startsWith('population.'));
   return at === -1 ? [...features, weather] : [...features.slice(0, at), weather, ...features.slice(at)];
 }
+/** OF29e1: where a plan with no population host finds the family's declared files (Pine's names). */
+const POPULATION_FILES = { environment: 'server/habitat.json', shelter: 'actors/shelter.json', roster: 'actors/roster.json', elites: 'actors/elites.json' } as const;
+/** ONE-FORMAT OF29e1: a plan that names no `population.*` host stands the population family from the product's declared files,
+ *  in the hosts' own order (Pine r10's plan): environment, shelter, roster, elites, each spawn script no elite fight owns
+ *  (the night director), then elites ready. The roster gates it; a plan naming any population host keeps its own (J486). */
+async function withSectionPopulation(product: ShardFolder, features: readonly NativeAssemblyFeature[]): Promise<readonly NativeAssemblyFeature[]> {
+  if (!product.hasFile(POPULATION_FILES.roster) || features.some(row => row.host.startsWith('population.'))) return features;
+  const family: NativeAssemblyFeature[] = [];
+  if (product.hasFile(POPULATION_FILES.environment)) family.push({ host: 'population.environment', rows: { file: POPULATION_FILES.environment } });
+  if (product.hasFile(POPULATION_FILES.shelter)) family.push({ host: 'population.shelter', rows: { file: POPULATION_FILES.shelter } });
+  family.push({ host: 'population.roster', rows: { file: POPULATION_FILES.roster } });
+  const elites = product.hasFile(POPULATION_FILES.elites);
+  const owned = new Set<string>();
+  if (elites) {
+    family.push({ host: 'population.elites', file: POPULATION_FILES.elites });
+    const rows = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await product.file(POPULATION_FILES.elites))) as { fights?: { program?: { step?: unknown } }[] };
+    for (const fight of rows.fights ?? []) if (typeof fight.program?.step === 'string') owned.add(fight.program.step);
+  }
+  const scripts = product.has('actors/spawn-scripts') ? product.section('actors/spawn-scripts') as readonly { readonly step: string }[] : [];
+  for (const row of scripts) if (!owned.has(row.step)) family.push({ host: 'population.spawn-script', id: row.step });
+  if (elites) family.push({ host: 'population.elites-ready' });
+  return [...features, ...family];
+}
 /** Put cooked taming at the same installation point as its explicit predecessor. */
 function withSectionTaming(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
   if (!product.hasFile(TAMING_FILE) || !features.some(row => row.host === 'riding.mounted') ||
@@ -194,7 +217,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const declaredRoster = declaredBootSpawns(plan.features.some(row => row.host === 'riding.roster') ? boot : null, shard);
   const meadow = plan.field === undefined && plan.features.some(row => row.host === 'riding.roster') && product.hasFile(MEADOW_FILE);
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake, meadow), product, assets, ports, plan, bake, nav, boot, declaredRoster };
-  const features = withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, plan.features)));
+  const features = withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, plan.features))));
   const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
   // OF30: with no species programme an older pending carcass restores by the declared rows' harvest
