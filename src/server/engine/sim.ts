@@ -548,10 +548,11 @@ export class SimHost {
     if (entity === undefined) throw new RangeError(`Unknown simulation body ${id}`);
     const bands = this.bands;
     if (bands === undefined) return FIXED_STEP;
-    if (bands.present?.(entity) === false) { bands.clocks.forget(id); return 0; }
-    if (entity.harnessHold || bands.present?.(entity) === false) { bands.clocks.forget(id); return 0; }
+    if (bands.present?.(entity) === false || entity.harnessHold) { bands.clocks.forget(id); return 0; }
     const active = bands.fixedSteps && (entity.attackPhase >= 0 || entity.hasImpulse || entity.driven || this.strikes.get(id)?.busy === true);
-    const dt = bands.clocks.bodyDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position), active);
+    const rate = bands.rate(entity);
+    const dt = bands.clocks.settledBodyDt(id, rate, active)
+      ?? bands.clocks.bodyDt(id, rate, active ? 0 : tickDistance(entity.position, this.nearestPlayer(entity.position).position), active);
     return bands.fixedSteps ? Math.round(dt * 60) / 60 : dt;
   }
   /** Take this tick's decision step for body `id` on its band (the page scheduler's takeBrainDt): 0 until its rate's

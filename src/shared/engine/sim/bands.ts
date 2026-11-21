@@ -148,6 +148,12 @@ export class BodyBandClocks {
     if (row?.rate !== rate) { row = { rate, brain: freshClock(this.time, this.frameDt), body: freshClock(this.time, this.frameDt) }; this.rows.set(id, row); }
     return { row, band: (distance) => { const band = bandAt(table, distance); if (band === undefined) throw new Error(`Uncovered tick distance: ${rate}`); return band; } };
   }
+  /** Reuse the existing clock decision when the same body and rate ask again this frame. */
+  settledBodyDt(id: string, rate: string, active: boolean): number | undefined {
+    const row = this.rows.get(id);
+    if (row?.rate !== rate || row.body.frame !== this.frame || (active && row.body.dt === 0)) return undefined;
+    return active ? Math.min(row.body.dt, this.frameDt) : row.body.dt;
+  }
   /** This frame's body step for `id` at `distance` (m) on `rate`; 0 = paused or the off frame of 'half'. */
   bodyDt(id: string, rate: string, distance: number, active = false): number {
     const { row, band } = this.row(id, rate);

@@ -54,3 +54,27 @@ test('saved body phases and the rate fingerprint survive exact restore without n
   expect(restored.snapshot()).toEqual(current.snapshot());
  }
 });
+
+test('a repeated frame can reuse its body step until the rate or wake changes', () => {
+  const clock = new BodyBandClocks();
+  clock.beginTick(1 / 60);
+  expect(clock.settledBodyDt('near', 'ai', false)).toBeUndefined();
+  const elapsed = clock.bodyDt('near', 'ai', 20);
+  expect(elapsed).toBeGreaterThan(0);
+  expect(clock.bodyDt('far', 'ai', 330)).toBe(0);
+  const snapshot = clock.snapshot();
+  expect(clock.settledBodyDt('near', 'ai', false)).toBe(elapsed);
+  expect(clock.settledBodyDt('near', 'always', false)).toBeUndefined();
+  expect(clock.settledBodyDt('far', 'ai', false)).toBe(0);
+  expect(clock.settledBodyDt('far', 'ai', true)).toBeUndefined();
+  expect(clock.snapshot()).toEqual(snapshot);
+
+  const restored = new BodyBandClocks();
+  restored.restore(snapshot, new Set(['near', 'far']));
+  expect(restored.settledBodyDt('near', 'ai', false)).toBe(elapsed);
+  expect(restored.settledBodyDt('far', 'ai', true)).toBeUndefined();
+  expect(restored.bodyDt('far', 'ai', 0, true)).toBe(clock.bodyDt('far', 'ai', 330, true));
+  expect(restored.snapshot()).toEqual(clock.snapshot());
+  clock.beginTick(1 / 60);
+  expect(clock.settledBodyDt('near', 'ai', false)).toBeUndefined();
+});
