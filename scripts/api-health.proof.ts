@@ -8,7 +8,7 @@ import {delimiter, resolve} from 'node:path';
 import {test} from 'node:test';
 import {observeApiHealth} from './api-health.ts';
 import {lockedFormatVersion} from './format-lock.mjs';
-import {browsers, phases, requirePublishedGreen, type Plan, type Verdict} from './nightly-model.ts';
+import {browsers, phases, requirePublishedGreen, testGroups, type Plan, type Verdict} from './nightly-model.ts';
 
 const lock = readFileSync('pnpm-lock.yaml', 'utf8'), expected = lockedFormatVersion(lock);
 const health = {ok: true, version: 'test-api-build', shardFormat: expected};
@@ -138,7 +138,7 @@ await test('diagnostic dispatches cannot displace the scheduled nightly used for
     heads: [{slug: 'example', hash: 'd'.repeat(64)}], tests: ['test/example.ts']};
   const report: Verdict = {version: 2, sha: expectedNight.sha, pins: expectedNight.pins, testList: expectedNight.testList,
     ok: true, tag: 'eligible', rows: browsers.flatMap(browser => phases.map(phase => ({browser, phase, slug: 'example', hash: 'd'.repeat(64), ok: true}))),
-    failures: [], tests: [0, 1].map(group => ({group, ok: true, files: 1, assertions: 1})),
+    failures: [], tests: Array.from({length: testGroups}, (_, group) => ({group, ok: true, files: 1, assertions: 1})),
     run: '42', baseline: null, newFailures: [], resolved: []};
   mkdirSync('tmp', {recursive: true});
   const folder = mkdtempSync(resolve('tmp/api-health-nightly-proof-')), gh = resolve(folder, 'gh'), savedPath = process.env.PATH;
