@@ -25,7 +25,7 @@ const wait = (ms: number) => delay(ms, undefined, { signal: stopping.signal });
 interface Verdict {
   build: string;
   status: string;
-  hold: boolean;
+  hold?: boolean;
   deploy?: { zoneEntry?: { build?: string; pass?: boolean; failures?: { from: string; to: string }[] } };
 }
 interface Asset { name: string; state: string; size: number; digest: string }
@@ -152,13 +152,9 @@ async function main(args: string[]) {
   if (!newer(tag, lastTag)) throw new Error('The train version must be newer than the last release tag');
   const previous = git(['rev-parse', `${last}^{commit}`]);
   const prepared = refs.includes(branchRef) ? git(['rev-parse', branchRef]) : undefined;
-  const other = refs.find(ref => ref.startsWith('refs/remotes/origin/release/') && ref !== branchRef &&
-    tagPattern.test(ref.split('/').at(-1) ?? '') && newer(ref.split('/').at(-1) ?? '', lastTag));
-  if (other) throw new Error(`Another release is in flight at ${other}`);
   const required = (values.require ?? []).map(commit => {
-    if (!/^[a-f0-9]{7,40}$/u.test(commit) || !ancestor(commit, mainRef)) {
-      throw new Error(`Required commit is absent from main: ${commit}`);
-    }
+    if (!/^[a-f0-9]{7,40}$/u.test(commit)) throw new Error('Use a commit SHA for each --require');
+    if (!ancestor(commit, mainRef)) throw new Error(`Required commit ${commit} is absent from main`);
     return git(['rev-parse', `${commit}^{commit}`]);
   });
   const cutAt = new Date(Number(git(['show', '-s', '--format=%ct', previous])) * 1000).toISOString();
@@ -372,7 +368,7 @@ async function main(args: string[]) {
     const failures = (await Promise.all([pageResult, archives, npm])).filter(error => error !== undefined);
     if (failures.length > 0) throw new Error(failures.map(error => error.message).join('\n'));
     const verdict = read(stageVerdict) as Verdict | undefined;
-    if (verdict?.build !== build || verdict.status !== 'pass' || verdict.hold) throw new Error(`Staging is held. See ${stageVerdict}`);
+    if (verdict?.build !== build || verdict.status !== 'pass' || verdict.hold !== false) throw new Error(`Staging is held. See ${stageVerdict}`);
     receipt(lane, `DONE FS28 ${tag} staging QA and J451 passed. Delivery evidence in tmp/release-train-${tag}.`);
   } catch (error) {
     const failed = stagingVerdict === undefined ? undefined : (read(stagingVerdict) as Verdict | undefined)?.deploy?.zoneEntry?.failures?.[0];

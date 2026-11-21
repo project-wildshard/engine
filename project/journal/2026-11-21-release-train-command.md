@@ -11,3 +11,7 @@ the candidate verdict, the public signed serial and the release CI run
 as admission. It keeps the archive and registry checks for the exact
 build and records the run ID before watching the publish. An interrupted
 delivery can continue from the existing branch and candidate evidence.
+
+The train also permits a newer cut when an earlier staging release was
+abandoned. The existing signed staging ancestry check owns that decision,
+and the train's local lock prevents simultaneous operator runs.
