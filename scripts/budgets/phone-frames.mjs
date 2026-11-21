@@ -29,6 +29,19 @@ export function expectPinnedZones(pins, built) {
   return expected;
 }
 
+/** A pinned zone with no placement or cell (a staging-only shard's first pin, meta MZ26) boots only from a cell, so the
+ * page's inlined catalogue gets a measuring cell east of the grid, as `wildshard dev` gives its one shard; a placed zone's
+ * page is unchanged. @param {string} html @param {string} slug */
+export function measuringCatalogue(html, slug) {
+  return html.replace(/(<script type="application\/json" id="ws-catalogue">)([^<]*)(<\/script>)/u, (all, open, json, close) => {
+    const catalogue = JSON.parse(json), bare = (/** @type {{slug:string}} */ row) => row.slug.replace(/^_/u, '');
+    if ([...catalogue.placements, ...catalogue.grid.cells].some(row => bare(row) === slug)) return all;
+    const east = Math.max(0, ...catalogue.grid.cells.map((/** @type {{cell:number[]}} */ row) => row.cell[0])) + 2;
+    catalogue.grid.cells.push({ instance: slug, slug, cell: [east, 0] });
+    return open + JSON.stringify(catalogue).replaceAll('<', String.raw`<`) + close;
+  });
+}
+
 /** Median frames at each fixed view, then the heaviest view for each counter.
  * @param {Record<string,string>} pins @param {readonly ZoneFrames[]} readings @param {string} [commit] */
 export function phoneFrameMeasures(pins, readings, commit) {
@@ -81,6 +94,10 @@ export async function readPhoneFrames(browser, base, slug) {
     const url = new URL(bootURL(base, slug));
     url.searchParams.set('tier', 'phone');
     url.searchParams.set('touch', '1');
+    await page.route(target => target.origin === url.origin && target.pathname === url.pathname, async route => {
+      const response = await route.fetch();
+      await route.fulfill({ response, body: measuringCatalogue(await response.text(), slug) });
+    });
     await page.goto(url.href, { waitUntil: 'domcontentloaded', timeout: READY_MS });
     const ready = await page.waitForFunction(zone => {
       const error = document.querySelector('.ws-load-error, #wserr');

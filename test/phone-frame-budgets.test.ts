@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { failed, judgeAll, recordAll } from '../scripts/budgets/cli.mjs';
 import { readCaps } from '../scripts/budgets/files.mjs';
 import { budgetReport, budgetResultLine, parseBudgetResults } from '../scripts/budgets/watch.mjs';
-import { PHONE_LOW, expectPinnedZones, phoneFrameMeasures } from '../scripts/budgets/phone-frames.mjs';
+import { PHONE_LOW, expectPinnedZones, measuringCatalogue, phoneFrameMeasures } from '../scripts/budgets/phone-frames.mjs';
 
 const slug = 'driftwood-isle', key = `render/phone-low/triangles/${slug}`;
 const pin = (revision: number) => ({ [slug]: `${slug}@${revision}` });
@@ -63,5 +63,16 @@ describe('phone Low frame budgets', () => {
     expect(judge(6, 89).find(row => row.key === key)?.status).toBe('raised');
     const next = recordAll(caps, baseline, phoneFrameMeasures(pin(6), [reading(89)]));
     expect(next.baselines.baselines[key]).toEqual({ value: 110, contentKey: 'driftwood-isle@6' });
+  });
+
+  test('gives a pinned zone with no cell a measuring cell in the page catalogue (meta MZ26)', () => {
+    const catalogue = { placements: [{ instance: 'driftwood-isle', slug: 'driftwood-isle', cell: [0, 0] }],
+      grid: { cells: [{ instance: 'driftwood-isle', slug: 'driftwood-isle', cell: [0, 0] }, { instance: 'x', slug: '_pine-hollow', cell: [3, -1] }] } };
+    const page = (doc: object) => `<head><script type="application/json" id="ws-catalogue">${JSON.stringify(doc)}</script></head>`;
+    const read = (html: string): typeof catalogue => JSON.parse(/id="ws-catalogue">([^<]*)</u.exec(html)?.[1] ?? 'null');
+    expect(measuringCatalogue(page(catalogue), 'driftwood-isle')).toBe(page(catalogue));
+    expect(measuringCatalogue(page(catalogue), 'pine-hollow')).toBe(page(catalogue));
+    expect(read(measuringCatalogue(page(catalogue), 'mossgate')).grid.cells.at(-1)).toEqual({ instance: 'mossgate', slug: 'mossgate', cell: [5, 0] });
+    expect(read(measuringCatalogue(page(catalogue), 'mossgate')).placements).toEqual(catalogue.placements);
   });
 });
