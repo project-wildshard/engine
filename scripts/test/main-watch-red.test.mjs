@@ -124,10 +124,11 @@ function redSpanFixture(state) {
   return { red, runs, green, io, sent, receipts };
 }
 
-test('a repeat red with the same commits and failing test only writes a receipt', () => withRedSpan(({ red, sent, receipts }) => {
+test('build-max A5: a repeat red with the same commits and failing test is "main still red", never MAIN RED', () => withRedSpan(({ red, sent, receipts }) => {
   red(62, [testFile]);
   expect(sent).toEqual([]);
-  expect(receipts).toContainEqual(expect.stringMatching(/MAIN RED .* run 62: /u));
+  expect(receipts).toContainEqual(expect.stringMatching(/^main still red .* run 62: no new failures; failed: /u));
+  expect(receipts.filter(line => line.startsWith('MAIN RED') && line.includes('run 62'))).toEqual([]);
 }));
 
 test('a newly failing file prompts just its suspect lander and omits the earlier failure', () => withRedSpan(({ red, sent }) => {
@@ -142,16 +143,20 @@ test('a newly failing file prompts just its suspect lander and omits the earlier
   expect(sent).toEqual([]);
 }));
 
-test('a new lander is the only recipient until a green ends the span', () => withRedSpan(({ red, runs, green, io, sent }) => {
+test('build-max A5: a new lander whose run fails only what already failed is not prompted; a green ends the span', () => withRedSpan(({ red, runs, green, io, sent, receipts }) => {
+  // Seven of 2026-11-20's alerts were this: a new push into a red span, its run failing nothing new.
   red(62, [testFile], incoming);
-  expect(sent).toEqual([{ to: 'w1:p3', text: expect.stringContaining('You landed dddddddddd') }]);
-  expect(sent[0]?.text).not.toContain(testFile);
-  sent.length = 0;
-  red(63, [testFile], incoming);
   expect(sent).toEqual([]);
-  runs.push({ ...green, id: 64, head_sha: incoming });
+  expect(receipts).toContainEqual(expect.stringMatching(/^main still red .* run 62: no new failures/u));
+  red(63, [testFile, freshFile], incoming);
+  expect(sent.map(row => row.to).sort()).toEqual(['w1:p2', 'w1:p3']);
+  expect(sent.find(row => row.to === 'w1:p3')?.text).toContain('You landed dddddddddd');
+  sent.length = 0;
+  red(64, [testFile, freshFile], incoming);
+  expect(sent).toEqual([]);
+  runs.push({ ...green, id: 65, head_sha: incoming });
   sweep(io);
-  red(65, [testFile]);
+  red(66, [testFile]);
   expect(sent.map(row => row.to)).toEqual(['w1:p1', 'w1:p2', 'coordinator']);
 }));
 

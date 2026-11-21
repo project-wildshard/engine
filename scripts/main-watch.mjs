@@ -9,10 +9,11 @@
 //
 // The verdict for a SHA is the newest completed main `ci` run that isn't cancelled and whose SHA is that SHA or a
 // descendant of it. A cancelled run is superseded when a later main run exists, never red; with no later run,
-// the watcher dispatches `ci` on main once. A started run cancelled with a blocking job failed, timed out or
-// cancelled is red, not superseded: main cancels a started run only for a timeout (J422) or when it is red already (FS24). Each red run gives one `MAIN RED <range>` receipt naming the landers
-// of the commits in its range (from their landed receipts). Later prompts in the same red span require a new commit
-// from the recipient or a newly failing test attributed to them. State (~/.cache/wildshard/main-watch.json) keeps the
+// the watcher dispatches `ci` on main once. A started run cancelled with a blocking job that failed, timed out or
+// never started is red, not superseded (FS24's early red); jobs the cancel itself left `cancelled` are not failures
+// (build-max A5). Each red run gives one `MAIN RED <range>` receipt naming the landers
+// of the commits in its range (from their landed receipts). A later run in the same red span with no newly failing test
+// or job is `main still red`, never MAIN RED, and prompts nobody (A5); a new failure prompts its suspect and new landers. State (~/.cache/wildshard/main-watch.json) keeps the
 // judged run ids and span history.
 // A green run that carries AMBER files (J295: a test file over its time budget, scripts/test-amber.mjs) also gives
 // one `main AMBER <sha> <file> <ms>/<budget>` receipt per file: the coordinator hands each out as a queue-skipping
@@ -34,12 +35,15 @@ const KEEP=500;
 /** FS22 (J443): a red with no green this long after its first alert goes to the keeper. */
 export const KEEPER_MS=20*60_000;
 // NB6's street and EM35's Chromium diagnostic jobs are advisory.
-const ADVISORY_VERSION=7;
+const ADVISORY_VERSION=8;
 const NATIVE_FOOTPRINT='memory-footprint-guard';
 const NATIVE_CHECKS=new Set(['Check armed native footprints and report Template', "Check or report Nine's online native WebKit ledger"]);
 /** @typedef {{id?:number,name:string,conclusion:string|null,started_at?:string|null,runner_id?:number|null,steps?:readonly {name:string,conclusion:string|null}[]}} Job */
 /** @param {{conclusion:string|null}} job */
 const unsuccessful=job=>['failure','timed_out','cancelled','startup_failure'].includes(job.conclusion??'');
+/** A job that broke on its own: a cancel leaves its other jobs `cancelled`, which is not a failure (build-max A5).
+ * @param {{conclusion:string|null}} job */
+const broke=job=>['failure','timed_out','startup_failure'].includes(job.conclusion??'');
 
 /** J426: keep a completed failed check even if the runner is later canceled.
  * @param {Job} job @returns {string|undefined} */
@@ -82,9 +86,19 @@ const finished=(/** @type {Run} */run)=>run.status==='completed';
 const FAILMODE_WINDOW_MS=26*60*60_000;
 /** Superseded, never red: a cancel that hid no blocking failure. Main pushes never cancel a started run (ci.yml's
  * cancel-in-progress is false for main) unless it is red already (ci-early-red.yml, FS24), so a started run whose
- * blocking job failed, timed out or was cancelled (a job over its timeout-minutes concludes `cancelled`:
- * nine-ring1-build in run 44361972035) is red (J422). */
+ * blocking job failed, timed out or never started is red (J422; run 44361972035's tests failed beside its cancelled
+ * nine-ring1-build). Jobs the cancel left `cancelled` are not failures (`cancelledJobs`, build-max A5). */
 const cancelled=(/** @type {Run} */run)=>(run.conclusion==='cancelled'||run.conclusion==='skipped')&&run.blockingFailed!==true;
+/** What a cancelled run's jobs say: whether any work started, and whether a blocking job broke before the cancel.
+ * Build-max A5 (2026-11-20): four of the day's reds (runs 44763550438, 44768998830, 44774041972, 44780910229) were
+ * cancels whose only unsuccessful jobs were the ones the cancel stopped; they are superseded, never MAIN RED.
+ * @param {readonly Job[]} jobs @returns {{started:boolean,blockingFailed:boolean}} */
+export function cancelledJobs(jobs){
+  // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
+  // the jobs, rather than that workflow timestamp, say whether any work actually started.
+  const started=jobs.some(job=>typeof job.started_at==='string');
+  return {started,blockingFailed:started&&jobs.some(job=>!advisory(job)&&broke(job))};
+}
 const byCreated=(/** @type {Run} */a,/** @type {Run} */b)=>Date.parse(a.created_at)-Date.parse(b.created_at)||a.id-b.id;
 
 /** Preserve the workflow verdict until every required job is clear.
@@ -372,10 +386,7 @@ export function liveIo(env=process.env){
           if(cancelled(row)&&judged.has(row.id))return row;
           const jobs=jobsFor(row.id);
           if(cancelled(row)){
-            // CIQ1 replaces pending runs without starting a single job. run_started_at is also set on those runs;
-            // the jobs, rather than that workflow timestamp, say whether any work actually started.
-            row.started=jobs.some(job=>typeof job.started_at==='string');
-            row.blockingFailed=jobs.some(job=>!advisory(job)&&unsuccessful(job))&&row.started;
+            Object.assign(row,cancelledJobs(jobs));
             row.blockingChecked=true;
             row.advisoryVersion=ADVISORY_VERSION;
           }
@@ -534,7 +545,6 @@ export function sweep(io,hint={}){
           const changes=files.length===0?new Map():io.changes(verdict.from??null,run.head_sha);
           const suspect=redSuspect(commits,files,changes);
           const details={range,url,failed:tests.length===0?failed:`${failed} (${tests.join(', ')})`,named,suspect},agents=io.agents();
-          lines.push(`MAIN RED ${range} run ${run.id}: landers ${named}; failed: ${failed}`);
           buddy=redRecipients([],[],agents,['buddy-engine'])[0];
           if(buddy!==undefined)buddyAlert=redMessage({...buddy,fixer:false},details);
           firstRed=state.red===undefined;
@@ -542,11 +552,15 @@ export function sweep(io,hint={}){
           const prompted=new Set(history.commits),seenFiles=new Set(history.files),seenJobs=new Set(history.jobs);
           const newFiles=tests.filter(file=>!seenFiles.has(file));
           const newJobs=jobs.names.filter(job=>!seenJobs.has(job));
-          const newFailures=(tests.length===0?newJobs:newFiles).join(' | ')||'no new failures reported';
+          const fresh=tests.length===0?newJobs:newFiles,newFailures=fresh.join(' | ');
+          // A5: a later run in the span that fails only what already failed is still the same red: a receipt, no prompts
+          const repeat=!firstRed&&fresh.length===0;
+          lines.push(repeat?`main still red ${range} run ${run.id}: no new failures; failed: ${failed}`
+            :`MAIN RED ${range} run ${run.id}: landers ${named}; failed: ${failed}`);
           const newSuspects=newFiles.map(file=>redSuspect(commits,[file],changes)).filter(candidate=>candidate!==undefined);
           // The failing test can point to a change in its source. Only use the run-wide suspect if every failed test is new.
           if(newFiles.length>0&&newFiles.length===tests.length&&suspect!==undefined)newSuspects.push(suspect);
-          for(const recipient of redRecipients(found,io.panes(),agents,io.fixers())){
+          if(!repeat)for(const recipient of redRecipients(found,io.panes(),agents,io.fixers())){
             const ownsNewFailure=newSuspects.find(candidate=>recipient.commits.has(candidate.sha));
             const ownsNewCommits=new Set([...recipient.commits].filter(sha=>!prompted.has(sha)||sha===ownsNewFailure?.sha));
             if(firstRed)messages.push({recipient,text:redMessage(recipient,details)});

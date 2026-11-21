@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { attribute, blockingRun, failedNames, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { attribute, blockingRun, cancelledJobs, failedNames, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 import '../scripts/test/main-watch-red.test.mjs';
 
@@ -215,6 +215,20 @@ test('J422: a started run cancelled with a blocking job red (a timeout) is MAIN 
   // A started cancel with every blocking job green stays superseded.
   const clean = { ...hidden, blockingFailed: false };
   expect(judge([...replay, clean, newer], { judged: replay.map(row => row.id), dispatched: [] }, sha('bbbb2222')).map(row => row.kind)).toEqual(['superseded', 'green']);
+});
+
+test('build-max A5: jobs a cancel stopped are not failures; a job that failed, timed out or never started is', () => {
+  const job = (name: string, conclusion: string | null, started = true) => ({ name, conclusion, started_at: started ? '2026-11-20T16:00:00Z' : null });
+  // Run 44768998830 (2026-11-20): only t1-e2e (B) unfinished, cancelled with its run; it was a MAIN RED with no failure.
+  expect(cancelledJobs([job('tests (1)', 'success'), job('t1-e2e (B)', 'cancelled'), job('memory-client-build', 'cancelled')]))
+    .toEqual({ started: true, blockingFailed: false });
+  // Run 44797469058: tests (3) failed before the early-red cancel stopped the rest, so it stays red.
+  expect(cancelledJobs([job('tests (3)', 'failure'), job('t1-e2e (J)', 'cancelled')])).toEqual({ started: true, blockingFailed: true });
+  for (const conclusion of ['timed_out', 'startup_failure'])
+    expect(cancelledJobs([job('tests (2)', conclusion)]).blockingFailed).toBe(true);
+  // An advisory failure never makes a cancel red; a run that never started a job is neither started nor red.
+  expect(cancelledJobs([job('timings', 'failure'), job('tests (1)', 'cancelled')]).blockingFailed).toBe(false);
+  expect(cancelledJobs([job('tests (1)', 'cancelled', false)])).toEqual({ started: false, blockingFailed: false });
 });
 
 test('landers come from landed receipts; a pane is found by its worktree label or directory', () => {
