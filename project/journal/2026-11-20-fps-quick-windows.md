@@ -18,12 +18,21 @@ per profile and records every cold frame from control. Five routes take
 No frame floor, loss check, quantile or comparison tolerance changes.
 Qualification keeps its complete matrix and reduced command-proof mode.
 
-Quick rejoins the blocking canonical queue after each two-worker batch.
-Each worker has a four-minute abort; the batch lease has a ten-minute
-hard watchdog. This replaces the previous twenty-minute batch lease.
+Quick rejoins the canonical queue once, after the first three profiles.
+Three 130-second routes leave 150 seconds for cold boots in its nine-
+minute capture watchdog. Browser admission has a 30-second bound.
+Each worker retains its four-minute abort. A slow boot still produces
+an incomplete table; neither watchdog nor the wall cap is extended.
 The existing Linux dry-plan test still exercises the portable path.
 
 Validation: 16 related FPS planning/batching/matrix/verdict checks pass.
 The ordinary push gate and fresh quiet repeated measurements follow.
 
 Lane: codex-tc48
+
+The first long-window attempt was 4/5 in 842.208 seconds: Desktop High
+hit the existing 90-second Home-region timeout, with no GPU overlap.
+The next was interrupted at 793.551 seconds, 2/5, after over five
+minutes queued between batches. Those original two-worker leases
+required three admissions. Preserve both attempts and use two leases
+for the fresh pair. No partial table is accepted or compared.

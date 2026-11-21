@@ -97,8 +97,9 @@ async function measureCell(job, signal) {
     // Join the kernel queue even while another measurement owns the GPU.
     // The worker checks for unrelated GPU users after acquiring this lease.
     signal.throwIfAborted();
-    const child = spawn('/usr/bin/lockf',['-k',lock,join(root,'scripts/browser-lane.sh'),'--max',Array.isArray(job) ? '10' : '5',
-      process.execPath,import.meta.filename,Array.isArray(job) ? '--worker-batch' : '--worker',JSON.stringify(job)],{stdio:'inherit',detached:true});
+    const child = spawn('/usr/bin/lockf',['-k',lock,join(root,'scripts/browser-lane.sh'),'--max',Array.isArray(job) ? '9' : '5',
+      process.execPath,import.meta.filename,Array.isArray(job) ? '--worker-batch' : '--worker',JSON.stringify(job)],{stdio:'inherit',detached:true,
+      env:{...process.env,BROWSER_LANE_WAIT_SECONDS:'30'}});
     const stop = () => {
       try { if (child.pid !== undefined) process.kill(-child.pid, 'SIGTERM'); }
       catch (error) {
@@ -186,9 +187,10 @@ async function main() {
         if (readCell(job.output,fingerprint,build,job) === null) return true;
         resumedCells++; return false;
       });
-      // Each cold worker is bounded to four minutes. Two workers fit a
-      // ten-minute lease; rejoin the shared queue before the next pair.
-      for (let i=0; i<pending.length; i+=2) await measureCell(pending.slice(i,i+2),stop.signal);
+      // Three 130-second routes leave room for cold boots inside the nine-
+      // minute watchdog. Rejoin the queue once for the final two profiles.
+      // Slow or stuck boots still fail within the same lease and wall caps.
+      for (let i=0; i<pending.length; i+=3) await measureCell(pending.slice(i,i+3),stop.signal);
     } else {
       for (let rep=0; rep<count; rep++) {
         for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
