@@ -28,7 +28,7 @@ const owners = new WeakMap<Scope, WeakMap<ShardFolder, ClientNativeBook>>();
 /** Feature admission precedes this book. Its lifetime is the entered scope,
  * independently of the world's resident scene/material scope. */
 export function clientNativeBook(ctx: ShardContext, scope: Scope = ctx.scope): ClientNativeBook {
-  if (scope.disposed) throw new Error('Native client features require a living scope');
+  if (scope.disposed) throw new Error('Native client features require a living entered scope');
   let products = owners.get(scope);
   if (products === undefined) { products = new WeakMap(); owners.set(scope, products); }
   const previous = products.get(ctx.product); if (previous !== undefined) return previous;
