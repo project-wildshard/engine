@@ -31,7 +31,7 @@ export function readNineState() {
   const timing=Reflect.get(globalThis,'__bootTiming'),read=timing===undefined?undefined:Reflect.get(timing,'read');
   const data=typeof read==='function'?read.call(timing):timing,entries=data===undefined||data===null?[]:Reflect.get(data,'entries');
   const rows=Array.isArray(entries)?entries:[];
-  return {error,ready:ready===true,frames:Number(world?.game?.frameCount??0),done:rows.filter(row=>row.end!==null).length,
+  return {error,ready,frames:world?.game?.frameCount??0,done:rows.filter(row=>row.end!==null).length,
     open:rows.filter(row=>row.end===null&&String(row.operation).startsWith('stage:')).map(row=>String(row.operation))};
 }
 
@@ -42,7 +42,7 @@ export function readNineState() {
  * @param {{now?:()=>number,sleep?:(ms:number)=>Promise<void>,log?:(line:string)=>void,stallMs?:number,capMs?:number}} [options]
  * @returns {Promise<{readinessMs:number,last:NineState}>} */
 export async function waitNineReady(read,options={}) {
-  const {now=Date.now,sleep=ms=>new Promise(done=>{setTimeout(done,ms);}),log=line=>{console.log(line);},stallMs=NINE_STALL_MS,capMs=NINE_READY_CAP_MS}=options;
+  const {now=Date.now,sleep=ms=>new Promise(resolve=>{setTimeout(resolve,ms);}),log=line=>{console.log(line);},stallMs=NINE_STALL_MS,capMs=NINE_READY_CAP_MS}=options;
   const start=now();
   /** @type {NineState|null} */ let last=null;
   let moved=start,logged=start,mark='';
