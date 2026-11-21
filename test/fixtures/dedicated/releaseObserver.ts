@@ -26,6 +26,7 @@ export interface ObserverOptions {
  readonly devices:readonly [string,string];
  readonly labels?:readonly [string,string];
  readonly durationMs:number;readonly pollMs?:number;readonly signal?:AbortSignal;
+ readonly retryMs?:number;
  readonly requireDurableBaseline?:boolean;
  readonly reloadClient?:boolean;
  readonly event?:(phase:string)=>void;
@@ -33,6 +34,7 @@ export interface ObserverOptions {
 type Status='observed'|'failed'|'inconclusive'|'refused'|'cancelled';
 interface Session {
  readonly label:string;readonly device:string;bot:NativeObserverBot;generation:number;attempts:number;
+ nextDialAt:number;prime:'unused'|'waiting'|'done';
  first:NativeReading|null;latest:NativeReading|null;moved:boolean;
  before:NativeReading|null;closeAt:number|null;closeReason:string|null;backMs:number|null;
 }
@@ -61,8 +63,10 @@ const identity=(release:ReleaseFile):string=>JSON.stringify([release.serial,rele
 /** Two stable native identities, one bounded observation, no release or service mutation. */
 export async function observeRelease(options:ObserverOptions){
  const pollMs=options.pollMs??2000;
+ const retryMs=options.retryMs??pollMs;
  if(!Number.isFinite(options.durationMs)||options.durationMs<100||options.durationMs>3600000||
-  !Number.isInteger(pollMs)||pollMs<10||pollMs>60000||options.devices.length!==2||new Set(options.devices).size!==2||
+  !Number.isInteger(pollMs)||pollMs<10||pollMs>60000||!Number.isInteger(retryMs)||retryMs<10||retryMs>60000||
+  options.devices.length!==2||new Set(options.devices).size!==2||
   options.devices.some(device=>!/^[a-zA-Z0-9._:-]{1,128}$/u.test(device)))
   throw new Error('Invalid bounded observer options');
  if(options.labels!==undefined&&(options.labels.length!==2||new Set(options.labels).size!==2||
@@ -112,6 +116,7 @@ export async function observeRelease(options:ObserverOptions){
   const socket=snapshot.release.socket;if(socket===undefined||client===undefined)throw new Error('Verified native observer target missing');
   const bot=client.connect(socket,session.device,session.label);owned.push(bot);
   session.bot=bot;session.generation=snapshot.release.serial;session.attempts++;session.first=null;session.latest=null;session.moved=false;
+  session.nextDialAt=performance.now()+retryMs;
   bot.move();
  };
  try{
@@ -130,21 +135,25 @@ export async function observeRelease(options:ObserverOptions){
    const label=options.labels?.[index]??`observer-${index}`;
    const bot=prepared.connect(socket,device,label);owned.push(bot);
    sessions.push({label,device,bot,generation:baseline.release.serial,attempts:1,first:null,latest:null,moved:false,
+    nextDialAt:performance.now()+retryMs,prime:'unused',
     before:null,closeAt:null,closeReason:null,backMs:null});bot.move();
   }
-  const priming=new Set<Session>();
   while(!signal.aborted){
    for(const session of sessions){
     sample(session);
     if(session.latest?.closed!==null&&session.latest?.closed!==undefined){
-     if(!priming.delete(session))return report('inconclusive','baseline-link-ended');
+     const primed=session.prime==='waiting';
+     if(!primed&&(session.first!==null||options.retryMs===undefined))return report('inconclusive','baseline-link-ended');
+     if(!primed&&performance.now()<session.nextDialAt)continue;
+     if(session.attempts>=5)return report('inconclusive','baseline-reconnect-budget');
      const current=await read();
      if(current===null||!current.ready||identity(current.release)!==identity(baseline.release))return report('inconclusive','baseline-moved-before-join');
+     if(primed)session.prime='done';
      connect(session,current);
     }
-    if(options.requireDurableBaseline===true&&session.moved&&!priming.has(session)&&!session.latest?.checkpoint){
-     if(session.attempts!==1||session.bot.quit===undefined)return report('inconclusive','missing-durable-baseline');
-     priming.add(session);
+    if(options.requireDurableBaseline===true&&session.moved&&session.prime!=='waiting'&&!session.latest?.checkpoint){
+     if(session.prime!=='unused'||session.bot.quit===undefined)return report('inconclusive','missing-durable-baseline');
+     session.prime='waiting';
      session.bot.quit();
     }
    }
@@ -171,6 +180,7 @@ export async function observeRelease(options:ObserverOptions){
      for(const session of sessions){
       sample(session);
       if(session.latest?.closed!==null&&session.latest?.closed!==undefined){
+       if(session.generation===target.release.serial&&performance.now()<session.nextDialAt)continue;
        if(options.reloadClient===true&&session.latest.closed==='reload'&&reloaded===undefined){
         reloaded=await options.prepare(target,signal);
         if(reloaded.sourceBuild!==target.release.engineBuild)throw new ObservationRefusedError('reload-client-source-build');

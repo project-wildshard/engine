@@ -5,6 +5,31 @@ import {releaseObserverFixtures,sourceBuild} from './fixtures/dedicated/releaseO
 
 const fixture=releaseObserverFixtures();
 
+test('the observer backs off after a rejected upgrade at the new serial',{timeout:120000},async()=>{
+ const f=await fixture(true),retryMs=180;
+ const refusedAt=new Map<string,number>(),retryWaits:number[]=[];
+ const observed=observeRelease({...f.options,retryMs,prepare:async()=>{
+  const client=await f.options.prepare();
+  return {...client,connect:(url,device,label)=>{
+   if(f.release.serial===2){
+    const refusal=refusedAt.get(device);
+    if(refusal===undefined){
+     refusedAt.set(device,performance.now());
+     return {read:()=>({tick:null,stand:null,coins:null,closed:'closed',closedAt:null}),move:()=>undefined,close:()=>undefined};
+    }
+    retryWaits.push(performance.now()-refusal);
+   }
+   return client.connect(url,device,label);
+  }};
+ }});
+ await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);
+ await f.advance();
+ const result=await observed;
+ assert.equal(result.status,'observed',JSON.stringify(result));
+ assert.equal(retryWaits.length,2);
+ assert.ok(retryWaits.every(wait=>wait>=retryMs),JSON.stringify(retryWaits));
+});
+
 test('two real native identities redial after signed serial/build change and clean every client',{timeout:120000},async()=>{
  const f=await fixture();const observed=observeRelease({...f.options,durationMs:6000});
  await Promise.race([f.playing,observed.then(result=>{throw Error('No playing baseline: '+JSON.stringify(result));})]);await f.advance();const result=await observed;

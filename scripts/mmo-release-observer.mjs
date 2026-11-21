@@ -69,6 +69,7 @@ export async function runObserver(args,root=ROOT){
     catch(error){if(signal.aborted)throw signal.reason;throw new ObservationRefusedError('client-prepare',error);}},
    devices:observerIdentities(realBase),
    labels:[`E7-${id.slice(0,6)}-0`,`E7-${id.slice(0,6)}-1`],durationMs:seconds*1000,signal:cancel.signal,requireDurableBaseline:true,reloadClient:true,
+   retryMs:60_000,
    event:phase=>{console.log(JSON.stringify({at:'release-observer',phase}));}});
   writeFileSync(join(work,'report.json'),`${JSON.stringify(report,null,2)}\n`,{mode:0o600});
   console.log(JSON.stringify({status:report.status,reason:report.reason,from:report.from,to:report.to,continuity:report.continuity,report:join(work,'report.json')}));
