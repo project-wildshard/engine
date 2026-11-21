@@ -29,3 +29,11 @@ export function constructionCheckpoint(owner: Scope, ownerBudgetMs: number = WOR
   if (live && (buildHeld() || buildUrgent() || !frameDue()) && !frameBudgetSpent(Math.min(WORK_SLICE_MS, ownerBudgetMs))) return undefined;
   return buildYield(owner).then(() => { requireOwner(owner); return undefined; });
 }
+
+/** The end of one scene placement row. Play and Node keep the original build turn after every row. A loading browser
+ * shares the 50 ms construction slice instead: one timer turn per row paid the 4 ms nested-timer clamp each time (Nine's
+ * props: 310 turns, 1.36 s idle with no named wait, NB6's boot refusal on the hosted nightly, FS30). */
+export function placementRowCheckpoint(owner: Scope): Promise<void> | undefined {
+  requireOwner(owner);
+  return presenting() || typeof document === 'undefined' ? buildYield(owner) : constructionCheckpoint(owner);
+}

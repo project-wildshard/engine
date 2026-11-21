@@ -5,6 +5,7 @@ import { withOwner } from '@wildshard/engine/app/ownership';
 import type { Scope } from '@wildshard/engine/app/scope';
 import { TIER } from '@wildshard/engine/core/tier';
 import { buildYield, workSlice } from '@wildshard/engine/core/workSlice';
+import { placementRowCheckpoint } from './constructionCheckpoint';
 import { slicer } from '@wildshard/engine/boot/plan';
 import { sharedModelContext } from '@wildshard/engine/models/model';
 import { readColliderRows } from '@wildshard/engine/models/colliders';
@@ -299,7 +300,7 @@ export class WorldScenePlacement {
       if (base !== undefined) base.name = row.name;
     }
     await placed.registered;
-    await buildYield(owner);
+    const rowEnd = placementRowCheckpoint(owner); if (rowEnd !== undefined) await rowEnd;
     return placed;
   }
   /**

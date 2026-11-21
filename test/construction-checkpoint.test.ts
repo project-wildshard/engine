@@ -3,7 +3,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import * as clock from '../src/shared/engine/core/clock';
 import * as pacing from '../src/shared/engine/core/framePacing';
 import * as work from '../src/shared/engine/core/workSlice';
-import { constructionCheckpoint } from '../src/client/game/shardfile/constructionCheckpoint';
+import { constructionCheckpoint, placementRowCheckpoint } from '../src/client/game/shardfile/constructionCheckpoint';
 
 const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
 beforeEach(() => {
@@ -164,5 +164,25 @@ test('loading retirement during a batched turn preserves the original continuati
     f.owner.dispose(); resume();
     await expect(pending).rejects.toThrow('scope has closed');
     expect(() => constructionCheckpoint(f.owner)).toThrow('scope has closed');
+  } finally { f.owner.dispose(); }
+});
+
+// FS30 / NB6: a loading browser paid one 4 ms nested-timer clamp per scene placement row (Nine: 310 turns, 1.36 s of
+// unexplained props idle, the hosted nightly's boot refusal). Rows now share the 50 ms loading slice; play and Node keep
+// the original turn after every row.
+test('placement rows share the loading slice, and keep one build turn per row in play and Node', async () => {
+  const f = loading();
+  try {
+    for (let ms = 0; ms < 50; ms += 5) { f.at(ms); expect(placementRowCheckpoint(f.owner)).toBeUndefined(); }
+    expect(f.turn).not.toHaveBeenCalled();
+    f.at(50); await placementRowCheckpoint(f.owner);
+    expect(f.turn).toHaveBeenCalledExactlyOnceWith(f.owner);
+    f.live.mockReturnValue(true);
+    await placementRowCheckpoint(f.owner); await placementRowCheckpoint(f.owner);
+    expect(f.turn).toHaveBeenCalledTimes(3);
+    f.live.mockReturnValue(false); Reflect.deleteProperty(globalThis, 'document');
+    await placementRowCheckpoint(f.owner);
+    expect(f.turn).toHaveBeenCalledTimes(4);
+    f.owner.dispose(); expect(() => placementRowCheckpoint(f.owner)).toThrow('scope has closed');
   } finally { f.owner.dispose(); }
 });
