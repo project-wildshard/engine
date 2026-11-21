@@ -3,6 +3,7 @@ import { outputDescriptor, isBuildValidatedOutput } from '../../../shared/game/s
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { cataloguePlaced } from '../../../shared/game/shardfile/identity';
+import { coinsDeclared } from '../../../shared/game/loot/currency';
 import { runtimeAccountedBytes } from '@wildshard/format/runtimeCost';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { contentCost } from '@wildshard/format/contentCost';
@@ -127,7 +128,7 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
     // A product with no terrain is a structure world, an empty one included: a slab needs rock art only a runtime shard's manifest has.
     ground: { structures: true, paths: 'plugin', terrain: clientGround(source, assets.retained), water: shardfileWater(source.water) },
     species: source.rows.species.map((row) => row.kind), uses: ['spawns', 'quests', 'bosses', 'elites', 'swim', 'hover', 'explore', 'practice'],
-    loot: { coins: source.rows.loot.length > 0 },
+    loot: { coins: coinsDeclared(source.rows.loot) },
     creatures: { lowPoly: true, waitForModels: false, furRim: false, tintRange: 0, oneMaterial: true },
     render: product => product.has('look/painted') ? folderPaintedLook(product) : Promise.resolve(source.look.keys.length === 0 ? emptyLook(source.look.dayOverride) : shardfileLook(source.look, assets.retained)),
     load: async () => { const { ShardfileClient } = await import('./client'); return { default: class extends ShardfileClient { constructor() { super(source, assets, clientBindings); } } }; },

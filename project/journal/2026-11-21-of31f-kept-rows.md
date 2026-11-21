@@ -10,3 +10,7 @@
   sharpening, sturdy-heart and charm pips read row gauges, so the whetstone/heart/charm ids leave `Owned`'s getters.
   `owned-kept.test.ts` is the old-save fixture: all 15 ids, under the table and under Driftwood's and Pine's rows.
 - OF31h1: an unset `WORLD_CELLS` opens the grid's home cell (0, 0) from the placement instead of the slug in code.
+- Format 0.67.0 pinned: it carries `kept` and `currency`, and the keeper programme goes optional, so
+  `runtime-declared-sky.test.ts` guards a plan with none.
+- OF31g2: `currency.ts` reads a shard's `economy/loot` currency row; the purse and kill bursts turn on for a declared
+  currency, and for any loot row only until OF31g4 (Driftwood's doubloon is declared in OF31g3).

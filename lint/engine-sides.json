@@ -1914,6 +1914,7 @@
     "src/shared/game/loot/deaths.ts": "shared",
     "src/shared/game/loot/exchange.ts": "shared",
     "src/shared/game/loot/Owned.ts": "shared",
+    "src/shared/game/loot/currency.ts": "shared",
     "src/shared/game/loot/ownedRows.ts": "shared",
     "src/shared/game/loot/platformCatalogue.ts": "shared",
     "src/shared/game/loot/Purse.ts": "shared",

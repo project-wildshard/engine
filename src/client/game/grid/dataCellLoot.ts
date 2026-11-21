@@ -6,6 +6,7 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
+import { coinsDeclared } from '../../../shared/game/loot/currency';
 import type { LootBody, ScopedLoot, ScopedLootHost } from '../loot/runtime';
 import type { ShardContext } from '../plugin/context';
 import type { RegionalRuntimePage } from './regionalRuntime';
@@ -24,7 +25,7 @@ export type DataCellLootPorts = Pick<ScopedLootHost<LootBody>, 'owned' | 'scene'
 export async function installCellLoot(source: Pick<Shardfile, 'rows' | 'identity'>, row: string, at: ShardContext, ports: DataCellLootPorts): Promise<ScopedLoot | null> {
   const loot = await import('../loot/runtime');
   if (at.scope.disposed || at.scope.disposing) return null;
-  return loot.installLoot({ ...ports, ctx: at, manifest: { slug: source.identity.slug, loot: { coins: source.rows.loot.length > 0 } },
+  return loot.installLoot({ ...ports, ctx: at, manifest: { slug: source.identity.slug, loot: { coins: coinsDeclared(source.rows.loot) } },
     presentation: loot.enteredLootPresentation(at, row) });
 }
 
