@@ -63,10 +63,18 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
+      # staging's catalogue cooks every pin on a cold runner (over 30 minutes, run 44939791409): an hour for the build.
+      # A tag before 5ed4f16dc has heavy-lane's fixed 30 minutes in its build:game; give it the same knob, and hide that
+      # one-line local edit from page-release's clean-tree check (skip-worktree), so an older release can still publish.
+      - name: Give an older tag's build the same limit
+        run: |
+          grep -q WS_BUILD_MAX_MINUTES package.json && exit 0
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));const s=p.scripts['build:game'];if(!s.startsWith('python3 scripts/heavy-lane.py build -- '))process.exit(1);p.scripts['build:game']=s.replace('build -- ','build --max \"\${WS_BUILD_MAX_MINUTES:-30}\" -- ');fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          git update-index --skip-worktree package.json
+          echo "$TAG predates the knob: build:game patched locally to WS_BUILD_MAX_MINUTES"
       # The Cloudflare token reaches wrangler only through the environment; page-release.mjs redacts it from all output.
       # --content publishes dist-content/ to packs.wildshard.io first; a new set copies unchanged files from the last one
       # on R2 (server side) and puts the rest through S3 with the bucket-scoped keys, as preview.yml does.
-      # staging's catalogue cooks every pin on a cold runner (over 30 minutes, run 44939791409): an hour for the build
       - name: Build, upload and check the Explore page
         env:
           WS_BUILD_MAX_MINUTES: 60

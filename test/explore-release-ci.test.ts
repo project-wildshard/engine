@@ -58,4 +58,8 @@ test('the Explore build gets an hour, and build:game honours it', () => {
   const step = workflow.slice(workflow.indexOf('name: Build, upload and check the Explore page'), workflow.indexOf('name: Attach'));
   expect(Number(/WS_BUILD_MAX_MINUTES: '?(\d+)/u.exec(step)?.[1])).toBeGreaterThanOrEqual(60);
   expect(Number(/timeout-minutes: (\d+)/u.exec(workflow)?.[1])).toBeGreaterThanOrEqual(150);
+  // a dispatch of an older tag checks out that tag's package.json: the patch step must come first
+  const patch = workflow.indexOf("name: Give an older tag's build the same limit");
+  expect(patch).toBeGreaterThan(-1);
+  expect(patch).toBeLessThan(workflow.indexOf('name: Build, upload and check the Explore page'));
 });
