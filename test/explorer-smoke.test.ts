@@ -5,6 +5,8 @@ import type { Browser, BrowserContext, CDPSession, Page, Request } from 'playwri
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 // oxlint-disable-next-line import/no-nodejs-modules -- Verify the actual required workflow leg, without dispatching it.
 import { readFileSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- Reproduce Playwright's page event transport in the fixture.
+import { EventEmitter } from 'node:events';
 
 const catalogue = [
   {slug:'driftwood-isle',status:'live',legacy:false},
@@ -22,13 +24,13 @@ function storageFixture() {
 }
 
 function fixtureBrowser(evaluate: Page['evaluate'], report?: Request): { browser: Browser; close: ReturnType<typeof vi.fn<BrowserContext['close']>> } {
-  let onRequest: ((request: Request) => void) | undefined;
-  const page: Page = legacyDouble<Page>({ evaluate, on: (event: string, listener: (request: Request) => void) => {
-    if (event === 'request') onRequest = listener;
+  const events = new EventEmitter();
+  const page: Page = legacyDouble<Page>({ evaluate, on: (event, listener) => {
+    events.on(event, listener);
     return page;
   },
     goto: vi.fn<Page['goto']>().mockImplementation(url => {
-      if (url !== 'about:blank' && report !== undefined) onRequest?.(report);
+      if (url !== 'about:blank' && report !== undefined) events.emit('request', report);
       return Promise.resolve(null);
     }),
     screenshot: vi.fn<Page['screenshot']>().mockRejectedValue(new Error('No browser capture in the unit fixture')) });
