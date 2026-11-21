@@ -15,6 +15,14 @@ export const SHADOW_LAYER = 9;
  * (`explore/pick.ts`), where a true shadow-only caster (a cabin's depth proxy) stays unpickable.
  */
 export const MERGED_VIEW = 'mergedView';
+/** DF8: the `userData` mark on a prop merge's member (game/shardfile/groundMerge.ts `mergeView`): the channels its merged
+ *  mesh leaves out (string[]). The merged mesh draws the member's material over the member's keyed channels less these,
+ *  so the warm-up builds the merged program from the member (`debug.programFold`): a merged mesh made after its tile's
+ *  warm-up (a ring tile published under its cell) linked at its first draw. */
+export const MERGED_PROGRAM = 'mergedProgram';
+/** DF8: the `userData` mark on a mesh a batch draws in its place (game/grid/kitBatch.ts: its layers are off while the mark
+ *  holds); the warm-up builds no program of its own for it (`debug.programFold`). */
+export const BATCHED_VIEW = 'batchedView';
 /** The name of a merge's own view mesh (AP8): it stands in for its members, so a pick reads the member, never it. */
 export const MERGED_COPY = 'props.merged';
 

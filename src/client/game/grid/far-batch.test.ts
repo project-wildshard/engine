@@ -58,3 +58,23 @@ test('DF8 (debug.programReuse): a group keeps one material across rebuilds, so i
   expect(disposed).toBe(1);
   batches.dispose();
 });
+
+test('DF8 (debug.programFold): a stand-in draws with the group material it will join, and leaves it on retire', () => {
+  const scene = new THREE.Scene(), batches = new FarBatches(scene, true);
+  const root = new THREE.Group(); scene.add(root);
+  const view = installFarProxy(root, proxyGeometry(), look('toon'));
+  if (view === undefined) throw new Error('a proxy');
+  const stand = batches.stand(view, look('toon'), false);
+  if (stand === null) throw new Error('a stand-in');
+  const material = stand.material;
+  let disposed = 0;
+  if (material instanceof THREE.Material) material.addEventListener('dispose', () => { disposed++; });
+  expect(stand.parent).toBe(null); // the caller places it, never in the drawn scene
+  stand.retire();
+  expect(disposed).toBe(0);
+  expect(view.mesh.layers.mask).not.toBe(0); // the proxy still draws itself until it joins
+  expect(batches.adopt(view, look('toon'), false)).toBe(true);
+  expect(batches.batches()[0]?.material).toBe(material); // the warmed program's material
+  batches.dispose();
+  expect(new FarBatches(scene, false).stand(view, look('toon'), false)).toBe(null); // no kept material: nothing to warm
+});

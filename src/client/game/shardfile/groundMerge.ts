@@ -21,7 +21,7 @@
 import { Box3, BufferAttribute, BufferGeometry, InterleavedBufferAttribute, Matrix3, Matrix4, Mesh, Sphere, Vector3, type Material, type Object3D } from 'three';
 import { buildTier } from '@wildshard/engine/core/tier';
 import type { Scope } from '@wildshard/engine/app/scope';
-import { MERGED_COPY, MERGED_VIEW, SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
+import { MERGED_COPY, MERGED_PROGRAM, MERGED_VIEW, SHADOW_LAYER } from '@wildshard/engine/core/shadowLayer';
 import { ownedArray, ownedCopy, type OwnedLabel } from '@wildshard/engine/core/ownedBuffer';
 
 /** EM6: each member's transformed arrays, kept so a rebuild only rewrites what moved */
@@ -340,6 +340,6 @@ export function mergeView(parent: Object3D, mesh: Mesh, material: Material, scop
   if (mesh.material !== material) throw new Error('Prop merge member draws another material');
   propMerge(parent, material, { receive: mesh.receiveShadow, order: mesh.renderOrder, ...(hook === undefined ? {} : { hook }), ...region }).add(mesh, scope);
   // SHARD-SOURCE ss4d: still the World Explorer's to pick (explore/pick.ts reads this mark), though it draws on SHADOW_LAYER
-  mesh.visible = true; mesh.layers.set(SHADOW_LAYER); mesh.userData[MERGED_VIEW] = true;
-  scope.onDispose(() => { mesh.userData[MERGED_VIEW] = false; });
+  mesh.visible = true; mesh.layers.set(SHADOW_LAYER); mesh.userData[MERGED_VIEW] = true; mesh.userData[MERGED_PROGRAM] = [...region?.ignore ?? []];
+  scope.onDispose(() => { mesh.userData[MERGED_VIEW] = false; Reflect.deleteProperty(mesh.userData, MERGED_PROGRAM); });
 }

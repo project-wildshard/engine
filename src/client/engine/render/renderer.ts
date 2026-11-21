@@ -24,6 +24,8 @@ import { installPassSplit, passSplitLimit, PASS_SPLIT_VERTICES } from './passSpl
 import { installByteTriples } from './byteTriples';
 import { installVertexPack, VERTEX_PACK_SLOT, vertexPackWanted } from './vertexPack';
 import { programReuseOn } from './programReuse';
+import { installEnvironmentFold, programFoldOn } from './programFold';
+import { skipEmptyBatches } from './drawGuards';
 import { jsonSlot } from '../saves/slots';
 import { TIER } from '../core/tier';
 import { gltfOpaqueSort } from './gltfMaterialOrder';
@@ -57,6 +59,8 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   // DF8: a live custom program holds its shader stages (`debug.programReuse`, off; vite/threeHeldShaderStages.ts), so a
   // revisited cell's graph materials reuse the programs the grid keeper pinned rather than linking identical twins
   Reflect.set(renderer, 'wsHeldShaderStages', programReuseOn());
+  // DF8 (mini-df8b): variants that draw the same pixels share one program (`debug.programFold`, off; programFold.ts)
+  if (programFoldOn()) { installEnvironmentFold(renderer); skipEmptyBatches(true); }
   renderer.setOpaqueSort(gltfOpaqueSort);
   installRenderListSort(renderer); // STR20: render lists sort in place, no work array per sort
   installUniformCacheKinds(renderer); // D180: float uniform caches keep double elements (uniformCaches.ts)

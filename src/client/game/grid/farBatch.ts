@@ -8,6 +8,7 @@ import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import type { FarLookRuntime } from '../../../shared/game/grid/farProxy';
 import { farProxyMaterial, type FarProxyView } from './farView';
 import { programReuseOn } from '@wildshard/engine/render/programReuse';
+import { programFoldOn } from '@wildshard/engine/render/programFold';
 
 /**
  * DF10 (mini-df10d): the far ring's proxies drawn as one multi-draw batch per program. Each neighbour cell's far proxy was
@@ -142,24 +143,73 @@ export class FarBatch extends ChangedBatchedMesh {
   }
 }
 
+/** one program's proxies and their batch */
+interface Group { look: FarLookRuntime; positionalMask: boolean; members: Member[]; batch: FarBatch | null; data: THREE.DataTexture | null; bytes: Uint8Array; rows: number;
+  /** DF8 (`debug.programReuse`, `debug.programFold`): the group's one material and its texture holder, kept across rebuilds */
+  material: THREE.Material | null; holder: { value: THREE.DataTexture } | null }
+
 /** The far ring's batches, one per program, under `parent` (the scene). */
 export class FarBatches {
-  private readonly groups = new Map<string, { look: FarLookRuntime; positionalMask: boolean; members: Member[]; batch: FarBatch | null; data: THREE.DataTexture | null; bytes: Uint8Array; rows: number;
-    /** DF8 (`debug.programReuse`): the group's one material and its texture holder, kept across rebuilds */
-    material: THREE.Material | null; holder: { value: THREE.DataTexture } | null }>();
+  private readonly groups = new Map<string, Group>();
   /** DF8 (mini-df8): a group keeps one material across rebuilds, so a ring change never frees its program and links it
    *  again at the next draw (a new material per rebuild disposed the old one first: its program went with it) */
-  constructor(private readonly parent: THREE.Object3D, private readonly keepMaterials: boolean = programReuseOn()) {}
+  constructor(private readonly parent: THREE.Object3D, private readonly keepMaterials: boolean = programReuseOn() || programFoldOn()) {}
+
+  /** the group key `view` would join, or null when it cannot be batched */
+  private keyOf(view: FarProxyView, look: FarLookRuntime, positionalMask: boolean): string | null {
+    const material: unknown = view.mesh.material, geometry = view.mesh.geometry;
+    if (!isMaterial(material) || farState(material) === null || geometry.getAttribute('position') === undefined) return null;
+    const signature = Object.keys(geometry.attributes).sort().map(name => `${name}:${String(geometry.getAttribute(name).itemSize)}`).join(',');
+    return `${look.family}|${positionalMask ? 'position' : 'region'}|${signature}|${geometry.index === null ? 'flat' : 'indexed'}`;
+  }
+  private groupOf(key: string, look: FarLookRuntime, positionalMask: boolean): Group {
+    let group = this.groups.get(key);
+    if (group === undefined) { group = { look, positionalMask, members: [], batch: null, data: null, bytes: EMPTY, rows: 0, material: null, holder: null }; this.groups.set(key, group); }
+    return group;
+  }
+  /** the group's flags texture, at least `rows` copies tall */
+  private ensureData(group: Group, rows: number): THREE.DataTexture {
+    if (group.data === null || group.rows < rows) {
+      group.data?.dispose();
+      const size = Math.max(8, 2 ** Math.ceil(Math.log2(Math.max(1, rows))));
+      const bytes = ownedArray(Uint8Array, TEXELS * size * 4, { owner: 'grid/far-batch', asset: 'far-flags', kind: 'scratch' });
+      const data = new THREE.DataTexture(bytes, TEXELS, size, THREE.RGBAFormat, THREE.UnsignedByteType);
+      data.magFilter = THREE.NearestFilter; data.minFilter = THREE.NearestFilter; data.generateMipmaps = false; data.needsUpdate = true;
+      group.data = data; group.bytes = bytes; group.rows = size;
+    }
+    return group.data;
+  }
+
+  /**
+   * DF8 (`debug.programFold`): a stand-in of the batch `view` will join, drawn with the group's kept material, for a warm-up
+   * to link the batch's program before the batch replaces its proxies (the far ring's first batches linked their programs
+   * at their first draw, 3.9 s after control). Null when the view cannot be batched or the group keeps no material. The
+   * caller retires it (its material stays the group's).
+   */
+  stand(view: FarProxyView, look: FarLookRuntime, positionalMask: boolean): FarBatch | null {
+    const key = this.keepMaterials ? this.keyOf(view, look, positionalMask) : null;
+    const material: unknown = view.mesh.material;
+    if (key === null || !isMaterial(material)) return null;
+    // a live batch keeps reading the group's texture: the stand-in never replaces it
+    const group = this.groupOf(key, look, positionalMask), data = group.data ?? this.ensureData(group, 1);
+    group.holder ??= { value: data };
+    group.material ??= batchMaterial(group.look, group.positionalMask, group.holder);
+    const bytes = ownedArray(Uint8Array, TEXELS * 8 * 4, { owner: 'grid/far-batch', asset: 'far-flags', kind: 'scratch' });
+    const scratch = new THREE.DataTexture(bytes, TEXELS, 8, THREE.RGBAFormat, THREE.UnsignedByteType);
+    const batch = FarBatch.of([{ view, material, geometry: view.mesh.geometry, instance: -1 }], scratch, bytes, group.material, true);
+    batch.name = 'far-batch:stand-in';
+    const retire = batch.retire.bind(batch);
+    batch.retire = (): void => { retire(); scratch.dispose(); };
+    return batch;
+  }
 
   /** Draw `view` in its group's batch, if it can be (a far ring proxy with a recorded program state); returns whether it
    *  joined. Its own mesh stops drawing; its dispose leaves the batch. */
   adopt(view: FarProxyView, look: FarLookRuntime, positionalMask: boolean): boolean {
     const material: unknown = view.mesh.material, geometry = view.mesh.geometry;
-    if (!isMaterial(material) || farState(material) === null || geometry.getAttribute('position') === undefined) return false;
-    const signature = Object.keys(geometry.attributes).sort().map(name => `${name}:${String(geometry.getAttribute(name).itemSize)}`).join(',');
-    const key = `${look.family}|${positionalMask ? 'position' : 'region'}|${signature}|${geometry.index === null ? 'flat' : 'indexed'}`;
-    let group = this.groups.get(key);
-    if (group === undefined) { group = { look, positionalMask, members: [], batch: null, data: null, bytes: EMPTY, rows: 0, material: null, holder: null }; this.groups.set(key, group); }
+    const key = this.keyOf(view, look, positionalMask);
+    if (key === null || !isMaterial(material)) return false;
+    const group = this.groupOf(key, look, positionalMask);
     const member: Member = { view, material, geometry, instance: -1 };
     group.members.push(member);
     view.mesh.layers.disableAll();
@@ -178,22 +228,15 @@ export class FarBatches {
     if (group === undefined) return;
     if (group.batch !== null) { group.batch.retire(); group.batch = null; }
     if (group.members.length === 0) { group.data?.dispose(); group.data = null; group.material?.dispose(); group.material = null; this.groups.delete(key); return; }
-    if (group.data === null || group.rows < group.members.length) {
-      group.data?.dispose();
-      const rows = Math.max(8, 2 ** Math.ceil(Math.log2(group.members.length)));
-      const bytes = ownedArray(Uint8Array, TEXELS * rows * 4, { owner: 'grid/far-batch', asset: 'far-flags', kind: 'scratch' });
-      const data = new THREE.DataTexture(bytes, TEXELS, rows, THREE.RGBAFormat, THREE.UnsignedByteType);
-      data.magFilter = THREE.NearestFilter; data.minFilter = THREE.NearestFilter; data.generateMipmaps = false; data.needsUpdate = true;
-      group.data = data; group.bytes = bytes; group.rows = rows;
-    }
+    const data = this.ensureData(group, group.members.length);
     let material: THREE.Material;
     if (this.keepMaterials) {
-      group.holder ??= { value: group.data };
-      group.holder.value = group.data;
+      group.holder ??= { value: data };
+      group.holder.value = data;
       group.material ??= batchMaterial(group.look, group.positionalMask, group.holder);
       material = group.material;
-    } else material = batchMaterial(group.look, group.positionalMask, { value: group.data });
-    const batch = FarBatch.of(group.members, group.data, group.bytes, material, this.keepMaterials);
+    } else material = batchMaterial(group.look, group.positionalMask, { value: data });
+    const batch = FarBatch.of(group.members, data, group.bytes, material, this.keepMaterials);
     this.parent.add(batch); batch.updateMatrixWorld(true);
     group.batch = batch;
   }

@@ -24,7 +24,16 @@ import { publishShellLevels } from './animalShells';
 import { FarHerd, type FarMember } from './farHerd';
 import { CreatureLods, type LodTier } from './creatureLods';
 import { shootViews, type SpriteViews } from '../render/spriteViews';
+import { programFoldOn } from '../render/programFold';
 import { speciesDef } from '../../../shared/engine/entities/species/registry';
+
+/** DF8: the card shot's plain materials (with a map, without), kept for the page (`debug.programFold`) */
+const shotMaterials = new Map<boolean, THREE.MeshStandardMaterial>();
+function keptShotMaterial(mapped: boolean): THREE.MeshStandardMaterial {
+  let material = shotMaterials.get(mapped);
+  if (material === undefined) { material = new THREE.MeshStandardMaterial({ roughness: 0.9 }); material.name = `card-shot:${mapped ? 'mapped' : 'plain'}`; shotMaterials.set(mapped, material); }
+  return material;
+}
 
 /** the live WORLD physics, read in one place (blood decals) */
 const worldPhysics = (): typeof app.physics => app.physics;
@@ -366,10 +375,15 @@ export class AnimalHerdView implements RowBodiesDraw {
    *  the sky's cascades, which the shot's scene does not have) */
   private lodViews(model: AnimalModel): SpriteViews | null {
     const rig = this.factory.instantiate(model, 0.5), fur = rig.materials[0];
-    const plain = new THREE.MeshStandardMaterial({ map: fur !== undefined && 'map' in fur ? fur.map : null, color: fur?.color ?? 0xffffff, roughness: 0.9 });
+    const map = fur !== undefined && 'map' in fur ? fur.map : null, color = fur?.color ?? 0xffffff;
+    // DF8 (`debug.programFold`): one kept plain material per map presence, so the shot's program outlives each shot (a new
+    // material per shot freed it, and the next herd's shot linked the same program again)
+    const kept = programFoldOn() ? keptShotMaterial(map !== null) : null;
+    const plain = kept ?? new THREE.MeshStandardMaterial({ map, color, roughness: 0.9 });
+    if (kept !== null) { kept.map = map; kept.color.set(color); }
     rig.mesh.material = plain;
     const size = TIER === 'phone' && graphicsMode() === 'low' ? 64 : 128;
-    try { return shootViews(rig.mesh, { views: 8, size }); } finally { plain.dispose(); rig.mesh.skeleton.dispose(); }
+    try { return shootViews(rig.mesh, { views: 8, size }); } finally { if (kept === null) plain.dispose(); else kept.map = null; rig.mesh.skeleton.dispose(); }
   }
 
   /** the far draw shows `a` (true) or its rig does (false): the rig's layers go to 0 and back */

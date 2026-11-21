@@ -1,4 +1,4 @@
-import { InstancedMesh, type Object3D } from 'three';
+import { BatchedMesh, InstancedMesh, type Object3D } from 'three';
 import type { Scope } from '../../../shared/engine/app/scope';
 import type { Renderer } from './renderer';
 
@@ -38,10 +38,17 @@ export function guardObjectDraw(object: Object3D, guard: DrawGuard, scope: Scope
  *  stay its owners' (visibility has many). A warm-up that must draw it (parkedDraws) raises its count first. */
 const noInstances = (object: Object3D): boolean => object instanceof InstancedMesh && object.count === 0;
 
+let emptyBatches = false;
+/** DF8 (`debug.programFold`, programFold.ts): refuse a batched draw whose culling (its own `onBeforeRender` or
+ *  `onBeforeShadow`, run before this port) left no copy to draw. It puts no pixel, but three looked its program up first: a
+ *  kit batch whose members had left with their cell linked a variant of its program for each draw of nothing. */
+export function skipEmptyBatches(on: boolean): void { emptyBatches = on; }
+const noCopies = (object: Object3D): boolean => emptyBatches && object instanceof BatchedMesh && Reflect.get(object, '_multiDrawCount') === 0;
+
 /** Final admission in the existing renderer port. Registration collapses a sole
  * subscriber ahead of time, with no new per-draw wrapper. */
 export const admitObjectDraw: DrawGuard = (camera, scene, geometry, material, object, group) => {
-  if (noInstances(object)) return false;
+  if (noInstances(object) || noCopies(object)) return false;
   const target: GuardedObject = object, admit = target[GUARDS];
   return admit === undefined || admit(camera, scene, geometry, material, object, group);
 };

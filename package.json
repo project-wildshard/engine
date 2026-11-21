@@ -584,6 +584,7 @@
     "./render/changedTextureUploads": "./src/client/engine/render/changedTextureUploads.ts",
     "./render/shaderPatches": "./src/client/engine/render/shaderPatches.ts",
     "./render/programReuse": "./src/client/engine/render/programReuse.ts",
+    "./render/programFold": "./src/client/engine/render/programFold.ts",
     "./render/instancedTwin": "./src/client/engine/render/instancedTwin.ts",
     "./render/displayColour": "./src/client/engine/render/displayColour.ts",
     "./render/textureBytes": "./src/client/engine/render/textureBytes.ts",

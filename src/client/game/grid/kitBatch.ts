@@ -5,7 +5,7 @@ import { TIER } from '@wildshard/engine/core/tier';
 import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { isGpuOnlyAttribute } from '@wildshard/engine/core/gpuOnly';
-import { MERGED_VIEW } from '@wildshard/engine/core/shadowLayer';
+import { BATCHED_VIEW, MERGED_VIEW } from '@wildshard/engine/core/shadowLayer';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { mergeableMaterial, sharedHook } from './staticViewMerge';
 
@@ -136,7 +136,7 @@ export class KitBatch extends ChangedBatchedMesh {
         drawn: geometry.index?.count ?? position.count, instance, geometryId, gone: false, at: Float64Array.from(mesh.matrixWorld.elements) });
       // a channel that gives its CPU copy up at upload goes now: the member never uploads, and the batch holds its copy
       for (const attribute of attributes) if (attribute !== null && isGpuOnlyAttribute(attribute)) attribute.onUploadCallback();
-      mesh.layers.disableAll();
+      mesh.layers.disableAll(); mesh.userData[BATCHED_VIEW] = true;
     }
     batch.hooks = [...hooks];
     // the copies follow their members' rewritten triangles: the batch's index stays on the CPU (the Memory saver keeps a
@@ -152,7 +152,7 @@ export class KitBatch extends ChangedBatchedMesh {
   retire(): void {
     if (this.retired) return;
     this.retired = true;
-    for (const member of this.members) if (!member.gone && !member.released) member.mesh.layers.mask = member.mask;
+    for (const member of this.members) { Reflect.deleteProperty(member.mesh.userData, BATCHED_VIEW); if (!member.gone && !member.released) member.mesh.layers.mask = member.mask; }
     this.removeFromParent(); this.dispose();
   }
   /** each copy's pose, visibility and range, as its member has them now; a changed member leaves */
@@ -169,7 +169,7 @@ export class KitBatch extends ChangedBatchedMesh {
       const changed = mesh.geometry !== member.geometry || mesh.material !== member.material || member.geometry.index !== member.attributes[last]
         || member.attributes.some((a, i) => (a?.version ?? 0) !== member.versions[i]);
       if (changed) {
-        member.gone = true;
+        member.gone = true; Reflect.deleteProperty(mesh.userData, BATCHED_VIEW);
         member.left = mesh.geometry !== member.geometry ? 'geometry' : mesh.material !== member.material ? 'material' : `vertices:${String(member.attributes.findIndex((a, i) => (a?.version ?? 0) !== member.versions[i]))}`;
         this.setVisibleAt(member.instance, false);
         // its own copies are whole (or it has a new geometry): it draws itself again

@@ -102,6 +102,8 @@ import { decodeTerrainTile } from '@wildshard/format/terrainTileBytes';
 import { shardfileLook } from '../shardfile/look';
 import { findShard } from '../shard/registry';
 import { tileRing } from '../shardfile/tileDriver';
+import { primeStaticMerges } from './staticViewMerge';
+import { programFoldOn } from '@wildshard/engine/render/programFold';
 
 /** Page-root ports; every default is the standalone behaviour, the live session supplies the cell's own installs. */
 export interface RegionalWorldPorts {
@@ -566,6 +568,11 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
         // install), so the warm-up compiled the page-look programs and the first frame after it the region-look ones
         beforeWarm: async () => {
           await skyReady;
+          if (resident.disposed) return;
+          // DF8 (`debug.programFold`): its static merges join now, as the boot's do under the card (finish.ts), so the
+          // warm-up links the merged meshes' programs; joined by the in-play sweep after it, a re-entered cell's merged props
+          // linked at their first draw
+          if (programFoldOn()) await primeStaticMerges();
           if (resident.disposed) return;
           regionLook?.sweep();
           // RP4: its content's own point lights (Sunscar's site and signal lights) show through the page's reserved lights,

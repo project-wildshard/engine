@@ -9,6 +9,7 @@ import type { Texture } from 'three';
  * a new height tells its listeners (the grid's ring prelink) to warm what the road already shows. Held weakly; a leaf.
  */
 const byHeight = new Map<number, WeakRef<Texture>>();
+let latest: number | null = null;
 const listeners = new Set<() => void>();
 
 const heightOf = (texture: Texture): number => {
@@ -19,10 +20,14 @@ const heightOf = (texture: Texture): number => {
 export function noteEnvironment(environment: Texture | null): void {
   if (environment === null) return;
   const height = heightOf(environment), known = byHeight.get(height)?.deref();
+  if (height > 0) latest = height;
   if (known === environment) return;
   byHeight.set(height, new WeakRef(environment));
   if (known === undefined) for (const listener of listeners) listener();
 }
+/** The cube height of the environment recorded last (null: none yet): the one the road beside it draws next to (DF8's
+ *  environment fold, programFold.ts). */
+export function latestEnvironmentHeight(): number | null { return latest; }
 /** Record the environment the frame just drawn lit with (null: none). */
 export function noteDrawnEnvironment(environment: Texture | null): void { noteEnvironment(environment); }
 /** One live environment per recorded cube height. */

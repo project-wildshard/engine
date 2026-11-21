@@ -840,6 +840,12 @@ export class GridSession {
         }
         await host.prepareView?.(root, () => !host.scope.disposed && view.mesh.parent === root);
         if (view.mesh.parent === root) host.keepViewPrograms?.(view.mesh);
+        // DF8 (`debug.programFold`): the batch this view joins links its program here, before it replaces the proxies
+        const stand = farBatches?.stand(view, data.look, data.positionalMask === true) ?? null;
+        if (stand !== null) {
+          const holder = new Group(); holder.name = 'far-batch:warm'; holder.add(stand);
+          try { await host.prepareView?.(holder, () => !host.scope.disposed && view.mesh.parent === root); } finally { stand.retire(); }
+        }
       } }),
       root: (id) => { const root = roots.get(id); if (root === undefined) throw new Error(`No grid cell root ${id}`); return root; },
       load: async (id) => {

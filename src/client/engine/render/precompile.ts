@@ -15,6 +15,7 @@ import { CompileLights, createCompileScene } from './compileLights';
 import { recordGpuCheckpoint } from '../boot/gpuTrace';
 import { familyCompileJobs } from './families/registry';
 import { shaderPatchTextures } from './shaderPatches';
+import { foldScene, programFoldOn } from './programFold';
 import { uploadCompressedTexture } from './compressedUpload';
 import { linkStandIn } from '../app/sceneOwnership';
 import { FenceAbortError } from './fencedUnits';
@@ -25,7 +26,7 @@ import { postTriangle } from './postPreparation';
 import { shadowDepthResolver, type ShadowDepthResolver } from './shadowDepthVariants';
 import { boundEntryWarmup } from './entryWarmupBound';
 import { workSlice } from '../../../shared/engine/core/workSlice';
-import { SHADOW_LAYER } from '../core/shadowLayer';
+import { BATCHED_VIEW, MERGED_PROGRAM, MERGED_VIEW, SHADOW_LAYER } from '../core/shadowLayer';
 import { buildHeld, buildUrgent, heldBudget, nativeBudgetSpent, presenting } from '../../../shared/engine/core/framePacing';
 import { countedWait, waitFor } from '../../../shared/engine/boot/waits';
 import { jsonSlot } from '../saves/slots';
@@ -375,7 +376,25 @@ function programCount(renderer: Renderer): number {
 }
 
 /** the object lives on the shadow pass's layer alone (no view camera ever draws it) */
-const shadowOnly = (o: THREE.Object3D): boolean => o.layers.mask === 1 << SHADOW_LAYER;
+const shadowOnly = (o: THREE.Object3D): boolean => o.layers.mask === 1 << SHADOW_LAYER
+  // DF8 (`debug.programFold`): a member a batch draws in its place never draws itself while its layers are off
+  || (o.layers.mask === 0 && o.userData[BATCHED_VIEW] === true && programFoldOn());
+/** DF8 (`debug.programFold`): the channels a prop merge's member's merged mesh leaves out (core/shadowLayer.ts
+ *  MERGED_PROGRAM), or null when `o` is no such member: the warm-up builds the merged mesh's program from it */
+function mergedProgram(o: THREE.Object3D): readonly string[] | null {
+  if (o.layers.mask !== 1 << SHADOW_LAYER || o.userData[MERGED_VIEW] !== true || !programFoldOn()) return null;
+  const ignore: unknown = o.userData[MERGED_PROGRAM];
+  return Array.isArray(ignore) && ignore.every(name => typeof name === 'string') ? ignore : null;
+}
+/** a stand-in drawing as `member`'s merged mesh does: the member's channels less `ignore` (shared, never copied) */
+function mergedStandIn(copy: MeshLike, ignore: readonly string[]): void {
+  const geometry = copy.geometry;
+  if (geometry === undefined || ignore.length === 0) return;
+  const view = new THREE.BufferGeometry();
+  for (const [name, attribute] of Object.entries(geometry.attributes)) if (!ignore.includes(name)) view.setAttribute(name, attribute);
+  view.setIndex(geometry.index); view.boundingBox = geometry.boundingBox; view.boundingSphere = geometry.boundingSphere;
+  copy.geometry = view;
+}
 /** the geometry and group a classic graph's pre-compile `onBeforeRender` is handed (it reads neither) */
 const NO_GEOMETRY = new THREE.BufferGeometry(), NO_GROUP = new THREE.Group();
 function materialsOf(o: THREE.Object3D): THREE.Material[] { const m = (o as MeshLike).material; return Array.isArray(m) ? m : m ? [m] : []; }
@@ -464,13 +483,14 @@ function* sceneJobSteps(scene: THREE.Scene, rt: THREE.WebGLRenderTarget | null, 
     const mesh = o as MeshLike;
     // G743: a shadow-only object (its layers are the shadow pass's alone: shadowChunks.ts' pieces) is never drawn by a
     // view, so its view program is never used; the shadow jobs warm the depth program it does draw with
-    const materials = shadowOnly(o) || channelless(o) ? [] : materialsOf(mesh), list = materials.length > 0 && include !== undefined && !include(o) ? [] : materials;
+    const merged = mergedProgram(o);
+    const materials = (shadowOnly(o) && merged === null) || channelless(o) ? [] : materialsOf(mesh), list = materials.length > 0 && include !== undefined && !include(o) ? [] : materials;
     if (list.length === 0) { yield; continue; }
     // DL23: every included mesh takes its white instance colours before its key is read, not only the first of its
     // (material, key) pair: a second colourless twin kept the colourless key the first had left, drew colourless at its
     // first parked draw and linked that program there (Nine's instanced architecture, Simulator frames of 456-711 ms)
     prepareInstances(mesh);
-    const ok = programObjectKey(mesh);
+    const ok = programObjectKey(mesh) + (merged === null ? '' : `|merged:${merged.join(',')}`);
     const wanted = list.filter((m) => { mats.add(m); const k = m.uuid + ok; if (seen.has(k)) return false; seen.add(k); return true; });
     const distance = from === undefined || wanted.length === 0 ? 0 : boundsDistance(o, from);
     // A mesh's material array can contain many distinct programs. Count each
@@ -482,6 +502,7 @@ function* sceneJobSteps(scene: THREE.Scene, rt: THREE.WebGLRenderTarget | null, 
       for (const side of sides) {
         const copy = standIn(mesh);
         copy.material = material;
+        if (merged !== null) mergedStandIn(copy, merged);
         clones.push({ object: copy, distance, ...(side === undefined ? {} : { side: { material, side } }) });
       }
       yield;
@@ -1360,6 +1381,7 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     const environment = job.target?.environment ?? null;
     let originalSide: THREE.Side | undefined;
     const restoreDrawn = isolateImageUploads ? holdDrawnPrograms(renderer, job.root) : undefined;
+    let unfold = (): void => undefined;
     try {
       if (job.fogOff && job.target) job.target.fog = null;
       if (job.environment !== undefined && job.target) job.target.environment = job.environment;
@@ -1382,6 +1404,8 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
       // a classic graph program follows its drawn scene's environment (and its object's codec) in its onBeforeRender,
       // which compile never calls: run it first, or the first draw links a second program
       const scene = job.target;
+      // DF8 (`debug.programFold`): the hook and the compile see the environment the draw will (programFold.ts)
+      unfold = foldScene(renderer, scene);
       if (scene !== null && scene !== undefined) job.root.traverse(object => {
         if (object instanceof THREE.Mesh) for (const material of materialsOf(object)) if (Reflect.get(material, 'isGraphShaderMaterial') === true) {
           material.onBeforeRender(renderer, scene, job.camera ?? camera, NO_GEOMETRY, object, NO_GROUP);
@@ -1395,6 +1419,7 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
         }
       } });
     } finally {
+      unfold();
       if (job.materialSide !== undefined && originalSide !== undefined) job.materialSide.material.side = originalSide;
       restoreDrawn?.();
       renderer.setRenderTarget(prevRt); renderer.toneMapping = prevTone;
