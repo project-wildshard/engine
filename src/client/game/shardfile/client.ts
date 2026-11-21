@@ -229,6 +229,8 @@ export class ShardfileClient {
   private post: ClientPost | null = null;
   private skins: ReadonlyMap<string, ClientSkin> = new Map();
   private rigLooks: ClientRigLooks = new Map();
+  /** OF23e4: the kit registered this native page's declared species (`declaredNativePage`). */
+  private declaredNative = false;
   private worldTiles: Awaited<ReturnType<typeof standaloneClientTiles>> | undefined;
   private items: DeclaredItems | undefined;
   private itemModels: Awaited<ReturnType<typeof loadItemModels>> = new Map();
@@ -453,10 +455,28 @@ export class ShardfileClient {
   }
 
   async kit(ctx: ShardContext): Promise<void> {
+    const declaredNative = this.declaredNativePage(ctx);
     // OF19d2: a declared look drawn from a scene library's rig waits on that library's rigs
-    if (this.mode === 'full') this.rigLooks = await loadClientRigLooks(ctx.product, this.source.rows, ctx.scope);
+    if (this.mode === 'full' || declaredNative) this.rigLooks = await loadClientRigLooks(ctx.product, this.source.rows, ctx.scope);
+    // ONE-FORMAT OF23e4: a native page with no species programme or hull book (Pine r10) draws its runtime's bodies from its
+    // declared species and their looks, and keeps the hull book kit's held equipment and socket cards
+    if (declaredNative) {
+      this.declaredNative = true;
+      declarePageCreatures(ctx, this.source, this.creatureModels());
+      const { prepareDeclaredNativeKit } = await import('../models/socketRigCreature');
+      await prepareDeclaredNativeKit(ctx);
+    }
     this.kitData(ctx);
     await this.phase(ctx, 'kit');
+  }
+
+  /** OF23e4: a native runtime page whose species are only its declared rows: no `actors/species-programs`, and no plan
+   *  feature that registers species (`population.hull-book`, `species.program`, `population.product-creatures`). */
+  private declaredNativePage(ctx: ShardContext): boolean {
+    if (this.bindings.nativeRuntime !== true || this.mode === 'empty' || this.nativeFeatures || ctx.product.has('actors/species-programs')) return false;
+    if (this.source.rows.species.length === 0 || this.source.creatures.spawns.length === 0) return false;
+    const owners = new Set(['population.hull-book', 'species.program', 'population.product-creatures']);
+    return !(this.plan?.features ?? []).some(row => owners.has(row.kind));
   }
 
   /** What this page draws its declared bodies with (declaredCreatures.ts), loaded in its world stage. */
@@ -492,7 +512,7 @@ export class ShardfileClient {
     const runtime = ctx.game.runtime, world = runtime?.world;
     if (runtime === undefined || world === null || world === undefined) throw new Error('Shardfile requires the normal kit stage');
     const source = this.source;
-    declarePageCreatures(ctx, this.source, this.creatureModels());
+    if (!this.declaredNative) declarePageCreatures(ctx, this.source, this.creatureModels());
     const sketches = compendiumSketches(source.rows, this.assets.retained);
     for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredFolderCompendium(ctx.product, row.id, sketches) });
     ctx.rows.lootTable(source.rows.loot);

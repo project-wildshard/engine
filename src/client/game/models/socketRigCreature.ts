@@ -45,6 +45,18 @@ export async function prepareHullBookKit(ctx: ShardContext, cards: readonly Sock
   held.install(ctx);
 }
 
+/** ONE-FORMAT OF23e4: the hull book's kit for a native page whose species are its declared rows (no species programme, no
+ *  hull book: Pine r10). The page registers those rows itself (`declarePageCreatures`); this keeps the rest of the kit: the
+ *  held equipment and each socket card's rows. */
+export async function prepareDeclaredNativeKit(ctx: ShardContext): Promise<void> {
+  const live = (): void => { if (ctx.scope.disposed || ctx.scope.disposing) throw new Error('Declared native kit owner left'); };
+  live();
+  const held = ctx.product.has('held/equipment') ? await HeldEquipment.prepare(ctx.product) : undefined; live();
+  const cards = ctx.product.has('explore/catalogue') ? declaredSocketRigCreatures(ctx.product) : [];
+  for (const card of cards) { await card.card.preload(); live(); }
+  held?.install(ctx);
+}
+
 const declaredCards = new WeakMap<ShardFolder, readonly SocketRigCreature[]>();
 /** One product's immutable card definitions are shared by kit and Explorer. All references preflight before construction. */
 export function declaredSocketRigCreatures(product: ShardFolder): readonly SocketRigCreature[] {
