@@ -10,7 +10,7 @@ import { folderCacheCompletion } from './folderCacheCompletion';
 import { builtValidationReceipt, readValidationReceipt, validationRevision, validationSourceBytes, type ValidationReceipt } from "@wildshard/format/validationReceipt";
 import { assertStateCompatibility, parseOutputLineageIndex, parseStateLineage } from '@wildshard/format/stateLineage';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
-import { compatibleShardfileVersion, shardfileRevision } from '@wildshard/format/version';
+import { compatibleShardfileVersion, parseShardfileVersion } from '@wildshard/format/version';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { builtIndexHash } from '@wildshard/format/builtIndexes';
 
@@ -200,7 +200,7 @@ function transportRelease(source: Shardfile, assets: Map<string, Uint8Array>, op
 }
 function version(input: unknown): string {
   if (typeof input !== 'object' || input === null || !('version' in input)) throw new Error('Shardfile needs a format version');
-  shardfileRevision(input.version);
+  parseShardfileVersion(input.version);
   if (typeof input.version !== 'string') throw new Error('Shardfile needs a format version');
   return input.version;
 }
