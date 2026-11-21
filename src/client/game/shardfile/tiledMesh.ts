@@ -17,7 +17,8 @@
  * around the city drew none of Nine's sky.
  */
 import { BufferAttribute, DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh, type Matrix4, type Mesh, Object3D, SkinnedMesh } from 'three';
-import { compactResident, tileKey, tileRanges, type TileContent } from './tileContent';
+import { compactResident, tileKey, tileRanges, type TileContent, type TileRanges } from './tileContent';
+import { farTiles, type FarTiles } from '@wildshard/engine/render/farLod';
 import { TILES_PER_SIDE, tileOf } from '../../../shared/game/shardfile/tileOrder';
 
 const attributeReaders: readonly unknown[] = ['getX', 'getY', 'getZ'].map((key): unknown => Reflect.get(BufferAttribute.prototype, key));
@@ -89,10 +90,13 @@ export function tiledMesh(id: string, mesh: Mesh, toCell: Matrix4, options: { re
   if (geometry.index === null) geometry.setIndex(index);
   // rewritten on every tile change: never a static buffer whose CPU copy a GPU-only release may drop (E264)
   index.setUsage(DynamicDrawUsage);
+  // DF9 (`debug.farLod` at phone Low, farLod.ts): a resident tile past the far lines draws its coarse copy
+  let far: FarTiles | null = null;
   const draw = (): void => {
-    const drawnCount = compactResident(ranges, resident, source, index.array, 3);
+    const drawnCount = far === null ? compactResident(ranges, resident, source, index.array, 3) : compactFar(ranges, resident, source, index.array, far);
     geometry.setDrawRange(0, drawnCount * 3); index.needsUpdate = true;
   };
+  far = farTiles(mesh, source, ranges, draw);
   draw();
   return { id, tiles: () => tiles, attach: (tile, scope) => {
     if (!tiles.has(tile) || scope.disposed) return Promise.resolve();
@@ -100,6 +104,29 @@ export function tiledMesh(id: string, mesh: Mesh, toCell: Matrix4, options: { re
     scope.onDispose(() => { resident.delete(tile); draw(); });
     return Promise.resolve();
   } };
+}
+
+/** DF9: `compactResident` for triangles, each resident tile's far copy in place of its own where it has one. */
+function compactFar(ranges: TileRanges, resident: ReadonlySet<number>, source: ArrayLike<number>, target: { [index: number]: number; readonly length: number }, far: FarTiles): number {
+  let written = 0;
+  for (let t = 0; t < TILES_PER_SIDE * TILES_PER_SIDE; t++) {
+    if (!resident.has(t)) continue;
+    const copy = far.copy(t);
+    if (copy !== null) {
+      if (written * 3 + copy.length > target.length) throw new RangeError('Resident triangles exceed the target');
+      for (let k = 0; k < copy.length; k++) target[written * 3 + k] = copy[k] ?? 0;
+      written += copy.length / 3;
+      continue;
+    }
+    const from = ranges.start[t] ?? 0, n = ranges.count[t] ?? 0;
+    for (let k = from; k < from + n; k++) {
+      const triangle = ranges.order[k] ?? 0;
+      if ((written + 1) * 3 > target.length) throw new RangeError('Resident triangles exceed the target');
+      for (let c = 0; c < 3; c++) target[written * 3 + c] = source[triangle * 3 + c] ?? 0;
+      written++;
+    }
+  }
+  return written;
 }
 
 function instanced(mesh: Mesh): mesh is InstancedMesh { return mesh instanceof InstancedMesh; }

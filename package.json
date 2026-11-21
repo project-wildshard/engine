@@ -553,6 +553,7 @@
     "./render/families/paintedTerrain": "./src/client/engine/render/families/paintedTerrain.ts",
     "./render/families/painterly": "./src/client/engine/render/families/painterly.ts",
     "./render/families/pbr": "./src/client/engine/render/families/pbr.ts",
+    "./render/farLod": "./src/client/engine/render/farLod.ts",
     "./render/frameCounter": "./src/client/engine/render/frameCounter.ts",
     "./render/graphBackend": "./src/client/engine/render/graphBackend.ts",
     "./render/graph/presets": "./src/client/engine/render/graph/presets.ts",

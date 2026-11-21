@@ -21,6 +21,8 @@ interface DrawHooks {
   ownerToken: symbol | null;
   retire?: ((complete: boolean) => void) | undefined;
   labels?: Draw | undefined;
+  /** DF9: far copies (farLod.ts) see each draw first: a wide mesh's arrays at its first draw, its index rewritten after */
+  lod?: ((camera: Parameters<Draw>[0], geometry: Parameters<Draw>[2], object: Parameters<Draw>[4]) => void) | undefined;
   /** MG10: the provoking-vertex convention of this draw (installProvokingVertex below), before three uploads its index */
   provoking?: ((geometry: Parameters<Draw>[2], object: Parameters<Draw>[4]) => void) | undefined;
   material?: (...args: Parameters<Draw>) => Parameters<Draw>[3] | null;
@@ -69,6 +71,7 @@ export function drawHooks(renderer: DrawTarget): DrawHooks {
     hooks.depth++; pipeline.epoch++;
     let complete = false, submitted = false;
     try {
+      hooks.lod?.(camera, geometry, object);
       hooks.provoking?.(geometry, object);
       hooks.labels?.(camera, scene, geometry, material, object, group);
       const selected = hooks.material === undefined ? material : hooks.material(camera, scene, geometry, material, object, group);

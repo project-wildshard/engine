@@ -58,6 +58,7 @@ import { graphicsMode, lowPowerOn, noteFastFrames, PIXELS_EVENT } from './graphi
 import { flagOn, frameCapFor, noteShipped, presetLabel, setFrameReadout, type ShippedLook } from './graphicsQuality';
 import { classifyFrames } from '../boot/lowPower';
 import { boundEntryWarmup } from '../render/entryWarmupBound';
+import { installFarLod } from '../render/farLod';
 import { dropOutputDepth, installMemorySaver, shadowLights } from '../render/memorySaver';
 import { dropShadowColour } from '../world/shadowVariants';
 import { duringShadowPass } from '../world/cascadeCull';
@@ -613,6 +614,7 @@ export class Game {
     this.renderer.shadowMap.type = THREE.PCFShadowMap; // r186 removed PCFSoft: it renders PCF anyway, and the type is in every program's cache key
     setAnisotropy(this.renderer);
     installMemorySaver(this.renderer, TIER === 'phone'); // SF22d, ENGINE-MEMORY EM27
+    installFarLod(this.renderer, () => this.camera); // DF9: the wide static meshes' far copies at phone Low (`debug.farLod`)
     // shadow-only casters (shadowLayer.ts): the shadow pass tests layers against the view camera, so the view camera sees
     // SHADOW_LAYER while — and only while — the shadow maps draw. Before this the cabins' depth proxies (PLAY-PERF lever
     // 12, 46868b5) were never drawn: the cabins cast no wall / roof shadow at all.

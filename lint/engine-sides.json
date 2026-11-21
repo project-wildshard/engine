@@ -387,6 +387,7 @@
     "src/client/engine/render/families/strands.ts": "client",
     "src/client/engine/render/families/toon.ts": "client",
     "src/client/engine/render/fogPatches.ts": "client",
+    "src/client/engine/render/farLod.ts": "client",
     "src/client/engine/render/frameCounter.ts": "client",
     "src/client/engine/render/frameDrawRange.ts": "client",
     "src/client/engine/render/gltfMaterialOrder.ts": "client",
