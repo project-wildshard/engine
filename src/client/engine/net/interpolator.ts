@@ -86,38 +86,50 @@ export class Interpolator {
   sample(handle: number, tick: number, out: Float64Array): boolean {
     const track = this.tracks.get(handle);
     if (track === undefined || track.count === 0) return false;
+    this.sampleTrack(track, tick, out);
+    return true;
+  }
+
+  private sampleTrack(track: Track, tick: number, out: Float64Array, selected?: readonly number[]): void {
     const { ticks, values, count, blend } = track, width = blend.columns.length, { blended, carried } = blend;
+    const length = selected?.length ?? width;
     let later = 0;
     while (later < count && (ticks[later] ?? 0) <= tick) later++;
-    if (later === 0 || count === 1) { for (let at = 0; at < width; at++) out[at] = values[at] ?? 0; return true; }
+    if (later === 0 || count === 1) {
+      for (let i = 0; i < length; i++) { const at = selected?.[i] ?? i; out[at] = values[at] ?? 0; }
+      return;
+    }
     if (later === count) { // past the newest: run on along the last delta for at most EXTRAPOLATE_TICKS
       const a = (count - 2) * width, b = (count - 1) * width, from = ticks[count - 2] ?? 0, to = ticks[count - 1] ?? 0, past = Math.min(tick - to, EXTRAPOLATE_TICKS) / (to - from);
-      for (let at = 0; at < width; at++) {
+      for (let i = 0; i < length; i++) {
+        const at = selected?.[i] ?? i;
         const older = values[a + at] ?? 0, newer = values[b + at] ?? 0;
         out[at] = carried[at] !== true ? newer : newer + delta(blend.columns[at], older, newer) * past;
       }
-      return true;
+      return;
     }
     const a = (later - 1) * width, b = later * width, from = ticks[later - 1] ?? 0, to = ticks[later] ?? 0, t = (tick - from) / (to - from);
-    for (let at = 0; at < width; at++) {
+    for (let i = 0; i < length; i++) {
+      const at = selected?.[i] ?? i;
       const older = values[a + at] ?? 0, newer = values[b + at] ?? 0;
       out[at] = blended[at] === true ? older + delta(blend.columns[at], older, newer) * t : older;
     }
-    return true;
   }
 
   /**
    * `sample` for a body a predicted player stands on, which has to stand in the present and not 100 ms behind: past the newest
    * sample it runs on along its last delta for up to `reach` ticks, where `sample` stops at 50 ms. A row the newest frames left
-   * out has stopped, and holds where it stopped.
+   * out has stopped, and holds where it stopped. A caller that needs only `selected` columns leaves the other slots untouched.
    */
-  project(handle: number, tick: number, out: Float64Array, reach: number): boolean {
+  project(handle: number, tick: number, out: Float64Array, reach: number, selected?: readonly number[]): boolean {
     const track = this.tracks.get(handle);
     if (track === undefined || track.count === 0) return false;
     const { ticks, values, count, blend } = track, to = ticks[count - 1] ?? 0, from = ticks[count - 2] ?? 0, width = blend.columns.length;
-    if (tick <= to) return this.sample(handle, tick, out);
+    if (tick <= to) { this.sampleTrack(track, tick, out, selected); return true; }
     const past = count === 1 || this.newest > to ? 0 : Math.min(tick - to, reach) / (to - from), { carried } = blend, a = (count - 2) * width, b = (count - 1) * width;
-    for (let at = 0; at < width; at++) {
+    const length = selected?.length ?? width;
+    for (let i = 0; i < length; i++) {
+      const at = selected?.[i] ?? i;
       const older = values[a + at] ?? 0, newer = values[b + at] ?? 0;
       out[at] = carried[at] !== true || past === 0 ? newer : newer + delta(blend.columns[at], older, newer) * past;
     }

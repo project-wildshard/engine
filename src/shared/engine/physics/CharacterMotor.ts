@@ -470,13 +470,12 @@ export class CharacterMotor {
     const r = this.result;
     if (!this.enabled) { feet.x += asked.x; feet.y += asked.y; feet.z += asked.z; r.grounded = false; r.groundNormalY = 1; r.horizontalFreedom = 1; r.groundCollider = null; this.anchorBody = null; return r; }
     const rested = !ignoreGround && asked.y <= 0 && this.restOnFlatFloor(feet);
-    const sideways = rested && Math.hypot(asked.x, asked.z) > 1e-6;
+    const wantH = Math.hypot(asked.x, asked.z), sideways = rested && wantH > 1e-6;
     if (sideways) feet.y += REST_LIFT;
     const want = sideways ? this.flatWant(asked) : asked;
     const { R } = this.physics, translation = this.translation;
     translation.x = feet.x; translation.y = feet.y + this.lift; translation.z = feet.z;
     this.collider.setTranslation(translation);
-    const wantH = Math.hypot(want.x, want.z);
     // SF49 / SF51: a sideways move near a kinematic body (a mover's deck, at rest or ridden) starts a skin higher (see
     // `nearDeck`); a move with no sideways part isn't snapped back down by the controller, so it starts where it is.
     const lifted = wantH > 1e-6 && want.y <= 0 && this.nearDeck(feet) ? this.kcc.offset() : 0;
@@ -504,7 +503,8 @@ export class CharacterMotor {
     let grounded = this.kcc.computedGrounded();
     if (!ignoreGround && this.opts.group === 'PLAYER' && this.opts.length === undefined && lifted === 0 && r.grounded
         && want.y < 0) {
-      const contacts = this.staticContacts();
+      // A vertical move cannot request a slope retry. A bank retry needs both a terrain contact and a separate wall.
+      const contacts = wantH === 0 && this.kcc.numComputedCollisions() < 2 ? 0 : this.staticContacts();
       const retry = contacts === (SLOPE_CONTACT | WALL_CONTACT) && movedH < wantH * 0.99 ? this.slideAboveSlope(want, pred)
         : contacts === (BANK_CONTACT | WALL_CONTACT) ? this.slideOffBank(feet, want, pred) : null;
       if (retry !== null) { m = retry; grounded = true; }

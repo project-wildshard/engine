@@ -404,6 +404,7 @@ export class GridSession {
    *  on the first walk back in). */
   private prelinkOwed = false;
   private readonly admitNeighbour: ((cell: GridCell, required?: boolean) => Promise<void>) | undefined;
+  private readonly approachNeighbour: ((cell: GridCell) => void) | undefined;
   private readonly admitNeighbourRender: ((cell: GridCell) => Promise<boolean>) | undefined;
   /** G222 playtest #7: each neighbour's declared doors and gates, shown exactly when its region has them standing */
   private readonly panels: NeighbourPanels;
@@ -952,6 +953,7 @@ export class GridSession {
     this.clientTiles = clientTileRegistration(tiles.instances, this.rings, tileRing, id => this.farMeshes.has(id));
     const neighbourAdmission = host.renderer === undefined ? undefined : this.tileAdmission(host.renderer, roots);
     this.admitNeighbour = neighbourAdmission?.complete;
+    this.approachNeighbour = neighbourAdmission?.approach;
     this.admitNeighbourRender = neighbourAdmission?.render;
     host.scope.onDispose(() => {
       this.clientTiles.dispose(); this.rings.dispose();
@@ -995,7 +997,7 @@ export class GridSession {
    * fails to admit keeps its far proxy.
    */
   private tileAdmission(renderer: Renderer, roots: ReadonlyMap<string, Group>): {
-    complete: (cell: GridCell, required?: boolean) => Promise<void>; render: (cell: GridCell) => Promise<boolean>;
+    complete: (cell: GridCell, required?: boolean) => Promise<void>; approach: (cell: GridCell) => void; render: (cell: GridCell) => Promise<boolean>;
   } {
     const scope = this.host.scope, skins = new Map<string, Promise<ReadonlyMap<string, ClientSkin>>>();
     const shared = new Map<string, Promise<{ source: ClientRingInstance['source']; assets: ClientAssets; views: ClientTileViews; compile: (entry: unknown) => Material; scene: CellScenePresentation; look: Omit<CellLook, 'source'> }>>();
@@ -1044,6 +1046,7 @@ export class GridSession {
     }, () => this.allocator.revision);
     return {
       complete: (cell, required) => scope.disposed || scope.disposing ? Promise.reject(new Error('Grid tile owner left')) : requests.complete(cell, required),
+      approach: cell => { if (!scope.disposed && !scope.disposing) requests.approach(cell); },
       render: async cell => {
         if (scope.disposed || scope.disposing) throw new Error('Grid tile owner left');
         try { await requests.render(cell); return true; }
@@ -1192,13 +1195,14 @@ export class GridSession {
     // home re-read ~225 of its files after control for it); leaving starts it while the runtime is still resident. A
     // runtime whose ground is those tiles (D189: Pine) still admits them, or its far proxy stays over the spawn
     const drawn = this.live?.runtimeDrawnCell() ?? null;
+    const reach = 400 + Math.min(speed, 60) * 4;
     if (this.initialFarReady && this.host.backgroundReady?.() !== false) for (const cell of this.neighbours) {
       if (cell.instance === drawn && !admitsCellTiles(cell.instance, drawn, this.clientTiles.owns(cell.instance), findShard(cell.slug)?.cellGround === 'world')) continue;
-      const distance = Math.hypot(Math.max(0, Math.abs(at.x - cell.origin.x) - CHUNK_HALF), Math.max(0, Math.abs(at.z - cell.origin.z) - CHUNK_HALF));
-      if (!this.assembly.approaching(distance, 400 + Math.min(speed, 60) * 4)) continue;
+      const x = Math.max(0, Math.abs(at.x - cell.origin.x) - CHUNK_HALF), z = Math.max(0, Math.abs(at.z - cell.origin.z) - CHUNK_HALF);
+      if (x > reach || z > reach || !this.assembly.approaching(Math.hypot(x, z), reach)) continue;
       // DF8 (mini-driftwood13i): each neighbour's admission call is timed on its own, so a long step names the cell
       if (timed) lap('grid.step neighbours');
-      void this.admitNeighbour?.(cell).catch(() => undefined);
+      this.approachNeighbour?.(cell);
       if (timed) lap(`grid.admit ${cell.slug}`);
     }
     lap('grid.step neighbours');

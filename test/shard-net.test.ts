@@ -31,6 +31,14 @@ test('a client sees a mover, its flags and public shared state as the server hol
     const world = new SimNetWorld(host), link = directLoopback(), client = new NetClient(link.client);
     const room = new NetRoom({ world, step: () => { host.step(); } });
     room.join(link.server); client.hello(); link.pump(); room.open(); link.pump();
+    const initialFlags = client.flags(), marker = 'fixture:shore-gate';
+    host.flags.set(marker); room.tick(); room.tick(); link.pump();
+    const raisedFlags = client.flags();
+    expect(initialFlags.has(marker)).toBe(false);
+    expect(raisedFlags.has(marker)).toBe(true);
+    host.flags.clear(marker); room.tick(); room.tick(); link.pump();
+    expect(client.flags().has(marker)).toBe(false);
+    expect(raisedFlags.has(marker)).toBe(true);
     const wired = (): { readonly x: number; readonly z: number; readonly enabled: boolean } => {
       const frame = client.latest, entity = [...client.entities.values()].find(value => value.id === `script:${row.id}`);
       if (frame === null || entity === undefined) throw new Error('Missing script row');

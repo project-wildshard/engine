@@ -51,6 +51,7 @@ test('each declared species reaches a remote page by its own id', () => {
     room.join(link.server); client.hello(); link.pump(); room.open(); link.pump();
     room.tick(); room.tick(); link.pump();
     const seen = new Map([...client.entities.values()].filter(info => info.cls.cls === ANIMAL_CLASS.cls).map(info => [info.id, [info.initial['kind'], info.initial['species']]]));
+    expect([...client.creatures.values()].map(info => info.id)).toEqual([...seen.keys()]);
     expect(seen.get('bandit.1')).toEqual(['bear', 'mesa.bandit']);
     expect(seen.get('wyrm')).toEqual(['bear', 'mesa.wyrm']);
     expect(seen.get('target.1')).toEqual(['greyBlob', 'mesa.target']);

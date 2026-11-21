@@ -111,11 +111,11 @@ function loadSeen(): Set<HintControl> {
 interface Box { l: number; t: number; r: number; b: number }
 /** drawn and seen: a box on screen, not faded out (E319's idle LOCK disc keeps its box but goes `opacity: 0; visibility:
  *  hidden` while nothing is lockable) — a hint never points at, or steps around, a control the player cannot see */
-function shown(el: HTMLElement): boolean {
+function shownRect(el: HTMLElement): DOMRect | null {
   const r = el.getBoundingClientRect();
-  if (r.width <= 0 || r.height <= 0) return false;
+  if (r.width <= 0 || r.height <= 0) return null;
   const cs = getComputedStyle(el);
-  return cs.visibility !== 'hidden' && Number.parseFloat(cs.opacity) > 0.05;
+  return cs.visibility !== 'hidden' && Number.parseFloat(cs.opacity) > 0.05 ? r : null;
 }
 const overlaps = (a: Box, b: Box): boolean => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b.t;
 
@@ -219,7 +219,7 @@ export class FirstHints {
   private anchor(c: HintControl): HTMLElement | null | undefined {
     if (!this.opts.touch) return null;
     if (this.anchors.has(c)) return this.anchors.get(c);
-    const el = document.querySelector<HTMLElement>(`.ws-touch ${ANCHOR[c]}`), found = el !== null && shown(el) ? el : undefined;
+    const el = document.querySelector<HTMLElement>(`.ws-touch ${ANCHOR[c]}`), found = el !== null && shownRect(el) !== null ? el : undefined;
     this.anchors.set(c, found);
     return found;
   }
@@ -246,17 +246,13 @@ export class FirstHints {
     const hud = this.tag.parentElement?.getBoundingClientRect() ?? new DOMRect(0, 0, innerWidth, innerHeight);
     const r = el.getBoundingClientRect();
     const x0 = r.left - hud.left, y0 = r.top - hud.top, w = r.width, h = r.height;
-    const round = Math.abs(w - h) < 4;
-    const rs = this.ring.style;
-    rs.left = `${x0 - RING_PAD}px`; rs.top = `${y0 - RING_PAD}px`; rs.width = `${w + RING_PAD * 2}px`; rs.height = `${h + RING_PAD * 2}px`;
-    this.ring.classList.toggle('round', round);
-
     const tw = this.tag.offsetWidth, th = this.tag.offsetHeight, W = hud.width;
     const cx = x0 + w / 2;
     const obstacles: Box[] = [];
     for (const o of document.querySelectorAll<HTMLElement>(`.ws-touch :is(${OBSTACLES}), ${PAGE_OBSTACLES}`)) {
-      if (o === el || o.contains(el) || !shown(o)) continue;
-      const b = o.getBoundingClientRect();
+      if (o === el || o.contains(el)) continue;
+      const b = shownRect(o);
+      if (b === null) continue;
       obstacles.push({ l: b.left - hud.left - 4, t: b.top - hud.top - 4, r: b.right - hud.left + 4, b: b.bottom - hud.top + 4 });
     }
     const clampX = (l: number): number => Math.max(MARGIN, Math.min(W - MARGIN - tw, l));
@@ -273,6 +269,10 @@ export class FirstHints {
       }
     }
     best ??= { l: clampX(cx - tw / 2), t: y0 - TAG_GAP - th, r: 0, b: 0 };
+    // The ring is out of flow. Finish reading the controls and tag before changing their overlay.
+    const rs = this.ring.style;
+    rs.left = `${x0 - RING_PAD}px`; rs.top = `${y0 - RING_PAD}px`; rs.width = `${w + RING_PAD * 2}px`; rs.height = `${h + RING_PAD * 2}px`;
+    this.ring.classList.toggle('round', Math.abs(w - h) < 4);
     const ts = this.tag.style;
     ts.left = `${best.l}px`; ts.top = `${best.t}px`;
     // the notch points at the control: under the tag when the control is below it, else on the side toward it

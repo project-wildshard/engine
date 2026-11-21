@@ -1,6 +1,6 @@
 import { ApproachInputsDeferredError } from './folderInputs';
 
-interface Request { complete: Promise<void>; offered: Promise<void>; deferred: boolean; revision: number }
+interface Request { complete: Promise<void>; offered: Promise<void>; watchingApproach: boolean; deferred: boolean; revision: number }
 /** Share view preparation, retry optional headroom only after accounting changes,
  * and promote a deferred view exactly once when actual entry requires it. */
 export class GridViewAdmissions<Cell extends { readonly instance: string }> {
@@ -11,7 +11,7 @@ export class GridViewAdmissions<Cell extends { readonly instance: string }> {
     if (previous !== undefined && (!previous.deferred || !required && previous.revision === this.revision())) return previous;
     let offer = (): void => undefined;
     const offered = new Promise<void>(resolve => { offer = resolve; });
-    const state: Request = { complete: Promise.resolve(), offered, deferred: false, revision: this.revision() };
+    const state: Request = { complete: Promise.resolve(), offered, watchingApproach: false, deferred: false, revision: this.revision() };
     state.complete = (async () => {
       try { await this.start(cell, required, offer); }
       catch (error) {
@@ -20,6 +20,13 @@ export class GridViewAdmissions<Cell extends { readonly instance: string }> {
       }
     })();
     this.requests.set(cell.instance, state); return state;
+  }
+  /** The fixed step visits this cell repeatedly. Observe each background request's rejection once. */
+  approach(cell: Cell): void {
+    const pending = this.request(cell, false);
+    if (pending.watchingApproach) return;
+    pending.watchingApproach = true;
+    void pending.complete.catch(() => undefined);
   }
   complete(cell: Cell, required = false): Promise<void> {
     const pending = this.request(cell, required).complete;

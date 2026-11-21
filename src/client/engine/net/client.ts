@@ -19,7 +19,7 @@ import { decodeWelcome } from '@wildshard/wire/handshake';
 import { WireFrameReader } from '../../../shared/engine/net/wireFrames';
 import { actMessage, commandsMessage, eventsReader, helloMessage, type Span } from '../../../shared/engine/net/wireMessages';
 import type { NetEvent, NetFlight, NetView, NetCombatEvent, NetPlayerDied, NetRide, NetTravel, NetWelcome } from '../../../shared/engine/net/messages';
-import { FLAG_CLASS, netClassOf, PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
+import { ANIMAL_CLASS, FLAG_CLASS, netClassOf, PLAYER_CLASS } from '../../../shared/engine/net/netSchemas';
 import { FLAG_PREFIX, STATE_PREFIX } from '../../../shared/engine/net/shardNet';
 import type { NetClass, NetValue } from '../../../shared/engine/net/schema';
 import type { Transport } from '../../../shared/engine/net/transport';
@@ -58,7 +58,9 @@ export class NetClient {
   closed: string | null = null;
   /** Frames refused as malformed or not applicable yet. */
   dropped = 0;
-  readonly entities: Map<number, NetEntityInfo> = new Map<number, NetEntityInfo>();
+  private readonly entityRows = new Map<number, NetEntityInfo>();
+  readonly entities: ReadonlyMap<number, NetEntityInfo> = this.entityRows;
+  private roster: { readonly creatures: ReadonlyMap<number, NetEntityInfo>; readonly flags: ReadonlySet<string> } | undefined;
   /** Where the server is now, and how far behind it rows are drawn (P1-E5.3-F3). */
   readonly clock: NetClock = new NetClock();
   /** Every row but this client's own character, buffered to be drawn in the past (P1-E5.3-F2). */
@@ -199,12 +201,22 @@ export class NetClient {
     for (let k = 0; k < columns.length; k++) { const column = columns[k]; if (column?.name === name) return column.value(row[k] ?? 0); }
     return undefined;
   }
-  /** The flags set in the shard, by name: a flag's entity exists while it is set (P1-E3.10). */
-  flags(): ReadonlySet<string> {
-    const out = new Set<string>();
-    for (const entity of this.entities.values()) if (entity.cls === FLAG_CLASS) out.add(entity.id.slice(FLAG_PREFIX.length));
-    return out;
+  /** The reliable roster changes on spawn, despawn or travel, independently of frame delivery. */
+  private entityRoster(): NonNullable<NetClient['roster']> {
+    if (this.roster === undefined) {
+      const creatures = new Map<number, NetEntityInfo>(), flags = new Set<string>();
+      for (const entity of this.entityRows.values()) {
+        if (entity.cls === ANIMAL_CLASS) creatures.set(entity.handle, entity);
+        else if (entity.cls === FLAG_CLASS) flags.add(entity.id.slice(FLAG_PREFIX.length));
+      }
+      this.roster = { creatures, flags };
+    }
+    return this.roster;
   }
+  /** The creature rows in reliable spawn order. */
+  get creatures(): ReadonlyMap<number, NetEntityInfo> { return this.entityRoster().creatures; }
+  /** The flags set in the shard, by name: a flag's entity exists while it is set (P1-E3.10). */
+  flags(): ReadonlySet<string> { return new Set(this.entityRoster().flags); }
   /** One public shared state field in a frame, by its declared name. STR20: read every frame (the grapple's seven rows, the
    *  day, the weather), so it decodes the one `value` column in place: no key string and no decoded row object. @frame */
   stateField(frame: DecodedFrame, name: string): number | undefined {
@@ -339,7 +351,8 @@ export class NetClient {
       if (event.kind === 'despawn') {
         const id = this.entities.get(event.handle)?.id;
         if (id !== undefined) { this.ids.delete(id); if (id.startsWith(STATE_PREFIX)) this.stateIds.delete(id.slice(STATE_PREFIX.length)); }
-        this.entities.delete(event.handle); this.senderClasses.delete(event.handle);
+        if (this.entityRows.delete(event.handle)) this.roster = undefined;
+        this.senderClasses.delete(event.handle);
         continue;
       }
       // The server's class id (game index + 1, 5.2), kept even for a class this build lacks so its rows still decode.
@@ -350,13 +363,14 @@ export class NetClient {
       const initial = decodeColumns(cls.initial, this.server?.initial(senderId, event.initial) ?? event.initial);
       const texts = this.server?.text(senderId, event.text) ?? event.text;
       cls.text.forEach((field, index) => { initial[field.name] = texts[index] ?? ''; });
-      this.entities.set(event.handle, { handle: event.handle, id: event.id, cls, initial });
+      this.entityRows.set(event.handle, { handle: event.handle, id: event.id, cls, initial });
+      this.roster = undefined;
       this.ids.set(event.id, event.handle);
       if (event.id.startsWith(STATE_PREFIX)) this.stateIds.set(event.id.slice(STATE_PREFIX.length), event.handle);
     }
   }
   /** Everything it holds named the cell it left. Commands stand: the player's own stream goes on. */
-  private left(): void { this.welcome = null; this.latest = null; this.deathTick = -1; this.clock.reset(); this.interpolator.clear(); this.delivery.clear(); this.frames.clear(); this.entities.clear(); this.senderClasses.clear(); this.ids.clear(); this.stateIds.clear(); this.quests.clear(); this.phased.clear(); this.riders.clear(); this.owned.clear(); this.ownedVersion++; this.ledgerSerial = 0; }
+  private left(): void { this.welcome = null; this.latest = null; this.deathTick = -1; this.clock.reset(); this.interpolator.clear(); this.delivery.clear(); this.frames.clear(); this.entityRows.clear(); this.roster = undefined; this.senderClasses.clear(); this.ids.clear(); this.stateIds.clear(); this.quests.clear(); this.phased.clear(); this.riders.clear(); this.owned.clear(); this.ownedVersion++; this.ledgerSerial = 0; }
   private receipt(event: NetLedger): void {
     if (event.serial <= this.ledgerSerial || this.granted.has(event.id)) return;
     this.ledgerSerial = event.serial; this.granted.add(event.id);

@@ -367,7 +367,8 @@ export class WirePage {
     if (client === null || client.latest === null || !here) return;
     this.followDay(clock, client); this.mirrorOwned(client, level);
     for (const [id, row] of client.quests) this.quests.set(id, row);
-    const held = new Set([...client.flags(), ...client.phased]), now = client.latest.tick;
+    const held = new Set(client.flags()), now = client.latest.tick;
+    for (const flag of client.phased) held.add(flag);
     this.heard.clear(); for (const flag of held) this.heard.add(flag); // a gate's flag may be the world's: a personal one comes as a `phase`
     for (const book of this.books) if (level === null || book.level.endsWith(level)) book.mirror(held, now);
     // What a save opened with is no news, and nor is a started quest a crossing comes back to: a world's first frame only says where things stand.

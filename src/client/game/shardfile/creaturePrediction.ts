@@ -4,6 +4,7 @@ import { ANIMAL_CLASS } from '@wildshard/engine/net/netSchemas';
 
 const X = ANIMAL_CLASS.row.findIndex(column => column.name === 'x'), Y = ANIMAL_CLASS.row.findIndex(column => column.name === 'y'),
   Z = ANIMAL_CLASS.row.findIndex(column => column.name === 'z'), ALIVE = ANIMAL_CLASS.row.findIndex(column => column.name === 'alive');
+const COLLISION_COLUMNS = [X, Y, Z, ALIVE] as const;
 /** Same bounded half-second projection as predicted moving decks. */
 const RUN_ON_TICKS = 30;
 /** NET-LAG NL13b3: a creature whose feet stand this far above the player's is off the ground under them (a diving flyer), and
@@ -29,7 +30,7 @@ export class CreaturePrediction implements PredictedMover {
   prepare(): void { this.pose(this.nextTick); }
   private pose(tick: number): void {
     for (const creature of this.rows) {
-      if (!this.interpolator.project(creature.handle, tick, this.row, RUN_ON_TICKS)) { creature.alive = false; continue; }
+      if (!this.interpolator.project(creature.handle, tick, this.row, RUN_ON_TICKS, COLLISION_COLUMNS)) { creature.alive = false; continue; }
       creature.x = this.row[X] ?? 0; creature.y = this.row[Y] ?? 0; creature.z = this.row[Z] ?? 0;
       creature.alive = this.row[ALIVE] === 1 && creature.y <= this.feet.y + AIRBORNE_ABOVE_FEET;
     }

@@ -10,7 +10,9 @@ import { Object3D, Vector3, type Texture } from 'three';
 import { ownSceneTree } from '@wildshard/engine/app/sceneOwnership';
 import type { DisposeStep, Scope } from '@wildshard/engine/app/scope';
 import type { Game } from '@wildshard/engine/core/Game';
-import { bindConstructionEnvironment, ownedFacade, ownerTask, withOwner } from '@wildshard/engine/app/ownership';
+import { bindConstructionEnvironment, ownedFacade, ownerTask, withOwner, withOwnerCall } from '@wildshard/engine/app/ownership';
+import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { frameCost } from '@wildshard/engine/core/frameCost';
 import { createLevelInstallation } from '@wildshard/engine/level/installation';
 import { EquipmentService } from '@wildshard/engine/combat/EquipmentService';
 import { startViewmodelTextures } from '@wildshard/engine/combat/view/ranged';
@@ -429,11 +431,18 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
                   disposeRifleDrop: () => { runtime.hooks.disposeRifleDrop?.(); } };
                 runtime.play = localPlay;
                 installEnteredRuntimeService(entered, entry => {
+                  const updateAnimals = (dt: number, t: number): void => {
+                    const feet = world.player.position;
+                    regional.animals.update(dt, t, feet, feet, viewFromRoot.of(world.game.camera));
+                  };
+                  const equipmentCost = `grid.runtime.${request.cell.instance}.equipment`;
                   app.addContentSystem({ id: `grid.runtime.${request.cell.instance}.animals`, phase: 'update', run: (dt, t) => {
                     // Native hitboxes/controllers are lazy, but belong to the parked resident rather than this entry.
-                    withOwner(owner, () => regional.animals.update(dt, t, world.player.position, world.player.position, viewFromRoot.of(world.game.camera)));
+                    withOwnerCall(owner, updateAnimals, dt, t);
                     localPlay?.progress.addPlay(dt);
+                    const at = frameCost.on ? diagnosticNow() : undefined;
                     weapons.update(dt, t);
+                    if (at !== undefined) frameCost.sectionOther(equipmentCost, diagnosticNow() - at);
                   } }, entry);
                   weapons.enabled = true; weapons.visible = !stowed; weapons.stowed = stowed;
                   entry.onDispose(() => { weapons.enabled = false; weapons.visible = false; weapons.adsHeld = false; weapons.altHeld = false; });
