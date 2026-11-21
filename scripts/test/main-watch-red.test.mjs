@@ -2,7 +2,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { failurePaths, KEEPER_MS, readState, redMessage, redRecipients, redSuspect, sweep } from '../main-watch.mjs';
+import { failurePaths, KEEPER_MS, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
 
 const older = 'a'.repeat(40), newer = 'b'.repeat(40), other = 'c'.repeat(40);
 const testFile = 'test/host-ruler-roots.test.ts', sourceFile = 'scripts/host-ruler/roots.mjs';
@@ -168,4 +168,45 @@ test('a running span keeps its prior prompts after a watcher upgrade', () => wit
   red(62, [testFile]);
   expect(sent).toEqual([]);
   expect(readState(io.state)?.red?.history?.files).toEqual([testFile]);
+}));
+
+
+test('MD8 replays the two MacBook reds without prompting a mini lane; exact run claims only', () => {
+  const localLanes=new Set(['codex-tc48']);
+  const scope={machine:'mini',run:44890926808,commits:[newer],recipientLanes:['codex-tc48'],localLanes,receipts:'',trailers:new Map([[newer,['codex-ci21']]])};
+  expect(shouldPromptRed(scope)).toBe(false);
+  expect(shouldPromptRed({...scope,run:44910588755,trailers:new Map([[newer,['opus-nalati']]])})).toBe(false);
+  const mine={...scope,trailers:new Map([[newer,['codex-tc48']]])};
+  expect(shouldPromptRed(mine)).toBe(true);
+  for(const receipt of [
+    '05:35 Cancún NOTE coordinator(mini): MAIN RED run 44890926808 is not mini code; routed to the MacBook.',
+    '09:02 Cancún CLAIM MacBook opus-nalati owns run44890926808',
+  ])expect(shouldPromptRed({...mine,receipts:receipt})).toBe(false);
+  expect(shouldPromptRed({...mine,receipts:'CLAIM MacBook owns run448909268080'})).toBe(true);
+  expect(shouldPromptRed({...mine,receipts:'NOTE MacBook owns run44910588755'})).toBe(true);
+  expect(shouldPromptRed({...mine,recipientLanes:['opus-nalati']})).toBe(false);
+});
+
+test('MD8 claimed MacBook-landed red still prompts its lander through sweep', () => withRedSpan(({red,io,sent})=>{
+  io.redAllowed=(run,commits,recipientLanes)=>shouldPromptRed({machine:'macbook',run,commits,recipientLanes,
+    localLanes:new Set(),receipts:`14:13 Cancún CLAIM MacBook first owns run${run}`,trailers:new Map()});
+  red(62,[testFile,freshFile]);
+  expect(sent.map(row=>row.to)).toEqual(['w1:p2']);
+}));
+
+test('MD8 mini suppression also covers fallback and keeper; verdict stays red', () => withRedSpan(({red,io,sent,receipts})=>{
+  io.redAllowed=()=>false;
+  red(62,[testFile,freshFile]);
+  io.now=()=>Date.now()+KEEPER_MS;
+  sweep(io);
+  expect(sent).toEqual([]);
+  expect(receipts).toContainEqual(expect.stringMatching(/^MAIN RED .*run 62/u));
+}));
+
+
+test('MD8 a mini-landed red still prompts its mini lander through sweep', () => withRedSpan(({red,io,sent})=>{
+  io.redAllowed=(run,commits,recipientLanes)=>shouldPromptRed({machine:'mini',run,commits,recipientLanes,
+    localLanes:new Set(['first','second','coordinator']),receipts:'',trailers:new Map([[older,['second']]])});
+  red(62,[testFile,freshFile]);
+  expect(sent.map(row=>row.to)).toEqual(['w1:p2']);
 }));

@@ -16,6 +16,7 @@ export interface Io {
   commits:(from:string|null,to:string)=>string[];contains:(ancestor:string,descendant:string)=>boolean;
   changes:(from:string|null,to:string)=>Map<string,string[]>;agents:()=>Map<string,string>;
   receipts:()=>string;receipt:(line:string)=>void;panes:()=>Pane[];send:(pane:string,text:string)=>boolean;prompt:(agent:string,text:string)=>boolean;fixers:()=>string[];dispatch:()=>void;
+  redAllowed?:(run:number,commits:readonly string[],recipientLanes:readonly string[])=>boolean;
   nativeRuns?:()=>Run[];
   budgetRuns?:()=>Run[];
   failmodeRuns?:()=>Run[];
@@ -45,3 +46,5 @@ export function liveIo(env?:NodeJS.ProcessEnv):Io;
 export function sweep(io:Io,hint?:{sha?:string;lane?:string;pane?:string}):Verdict[];
 export function reached(io:{tip:()=>string;contains:(ancestor:string,descendant:string)=>boolean},sha:string,waitMs:number,pollMs?:number):Promise<boolean>;
 export function follow(io:Io,options:{sha:string;lane?:string;pane?:string;pollMs?:number;timeoutMs?:number}):Promise<Verdict[]>;
+
+export function shouldPromptRed(scope:{machine:string;run:number;commits:readonly string[];recipientLanes:readonly string[];localLanes:ReadonlySet<string>;receipts:string;trailers:ReadonlyMap<string,readonly string[]>}):boolean;

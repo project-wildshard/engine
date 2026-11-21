@@ -21,7 +21,7 @@
 // kind of receipt, `main AMBER <sha> audio <shard> <tier> <MB>/6.00 MB`, from the cook report's test; never a red main.
 import {execFileSync,spawn} from 'node:child_process';
 import {appendFileSync,existsSync,mkdirSync,openSync,readFileSync,renameSync,rmSync,writeFileSync} from 'node:fs';
-import {homedir} from 'node:os';
+import {homedir,hostname} from 'node:os';
 import {dirname,join,resolve} from 'node:path';
 import {setTimeout} from 'node:timers/promises';
 import {pathToFileURL} from 'node:url';
@@ -273,8 +273,22 @@ function writeState(file,state){
   writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{}),...(state.red===undefined?{}:{red:state.red}),...(state.notified===undefined?{}:{notified:state.notified})})}\n`);renameSync(temporary,file);
 }
 
+/** MD8: only mini routing changes. MacBook landers keep their existing prompts, including claimed runs.
+ * @param {{machine:string,run:number,commits:readonly string[],recipientLanes:readonly string[],
+ * localLanes:ReadonlySet<string>,receipts:string,trailers:ReadonlyMap<string,readonly string[]>}} scope */
+export function shouldPromptRed({machine,run,commits,recipientLanes,localLanes,receipts,trailers}){
+  if(machine!=='mini')return true;
+  const local=(/** @type {string} */lane)=>localLanes.has(lane)||lane.startsWith('mini-');
+  if(!recipientLanes.some(local))return false;
+  const namedRun=new RegExp(`(?:run\\s*|actions/runs/)${run}(?!\\d)`,'iu');
+  const claimed=receipts.split('\n').some(line=>/\b(?:NOTE|CLAIM)\b/u.test(line)&&namedRun.test(line)
+    &&/MacBook/iu.test(line)&&/claim|owns?|owner|routed|not mini|stand down|stood down/iu.test(line));
+  if(claimed)return false;
+  return commits.some(sha=>(trailers.get(sha)??[]).some(local));
+}
+
 /** Save the address before submitting: an interrupted transport might already have delivered the prompt.
- * @param {Pick<ReturnType<typeof liveIo>,'state'|'send'|'prompt'>} io @param {State} state
+ * @param {Pick<ReturnType<typeof liveIo>,'state'|'send'|'prompt'|'redAllowed'>} io @param {State} state
  * @param {number} run @param {RedRecipient} recipient @param {string} text @param {readonly string[]} [commits] */
 function notifyRed(io,state,run,recipient,text,commits=[]){
   const seen=state.notified??={};
@@ -282,6 +296,7 @@ function notifyRed(io,state,run,recipient,text,commits=[]){
   const pane=recipient.key.startsWith('pane:'),aliases=[...recipient.lanes].map(lane=>`agent:${lane}`);
   if(previous.includes(recipient.key)||aliases.some(alias=>previous.includes(alias)
     ||(!pane&&previous.some(key=>key.startsWith(`${alias}@pane:`)))))return null;
+  if(io.redAllowed?.(run,commits.length>0?commits:state.red?.history?.commits??[],[...recipient.lanes])===false)return null;
   const keys=[recipient.key,...pane?aliases.map(alias=>`${alias}@${recipient.key}`):[]];
   seen[run]=[...new Set([...previous,...keys])];
   const history=state.red?.history;
@@ -369,7 +384,7 @@ export function liveIo(env=process.env){
   const state=resolve(env.WS_MAIN_WATCH_STATE??join(homedir(),'.cache/wildshard/main-watch.json'));
   /** @param {number} id @returns {Job[]} */
   const jobsFor=id=>JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}/jobs?per_page=100`])).jobs;
-  return {
+  const io={
     repo,
     quotaReset:()=>quotaReset(),
     state,
@@ -469,8 +484,23 @@ export function liveIo(env=process.env){
       if(names===undefined){try{names=readFileSync(join(homedir(),'.config/wildshard/forward-fixer'),'utf8');}catch{names='';}}
       return names.split(/[,\s]+/u).filter(name=>/^[\w.-]+$/u.test(name));
     },
+    redAllowed:(/** @type {number} */id,/** @type {readonly string[]} */commits,/** @type {readonly string[]} */recipientLanes)=>{
+      const machine=env.WS_MACHINE??(/mini/iu.test(hostname())?'mini':'macbook');
+      if(machine!=='mini')return true;
+      const text=io.receipts(),localLanes=new Set([...io.agents().keys(),...io.fixers(),...[...landers(text).values()].map(row=>row.lane)]);
+      const trailers=new Map();
+      if(commits.length>0){
+        const log=run('git',['show','-s','--format=%H%x00%(trailers:key=Lane,valueonly)%x1e',...commits]);
+        for(const entry of log.split('\x1e')){
+          const [sha,lanes]=entry.trim().split('\0');
+          if(sha&&lanes!==undefined)trailers.set(sha,lanes.split(/\s+/u).filter(Boolean));
+        }
+      }
+      return shouldPromptRed({machine,run:id,commits,recipientLanes,localLanes,receipts:text,trailers});
+    },
     dispatch:()=>{run('gh',['workflow','run','ci.yml','--ref','main','-R',repo]);},
   };
+  return io;
 }
 
 /** Judge every newly finished run and report it. A first run with no state only records what is already finished.
