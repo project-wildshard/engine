@@ -527,29 +527,31 @@ jobs:
         run: |
           armed=$(node --input-type=module -e 'import {armedMemory} from "./scripts/memory/armed.mjs"; console.log(armedMemory().zones.size > 0)')
           printf 'armed=%s\n' "$armed" >> "$GITHUB_OUTPUT"
-      # The full ledger's q11 parts are already decoded and hash-checked by
-      # the app build. Keep its cache separate from the smaller Ring 1 build.
-      - name: Key the full ledger Brotli cache
+      # Retain the full ledger's verified q11 parts and input-addressed
+      # phone texture encodes. Both are used before the artifact upload.
+      - name: Key the full ledger encode cache
         id: ledger-codec
         continue-on-error: true
         env:
-          CODEC_INPUTS: ${{ hashFiles('src/cook/game/spawnParts.ts') }}
+          CODEC_INPUTS: ${{ hashFiles('src/cook/game/spawnParts.ts', 'src/cook/game/astc6Wasm.ts') }}
           PART_INPUTS: ${{ hashFiles('test/pins/shardfiles.json', 'test/pins/catalogue.json', 'test/pins/assets.json', 'src/cook/game/entryDownloads.ts', 'src/cook/game/entryTotals.ts', 'src/cook/game/shardCook.ts', 'scripts/app-build/appCook.ts') }}
         run: |
           codec=$(node -p 'process.versions.brotli')
           [[ "$codec" =~ ^[0-9]+(\.[0-9]+)+$ ]] || exit 1
           [[ "$CODEC_INPUTS" =~ ^[a-f0-9]{64}$ && "$PART_INPUTS" =~ ^[a-f0-9]{64}$ ]] || exit 1
-          prefix="full-ledger-spawn-parts-br-v1-$RUNNER_OS-$RUNNER_ARCH-$codec-$CODEC_INPUTS-"
+          prefix="full-ledger-spawn-parts-br-v2-$RUNNER_OS-$RUNNER_ARCH-$codec-$CODEC_INPUTS-"
           printf 'prefix=%s\nkey=%s%s-parts-and-server\n' "$prefix" "$prefix" "$PART_INPUTS" >> "$GITHUB_OUTPUT"
-      - name: Restore full-ledger Brotli parts
+      - name: Restore full-ledger encodes
         id: ledger-parts
         if: steps.ledger-codec.outcome == 'success'
         continue-on-error: true
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/wildshard/gen/spawn-parts-br/1
+          path: ~/.cache/wildshard/gen/spawn-parts-br
           key: ${{ steps.ledger-codec.outputs.key }}
-          restore-keys: ${{ steps.ledger-codec.outputs.prefix }}
+          restore-keys: |
+            ${{ steps.ledger-codec.outputs.prefix }}
+            nightly-encodes-
       - name: Build every production pin
         id: ledger-client
         run: |
@@ -568,14 +570,16 @@ jobs:
             if [[ -n "$zone" ]]; then server_inputs+=("out/$zone"); fi
           done <<< "$products"
           tar -cf tmp/memory-ledger/client.tar tmp/memory-ledger/preview "${server_inputs[@]}"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - name: Upload the full pinned preview
+        timeout-minutes: 4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: memory-pinned-client
           path: tmp/memory-ledger/client.tar
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
-      - name: Keep only encodings emitted by this full ledger build
+      - name: Prune unused full-ledger encodes
         id: ledger-parts-pruned
         if: ${{ !cancelled() && steps.ledger-codec.outcome == 'success' && steps.ledger-client.outcome == 'success' && steps.ledger-parts.outputs.cache-hit != 'true' }}
         continue-on-error: true
@@ -591,14 +595,17 @@ jobs:
             part="${name:0:16}.pack.br"
             [[ -f "$spawn/parts/$part" || -f "$spawn/server/$part" ]] || rm -- "$file"
           done
+          if [[ -d "${cache%/1}/astc6-1" ]]; then
+            find "${cache%/1}/astc6-1" -type f -name '*.ktx2' -mmin +180 -delete
+          fi
           kept=("$cache"/*.br)
           (( ${#kept[@]} > 0 ))
-      - name: Save verified full-ledger Brotli parts
+      - name: Save verified full-ledger encodes
         if: ${{ !cancelled() && steps.ledger-parts-pruned.outcome == 'success' }}
         continue-on-error: true
         uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/wildshard/gen/spawn-parts-br/1
+          path: ~/.cache/wildshard/gen/spawn-parts-br
           key: ${{ steps.ledger-codec.outputs.key }}
 
   # BUDGET-CAPS BC9 (J444): the memory ledger's regression check left ci for budgets.yml, which reads this run's

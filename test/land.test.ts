@@ -3,7 +3,7 @@
 // hook), a post-receive hook records every pushed tip, and a fake `gh` on PATH
 // answers Actions queries only for SHAs that were really pushed.
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture repositories stay in the repository scratch root.
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, utimesSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Execute the workflow shell against owned fixture paths.
 import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Evaluate ci.yml's real concurrency-key expressions.
@@ -50,7 +50,7 @@ test('boundaries stays blocking and independent; J400 moves quarantine to report
   expect(ciJob('tests')).not.toMatch(/^ {4}if: /mu);
 });
 
-test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves its own verified Brotli parts', () => {
+test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves its verified Brotli parts and phone textures', () => {
   const producer = ciJob('memory-client-build');
   const ledger = ciJob('budgets', 'budgets.yml');
   // The native consumer runs after ci in memory-footprint.yml (ci's verdict never waits on its xcode-27 runner).
@@ -75,11 +75,16 @@ test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves i
   expect(unpack).toBeGreaterThan(0);
   expect(digest).toBeGreaterThan(unpack);
   expect(read).toBeGreaterThan(digest);
-  expect(producer.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br\/1/gu)).toHaveLength(2);
-  expect(producer).toContain('full-ledger-spawn-parts-br-v1-');
+  expect(producer.match(/path: ~\/\.cache\/wildshard\/gen\/spawn-parts-br$/gmu)).toHaveLength(2);
+  expect(producer).toContain('full-ledger-spawn-parts-br-v2-');
   expect(producer).toContain('$codec-$CODEC_INPUTS-');
   expect(producer).toContain('key=%s%s-parts-and-server');
-  expect(producer).toContain('restore-keys: ${{ steps.ledger-codec.outputs.prefix }}');
+  expect(producer).toContain('${{ steps.ledger-codec.outputs.prefix }}');
+  expect(producer).toMatch(/restore-keys: \|\n[^\n]+\n +nightly-encodes-/u);
+  expect(producer).toContain('astc6-1');
+  expect(producer).toMatch(/name: Upload the full pinned preview\n +timeout-minutes: 4\n +uses: actions\/upload-artifact@/u);
+  expect(producer).toContain('timeout-minutes: 30');
+  expect(producer).toContain('name: memory-pinned-client');
   expect(ledger).toContain('tmp/memory-ledger/spawn-parts.sha256');
   expect(producer).toContain("steps.ledger-client.outcome == 'success'");
   expect(producer).toContain("steps.ledger-parts-pruned.outcome == 'success'");
@@ -94,15 +99,20 @@ test('the memory ledger (budgets.yml since BUDGET-CAPS BC9) restores and saves i
   expect(ledger.slice(judge, upload)).toContain('node scripts/budgets/cli.mjs check tmp/budgets/measures.json');
 });
 
-test('the ledger cache preserves browser and server packs and records both digests', () => {
+test('the ledger cache keeps current encodes and records both pack digests', () => {
   const root = mkdtempSync(resolve('tmp', 'land-ledger-parts-'));
   trackLandFixtureRoot(root);
-  const cache = join(root, 'cache');
+  const cache = join(root, 'cache', '1');
+  const astc = join(root, 'cache', 'astc6-1');
   const spawnRoot = join(root, 'tmp/memory-ledger/preview/dist/assets/spawn');
   const browser = 'a'.repeat(64);
   const server = 'b'.repeat(64);
   const stale = 'c'.repeat(64);
-  mkdirSync(cache);
+  mkdirSync(cache, {recursive: true});
+  mkdirSync(astc);
+  for (const name of ['used.ktx2','old.ktx2']) writeFileSync(join(astc, name), name);
+  const old = new Date(Date.now() - 240 * 60_000);
+  utimesSync(join(astc, 'old.ktx2'), old, old);
   for (const hash of [browser, server, stale]) writeFileSync(join(cache, `${hash}.br`), hash);
   for (const [folder, hash] of [['parts', browser], ['server', server]] as const) {
     mkdirSync(join(spawnRoot, folder), {recursive: true});
@@ -118,12 +128,13 @@ test('the ledger cache preserves browser and server packs and records both diges
       cwd: root, encoding: 'utf8', env: {...process.env, GITHUB_WORKSPACE: root, LEDGER_FIXTURE_CACHE: cache},
     });
   };
-  const prune = 'Keep only encodings emitted by this full ledger build';
+  const prune = 'Prune unused full-ledger encodes';
   const serverFolder = join(spawnRoot, 'server');
   const hiddenServer = join(root, 'missing-server');
   renameSync(serverFolder, hiddenServer);
   expect(run('memory-client-build', prune).status).toBe(1);
   expect(readdirSync(cache).sort()).toEqual([`${browser}.br`, `${server}.br`, `${stale}.br`]);
+  expect(readdirSync(astc).sort()).toEqual(['old.ktx2','used.ktx2']);
   const digestStep = 'Record the served ledger Brotli part digests';
   expect(run('budgets', digestStep).status).not.toBe(0);
   expect(readdirSync(join(root, 'tmp/memory-ledger'))).not.toContain('spawn-parts.sha256');
@@ -131,6 +142,7 @@ test('the ledger cache preserves browser and server packs and records both diges
   const pruned = run('memory-client-build', prune);
   expect(pruned.status, pruned.stderr).toBe(0);
   expect(readdirSync(cache).sort()).toEqual([`${browser}.br`, `${server}.br`]);
+  expect(readdirSync(astc)).toEqual(['used.ktx2']);
   const recorded = run('budgets', digestStep);
   expect(recorded.status, recorded.stderr).toBe(0);
   const manifest = readFileSync(join(root, 'tmp/memory-ledger/spawn-parts.sha256'), 'utf8');
