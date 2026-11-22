@@ -6,3 +6,6 @@ declared such a page's rows (`declaredNativePage`), but a grid cell's entered ki
 (`pageDeclaresOwnSpecies`), so on the grid nobody registered deer. `nativeDeclaresOwnSpecies` now names that page; the
 regional world loads its declared bodies' materials (bodies only, no data page binds them) and the entered kit registers
 the rows and keeps the hull book's kit, as standalone does.
+
+The push gate caught `regional-declared-species.test.ts`, which runs the hook's own source with its deps injected: the native
+branch is now one call, `declareNativePage`, which the test injects; two cases pin the predicate and the branch.

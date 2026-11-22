@@ -44,6 +44,14 @@ export function nativeDeclaresOwnSpecies(product: Pick<ShardFolder, 'has' | 'sec
   return !features.some(row => SPECIES_OWNERS.has(row.kind));
 }
 
+/** OF23e4 on the grid: a native page's declared species, and the hull book's kit it keeps (held equipment, socket cards),
+ *  as client.ts's `kit` does standalone. */
+export async function declareNativePage(ctx: ShardContext, source: Shardfile, models: DeclaredCreatureModels): Promise<void> {
+  declarePageCreatures(ctx, source, models);
+  const { prepareDeclaredNativeKit } = await import('../models/socketRigCreature');
+  await prepareDeclaredNativeKit(ctx);
+}
+
 /** Load what `declarePageSpecies` draws with, from the page's own retained files (the data client loads the same in its world). */
 export async function loadDeclaredCreatureModels(product: ShardFolder, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>,
   presentation: { readonly materials: ReadonlyMap<string, Material>; readonly compile: (entry: unknown) => Material }, scope: Scope,

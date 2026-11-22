@@ -7,7 +7,7 @@ import {stripTypeScriptTypes} from 'node:module';
 import {runInNewContext} from 'node:vm';
 import {Scope} from '@wildshard/engine/app/scope';
 import {clientNativeBook} from '../shardfile/clientNativeBook';
-import {declarePageSpecies, pageDeclaresOwnSpecies, type DeclaredCreatureModels} from '../shardfile/declaredCreatures';
+import {declareNativePage, declarePageSpecies, nativeDeclaresOwnSpecies, pageDeclaresOwnSpecies, type DeclaredCreatureModels} from '../shardfile/declaredCreatures';
 import type {ShardContext} from '../plugin/context';
 import type {ShardFolder} from '../../../shared/game/shardfile/shardFolder';
 
@@ -16,26 +16,28 @@ import type {ShardFolder} from '../../../shared/game/shardfile/shardFolder';
 // refused ("Population requires its actual catalogue and saved page") and the cell stalled at finish on every phone.
 
 const PAGE = {version: 1};
-function product(kinds: readonly string[], spawns: readonly {species: string; variant: number}[] = [], runtime: object | null = null): ShardFolder {
-  const shardfile = {runtime, questHost: {page: PAGE}, creatures: {spawns}, rows: {species: [], looks: []}};
-  return {shardfile, has: (name: string): boolean => name === 'client/plan',
+function product(kinds: readonly string[], spawns: readonly {species: string; variant: number}[] = [], runtime: object | null = null,
+  {page = true, species = 0, programs = false}: {page?: boolean; species?: number; programs?: boolean} = {}): ShardFolder {
+  const shardfile = {runtime, questHost: page ? {page: PAGE} : null, creatures: {spawns}, rows: {species: Array.from({length: species}, (_, i) => ({id: `s${String(i)}`})), looks: []}};
+  return {shardfile, has: (name: string): boolean => name === 'client/plan' || (programs && name === 'actors/species-programs'),
     section: (name: string): unknown => { if (name !== 'client/plan') throw new Error(`no ${name}`); return {version: 1, features: kinds.map(kind => ({kind}))}; }} as unknown as ShardFolder;
 }
 function entered(folder: ShardFolder): ShardContext {
   return {scope: new Scope('entered'), product: folder, game: {runtime: {hooks: {}}}, rows: {}} as unknown as ShardContext;
 }
 
-function kitHook(ports: {foundation: object; request: object; owner: {disposed: boolean}; declare: typeof declarePageSpecies}): (context: ShardContext) => Promise<void> {
+function kitHook(ports: {foundation: object; request: object; owner: {disposed: boolean}; declare: typeof declarePageSpecies; native?: typeof declareNativePage}): (context: ShardContext) => Promise<void> {
   const source = readFileSync(new URL('regionalRuntime.ts', import.meta.url), 'utf8');
   const start = source.indexOf('            kit: async entered =>');
   const end = source.indexOf('            afterKit: async entered =>', start);
   if (start === -1 || end === -1) throw new Error('Regional entered kit hook missing');
   const factory: unknown = runInNewContext(stripTypeScriptTypes(`(function(deps) {
-    const {foundation, request, owner, declarePageSpecies, pageDeclaresOwnSpecies} = deps;
+    const {foundation, request, owner, declarePageSpecies, pageDeclaresOwnSpecies, declareNativePage, nativeDeclaresOwnSpecies} = deps;
     return {${source.slice(start, end)}}.kit;
   })`), {});
   if (typeof factory !== 'function') throw new Error('Regional entered kit hook missing');
-  const hook: unknown = Reflect.apply(factory, undefined, [{...ports, declarePageSpecies: ports.declare, pageDeclaresOwnSpecies}]);
+  const hook: unknown = Reflect.apply(factory, undefined, [{...ports, declarePageSpecies: ports.declare, pageDeclaresOwnSpecies,
+    declareNativePage: ports.native ?? declareNativePage, nativeDeclaresOwnSpecies}]);
   if (typeof hook !== 'function') throw new Error('Regional entered kit hook missing');
   return async (context) => { await Reflect.apply(hook, undefined, [context]); };
 }
@@ -83,4 +85,30 @@ test('the entered kit stage runs the resident kit hook before the plan kit featu
   const source = readFileSync(new URL('../shardfile/runtimePage.ts', import.meta.url), 'utf8');
   const hook = source.indexOf('await installation.kit?.(context);'), plan = source.indexOf("await runtimeClientPhase(context, 'kit', resident.scope);");
   expect(hook).toBeGreaterThan(-1); expect(plan).toBeGreaterThan(hook);
+});
+
+// K4 (v0.1.67 local): Pine r10 is a native page with no species programme and no plan feature that registers species
+// (OF23e4). Standalone its client declares its rows; on the grid nobody did, and its deep link stopped at finish on
+// "unknown animal kind 'deer' (registered: boar, bear)".
+test('a native page with declared species and no species owner declares its own', () => {
+  const spawn = [{species: 's0', variant: 0}];
+  expect(nativeDeclaresOwnSpecies(product(['world.forest-page'], spawn, {}, {page: false, species: 1}))).toBe(true);
+  expect(nativeDeclaresOwnSpecies(product(['species.program'], spawn, {}, {page: false, species: 1}))).toBe(false);
+  expect(nativeDeclaresOwnSpecies(product(['population.hull-book'], spawn, {}, {page: false, species: 1}))).toBe(false);
+  expect(nativeDeclaresOwnSpecies(product([], spawn, {}, {page: false, species: 1, programs: true}))).toBe(false);
+  expect(nativeDeclaresOwnSpecies(product([], [], {}, {page: false, species: 1}))).toBe(false);
+  expect(nativeDeclaresOwnSpecies(product([], spawn, null, {species: 1}))).toBe(false); // a data page: pageDeclaresOwnSpecies
+});
+
+test('the grid entered kit declares a native page\'s own species with its loaded bodies', async () => {
+  const folder = product(['world.forest-page'], [{species: 's0', variant: 0}], {}, {page: false, species: 1}), context = entered(folder);
+  const models = {materials: new Map()} as unknown as DeclaredCreatureModels;
+  const load = vi.fn((_given: unknown) => Promise.resolve(models));
+  const declare = vi.fn<typeof declarePageSpecies>(), native = vi.fn<typeof declareNativePage>(() => Promise.resolve());
+  await kitHook({foundation: {declaredCreatures: load}, request: {admitted: {source: folder.shardfile}}, owner: {disposed: false}, declare, native})(context);
+  expect(load).toHaveBeenCalledWith(folder);
+  expect(native).toHaveBeenCalledWith(context, folder.shardfile, models);
+  expect(declare).not.toHaveBeenCalled();
+  await expect(kitHook({foundation: {}, request: {admitted: {source: folder.shardfile}}, owner: {disposed: false}, declare, native})(entered(folder)))
+    .rejects.toThrow('Declared native species require their regional presentation');
 });

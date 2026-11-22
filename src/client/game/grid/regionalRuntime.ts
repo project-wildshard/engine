@@ -28,7 +28,7 @@ import type { ShardWorld } from '../../../server/game/shard/world';
 import type { RuntimePageResident } from '../shardfile/runtimePage';
 import type { AdmittedFolder } from '../shardfile/folder';
 import { admittedRuntimeFolder, shardFolderFromAdmission } from '../shardfile/runtimeFolder';
-import { declarePageCreatures, declarePageSpecies, nativeDeclaresOwnSpecies, pageDeclaresOwnSpecies, type DeclaredCreatureModels } from '../shardfile/declaredCreatures';
+import { declareNativePage, declarePageSpecies, nativeDeclaresOwnSpecies, pageDeclaresOwnSpecies, type DeclaredCreatureModels } from '../shardfile/declaredCreatures';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import { enteredFullMap, shiftedFullMap, shiftedMinimap } from './mapFrame';
@@ -372,9 +372,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
                 if (load === undefined) throw new Error('Declared native species require their regional presentation');
                 const models = await load(entered.product);
                 if (owner.disposed) throw new Error('Regional runtime left while loading its declared creatures');
-                declarePageCreatures(entered, request.admitted.source, models);
-                const { prepareDeclaredNativeKit } = await import('../models/socketRigCreature');
-                await prepareDeclaredNativeKit(entered);
+                await declareNativePage(entered, request.admitted.source, models);
                 return;
               }
               if (!pageDeclaresOwnSpecies(entered.product)) return;
