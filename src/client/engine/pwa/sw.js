@@ -6,9 +6,9 @@ import { cacheChannel, cacheName, ownsCache, PRODUCTION_MARK } from './cacheName
  * No fetched-body reconstruction, checksums, receipts, packs, retries or work timers. */
 const BUILD = '__BUILD_ID__';
 const DOCUMENT = '__DOCUMENT__';
-// PZ12 (J274): the page origin's COOP and COEP for the baked document (empty on a channel that is not isolated)
+// PZ12 (J274): the page origin's COOP and COEP for the baked document; DW12: COOP on every channel, COEP only isolated
 const DOCUMENT_HEADERS = (baked => baked.startsWith('{') ? JSON.parse(baked) : {})('__DOCUMENT_HEADERS__');
-const ISOLATED = Object.keys(DOCUMENT_HEADERS).length > 0;
+const ISOLATED = 'cross-origin-embedder-policy' in DOCUMENT_HEADERS;
 /** PZ12: a dedicated worker in an isolated page starts only if its own script carries COEP. A worker chunk whose name did
  *  not change across the switch is held here (or in the HTTP cache) with the headers it was first fetched with, so on an
  *  isolated channel every worker script this worker answers wears the document's headers. */

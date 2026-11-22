@@ -939,6 +939,18 @@ test('PZ12: an isolated build answers its document and every worker script with 
   expect((await open.dispatch('fetch', { request: worker(script) }))?.headers.get('cross-origin-embedder-policy')).toBeNull();
 });
 
+// Meta IPHONE13-DRIFTWOOD DW12: every channel's baked document says COOP (a boot after a COOP-less page gets a fresh
+// WebContent); without COEP the channel is not isolated, so worker scripts go out as served.
+test('DW12: a channel that is not isolated still answers its document with COOP, and leaves worker scripts alone', async () => {
+  const worker = (path: string): Request => { const request = new Request(url(path)); Object.defineProperty(request, 'destination', { value: 'worker' }); return request; };
+  const script = '/b/A/standalone/server-worker.js', f = fixture(), held = f.load('A', [script], shell, {}, document, { 'cross-origin-opener-policy': 'same-origin' });
+  await held.dispatch('install'); await held.dispatch('activate'); await held.dispatch('message', precached);
+  const page = await held.dispatch('fetch', { request: new Request(url('/')) });
+  expect([page?.headers.get('cross-origin-opener-policy'), page?.headers.get('cross-origin-embedder-policy')]).toEqual(['same-origin', null]);
+  const served = await held.dispatch('fetch', { request: worker(script) });
+  expect([served?.headers.get('cross-origin-opener-policy') ?? null, served?.headers.get('cross-origin-embedder-policy') ?? null]).toEqual([null, null]);
+});
+
 // OFFLINE OF12 (J298: "The preview build should have a different cache"): every cache name carries the channel, so preview and
 // staging served on one origin keep disjoint caches, and neither's activate deletes the other's.
 const stagingDocument = '<!doctype html><html><head><script>globalThis.__WS_WORLD__={"release":"https://packs.test/releases/staging.json","key":"ab"};</script></head></html>';

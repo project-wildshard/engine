@@ -8,3 +8,9 @@ export function withIsolationRule(text: string, channel: string | undefined): st
 export function writeIsolationRule(outDir: string, channel: string | undefined): boolean;
 /** The COOP and COEP a _headers text sends on its /* rules, lower-cased. */
 export function documentIsolation(text: string): Record<string, string>;
+/** DW12: the opener policy every channel's game document sends. */
+export const DOCUMENT_OPENER: 'same-origin';
+/** DW12: whether a path is the game's document (`/`, `/index.html`, `/slug/<slug>`). */
+export function isDocumentRoute(pathname: string): boolean;
+/** DW12: the service worker's document headers: the opener policy, then the channel's isolation. */
+export function documentHeaders(text: string): Record<string, string>;

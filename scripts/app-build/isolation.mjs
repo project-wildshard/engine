@@ -32,6 +32,23 @@ export function writeIsolationRule(outDir, channel) {
   return isolated(channel);
 }
 
+/**
+ * Meta IPHONE13-DRIFTWOOD DW12 (mini-dw12e): the game's document says COOP `same-origin` on every channel, and nothing
+ * else on the origin does. On the iPhone 13 a second Driftwood boot in the WebContent that held the first one is
+ * jetsammed; WebKit starts a navigation in a new WebContent when the opener policy changes between documents, so a page
+ * with none in between (robots.txt, a 404) and this one give every boot a clean process. COEP stays per channel (above):
+ * without it the page is not cross-origin isolated, so nothing it loads changes. pages/worker.ts sends the same value on
+ * its page answers, scripts/preview-server.mjs on these routes, and the service worker on its baked document.
+ */
+export const DOCUMENT_OPENER = 'same-origin';
+const DOCUMENT_ROUTE = /^\/(?:index\.html)?$|^\/slug\/[\w-]+\/?$/u;
+/** Whether a path is the game's document (`/`, `/index.html`, `/slug/<slug>`). @param {string} pathname */
+export const isDocumentRoute = pathname => DOCUMENT_ROUTE.test(pathname);
+
+/** The service worker's document headers: DW12's opener policy, then the channel's isolation from `_headers`.
+ * @param {string} text @returns {Record<string, string>} */
+export const documentHeaders = text => ({ 'cross-origin-opener-policy': DOCUMENT_OPENER, ...documentIsolation(text) });
+
 /** The COOP and COEP a `_headers` text sends on `/` (from its `/*` rules), lower-cased, for the service worker's document.
  * @param {string} text @returns {Record<string, string>} */
 export function documentIsolation(text) {

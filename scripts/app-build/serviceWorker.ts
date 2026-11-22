@@ -9,7 +9,7 @@ import { serverPackBookPath } from '../../src/shared/game/shardfile/serverPack';
 import { packsBookPath } from '../../src/shared/game/shardfile/spawnManifest';
 import { titleAssetURLs } from '../title-assets.mjs';
 import { staticAssetHashes, contentNamed } from './assetHashes';
-import { documentIsolation } from './isolation.mjs';
+import { documentHeaders as pageDocumentHeaders } from './isolation.mjs';
 import { writtenBundle, type EmittedFile } from './writtenBundle';
 
 /** Update checks fetch this tiny bootstrap; the core URL names its exact bytes. */
@@ -159,7 +159,7 @@ export async function writeServiceWorker(outDir: string, root: string): Promise<
     const file = [join(outDir, path), join(`${resolve(outDir)}-content`, path)].find(at => existsSync(at));
     return file === undefined ? undefined : { url: `/${path}`, bytes: readFileSync(file) };
   };
-  const headersFile = join(outDir, '_headers'), documentHeaders = existsSync(headersFile) ? documentIsolation(readFileSync(headersFile, 'utf8')) : {};
+  const headersFile = join(outDir, '_headers'), documentHeaders = pageDocumentHeaders(existsSync(headersFile) ? readFileSync(headersFile, 'utf8') : '');
   const { core, build, hashed } = await serviceWorkerCore(splitBundle(outDir, writtenBundle(outDir, root)), root, buildId, book(serverPackBookPath(buildId)), book(packsBookPath(buildId)), documentHeaders), scripts = workerScripts(core);
   mkdirSync(dirname(join(outDir, scripts.fileName)), { recursive: true });
   writeFileSync(join(outDir, scripts.fileName), core);

@@ -162,11 +162,15 @@ test('JSON and JavaScript carry the content types the old host sent', async () =
   expect(types).toEqual(['application/json; charset=utf-8', 'application/javascript; charset=utf-8', 'application/manifest+json; charset=utf-8']);
 }, 30_000);
 
-test('the page: no-store, ?doctor 307 as the old host answered, a missing chunk 404 with no HTML', async () => {
+test('the page: no-store and COOP, ?doctor 307 as the old host answered, a missing chunk 404 with no HTML', async () => {
   for (const path of ['/', '/index.html']) {
     const response = await wire(new URL(path, served()));
-    expect([response.status, response.headers['cache-control'], response.headers['content-type']])
-      .toEqual([200, 'no-store', 'text/html; charset=utf-8']);
+    // Meta IPHONE13-DRIFTWOOD DW12: the game's document, and only it, says COOP (a fresh WebContent after a COOP-less page)
+    expect([response.status, response.headers['cache-control'], response.headers['content-type'], response.headers['cross-origin-opener-policy']])
+      .toEqual([200, 'no-store', 'text/html; charset=utf-8', 'same-origin']);
+  }
+  for (const path of ['/b/04e1/main-Ab_3.js', '/version.json', '/robots.txt']) {
+    expect((await wire(new URL(path, served()))).headers['cross-origin-opener-policy'], path).toBeUndefined();
   }
   const doctor = await wire(new URL('/?doctor', served()));
   expect([doctor.status, doctor.headers.location]).toEqual([307, '/doctor/?doctor&sw=0']);

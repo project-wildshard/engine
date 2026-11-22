@@ -17,6 +17,7 @@ import { createEncodedFileCache } from './preview-encoded-cache.mjs';
 import { readFile as readFileAsync } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { createPreviewTelemetrySink } from './preview-telemetry.mjs';
+import { DOCUMENT_OPENER, isDocumentRoute } from './app-build/isolation.mjs';
 
 const args = process.argv.slice(2);
 /** a `--name value` or `--name=value` argument's value */
@@ -195,6 +196,8 @@ const server = createServer((req, res) => {
   }
   const { file, stat } = found, etag = `W/"${stat.size}-${stat.mtime.getTime()}"`;
   res.setHeader('Content-Type', type(file)); res.setHeader('Last-Modified', stat.mtime.toUTCString()); res.setHeader('ETag', etag);
+  // Meta IPHONE13-DRIFTWOOD DW12: the game's document says COOP, as pages/worker.ts does; the SPA fallback's other paths don't
+  if (type(file) === 'text/html' && isDocumentRoute(pathname)) res.setHeader('Cross-Origin-Opener-Policy', DOCUMENT_OPENER);
   res.setHeader('Accept-Ranges', 'bytes');
   const compressible = COMPRESSIBLE.test(type(file)) && stat.size >= 1024;
   if (compressible) varyEncoding(res);

@@ -47,6 +47,10 @@ const OK = 200
 const FOUND = 302
 const PART = /^\/assets\/spawn\/(?:parts|server)\/[^/]+\.pack\.br$/u
 const NOT_MODIFIED = 304
+// Meta IPHONE13-DRIFTWOOD DW12: the game's document, and only it, says COOP `same-origin` (scripts/app-build/isolation.mjs
+// DOCUMENT_OPENER; a named value export would be a workerd entrypoint). WebKit starts a navigation whose opener policy
+// changes in a new WebContent, so a boot after a COOP-less page never inherits the last boot's heap.
+const OPENER = 'same-origin'
 
 /** A 2xx or a 304 as the assets sent it; any other answer (a 404 above all) with `Cache-Control: no-store`. */
 function uncachedMiss(asset: Response): Response {
@@ -85,6 +89,7 @@ async function page(request: Request, url: URL, env: Env): Promise<Response> {
   response.headers.set('cache-control', 'no-store')
   // OV6: the Cloudflare edge's assets say `text/html` (local wrangler dev adds the charset); the old host said this.
   response.headers.set('content-type', 'text/html; charset=utf-8')
+  response.headers.set('cross-origin-opener-policy', OPENER)
   return response
 }
 
@@ -96,6 +101,7 @@ function pageHeaders(asset: Response): Headers {
   }
   headers.set('cache-control', 'no-store')
   headers.set('content-type', 'text/html; charset=utf-8')
+  headers.set('cross-origin-opener-policy', OPENER)
   return headers
 }
 
