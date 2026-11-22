@@ -16,7 +16,7 @@ const catalogue = [
   {slug:'open-plot-alien-plain',status:'hidden',legacy:false,shardSelect:false},
   {slug:'nine-dragon-stack-legacy',status:'live',legacy:true},
 ];
-const currentDocument={url:'https://test.example/?chunk=fixture',timeOrigin:1,slug:'fixture'};
+const currentDocument={url:'https://test.example/?chunk=fixture',id:'fixture-document',timeOrigin:1,slug:'fixture'};
 const diagnostics={document:currentDocument,timingBufferFull:false,navigation:null,resources:[],measures:[]};
 function storageFixture() {
   const storage=legacyDouble<CDPSession>({send:()=>Promise.reject(new Error('Unconfigured protocol response'))});
@@ -235,6 +235,25 @@ test('a model-ready invalidation between presence and pixels waits for the repla
   } finally { rmSync(out, { recursive: true, force: true }); }
 });
 
+test.each(['clock drift', 'document replacement'] as const)('Explorer checks document identity through %s', async mode => {
+  mkdirSync('tmp/sp-x9-explorer', { recursive: true });
+  const out = mkdtempSync('tmp/sp-x9-explorer/document-identity-');
+  const document = { ...currentDocument, id: 'first-document' };
+  const captured = mode === 'clock drift' ? { ...document, timeOrigin: 2 } : { ...document, id: 'second-document' };
+  const state = { document, fatal: [], empty: false, ready: true, readyIds: ['one'] };
+  const captureState = { ...state, document: captured };
+  const evaluate = vi.fn<Page['evaluate']>().mockResolvedValueOnce(state)
+    .mockResolvedValueOnce({ before: captureState, after: captureState, cards: [{ id: 'one', ready: true, pixels: 100, darkShare: .2 }] })
+    .mockResolvedValue({ ...diagnostics, document });
+  const { browser, close } = fixtureBrowser(evaluate);
+  try {
+    const sweep = sweepExplorer(browser, 'https://test.example/', 'fixture', out);
+    if (mode === 'clock drift') await expect(sweep).resolves.toBeUndefined();
+    else await expect(sweep).rejects.toThrow('Explorer document changed during pixel validation');
+    expect(close).toHaveBeenCalledOnce();
+  } finally { rmSync(out, { recursive: true, force: true }); }
+});
+
 test('a ready catalogue must belong to the requested new world document',()=>{
   expect(()=>verifyExplorerDocument(currentDocument,'https://test.example/','fixture',undefined)).not.toThrow();
   for(const observed of [
@@ -242,8 +261,9 @@ test('a ready catalogue must belong to the requested new world document',()=>{
     {...currentDocument,url:'https://test.example/?chunk=previous'},
     {...currentDocument,url:'https://foreign.example/?chunk=fixture'},
     {...currentDocument,timeOrigin:Number.NaN},
+    {...currentDocument,id:''},
   ])expect(()=>verifyExplorerDocument(observed,'https://test.example/','fixture',undefined)).toThrow('stale or foreign');
-  expect(()=>verifyExplorerDocument(currentDocument,'https://test.example/','fixture',1)).toThrow('stale or foreign');
+  expect(()=>verifyExplorerDocument(currentDocument,'https://test.example/','fixture',currentDocument.id)).toThrow('stale or foreign');
 });
 
 function sessionFixture(stale=false){
@@ -252,7 +272,7 @@ function sessionFixture(stale=false){
   const listeners=new Map<string,unknown>();
   const goto=vi.fn<Page['goto']>().mockImplementation(url=>{
     if(url==='about:blank')return Promise.resolve(null);
-    identity={url,timeOrigin:frozen&&identity.timeOrigin>0?identity.timeOrigin:identity.timeOrigin+1,
+    identity={url,id:frozen?identity.id:String(identity.timeOrigin+1),timeOrigin:frozen&&identity.timeOrigin>0?identity.timeOrigin:identity.timeOrigin+1,
       slug:frozen&&identity.timeOrigin>0?identity.slug:new URL(url).searchParams.get('chunk')??''};
     return Promise.resolve(null);
   });

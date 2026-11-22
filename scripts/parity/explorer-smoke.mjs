@@ -67,7 +67,7 @@ export function explorerState() {
     return card.dataset.id??'';
   });
   const probe = /** @type {import('../../src/client/engine/debug/probe').EngineProbe | undefined} */ (window.__wildshard);
-  const identity = {url:location.href,timeOrigin:performance.timeOrigin,slug:probe?.shard.slug??null};
+  const identity = {url:location.href,id:String(Reflect.get(document,'__explorerProofDocumentId')??''),timeOrigin:performance.timeOrigin,slug:probe?.shard.slug??null};
   return {fatal,document:identity,empty:root?.querySelector('.ws-x-empty-models.show')!==null && root!==null,
     ready:cards!==undefined && cards.length>0 && readyIds.length===cards.length,readyIds};
 }
@@ -84,7 +84,7 @@ export function explorerCapture(){
     return card.dataset.id??'';
   });
   const probe = /** @type {import('../../src/client/engine/debug/probe').EngineProbe | undefined} */ (window.__wildshard);
-  const identity = {url:location.href,timeOrigin:performance.timeOrigin,slug:probe?.shard.slug??null};
+  const identity = {url:location.href,id:String(Reflect.get(document,'__explorerProofDocumentId')??''),timeOrigin:performance.timeOrigin,slug:probe?.shard.slug??null};
   return {fatal,document:identity,empty:root?.querySelector('.ws-x-empty-models.show')!==null && root!==null,
     ready:cards!==undefined && cards.length>0 && readyIds.length===cards.length,readyIds};
   }
@@ -124,12 +124,12 @@ async function withinProgressBudget(work,remainingMs){
 }
 
 /** Refuse prior or foreign ready catalogues on a reused page.
- * @param {{url:string,timeOrigin:number,slug:string|null}} observed
- * @param {string} base @param {string} slug @param {number|undefined} previous */
+ * @param {{url:string,id:string,timeOrigin:number,slug:string|null}} observed
+ * @param {string} base @param {string} slug @param {string|undefined} previous */
 export function verifyExplorerDocument(observed,base,slug,previous){
   const url=new URL(observed.url);
   if(url.origin!==new URL(base).origin || url.searchParams.get('chunk')!==slug || observed.slug!==slug ||
-    !Number.isFinite(observed.timeOrigin) || observed.timeOrigin===previous)
+    !Number.isFinite(observed.timeOrigin) || observed.id==='' || observed.id===previous)
     throw new Error(`Explorer requested ${slug} but observed a stale or foreign catalogue`);
 }
 
@@ -141,7 +141,7 @@ export function explorerDiagnostics(){
     url:row.name,type:row.initiatorType,durationMs:row.duration,transferBytes:row.transferSize,encodedBytes:row.encodedBodySize,
     startMs:row.startTime,responseStartMs:row.responseStart,deliveryType:Reflect.get(row,'deliveryType')??null}));
   const measures=performance.getEntriesByType('measure').map(row=>({name:row.name,startMs:row.startTime,durationMs:row.duration}));
-  return {document:{url:location.href,timeOrigin:performance.timeOrigin,slug:probe?.shard.slug??null},
+  return {document:{url:location.href,id:String(Reflect.get(document,'__explorerProofDocumentId')??''),timeOrigin:performance.timeOrigin,slug:probe?.shard.slug??null},
     timingBufferFull:Reflect.get(window,'__explorerTimingFull')===true,navigation:navigation?.toJSON()??null,resources,measures};
 }
 
@@ -154,7 +154,7 @@ const CONTEXT_CATALOGUES=4;
  * @param {import('playwright').Browser} browser @param {string} base */
 export async function openExplorerSession(browser,base,isolated=false){
   /** @type {string[]} */ const faults=[];
-  /** @type {{previous:number|undefined}} */ const lifetime={previous:undefined};
+  /** @type {{previous:string|undefined}} */ const lifetime={previous:undefined};
   let generation=1,used=0,busy=false,closed=false;
   const limit=isolated?1:CONTEXT_CATALOGUES;
   /** @type {Awaited<ReturnType<typeof openExplorerContext>>|undefined} */ let active=await openExplorerContext(browser,base,faults,lifetime,generation,isolated);
@@ -184,14 +184,15 @@ export async function openExplorerSession(browser,base,isolated=false){
  * persistent origin data after retiring each document's writers, matching
  * the original independent input fixtures without accumulating world bodies.
  * @param {import('playwright').Browser} browser @param {string} base
- * @param {string[]} faults @param {{previous:number|undefined}} lifetime
+ * @param {string[]} faults @param {{previous:string|undefined}} lifetime
  * @param {number} generation @param {boolean} isolated */
 async function openExplorerContext(browser,base,faults,lifetime,generation,isolated){
   const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
   try{
     // The existing harness identity suppresses telemetry without request
     // routing, which would disable the native HTTP cache for every asset.
-    await context.addInitScript({content:`if(location.origin===${JSON.stringify(new URL(base).origin)}){localStorage.clear();sessionStorage.clear();performance.setResourceTimingBufferSize(8000);performance.addEventListener('resourcetimingbufferfull',()=>{Reflect.set(window,'__explorerTimingFull',true);});${saveFixtureCode({scope:'device',key:'devMode',data:true})};${harnessPinCode({lane:'explorer-smoke'})};}`});
+    // WebKit can recalculate timeOrigin within a live document. Mark each new Document at creation.
+    await context.addInitScript({content:`if(location.origin===${JSON.stringify(new URL(base).origin)}){Object.defineProperty(document,'__explorerProofDocumentId',{value:crypto.getRandomValues(new Uint32Array(4)).join('-')});localStorage.clear();sessionStorage.clear();performance.setResourceTimingBufferSize(8000);performance.addEventListener('resourcetimingbufferfull',()=>{Reflect.set(window,'__explorerTimingFull',true);});${saveFixtureCode({scope:'device',key:'devMode',data:true})};${harnessPinCode({lane:'explorer-smoke'})};}`});
     const page=await context.newPage();
     // WebKit has no CDP. An isolated session owns a fresh context for exactly
     // one catalogue, so retirement replaces all origin storage natively.
@@ -242,7 +243,7 @@ export async function sweepExplorer(browser,base,slug,out,isolated=false){
 
 /** @param {import('playwright').Page} page @param {string[]} faults @param {unknown[]} reports
  * @param {string} base @param {string} slug
- * @param {string} out @param {{previous:number|undefined}} lifetime @param {()=>Promise<void>} reset
+ * @param {string} out @param {{previous:string|undefined}} lifetime @param {()=>Promise<void>} reset
  * @param {{generation:number,catalogue:number,maxCatalogues:number}} session @param {number} started
  * @param {()=>{path:string,status:number|null,ageMs:number}[]} readPending */
 async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,session,started,readPending){
@@ -271,7 +272,7 @@ async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,sessio
         if(snapshot.before.fatal.length>0)throw new Error(`Explorer fatal: ${snapshot.before.fatal.join('; ')}`);
         verifyExplorerDocument(snapshot.before.document,base,slug,lifetime.previous);
         verifyExplorerDocument(snapshot.after.document,base,slug,lifetime.previous);
-        if(snapshot.before.document.timeOrigin!==state.document.timeOrigin || snapshot.after.document.timeOrigin!==snapshot.before.document.timeOrigin)
+        if(snapshot.before.document.id!==state.document.id || snapshot.after.document.id!==snapshot.before.document.id)
           throw new Error('Explorer document changed during pixel validation');
         if(snapshot.before.empty){empty=true;cards=snapshot.cards;captured=snapshot;break;}
         // A readiness notification before this atomic task still waits for
@@ -294,12 +295,12 @@ async function sweepPage(page,faults,reports,base,slug,out,lifetime,reset,sessio
     if(faults.length>0)failures.push(...faults);
     const diagnostics=await withinProgressBudget(page.evaluate(explorerDiagnostics),hangMs-(Date.now()-progressAt));
     verifyExplorerDocument(diagnostics.document,base,slug,lifetime.previous);
-    if(diagnostics.document.timeOrigin!==final.document.timeOrigin)failures.push('Explorer document changed during final capture');
+    if(diagnostics.document.id!==final.document.id)failures.push('Explorer document changed during final capture');
     if(faults.length>0)failures.push(...faults);
     const result={slug,session,elapsedMs:Date.now()-started,hangMs,empty,cards,failures,reports,document:final.document,captureBefore:captured.before,captureAfter:final,diagnostics,firstReadyMs:Object.fromEntries(firstReady)};
     writeFileSync(join(out,`${slug}.json`),`${JSON.stringify(result,null,2)}\n`);
     if(failures.length>0)throw new Error(`${slug}: ${failures.join('; ')}`);
-    lifetime.previous=final.document.timeOrigin;
+    lifetime.previous=final.document.id;
     console.info(`Explorer ${slug}: ${empty?'explicit empty catalogue':`${cards.length} real thumbnails`} PASS`);
   }catch(error){
     const failedAt=Date.now(), pending=readPending(), evidenceMs=Math.min(2000,hangMs-(failedAt-progressAt));
