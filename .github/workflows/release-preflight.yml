@@ -1,0 +1,46 @@
+name: release preflight
+
+on:
+  schedule:
+    - cron: '13 15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-preflight-main
+  cancel-in-progress: false
+
+jobs:
+  local-qa-and-zone-entry:
+    if: github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      BROWSER: none
+      WS_LANE_NAME: release-preflight
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: release-preflight
+      - run: pnpm exec playwright install chromium webkit
+      - name: Test the socket guard and release harness
+        run: pnpm exec vitest run test/staging-proof-lines.test.ts test/staging-qa.test.ts test/zone-entry-tour.test.ts
+      - name: Run exact-main local QA and the seeded tour
+        run: |
+          release=$(node -p "'v' + require('./package.json').version")
+          seed=$(node -p 'Math.floor(Date.now() / 86400000)')
+          bash scripts/browser-lane.sh --max 35 node scripts/staging-qa.mjs --local \
+            --release "$release" --build "$GITHUB_SHA" --preflight "$seed" --out tmp/fs29
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-preflight
+          path: |
+            tmp/fs29/verdict.json
+            tmp/fs29/zone-entry/zone-entry.json
+            tmp/fs29/zone-entry-retry/zone-entry.json

@@ -23,8 +23,9 @@ export interface Tour {
 export const FIRST_ZONE_PAIR: Readonly<Pair>;
 export function featuredZoneEntry(cells: readonly Cell[], seed: number): Leg[];
 export function smokeBatches(pending: readonly number[]): number[][];
-export function retrySmokeEntries(route: readonly Leg[], proof: unknown, build: string, seed: number):
+export function retrySmokeEntries(route: readonly Leg[], proof: unknown, build: string, seed: number, scope?: 'loopback'):
   {arrivals: SmokeArrival[]; pending: number[]};
+export function runLoopbackSmoke(options: {build:string; out:string; seed:number; prior?:unknown; base:string; socket:string}): Promise<number>;
 export function smokeGap(proof: unknown): string | undefined;
 export function stagedTourProof(value: unknown): unknown;
 export function zoneEntryTour(cells: readonly Cell[]): {from: Cell; to: Cell}[];

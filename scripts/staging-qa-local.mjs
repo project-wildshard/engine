@@ -1,7 +1,7 @@
 // SQ5: build the source and exercise a real signed world on loopback.
 import { execFileSync, spawn } from 'node:child_process';
-import { generateKeyPairSync } from 'node:crypto';
-import { closeSync, mkdirSync, openSync, rmSync, writeFileSync } from 'node:fs';
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { makeGateCopy } from './push-gate-copy.mjs';
@@ -26,29 +26,66 @@ export function checkLocalSource(root, build) {
   if (dirty !== '') throw new Error('Local QA needs clean tracked source');
 }
 
-/** @param {{root: string, build: string, out: string}} options */
-export async function openQaRig({ root, build, out }) {
+/** Build the seeded tour's fixture from its pinned products and the reviewed positions of any missing featured cells.
+ * @param {string} checkout @param {number} seed */
+async function tourFixture(checkout, seed) {
+  const home = (/** @type {string} */ path) => JSON.parse(readFileSync(join(checkout, path), 'utf8'));
+  const catalogue = home('test/pins/catalogue.json');
+  const snapshot = home('test/pins/staging.json').catalogue;
+  /** @type {string[]} */ const featured = home('src/server/game/zoneSelect/featured.json');
+  /** @type {import('./zone-entry-tour.mjs').Cell[]} */ const cells = catalogue.grid.cells;
+  /** @type {import('./zone-entry-tour.mjs').Cell[]} */ const reviewed = snapshot.grid.cells;
+  for (const cell of reviewed) {
+    const slug = cell.slug ?? cell.instance;
+    if (featured.includes(slug) && !cells.some(row => (row.slug ?? row.instance) === slug)) cells.push(cell);
+  }
+  // Import from this exact source so both the fixture selection and the browser use the same featured list.
+  const {featuredZoneEntry} = await import(pathToFileURL(join(checkout, 'scripts/zone-entry-tour.mjs')).href);
+  const route = featuredZoneEntry(cells, seed);
+  const selected = new Set(route.flatMap(({from,to}) => [from.slug ?? from.instance,to.slug ?? to.instance]));
+  const base = /** @type {import('./zone-entry-tour.mjs').Cell[]} */ (home('src/shared/game/grid/singleplayer.json').grid.cells);
+  const builtIn = new Set(base.map(cell => cell.instance));
+  const extras = cells.filter(cell => !builtIn.has(cell.instance) && selected.has(cell.slug ?? cell.instance));
+  return {catalogue, extras, more: [...selected].filter(slug => slug !== 'driftwood-isle')};
+}
+
+/** @param {{root: string, build: string, out: string, tourSeed?: number}} options */
+export async function openQaRig({ root, build, out, tourSeed }) {
   const work = join(out, 'local'), dist = join(work, 'dist'), keyFile = join(work, 'fixture-key.json');
   mkdirSync(work, { recursive: true });
   const source = makeGateCopy(root, build, { directory: join(work, 'copies') });
   const checkout = source.path;
   const pair = generateKeyPairSync('ed25519');
   const key = pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
+  const placementFile = join(work, 'fixture-placements.json');
   try {
     writeFileSync(keyFile, JSON.stringify({ private: pair.privateKey.export({ type: 'pkcs8', format: 'pem' }), public: key }), { mode: 0o600, flag: 'wx' });
     // Both the app and server are built using this source checkout's tools.
     process.env.WS_RIG_PORTS ??= '19476';
-    const { RELEASE_PORT, openRig } = await import(pathToFileURL(join(checkout, 'scripts', 'online-rig.mjs')).href);
+    const { RELEASE_PORT, WORLD_PORT, openRig } = await import(pathToFileURL(join(checkout, 'scripts', 'online-rig.mjs')).href);
+    const tour = tourSeed === undefined ? undefined : await tourFixture(checkout, tourSeed);
+    const catalogueFile = join(work, 'fixture-catalogue.json');
+    if (tour !== undefined) {
+      writeFileSync(catalogueFile, JSON.stringify(tour.catalogue), {mode:0o600});
+      const body = JSON.stringify({kind:'placement',channel:'staging',serial:1,cells:tour.extras});
+      writeFileSync(placementFile, JSON.stringify({body,signature:sign(null, Buffer.from(body), pair.privateKey).toString('hex')}), {mode:0o600,flag:'wx'});
+    }
     await run(checkout, 'pnpm', ['pins'], process.env, join(work, 'pins.log'));
     await run(checkout, 'python3', ['scripts/heavy-lane.py', 'build', '--', process.execPath, 'scripts/build-app.mjs', '--outDir', dist],
-      { ...process.env, WS_BUILD_ID: build, WILDSHARD_RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, WILDSHARD_RELEASE_KEY: key },
+      { ...process.env, WS_BUILD_ID: build, WILDSHARD_RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, WILDSHARD_RELEASE_KEY: key,
+        ...(tour === undefined ? {} : {WILDSHARD_CATALOGUE:catalogueFile}) },
       join(work, 'build.log'));
     checkLocalSource(checkout, build);
-    const rig = await openRig({ dist, work: join(work, 'rig'), keyFile, pgBin: 'pglite:', more: ['pine-hollow', 'far-reach'], cells: 'grid', isolated: true });
-    return { base: String(rig.base), source: checkout, close: async () => {
-      try { await rig.close(); } finally { source.remove(); }
+    const rig = await openRig({ dist, work: join(work, 'rig'), keyFile, pgBin: 'pglite:', more: tour?.more ?? ['pine-hollow', 'far-reach'], cells: 'grid', isolated: true,
+      ...(tour === undefined ? {} : {channel:'staging',placement:{url:pathToFileURL(placementFile).href,key}}) });
+    return { base: String(rig.base), socket: `ws://127.0.0.1:${String(WORLD_PORT)}`, source: checkout, close: async () => {
+      try { await rig.close(); } finally {
+        rmSync(placementFile, { force: true });
+        source.remove();
+      }
     } };
   } catch (error) {
+    rmSync(placementFile, { force: true });
     source.remove();
     throw error;
   } finally { rmSync(keyFile, { force: true }); }

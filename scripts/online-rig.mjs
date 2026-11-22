@@ -59,8 +59,8 @@ export async function intoWorld(page) {
  * the local chaos proxy): `/release.json` is the world's and `/__release.json` the page's (the proxy's page route), so `pageView`
  * can run the page's ahead of the world's; `retain` serves a signed `/code-retention.json` on the page origin; `move` carries the
  * world and the page origin to the other build, as a deploy does.
- * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean, port?: 0, gridRoot?: string }} options */
-export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT }) {
+ * @param {{ dist: string, nextDist?: string, work: string, keyFile: string, pgBin?: string, pgData?: string, saves?: 'memory', shard?: string, seats?: number, more?: string[], cells?: string, socket?: string, workers?: number, origins?: string[], channel?: string, isolated?: boolean, port?: 0, gridRoot?: string, placement?: {url:string,key:string} }} options */
+export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin = '', pgData = '', shard = 'driftwood-isle', seats, more = [], cells = shard, socket = `ws://127.0.0.1:${String(WORLD_PORT)}/`, workers, origins = [], channel = 'production', isolated = false, port, gridRoot = ROOT, placement }) {
   if (origins.some(origin => new URL(origin).origin !== origin || new URL(origin).hostname !== '127.0.0.1')) throw new Error('A rig lets in loopback page origins only');
   const { memory } = rigOptions({ saves, pgBin, pgData, socket });
   if (port !== undefined && port !== 0) throw new Error('A rig port option must be zero; use WS_RIG_PORTS for legacy named ports');
@@ -156,6 +156,10 @@ export async function openRig({ dist, nextDist = '', work, keyFile, saves, pgBin
   const DATABASE = memory ? 'memory:' : database('saves_online', pgPort);
   const worldEnv = { ...process.env };
   delete worldEnv.PULL_SCRIPT;
+  if (placement !== undefined) {
+    worldEnv.PLACEMENT_URL = placement.url;
+    worldEnv.PLACEMENT_PUBLIC_KEY = placement.key;
+  }
   const waitForWorld = isolated || ephemeral;
   const readyWorld = async (/** @type {import('node:child_process').ChildProcess} */ child) => {
     if (!waitForWorld) return;

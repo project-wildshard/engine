@@ -18,7 +18,7 @@ import featured from '../src/server/game/zoneSelect/featured.json' with { type: 
 /** @typedef {{expected:number, arrivals:Arrival[], failure?:CrossingFailure, retries?:CrossingFailure[], resumedFrom?:number, pass:boolean}} Tour */
 /** @typedef {Arrival & {index:number}} SmokeArrival */
 /** @typedef {CrossingFailure & {index:number}} SmokeFailure */
-/** @typedef {{mode:'smoke', build:string, engine:'webkit', profile:'phone', seed:number, cells: Cell[], expected:number,
+/** @typedef {{mode:'smoke', scope?:'loopback', build:string, engine:'webkit', profile:'phone', seed:number, cells: Cell[], expected:number,
  * arrivals:SmokeArrival[], failures:SmokeFailure[], failure?:CrossingFailure, pass:boolean, wallMs:number}} SmokeReport */
 const SIDES = /** @type {const} */ ([[1, 0], [0, 1], [-1, 0], [0, -1]]);
 const DRIFTWOOD = 'driftwood-isle', SKY = 'far-reach', HALF = 250, ENTRY_MS = 90_000, APPROACH_MS = 120_000;
@@ -93,10 +93,10 @@ function smokeEntries(route, proof) {
   if (seen.size !== route.length) throw new Error('The verdict does not account for every smoke pair');
 }
 
-/** @param {readonly Leg[]} route @param {unknown} report @param {string} build @param {number} seed */
-export function retrySmokeEntries(route, report, build, seed) {
+/** @param {readonly Leg[]} route @param {unknown} report @param {string} build @param {number} seed @param {'loopback'} [scope] */
+export function retrySmokeEntries(route, report, build, seed, scope) {
   const proof = /** @type {Partial<SmokeReport>|null} */ (report);
-  if (proof?.mode !== 'smoke' || proof.build !== build || proof.engine !== 'webkit' || proof.profile !== 'phone' || proof.pass !== false)
+  if (proof?.mode !== 'smoke' || proof.scope !== scope || proof.build !== build || proof.engine !== 'webkit' || proof.profile !== 'phone' || proof.pass !== false)
     throw new Error('Retry needs a held phone WebKit smoke for the same staging build');
   if (proof.seed !== seed) throw new Error('Retry must use the saved seed');
   smokeEntries(route, proof);
@@ -110,7 +110,7 @@ export function smokeGap(report) {
   try {
     const route = featuredZoneEntry(proof.cells, proof.seed);
     smokeEntries(route, proof);
-    if (proof.pass && proof.failures.length === 0 && proof.arrivals.length === 16) return undefined;
+    if (proof.scope === undefined && proof.pass && proof.failures.length === 0 && proof.arrivals.length === 16) return undefined;
   } catch { /* Only a complete, matching smoke qualifies a release. */ }
   return 'J476 zone-entry smoke did not pass all 16 seeded crossings';
 }
@@ -340,7 +340,9 @@ async function portalExits(page, slug, missingIsEmpty = false) {
     return new URL(`shardfiles/${encodeURIComponent(slug_)}/sections/world/edge.json`, root).href;
   }, slug);
   const address = new URL(path);
-  if (!['https://packs.wildshard.io', 'https://staging.wildshard.io'].includes(address.origin)) throw new Error('Unexpected portal data origin');
+  const pageOrigin = new URL(page.url()).origin;
+  const local = /^http:\/\/127\.0\.0\.1:\d+$/u.test(pageOrigin) && address.origin === pageOrigin;
+  if (!local && !['https://packs.wildshard.io', STAGING].includes(address.origin)) throw new Error('Unexpected portal data origin');
   const response = await fetch(address, {signal: AbortSignal.timeout(10_000)});
   if (missingIsEmpty && response.status === 404) return [];
   if (!response.ok) throw new Error(`Could not read the portal rows (HTTP ${response.status})`);
@@ -576,16 +578,16 @@ export async function walkZoneEntryTour(page, origin, result, save, {restart, re
   result.pass = true;
 }
 
-/** @param {string} build */
-async function requireStagingBuild(build) {
-  const response = await fetch(`${STAGING}/version.json`, {cache:'no-store', signal:AbortSignal.timeout(15_000)});
-  if (!response.ok || (await response.json()).build !== build) throw new Error('Staging serves a different build from the zone-entry request');
+/** @param {string} build @param {string} base */
+async function requireSmokeBuild(build, base) {
+  const response = await fetch(`${base}/version.json`, {cache:'no-store', signal:AbortSignal.timeout(15_000)});
+  if (!response.ok || (await response.json()).build !== build) throw new Error('The page serves a different build from the zone-entry request');
 }
 
 /** Seat a normal guest at the source cell of an otherwise independent crossing.
- * @param {Page} page @param {Cell} source @param {string} build @param {string} name */
-async function bootSmokeSource(page, source, build, name) {
-  const url = new URL('/', STAGING);
+ * @param {Page} page @param {Cell} source @param {string} build @param {string} name @param {string} base */
+async function bootSmokeSource(page, source, build, name, base) {
+  const url = new URL('/', base);
   url.search = new URLSearchParams({chunk:source.slug ?? source.instance, mute:'1', nolock:'1', skipintro:'1', fps:'60'}).toString();
   await page.goto(url.href, {waitUntil:'domcontentloaded', timeout:45_000});
   const nameBox = page.locator('#ws-name-box input');
@@ -625,18 +627,20 @@ async function smokePose(page, leg) {
   return {center, pitch};
 }
 
-/** @param {{build:string, out:string, seed:number, prior?:unknown}} options */
-async function runSmoke({build, out, seed, prior}) {
+/** @param {{build:string, out:string, seed:number, prior?:unknown, loopback?:{base:string,socket:string}}} options */
+async function runSmoke({build, out, seed, prior, loopback}) {
   const began = Date.now(), path = join(out, 'zone-entry.json');
+  const base = loopback?.base ?? STAGING;
+  const scope = loopback === undefined ? undefined : 'loopback';
   const {webkit} = await import('./browser-playwright.mjs');
-  await requireStagingBuild(build);
+  await requireSmokeBuild(build, base);
   console.log(`J476 zone-entry seed ${seed}; exact build ${build}`);
   // Three independent guest sessions share one admitted headless WebKit owner.
   const browser = await webkit.launch({headless:true});
   try {
     const newContext = async () => {
       const context = await browser.newContext({...PHONE,isMobile:true});
-      await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
+      await context.addInitScript(guardStagingSockets, loopback?.socket ?? 'wss://rooms-staging.wildshard.io');
       await saveFixture(context, {scope:'device',key:'firstPlayDone',data:true});
       await saveFixture(context, {scope:'device',key:'devMode',data:true});
       await saveFixture(context, {scope:'global',key:'settings',merge:true,data:{volume:0}});
@@ -646,7 +650,7 @@ async function runSmoke({build, out, seed, prior}) {
     if (prior === undefined) {
       const context = await newContext(), discovery = await context.newPage();
       try {
-        await bootSmokeSource(discovery, {instance:DRIFTWOOD,cell:[0,0]}, build, `ZE ${began.toString(36).slice(-5)} G`);
+        await bootSmokeSource(discovery, {instance:DRIFTWOOD,cell:[0,0]}, build, `ZE ${began.toString(36).slice(-5)} G`, base);
         ({cells} = await gridLayout(discovery));
       } catch (error) {
         const detail = await Promise.race([crossingDetail(discovery),delay(2000,'')]);
@@ -664,7 +668,7 @@ async function runSmoke({build, out, seed, prior}) {
     const fullRoute = zoneEntryTour(cells);
     const {arrivals,pending} = prior === undefined
       ? {arrivals:[],pending:route.map((_,index) => index)}
-      : retrySmokeEntries(route,prior,build,seed);
+      : retrySmokeEntries(route,prior,build,seed,scope);
     /** @type {Map<number,SmokeFailure>} */ const failed = new Map();
     for (const index of pending) {
       const leg = route[index];
@@ -675,7 +679,7 @@ async function runSmoke({build, out, seed, prior}) {
       const pass = checked && failures.length === 0 && arrivals.length === route.length;
       /** @type {SmokeReport} */ const verdict = {mode:'smoke',seed,build,engine:'webkit',profile:'phone',cells,
         expected:route.length,arrivals:[...arrivals].sort((a,b) => a.index-b.index),failures,
-        ...(failure === undefined ? {} : {failure}),pass,wallMs:Date.now()-began};
+        ...(scope === undefined ? {} : {scope}), ...(failure === undefined ? {} : {failure}),pass,wallMs:Date.now()-began};
       writeFileSync(`${path}.next`, `${JSON.stringify(verdict,null,2)}\n`);
       renameSync(`${path}.next`,path);
       return verdict;
@@ -700,7 +704,7 @@ async function runSmoke({build, out, seed, prior}) {
           // from Driftwood first to start at the same reachable approach.
           const roadStart = leg.from.instance === SKY || leg.from.instance === 'nalati-grasslands';
           const stagingLeg = roadStart ? fullRoute.find(edge => edge.from.instance === DRIFTWOOD && edge.to === leg.from) : undefined;
-          await bootSmokeSource(page,stagingLeg?.from ?? leg.from,build,`ZE ${began.toString(36).slice(-5)} ${String(index+1)}`);
+          await bootSmokeSource(page,stagingLeg?.from ?? leg.from,build,`ZE ${began.toString(36).slice(-5)} ${String(index+1)}`,base);
           if (stagingLeg !== undefined) {
             const start = await smokePose(page,stagingLeg);
             await crossZoneEntry(page,stagingLeg,start.center,start.pitch,undefined,true);
@@ -722,13 +726,26 @@ async function runSmoke({build, out, seed, prior}) {
         }
       }
     }));
-    await requireStagingBuild(build);
+    await requireSmokeBuild(build, base);
     const verdict = save(true);
     console.log(`J476 ${verdict.pass ? 'PASS' : 'HOLD'} ${arrivals.length}/${route.length}, seed ${seed}, wall ${verdict.wallMs} ms`);
     return verdict.pass ? 0 : 1;
   } finally {
     await browser.close();
   }
+}
+
+/** FS29 exercises the same walker on the exact signed local rig. Its verdict cannot qualify a staging deploy.
+ * @param {{build:string, out:string, seed:number, prior?:unknown, base:string, socket:string}} options */
+export async function runLoopbackSmoke({base, socket, ...options}) {
+  const page = new URL(base), rooms = new URL(socket);
+  if (!/^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || page.origin !== base ||
+      !/^ws:\/\/127\.0\.0\.1:\d+$/u.test(socket) || rooms.origin !== socket ||
+      !/^[a-f0-9]{40}$/u.test(options.build) || !validSeed(options.seed)) {
+    throw new Error('The loopback tour needs an exact build, seed and local page and rooms origins');
+  }
+  mkdirSync(options.out, {recursive:true});
+  return runSmoke({...options, loopback:{base,socket}});
 }
 
 /** Read either the raw smoke or the staging deploy verdict that contains it.

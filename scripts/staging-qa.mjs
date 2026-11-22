@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // J426–J428: the staging deploy checks. Run under browser-lane.sh on the release Mac.
 // node scripts/staging-qa.mjs [--local | --candidate <worker-version-url> | --url <url>]
-//   --release vX.Y.Z [--build <sha>] [--only K3] [--out <dir>]
+//   --release vX.Y.Z [--build <sha>] [--only K3] [--out <dir>] [--local --preflight <seed>]
 // node scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z
 // SQ16 (J427): each leg runs the steps staging-qa-budget.mjs lists for it, about 10 minutes; over 12 is a P2 on the runner.
 import { spawn } from 'node:child_process';
 import { appendFileSync, closeSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { parseArgs, runSmoke, served } from './staging-smoke.mjs';
 import { bugbashRows } from './staging-smoke/bugbash.mjs';
 import { writeBoard } from './staging-smoke/board.mjs';
@@ -146,6 +147,12 @@ async function cli() {
   const url = new URL(args.get('url') ?? STAGING).origin;
   if (url !== STAGING && !/^http:\/\/(localhost|127\.0\.0\.1):\d+$/u.test(url)) throw new Error('Staging QA requires staging or a loopback server');
   const requested = args.get('only')?.split(',');
+  const preflight = args.get('preflight');
+  const tourSeed = preflight === undefined ? undefined : Number(preflight);
+  if (preflight !== undefined && (!local || requested !== undefined || !/^\d+$/u.test(preflight) ||
+      tourSeed === undefined || !Number.isSafeInteger(tourSeed) || tourSeed > 0xffff_ffff)) {
+    throw new Error('Release preflight needs --local and an unsigned 32-bit seed');
+  }
   const deployChecks = args.has('deploy-checks');
   if (deployChecks && (local || requested !== undefined || url !== STAGING || source === undefined)) {
     throw new Error('Deploy checks require the full, exact candidate or staging build');
@@ -154,8 +161,9 @@ async function cli() {
   if (requested?.some(id => !known.has(id))) throw new Error('Unknown staging QA step');
   // SQ16 (J427): each leg runs its budgeted steps; --only picks steps by hand
   const kind = local ? 'local' : candidateUrl === undefined ? 'staging' : 'candidate';
+  // FS29 uses the hosted browser legs. The release's local leg owns Simulator Safari.
   /** @type {readonly string[]} */
-  const leg = deployChecks ? DEPLOY_CHECKS : requested ?? LEGS[kind];
+  const leg = deployChecks ? DEPLOY_CHECKS : requested ?? (tourSeed === undefined ? LEGS[kind] : LEGS.local.filter(id => id !== 'ios-safari'));
   const selected = DEPLOY_SCENARIOS.filter(id => leg.includes(id));
   const expected = JOURNEYS.filter(id => leg.includes(id));
   // SQ14: the Simulator's Safari uses the Mac's own network, which no route can point at the unaliased candidate
@@ -164,6 +172,7 @@ async function cli() {
     const target = local ? 'local source' : candidateUrl === undefined ? url : 'staging candidate';
     console.log(`staging-qa ${release} ${target}: ${[...selected, ...expected].join(', ')}; vision reports only; hold and fix forward on P0/P1`);
     for (const line of budgetLines(kind, [...(local ? ['build'] : []), ...selected, ...expected])) console.log(line);
+    if (tourSeed !== undefined) console.log(`J451: walk 16 seeded phone WebKit crossings on the local rig (seed ${tourSeed})`);
     return;
   }
   const legStarted = Date.now();
@@ -177,15 +186,22 @@ async function cli() {
     if (saved !== undefined) cpSync(saved.dir, join(store, saved.note.release, 'profiles'), { recursive: true });
     mkdirSync(out, { recursive: true });
   }
-  const rig = local && source !== undefined ? await openQaRig({ root, build: source, out }) : undefined;
+  const rig = local && source !== undefined ? await openQaRig({ root, build: source, out, ...(tourSeed === undefined ? {} : {tourSeed}) }) : undefined;
   const candidate = candidateUrl !== undefined && source !== undefined ? await openQaCandidate({ root, out, candidate: candidateUrl, build: source }) : undefined;
   let unbind;
   try {
     unbind = candidate === undefined ? undefined : bindCandidateBrowser(candidate);
     await qualify({ url: rig?.base ?? url, release, root: rig?.source ?? root, out, store, local, kind, legStarted,
-      selected, expected, owner, full: requested === undefined,
+      selected, expected, owner, full: requested === undefined && tourSeed === undefined,
       ...(candidate === undefined ? {} : { candidate }),
       ...(source === undefined ? {} : { source }), ...(args.has('bugbash') ? { bugbash: args.get('bugbash') } : {}) });
+    if (rig !== undefined && source !== undefined && tourSeed !== undefined && readResult(join(out, 'verdict.json'))?.hold === false) {
+      const {runLoopbackSmoke:walk} = await import(pathToFileURL(join(rig.source, 'scripts/zone-entry-tour.mjs')).href);
+      const tour = {build:source, base:rig.base, socket:rig.socket, seed:tourSeed, out:join(out, 'zone-entry')};
+      const code = await walk(tour);
+      const prior = code === 0 ? undefined : readResult(join(tour.out, 'zone-entry.json'));
+      process.exitCode = prior === undefined ? code : await walk({...tour, prior, out:join(out, 'zone-entry-retry')});
+    }
     // SQ16: the candidate plays K1, K2 and K6 and the live leg does not, so a clean candidate's run and its K1/K2 profiles
     // become the live store's: the next release's old cache and time-to-play baseline
     if (candidate !== undefined && process.exitCode === 0 && existsSync(join(store, release))) cpSync(join(store, release), join(liveStore, release), { recursive: true });
