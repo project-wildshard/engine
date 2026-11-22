@@ -2,8 +2,8 @@
  * file and network limits (`cookWorker.ts`), so a hostile shardfile can kill this process and nothing else. Everything
  * here is built-in code reading data; the only foreign code is a shard's wasm, under the sim's fuel limit.
  *
- * Gates, in order: `api-server` already refused what it could (F3 (a)); the cap of D31; the format's product validator
- * again, because this host trusts no other host; the simulation proof (F3 (b)); then the cook. A shard with built-in
+ * Gates, in order: `api-server` already refused what it could (F3 (a)); the cap of D31; the format's migration chain and
+ * product validator again, because this host trusts no other host; the simulation proof (F3 (b)); then the cook. A shard with built-in
  * runtime bindings can't be proved without its native recipes, so its proof says `unmeasured` and never invents one. */
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {createHash} from 'node:crypto';
@@ -15,7 +15,8 @@ import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
 import {validateShardfileFolder, type ValidatedShardfile} from '@wildshard/format/shardfileValidation';
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import type {ShardfileCheckReport, ShardfileEntryProof} from '@wildshard/engine/game/shardfile/checkReport';
-import {readTar} from '@wildshard/format/tar';
+import {migrateShardfile, validateMigrated} from '@wildshard/format/migrate';
+import {readTar, writeTar} from '@wildshard/format/tar';
 import {cookShard, openShardfile, serverRows, type CookReport, type CookShardPhase, type OpenShardfile, type WireBytes} from './shardCook';
 import type {PartEncoder} from './spawnParts';
 
@@ -70,16 +71,41 @@ const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes)
 // Spread, so a format before CP10 (which has no `judged` port) still types.
 const STORED = {judged: 'stored'} as const;
 
-function admit(tarball: Uint8Array, cap: number): {readonly product: ValidatedShardfile; readonly receipt?: CookReceipt} {
+/** What the cook admits: the validated product, the bytes it cooks, and the chain steps that made them. */
+interface Admitted {readonly product: ValidatedShardfile; readonly cooked: Uint8Array; readonly applied: readonly string[]; readonly receipt?: CookReceipt}
+
+const folderOf = (files: ReadonlyMap<string, Uint8Array>): Parameters<typeof validateShardfileFolder>[0] => ({
+  read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path} within ${maximum} bytes`); return bytes; },
+  paths: () => files.keys(),
+});
+
+/** CP1: the chain's copy of an original this validator refuses, validated as the API validates a migrated copy. */
+function chainedCopy(files: ReadonlyMap<string, Uint8Array>, refusal: unknown): Admitted {
+  const chained = migrateShardfile(files, {hash: sha256});
+  if (chained.applied.length === 0) throw refusal;
+  const preparation = chained.preparation === 'author' ? {preparation: 'author' as const} : {};
+  const product = validateMigrated(chained.files, {hash: sha256, ...STORED, ...preparation});
+  const receipt = cookReceipt(chained.files);
+  return {product, cooked: writeTar(chained.files), applied: chained.applied, ...(receipt === undefined ? {} : {receipt})};
+}
+
+/**
+ * SHARD-COMPAT CP1 (J486): a stored shard that can migrate keeps working without a re-upload. An original this validator
+ * refuses goes through the format's migration chain, as the API's migrated copies do, and the cook cooks that copy, built in
+ * memory; the original's bytes are never changed or written (Pine r5 2afc6270, live on production: its `compendiums`
+ * predate `journal-glyph-images`, and v0.1.65/.66 refused it). An original that validates cooks as it is, as before, so no
+ * working head pays for a copy. A refusal the chain can't repair is the original's refusal.
+ */
+function admit(tarball: Uint8Array, cap: number): Admitted {
   if (tarball.length > cap) throw new ShardfileRefusedError(`Shardfile is ${tarball.length} bytes, past the ${cap} cap`);
   try {
     const files = readTar(tarball);
-    const product = validateShardfileFolder({
-      read: (path, maximum) => { const bytes = files.get(path); if (bytes === undefined || bytes.length > maximum) throw new Error(`No ${path} within ${maximum} bytes`); return bytes; },
-      paths: () => files.keys(),
-    }, {hash: sha256, ...STORED});
+    let product: ValidatedShardfile;
+    try {
+      product = validateShardfileFolder(folderOf(files), {hash: sha256, ...STORED});
+    } catch (refusal) { return chainedCopy(files, refusal); }
     const receipt = cookReceipt(files);
-    return {product, ...(receipt === undefined ? {} : {receipt})};
+    return {product, cooked: tarball, applied: [], ...(receipt === undefined ? {} : {receipt})};
   } catch (error) { throw new ShardfileRefusedError(error instanceof Error ? error.message : 'Shardfile refused', {cause: error}); }
 }
 const object = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -125,7 +151,8 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   const phase = (stage: CookJobPhase): void => { ports.onPhase?.(stage, Math.round(ports.now() - started)); };
   phase('validation');
   await prepareAssetDecoders();
-  const {product, receipt} = admit(tarball, ports.maxBytes ?? MAX_SHARDFILE_BYTES);
+  const {product, receipt, cooked, applied} = admit(tarball, ports.maxBytes ?? MAX_SHARDFILE_BYTES);
+  if (applied.length > 0) ports.warn?.(`cooking the migrated copy (${applied.join(', ')}); the original is unchanged`);
   // Match the transport's generic identity allowlist, without shard behavior branches.
   if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
     throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
@@ -135,10 +162,10 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   const proof = check.proof === 'refused' ? 'unmeasured' : check.proof;
   const client = join(out, 'client');
   const renderer = ports.renderer === undefined ? {} : {renderer: ports.renderer};
-  const cook = await cookShard(tarball, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});
+  const cook = await cookShard(cooked, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});
   phase('server-files');
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
-  const shard = openShardfile(tarball, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
+  const shard = openShardfile(cooked, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
   mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, shard.header);
   return {slug: product.index.identity.slug, hash: sha256(tarball), proof, check, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
     ...(receipt === undefined ? {} : {receipt})};
