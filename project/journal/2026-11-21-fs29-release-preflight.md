@@ -9,3 +9,7 @@ and reruns only its failed pairs.
 The loopback socket admits only the rig's rooms origin. Its verdict stays
 out of staging admission and cannot supply arrivals to a staging retry.
 The release's own gates still run on the release build.
+
+The first loopback run reproduced v0.1.67's Nine to Nalati miss. The
+walker now keeps the deck it observed in the matching frame. A second
+browser read could sample the next movement outside the deck radius.

@@ -357,12 +357,13 @@ async function walkPortalExit(page, from, plan, end) {
   /** @param {Point} point */
   const onDeck = point => plan.decks.some(deck => Math.hypot(point.x-deck.x, point.z-deck.z) < 5);
   for (const point of plan.walk) await walk(page, point, end, {landed: onDeck});
-  await page.waitForFunction(decks => {
+  const landing = await page.waitForFunction(decks => {
     const st = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.();
-    return st !== undefined && decks.some(deck => Math.hypot(st.feet.x-deck.x, st.feet.z-deck.z) < 5);
+    return st === undefined ? 0 : decks.findIndex(deck => Math.hypot(st.feet.x-deck.x, st.feet.z-deck.z) < 5) + 1;
   }, plan.decks, {timeout: Math.min(10_000, Math.max(1, end-Date.now())), polling: 150});
-  const out = await feet(page);
-  const deck = out === null ? undefined : plan.decks.find(row => Math.hypot(out.x-row.x, out.z-row.z) < 5);
+  // Keep the matching deck from the same frame. A new browser turn can sample the first movement off its edge.
+  const index = await landing.jsonValue().finally(() => landing.dispose());
+  const deck = plan.decks[index - 1];
   if (deck === undefined) throw new Error('The portal did not leave the walker on a declared deck');
   return {instance:from.instance, cell:[from.cell[0]+deck.dx, from.cell[1]+deck.dz]};
 }
