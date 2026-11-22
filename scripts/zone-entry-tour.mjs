@@ -69,10 +69,10 @@ export function featuredZoneEntry(cells, seed) {
   }));
 }
 
-/** @param {readonly number[]} pending @returns {number[][]} */
-export function smokeBatches(pending) {
-  if (pending.length === 16) return [pending.slice(0,5), pending.slice(5,10), pending.slice(10)];
-  return [0,1,2].map(lane => pending.filter((_,index) => index%3 === lane));
+/** @param {readonly number[]} pending @param {2|3} [walkers] @returns {number[][]} */
+export function smokeBatches(pending, walkers = 3) {
+  if (walkers === 3 && pending.length === 16) return [pending.slice(0,5), pending.slice(5,10), pending.slice(10)];
+  return Array.from({length:walkers}, (_,lane) => pending.filter((_crossing,index) => index%walkers === lane));
 }
 
 /** @param {readonly Leg[]} route @param {Partial<SmokeReport>} proof */
@@ -646,7 +646,7 @@ async function runSmoke({build, out, seed, prior, loopback}) {
   const {webkit} = await import('./browser-playwright.mjs');
   await requireSmokeBuild(build, base);
   console.log(`J476 zone-entry seed ${seed}; exact build ${build}`);
-  // Three independent guest sessions share one admitted headless WebKit owner.
+  // Independent guest sessions share one admitted headless WebKit owner.
   const browser = await webkit.launch({headless:true});
   try {
     const newContext = async () => {
@@ -696,7 +696,8 @@ async function runSmoke({build, out, seed, prior, loopback}) {
       return verdict;
     };
     save();
-    const batches = smokeBatches(pending);
+    // FS29 leaves more renderer capacity for each hosted loopback guest. Staging keeps its three walkers.
+    const batches = smokeBatches(pending, scope === 'loopback' && process.env.GITHUB_ACTIONS === 'true' ? 2 : 3);
     console.log(`J476 batches ${batches.map(batch => batch.length).join('/')}`);
     await Promise.all(batches.map(async (batch,lane) => {
       for (const index of batch) {

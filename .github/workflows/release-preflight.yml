@@ -15,7 +15,7 @@ concurrency:
 jobs:
   local-qa-and-zone-entry:
     if: github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main'
-    # Keep the phone walker on macOS, where the same seed and three sessions fit its entry deadlines.
+    # The hosted loopback tour uses two concurrent WebKit guests on macOS.
     runs-on: macos-15
     timeout-minutes: 45
     env:

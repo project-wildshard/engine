@@ -23,7 +23,12 @@ test('the smoke seeds two real entries per featured shard and assigns 5/5/6', ()
   expect(route).toHaveLength(16);
   expect(featuredZoneEntry([...featuredCells].reverse(), 476)).toEqual(route);
   expect(featuredZoneEntry(featuredCells, 477)).not.toEqual(route);
-  expect(smokeBatches(route.map((_, index) => index)).map(batch => batch.length)).toEqual([5,5,6]);
+  const crossings = route.map((_, index) => index);
+  expect(smokeBatches(crossings).map(batch => batch.length)).toEqual([5,5,6]);
+  const hosted = smokeBatches(crossings, 2);
+  expect(hosted.map(batch => batch.length)).toEqual([8,8]);
+  expect(hosted.flat().sort((a,b) => a-b)).toEqual(crossings);
+  expect(smokeBatches([1,7,14], 2)).toEqual([[1,14],[7]]);
   for (const cell of featuredCells) expect(route.filter(leg => leg.to.instance === cell.instance)).toHaveLength(2);
   const full = zoneEntryTour(featuredCells);
   for (const leg of route) expect(full).toContainEqual(leg);
