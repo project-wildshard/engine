@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.69 (2026-11-22)
+
+- Mirror Salt shows the dock prompt at seat height and lets drivers get back into their buggies.
+- Mossgate Hollow shows its completion card.
+- Direct links to Pine Hollow take you into the world.
+- Choosing another zone moves your online seat there while the old server is still holding your spot.
+
 ## v0.1.64 (2026-11-21)
 
 - Nalati's new eagle and balbal can use their authored bodies and coats.
