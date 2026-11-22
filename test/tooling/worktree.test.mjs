@@ -4,7 +4,7 @@ import {spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {INSTALLED_LOCK, SLUG, followMain, parseArgs, refreshCanonicalInstall, withStoreUse} from '../../scripts/worktree.mjs';
+import {CAP_REAP_IDLE_MS, INSTALLED_LOCK, MAX_WORKTREES, SLUG, followMain, parseArgs, reapForCap, refreshCanonicalInstall, withStoreUse} from '../../scripts/worktree.mjs';
 
 const SCRIPT = resolve(import.meta.dirname, '../../scripts/worktree.mjs');
 /** @type {string[]} */
@@ -380,5 +380,57 @@ describe('followMain keeps the canonical install on its lockfile', () => {
     git(canonical, ['switch', '-q', '-c', 'side']);
     const never = () => { throw new Error('must not install'); };
     expect(followMain(canonical, git(canonical, ['rev-parse', 'origin/main']), {env, install: never})).toMatch(/^canonical not on main \(refs\/heads\/side\); left alone$/u);
+  });
+});
+
+// Build-max C4 (2026-11-21): a full cap reaps a landed, clean worktree idle 30 min instead of refusing a new one.
+describe('a full cap makes room', () => {
+  test('reaps the oldest landed, clean, idle worktree with a copy first; keeps dirty and recent ones', () => {
+    const {canonical, base} = repos();
+    // .owner marks each worktree, as the real .gitignore ignores it.
+    writeFileSync(join(canonical, '.git/info/exclude'), '/.owner\n');
+    const keepRoot = join(base, 'keep'), receipts = join(base, 'receipts.log');
+    const env = {WS_SESSION_KEEP_ROOT: keepRoot, WS_LANE_RECEIPTS: receipts};
+    const slugs = Array.from({length: MAX_WORKTREES}, (_, index) => `full-${String(index)}`);
+    for (const slug of slugs) expect(worktree(canonical, ['new', slug, '--no-install'], env).status).toBe(0);
+    put(join(canonical, '.worktrees/full-0'), 'src/same.ts', 'export const same = "work in progress";\n');
+    // Fresh worktrees are not idle: the cap still refuses, naming the parked one.
+    const refused = worktree(canonical, ['new', 'next', '--no-install'], env);
+    expect(refused.status).toBe(1);
+    expect(refused.stderr).toMatch(/cap 6\).*a full cap reaps one idle 30 min with no process inside/u);
+    const ENV_FULL = {...ENV, ...env};
+    expect(reapForCap(canonical, ENV_FULL)).toEqual([]);
+    // 31 min on: full-0 is dirty and stays; full-1 is the oldest clean one and goes, after its copy.
+    const lines = reapForCap(canonical, ENV_FULL, Date.now() + CAP_REAP_IDLE_MS + 60_000);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^reaped full-\d \(landed, clean, idle \d+ min\) for the cap; copy at /u);
+    const gone = /^reaped (full-\d)/u.exec(lines[0] ?? '')?.[1] ?? '';
+    expect(gone).not.toBe('full-0');
+    expect(existsSync(join(canonical, '.worktrees', gone))).toBe(false);
+    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/plan/${gone}`], {cwd: canonical, env: ENV}).status).not.toBe(0);
+    expect(existsSync(join(canonical, '.worktrees/full-0/src/same.ts'))).toBe(true);
+    expect(readdirSync(keepRoot).length).toBeGreaterThan(0);
+    const made = worktree(canonical, ['new', 'next', '--no-install'], env);
+    expect(made.status, made.stderr).toBe(0);
+  });
+
+  test('the canonical refresh installs when pnpm\'s installed lockfile disagrees with a matching record', () => {
+    const {origin, base} = repos();
+    const seed = join(base, 'seed');
+    put(seed, 'pnpm-lock.yaml', 'lockfileVersion: 9.0\n# v1\n');
+    git(seed, ['add', 'pnpm-lock.yaml']);
+    git(seed, ['commit', '-q', '-m', 'lock v1', '--', 'pnpm-lock.yaml']);
+    git(seed, ['push', '-q', 'origin', 'main']);
+    const canonical = join(base, 'fresh');
+    git(base, ['clone', '-q', origin, canonical]);
+    const env = {...ENV, WS_STORE_USERS: join(base, 'store-users'), WS_STORE_RESERVATION: join(base, 'no-prune.lock')};
+    const lock = git(canonical, ['rev-parse', 'HEAD:pnpm-lock.yaml']);
+    put(canonical, INSTALLED_LOCK, `${lock}\n`);
+    put(canonical, 'node_modules/.pnpm/lock.yaml', 'lockfileVersion: 9.0\n# v0\n');
+    /** @type {string[]} */ const installs = [];
+    const install = (/** @type {string} */ cwd) => { installs.push(cwd); put(cwd, 'node_modules/.pnpm/lock.yaml', 'lockfileVersion: 9.0\n# v1\n'); };
+    expect(refreshCanonicalInstall(canonical, {env, install})).toBe(`canonical install refreshed for pnpm-lock.yaml ${lock.slice(0, 10)}`);
+    expect(refreshCanonicalInstall(canonical, {env, install})).toBe('');
+    expect(installs).toEqual([canonical]);
   });
 });

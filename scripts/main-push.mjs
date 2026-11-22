@@ -33,6 +33,8 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {assertNoLocalCandidates} from './local-candidates.ts';
+import {installLag} from './install-lag.mjs';
+import {withStoreUse} from './worktree.mjs';
 
 export class StopError extends Error {
   /** @param {string} message @param {boolean} [retry] a later try may succeed */
@@ -269,6 +271,23 @@ export function pushMain(cwd, remote = 'origin') {
 }
 
 /**
+ * Build-max C4: a sync that moved pnpm-lock.yaml leaves this shared checkout's install behind it, and the gate's typecheck
+ * then fails for every lane (2026-11-21, 14:33 to 16:59 Cancún: shard-format 0.66.0 installed, 0.67.0 locked). Install
+ * before a gate reads it. Returns the line to log, or '' when the install is current.
+ * @param {string} cwd @param {{ env?: NodeJS.ProcessEnv, install?: (cwd: string) => {status: number|null, stderr: string, stdout: string} }} [options]
+ */
+export function freshInstall(cwd, { env = process.env, install } = {}) {
+  const lag = installLag(cwd);
+  if (lag === '') return '';
+  const doInstall = install ?? ((/** @type {string} */ root) => spawnSync('pnpm', ['install', '--frozen-lockfile', '--config.confirmModulesPurge=false'], { cwd: root, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 << 20 }));
+  let result;
+  try { result = withStoreUse(env, 'main-push install', () => doInstall(cwd)); }
+  catch (error) { throw new StopError(`node_modules is behind (${lag}) and the install could not start: ${error instanceof Error ? error.message : String(error)}`); }
+  if (result.status !== 0) throw new StopError(`node_modules is behind (${lag}) and pnpm install --frozen-lockfile failed: ${firstLines(`${result.stderr}${result.stdout}`, 3)}. Run it in ${cwd}`);
+  return `installed: ${lag}`;
+}
+
+/**
  * Sync and push, trying again on a retryable stop. `afterSync` runs once, after the first sync that succeeds (the
  * --onto commit).
  * @param {string} cwd @param {{ tries?: number, wait?: number, sleep?: (s: number) => void, log?: (line: string) => void, afterSync?: () => void }} [options]
@@ -278,6 +297,8 @@ export function syncAndPush(cwd, { tries = 8, wait = 5, sleep = sleepSeconds, lo
   for (let attempt = 1; ; attempt++) {
     try {
       log(syncMain(cwd));
+      const installed = freshInstall(cwd);
+      if (installed !== '') log(installed);
       if (!synced) {
         synced = true;
         afterSync();
@@ -512,6 +533,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
           if (!(error instanceof StopError) || !error.retry) throw error;
           log(`sync before the gate: ${error.message}; the gate runs on local main as it is`);
         }
+        const installed = freshInstall(cwd);
+        if (installed !== '') log(installed);
         unlock();
         log(await pregate(cwd, log));
         process.env.WS_MAIN_PUSH_GATED = '1';

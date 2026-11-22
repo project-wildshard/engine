@@ -20,6 +20,7 @@ import {dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {MANIFEST as PINS_MANIFEST,stalePinFolders,verifiedPinsOutputs} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
+import {installLag} from './install-lag.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 import {assertNoLocalCandidates} from './local-candidates.ts';
@@ -462,8 +463,8 @@ class Landing{
   * (pnpm otherwise aborts: ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY). Purging is only safe in this worktree's own
   * node_modules, never through a link to the canonical checkout's, so a linked one stops. withStoreUse keeps the
   * install out of a running store prune (meta make prune), as worktree.mjs's install does.
-  * @param {string[]} moved */
- install(moved){
+  * @param {string[]} moved @param {string} [when] what moved them, for the lines */
+ install(moved,when='changed in the rebase'){
   const modules=join(this.root,'node_modules');
   let linked=false;
   try{linked=lstatSync(modules).isSymbolicLink();}catch{/* no node_modules yet */}
@@ -471,7 +472,7 @@ class Landing{
    this.receipt('STOP node_modules here is a link; land will not purge through it');
    throw new StopError(`${modules} is a symlink; land installs only into this worktree's own node_modules. Replace it with a real install (rm the link, pnpm install --frozen-lockfile), then run land again.`);
   }
-  this.say('install',`${moved.join(', ')} changed in the rebase; pnpm install --frozen-lockfile`);
+  this.say('install',`${moved.join(', ')} ${when}; pnpm install --frozen-lockfile`);
   let installed;
   try{
    installed=withStoreUse(this.env,'land install',()=>spawnSync('pnpm',['install','--frozen-lockfile','--config.confirmModulesPurge=false'],{cwd:this.root,env:this.env,encoding:'utf8',stdio:['ignore','pipe','pipe'],maxBuffer:64<<20}));
@@ -482,8 +483,8 @@ class Landing{
    throw new StopError(`${why}\n${busy?'Run land again once the prune ends; the install is still owed and runs first.':'Fix that, then run land again; the install is still owed and runs first.'}`);
   }
   if(installed.status===0){rmSync(this.installMarker(),{force:true});return;}
-  this.receipt(`STOP pnpm install --frozen-lockfile failed after the rebase`);
-  throw new StopError(`pnpm install --frozen-lockfile failed after the rebase (${moved.join(', ')} changed): ${`${installed.stderr}${installed.stdout}`.trim().split('\n').slice(-3).join(' ')}\nRun it by hand in the worktree, then run land again.`);
+  this.receipt(`STOP pnpm install --frozen-lockfile failed (${moved.join(', ')} ${when})`);
+  throw new StopError(`pnpm install --frozen-lockfile failed (${moved.join(', ')} ${when}): ${`${installed.stderr}${installed.stdout}`.trim().split('\n').slice(-3).join(' ')}\nRun it by hand in the worktree, then run land again.`);
  }
 
  /** Fast-forward main to HEAD. Refuses before pushing unless origin/main is
@@ -571,6 +572,10 @@ class Landing{
    this.rebase(main);
    if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return Promise.resolve(0);}
   }
+  // Build-max C4: an install behind the lockfile however it got there (made before a lock move, a by-hand rebase): the
+  // pre-push's typecheck reads this node_modules, and on 2026-11-21 stale ones failed every gate for 2.5 h.
+  const lag=installLag(this.root);
+  if(lag!==''){writeFileSync(this.installMarker(),`${lag}\n`);this.install(['node_modules'],`is behind: ${lag}`);}
   this.regenerate(this.pinsOnce());
   return this.options.mode==='local'?this.runLocal(main):this.runPush(main);
  }
