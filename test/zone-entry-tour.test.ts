@@ -49,8 +49,9 @@ test('a retry carries passed pairs forward and only redoes failed indexed pairs 
   expect(() => retrySmokeEntries(route, {...report,arrivals:[...arrivals, ...arrivals.slice(0, 1)]}, build, 476)).toThrow(/pair/u);
   const {failure: _failure, ...held} = report;
   const complete = {...held,pass:true,arrivals:all,failures:[]};
+  const loopback = {...complete,scope:'loopback'};
   expect(zoneEntryGap(complete, build)).toBeUndefined();
-  expect(zoneEntryGap({...complete,scope:'loopback'}, build)).toMatch(/16 seeded crossings/u);
+  expect(zoneEntryGap(loopback, build)).toMatch(/16 seeded crossings/u);
   expect(zoneEntryGap(complete, 'b'.repeat(40))).toMatch(/for this build/u);
   expect(smokeGap({...report,pass:true})).toMatch(/16 seeded crossings/u);
   expect(smokeGap({...report,pass:true,arrivals:all.map((pair, index) => index===0 ? {...pair,to:pair.from} : pair),failures:[]})).toMatch(/16 seeded crossings/u);

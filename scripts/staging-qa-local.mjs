@@ -41,6 +41,7 @@ async function tourFixture(checkout, seed) {
   }
   // Import from this exact source so both the fixture selection and the browser use the same featured list.
   const {featuredZoneEntry} = await import(pathToFileURL(join(checkout, 'scripts/zone-entry-tour.mjs')).href);
+  /** @type {ReturnType<typeof import('./zone-entry-tour.mjs').featuredZoneEntry>} */
   const route = featuredZoneEntry(cells, seed);
   const selected = new Set(route.flatMap(({from,to}) => [from.slug ?? from.instance,to.slug ?? to.instance]));
   const base = /** @type {import('./zone-entry-tour.mjs').Cell[]} */ (home('src/shared/game/grid/singleplayer.json').grid.cells);
