@@ -595,7 +595,9 @@ async function bootSmokeSource(page, source, build, name, base) {
   url.search = new URLSearchParams({chunk:source.slug ?? source.instance, mute:'1', nolock:'1', skipintro:'1', fps:'60'}).toString();
   await page.goto(url.href, {waitUntil:'domcontentloaded', timeout:45_000});
   const nameBox = page.locator('#ws-name-box input');
+  const nameSubmit = page.locator('#ws-name-box button[type=submit]');
   const stop = Date.now()+90_000;
+  const nameActionTime = () => Math.max(1, Math.min(3000, stop-Date.now()));
   while (Date.now() < stop) {
     const state = await page.evaluate(() => {
       const w = /** @type {any} */ (window), st = w.__wildshard?.shard?.grid?.state?.();
@@ -609,8 +611,13 @@ async function bootSmokeSource(page, source, build, name, base) {
       return;
     }
     if (await nameBox.isVisible().catch(() => false)) {
-      await nameBox.fill(name, {timeout:3000});
-      await page.locator('#ws-name-box button[type=submit]').click({timeout:3000});
+      try {
+        await nameBox.fill(name, {timeout:nameActionTime()});
+        await nameSubmit.click({timeout:nameActionTime()});
+      } catch (error) {
+        // A slow or replaced form gets another poll inside the source boot deadline.
+        if (!(error instanceof Error) || error.name !== 'TimeoutError') throw error;
+      }
     } else await acceptPhoneMemoryWarning(page);
     await delay(400);
   }

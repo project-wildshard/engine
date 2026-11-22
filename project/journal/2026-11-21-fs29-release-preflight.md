@@ -25,3 +25,9 @@ encodes. Its three WebKit walkers reached 1/16, mostly timing out while
 loading cells on seed 20779. The same commit and seed on the MacBook
 reached 15/16 before retry. Run the hosted walker on macOS with the
 encode cache from the successful build, keeping the same deadlines.
+
+Hosted macOS run 44990582047 passed the build and local QA. The
+tour reached 4/16, with seven of twelve misses caused by three-second
+guest form action timeouts. Poll transient form timeouts within the
+existing source boot deadline. World arrival, frame, and gate checks
+still decide the crossing.
