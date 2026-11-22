@@ -21,7 +21,7 @@ await import('./bake-loader.mjs');
 const {BOOST_TAP_MS} = await import('../src/client/engine/ui/hoverBoost.ts');
 const {folderStore} = await import('../src/cook/game/packStore.ts');
 const {objectHeaders, DEFAULT_LIMITS} = await import('../src/cook/game/cookWorker.ts');
-const {addStoredShards} = await import('./app-build/catalogue.ts');
+const {addStoredShards, nightlyHeadCatalogue} = await import('./app-build/catalogue.ts');
 const {bareSlug} = await import('../src/shared/game/grid/catalogueSlot.ts');
 const {packsBookPath} = await import('../src/shared/game/shardfile/spawnManifest.ts');
 const [browserName, groupText, directory = 'tmp/nightly/reports', only, fault = 'none'] = process.argv.slice(2);
@@ -40,6 +40,8 @@ const {build} = read(join(dist, 'version.json')) as {build: string};
 requireBuild(build, expected);
 const bookFile = join(dist, packsBookPath(build)), originalBook = readFileSync(bookFile, 'utf8');
 const live = read('test/pins/catalogue.json') as StandaloneCatalogue;
+const {catalogue: reviewed} = read('test/pins/staging.json') as {catalogue: StandaloneCatalogue};
+const catalogueFile = join(dist, 'catalogue.json'), originalCatalogue = readFileSync(catalogueFile);
 const originalHTML = readFileSync(join(dist, 'index.html'), 'utf8');
 const work = mkdtempSync(join(out, '.heads-'));
 let preview: Awaited<ReturnType<typeof serve>> | undefined;
@@ -107,9 +109,10 @@ try {
       for (const slug of Object.keys(book.client)) if (bareSlug(slug) === bareSlug(head.slug)) delete book.client[slug];
       writeFileSync(bookFile, JSON.stringify(book));
       writeFileSync(join(dist, 'index.html'), originalHTML.replace(expression, (_, before, _body, after) => `${before}${JSON.stringify(bank).replaceAll('<', String.raw`\u003c`)}${after}`));
+      writeFileSync(catalogueFile, originalCatalogue);
       const added = await addStoredShards(dist, [head], store,
         hash => Promise.resolve(readFileSync(join(process.env.WILDSHARD_PIN_CACHE ?? join(homedir(), '.cache/wildshard/pins'), `${hash}.tar`))),
-        {base: `http://127.0.0.1:${address.port}`, shards: []}, live);
+        {base: `http://127.0.0.1:${address.port}`, shards: []}, nightlyHeadCatalogue(live, reviewed, head));
       if (added.length !== 1 || added[0] !== head.slug) throw new Error('Cold cook was not attached');
       const titlesText = /<script type="application\/json" id="ws-title-rows">([^<]*)<\/script>/u.exec(readFileSync(join(dist, 'index.html'), 'utf8'))?.[1];
       if (titlesText === undefined) throw new Error('No title routes');
@@ -252,5 +255,12 @@ try {
       rmSync(cooked, {recursive: true, force: true}); rmSync(evidence, {recursive: true, force: true});
     }
   }
-} finally {preview?.close(); writeFileSync(join(dist, 'index.html'), originalHTML); writeFileSync(bookFile, originalBook); rmSync(work, {recursive: true, force: true}); checkpoint();}
+} finally {
+  preview?.close();
+  writeFileSync(join(dist, 'index.html'), originalHTML);
+  writeFileSync(bookFile, originalBook);
+  writeFileSync(catalogueFile, originalCatalogue);
+  rmSync(work, {recursive: true, force: true});
+  checkpoint();
+}
 if (report.results.some(row => row.phases.length !== 5 || row.phases.some(phase => !phase.ok))) process.exitCode = 1;

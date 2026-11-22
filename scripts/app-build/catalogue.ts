@@ -8,6 +8,7 @@ import {prepareAssetDecoders} from '@wildshard/format/shardfileAssets';
 import {validateShardfileFolder} from '@wildshard/format/shardfileValidation';
 import {assertKtx2TableTargets} from '../../src/shared/game/shardfile/ktx2Targets';
 import {StandaloneCatalogueSchema, type StandaloneCatalogue} from '@wildshard/format/standaloneCatalogue';
+import {CELL_HEIGHT, CHUNK_SIZE} from '@wildshard/format/contentBounds';
 import {readTar} from '@wildshard/format/tar';
 import type {CookIndex} from '../../src/cook/game/cookWorker';
 import type {PackStore} from '../../src/cook/game/packStore';
@@ -240,6 +241,18 @@ export async function folderVerdict(tarball: Uint8Array, out: string): Promise<{
   const {identity: {slug}} = JSON.parse(new TextDecoder().decode(index)) as {readonly identity: {readonly slug: string}};
   const discovery = [...files].find(([path]) => /^mounts\/shardfiles\/[^/]+\/discovery\.json$/u.test(path))?.[1];
   return {verdict: {revision, sourceHash, indexHash, residentBytes, postCost, path: `/shardfiles/${slug}/shard.json`, ...(worst === undefined ? {} : {worst})}, ...(discovery === undefined ? {} : {discovery})};
+}
+
+/** A pinned staging-only head needs an instance on the nightly standalone page. */
+export function nightlyHeadCatalogue(built: StandaloneCatalogue, reviewed: StandaloneCatalogue,
+  head: {readonly slug: string; readonly hash: string}): StandaloneCatalogue {
+  const namesHead = (row: {readonly slug: string}): boolean => bareSlug(row.slug) === head.slug;
+  if (built.placements.some(namesHead) || built.grid.cells.some(namesHead)) return built;
+  const cell = reviewed.grid.cells.find(namesHead);
+  if (cell === undefined || !reviewed.shards.some(row => row.slug === head.slug && row.hash === head.hash)) return built;
+  return {...built, placements: [...built.placements, {
+    instance: cell.instance, slug: cell.slug, cell: cell.cell, size: [CHUNK_SIZE, CELL_HEIGHT, CHUNK_SIZE],
+  }]};
 }
 
 /** A deploy's catalogue over a build's: the build keeps what it shipped, grid included, and gains each added shard's rows. */

@@ -3,6 +3,9 @@ import { spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- read the pins file the nightly reads
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
+import { CELL_HEIGHT, CHUNK_SIZE } from '@wildshard/format/contentBounds';
+import type { StandaloneCatalogue } from '@wildshard/format/standaloneCatalogue';
+import { nightlyHeadCatalogue } from '../scripts/app-build/catalogue';
 import { plan } from '../scripts/nightly-model';
 import { DEFAULT_LIMITS } from '../src/cook/game/cookWorker';
 
@@ -13,6 +16,20 @@ test('the nightly plan holds every pinned head, each once', () => {
   const heads = plan().heads.map(row => row.slug);
   expect([...heads].sort()).toEqual([...pinned].sort());
   expect(new Set(heads).size).toBe(heads.length);
+});
+
+test('FS30 a cold staging-only head gets its reviewed placement in the nightly catalogue', () => {
+  const pins = JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as StandaloneCatalogue;
+  const head = {slug: 'mirror-salt', hash: 'a'.repeat(64)};
+  const cell = {instance: head.slug, slug: head.slug, cell: [2, 3] as [number, number]};
+  const built = {...pins, placements: [], grid: {...pins.grid, cells: []}};
+  const reviewed = {...built, shards: [{...head, name: 'Mirror Salt', revision: 5}], grid: {...built.grid, cells: [cell]}};
+  const fixture = nightlyHeadCatalogue(built, reviewed, head);
+  expect(fixture.placements).toEqual([{...cell, size: [CHUNK_SIZE, CELL_HEIGHT, CHUNK_SIZE]}]);
+  expect(fixture.grid).toBe(built.grid);
+  expect(nightlyHeadCatalogue(built, reviewed, {...head, hash: '0'.repeat(64)})).toBe(built);
+  const alreadyPlaced = {...built, grid: reviewed.grid};
+  expect(nightlyHeadCatalogue(alreadyPlaced, reviewed, head)).toBe(alreadyPlaced);
 });
 
 test('FS30 the Ring 2 CLI accepts the nightly cook allowance and refuses anything longer', () => {
