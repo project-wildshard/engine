@@ -1,9 +1,9 @@
-// ONE-FORMAT OF38d: a native world's ranged kit from its sections. Pine's plan names the `held.ranged` family as hosts
-// (`loadout`, `combat.motion`, three `item.ranged`, `ammunition`); every fact they read is already in `combat/items` (each
-// weapon's `ranged` row and profile, the loadout's equip route) and `held/loadout` (the pouch and its fallback). A plan
-// with none of those hosts now stands the same kit from the sections, before any host. The pinned Pine product is the
-// proof: with its held hosts cut from the plan it arms, fires the bow and the lever rifle, and runs tick for tick with
-// the plan that still names them, saves and restores included.
+// ONE-FORMAT OF38d: a native world's ranged kit from its sections. Pine's plan once named the `held.ranged` family as
+// hosts (`loadout`, `combat.motion`, three `item.ranged`, `ammunition`); every fact they read is already in `combat/items`
+// (each weapon's `ranged` row and profile, the loadout's equip route) and `held/loadout` (the pouch and its fallback).
+// Since r10 (OF23e5, OF29e) the pinned Pine product names none of those hosts, so it is itself the proof: it stands the
+// kit from the sections, arms, fires the bow and the lever rifle, saves and restores. The cut stays as the guard that a
+// plan which did name them runs tick for tick with one that does not.
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
@@ -68,7 +68,7 @@ function fight(live: NativeHeadlessResident): string[] {
 test('Pine with no held host stands its ranged kit from combat/items and held/loadout, tick for tick', async () => {
   const fixture = await shipped(), moved = await cut(fixture.product);
   const hosts = (await planOf(fixture.product)).features.map(row => row.host);
-  expect(hosts.filter(name => HELD.has(name)), 'the pinned Pine still names its held hosts').not.toEqual([]);
+  expect(hosts.filter(name => HELD.has(name)), 'the pinned Pine (r10 on) names no held host').toEqual([]);
   expect((await planOf(moved)).features.map(row => row.host).filter(name => HELD.has(name))).toEqual([]);
   // each ranged row's kind comes from its profile, as the hosts named it
   const rows = fixture.product.shardfile.items.rows.filter(row => row.kind === 'weapon' && row.ranged !== undefined);
