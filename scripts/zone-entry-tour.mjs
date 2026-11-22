@@ -362,10 +362,13 @@ async function walkPortalExit(page, from, plan, end) {
     return st === undefined ? 0 : decks.findIndex(deck => Math.hypot(st.feet.x-deck.x, st.feet.z-deck.z) < 5) + 1;
   }, plan.decks, {timeout: Math.min(10_000, Math.max(1, end-Date.now())), polling: 150});
   // Keep the matching deck from the same frame. A new browser turn can sample the first movement off its edge.
-  const index = await landing.jsonValue().finally(() => landing.dispose());
-  const deck = plan.decks[index - 1];
-  if (deck === undefined) throw new Error('The portal did not leave the walker on a declared deck');
-  return {instance:from.instance, cell:[from.cell[0]+deck.dx, from.cell[1]+deck.dz]};
+  try {
+    const deck = plan.decks[(await landing.jsonValue()) - 1];
+    if (deck === undefined) throw new Error('The portal did not leave the walker on a declared deck');
+    return {instance:from.instance, cell:[from.cell[0]+deck.dx, from.cell[1]+deck.dz]};
+  } finally {
+    await landing.dispose();
+  }
 }
 
 /** A portal can carry the walker inside immediately after a gate. Walk the declared exit first.
@@ -738,7 +741,7 @@ async function runSmoke({build, out, seed, prior, loopback}) {
 
 /** FS29 exercises the same walker on the exact signed local rig. Its verdict cannot qualify a staging deploy.
  * @param {{build:string, out:string, seed:number, prior?:unknown, base:string, socket:string}} options */
-export async function runLoopbackSmoke({base, socket, ...options}) {
+export function runLoopbackSmoke({base, socket, ...options}) {
   const page = new URL(base), rooms = new URL(socket);
   if (!/^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || page.origin !== base ||
       !/^ws:\/\/127\.0\.0\.1:\d+$/u.test(socket) || rooms.origin !== socket ||
