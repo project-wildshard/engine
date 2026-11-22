@@ -13,3 +13,9 @@ The release's own gates still run on the release build.
 The first loopback run reproduced v0.1.67's Nine to Nalati miss. The
 walker now keeps the deck it observed in the matching frame. A second
 browser read could sample the next movement outside the deck radius.
+
+The first hosted run, 44983716249, reached the local app build and
+failed after 30 minutes. The preflight omitted the nightly's verified
+encode cache. It now shares the nightly's runner image, browser install
+and content-addressed cache, and reports the failing command's exit
+code when the build fails before the browser writes a verdict.

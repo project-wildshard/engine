@@ -15,7 +15,7 @@ concurrency:
 jobs:
   local-qa-and-zone-entry:
     if: github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main'
-    runs-on: macos-15
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       BROWSER: none
@@ -27,7 +27,16 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: release-preflight
-      - run: pnpm exec playwright install chromium webkit
+      - run: bash scripts/ci-playwright-install.sh chromium webkit
+      # Reuse the nightly's content-addressed encodes. The app and the signed rig are still built from this commit.
+      - name: Restore spawn and phone texture encodes
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: nightly-encodes-${{ github.sha }}
+          restore-keys: |
+            nightly-encodes-
+            ring1-spawn-parts-br-
       - name: Test the socket guard and release harness
         run: pnpm exec vitest run test/staging-proof-lines.test.ts test/staging-qa.test.ts test/zone-entry-tour.test.ts
       - name: Run exact-main local QA and the seeded tour

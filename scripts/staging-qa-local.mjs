@@ -2,7 +2,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { generateKeyPairSync, sign } from 'node:crypto';
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { makeGateCopy } from './push-gate-copy.mjs';
 
@@ -13,7 +13,8 @@ async function run(root, file, args, env, log) {
     const child = spawn(file, args, { cwd: root, env, stdio: ['ignore', fd, fd] });
     await new Promise((resolve, reject) => {
       child.once('error', reject);
-      child.once('close', code => code === 0 ? resolve(undefined) : reject(new Error(`Local QA build failed. See ${log}`)));
+      child.once('close', (code, signal) => code === 0 ? resolve(undefined) :
+        reject(new Error(`Local QA ${basename(log)} failed (${code === null ? signal : `exit ${String(code)}`}). See ${log}`)));
     });
   } finally { closeSync(fd); }
 }
