@@ -13,6 +13,10 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.71 (2026-11-22)
+
+- Quickly rejoining Driftwood now restores your zipline state.
+
 ## v0.1.64 (2026-11-21)
 
 - Nalati's new eagle and balbal can use their authored bodies and coats.
