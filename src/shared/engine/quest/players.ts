@@ -149,9 +149,16 @@ export class QuestBooks {
     for (const owner of this.owners) owner(book);
     return book;
   }
+  /** Retire the outgoing body's owners before the same player ID can take a new seat. */
+  remove(id: string): void {
+    const book = this.books.get(id);
+    if (book === undefined || book === this.lead) return;
+    book.dispose();
+    this.books.delete(id);
+  }
   /** Every present player's book, lead first; a reused list. A book whose player left goes with it. */
   each(): readonly QuestBook[] {
-    for (const [id, book] of this.books) if (!this.host.players.has(id)) { book.dispose(); this.books.delete(id); }
+    for (const id of this.books.keys()) if (!this.host.players.has(id)) this.remove(id);
     this.list.length = 0;
     for (const id of this.host.players.keys()) this.list.push(this.of(id));
     return this.list;

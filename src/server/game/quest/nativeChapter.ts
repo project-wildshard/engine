@@ -56,6 +56,7 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     get night() { return host.dayClock?.night ?? 0; }, set: () => Promise.resolve() };
   books.install(book => {
     const body = host.players.get(book.player); if (body === undefined) throw new Error('Native chapter requires its player');
+    seats.get(book.player)?.scope.dispose();
     const scope = host.scope.child(`chapter:${book.player}`);
     const clock = new ChapterClock(scope, director, rows, book.flags, { get day() { return host.dayClock === undefined ? null : seen; }, player: body.position, reward: rows.reward ?? null, finish: 'assign' }, effect => {
       // the boss is the room's: a player's chapter can wake one, and never resets a fight already running

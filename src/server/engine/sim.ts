@@ -28,7 +28,7 @@ import type { Rapier } from '../../shared/engine/physics/rapier';
 import { groups } from '../../shared/engine/physics/groups';
 import { tagCollider } from '../../shared/engine/physics/surface';
 import { Flags } from '../../shared/engine/world/interact/flags';
-import { CREDIT_PREFIX, isCredit, LeadFlags, questBooks, type QuestBookSaved } from '../../shared/engine/quest/players';
+import { CREDIT_PREFIX, isCredit, LeadFlags, questBooks, type QuestBooks } from '../../shared/engine/quest/players';
 import { QuestState, type QuestDef } from '../../shared/engine/quest/core';
 import type { DayCycle, DayCycleClock, DayCycleSpec } from '../../shared/engine/world/dayCycle';
 import { clockDayPhase, clockPeriod, wrapClock, type DayClockState } from '../../shared/engine/sim/dayClock';
@@ -201,7 +201,7 @@ export class SimHost {
   readonly questFlags: LeadFlags;
   readonly quests: QuestState[];
   /** P1-E3.3: other players' quest books, which the save carries; engine/quest/players sets it. */
-  questStore: { save: () => QuestBookSaved[] | undefined; restore: (saved: readonly QuestBookSaved[] | undefined) => void } | undefined = undefined;
+  questStore: Pick<QuestBooks, 'save' | 'restore' | 'remove'> | undefined = undefined;
   readonly entities: Map<string, AnimalSim> = new Map<string, AnimalSim>();
   readonly strikes: Map<string, StrikeRunner> = new Map<string, StrikeRunner>();
   readonly adapters: Map<string, SimStateAdapter> = new Map<string, SimStateAdapter>();
@@ -362,7 +362,8 @@ export class SimHost {
     if (player === undefined || player === this.lead) return false;
     if (this.focused === player) this.focused = this.lead;
     player.disposeMotor(); this.playerScopes.get(id)?.dispose(); this.playerScopes.delete(id);
-    this.players.delete(id); this.parked.delete(id); this.shown.delete(id); this.strikes.delete(id); this.weapons.delete(id); this.strikeSeqs.delete(id); this.damage.leave(id);
+    this.players.delete(id); this.questStore?.remove(id);
+    this.parked.delete(id); this.shown.delete(id); this.strikes.delete(id); this.weapons.delete(id); this.strikeSeqs.delete(id); this.damage.leave(id);
     for (const [source, target] of this.targetIds) if (source === id || target === id) {
       this.strikes.get(source)?.cancel(); this.entities.get(source)?.cancelAttack(); this.targetIds.delete(source);
     }

@@ -33,6 +33,26 @@ function stand(live: NativeHeadlessResident, x: number, z: number): void {
   for (let tick = 0; tick < 3; tick++) live.step([]);
 }
 
+test('a Driftwood guest can leave and restore their cable seat before the next tick', async () => {
+  const live = await resident();
+  try {
+    const { host } = live, spawn = leadPlayer(host).position, books = questBooks(host);
+    const guest = host.addPlayer('bot:1', spawn);
+    const saved = books.exportOf(guest.id);
+    const cable = Object.keys(saved.parts).find(name => name.startsWith('cable:'));
+    if (cable === undefined) throw new Error('Missing Driftwood cable save part');
+
+    expect(host.removePlayer(guest.id)).toBe(true);
+    const replacement = host.addPlayer(guest.id, spawn);
+    books.importOf(replacement.id, saved);
+    live.step([]);
+
+    expect(books.exportOf(replacement.id).parts[cable]).toBe(saved.parts[cable]);
+  } finally {
+    live.dispose();
+  }
+}, 60_000);
+
 test('a bot plays Driftwood\'s opening, and the quest is the bot\'s alone', async () => {
   const live = await resident(), { host } = live, spawn = leadPlayer(host).position;
   host.addPlayer('bot:1', { x: spawn.x, y: spawn.y, z: spawn.z });
