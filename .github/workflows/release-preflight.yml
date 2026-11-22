@@ -15,7 +15,8 @@ concurrency:
 jobs:
   local-qa-and-zone-entry:
     if: github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    # Keep the phone walker on macOS, where the same seed and three sessions fit its entry deadlines.
+    runs-on: macos-15
     timeout-minutes: 45
     env:
       BROWSER: none
@@ -27,7 +28,7 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: release-preflight
-      - run: bash scripts/ci-playwright-install.sh chromium webkit
+      - run: pnpm exec playwright install chromium webkit
       # Reuse the nightly's content-addressed encodes. The app and the signed rig are still built from this commit.
       - name: Restore spawn and phone texture encodes
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0

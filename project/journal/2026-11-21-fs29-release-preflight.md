@@ -19,3 +19,9 @@ failed after 30 minutes. The preflight omitted the nightly's verified
 encode cache. It now shares the nightly's runner image, browser install
 and content-addressed cache, and reports the failing command's exit
 code when the build fails before the browser writes a verdict.
+
+Ubuntu run 44986418544 passed K3–K5 and Chromium after restoring
+encodes. Its three WebKit walkers reached 1/16, mostly timing out while
+loading cells on seed 20779. The same commit and seed on the MacBook
+reached 15/16 before retry. Run the hosted walker on macOS with the
+encode cache from the successful build, keeping the same deadlines.
