@@ -4,7 +4,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import type { LinkState } from '../src/client/engine/net/redial';
 import { readSignedRelease } from '../src/client/host/online/release';
 import { browserErrorLevel } from '../src/client/engine/telemetry/browserErrors';
-import { connectOnline, worldHostsGrid, worldWord, type OnlineShell } from '../src/client/host/online/shell';
+import { connectOnline, gotoSocket, worldHostsGrid, worldWord, type OnlineShell } from '../src/client/host/online/shell';
 import { hostsGrid } from '../src/client/game/shardfile/serverRoute';
 // oxlint-disable-next-line import/no-nodejs-modules -- The release file's own origin.
 import { createServer, type Server } from 'node:http';
@@ -162,6 +162,25 @@ test('a one-shard page whose held seat stands in another shard goes there, and n
   void shell.booted.then(() => { arrived = true; return undefined; });
   await vi.waitFor(() => { expect(places).toEqual(['brasscap-mesa']); }, { timeout: 5000 });
   expect(arrived, 'the Driftwood page never takes the Brasscap seat as its own').toBe(false);
+});
+
+test('NB2: a fresh one-shard pick that asks for its shard moves the held seat there, and the page plays', { timeout: 60_000 }, async () => {
+  const saves = memoryPlayerSaves(), assembly = new GridAssembly({ developer: false, devserver: false }).cells, cells = assembly.map(cell => cell.instance), shards = assembly.map(cell => cell.slug);
+  saves.write({ player: IDENTITY.player, name: 'Jake', shard: 'brasscap-mesa', cell: 'blender-template', build: 'bench', saveVersion: 0, seq: 1, reason: 'test', doc: null, receipts: [] });
+  bench = await roomBench({ cells: [SHARD, 'blender-template'], workers: 2, saves, holdMs: 30_000 });
+  const places: string[] = [], view = { link: (): void => undefined, countdown: (): void => undefined, elsewhere: (shard: string): void => { places.push(shard); } };
+  const first = connectOnline({ socket: bench.url, build: 'bench', loaded: 'brasscap-mesa', identity: IDENTITY, gridCell: 'blender-template', gridCells: cells }, view);
+  pump = setInterval(() => { first.client.present(); first.client.flush(); }, 16);
+  await first.booted; first.ready();
+  await vi.waitFor(() => { expect(bench?.room('blender-template')?.holds(IDENTITY.player)).toBe(true); }, { timeout: 5000 });
+  clearInterval(pump); first.dispose();
+  // the title's pick of SHARD inside the hold: startOnline's one-shard page dials gotoSocket(socket, its slug)
+  shell = connectOnline({ socket: gotoSocket(bench.url, SHARD), build: 'bench', loaded: SHARD, identity: IDENTITY, shardCells: shards }, view);
+  const { client, booted, ready } = shell;
+  pump = setInterval(() => { client.present(); client.flush(); }, 16);
+  await booted; ready();
+  await vi.waitFor(() => { expect(bench?.room(SHARD)?.holds(IDENTITY.player)).toBe(true); expect(bench?.room('blender-template')?.holds(IDENTITY.player) ?? false).toBe(false); }, { timeout: 5000 });
+  expect(places, 'the page is never sent to the old seat').toEqual([]);
 });
 
 test('a seated page that leaves takes its body with it at once', { timeout: 30_000 }, async () => {

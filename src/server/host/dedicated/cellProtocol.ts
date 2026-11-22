@@ -10,8 +10,8 @@ import type {CheckpointCertificate,DurableCheckpoint} from './checkpointWitness'
 
 // J182: what the door and a cell worker say to each other. Sockets stay with the door, and a seat's bytes go through its own port.
 
-/** J114: how long a dropped player's body stands. */
-export const HOLD_MS = 30_000;
+/** How long a dropped player's body stands: 5 minutes (meta SHARD-COMPAT NB2, D1.5 and Q44; J114's 30 s before). */
+export const HOLD_MS = 300_000;
 /** Where a client must load. */
 export interface ResumeAt { readonly x: number; readonly y: number; readonly z: number; readonly yaw: number }
 /** The previous durable copy and grants it still needs, tried only if the current copy cannot import. */

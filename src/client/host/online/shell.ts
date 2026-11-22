@@ -508,8 +508,10 @@ export function readReleaseEarly(config: { readonly release: string; readonly ke
 }
 export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   const { release: at, key, keep, identity, recordTag, grid, leaving = OWN_LEAVING, session, ...link } = config;
-  // ZE10d2: a gate's adoption moves the page's slug, grid and goto to the cell entered (a redial then asks for that cell)
-  let loadedNow = link.loaded, gridNow = grid, goto = grid?.goto === true ? grid.cell : undefined, spawn = goto !== undefined && grid?.spawn === true;
+  // ZE10d2: a gate's adoption moves the page's slug, grid and goto to the cell entered (a redial then asks for that cell).
+  // NB2: a one-shard page asks for its own shard on every dial, so a fresh title pick moves a seat held in another cell (GO7)
+  // and the page and the seat agree; a door that doesn't host the shard seats it as before, and the page follows (duneRay).
+  let loadedNow = link.loaded, gridNow = grid, goto = grid === undefined ? link.loaded : grid.goto === true ? grid.cell : undefined, spawn = grid?.goto === true && grid.spawn === true;
   const toTitle = (from = 'release page'): void => { leaving.unload(`${from}: title screen`); location.replace(new URL('/', location.origin).toString()); };
   const dial = await takeRelease(at, () => readRelease(at, key, keep ?? NO_KEEP, leaving));
   const { file: release, fresh } = dial, { socket } = release;
