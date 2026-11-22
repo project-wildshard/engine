@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { nextAdmission, provesTrainCi } from '../scripts/release-train-proof.mjs';
+import { nextAdmission, provesNpmNext, provesTrainCi, watchTrainRun } from '../scripts/release-train-proof.mjs';
 
 const build = 'a'.repeat(40);
 const release = 'v0.1.65';
@@ -53,4 +53,52 @@ test('train CI proves the exact build after running packed tests and the require
   expect(provesTrainCi({ ...run, conclusion: 'failure' }, build)).toBe(false);
   expect(provesTrainCi({ ...run, jobs: jobs.slice(1) }, build)).toBe(false);
   expect(provesTrainCi({ ...run, jobs: jobs.slice(0, -1) }, build)).toBe(false);
+});
+
+
+describe('hosted run readback', () => {
+  const publishJob = { name: 'publish', status: 'completed', conclusion: 'success' };
+  const published = {
+    databaseId: 45065429703, status: 'completed', conclusion: 'success', headSha: 'b'.repeat(40),
+    headBranch: 'main', event: 'workflow_dispatch', workflowName: 'npm-publish', displayTitle: `npm next ${build}`,
+    jobs: [publishJob],
+  };
+  const brokenWatch = async () => { throw new Error('HTTP 404'); };
+  const cleanWatch = async () => {};
+
+  test('a broken watcher recovers from the exact completed publish run', async () => {
+    const run = await watchTrainRun(published.databaseId, brokenWatch, id => {
+      expect(id).toBe(published.databaseId);
+      return published;
+    });
+    expect(provesNpmNext(run, build)).toBe(true);
+  });
+
+  test.each([
+    { ...published, databaseId: 1 },
+    { ...published, status: 'in_progress' },
+    { ...published, conclusion: 'failure' },
+    { ...published, conclusion: 'cancelled' },
+  ])('requires the exact completed success even if the watcher exits cleanly', async run => {
+    for (const watch of [brokenWatch, cleanWatch]) {
+      await expect(watchTrainRun(published.databaseId, watch, () => run)).rejects.toThrow('did not prove success');
+    }
+  });
+
+  test('holds when the watcher fails and the exact verdict is unavailable', async () => {
+    await expect(watchTrainRun(published.databaseId, brokenWatch, () => {
+      throw new Error('readback unavailable');
+    })).rejects.toThrow('readback unavailable');
+  });
+
+  test.each([
+    { ...published, displayTitle: `npm next ${'b'.repeat(40)}` },
+    { ...published, displayTitle: 'npm latest v0.1.65' },
+    { ...published, workflowName: 'ci' },
+    { ...published, headBranch: 'plan/other' },
+    { ...published, event: 'push' },
+    { ...published, jobs: [{ ...publishJob, conclusion: 'skipped' }] },
+  ])('refuses another build, workflow, trigger or skipped publish job', run => {
+    expect(provesNpmNext(run, build)).toBe(false);
+  });
 });

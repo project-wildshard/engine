@@ -7,7 +7,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { nextAdmission, provesTrainCi, trainSha as sha, trainTag as tagPattern,
+import { nextAdmission, provesNpmNext, provesTrainCi, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './pid-lock.mjs';
@@ -131,7 +131,13 @@ async function main(args: string[]) {
   const git = (cmd: string[], cwd = root) => command(cwd, 'git', cmd);
   const gh = (cmd: string[], input?: string) => command(root, 'gh', cmd, input);
   const runView = (id: number) => JSON.parse(gh(['run', 'view', String(id), '-R', repo,
-    '--json', 'databaseId,headSha,status,conclusion,jobs'])) as Run;
+    '--json', 'databaseId,headSha,status,conclusion,jobs,workflowName,event,headBranch,displayTitle'])) as Run;
+  const watchRun = (id: number, log: string) => watchTrainRun(id,
+    () => runLogged(root, log, 'gh', ['run', 'watch', String(id), '-R', repo, '--exit-status', '--interval', '20']),
+    runId => {
+      stopping.signal.throwIfAborted();
+      return runView(runId);
+    });
   const ancestor = (base: string, head: string) => {
     try { git(['merge-base', '--is-ancestor', base, head]); return true; } catch { return false; }
   };
@@ -209,8 +215,9 @@ async function main(args: string[]) {
     let ci = listRelease()[0]?.databaseId;
     for (let poll = 0; ci === undefined && poll < 18; poll++) { await wait(10_000); ci = listRelease()[0]?.databaseId; }
     if (!ci) throw new Error('Exact release CI was not listed');
-    await runLogged(root, join(out, 'release-ci.log'), 'gh', ['run', 'watch', String(ci), '-R', repo, '--exit-status', '--interval', '20']);
-    if (!provesTrainCi(runView(ci), build)) throw new Error('Exact release CI did not prove the release build');
+    if (!provesTrainCi(await watchRun(ci, join(out, 'release-ci.log')), build)) {
+      throw new Error('Exact release CI did not prove the release build');
+    }
     receipt(lane, `DONE ${tag} ${build.slice(0, 10)} exact release CI ${ci} green. Starting staging.`);
 
     const stageTree = join(out, 'stage-tree');
@@ -341,7 +348,9 @@ async function main(args: string[]) {
       if (!Number.isSafeInteger(run) || run <= 0) throw new Error('The recorded npm next run is invalid');
       record(publish, { build, run });
       receipt(lane, `NOTE ${tag} npm next run ${run}.`);
-      await runLogged(root, join(out, 'npm-next.log'), 'gh', ['run', 'watch', String(run), '-R', repo, '--exit-status', '--interval', '20']);
+      if (!provesNpmNext(await watchRun(run, join(out, 'npm-next.log')), build)) {
+        throw new Error(`Actions run ${run} did not prove npm next for this build`);
+      }
       const version = `${tag.slice(1)}-next.${build.slice(0, 8)}`;
       const tgz = `https://registry.npmjs.org/@wildshard/engine/-/engine-${version}.tgz`;
       const deadline = Date.now() + 60 * 60_000;

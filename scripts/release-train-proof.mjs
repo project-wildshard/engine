@@ -4,6 +4,25 @@ import { provesCode } from './ci-proof-jobs.mjs';
 export const trainSha = /^[a-f0-9]{40}$/u;
 export const trainTag = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
 
+/** @param {number} id @param {() => Promise<void>} watch
+ * @param {(id: number) => import('./release-train-proof.mjs').Run} readRun */
+export async function watchTrainRun(id, watch, readRun) {
+  // The watcher can lose its connection after Actions has finished the run.
+  const watchError = await watch().catch((/** @type {unknown} */ error) => error);
+  const run = readRun(id);
+  if (run?.databaseId !== id || run.status !== 'completed' || run.conclusion !== 'success') {
+    throw new Error(`Actions run ${id} did not prove success`, { cause: watchError });
+  }
+  return run;
+}
+
+/** @param {import('./release-train-proof.mjs').Run} run @param {string} build */
+export function provesNpmNext(run, build) {
+  return run.workflowName === 'npm-publish' && run.event === 'workflow_dispatch' &&
+    run.headBranch === 'main' && run.displayTitle === `npm next ${build}` &&
+    run.jobs.some(job => job.name === 'publish' && job.status === 'completed' && job.conclusion === 'success');
+}
+
 /** @param {string} build @param {string} tag @param {number} ci
  * @param {import('./release-train-proof.mjs').Alias} [alias] @param {import('./release-train-proof.mjs').Leg} [candidate] */
 export function nextAdmission(build, tag, ci, alias, candidate) {
