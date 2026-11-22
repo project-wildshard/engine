@@ -4,6 +4,7 @@ import {mkdirSync,rmSync} from 'node:fs';
 import {dirname,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
+import {gateSlot} from '../scripts/push-gate-slot.mjs';
 import {PUSH_BUDGET, PUSH_PROFILE, SPLIT_PROFILE} from '../scripts/push-budget.mjs';
 import {BROWSER_TESTS,TIMING_TESTS,logHostedOnly,planBaseRefs,splitLocalTests,splitRequested} from '../scripts/push-local-split.mjs';
 import {pushSelection} from '../scripts/push-selection.mjs';
@@ -153,6 +154,8 @@ async function main(){
     console.error(`  - exact-tree green reuse: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
     return;
   }
+  // Build-max C5: over a 1-minute load of 24, one gate at a time on this machine; held until this process exits.
+  process.once('exit',await gateSlot());
   const record=seconds=>{
     // A full fallback actually reruns every check, so it starts fresh proof
     // lineage even when an older delta basis admitted the attempt.
