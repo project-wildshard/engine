@@ -172,6 +172,9 @@ async function main(args: string[]) {
   green.sort((a, b) => a.headSha === b.headSha ? b.databaseId - a.databaseId : ancestor(a.headSha, b.headSha) ? 1 : -1);
   const source = green.find(row => provesTrainCi(runView(row.databaseId), row.headSha));
   if (!source) throw new Error('No eligible green main CI contains the previous release');
+  if (!prepared && Number(git(['rev-list', '--no-merges', '--count', `${cadence.build}..${source.headSha}`])) === 0) {
+    throw new Error(`Newest eligible green main has no changes since ${cadence.tag}`);
+  }
   if (values['dry-run']) {
     console.log(JSON.stringify({ release: tag, source: source.headSha, mainCi: source.databaseId, prepared, required }));
     return;
