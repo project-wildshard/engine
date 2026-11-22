@@ -18,7 +18,7 @@ import featured from '../src/server/game/zoneSelect/featured.json' with { type: 
 /** @typedef {{expected:number, arrivals:Arrival[], failure?:CrossingFailure, retries?:CrossingFailure[], resumedFrom?:number, pass:boolean}} Tour */
 /** @typedef {Arrival & {index:number}} SmokeArrival */
 /** @typedef {CrossingFailure & {index:number}} SmokeFailure */
-/** @typedef {{mode:'smoke', scope?:'loopback', build:string, engine:'webkit', profile:'phone', seed:number, cells: Cell[], expected:number,
+/** @typedef {{mode:'smoke', scope?:'loopback', batch?:number, build:string, engine:'webkit', profile:'phone', seed:number, cells: Cell[], expected:number,
  * arrivals:SmokeArrival[], failures:SmokeFailure[], failure?:CrossingFailure, pass:boolean, wallMs:number}} SmokeReport */
 const SIDES = /** @type {const} */ ([[1, 0], [0, 1], [-1, 0], [0, -1]]);
 const DRIFTWOOD = 'driftwood-isle', SKY = 'far-reach', HALF = 250, ENTRY_MS = 90_000, APPROACH_MS = 120_000;
@@ -69,7 +69,7 @@ export function featuredZoneEntry(cells, seed) {
   }));
 }
 
-/** @param {readonly number[]} pending @param {2|3} [walkers] @returns {number[][]} */
+/** @template T @param {readonly T[]} pending @param {2|3} [walkers] @returns {T[][]} */
 export function smokeBatches(pending, walkers = 3) {
   if (walkers === 3 && pending.length === 16) return [pending.slice(0,5), pending.slice(5,10), pending.slice(10)];
   return Array.from({length:walkers}, (_,lane) => pending.filter((_crossing,index) => index%walkers === lane));
@@ -93,12 +93,13 @@ function smokeEntries(route, proof) {
   if (seen.size !== route.length) throw new Error('The verdict does not account for every smoke pair');
 }
 
-/** @param {readonly Leg[]} route @param {unknown} report @param {string} build @param {number} seed @param {'loopback'} [scope] */
-export function retrySmokeEntries(route, report, build, seed, scope) {
+/** @param {readonly Leg[]} route @param {unknown} report @param {string} build @param {number} seed @param {'loopback'} [scope] @param {number} [batch] */
+export function retrySmokeEntries(route, report, build, seed, scope, batch) {
   const proof = /** @type {Partial<SmokeReport>|null} */ (report);
   if (proof?.mode !== 'smoke' || proof.scope !== scope || proof.build !== build || proof.engine !== 'webkit' || proof.profile !== 'phone' || proof.pass !== false)
     throw new Error('Retry needs a held phone WebKit smoke for the same staging build');
   if (proof.seed !== seed) throw new Error('Retry must use the saved seed');
+  if (proof.batch !== batch) throw new Error('Retry must use the saved loopback batch');
   smokeEntries(route, proof);
   if (proof.failures === undefined || proof.failures.length === 0) throw new Error('The held verdict has no failed pairs to retry');
   return {arrivals:[...proof.arrivals ?? []], pending:proof.failures.map(row => row.index).sort((a,b) => a-b)};
@@ -638,7 +639,7 @@ async function smokePose(page, leg) {
   return {center, pitch};
 }
 
-/** @param {{build:string, out:string, seed:number, prior?:unknown, loopback?:{base:string,socket:string}}} options */
+/** @param {{build:string, out:string, seed:number, prior?:unknown, loopback?:{base:string,socket:string,batch?:number}}} options */
 async function runSmoke({build, out, seed, prior, loopback}) {
   const began = Date.now(), path = join(out, 'zone-entry.json');
   const base = loopback?.base ?? STAGING;
@@ -675,11 +676,13 @@ async function runSmoke({build, out, seed, prior, loopback}) {
       cells = /** @type {SmokeReport} */ (prior).cells;
     }
     cells = cells.map(({instance,slug,cell}) => ({instance,...(slug === undefined ? {} : {slug}),cell}));
-    const route = featuredZoneEntry(cells,seed);
+    const draw = featuredZoneEntry(cells,seed), batchId = loopback?.batch;
+    const route = batchId === undefined ? draw : smokeBatches(draw)[batchId];
+    if (route === undefined) throw new Error('Unknown loopback batch');
     const fullRoute = zoneEntryTour(cells);
     const {arrivals,pending} = prior === undefined
       ? {arrivals:[],pending:route.map((_,index) => index)}
-      : retrySmokeEntries(route,prior,build,seed,scope);
+      : retrySmokeEntries(route,prior,build,seed,scope,batchId);
     /** @type {Map<number,SmokeFailure>} */ const failed = new Map();
     for (const index of pending) {
       const leg = route[index];
@@ -690,14 +693,16 @@ async function runSmoke({build, out, seed, prior, loopback}) {
       const pass = checked && failures.length === 0 && arrivals.length === route.length;
       /** @type {SmokeReport} */ const verdict = {mode:'smoke',seed,build,engine:'webkit',profile:'phone',cells,
         expected:route.length,arrivals:[...arrivals].sort((a,b) => a.index-b.index),failures,
-        ...(scope === undefined ? {} : {scope}), ...(failure === undefined ? {} : {failure}),pass,wallMs:Date.now()-began};
+        ...(scope === undefined ? {} : {scope}), ...(batchId === undefined ? {} : {batch:batchId}),
+        ...(failure === undefined ? {} : {failure}),pass,wallMs:Date.now()-began};
       writeFileSync(`${path}.next`, `${JSON.stringify(verdict,null,2)}\n`);
       renameSync(`${path}.next`,path);
       return verdict;
     };
     save();
-    // FS29 leaves more renderer capacity for each hosted loopback guest. Staging keeps its three walkers.
-    const batches = smokeBatches(pending, scope === 'loopback' && process.env.GITHUB_ACTIONS === 'true' ? 2 : 3);
+    // Each hosted batch gives its WebKit guest a runner. Staging keeps three walkers.
+    const walkers = scope === 'loopback' && process.env.GITHUB_ACTIONS === 'true' ? 2 : 3;
+    const batches = batchId === undefined ? smokeBatches(pending, walkers) : [pending];
     console.log(`J476 batches ${batches.map(batch => batch.length).join('/')}`);
     await Promise.all(batches.map(async (batch,lane) => {
       for (const index of batch) {
@@ -748,8 +753,8 @@ async function runSmoke({build, out, seed, prior, loopback}) {
 }
 
 /** FS29 exercises the same walker on the exact signed local rig. Its verdict cannot qualify a staging deploy.
- * @param {{build:string, out:string, seed:number, prior?:unknown, base:string, socket:string}} options */
-export function runLoopbackSmoke({base, socket, ...options}) {
+ * @param {{build:string, out:string, seed:number, prior?:unknown, base:string, socket:string, batch?:number}} options */
+export function runLoopbackSmoke({base, socket, batch, ...options}) {
   const page = new URL(base), rooms = new URL(socket);
   if (!/^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || page.origin !== base ||
       !/^ws:\/\/127\.0\.0\.1:\d+$/u.test(socket) || rooms.origin !== socket ||
@@ -757,7 +762,8 @@ export function runLoopbackSmoke({base, socket, ...options}) {
     throw new Error('The loopback tour needs an exact build, seed and local page and rooms origins');
   }
   mkdirSync(options.out, {recursive:true});
-  return runSmoke({...options, loopback:{base,socket}});
+  if (batch !== undefined && ![0,1,2].includes(batch)) throw new Error('Use loopback batch 0, 1 or 2');
+  return runSmoke({...options, loopback:{base,socket,...(batch === undefined ? {} : {batch})}});
 }
 
 /** Read either the raw smoke or the staging deploy verdict that contains it.

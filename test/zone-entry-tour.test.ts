@@ -62,6 +62,22 @@ test('a retry carries passed pairs forward and only redoes failed indexed pairs 
   expect(smokeGap({...report,pass:true,arrivals:all.map((pair, index) => index===0 ? {...pair,to:pair.from} : pair),failures:[]})).toMatch(/16 seeded crossings/u);
 });
 
+test('a loopback batch resumes its own failed pairs and covers the full route across three jobs', () => {
+  const build = 'a'.repeat(40), seed = 476;
+  const route = featuredZoneEntry(featuredCells, seed);
+  const batches = smokeBatches(route);
+  expect(batches.map(batch => batch.length)).toEqual([5,5,6]);
+  expect(batches.flat()).toEqual(route);
+  const batch = batches[1];
+  if (batch === undefined) throw new Error('Missing second batch');
+  const pairs = batch.map(({from,to}, index) => ({index,from:from.instance,to:to.instance}));
+  const arrivals = pairs.slice(1).map(pair => ({...pair,ms:700}));
+  const report = {mode:'smoke',scope:'loopback',batch:1,build,seed,engine:'webkit',profile:'phone',
+    cells:featuredCells,expected:batch.length,arrivals,failures:[{...pairs[0],reason:'timed out'}],pass:false};
+  expect(retrySmokeEntries(batch, report, build, seed, 'loopback', 1)).toEqual({arrivals,pending:[0]});
+  expect(() => retrySmokeEntries(batch, report, build, seed, 'loopback', 0)).toThrow(/batch/u);
+});
+
 test('opens with Driftwood into Sky Reach and walks both directions of every live edge in one circuit', (): void => {
   const route = zoneEntryTour(cells);
   expect(route[0]).toEqual({from:cells[0], to:cells[1]});

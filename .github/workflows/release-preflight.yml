@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '13 15 * * *'
   workflow_dispatch:
+    inputs:
+      seed:
+        description: Seed to replay
+        type: number
+        required: false
 
 permissions:
   contents: read
@@ -15,12 +20,18 @@ concurrency:
 jobs:
   local-qa-and-zone-entry:
     if: github.repository == 'project-wildshard/engine' && github.ref == 'refs/heads/main'
-    # The hosted loopback tour uses two concurrent WebKit guests on macOS.
+    strategy:
+      fail-fast: false
+      matrix:
+        batch: [0, 1, 2]
+    # One WebKit guest at a time on each hosted Mac.
     runs-on: macos-15
     timeout-minutes: 45
     env:
       BROWSER: none
       WS_LANE_NAME: release-preflight
+      WS_PREFLIGHT_BATCH: ${{ matrix.batch }}
+      WS_PREFLIGHT_SEED: ${{ inputs.seed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -28,7 +39,9 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: release-preflight
-      - run: pnpm exec playwright install chromium webkit
+      - run: pnpm exec playwright install webkit
+      - if: matrix.batch == 0
+        run: pnpm exec playwright install chromium
       # Reuse the nightly's content-addressed encodes. The app and the signed rig are still built from this commit.
       - name: Restore spawn and phone texture encodes
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -39,17 +52,18 @@ jobs:
             nightly-encodes-
             ring1-spawn-parts-br-
       - name: Test the socket guard and release harness
+        if: matrix.batch == 0
         run: pnpm exec vitest run test/staging-proof-lines.test.ts test/staging-qa.test.ts test/zone-entry-tour.test.ts
-      - name: Run exact-main local QA and the seeded tour
+      - name: Run the exact-main preflight batch
         run: |
           release=$(node -p "'v' + require('./package.json').version")
-          seed=$(node -p 'Math.floor(Date.now() / 86400000)')
+          seed=${WS_PREFLIGHT_SEED:-$(node -p 'Number(process.env.GITHUB_RUN_ID) >>> 0')}
           bash scripts/browser-lane.sh --max 35 node scripts/staging-qa.mjs --local \
-            --release "$release" --build "$GITHUB_SHA" --preflight "$seed" --out tmp/fs29
+            --release "$release" --build "$GITHUB_SHA" --preflight "$seed" --preflight-batch "$WS_PREFLIGHT_BATCH" --out tmp/fs29
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: release-preflight
+          name: release-preflight-${{ matrix.batch }}
           path: |
             tmp/fs29/verdict.json
             tmp/fs29/zone-entry/zone-entry.json

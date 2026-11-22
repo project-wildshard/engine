@@ -22,10 +22,10 @@ export interface Tour {
 
 export const FIRST_ZONE_PAIR: Readonly<Pair>;
 export function featuredZoneEntry(cells: readonly Cell[], seed: number): Leg[];
-export function smokeBatches(pending: readonly number[], walkers?: 2|3): number[][];
-export function retrySmokeEntries(route: readonly Leg[], proof: unknown, build: string, seed: number, scope?: 'loopback'):
+export function smokeBatches<T>(pending: readonly T[], walkers?: 2|3): T[][];
+export function retrySmokeEntries(route: readonly Leg[], proof: unknown, build: string, seed: number, scope?: 'loopback', batch?: number):
   {arrivals: SmokeArrival[]; pending: number[]};
-export function runLoopbackSmoke(options: {build:string; out:string; seed:number; prior?:unknown; base:string; socket:string}): Promise<number>;
+export function runLoopbackSmoke(options: {build:string; out:string; seed:number; prior?:unknown; base:string; socket:string; batch?:number}): Promise<number>;
 export function smokeGap(proof: unknown): string | undefined;
 export function stagedTourProof(value: unknown): unknown;
 export function zoneEntryTour(cells: readonly Cell[]): {from: Cell; to: Cell}[];

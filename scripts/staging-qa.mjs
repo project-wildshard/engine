@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // J426–J428: the staging deploy checks. Run under browser-lane.sh on the release Mac.
 // node scripts/staging-qa.mjs [--local | --candidate <worker-version-url> | --url <url>]
-//   --release vX.Y.Z [--build <sha>] [--only K3] [--out <dir>] [--local --preflight <seed>]
+//   --release vX.Y.Z [--build <sha>] [--only K3] [--out <dir>] [--local --preflight <seed> [--preflight-batch <0|1|2>]]
 // node scripts/staging-qa.mjs --train --dry-run --release vX.Y.Z
 // SQ16 (J427): each leg runs the steps staging-qa-budget.mjs lists for it, about 10 minutes; over 12 is a P2 on the runner.
 import { spawn } from 'node:child_process';
@@ -153,6 +153,12 @@ async function cli() {
       tourSeed === undefined || !Number.isSafeInteger(tourSeed) || tourSeed > 0xffff_ffff)) {
     throw new Error('Release preflight needs --local and an unsigned 32-bit seed');
   }
+  const rawBatch = args.get('preflight-batch');
+  if (rawBatch !== undefined && (tourSeed === undefined || !/^[012]$/u.test(rawBatch))) {
+    throw new Error('Release preflight batch requires --preflight and a batch from 0 to 2');
+  }
+  const batch = rawBatch === undefined ? undefined : Number(rawBatch);
+  const runQa = batch === undefined || batch === 0;
   const deployChecks = args.has('deploy-checks');
   if (deployChecks && (local || requested !== undefined || url !== STAGING || source === undefined)) {
     throw new Error('Deploy checks require the full, exact candidate or staging build');
@@ -163,16 +169,21 @@ async function cli() {
   const kind = local ? 'local' : candidateUrl === undefined ? 'staging' : 'candidate';
   // FS29 uses the hosted browser legs. The release's local leg owns Simulator Safari.
   /** @type {readonly string[]} */
-  const leg = deployChecks ? DEPLOY_CHECKS : requested ?? (tourSeed === undefined ? LEGS[kind] : LEGS.local.filter(id => id !== 'ios-safari'));
+  const leg = !runQa ? [] : deployChecks ? DEPLOY_CHECKS : requested ?? (tourSeed === undefined ? LEGS[kind] : LEGS.local.filter(id => id !== 'ios-safari'));
   const selected = DEPLOY_SCENARIOS.filter(id => leg.includes(id));
   const expected = JOURNEYS.filter(id => leg.includes(id));
   // SQ14: the Simulator's Safari uses the Mac's own network, which no route can point at the unaliased candidate
   if (candidateUrl !== undefined && expected.includes('ios-safari')) throw new Error('iOS Simulator Safari runs on the local or live staging leg, not the candidate');
   if (args.has('dry-run')) {
     const target = local ? 'local source' : candidateUrl === undefined ? url : 'staging candidate';
-    console.log(`staging-qa ${release} ${target}: ${[...selected, ...expected].join(', ')}; vision reports only; hold and fix forward on P0/P1`);
-    for (const line of budgetLines(kind, [...(local ? ['build'] : []), ...selected, ...expected])) console.log(line);
-    if (tourSeed !== undefined) console.log(`J451: walk 16 seeded phone WebKit crossings on the local rig (seed ${tourSeed})`);
+    if (runQa) {
+      console.log(`staging-qa ${release} ${target}: ${[...selected, ...expected].join(', ')}; vision reports only; hold and fix forward on P0/P1`);
+      for (const line of budgetLines(kind, [...(local ? ['build'] : []), ...selected, ...expected])) console.log(line);
+    }
+    if (tourSeed !== undefined) {
+      const route = batch === undefined ? '16 seeded phone WebKit crossings' : `seeded phone WebKit batch ${batch + 1}/3`;
+      console.log(`J451: walk ${route} on the local rig (seed ${tourSeed})`);
+    }
     return;
   }
   const legStarted = Date.now();
@@ -191,13 +202,15 @@ async function cli() {
   let unbind;
   try {
     unbind = candidate === undefined ? undefined : bindCandidateBrowser(candidate);
-    await qualify({ url: rig?.base ?? url, release, root: rig?.source ?? root, out, store, local, kind, legStarted,
+    if (runQa) await qualify({ url: rig?.base ?? url, release, root: rig?.source ?? root, out, store, local, kind, legStarted,
       selected, expected, owner, full: requested === undefined && tourSeed === undefined,
       ...(candidate === undefined ? {} : { candidate }),
       ...(source === undefined ? {} : { source }), ...(args.has('bugbash') ? { bugbash: args.get('bugbash') } : {}) });
-    if (rig !== undefined && source !== undefined && tourSeed !== undefined && readResult(join(out, 'verdict.json'))?.hold === false) {
+    if (rig !== undefined && source !== undefined && tourSeed !== undefined &&
+        (!runQa || readResult(join(out, 'verdict.json'))?.hold === false)) {
       const {runLoopbackSmoke:walk} = await import(pathToFileURL(join(rig.source, 'scripts/zone-entry-tour.mjs')).href);
-      const tour = {build:source, base:rig.base, socket:rig.socket, seed:tourSeed, out:join(out, 'zone-entry')};
+      const tour = {build:source, base:rig.base, socket:rig.socket, seed:tourSeed, out:join(out, 'zone-entry'),
+        ...(batch === undefined ? {} : {batch})};
       const code = await walk(tour);
       const prior = code === 0 ? undefined : readResult(join(tour.out, 'zone-entry.json'));
       process.exitCode = prior === undefined ? code : await walk({...tour, prior, out:join(out, 'zone-entry-retry')});
