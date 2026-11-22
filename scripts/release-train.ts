@@ -11,7 +11,7 @@ import { nextAdmission, provesTrainCi, trainSha as sha, trainTag as tagPattern,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './pid-lock.mjs';
-import { latestReleaseRef, releaseDue, reminderLine } from './release-due.mjs';
+import { latestReleaseRef, releaseDueFromRefs, reminderLine } from './release-due.mjs';
 import { readPublication } from './server-release/sign.mjs';
 import { scratchDir } from './scratch-dir.mjs';
 
@@ -157,9 +157,7 @@ async function main(args: string[]) {
     if (!ancestor(commit, mainRef)) throw new Error(`Required commit ${commit} is absent from main`);
     return git(['rev-parse', `${commit}^{commit}`]);
   });
-  const cutAt = new Date(Number(git(['show', '-s', '--format=%ct', previous])) * 1000).toISOString();
-  const cadence = releaseDue({ tag: lastTag, build: previous, cutAt,
-    newCommits: Number(git(['rev-list', '--no-merges', '--count', `${previous}..${mainRef}`])) }, Date.now());
+  const cadence = releaseDueFromRefs(refs, git, Date.now());
   if (!prepared && (cadence.status === 'no-change' || (cadence.status === 'waiting' && !values['on-demand']))) {
     throw new Error(reminderLine(cadence));
   }

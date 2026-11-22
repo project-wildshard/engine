@@ -24,6 +24,15 @@ export function latestReleaseRef(refs) {
       return a.ref.localeCompare(b.ref);
     })[0]?.ref;
 }
+/** @param {string[]} refs @param {(args:string[])=>string} readGit @param {number} now */
+export function releaseDueFromRefs(refs, readGit, now) {
+  const ref = latestReleaseRef(refs);
+  if (ref === undefined) throw new Error('No prepared or tagged release');
+  const tag = ref.split('/').at(-1) ?? '', build = readGit(['rev-parse', `${ref}^{commit}`]);
+  const cutAt = new Date(Number(readGit(['show', '-s', '--format=%ct', build])) * 1000).toISOString();
+  const newCommits = Number(readGit(['rev-list', '--no-merges', '--count', `${build}..refs/remotes/origin/main`]));
+  return releaseDue({ tag, build, cutAt, newCommits }, now);
+}
 /** @param {string} value */
 function mexico(value) { return `${new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Cancun', dateStyle: 'short', timeStyle: 'short', hour12: false }).format(new Date(value))} Cancún`; }
 /** @param {ReturnType<typeof releaseDue>} result */
@@ -91,16 +100,12 @@ export function main(args) {
     process.exitCode = 1;
     return undefined;
   }
-  const ref = latestReleaseRef(git(['for-each-ref', '--format=%(refname)', 'refs/tags', 'refs/heads/release', 'refs/remotes/origin/release'], root).split('\n'));
-  if (ref === undefined) throw new Error('No prepared or tagged release');
-  const tag = ref.split('/').at(-1) ?? '', build = git(['rev-parse', `${ref}^{commit}`], root);
-  const cutAt = new Date(Number(git(['show', '-s', '--format=%ct', build], root)) * 1000).toISOString();
-  const newCommits = Number(git(['rev-list', '--no-merges', '--count', `${build}..refs/remotes/origin/main`], root));
-  const result = releaseDue({ tag, build, cutAt, newCommits }, Date.now());
+  const refs = git(['for-each-ref', '--format=%(refname)', 'refs/tags', 'refs/heads/release', 'refs/remotes/origin/release'], root).split('\n');
+  const result = releaseDueFromRefs(refs, gitArgs => git(gitArgs, root), Date.now());
   console.log(args.includes('--json') ? JSON.stringify(result) : reminderLine(result));
   if (args.includes('--receipt')) {
     const { marker, needed } = receiptNeeded(result, existsSync(log) ? readFileSync(log, 'utf8') : '');
-    if (needed) appendReminder(log, `${marker} ${newCommits} new commits; green main cut due; on-demand remains available`);
+    if (needed) appendReminder(log, `${marker} ${result.newCommits} new commits; green main cut due; on-demand remains available`);
   }
   return result;
 }

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { latestReleaseRef, receiptNeeded, refreshReminderRefs, releaseDue, reminderLine, reminderPlist } from '../scripts/release-due.mjs';
+import { latestReleaseRef, receiptNeeded, refreshReminderRefs, releaseDue, releaseDueFromRefs, reminderLine, reminderPlist } from '../scripts/release-due.mjs';
 const cutAt = '2026-11-17T15:00:00.000Z', cut = Date.parse(cutAt), hour = 3_600_000;
 const latest = { tag: 'v0.1.36', build: '6'.repeat(40), cutAt, newCommits: 2 };
 describe('the release due window', () => {
@@ -23,6 +23,22 @@ describe('the release due window', () => {
   it('chooses semantic versions across tags and prepared branches, ignoring unrelated refs', () => {
     expect(latestReleaseRef(['refs/tags/v0.1.9', 'refs/tags/v0.1.36', 'refs/remotes/origin/release/v0.1.37', 'refs/heads/plan/release-v0.1.99', 'refs/tags/v0.1.38-rc.1'])).toBe('refs/remotes/origin/release/v0.1.37');
     expect(latestReleaseRef(['refs/tags/server-staging-a'])).toBeUndefined();
+  });
+  it('starts the clock from a staging cut even when production still serves an older tag', () => {
+    const staged = 'refs/remotes/origin/release/v0.1.69', build = 'b'.repeat(40);
+    const output = new Map([
+      [`rev-parse ${staged}^{commit}`, build],
+      [`show -s --format=%ct ${build}`, String(cut / 1000)],
+      [`rev-list --no-merges --count ${build}..refs/remotes/origin/main`, '2'],
+    ]);
+    const git = (args: string[]) => {
+      const value = output.get(args.join(' '));
+      if (value === undefined) throw new Error(`Unexpected Git call: ${args.join(' ')}`);
+      return value;
+    };
+    const refs = ['refs/tags/v0.1.64', staged];
+    expect(releaseDueFromRefs(refs, git, cut + 4 * hour - 1)).toMatchObject({ tag: 'v0.1.69', build, status: 'waiting', newCommits: 2 });
+    expect(releaseDueFromRefs(refs, git, cut + 4 * hour).status).toBe('due');
   });
   it('logs one due and one overdue receipt per cut without another state store', () => {
     const due = releaseDue(latest, cut + 5 * hour), first = receiptNeeded(due, '');

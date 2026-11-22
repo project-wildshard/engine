@@ -6,6 +6,7 @@ export interface ReleaseDue extends ReleaseCut {
 }
 export function releaseDue(latest: ReleaseCut, now: number): ReleaseDue;
 export function latestReleaseRef(refs: string[]): string | undefined;
+export function releaseDueFromRefs(refs: string[], readGit: (args: string[]) => string, now: number): ReleaseDue;
 export function reminderLine(result: ReleaseDue): string;
 export function receiptNeeded(result: ReleaseDue, previous: string): { marker: string; needed: boolean };
 export function reminderPlist(root: string, userHome: string): string;
