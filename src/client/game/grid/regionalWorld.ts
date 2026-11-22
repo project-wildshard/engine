@@ -90,7 +90,8 @@ import { buildRegionSky, type RegionBackdrop, type RegionSkyOutcome } from './re
 import { publishSkyClock } from '../session/clockSettings';
 import { imagesFirstPlayingBytes } from './runtimeCost';
 import { provideRuntimeFolder, runtimeFolder, shardFolderFromAdmission } from '../shardfile/runtimeFolder';
-import { loadDeclaredCreatureModels, type DeclaredCreatureModels } from '../shardfile/declaredCreatures';
+import { withoutRuntimeRows } from '../../../shared/game/plugin/runtimeRows';
+import { loadDeclaredCreatureModels, nativeDeclaresOwnSpecies, type DeclaredCreatureModels } from '../shardfile/declaredCreatures';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { AdmittedFolder } from '../shardfile/folder';
 import { clientMaterials } from '../shardfile/clientMaterials';
@@ -149,13 +150,21 @@ export async function regionalTerrain(level: LevelSpec, scope: Scope, binding: L
 type RegionalPresentationInputs = {
   readonly collider: Uint8Array | undefined;
   readonly presentation: Awaited<ReturnType<typeof clientMaterials>>;
+  /** OF23e4: only a native page's declared bodies draw with these (no data page binds them) */
+  readonly bodiesOnly?: true;
 } | null;
 
 /** Verified input and private scope-owned materials need no native frame or
  * heightfield. Their bindings still publish at the original cursor below. */
 async function prepareRegionalPresentation(admitted: AdmittedFolder, renderer: Parameters<typeof clientMaterials>[2], scope: Scope): Promise<RegionalPresentationInputs> {
   const full = admitted.source;
-  if (!hasDeclaredClientPage(full)) return null;
+  if (!hasDeclaredClientPage(full)) {
+    // OF23e4 (Pine r10): a native page that declares its own species draws them with its data's materials, as standalone
+    if (!nativeDeclaresOwnSpecies(shardFolderFromAdmission(admitted, scope))) return null;
+    const presentation = await clientMaterials(withoutRuntimeRows(full), runtimeFolder(full).assets.retained, renderer, scope);
+    if (scope.disposed || scope.disposing) throw new Error('Regional world left while preparing its declared bodies\' materials');
+    return { collider: undefined, presentation, bodiesOnly: true };
+  }
   const assets = runtimeFolder(full).assets, terrain = full.terrain;
   const collider = terrain === null ? undefined : await assets.read(terrain.collider);
   if (scope.disposed || scope.disposing) throw new Error('Regional world left while reading its presentation collider');
@@ -167,7 +176,7 @@ async function prepareRegionalPresentation(admitted: AdmittedFolder, renderer: P
 /** Bind prepared data at its original ordered cursor. Curves and tiles advance
  * only while entered; the material reader never publishes a regional frame. */
 async function regionalPresentation(admitted: AdmittedFolder, start: { readonly x: number; readonly z: number }, root: Object3D, renderer: Parameters<typeof clientMaterials>[2], scope: Scope, hour: () => number | null, allocator: ResidencyAllocator, instance: string, sky: ShardWorld['sky'], input: RegionalPresentationInputs, registration?: ClientTileRegistration): Promise<{ ready: Promise<void>; tick: (dt: number) => void; follow: (x: number, z: number) => void } | null> {
-  if (input === null) return null;
+  if (input === null || input.bodiesOnly === true) return null;
   const full = admitted.source, data = full, terrain = data.terrain, assets = runtimeFolder(full).assets;
   const { collider, presentation } = input, slug = full.identity.slug;
   if (terrain !== null) {

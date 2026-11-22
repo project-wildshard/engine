@@ -28,7 +28,7 @@ import type { ShardWorld } from '../../../server/game/shard/world';
 import type { RuntimePageResident } from '../shardfile/runtimePage';
 import type { AdmittedFolder } from '../shardfile/folder';
 import { admittedRuntimeFolder, shardFolderFromAdmission } from '../shardfile/runtimeFolder';
-import { declarePageSpecies, pageDeclaresOwnSpecies, type DeclaredCreatureModels } from '../shardfile/declaredCreatures';
+import { declarePageCreatures, declarePageSpecies, nativeDeclaresOwnSpecies, pageDeclaresOwnSpecies, type DeclaredCreatureModels } from '../shardfile/declaredCreatures';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import { enteredFullMap, shiftedFullMap, shiftedMinimap } from './mapFrame';
@@ -365,6 +365,18 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
             // OF19d2 (K6, v0.1.56): a declared data page with no `species.program` registers its own declared species in its
             // entered kit, as its standalone data client does, before the plan's kit and play features read them
             kit: async entered => {
+              // OF23e4 (Pine r10): a native page with no species programme registers its declared rows and keeps the hull
+              // book's kit (held equipment, socket cards), as its standalone client does (client.ts `declaredNativePage`)
+              if (nativeDeclaresOwnSpecies(entered.product)) {
+                const load = foundation.declaredCreatures;
+                if (load === undefined) throw new Error('Declared native species require their regional presentation');
+                const models = await load(entered.product);
+                if (owner.disposed) throw new Error('Regional runtime left while loading its declared creatures');
+                declarePageCreatures(entered, request.admitted.source, models);
+                const { prepareDeclaredNativeKit } = await import('../models/socketRigCreature');
+                await prepareDeclaredNativeKit(entered);
+                return;
+              }
               if (!pageDeclaresOwnSpecies(entered.product)) return;
               const source = request.admitted.source, load = foundation.declaredCreatures;
               if (load === undefined) throw new Error('Declared species page requires its regional presentation');

@@ -30,6 +30,20 @@ export function pageDeclaresOwnSpecies(product: Pick<ShardFolder, 'has' | 'secti
   return !product.section('client/plan').features.some(row => row.kind === 'species.program');
 }
 
+/** The plan features that register a native page's species themselves: such a page never declares its own. */
+const SPECIES_OWNERS = new Set(['population.hull-book', 'species.program', 'population.product-creatures']);
+
+/** ONE-FORMAT OF23e4: a native runtime page whose species are only its declared rows (Pine r10): no `actors/species-programs`
+ *  and no plan feature that registers species. Its page registers them itself (`declarePageCreatures`), standalone
+ *  (client.ts `declaredNativePage`) and on the grid (regionalRuntime.ts's entered kit), or a row's kind is unknown. */
+export function nativeDeclaresOwnSpecies(product: Pick<ShardFolder, 'has' | 'section' | 'shardfile'>): boolean {
+  const source = product.shardfile;
+  if (source.runtime === null || hasDeclaredClientPage(source) || product.has('actors/species-programs')) return false;
+  if (source.rows.species.length === 0 || source.creatures.spawns.length === 0) return false;
+  const features = product.has('client/plan') ? product.section('client/plan').features : [];
+  return !features.some(row => SPECIES_OWNERS.has(row.kind));
+}
+
 /** Load what `declarePageSpecies` draws with, from the page's own retained files (the data client loads the same in its world). */
 export async function loadDeclaredCreatureModels(product: ShardFolder, source: Shardfile, assets: ReadonlyMap<string, Uint8Array>,
   presentation: { readonly materials: ReadonlyMap<string, Material>; readonly compile: (entry: unknown) => Material }, scope: Scope,
