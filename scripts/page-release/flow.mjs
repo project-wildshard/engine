@@ -246,6 +246,11 @@ export async function runPhase(phase, deps) {
 
   if (phase === 'check') {
     if (channel.channel === 'staging') {
+      plan('move the cook when this exact staging release is signed, during the rooms switch');
+      if (!dry) {
+        await waitForGate(channel, deps, refuse, true);
+        deps.run('node', ['scripts/release-cook.mjs', '--staging', `--build=${deps.build}`]);
+      }
       plan('ready every signed extra placement for this exact build before checking the page');
       if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/release-placed-ready.mjs', 'staging'], {WS_BUILD_ID: deps.build});
     }
@@ -480,11 +485,11 @@ export function qaGap(qa, build) {
 }
 
 /**
- * The signed file names this build. Online channels also require matching /health; preview forbids a socket.
+ * The signed file names this exact build. This check can pass while rooms are still switching.
  * @param {ChannelConfig} channel @param {Deps} deps
  * @returns {Promise<{serial?: number, problem?: string}>}
  */
-export async function readGate(channel, deps) {
+async function readSignedGate(channel, deps) {
   /** @type {any} */
   let signed;
   try { signed = await deps.fetchJSON(channel.release); } catch { return {problem: `${channel.release} unreadable`}; }
@@ -501,34 +506,43 @@ export async function readGate(channel, deps) {
   if (release.channel !== expectedChannel) return {problem: `${channel.release} is channel ${release.channel}`};
   if (release.engineBuild !== deps.build) return {problem: `${channel.release} serial ${release.serial} signs ${release.engineBuild}, not ${deps.build}`};
   if (release.saveEpoch !== deps.manifest.saveEpoch) return {problem: `${channel.release} save epoch ${release.saveEpoch} is not ${deps.manifest.saveEpoch}`};
+  if (channel.channel === 'explore') return {serial: release.serial};
+  if (channel.solo) return release.socket === undefined && release.bundle === undefined
+    ? {serial: release.serial} : {problem: `${channel.release} must be solo (no socket or server bundle)`};
+  if (String(release.socket).replace(/\/$/u, '') !== channel.socket) return {problem: `${channel.release} socket ${release.socket} is not ${channel.socket}`};
+  return {serial: release.serial};
+}
+
+/** @param {ChannelConfig} channel @param {Deps} deps */
+export async function readGate(channel, deps) {
+  const signed = await readSignedGate(channel, deps);
+  if (signed.problem !== undefined) return signed;
   if (channel.channel === 'explore') {
     const versionURL = `${CHANNELS.staging.origin}/version.json`;
     try {
       const page = await deps.fetchJSON(versionURL);
       if (page?.build !== deps.build) return {problem: `${versionURL} names ${page?.build}, not ${deps.build}`};
     } catch { return {problem: `${versionURL} unreadable`}; }
-    return {serial: release.serial};
+    return signed;
   }
-  if (channel.solo) return release.socket === undefined && release.bundle === undefined
-    ? {serial: release.serial} : {problem: `${channel.release} must be solo (no socket or server bundle)`};
-  if (String(release.socket).replace(/\/$/u, '') !== channel.socket) return {problem: `${channel.release} socket ${release.socket} is not ${channel.socket}`};
+  if (channel.solo) return signed;
   /** @type {any} */
   let health;
   try { health = await deps.fetchJSON(channel.health); } catch { return {problem: `${channel.health} unreadable`}; }
-  if (health?.build !== deps.build || health?.serial !== release.serial) return {problem: `${channel.health} shows ${health?.build} serial ${health?.serial}, not ${deps.build} serial ${release.serial}`};
-  return {serial: release.serial};
+  if (health?.build !== deps.build || health?.serial !== signed.serial) return {problem: `${channel.health} shows ${health?.build} serial ${health?.serial}, not ${deps.build} serial ${signed.serial}`};
+  return signed;
 }
 
 /** @param {ChannelConfig} channel @param {Deps} deps @param {(message: string) => void} refuse */
-async function waitForGate(channel, deps, refuse) {
+async function waitForGate(channel, deps, refuse, signedOnly = false) {
   const deadline = deps.now() + (deps.dryRun ? 0 : deps.waitMs ?? 45 * 60_000);
   for (let last = '';;) {
-    const gate = await readGate(channel, deps);
+    const gate = signedOnly ? await readSignedGate(channel, deps) : await readGate(channel, deps);
     if (gate.problem === undefined) return gate;
     if (deps.now() >= deadline) { refuse(`gave up waiting: ${gate.problem}`); return gate; }
     if (gate.problem !== last) deps.log(`waiting: ${gate.problem}`);
     last = gate.problem;
-    await deps.sleep(deps.pollMs ?? 30_000);
+    await deps.sleep(deps.pollMs ?? (signedOnly ? 5000 : 30_000));
   }
 }
 

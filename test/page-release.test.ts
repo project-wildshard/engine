@@ -118,6 +118,7 @@ test('the four phases run in order and move the alias last', async () => {
   expect(fetched(calls)).toEqual([
     'prepare', 'run pnpm build:game', 'run node scripts/app-build/splitOutput.mjs dist --join', 'package', 'state build',
     'packs.publish', 'upload', 'state upload',
+    'run node scripts/release-cook.mjs --staging --build=' + build,
     'run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging',
     'deployedDigests', 'packs.verify', 'state check',
     'run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging',
@@ -263,6 +264,33 @@ test('check waits for the signed serial and health, and gives up without a match
   clock = 0;
   deps.sleep = ms => { clock += ms; return Promise.resolve(); };
   await expect(runPhase('check', deps)).rejects.toThrow(/gave up waiting/);
+});
+
+test('staging moves the cook once the new rooms release is signed, before waiting on rooms', async () => {
+  const {deps, calls, live} = rig();
+  await through(deps, 'upload');
+  live.release = signed('staging', 6, source);
+  live.health = {build: source, serial: 6};
+  calls.length = 0;
+  let clock = 0;
+  deps.now = () => clock;
+  deps.waitMs = 20_000;
+  deps.sleep = ms => {
+    clock += ms;
+    if (clock === 5000) {
+      live.release = signed('staging', 7);
+      calls.push('new rooms release signed');
+    }
+    if (clock >= 10_000) live.health = {build, serial: 7};
+    return Promise.resolve();
+  };
+  await runPhase('check', deps);
+  const move = 'run node scripts/release-cook.mjs --staging --build=' + build;
+  const health = 'fetch ' + CHANNELS.staging.health;
+  expect(calls.filter(call => call === move)).toHaveLength(1);
+  expect(calls.indexOf(move)).toBeGreaterThan(calls.indexOf('new rooms release signed'));
+  expect(calls.indexOf(move)).toBeLessThan(calls.indexOf(health));
+  expect(calls.indexOf(move)).toBeLessThan(calls.indexOf('run node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging'));
 });
 
 test('check refuses when the uploaded bytes differ from the local build', async () => {
