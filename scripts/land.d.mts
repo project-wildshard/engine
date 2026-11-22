@@ -12,6 +12,7 @@ export function shaVerdict(data: unknown, sha: string): { state: 'pending' | 'gr
 export function mainPushArgs(sha: string): string[];
 export function land(argv: string[], cwd?: string, env?: NodeJS.ProcessEnv): Promise<number>;
 export const STAMPS: readonly string[];
-export function prePushCause(output: string, porcelain?: string): string;
+export function prePushCause(output: string, porcelain?: string, fallback?: string): string;
+export function failingDetail(lines: string[]): string | undefined;
 export const REF_LOCK: RegExp;
 export function tryGitLocked(cwd: string, args: string[], env: NodeJS.ProcessEnv, onRetry?: (why: string) => void): SpawnSyncReturns<string>;

@@ -69,6 +69,20 @@ function dirtFix(code,path,branch){
 
 /** Git's own lines in a refused push's output, never the hook's cause. */
 const GIT_OWN=/^error: failed to push some refs|^To \S+$|^hint: |^Done$|^!\s/u;
+/** Build-max C3 (2026-11-21): under a RED check, what in it failed: the first new red test, type error or lint rule
+ * (with its place), and how many more. A STOP that says only "vitest RED" sends the lane back to scroll the gate.
+ * @param {string[]} lines plain, trimmed hook lines @returns {string|undefined} */
+export function failingDetail(lines){
+ const counted=(/** @type {RegExp} */pattern,/** @type {(line:string,index:number)=>string} */name)=>{
+  const hits=lines.flatMap((line,index)=>pattern.test(line)?[name(line,index)]:[]);
+  return hits[0]===undefined?undefined:`${hits[0]}${hits.length>1?` (+${String(hits.length-1)} more)`:''}`;
+ };
+ return counted(/^NEW red: /u,line=>line.slice('NEW red: '.length))
+  ??counted(/: error TS\d+: /u,line=>line)
+  ??counted(/^x \S+\(/u,(line,index)=>{const at=/^,-\[(.+)\]$/u.exec(lines[index+1]??'')?.[1];return `${line.slice(2)}${at===undefined?'':` at ${at}`}`;})
+  ??counted(/^FAIL /u,line=>line.slice('FAIL '.length).trim());
+}
+
 /** Prefer an actual remote rejection, otherwise the hook's first RED or last
  * thrown error. Git may forward hook output on either stream under --porcelain.
  * Keep Git's stdout separate from hook stderr, which can print sample trailers.
@@ -89,7 +103,9 @@ export function prePushCause(output,porcelain='',fallback=''){
   ??hook.at(-1)
   ??otherHook.at(-1)
   ??plain(porcelain).findLast(line=>!GIT_OWN.test(line));
- return pick===undefined?'no output':pick.slice(0,300);
+ if(pick===undefined||pick.trim()==='')return 'no output';
+ const detail=/(?:^|\s)RED(?:\s|$)/u.test(pick)?failingDetail([...hook,...otherHook]):undefined;
+ return (detail===undefined?pick:`${pick}; ${detail}`).slice(0,300);
 }
 
 /** Only Git's final porcelain trailer proves the hook passed and the remote refused.

@@ -11,7 +11,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSyn
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { failureLine, PINS_LEDGER, prePushCause, REF_LOCK, STAMPS } from '../scripts/land.mjs';
+import { failingDetail, failureLine, PINS_LEDGER, prePushCause, REF_LOCK, STAMPS } from '../scripts/land.mjs';
 import { cleanLandFixtures, fixture, prepushLines, type Fixture } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -161,6 +161,19 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
     expect(prePushCause('lint RED in 1 s\nTo /sample.git\n!\tHEAD:refs/heads/main\t[remote rejected] (sample)\nDone\n'))
       .toBe('lint RED in 1 s');
     expect(prePushCause('')).toBe('no output');
+  });
+
+  test('build-max C3: a RED check names what in it failed, and how many more', () => {
+    const refused = "error: failed to push some refs to 'x'\n";
+    expect(prePushCause(`  - vitest (split full: 28 local) RED in 195.7 s\nX known-red: 2 NEW red(s) not on origin/main 6a6ec56939\n  NEW red: test/headless-direct-worker.test.ts::direct native deferred-run\n  NEW red: test/headless-verb-tape-worker.test.ts::native verb tape\n${refused}`))
+      .toBe('vitest (split full: 28 local) RED in 195.7 s; test/headless-direct-worker.test.ts::direct native deferred-run (+1 more)');
+    expect(prePushCause(`  x eslint(no-use-before-define): 'CAP_REAP_IDLE_MS' was used before it was defined.\n     ,-[scripts/worktree.mjs:138:172]\n  - lint (kit + game) RED in 120.1 s\n${refused}`))
+      .toBe("lint (kit + game) RED in 120.1 s; eslint(no-use-before-define): 'CAP_REAP_IDLE_MS' was used before it was defined. at scripts/worktree.mjs:138:172");
+    expect(prePushCause(`test/land-hosted.test.ts(99,30): error TS2554: Expected 1-2 arguments, but got 3.\n  - typecheck (kit + layers) RED in 47.6 s\n${refused}`))
+      .toBe('typecheck (kit + layers) RED in 47.6 s; test/land-hosted.test.ts(99,30): error TS2554: Expected 1-2 arguments, but got 3.');
+    expect(prePushCause(` FAIL  |node| test/x.test.ts > a case\n  - vitest (split related: 3 local) RED in 9 s\n${refused}`))
+      .toBe('vitest (split related: 3 local) RED in 9 s; |node| test/x.test.ts > a case');
+    expect(failingDetail(['lint RED in 3.0 s'])).toBeUndefined();
   });
 
   test('refuses the canonical checkout and non-plan branches', () => {
