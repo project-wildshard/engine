@@ -18,7 +18,7 @@ export const STALL_STAGES: readonly string[];
 /** The page function the clock mark runs, by this name in the profile. */
 export const CLOCK_MARK: string;
 /** A fresh page expression (new text each call) that runs the clock mark and returns its start on the page clock. */
-export function clockMarkExpression(): string;
+export function clockMarkExpression(backup?: boolean): string;
 /** Idle spans merged, minus holes, cut to [from, to]. */
 export function idleWithin(spans: readonly Span[], holes: readonly Span[], from: number, to: number): Span[];
 /** The most of the spans inside any window of `width`, and where that window starts. */
@@ -30,7 +30,7 @@ export function stageGaps(entries: readonly StallEntry[], stage: string): Span[]
 /** Stage stalls at or over the share, as fault lines. */
 export function stallFaults(entries: readonly StallEntry[], idle: readonly Span[]): string[];
 /** Where the profile's clock meets the page's, from the first sampled leaf beneath the clock mark. */
-export function profileAnchor(profile: CpuProfile, markPageMs: number): { pageMs: number; profileUs: number };
+export function profileAnchor(profile: CpuProfile, markPageMs: number, backupPageMs?: number): { pageMs: number; profileUs: number };
 /** A Chromium CPU profile's idle stretches on the page clock. */
 export function profileIdle(profile: CpuProfile, anchor: { pageMs: number; profileUs: number }): Span[];
 /** Browser-side: the page's boot timeline entries. */

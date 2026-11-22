@@ -25,12 +25,29 @@ test('a refused props stall retains the original timed entries for diagnosis', a
   const entries = [props(1000, 2000)];
   const profile = { nodes: [{ id: 1, callFrame: { functionName: '(idle)' } }, { id: 2, callFrame: { functionName: CLOCK_MARK } }],
     samples: [1, 2], timeDeltas: [0, 2_000_000], startTime: 0, endTime: 2_005_000 };
-  const page = legacyDouble<Page>({ evaluate: vi.fn<Page['evaluate']>().mockResolvedValueOnce(3000).mockResolvedValueOnce(entries) });
+  const page = legacyDouble<Page>({ evaluate: vi.fn<Page['evaluate']>().mockResolvedValueOnce(3000)
+    .mockResolvedValueOnce(3030).mockResolvedValueOnce(entries) });
   const session = { send: vi.fn(async () => ({ profile })), detach: async () => {} };
   const report = await finishStallProfile(page, session);
   expect(report.faults[0]).toMatch(/^Load stall: props/u);
   expect(report.entries).toEqual(entries);
   expect(session.send).toHaveBeenCalledWith('Profiler.stop');
+});
+
+test('a sampled backup clock mark still measures the props stall', async () => {
+  const entries = [props(1000, 2000)];
+  const profile = { nodes: [{ id: 1, callFrame: { functionName: '(idle)' } },
+    { id: 2, callFrame: { functionName: `${CLOCK_MARK}Backup` }, children: [3] },
+    { id: 3, callFrame: { functionName: 'now' } }],
+    samples: [1, 3], timeDeltas: [0, 2_030_000], startTime: 0, endTime: 2_035_000 };
+  const page = legacyDouble<Page>({ evaluate: vi.fn<Page['evaluate']>().mockResolvedValueOnce(3000)
+    .mockResolvedValueOnce(3030).mockResolvedValueOnce(entries) });
+  const session = { send: vi.fn(async () => ({ profile })), detach: async () => {} };
+  const report = await finishStallProfile(page, session);
+  expect(report.faults[0]).toMatch(/^Load stall: props/u);
+  expect(report.entries).toEqual(entries);
+  expect(session.send).toHaveBeenCalledTimes(1);
+  expect(() => profileAnchor({ ...profile, samples: [1, 1] }, 3000, 3030)).toThrow('no clock mark');
 });
 
 test('a 2 s idle stretch with no named wait is a props stall', () => {

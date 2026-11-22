@@ -13,6 +13,7 @@ export const STALL_WINDOW_MS = 1500, STALL_IDLE_SHARE = 0.8;
 export const STALL_STAGES = Object.freeze(['props']);
 /** The page function the clock mark runs, by this name in the profile. */
 export const CLOCK_MARK = '__wildshardStallClock';
+const BACKUP_CLOCK_MARK = `${CLOCK_MARK}Backup`;
 
 /** @typedef {{ operation: string, realm: string, start: number, end: number | null }} StallEntry */
 /** @typedef {{ start: number, end: number }} Span an idle stretch on the page clock (ms) */
@@ -97,16 +98,27 @@ export function stallFaults(entries, idle) {
 
 /** Where the profile's clock meets the page's: the first sample of the clock mark (CLOCK_MARK) against the page time the
  * mark started at. That sample lands within one sampling interval after the mark's start, which bounds the error.
- * @param {CpuProfile} profile @param {number} markPageMs @returns {{ pageMs: number, profileUs: number }} */
-export function profileAnchor(profile, markPageMs) {
-  const marks = new Set(profile.nodes.filter(node => node.callFrame.functionName === CLOCK_MARK).map(node => node.id));
+ * @param {CpuProfile} profile @param {number} markPageMs @param {number} [backupPageMs]
+ * @returns {{ pageMs: number, profileUs: number }} */
+export function profileAnchor(profile, markPageMs, backupPageMs) {
+  /** @type {Map<number, number>} */ const marks = new Map();
+  for (const { id, callFrame } of profile.nodes) {
+    if (callFrame.functionName === CLOCK_MARK) marks.set(id, markPageMs);
+    else if (callFrame.functionName === BACKUP_CLOCK_MARK && backupPageMs !== undefined) marks.set(id, backupPageMs);
+  }
   // Profiles sample leaves. A native clock read beneath the named mark is
   // still inside its stack; an equally named read elsewhere is not.
   const nodes = new Map(profile.nodes.map(node => [node.id, node]));
-  for (const id of marks) for (const child of nodes.get(id)?.children ?? []) if (nodes.has(child)) marks.add(child);
+  for (const [id, pageMs] of marks) for (const child of nodes.get(id)?.children ?? []) {
+    if (nodes.has(child) && !marks.has(child)) marks.set(child, pageMs);
+  }
   const samples = profile.samples ?? [];
   let at = profile.startTime;
-  for (const [i, delta] of (profile.timeDeltas ?? []).entries()) { at += delta; if (marks.has(samples[i] ?? -1)) return { pageMs: markPageMs, profileUs: at }; }
+  for (const [i, delta] of (profile.timeDeltas ?? []).entries()) {
+    at += delta;
+    const pageMs = marks.get(samples[i] ?? -1);
+    if (pageMs !== undefined) return { pageMs, profileUs: at };
+  }
   throw new Error(`Stall profile has no clock mark sample (${marks.size} mark-stack nodes; ${samples.length} samples)`);
 }
 
@@ -129,11 +141,12 @@ let clockMarks = 0;
 /** The page expression that runs the clock mark: 30 ms busy inside CLOCK_MARK, returning its start on the page clock. Each
  * call's text is new: V8 reuses a repeated eval's compiled script, and a second mark (play's profile after boot's) then
  * ran with CLOCK_MARK inlined into its caller and never sampled by name (NB6).
- * @returns {string} */
-export function clockMarkExpression() {
+ * @param {boolean} [backup] @returns {string} */
+export function clockMarkExpression(backup = false) {
+  const mark = backup ? BACKUP_CLOCK_MARK : CLOCK_MARK;
   return `/* clock mark ${++clockMarks} */ (() => { const start = performance.now(), until = start + 30;
-  function ${CLOCK_MARK}() { while (performance.now() < until) { /* busy: the profiler samples this function */ } }
-  ${CLOCK_MARK}(); return start; })()`;
+  function ${mark}() { while (performance.now() < until) { /* busy: the profiler samples this function */ } }
+  ${mark}(); return start; })()`;
 }
 
 /** Browser-side: the page's boot timeline entries (its own collector, as Copy diagnostics reads it). */
@@ -157,11 +170,24 @@ export async function startStallProfile(page) {
  * @param {import('playwright').Page} page
  * @param {{ send: (method: 'Profiler.stop') => Promise<{ profile: CpuProfile }>; detach: () => Promise<void> }} session */
 export async function finishStallProfile(page, session) {
-  const markPageMs = Number(await page.evaluate(clockMarkExpression()));
-  const { profile } = await session.send('Profiler.stop');
-  await session.detach().catch(() => undefined);
-  const entries = await page.evaluate(bootTimelineEntries), idle = profileIdle(profile, profileAnchor(profile, markPageMs));
+  const { profile, anchor } = await finishClockedProfile(page, session);
+  const entries = await page.evaluate(bootTimelineEntries), idle = profileIdle(profile, anchor);
   return { stalls: stageStalls(entries, idle), faults: stallFaults(entries, idle), entries };
+}
+
+/** Sample separately named marks in the same profile so one missed mark cannot lose the whole measurement.
+ * @param {import('playwright').Page} page
+ * @param {{ send: (method: 'Profiler.stop') => Promise<{ profile: CpuProfile }>; detach: () => Promise<void> }} session */
+async function finishClockedProfile(page, session) {
+  try {
+    const markPageMs = Number(await page.evaluate(clockMarkExpression()));
+    const backupPageMs = Number(await page.evaluate(clockMarkExpression(true)));
+    if (!Number.isFinite(markPageMs) || !Number.isFinite(backupPageMs)) throw new Error('Stall clock marks must have page timestamps');
+    const { profile } = await session.send('Profiler.stop');
+    return { profile, markPageMs, anchor: profileAnchor(profile, markPageMs, backupPageMs) };
+  } finally {
+    await session.detach().catch(() => undefined);
+  }
 }
 
 // NINE-DRAGON-BENCHMAX NB6, widened to play (meta QA-FEEDBACK-2026-11-14 rows 2, 3, 5): a play stall is a stretch of live
@@ -212,11 +238,9 @@ export function playStallFaults(stall) {
  * play's worst window and its fault.
  * @param {import('playwright').Page} page @param {import('playwright').CDPSession} session @param {number} fromPageMs */
 export async function finishPlayProfile(page, session, fromPageMs) {
-  const markPageMs = Number(await page.evaluate(clockMarkExpression()));
-  const { profile } = await session.send('Profiler.stop');
-  await session.detach().catch(() => undefined);
-  // the clock mark's own 30 ms of busy work ends the window
-  const anchor = profileAnchor(profile, markPageMs), stall = playStall(profileBusy(profile, anchor), fromPageMs, markPageMs);
+  const { profile, anchor, markPageMs } = await finishClockedProfile(page, session);
+  // The play window ends as the first clock mark starts.
+  const stall = playStall(profileBusy(profile, anchor), fromPageMs, markPageMs);
   return { stall, faults: playStallFaults(stall), leaves: busiestLeaves(profile, anchor, fromPageMs + stall.from, STALL_WINDOW_MS) };
 }
 
