@@ -194,6 +194,7 @@ export function zoneEntryCorridor(qualified, home, destination) {
 
 /** @typedef {{x:number,z:number}} Point */
 /** @typedef {Point & {ride:boolean}} ApproachPoint */
+/** @typedef {(kind:'portal'|'road'|'walk', point:Point) => void} NoteWaypoint */
 /** @typedef {readonly [number,number,number]} PortalPoint */
 /** @typedef {{road:{at:PortalPoint},route:readonly PortalPoint[]}} PortalExit */
 /** @typedef {import('playwright').Page} Page */
@@ -353,11 +354,14 @@ async function portalExits(page, slug, missingIsEmpty = false) {
 
 /** Walk the shard's declared inland route to its portal, and identify the road deck it leads to.
  * @param {Page} page @param {Cell} from @param {NonNullable<ReturnType<typeof portalExitPlan>>} plan
- * @param {number} end @returns {Promise<Cell>} */
-async function walkPortalExit(page, from, plan, end) {
+ * @param {number} end @param {NoteWaypoint} noteWaypoint @returns {Promise<Cell>} */
+async function walkPortalExit(page, from, plan, end, noteWaypoint) {
   /** @param {Point} point */
   const onDeck = point => plan.decks.some(deck => Math.hypot(point.x-deck.x, point.z-deck.z) < 5);
-  for (const point of plan.walk) await walk(page, point, end, {landed: onDeck});
+  for (const point of plan.walk) {
+    noteWaypoint('portal', point);
+    await walk(page, point, end, {landed: onDeck});
+  }
   const landing = await page.waitForFunction(decks => {
     const st = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.();
     return st === undefined ? 0 : decks.findIndex(deck => Math.hypot(st.feet.x-deck.x, st.feet.z-deck.z) < 5) + 1;
@@ -373,14 +377,15 @@ async function walkPortalExit(page, from, plan, end) {
 }
 
 /** A portal can carry the walker inside immediately after a gate. Walk the declared exit first.
- * @param {Page} page @param {Cell} from @param {Cell} last @param {Point} center @param {number} end @returns {Promise<Cell>} */
-async function exitToRoad(page, from, last, center, end) {
+ * @param {Page} page @param {Cell} from @param {Cell} last @param {Point} center @param {number} end
+ * @param {NoteWaypoint} noteWaypoint @returns {Promise<Cell>} */
+async function exitToRoad(page, from, last, center, end, noteWaypoint) {
   const at = await feet(page);
   if (at === null || Math.max(Math.abs(at.x-center.x), Math.abs(at.z-center.z)) >= HALF-30) return last;
   const plan = portalExitPlan(await portalExits(page, from.slug ?? from.instance), center,
     {x:last.cell[0]-from.cell[0], z:last.cell[1]-from.cell[1]});
   if (plan === null || plan.walk.length === 0) throw new Error('The gate seated the walker inland without a declared portal exit');
-  return walkPortalExit(page, from, plan, end);
+  return walkPortalExit(page, from, plan, end, noteWaypoint);
 }
 
 /** Stay on the public road around the current cell when changing exit sides.
@@ -407,8 +412,9 @@ export function roadApproach(last, leg, center, pitch) {
 }
 
 /** A fresh smoke guest starts at the shard's spawn. Use its actual portal route where one is declared.
- * @param {Page} page @param {Leg} leg @param {Point} center @param {number} pitch @param {number} end */
-async function smokeApproach(page, leg, center, pitch, end) {
+ * @param {Page} page @param {Leg} leg @param {Point} center @param {number} pitch @param {number} end
+ * @param {NoteWaypoint} noteWaypoint */
+async function smokeApproach(page, leg, center, pitch, end, noteWaypoint) {
   const {from,to} = leg, dx = to.cell[0]-from.cell[0], dz = to.cell[1]-from.cell[1];
   const slug = from.slug ?? from.instance;
   const portals = await portalExits(page, slug, true);
@@ -417,7 +423,7 @@ async function smokeApproach(page, leg, center, pitch, end) {
   if (at !== null) {
     const nearest = plans.flatMap(plan => plan.walk.slice(0,1).map(first => ({plan,distance:Math.hypot(first.x-at.x,first.z-at.z)})))
       .sort((a,b) => a.distance-b.distance)[0];
-    if (nearest !== undefined) return roadApproach(await walkPortalExit(page,from,nearest.plan,end),leg,center,pitch);
+    if (nearest !== undefined) return roadApproach(await walkPortalExit(page,from,nearest.plan,end,noteWaypoint),leg,center,pitch);
   }
   return spawnApproach(slug, at ?? center, center, dx, dz);
 }
@@ -489,15 +495,24 @@ async function crossZoneEntry(page, leg, center, pitch, previous, fresh = false)
   const gate = {x:center.x+dx*(pitch-HALF+2), z:center.z+dz*(pitch-HALF+2)};
   const targetCenter = {x:center.x+dx*pitch, z:center.z+dz*pitch};
   let approachEnd = Date.now()+APPROACH_MS;
+  let approachDetail = 'before the first waypoint';
+  /** @type {NoteWaypoint} */
+  const noteWaypoint = (kind, point) => { approachDetail = `${kind} waypoint (${point.x.toFixed(1)}, ${point.z.toFixed(1)})`; };
   await boundedUntil(() => approachEnd, async () => {
-    const approach = fresh ? await smokeApproach(page,leg,center,pitch,approachEnd)
+    const approach = fresh ? await smokeApproach(page,leg,center,pitch,approachEnd,noteWaypoint)
       : previous === undefined ? [{x:center.x+dx*(HALF-15), z:center.z+dz*(HALF-15), ride:false}]
-        : roadApproach(await exitToRoad(page, from, previous, center, approachEnd), leg, center, pitch);
+        : roadApproach(await exitToRoad(page, from, previous, center, approachEnd, noteWaypoint), leg, center, pitch);
     // the route is known now: its length sets the budget (a fresh guest's swim round Driftwood's harbour takes nearly 3 minutes)
     const at = await feet(page);
     if (at !== null) approachEnd = Math.max(approachEnd, Date.now()+approachBudget(at, approach));
-    for (const point of approach) await approachPoint(page, point, approachEnd);
-  }, 'The walker timed out on the gate approach');
+    for (const point of approach) {
+      noteWaypoint(point.ride ? 'road' : 'walk', point);
+      await approachPoint(page, point, approachEnd);
+    }
+  }, 'The walker timed out on the gate approach').catch((/** @type {unknown} */ error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${message.split('\n', 1)[0]} (${approachDetail})`, {cause:error});
+  });
   const started = Date.now();
   await bounded(ENTRY_MS, async () => {
     await walk(page, gate, started+ENTRY_MS, {arriving: to.instance});

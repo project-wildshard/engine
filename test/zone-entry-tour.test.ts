@@ -1,5 +1,5 @@
-import { expect, test } from 'vitest';
-import { approachBudget, featuredZoneEntry, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, zoneEntryCorridor, zoneEntryTour } from '../scripts/zone-entry-tour.mjs';
+import { expect, test, vi } from 'vitest';
+import { approachBudget, featuredZoneEntry, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../scripts/zone-entry-tour.mjs';
 import { zoneEntryGap } from '../scripts/page-release/flow.mjs';
 import curated from '../src/server/game/zoneSelect/featured.json';
 
@@ -94,6 +94,33 @@ test('opens with Driftwood into Sky Reach and walks both directions of every liv
 
 test('refuses a partial tour when a live cell is disconnected', (): void => {
   expect((): void => { zoneEntryTour([...cells, {instance:'stranded', cell:[3, 3]}]); }).toThrow(/outside the walking tour/u);
+});
+
+test('a held crossing reports the active approach waypoint and last player position', async () => {
+  const state = { cells: cells.slice(0, 2), pitch: 562.5, home: 'driftwood-isle', feet: {x:0,z:0} };
+  const page = {
+    evaluate: async (run: (arg: unknown) => unknown, arg: unknown) => run(arg),
+    keyboard: {
+      async down(key: string) { if (key === 'KeyW') throw new Error('Could not press move\nBrowser details'); },
+      async up() {},
+    },
+  } as unknown as Parameters<typeof walkZoneEntryTour>[0];
+  const verdict: Tour = {expected: 0, arrivals: [], pass: false};
+  const originalWindow = globalThis.window, originalDocument = globalThis.document;
+  vi.stubGlobal('window', {__wildshard:{shard:{grid:{state:() => state}},world:{player:{}}}});
+  vi.stubGlobal('document', {querySelectorAll:() => []});
+  try {
+    await walkZoneEntryTour(page, {x:0,z:0}, verdict, () => {}, {restart: async () => page});
+    expect(verdict.pass).toBe(false);
+    expect(verdict.arrivals).toEqual([]);
+    expect(verdict.failure).toEqual({
+      from: 'driftwood-isle', to: 'far-reach',
+      reason: 'Could not press move (walk waypoint (0.0, -235.0)) (home driftwood-isle, gate none, feet 0.0, 0.0)',
+    });
+  } finally {
+    vi.stubGlobal('window', originalWindow);
+    vi.stubGlobal('document', originalDocument);
+  }
 });
 
 test('resumes only the next crossing after an exact live route prefix', (): void => {
