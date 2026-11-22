@@ -9,7 +9,7 @@ export interface NativeReading {
  readonly checkpoint?:DurableCheckpoint|null;
  readonly closed:string|null;readonly closedAt:number|null;
 }
-export interface NativeObserverBot {read:()=>NativeReading;move:()=>void;quit?:()=>void;close:()=>void}
+export interface NativeObserverBot {read:()=>NativeReading;move:()=>void;idle:()=>void;quit?:()=>void;close:()=>void}
 export interface ObservationSnapshot {
  readonly release:ReleaseFile;readonly ready:boolean;readonly reason:string|null;
  readonly health:{readonly build:string;readonly serial:number;readonly players:number};
@@ -161,7 +161,11 @@ export async function observeRelease(options:ObserverOptions){
    await pause(Math.min(pollMs,100),undefined,{signal});
   }
   if(signal.aborted)throw signal.reason;
-  for(const session of sessions)session.before=session.latest;
+ for(const session of sessions){
+  session.before=session.latest;
+  // Keep the checkpointed bot connected with neutral input during the release wait.
+  session.bot.idle();
+ }
   options.event?.('baseline-playing');
   while(!signal.aborted){
    for(const session of sessions){

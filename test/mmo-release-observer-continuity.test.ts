@@ -15,7 +15,7 @@ test('the observer backs off after a rejected upgrade at the new serial',{timeou
     const refusal=refusedAt.get(device);
     if(refusal===undefined){
      refusedAt.set(device,performance.now());
-     return {read:()=>({tick:null,stand:null,coins:null,closed:'closed',closedAt:null}),move:()=>undefined,close:()=>undefined};
+     return {read:()=>({tick:null,stand:null,coins:null,closed:'closed',closedAt:null}),move:()=>undefined,idle:()=>undefined,close:()=>undefined};
     }
     retryWaits.push(performance.now()-refusal);
    }
@@ -41,10 +41,20 @@ test('two real native identities redial after signed serial/build change and cle
  assert.deepEqual(f.counts(),{disposed:true,connections:4,closed:4});
 });
 
-test('a signed grace restores both durable checkpoints with native progress',{timeout:120000},async()=>{
- const f=await fixture(true),observed=observeRelease(f.options);
- await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);await f.advance();
+test('a signed grace restores both checkpointed bots after they wait with neutral input',{timeout:120000},async()=>{
+ const f=await fixture(true),parked=new Set<string>();
+ const observed=observeRelease({...f.options,prepare:async()=>{
+  const client=await f.options.prepare();
+  return {...client,connect:(url,device,label)=>{
+   const bot=client.connect(url,device,label);
+   return {...bot,idle:()=>{parked.add(device);bot.idle();}};
+  }};
+ }});
+ await Promise.race([f.playing,observed.then(result=>{throw Error(JSON.stringify(result));})]);
+ const idleBeforeRestart=[...parked];
+ await f.advance();
  const result=await observed;
+ assert.deepEqual(idleBeforeRestart.sort(),[...f.options.devices].sort());
  assert.equal(result.status,'observed',JSON.stringify(result));assert.equal(result.continuity,'restored');
  assert.ok(result.bots.every(bot=>bot.before?.checkpoint&&bot.after?.checkpoint&&bot.after.coins===bot.before.coins&&bot.backToMovingObservedMs!==null));
  assert.equal(result.failedSaves,null);assert.equal(result.saveCompletionTime,null);

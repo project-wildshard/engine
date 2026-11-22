@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import {afterEach,test} from 'vitest';
-import {chmodSync,existsSync,lstatSync,mkdirSync,readFileSync,rmSync,symlinkSync,watch,writeFileSync} from 'node:fs';
+import {afterEach,test,vi} from 'vitest';
+import {chmodSync,existsSync,lstatSync,mkdirSync,readFileSync,rmSync,symlinkSync,writeFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {randomUUID} from 'node:crypto';
-import {dirname,resolve,join} from 'node:path';
+import {resolve,join} from 'node:path';
 import {observerArguments,observerIdentities,runObserver} from '../scripts/mmo-release-observer.mjs';
 import {observerCommand} from '../scripts/mmo-observer-client.mjs';
 
@@ -13,11 +13,6 @@ function folder(){
  const root=resolve(process.env['VITEST_TMP_ROOT']??'tmp/vitest',`child-${randomUUID()}`);mkdirSync(root,{recursive:true});
  cleanups.push(()=>rmSync(root,{recursive:true}));return root;
 }
-function fileReady(path:string){return new Promise<void>((ready,reject)=>{
- let timer:ReturnType<typeof setTimeout>|undefined,watcher:ReturnType<typeof watch>|undefined;
- const done=()=>{if(existsSync(path)){clearTimeout(timer);watcher?.close();ready();}};
- watcher=watch(dirname(path),done);timer=setTimeout(()=>{watcher?.close();reject(Error('Owned child did not become ready'));},5000);done();
-});}
 test('CLI is staging only, bounded and below its own checkout tmp',()=>{
  const root=resolve('.');
  assert.throws(()=>observerArguments(['production','--work-dir','tmp/lane'],root),/usage/u);
@@ -49,7 +44,8 @@ test('cancellation kills the owned group including a stubborn descendant and cle
   'fs.writeFileSync('+JSON.stringify(users)+"+'/'+process.pid+'.json',JSON.stringify({pid:process.pid,what:"+JSON.stringify(what)+",at:Date.now()}));setInterval(()=>{},1000);";
  const completed=observerCommand(process.execPath,['--eval',script],{cwd,signal:controller.signal,log,storeUse:what}).then(code=>({code,error:null}),error=>({code:null,error:error as Error}));
  try{
-  await fileReady(ready);const pids=JSON.parse(readFileSync(pidFile,'utf8')) as {parent:number;descendant:number};controller.abort();
+  await vi.waitFor(()=>{assert.ok(existsSync(ready),'Owned child did not become ready');},{timeout:5000});
+  const pids=JSON.parse(readFileSync(pidFile,'utf8')) as {parent:number;descendant:number};controller.abort();
   const result=await completed;assert.equal(result.error?.name,'AbortError');
   await new Promise<void>(resolve=>{setTimeout(resolve,50);});
   const observed=spawnSync('ps',['-p',`${pids.parent},${pids.descendant}`,'-o','stat='],{encoding:'utf8'});

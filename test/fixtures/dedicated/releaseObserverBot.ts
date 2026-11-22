@@ -1,5 +1,5 @@
 import type {DurableCheckpoint} from '../../../src/server/host/dedicated/checkpointWitness';
-import {RoomBot} from './roomBot';
+import {RoomBot,stillThumb} from './roomBot';
 import {botTarget} from './mmoBotsGuard';
 import {OWNED_ROW} from '../../../src/shared/game/loot/ownedRows';
 import type {NativeObserverBot} from './releaseObserver';
@@ -29,6 +29,7 @@ export function connect(socket:string,device:string,name:string):NativeObserverB
     coins:frame===null?null:coins,checkpoint,closed:bot.closed,closedAt};
   },
   move:()=>{bot.thumb=tick=>({viewTick:0,steer:{keyX:0,keyY:1,stickX:0,stickY:0},yaw:tick/90,pitch:0,buttons:0});},
+  idle:()=>{bot.thumb=stillThumb;},
   quit:()=>bot.quit(),
   close:()=>{control();off();owned.set=write;owned.delete=remove;owned.clear=clear;bot.drop();},
  };
