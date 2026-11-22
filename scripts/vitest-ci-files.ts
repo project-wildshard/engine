@@ -83,6 +83,8 @@ export const CI_SERIAL_TESTS = Object.values(CI_NATIVE_GROUPS).flat();
 export const NATIVE_CONTENTION_SUITES = [
   'test/net-fuzz.test.ts', 'test/physics-nalati-headless.test.ts', 'test/physics-shards-headless.test.ts',
 ] as const;
+// FS30: main CI already runs the two cold restore worlds without sibling workers.
+export const NIGHTLY_SERIAL_TESTS = [...NATIVE_CONTENTION_SUITES, ...CI_NATIVE_GROUPS['native-restores']] as const;
 /** Timing, uncapped encoding and load-sensitive cold native setup own the full
  * budget before collection. Split gates leave these files to hosted CI. */
 export const CPU_EXCLUSIVE_TESTS = [

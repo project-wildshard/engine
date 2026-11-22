@@ -2,7 +2,7 @@
 import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
-import {NATIVE_CONTENTION_SUITES} from './vitest-ci-files.ts';
+import {NIGHTLY_SERIAL_TESTS} from './vitest-ci-files.ts';
 
 export interface Head {slug: string; hash: string}
 export interface Plan {version: number; sha: string; pins: string; testList: string; heads: Head[]; tests: string[]}
@@ -24,7 +24,7 @@ const sharedGroups = 4;
 const metalHeads: ReadonlySet<string> = new Set(['nalati-grasslands', 'nine-dragon-stack', 'pine-hollow']);
 export const parallelTestGroups = 3;
 export const testGroups = parallelTestGroups + 1;
-const serialTests: ReadonlySet<string> = new Set(NATIVE_CONTENTION_SUITES);
+const serialTests: ReadonlySet<string> = new Set(NIGHTLY_SERIAL_TESTS);
 export const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
 

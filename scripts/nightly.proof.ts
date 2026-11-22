@@ -5,7 +5,7 @@ import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {browsers, headGroups, parallelTestGroups, phases, plan, read, requireBuild, requireGreen, requireLatest, testGroups, type HeadsReport, type Plan, type TestsReport, type Verdict} from './nightly-model.ts';
-import {NATIVE_CONTENTION_SUITES} from './vitest-ci-files.ts';
+import {NIGHTLY_SERIAL_TESTS} from './vitest-ci-files.ts';
 
 interface Execution {status: number | null; report: Verdict; summary: string}
 interface Fixture {root: string; heads: HeadsReport[]; suite: TestsReport; suites: TestsReport[]; expected: Plan;
@@ -30,8 +30,8 @@ function fixture(run: (context: Fixture) => void): void {
     const suite: TestsReport = {...expected, kind: 'tests', group: 0, groups: testGroups, exitCode: 0, kitExitCode: 0, totalTests: 1, files: [{path: 'test/journey.test.ts', ok: true, assertions: 1, skipped: 0}]};
     const suites: TestsReport[] = [suite, ...Array.from({length: parallelTestGroups - 1}, (_, index) => ({...suite, group: index + 1,
       files: [{path: `test/ordinary-${index}.test.ts`, ok: true, assertions: 1, skipped: 0}]})),
-    {...suite, group: parallelTestGroups, totalTests: NATIVE_CONTENTION_SUITES.length,
-      files: NATIVE_CONTENTION_SUITES.map(path => ({path, ok: true, assertions: 1, skipped: 0}))}];
+    {...suite, group: parallelTestGroups, totalTests: NIGHTLY_SERIAL_TESTS.length,
+      files: NIGHTLY_SERIAL_TESTS.map(path => ({path, ok: true, assertions: 1, skipped: 0}))}];
     const execute = (baseline?: string, env: NodeJS.ProcessEnv = {}): Execution => {
       rmSync(join(root, 'reports'), {recursive: true, force: true});
       for (const report of heads) write(`reports/heads-${report.browser}-${report.group}.json`, report);
@@ -138,6 +138,14 @@ await test('the verdict holds if a native file runs in the parallel partition', 
   assert.equal(result.status, 1);
   assert.match(result.report.failures.find(failure => failure.key === 'shared/tests/0')?.error ?? '', /serial file ran in a parallel partition/u);
   assert.match(result.report.failures.find(failure => failure.key === `shared/tests/${parallelTestGroups}`)?.error ?? '', /serial partition inventory differs/u);
+}));
+await test('the pinned save and restore proof must run without a second worker', () => fixture(({suite, suites, execute}) => {
+  const path = 'test/pinned-restore-play.test.ts', serial = suites[parallelTestGroups];
+  serial.files = serial.files.filter(file => file.path !== path);
+  suite.files.push({path, ok: true, assertions: 7, skipped: 0});
+  const result = execute();
+  assert.equal(result.status, 1);
+  assert.match(result.report.failures.find(failure => failure.key === 'shared/tests/0')?.error ?? '', /serial file ran in a parallel partition/u);
 }));
 await test('missing, duplicate, malformed or overlapping suite partitions hold an otherwise green night', () => {
   const mutations: ((suites: TestsReport[]) => void)[] = [suites => {suites.pop();}, suites => {suites[1].group = 0;}, suites => {suites[1].groups = 1;}, suites => {suites[1].files = [...suites[0].files];}, suites => {suites[1].files = [];}];
