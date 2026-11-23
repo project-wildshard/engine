@@ -73,7 +73,7 @@ import { FarImpostorSchema, type FarImpostor } from '@wildshard/format/shardSect
 import { bindCellCover, cellCoverPort } from './cellCover';
 import { FAR_RING, type FarLookRuntime } from '../../../shared/game/grid/farProxy';
 import { bakedNearFiles, NearPlaceholders, type NearPlaceholderState } from './nearPlaceholderView';
-import { PHONE_NEAR_CELLS, admitsCellTiles, placeholderBlocksTiles } from './nearPlaceholderPlan';
+import { PHONE_NEAR_CELLS, admitsCellTiles, farDrawnAt, placeholderBlocksTiles } from './nearPlaceholderPlan';
 import { TIER } from '@wildshard/engine/core/tier';
 import { GridFrame, type GridFrameHost, type GridFrameState } from './frame';
 import { installHazeBand } from './hazeBand';
@@ -876,7 +876,7 @@ export class GridSession {
       return view;
     } };
     // the drawn far views, for the cell screen's far-view row; G342: each one's mask is mirrored onto its near view
-    const drawnFar = new Map<string, { view: FarProxyView; excluded: ReadonlySet<number> }>();
+    const drawnFar = new Map<string, { view: FarProxyView; excluded: ReadonlySet<number>; far: boolean }>();
     // G607 (Jake's round-36 D): every neighbour draws its near view, whatever its distance; round 39: the phone tier only
     // its nearest PHONE_NEAR_CELLS (the rest on their far proxies, still unhazed)
     const near = new NearPlaceholders({
@@ -884,7 +884,7 @@ export class GridSession {
       readyToRefine: () => this.initialFarReady,
       ...(TIER === 'phone' ? { limit: PHONE_NEAR_CELLS } : {}),
       load: (id) => loadNear(this.assembly.cell(id).slug),
-      cover: (id, covered) => { const drawn = drawnFar.get(id); if (drawn !== undefined) drawn.view.mesh.visible = !covered && drawn.excluded.size < 16; },
+      cover: (id, covered) => { const drawn = drawnFar.get(id); if (drawn !== undefined) drawn.view.mesh.visible = drawn.far && !covered && drawn.excluded.size < 16; },
       mask: (id) => drawnFar.get(id)?.excluded ?? new Set<number>(),
       ...(host.prepareView === undefined ? {} : { prepare: async (view: FarProxyView, current: () => boolean) => {
         await host.prepareView?.(view.mesh, current);
@@ -901,9 +901,9 @@ export class GridSession {
         try { dispose(); }
         finally { if (!retired) { retired = true; this.tileGhosts.retired(tile.key, [view.mesh]); } }
       };
-      const id = tile.instance, entry = { view, excluded: new Set<number>() as ReadonlySet<number> }, mask = view.mask, gone = view.dispose;
+      const id = tile.instance, entry = { view, excluded: new Set<number>() as ReadonlySet<number>, far: true }, mask = view.mask, gone = view.dispose;
       drawnFar.set(id, entry);
-      view.mask = (excluded) => { entry.excluded = excluded; mask(excluded); if (near.shows(id)) view.mesh.visible = false; near.remask(id); };
+      view.mask = (excluded) => { entry.excluded = excluded; mask(excluded); if (near.shows(id) || !entry.far) view.mesh.visible = false; near.remask(id); };
       view.dispose = () => { if (drawnFar.get(id) === entry) drawnFar.delete(id); gone(); };
       if (near.shows(id)) view.mesh.visible = false;
       return view;
@@ -921,11 +921,15 @@ export class GridSession {
     const bands = (): void => {
       const camera = host.frame?.camera; if (camera === undefined) return;
       camera.getWorldPosition(eye);
-      for (const [id, { view }] of drawnFar) {
-        const root = roots.get(id); if (root === undefined || view.band === undefined) continue;
-        view.band(farBandShare(Math.hypot(Math.max(0, Math.abs(eye.x - root.position.x) - CHUNK_HALF), Math.max(0, Math.abs(eye.z - root.position.z) - CHUNK_HALF))));
+      for (const [id, entry] of drawnFar) {
+        const root = roots.get(id), view = entry.view; if (root === undefined) continue;
+        const distance = Math.hypot(Math.max(0, Math.abs(eye.x - root.position.x) - CHUNK_HALF), Math.max(0, Math.abs(eye.z - root.position.z) - CHUNK_HALF));
+        // J500 rule 3: within one road cell of its zone the far proxy never draws (its near view or the zone itself does)
+        const shown = farDrawnAt(distance, this.assembly.pitch);
+        if (shown !== entry.far) { entry.far = shown; view.mesh.visible = shown && !near.shows(id) && entry.excluded.size < 16; }
+        view.band?.(farBandShare(distance));
       }
-      for (const [root, holder] of bandHolders) holder.visible = root.visible;
+      for (const [root, holder] of bandHolders) holder.visible = root.visible && farDrawnAt(Math.hypot(Math.max(0, Math.abs(eye.x - root.position.x) - CHUNK_HALF), Math.max(0, Math.abs(eye.z - root.position.z) - CHUNK_HALF)), this.assembly.pitch);
     };
     // the one late system (play.ts binds every onLate to game.grid.frame): the ring tiles' static-matrix checks run in it too
     let ringStep: (() => void) | undefined;

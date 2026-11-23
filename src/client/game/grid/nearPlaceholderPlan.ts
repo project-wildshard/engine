@@ -16,7 +16,19 @@ export interface NearPlanOptions {
   readonly held?: ReadonlySet<string>; readonly skip?: ReadonlySet<string>;
   /** at most this many cells, the nearest (absent: every cell) */
   readonly limit?: number;
+  /** J500 rule 3: a cell whose square is within this many metres stays in the plan past `limit` (`nearReach`) */
+  readonly reach?: number;
 }
+
+/**
+ * J500 rule 3 (Jake, 2026-11-23 ~13:05 Cancún: the far placeholder is only for zones that are genuinely far): the metres from
+ * a cell's content square within which its far proxy is never drawn, one road cell (the road between two cells, its
+ * diagonal at a crossing). Jake's Dunes clip showed a far proxy as a flat brown wedge at arm's length, Nalati's as a grey wall
+ * across the road.
+ */
+export function nearReach(pitch: number): number { return (pitch - CHUNK_HALF * 2) * Math.SQRT2; }
+/** Whether a cell's far proxy (and its haze band) may draw with the eye `distance` metres from its content square. */
+export function farDrawnAt(distance: number, pitch: number): boolean { return distance > nearReach(pitch); }
 
 /** Metres from `point` to the cell's content square (0 inside it). */
 function squareDistance(cell: GridCell, point: Readonly<{ x: number; z: number }>): number {
@@ -47,9 +59,9 @@ export function planNearPlaceholders(cells: readonly GridCell[], pitch: number,
       centre: Math.hypot(point.x - cell.origin.x, point.z - cell.origin.z) };
   });
   ranked.sort((a, b) => a.rank - b.rank || a.centre - b.centre || a.instance.localeCompare(b.instance));
-  const limit = options.limit ?? ranked.length;
+  const limit = options.limit ?? ranked.length, reach = options.reach ?? -1;
   if (!Number.isSafeInteger(limit) || limit < 0) throw new RangeError('Invalid near-placeholder limit');
-  return { cells: ranked.slice(0, limit).map(({ instance, distance }) => ({ instance, distance })) };
+  return { cells: ranked.filter((cell, index) => index < limit || cell.distance <= reach).map(({ instance, distance }) => ({ instance, distance })) };
 }
 
 

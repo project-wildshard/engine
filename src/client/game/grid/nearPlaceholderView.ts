@@ -13,7 +13,7 @@ import type { Material, Object3D } from 'three';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { ResidencyAllocator, ResidencyLease } from '../../../shared/game/grid/allocator';
 import { installFarProxy, type FarPrepared, type FarProxyView } from './farView';
-import { planNearPlaceholders } from './nearPlaceholderPlan';
+import { nearReach, planNearPlaceholders } from './nearPlaceholderPlan';
 import { updateLeanOn } from '@wildshard/engine/core/updateLean';
 
 /** DF13 `debug.leanNearPlan`: the eye moves this far (m), or this many updates pass, before the near views are re-ranked */
@@ -79,7 +79,7 @@ export class NearPlaceholders {
     const skip = new Set(this.missing);
     for (const cell of this.host.cells) if (this.host.root(cell.instance) === undefined) skip.add(cell.instance);
     const plan = planNearPlaceholders(this.host.cells, this.host.pitch, eye, entered, { held: new Set(this.slots.keys()), skip,
-      ...(this.host.limit === undefined ? {} : { limit: this.host.limit }) });
+      ...(this.host.limit === undefined ? {} : { limit: this.host.limit, reach: nearReach(this.host.pitch) }) });
     this.eye = { x: Math.round(eye.x * 10) / 10, z: Math.round(eye.z * 10) / 10 };
     const wanted = new Map(plan.cells.map(c => [c.instance, c.distance]));
     // QA 2026-11-13 (Jake, Driftwood from the road): a cell turns live a few metres before its runtime draws it (the entry

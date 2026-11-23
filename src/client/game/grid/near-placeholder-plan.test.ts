@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { PHONE_NEAR_CELLS, planNearPlaceholders } from './nearPlaceholderPlan';
+import { PHONE_NEAR_CELLS, farDrawnAt, nearReach, planNearPlaceholders } from './nearPlaceholderPlan';
 
 const pitch = 555, cells = [-2, -1, 0, 1, 2].flatMap(x => [-2, -1, 0, 1, 2].map(z => ({ instance: `c${x}${z}`, slug: 'content', cell: [x, z] as [number, number], origin: { x: x * pitch, y: 0, z: z * pitch } })));
 
@@ -15,4 +15,17 @@ test('the phone budget keeps only the nearest cells near, nearest first, held ce
   expect(held.cells).toHaveLength(PHONE_NEAR_CELLS); expect(held.cells.map(cell => cell.instance)).toContain('c11');
   expect(planNearPlaceholders(cells, pitch, { x: 0, z: 0 }, null, { limit: 0 }).cells).toEqual([]);
   expect(() => planNearPlaceholders(cells, pitch, { x: 0, z: 0 }, null, { limit: -1 })).toThrow('limit');
+});
+
+test('J500 rule 3: a cell within one road cell of the eye stays near past the phone limit, and its far proxy never draws there', () => {
+  const reach = nearReach(pitch), crossing = { x: pitch / 2, z: pitch / 2 };
+  // at a road crossing four cells meet; with a limit of one, the other three would fall back to their far proxies
+  const plan = planNearPlaceholders(cells, pitch, crossing, null, { limit: 1, reach });
+  expect(plan.cells.map(cell => cell.instance).sort()).toEqual(['c00', 'c01', 'c10', 'c11']);
+  expect(planNearPlaceholders(cells, pitch, crossing, null, { limit: 1 }).cells).toHaveLength(1);
+  // the road between two cells is one road cell wide; its diagonal at a crossing is the reach
+  expect(farDrawnAt(0, pitch)).toBe(false);
+  expect(farDrawnAt(pitch - 512, pitch)).toBe(false);
+  expect(farDrawnAt(reach + 1, pitch)).toBe(true);
+  expect(farDrawnAt(pitch, pitch)).toBe(true);
 });
