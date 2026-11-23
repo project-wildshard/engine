@@ -2,10 +2,11 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { recordSource, replaySource } from '@wildshard/engine/render/shaderSourceCache';
-import { openShaderSourceCache } from './shaderSourceStore';
+import { openShaderSourceCache, shaderBookIdentity } from './shaderSourceStore';
 
-// STR35 defaults on for phone Low (QA-FEEDBACK-2026-11-19-mini row 11): the stored book is the last boot's, keyed by the engine
-// build and the zone, so an engine upgrade (build A to build B) boots cold and emits its own GLSL instead of replaying A's.
+// STR35 defaults on for phone Low (QA-FEEDBACK-2026-11-19-mini row 11): the stored book is the last boot's, keyed by the
+// renderer it was emitted by and the zone (QA-FEEDBACK-2026-11-23 row 8: it was keyed by the deploy, so every update booted
+// cold). An update that leaves the renderer alone replays; a renderer change boots cold and emits its own GLSL.
 
 /** A one-store IndexedDB: enough of `open`, `transaction`, `get` and `put` for the store's own calls. */
 function fakeIndexedDb(rows: Map<string, unknown>): IDBFactory {
@@ -35,11 +36,13 @@ let saved: IDBFactory | undefined;
 beforeEach(() => { rows.clear(); saved = globalThis.indexedDB; globalThis.indexedDB = fakeIndexedDb(rows); });
 afterEach(() => { if (saved !== undefined) globalThis.indexedDB = saved; });
 
+const RENDERER_A = 'a'.repeat(64), RENDERER_B = 'b'.repeat(64);
+
 /** One boot: open the cache, replay or emit one lowering, reach control and wait for the write. */
-async function boot(build: string, zone: string): Promise<{ replayed: unknown; counters: unknown }> {
+async function boot(build: string, zone: string, renderer: string = RENDERER_A): Promise<{ replayed: unknown; counters: unknown }> {
   const scope = new Scope(`boot-${build}`);
   try {
-    await openShaderSourceCache(build, zone, scope);
+    await openShaderSourceCache(shaderBookIdentity(renderer, build), zone, scope);
     const replayed = replaySource('lower', 'graph-hash');
     if (replayed === undefined) recordSource('lower', 'graph-hash', `glsl of ${build}`);
     const before = rows.get('last');
@@ -49,16 +52,29 @@ async function boot(build: string, zone: string): Promise<{ replayed: unknown; c
   } finally { scope.dispose(); }
 }
 
-test('a cached book replays on the same build and never across an engine upgrade', async () => {
+test('a new build with the same renderer replays the book: an update that changes no shader is a cache hit', async () => {
+  expect((await boot('build-A', 'nine-dragon-stack')).replayed).toBeUndefined();
+  const updated = await boot('build-B', 'nine-dragon-stack');
+  expect(updated.replayed).toBe('glsl of build-A');
+  expect(updated.counters).toEqual({ hits: { lower: 1, wrap: 0, finish: 0 }, emitted: { lower: 0, wrap: 0, finish: 0 } });
+});
+
+test('a renderer change boots cold, and the book stays per zone', async () => {
   expect((await boot('build-A', 'nine-dragon-stack')).replayed).toBeUndefined();
   const warm = await boot('build-A', 'nine-dragon-stack');
   expect(warm.replayed).toBe('glsl of build-A');
   expect(warm.counters).toEqual({ hits: { lower: 1, wrap: 0, finish: 0 }, emitted: { lower: 0, wrap: 0, finish: 0 } });
-  const upgraded = await boot('build-B', 'nine-dragon-stack');
+  const upgraded = await boot('build-B', 'nine-dragon-stack', RENDERER_B);
   expect(upgraded.replayed).toBeUndefined();
   expect(upgraded.counters).toEqual({ hits: { lower: 0, wrap: 0, finish: 0 }, emitted: { lower: 1, wrap: 0, finish: 0 } });
-  expect((await boot('build-B', 'nine-dragon-stack')).replayed).toBe('glsl of build-B');
-  expect((await boot('build-B', 'pine-hollow')).replayed).toBeUndefined();
+  expect((await boot('build-C', 'nine-dragon-stack', RENDERER_B)).replayed).toBe('glsl of build-B');
+  expect((await boot('build-C', 'pine-hollow', RENDERER_B)).replayed).toBeUndefined();
+});
+
+test('a document with no renderer stamp keys by its build', () => {
+  expect(shaderBookIdentity(undefined, 'build-A')).toBe('build:build-A');
+  expect(shaderBookIdentity('not-a-hash', 'build-A')).toBe('build:build-A');
+  expect(shaderBookIdentity(RENDERER_A, 'build-A')).toBe(shaderBookIdentity(RENDERER_A, 'build-B'));
 });
 
 test('a damaged book is ignored', async () => {

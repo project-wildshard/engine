@@ -596,8 +596,8 @@ async function askPhoneMemory(root: HTMLElement, scope: Scope): Promise<void> {
 
 /** The opt-in cache stays outside the mandatory startup module bank. */
 async function prepareShaderSourceCache(zone: string): Promise<void> {
-  const { openShaderSourceCache } = await import('./shaderSourceStore');
-  await openShaderSourceCache(__BUILD_ID__, zone, entryScope);
+  const { openShaderSourceCache, shaderBookIdentity } = await import('./shaderSourceStore');
+  await openShaderSourceCache(shaderBookIdentity(Reflect.get(globalThis, '__WS_RENDERER_REVISION__'), __BUILD_ID__), zone, entryScope);
 }
 
 async function startSelected(): Promise<void> {

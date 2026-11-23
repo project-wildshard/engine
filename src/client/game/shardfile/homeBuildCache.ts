@@ -7,7 +7,7 @@ import { HomeGeometrySnapshotSchema, homeGeometryBytes, restoreHomeGeometry, sna
 import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 declare const __BUILD_ID__: string;
-/** One home's completed static geometry: at most 64 MiB of payload and 256 entries, shared across all builds. */
+/** One home's completed static geometry: at most 64 MiB of payload and 256 entries, kept across deploys that leave its code alone. */
 export const HOME_BUILD_CACHE_BYTES: number = 64 * 1024 * 1024;
 const homes = new WeakMap<Shardfile, string>();
 const size = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(HOME_BUILD_CACHE_BYTES));
@@ -15,10 +15,20 @@ const metadata = v.strictObject({ identity: v.string(), bytes: size, entries: v.
 const record = v.strictObject({ identity: v.string(), bytes: size, snapshot: HomeGeometrySnapshotSchema });
 let database: Promise<IDBDatabase | null> | undefined;
 
+/** QA-FEEDBACK-2026-11-23 row 8 (Jake: *"its only frozen and really fucking slow when doing a version upgrade or update"*): the
+ *  store was keyed by the deploy, so every update decoded and assembled the whole Home again. It is keyed by the code that
+ *  builds Home geometry instead (scripts/home-geometry-revision.mjs, stamped on every document as
+ *  `__WS_HOME_GEOMETRY_REVISION__`), so an update that leaves that code alone restores the Home. A document without the
+ *  stamp (a dev page, an older build's) keys by its build, as before. */
+export function homeGeometryCode(revision: unknown, build: string): string {
+  return typeof revision === 'string' && /^[0-9a-f]{64}$/u.test(revision) ? `geometry:${revision}` : build;
+}
+
 /** The composition root calls this only for its actual Home instance, never a neighbour. */
 export function bindHomeBuildCache(source: Shardfile): void {
   if (typeof __BUILD_ID__ !== 'string' || typeof indexedDB === 'undefined') return;
-  homes.set(source, JSON.stringify([__BUILD_ID__, source.identity.slug, saveRevision(source.identity), TIER]));
+  const code = homeGeometryCode(Reflect.get(globalThis, '__WS_HOME_GEOMETRY_REVISION__'), __BUILD_ID__);
+  homes.set(source, JSON.stringify([code, source.identity.slug, saveRevision(source.identity), TIER]));
 }
 
 function open(): Promise<IDBDatabase | null> {
@@ -69,7 +79,7 @@ async function readKeys(identity: string): Promise<ReadonlySet<string>> {
   } catch { return new Set(); }
 }
 
-/** Reads are optional acceleration only. Wrong-build, unavailable or malformed records use the original verified decoder. */
+/** Reads are optional acceleration only. Records of other geometry code, unavailable or malformed records use the original verified decoder. */
 export async function readHomeBuildGeometry(source: Shardfile, key: string): Promise<Map<string, HomeGeometryView> | null> {
   const identity = homes.get(source); if (identity === undefined) return null;
   try {
@@ -96,7 +106,7 @@ async function write(identity: string, key: string, snapshot: HomeGeometrySnapsh
     const prior = v.safeParse(metadata, await requestValue(store.get('identity')));
     let total = 0, entries = 0;
     if (prior.success && prior.output.identity === identity) { total = prior.output.bytes; entries = prior.output.entries; }
-    else store.clear(); // One Home, one build/profile. Older records never accumulate.
+    else store.clear(); // One Home, one geometry code and profile. Older records never accumulate.
     const previous = v.safeParse(record, await requestValue(store.get(key)));
     if (previous.success && previous.output.identity === identity) { total -= previous.output.bytes + key.length * 2; entries--; }
     if (total + bytes <= HOME_BUILD_CACHE_BYTES && entries < 256) {

@@ -45,12 +45,13 @@ test('the post-bundle stamp covers web and native document entries without modif
   const root = mkdtempSync(resolve('tmp/build-identity-'));
   const html = '<html><head></head><body></body></html>';
   try {
-    writeFileSync(join(root, 'version.json'), JSON.stringify({ build: 'deploy-123', clientVersion: '0.1.31', rendererRevision: 'c'.repeat(64) }));
+    writeFileSync(join(root, 'version.json'), JSON.stringify({ build: 'deploy-123', clientVersion: '0.1.31', rendererRevision: 'c'.repeat(64), homeGeometryRevision: 'd'.repeat(64) }));
     writeFileSync(join(root, 'index.html'), html);
     stampBuildDocuments(root); // native: no Vite manifest
     expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain('"deploy-123"');
     expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain('globalThis.__WS_CLIENT_VERSION__="0.1.31";');
     expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain(`globalThis.__WS_RENDERER_REVISION__="${'c'.repeat(64)}";`);
+    expect(readFileSync(join(root, 'index.html'), 'utf8')).toContain(`globalThis.__WS_HOME_GEOMETRY_REVISION__="${'d'.repeat(64)}";`);
     mkdirSync(join(root, '.vite')); mkdirSync(join(root, 'calibration')); mkdirSync(join(root, 'assets'));
     writeFileSync(join(root, '.vite/manifest.json'), JSON.stringify({ 'index.html': { isEntry: true }, 'calibration/index.html': { isEntry: true }, 'src/lazy.ts': { isEntry: true } }));
     writeFileSync(join(root, 'index.html'), html); writeFileSync(join(root, 'calibration/index.html'), html);

@@ -6,7 +6,18 @@ const DATABASE = 'wildshard-shader-source';
 const BOOK = 'book';
 const ENTRY = 'last';
 const MAX_BYTES = 12_000_000;
-interface StoredBook { build: string; zone: string; book: SourceBook }
+interface StoredBook { renderer: string; zone: string; book: SourceBook }
+
+/** QA-FEEDBACK-2026-11-23 row 8 (Jake: *"its only frozen and really fucking slow when doing a version upgrade or update"*): the
+ *  book is keyed by the renderer it was emitted by, not the deploy. Its texts are pure functions of their keyed inputs and of the
+ *  shader-emitting code (render/graph's lowering and wrapping, shaderText's finishing, three's chunks, the format pin), which is
+ *  exactly what the renderer revision hashes (scripts/renderer-revision.mjs, J259; stamped on every document as
+ *  `__WS_RENDERER_REVISION__`). GPU identity is not an input: three adds the GPU's precision and extension prefixes after the
+ *  book. So an update that leaves the renderer alone replays the book; one that changes a shader starts it again. A document
+ *  without the stamp (a dev page) keys by its build, as before. */
+export function shaderBookIdentity(renderer: unknown, build: string): string {
+  return typeof renderer === 'string' && /^[0-9a-f]{64}$/u.test(renderer) ? `renderer:${renderer}` : `build:${build}`;
+}
 interface CacheEntry { bytes: Uint8Array<ArrayBuffer>; digest: string }
 
 async function checksum(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
@@ -29,7 +40,7 @@ function openBookStore(): Promise<IDBDatabase> {
   return requested(request);
 }
 
-async function readBook(build: string, zone: string): Promise<SourceBook | undefined> {
+async function readBook(renderer: string, zone: string): Promise<SourceBook | undefined> {
   const database = await openBookStore();
   try {
     const request: IDBRequest<unknown> = database.transaction(BOOK).objectStore(BOOK).get(ENTRY);
@@ -37,13 +48,13 @@ async function readBook(build: string, zone: string): Promise<SourceBook | undef
     const bytes = cached?.bytes;
     if (!(bytes instanceof Uint8Array) || bytes.length > MAX_BYTES || await checksum(bytes) !== cached?.digest) return undefined;
     const saved = JSON.parse(new TextDecoder().decode(bytes)) as StoredBook;
-    if (saved.build !== build || saved.zone !== zone || saved.book?.lower === undefined || saved.book.wrap === undefined || saved.book.finish === undefined) return undefined;
+    if (saved.renderer !== renderer || saved.zone !== zone || saved.book?.lower === undefined || saved.book.wrap === undefined || saved.book.finish === undefined) return undefined;
     return saved.book;
   } finally { database.close(); }
 }
 
-async function writeBook(build: string, zone: string, book: SourceBook): Promise<void> {
-  const bytes = encoder.encode(JSON.stringify({ build, zone, book } satisfies StoredBook));
+async function writeBook(renderer: string, zone: string, book: SourceBook): Promise<void> {
+  const bytes = encoder.encode(JSON.stringify({ renderer, zone, book } satisfies StoredBook));
   if (bytes.length > MAX_BYTES) return;
   const digest = await checksum(bytes), database = await openBookStore();
   try {
@@ -56,9 +67,10 @@ async function writeBook(build: string, zone: string, book: SourceBook): Promise
   } finally { database.close(); }
 }
 
-/** Use the last played zone's local cache. A missing entry or a denied store keeps the normal emitter. */
-export async function openShaderSourceCache(build: string, zone: string, scope: Scope): Promise<void> {
-  const book = await readBook(build, zone).catch(() => undefined);
+/** Use the last played zone's local cache. A missing entry or a denied store keeps the normal emitter. `renderer` is
+ *  `shaderBookIdentity`'s value. */
+export async function openShaderSourceCache(renderer: string, zone: string, scope: Scope): Promise<void> {
+  const book = await readBook(renderer, zone).catch(() => undefined);
   if (scope.disposed || scope.disposing) return;
   const wasWarm = book !== undefined;
   let session: SourceSession | undefined = beginShaderSourceSession(book);
@@ -73,7 +85,7 @@ export async function openShaderSourceCache(build: string, zone: string, scope: 
     if (completed === undefined) return;
     document.documentElement.dataset['shaderSourceCache'] = JSON.stringify({ hits: completed.hits, emitted: completed.emitted });
     if (!wasWarm || Object.values(completed.emitted).some(value => value > 0)) {
-      void writeBook(build, zone, completed.book).catch(() => undefined);
+      void writeBook(renderer, zone, completed.book).catch(() => undefined);
     }
   }, { once: true });
 }

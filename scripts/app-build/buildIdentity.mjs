@@ -124,6 +124,8 @@ export function stampBuildDocuments(directory, facts) {
   const version = JSON.parse(readFileSync(resolve(directory, 'version.json'), 'utf8'));
   if (typeof version !== 'object' || version === null || !('build' in version) || typeof version.build !== 'string') throw new Error('Missing document build identity');
   if (version.rendererRevision !== undefined && (typeof version.rendererRevision !== 'string' || !/^[a-f0-9]{64}$/u.test(version.rendererRevision))) throw new Error('Invalid renderer identity');
+  // QA-FEEDBACK-2026-11-23 row 8: the built-Home cache's key (scripts/home-geometry-revision.mjs), so an update keeps it
+  if ('homeGeometryRevision' in version && (typeof version.homeGeometryRevision !== 'string' || !/^[a-f0-9]{64}$/u.test(version.homeGeometryRevision))) throw new Error('Invalid Home geometry identity');
   // STALE-BUILD SB1: version.json's `time` is the build's one time (build-app's WS_BUILT_AT)
   const time = 'time' in version && typeof version.time === 'string' ? Date.parse(version.time) : Number.NaN;
   const builtAt = Number.isFinite(time) ? time : undefined;
@@ -147,6 +149,7 @@ export function stampBuildDocuments(directory, facts) {
     const stamped=stampBuildHtml(readFileSync(path, 'utf8'), version.build, builtAt === undefined ? facts : { ...facts, builtAt });
     const client = typeof version.clientVersion === 'string' ? `globalThis.__WS_CLIENT_VERSION__=${JSON.stringify(version.clientVersion)};` : '';
     const renderer = version.rendererRevision === undefined ? '' : `globalThis.__WS_RENDERER_REVISION__=${JSON.stringify(version.rendererRevision)};`;
-    writeFileSync(path, stamped.replace('<script>globalThis.__WS_BUILD_ID__=', `<script>${client}${renderer}globalThis.__WS_BUILD_ID__=`));
+    const home = 'homeGeometryRevision' in version ? `globalThis.__WS_HOME_GEOMETRY_REVISION__=${JSON.stringify(version.homeGeometryRevision)};` : '';
+    writeFileSync(path, stamped.replace('<script>globalThis.__WS_BUILD_ID__=', `<script>${client}${renderer}${home}globalThis.__WS_BUILD_ID__=`));
   }
 }
