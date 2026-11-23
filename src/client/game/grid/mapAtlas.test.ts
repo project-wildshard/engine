@@ -63,7 +63,7 @@ test('every current placement has an image on the first map open without reading
     name: cell => `Open Plot · ${cell.slug}`, image: () => { throw new Error('Resident product read'); } }, [], slug => {
     requested.push(slug); return { image, crop: [0, 0, 256, 256] };
   });
-  expect(overlay.images).toHaveLength(24); expect(overlay.labels).toHaveLength(24); expect(overlay.baseAlpha).toBe(0);
+  expect(overlay.images).toHaveLength(assembly.cells.length); expect(overlay.labels).toHaveLength(assembly.cells.length); expect(overlay.baseAlpha).toBe(0);
   expect(requested).toEqual(assembly.cells.map(cell => cell.slug));
   for (const label of overlay.labels) { expect(label.width).toBeLessThan(500); expect(label.short).not.toContain('Open Plot'); }
 });
@@ -77,11 +77,11 @@ test('a placed cell the atlas has no tile for draws its own map, or a plain plot
     image: (instance: string) => { asked.push(instance); return ownLoaded ? own : null; } };
   const tile = (slug: string) => slug === placed.slug ? null : { image: atlasImage, crop: [0, 0, 256, 256] as [number, number, number, number] };
   const first = fullMapOverlay(host, [], tile);
-  expect(first.images).toHaveLength(23); expect(first.labels).toHaveLength(24); expect(asked).toEqual([placed.instance]);
+  expect(first.images).toHaveLength(assembly.cells.length - 1); expect(first.labels).toHaveLength(assembly.cells.length); expect(asked).toEqual([placed.instance]);
   expect(first.rects.filter(r => r.color === '#69704f')).toEqual([{ x: placed.origin.x - home.origin.x, z: placed.origin.z - home.origin.z, hx: CHUNK_HALF, hz: CHUNK_HALF, color: '#69704f' }]);
   ownLoaded = true;
   const loaded = fullMapOverlay(host, [], tile);
-  expect(loaded.images).toHaveLength(24); expect(loaded.images.find(row => row.image === own)).toMatchObject({ x: placed.origin.x - home.origin.x, alpha: 1 });
+  expect(loaded.images).toHaveLength(assembly.cells.length); expect(loaded.images.find(row => row.image === own)).toMatchObject({ x: placed.origin.x - home.origin.x, alpha: 1 });
   expect(loaded.rects.filter(r => r.color === '#69704f')).toEqual([]);
 });
 
