@@ -15,9 +15,8 @@ import { TIER } from './tier';
  */
 
 export type DesktopPreset = 'low' | 'medium' | 'high';
-/** the device slot Medium is saved in (graphicsMode.ts's; a phone reads anything but 'low' as High) */
-export const DESKTOP_PRESET_SLOT = 'graphics';
-const slot = jsonSlot(DESKTOP_PRESET_SLOT, 'device');
+/** the device slot Medium is saved in: graphicsMode.ts's (a phone reads anything but 'low' as High) */
+const slot = jsonSlot('graphics', 'device');
 
 /** Whether a saved `graphics` value picks Medium on this tier (pure: the tier and the value). */
 export function mediumOn(tier: 'phone' | 'desktop', saved: unknown): boolean { return tier === 'desktop' && saved === 'medium'; }
