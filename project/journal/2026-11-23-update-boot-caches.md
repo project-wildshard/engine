@@ -14,3 +14,5 @@
 - Proof rig: `scripts/loading-flow/update-boot.mjs`, headless WebKit 402x874, two builds of one tree behind one origin,
   alternating so each round reads two updates and two warm boots.
 - The Home list is narrowed by hand like J259's renderer list; a file that changes how Home geometry is built joins it.
+- The rig reads the book and the Home store 3 s after control: the book's counters are written at `ws:control-ready`,
+  which can land after the reveal ends, and the Home snapshot is written after first draw.
