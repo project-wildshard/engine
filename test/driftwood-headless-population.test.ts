@@ -13,6 +13,7 @@ import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../
 import { populationCensus } from '../src/shared/game/population/census';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { loadScaledMs } from './fixtures/loadBudget';
 
 // P1-E3.1b: Driftwood's population on the shipped headless host, from its built product and nothing else: the plan and
 // rows under server/, no fixture and no overlay.
@@ -36,6 +37,8 @@ const kill = (resident: NativeHeadlessResident, id: string): void => {
 };
 const steps = (resident: NativeHeadlessResident, ticks: number): void => { for (let i = 0; i < ticks; i++) resident.step([]); };
 
+// QA-11-22 row 12b: real-clock fences stretch with the machine's load (red in a land gate under load, green alone);
+// on an idle or hosted machine loadScaledMs keeps every number, and each test proves the same thing.
 test('Driftwood spawns, moves, kills and returns its declared population headless, and its census round-trips a snapshot', async () => {
   const { shard, resident } = await shipped();
   const live = await resident();
@@ -82,7 +85,7 @@ test('Driftwood spawns, moves, kills and returns its declared population headles
     expect(populationCensus(restored.host)).toEqual(returned);
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));
   } finally { restored?.dispose(); live.dispose(); }
-}, 120_000);
+}, loadScaledMs(120_000));
 
 // SERVER-PARITY HS1: the worker ticks the room's world (`openWorldAdapter`), so its twin on this thread is that world too
 test('the worker runs Driftwood from its built product, tick for tick with the room\'s world', async () => {
@@ -104,7 +107,7 @@ test('the worker runs Driftwood from its built product, tick for tick with the r
     expect(result.commit.snapshot).toBe(serializeSimSnapshot(snapshotSimHostBytes(live.host)));
     expect(live.host.entities.size).toBe(35); // 34 declared bodies and the Captain's, waiting for his wake
   } finally { await (await starting.catch(() => undefined))?.dispose(); live?.dispose(); }
-}, 10_000); // Both owners still run every tick; only the final full continuation is asserted and published.
+}, loadScaledMs(10_000)); // Both owners still run every tick; only the final full continuation is asserted and published.
 
 test("Driftwood's server files stay off every client path", async () => {
   const { descriptor, directory } = await shipped(), { admission, files, packs } = descriptor.index;
