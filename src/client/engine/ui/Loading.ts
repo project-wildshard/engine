@@ -708,7 +708,11 @@ export class Loading {
     // DL21 (sp-o1): a read held for the spawn download's whole set waits on that download, not on its own file: name it
     // with the download's bytes ('Spawn download · 3.1 of 9.8 MB'), never the step's first file ('Read audio 1 / 77')
     const spawnHold = files.find(row => row.resource?.startsWith('spawn-download:') === true);
-    const wait = pending.find(row => row.retry !== null) ?? spawnHold ?? files[0] ?? pending.find(row => row.id !== this.waitId && row.kind !== 'admission');
+    // DL21: the step's reads tally only rides along a file wait (below). Picked as the wait itself, its stale count
+    // ('Reading 15 files · 2.3 MB') hid the work the step names between reads: Nine's 'Road system' read so 1.1 s on
+    // the Simulator (opus-phone1, 11-23), where the card knew 'Road system · <part>'
+    const wait = pending.find(row => row.retry !== null) ?? spawnHold ?? files[0]
+      ?? pending.find(row => row.id !== this.waitId && row.kind !== 'admission' && row.resource !== STAGE_READS);
     // DL21: a step's file waits come and go one at a time ('Read Model data · 0.1 s' held Nalati's step 8 unchanged for 6.3 s
     // in the DL23 recording while its reads kept landing): the step's reads tally rides along, so the line moves per read,
     // and its count is progress (sp-x1's review: else 'No reported progress' would sit beside a growing count)

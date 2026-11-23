@@ -407,6 +407,25 @@ it('DL21: a file wait carries its step\'s reads tally, so the line moves with ev
   } finally { finish(); await read; if (tally !== undefined) finishLoadingWait(tally); loading.scope.dispose(); }
 });
 
+it('DL21: between reads, the step names its own work, not its reads tally', () => {
+  const loading = new Loading({id: 'reads-between', name: 'Reads between'});
+  const foot = (): string => loading.root.querySelector('[data-el="foot"]')?.textContent ?? '';
+  let tally: number | undefined;
+  try {
+    loading.setPath({id: 'shardfile', steps: [{key: 'modules', label: 'Modules', weight: 1}, {key: 'steppe', label: 'Steppe', weight: 1}]});
+    loading.endAdmission();
+    const timeline = currentLoadingTimeline();
+    if (timeline === undefined) throw new Error('Missing loading timeline');
+    const steppe = timeline.begin('steppe');
+    tally = beginLoadingWait('Reading 15 files · 2.3 MB', {kind: 'work', step: 'steppe', owner: timeline.waitOwner, resource: STAGE_READS});
+    timeline.report('steppe', 'resident tiles');
+    now = 400; vi.advanceTimersByTime(100);
+    expect(foot()).toContain('Now working on: Steppe · resident tiles');
+    expect(foot()).not.toContain('Reading 15 files');
+    steppe.end();
+  } finally { if (tally !== undefined) finishLoadingWait(tally); loading.scope.dispose(); }
+});
+
 it('names uncounted admission work without inventing an empty file batch', () => {
   const loading = new Loading({id: 'visited-product', name: 'Visited product'});
   const foot = (): string => loading.root.querySelector('[data-el="foot"]')?.textContent ?? '';
