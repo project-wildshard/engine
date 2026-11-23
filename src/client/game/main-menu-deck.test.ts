@@ -346,3 +346,35 @@ test('ZS10: Developer\'s ALL (J469) is a list of every zone, served order first,
   expect(player.root.querySelector('.ws-menu-tab[aria-selected="true"]')?.textContent).toBe('FEATURED');
   pressTab(player.root, 'featured');
 });
+
+// QA 11-23-b row 26 (J453, J498): staging v0.1.76 placed the hidden test shards Pastel Plain and Ink-Cel Valley on the grid, and
+// Popular and New listed them. However a door or a kept list serves them, no player tab names a hidden or test shard; ALL does.
+test('row 26: a hidden or test shard is on no player tab, even served and placed; Developer\'s ALL still lists it', () => {
+  const tester = (slug: string, status: string | null = null): ZoneSelectCard => ({ ...zone(slug), status });
+  const leaky: ZoneSelectDocument = { channel: 'staging', serial: 1,
+    featured: [zone('a-one'), tester('pastel-plain'), tester('proof-town')],
+    popular: [tester('pastel-plain'), tester('ink-cel-valley'), zone('a-one'), tester('c-three', 'hidden')],
+    new: [tester('ink-cel-valley'), tester('_template'), zone('b-two'), tester('open-plot-thin-ice')],
+    all: [zone('a-one'), tester('c-three', 'hidden')] };
+  const cards = [...SIX, card('pastel-plain', 'PASTEL PLAIN'), card('ink-cel-valley', 'INK-CEL VALLEY'), card('proof-town', 'PROOF TOWN'),
+    { ...card('g-seven', 'G-SEVEN'), badge: 'Developer only' as const }];
+  const leakyMenu = (developer: boolean) => {
+    const view = buildTitleMenu({ cards, zoneSelect: leaky, active: null, onEnter: () => undefined, onSettings: () => undefined,
+      onGrid: () => undefined, mode: () => ({ developer, devserver: false }) });
+    document.body.append(view.root); views.push(view); view.show('select');
+    return view;
+  };
+  const player = leakyMenu(false);
+  pressTab(player.root, 'featured');
+  expect(names(player.root)).toEqual(['A-ONE']);
+  pressTab(player.root, 'popular');
+  expect(names(player.root)).toEqual(['A-ONE']);
+  pressTab(player.root, 'new');
+  expect(names(player.root)).toEqual(['B-TWO']);
+  const developer = leakyMenu(true);
+  pressTab(developer.root, 'popular');
+  expect(names(developer.root)).toEqual(['A-ONE']);
+  pressTab(developer.root, 'all');
+  expect(names(developer.root)).toEqual(expect.arrayContaining(['PASTEL PLAIN', 'INK-CEL VALLEY', 'C-THREE', 'G-SEVEN']));
+  pressTab(developer.root, 'featured');
+});

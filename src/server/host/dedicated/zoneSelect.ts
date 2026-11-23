@@ -2,7 +2,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import * as v from 'valibot';
 import { catalogueDocument } from '@wildshard/engine/game/grid/catalogueDocument';
-import type { ZoneSelectCard, ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
+import { offPlayerLists, type ZoneSelectCard, type ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 import { originAllowed } from './doorTrust';
 import type { ZoneEntryTotal } from './saves/zoneEntries';
 import { within } from './saves/saveStore';
@@ -48,9 +48,6 @@ export async function readZoneUploads(at: URL): Promise<readonly Upload[]> {
   return v.parse(Uploads, await response.json()).shards;
 }
 
-/** A placeholder open plot or a test shard (J498's list): on the grid it may be, but no player list names it. */
-const PLACEHOLDER = /^(?:open-plot-|walkin-proof|f30-clean$|blender-template$)/u;
-
 const readable = (slug: string): string => slug.split(/[-_]+/u).filter(Boolean)
   .map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
@@ -73,8 +70,9 @@ export function zoneSelectTabs(channel: ZoneSelectOptions['channel'], live: Live
   const name = (a: ZoneSelectCard, b: ZoneSelectCard): number => a.name.localeCompare(b.name, 'en') || a.slug.localeCompare(b.slug, 'en');
   const all = cards(live.slugs, uploads, counts).sort(name);
   // QA 11-23-b row 4 (Jake ~12:20 Cancun: "one plot thin ice should not show up in popular lol"; J498): Featured, Popular and
-  // New list only real zones, never a placeholder open plot or a test shard; All, the Developer's list, still names them.
-  const visible = all.filter(card => card.status !== 'hidden' && !PLACEHOLDER.test(card.slug.replace(/^_/u, '')));
+  // New list only real zones, never a placeholder open plot or a test shard (row 26: even one placed on the grid); All, the
+  // Developer's list, still names them.
+  const visible = all.filter(card => !offPlayerLists(card));
   const bySlug = new Map(visible.map(card => [card.slug, card]));
   const featured = live.featured === undefined ? visible : live.featured.flatMap(slug => { const card = bySlug.get(slug); return card === undefined ? [] : [card]; });
   const order = new Map(featured.map((card, index) => [card.slug, index]));
