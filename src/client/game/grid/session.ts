@@ -60,7 +60,7 @@ import { spawnHeld } from '../boot/spawnDownload';
 import { gridCells, pageGridInstance } from '../plugin/context';
 import { prepareHomeMetadata, withInitialHomeMetadata } from './homeMetadata';
 import { bootSteppedTiles, stepRingsUntil } from './loadingRings';
-import { holdSpawnGround, spawnGroundCell, type SpawnGround } from './spawnGround';
+import { holdSpawnGround, L1_QUADRANTS, spawnGroundCell, type SpawnGround } from './spawnGround';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { PageResidency } from './pageResidency';
 import { PlatformRenderResidency } from './renderResidency';
@@ -886,6 +886,7 @@ export class GridSession {
       allocator: this.allocator, cells: this.assembly.cells, pitch: this.assembly.pitch, root: (id) => roots.get(id),
       readyToRefine: () => this.initialFarReady,
       ...(TIER === 'phone' ? { limit: PHONE_NEAR_CELLS, reach: farNearReach } : {}),
+      drawnWhole: (id) => this.live?.groundFromRoad(id) === true,
       load: (id) => loadNear(this.assembly.cell(id).slug),
       cover: (id, covered) => { const drawn = drawnFar.get(id); if (drawn !== undefined) drawn.view.mesh.visible = drawn.far && !covered && drawn.excluded.size < 16; },
       mask: (id) => drawnFar.get(id)?.excluded ?? new Set<number>(),
@@ -927,8 +928,8 @@ export class GridSession {
       for (const [id, entry] of drawnFar) {
         const root = roots.get(id), view = entry.view; if (root === undefined) continue;
         const distance = Math.hypot(Math.max(0, Math.abs(eye.x - root.position.x) - CHUNK_HALF), Math.max(0, Math.abs(eye.z - root.position.z) - CHUNK_HALF));
-        // J500 rule 3: within one road cell of its zone the far proxy goes once the zone itself draws there with its own ground
-        // (alone it left empty sky; a ring-tile zone such as Pine keeps it under its pieces)
+        // J500 rule 3: within one road cell of its zone the far proxy goes once the zone itself draws whole there (its own
+        // ground, or its ground tiles pinned from the road: alone it left empty sky)
         const shown = !farNearReach || farDrawnAt(distance, this.assembly.pitch) || this.live?.groundFromRoad(id) !== true;
         if (shown !== entry.far) { entry.far = shown; view.mesh.visible = shown && !near.shows(id) && entry.excluded.size < 16; }
         view.band?.(farBandShare(distance));
@@ -1188,17 +1189,31 @@ export class GridSession {
         // GO7: an initial data home (template-2 from Shard select) waits on these tiles in loading step `home`, before the
         // page loop steps the rings: the boot registration steps them until it does
         await tiles.enterOffered(cell.instance, scope, start);
-      }, prepareNeighbourTiles: async (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal) => {
+      }, prepareNeighbourTiles: async (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal, required = false) => {
         const owner = this.host.scope.child(`grid.tile-approach.${cell.instance}`);
         const release = (): void => { owner.dispose(); };
         owner.listen(signal, 'abort', release, { once: true });
         try {
           if (signal.aborted) throw new Error('Tile approach abandoned');
-          if (await this.admitNeighbourRender?.(cell) === false) { owner.dispose(); return; }
+          // J500: the road's ground pin (`required`) reads the product's tile inputs as an entry would; a gate's read-ahead
+          // defers when they are not cached or have no headroom
+          if (await this.admitNeighbourRender?.(cell) === false) {
+            if (!required || this.admitNeighbour === undefined) { owner.dispose(); return false; }
+            await this.admitNeighbour(cell, true);
+          }
           if (owner.disposed || owner.disposing || signal.aborted) throw new Error('Tile approach abandoned');
           const prepare = this.clientTiles.prepareOffered;
           if (prepare === undefined) throw new Error('Tile approach preparation is unavailable');
-          await prepare(cell.instance, owner, start);
+          const ring = prepare(cell.instance, owner, start);
+          // J500: from the road a tile-ground zone (Pine) draws whole only over its whole ground: its L0 ring at the road edge
+          // is asked first, then every L1 quadrant (the far proxy masks region by region as each uploads, as the spawn hold)
+          if (required) {
+            const coarse = this.rings.require(cell.instance, L1_QUADRANTS, 'l1');
+            owner.onDispose(() => { coarse.release(); });
+            await Promise.all([ring, coarse.ready]);
+          } else await ring;
+          if (owner.disposed || owner.disposing || signal.aborted) throw new Error('Tile approach abandoned');
+          return true;
         } catch (error) { owner.dispose(); throw error; }
       } }),
       neighbourEdges: (cell, origin) => zoneWallEdges(cell, { origin }), rimEdges: (origin) => rimEdges(this.assembly, { origin }) }, page);

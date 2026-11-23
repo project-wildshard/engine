@@ -34,6 +34,8 @@ export interface NearPlaceholderHost {
   readonly limit?: number;
   /** J500 rule 3 (`debug.farNearReach`): a cell within one road cell stays near past `limit` */
   readonly reach?: boolean;
+  /** J500: a cell its own zone draws whole from the road now draws no near view (`LiveGridSession.groundFromRoad`) */
+  readonly drawnWhole?: (instance: string) => boolean;
   /** Optional startup dependency: richer views must not enter the shared decode
    * queue before the visible coarse fallback is ready. Existing views stay owned. */
   readonly readyToRefine?: () => boolean;
@@ -79,7 +81,7 @@ export class NearPlaceholders {
     if (lean && last !== null && last.entered === entered && ++last.updates < LEAN_UPDATES
       && Math.hypot(eye.x - last.x, eye.z - last.z) < LEAN_MOVE && last.stamp === this.stamp()) return;
     const skip = new Set(this.missing);
-    for (const cell of this.host.cells) if (this.host.root(cell.instance) === undefined) skip.add(cell.instance);
+    for (const cell of this.host.cells) if (this.host.root(cell.instance) === undefined || this.host.drawnWhole?.(cell.instance) === true) skip.add(cell.instance);
     const plan = planNearPlaceholders(this.host.cells, this.host.pitch, eye, entered, { held: new Set(this.slots.keys()), skip,
       ...(this.host.limit === undefined ? {} : { limit: this.host.limit, ...(this.host.reach === true ? { reach: nearReach(this.host.pitch) } : {}) }) });
     this.eye = { x: Math.round(eye.x * 10) / 10, z: Math.round(eye.z * 10) / 10 };
@@ -112,10 +114,10 @@ export class NearPlaceholders {
   private lastPlan: { x: number; z: number; entered: string | null; updates: number; stamp: string } | null = null;
   /** What the plan reads besides the eye: the slots and their state, the missing and deferred cells, the roots, the allocator. */
   private stamp(): string {
-    let ready = 0, owns = 0, roots = 0;
+    let ready = 0, owns = 0, roots = 0, whole = '';
     for (const slot of this.slots.values()) { if (slot.ready) ready++; if (slot.owns) owns++; }
-    for (const cell of this.host.cells) if (this.host.root(cell.instance) !== undefined) roots++;
-    return `${String(this.generation)}/${String(this.slots.size)}/${String(ready)}/${String(owns)}/${String(this.missing.size)}/${String(this.deferred.size)}/${String(roots)}/${String(this.host.allocator.revision)}`;
+    for (const cell of this.host.cells) { if (this.host.root(cell.instance) !== undefined) roots++; if (this.host.drawnWhole?.(cell.instance) === true) whole += `${cell.instance},`; }
+    return `${String(this.generation)}/${String(this.slots.size)}/${String(ready)}/${String(owns)}/${String(this.missing.size)}/${String(this.deferred.size)}/${String(roots)}/${String(this.host.allocator.revision)}/${whole}`;
   }
 
   /** Mirror the rings' refinement onto a cell's near view (the regions its L1 / L0 tiles now draw). */

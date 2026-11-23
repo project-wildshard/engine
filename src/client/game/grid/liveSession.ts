@@ -168,8 +168,9 @@ export interface LiveGridPage {
 export interface LiveGridSessionPorts {
   /** Data-only cells publish gameplay only after their admitted entry tiles are resident. */
   readonly prepareDataTiles?: (cell: GridCell, scope: Scope, start: { readonly x: number; readonly z: number }) => Promise<void>;
-  /** Render-only destination preparation; the signal releases its temporary entry-tile pins. */
-  readonly prepareNeighbourTiles?: (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal) => Promise<void>;
+  /** Render-only destination preparation; the signal releases its temporary entry-tile pins. False: its inputs were deferred
+   *  (no room yet), nothing is pinned; `required` (the road's ground, J500) reads them as an entry would. */
+  readonly prepareNeighbourTiles?: (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal, required?: boolean) => Promise<boolean>;
   /** Borrow the page render scheduler when an entered data region replaces neighbour views. */
   readonly tiles?: ClientTileRegistration;
   /** Told once the lighting a crossing changes is in place (an entered runtime's activation settled, or the road again
@@ -205,6 +206,8 @@ export interface LiveGridSessionState {
   readonly live: LiveGridState; readonly crossing: GridCrossingState; readonly stowed: boolean; readonly renderOrigin: { x: number; z: number };
   /** J500: the resident worlds drawn from the road now (`syncRoadDisplays`) */
   readonly roadDisplays?: readonly string[];
+  /** J500: each tile-ground zone's ground pin from the road (`roadGroundReady`) */
+  readonly roadGround?: Readonly<Record<string, string>>;
   /** Entered hook intervals in the same performance clock as browser long tasks. */
   readonly runtimeTiming: ReturnType<RuntimePageSession['timings']>;
   /** Committed synchronous transitions; approach preparation wall intervals remain separate. */
@@ -233,6 +236,8 @@ const ROAD_AHEAD = { minSpeed: 8, margin: 1.25, leadMetres: 8 } as const;
 /** J500 rule 1 (QA 11-23-b row 17): the zone just left stays whole beside the road up to the J410 memory refusal line (engine
  *  budgets `memory/loading/*`, 1.5 GB), not the 1.0 GB playing envelope (J445's may-crash target): on a phone Driftwood alone
  *  plays 1.18 GB, so the envelope retired it the moment its gate was crossed and walking back in rebuilt it at the gate. */
+/** J500: a tile-ground zone's deferred ground pin asks again after this long */
+const ROAD_GROUND_RETRY_MS = 2000;
 const DEPARTED_PLAYING_BYTES = 1_500_000_000;
 
 /** G598: a preparation that fails (or a road approach abandoned for another crossing, T7) frees its half-built region as a
@@ -312,6 +317,8 @@ export class LiveGridSession {
   private readonly runtimeRegions = new Map<string, PreparedRegionalRuntime>();
   /** J500 rules 1 and 2: the resident worlds drawn from the road now, each with the scope that shows it */
   private readonly roadDisplays = new Map<string, { readonly prepared: PreparedRegionalRuntime; readonly owner: Scope }>();
+  /** J500: a tile-ground zone's ground tiles pinned from the road (`roadGroundReady`), each released by its abort */
+  private readonly roadGround = new Map<string, { readonly abort: AbortController; ready: boolean; state: 'pinning' | 'ready' | 'deferred' | 'refused'; readonly at: number }>();
   /** GC9: worlds pre-warmed from inside an entered runtime (GC5), whose entry preparation waits for the source to be left:
    *  the runtime session prepares an entry only from the neutral road, so preparing it inside the source threw away the
    *  whole world just built ("Entry preparation requires the neutral road") and closed the cell until a retry. */
@@ -398,6 +405,7 @@ export class LiveGridSession {
       readiness: { link: LINK, bundle: (cell) => this.bundle(cell) },
     }); } catch (error) { transferScope.dispose(); throw error; }
     scope.onDispose(() => { this.live.dispose(); });
+    scope.onDispose(() => { for (const pin of this.roadGround.values()) pin.abort.abort(); this.roadGround.clear(); });
     this.crossing = this.installCrossing();
     installGridTravellerCombat(page.events, scope, page.health, () => {
       const active = this.runtimePage.state();
@@ -1173,9 +1181,10 @@ export class LiveGridSession {
    */
   private syncRoadDisplays(): void {
     const current = this.live.current(), entered = this.runtimePage.state();
-    // a zone draws whole from the road once played (its tiles are up) or when its world draws its own ground (Nalati); one
-    // built ahead whose ground is its tiles (Pine) drew floating pieces there, so it keeps its far proxy until its gate
-    const wanted = new Set(this.live.drawnFromRoad().filter(instance => this.startedRuntimes.has(instance) || this.runtimeRegions.get(instance)?.ownsGround === true));
+    const drawn = this.live.drawnFromRoad();
+    // a tile-ground zone's pinned ground goes with its road display (an entered one holds its own tiles)
+    for (const [instance, pin] of this.roadGround) if (!drawn.includes(instance) || instance === current) { pin.abort.abort(); this.roadGround.delete(instance); }
+    const wanted = new Set(drawn.filter(instance => this.roadGroundReady(instance)));
     if (current !== null && this.roadDisplays.has(current) && !(entered.instance === current && entered.ready)) wanted.add(current);
     for (const [instance, shown] of this.roadDisplays) {
       if (wanted.has(instance) && this.runtimeRegions.get(instance) === shown.prepared) continue;
@@ -1188,6 +1197,36 @@ export class LiveGridSession {
       this.roadDisplays.set(instance, { prepared, owner });
       prepared.display(owner);
     }
+  }
+
+  /**
+   * J500: whether a zone built from the road has its ground to draw on: once played its tiles are up; a zone whose world draws
+   * its own ground (`cellGround: 'world'`, Nalati) has it. A zone whose ground is its tiles (Pine) drew its pieces floating over
+   * nothing, so its tiles are pinned first, from the edge nearest the walker (the render-only approach pin a gate uses), and it
+   * draws once they are up.
+   */
+  private roadGroundReady(instance: string): boolean {
+    if (this.startedRuntimes.has(instance) || this.runtimeRegions.get(instance)?.ownsGround === true) return true;
+    const prepare = this.ports.prepareNeighbourTiles;
+    if (prepare === undefined) return false;
+    const held = this.roadGround.get(instance);
+    // a deferred pin (no room for its inputs yet) asks again after a while
+    if (held !== undefined && !(held.state === 'deferred' && diagnosticNow() - held.at > ROAD_GROUND_RETRY_MS)) return held.ready;
+    held?.abort.abort();
+    const cell = this.ports.assembly.cell(instance), feet = this.live.worldFeet(), edge = CHUNK_HALF - 8;
+    const start = { x: Math.max(-edge, Math.min(edge, feet.x - cell.origin.x)), z: Math.max(-edge, Math.min(edge, feet.z - cell.origin.z)) };
+    const pin: { readonly abort: AbortController; ready: boolean; state: 'pinning' | 'ready' | 'deferred' | 'refused'; at: number } = { abort: new AbortController(), ready: false, state: 'pinning', at: diagnosticNow() };
+    this.roadGround.set(instance, pin);
+    void (async () => {
+      try {
+        const pinned = await prepare(cell, start, pin.abort.signal, true);
+        if (pin.abort.signal.aborted) return;
+        pin.ready = pinned; pin.state = pinned ? 'ready' : 'deferred'; pin.at = diagnosticNow();
+      }
+      // a refused pin stays (not ready) until the zone leaves the road's view, so it is not asked again every frame
+      catch (error) { if (!pin.abort.signal.aborted) { pin.state = 'refused'; console.warn(`[grid] ${instance} ground from the road:`, error); } }
+    })();
+    return false;
   }
 
   private bind(frame: LiveGridFrame): void {
@@ -1284,6 +1323,7 @@ export class LiveGridSession {
   state(): LiveGridSessionState {
     const cap = this.page.traveller.hoverSpeedLimit?.();
     return { keptPrograms: this.keeper?.size ?? 0, live: this.live.state(), crossing: this.crossing.crossing.state(), stowed: this.page.equipment.stowed, renderOrigin: { x: this.offset.x, z: this.offset.z }, runtimeTiming: this.runtimePage.timings(), crossingTiming: this.crossing.crossing.timings(), leaveTiming: this.leaveTiming.map(row => ({ ...row })), crossingLoading: this.crossing.crossing.timings().map(crossingLoadingRows),
-      hoverCap: cap === undefined ? null : Math.round(cap * 100) / 100, roadDisplays: [...this.roadDisplays.keys()].sort() };
+      hoverCap: cap === undefined ? null : Math.round(cap * 100) / 100, roadDisplays: [...this.roadDisplays.keys()].sort(),
+      roadGround: Object.fromEntries([...this.roadGround].map(([instance, pin]) => [instance, pin.state])) };
   }
 }

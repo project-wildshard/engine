@@ -229,7 +229,9 @@ try {
     const dark = await deployFrameProblem(page);
     if (dark !== null) throw new Error(dark);
     if (await page.locator('#wserr:visible, .ws-fail:visible').count() > 0) throw new Error('an error card opened after crossing');
-    result.fired = { ready: true, crossedFrom: from.cur, target: targetSlug };
+    /** @type {{ ready: boolean, crossedFrom: unknown, target: string, reentry?: { arrival: number, onRoad: boolean, back: number } }} */
+    const crossed = { ready: true, crossedFrom: from.cur, target: targetSlug };
+    result.fired = crossed;
     // QA 11-23-b row 21 (`--reenter`): Jake's Nalati clip bounced him back onto the road. Stand 6 s in the arrival, step 3 m out onto
     // the road and straight back 12 m in, stand 6 s: the page must hold the zone as its own (feet and live grid) every sample
     if (reenter) {
@@ -240,7 +242,7 @@ try {
       const onRoad = (await state()).inside === null;
       await walkTo(homeAt[ax] - dir * (HALF - 12));
       const back = await outside(6000);
-      result.fired.reentry = { arrival, onRoad, back };
+      crossed.reentry = { arrival, onRoad, back };
       if (arrival > 0 || !onRoad || back > 0) throw new Error(`${targetSlug} did not hold the walker: ${String(arrival)} samples out after arrival, on the road ${String(onRoad)}, ${String(back)} out after stepping back in`);
     }
     code = 0;

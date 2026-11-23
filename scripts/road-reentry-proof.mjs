@@ -38,7 +38,7 @@ const gridState = page => page.evaluate(() => {
   const live = st.live, load = document.querySelector('.ws-load:not(.hide)');
   const card = load !== null && getComputedStyle(load).display !== 'none' && load.getBoundingClientRect().height > 0;
   return { home: st.home ?? null, inside: st.inside ?? null, feet: st.feet === undefined ? null : { x: Number(st.feet.x), z: Number(st.feet.z) },
-    residents: live?.live?.residents ?? [], drawn: live?.roadDisplays ?? [], ahead: live?.live?.ahead?.instance ?? null,
+    residents: live?.live?.residents ?? [], drawn: live?.roadDisplays ?? [], ground: live?.roadGround ?? null, ahead: live?.live?.ahead?.instance ?? null,
     current: live?.live?.current ?? null, ready: live?.live?.gameplayReady === true, card, pitch: st.pitch, cells: st.cells, walls: st.softWalls ?? null,
     t: Math.round(performance.now()), retained: live?.live?.retainedCell ?? null, retirements: (live?.live?.retirements ?? []).slice(-3), issues: live?.live?.issues ?? {} };
 }).catch(() => null);
@@ -46,10 +46,39 @@ const gridState = page => page.evaluate(() => {
 const setYaw = (page, yaw) => page.evaluate(value => { /** @type {any} */ (window).__wildshard.world.player.yaw = value; }, yaw);
 /** @param {Point} from @param {Point} toward */
 const yawTo = (from, toward) => Math.atan2(from.x - toward.x, from.z - toward.z);
+/** What draws straight ahead of the camera: every visible mesh whose world box holds a point 6, 15 or 40 m ahead (its name and
+ *  its parents' names), so a board shot names the object filling it (a far proxy, a near view, a ring tile, the zone's world)
+ *  @param {Page} page */
+const whatIsAhead = page => page.evaluate(() => {
+  const { game } = /** @type {any} */ (window).__wildshard.world, camera = game.camera, scene = game.rootScene ?? game.scene;
+  const look = camera.position.clone(); camera.getWorldDirection(look);
+  /** @type {Record<string, string[]>} */ const found = {};
+  for (const metres of [6, 15, 40]) {
+    const at = camera.getWorldPosition(camera.position.clone()).addScaledVector(look, metres), names = new Set();
+    scene.traverseVisible((/** @type {any} */ node) => {
+      if (node.isMesh !== true || node.geometry === undefined) return;
+      if (node.geometry.boundingBox === null) node.geometry.computeBoundingBox?.();
+      const box = node.geometry.boundingBox?.clone().applyMatrix4(node.matrixWorld);
+      if (box === undefined || !box.containsPoint(at)) return;
+      const path = []; for (let up = node; up !== null && path.length < 4; up = up.parent) path.push(up.name || up.type);
+      names.add(path.join(' < '));
+    });
+    found[`${String(metres)}m`] = [...names].slice(0, 12);
+  }
+  return found;
+}).catch(error => String(error));
 /** the page's attributed memory (the budget's model input) and the worlds held, at one moment @param {Page} page */
 const memory = page => page.evaluate(() => {
   const w = /** @type {any} */ (window), m = w.__wildshard.memory(), live = w.__wildshard.shard.grid.state().live;
-  return { totals: m.totals, accountedBytes: m.accountedBytes, residents: live?.live?.residents ?? [], drawn: live?.roadDisplays ?? [] };
+  // the Developer memory chip's headline (budgetOverlay.ts memoryHeadline): the larger of the claims model and the measurement
+  const chip = /** @type {HTMLElement | null} */ (document.querySelector('.ws-grid-budget'));
+  // the ledger EM11 predicts the phone from (`__wildshardMemory.counters()`), summed per domain
+  const ledger = /** @type {Record<string, Record<string, number>> | undefined} */ (/** @type {any} */ (globalThis).__wildshardMemory?.counters?.());
+  const domains = ledger === undefined ? null : Object.fromEntries(Object.entries(ledger).map(([domain, rows]) => [domain, Math.round(Object.values(rows ?? {}).reduce((sum, bytes) => sum + (Number(bytes) || 0), 0))]));
+  const top = ledger === undefined ? null : Object.entries(ledger).flatMap(([domain, rows]) => Object.entries(rows ?? {}).map(([key, bytes]) => [`${domain}:${key}`, Math.round(Number(bytes) || 0)]))
+    .sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 14);
+  return { totals: m.totals, accountedBytes: m.accountedBytes, ledger: domains, top, residents: live?.live?.residents ?? [], drawn: live?.roadDisplays ?? [],
+    headline: chip === null ? null : { bytes: Number(chip.dataset['playingBytes']), peak: Number(chip.dataset['peakBytes']), source: chip.dataset['source'] ?? null } };
 }).catch(() => null);
 
 /** the zone's declared portal rows (sections/world/edge.json), read from the page's own content set like the J451 smoke
@@ -204,7 +233,7 @@ try {
       const st = await gridState(page); if (st === null || st.feet === null) return;
       await setYaw(page, yawTo(st.feet, toward)); await delay(2500);
       await page.screenshot({ path: join(dir, `board-${name}.png`), scale: 'css' });
-      /** @type {any[]} */ (report.shots).push({ name, wait, ...(await gridState(page)), cells: undefined, memory: await memory(page) });
+      /** @type {any[]} */ (report.shots).push({ name, wait, ...(await gridState(page)), cells: undefined, memory: await memory(page), ahead: await whatIsAhead(page) });
     };
     const c = (/** @type {number} */ x, /** @type {number} */ z) => ({ x: center.x + x, z: center.z + z });
     const zoneAt = (/** @type {number} */ x, /** @type {number} */ z) => /** @type {any[]} */ (report.cells ?? []).find(row => row.cell[0] === x && row.cell[1] === z)?.instance ?? null;
@@ -212,8 +241,17 @@ try {
     await stop('left', c(R, 0), c(0, 0), zone);
     await stop('crossing', c(R, R), c(pitch, pitch), zoneAt(1, 1));
     await stop('road-n', c(0, R), c(0, pitch), zoneAt(0, 1));
-    await walkTo(c(-R, R), 180_000, 3); await walkTo(c(-R, -R), 180_000, 3);
+    // arm's length: 2 m short of a walled zone's wall, which stands at its buffer's road side (~18 m out from its square)
+    const edge = pitch - HALF - 21;
+    await stop('road-n-near', c(60, edge), c(60, pitch), zoneAt(0, 1));
+    await walkTo(c(-R, R), 180_000, 3);
+    await stop('road-w', c(-R, 0), c(-pitch, 0), zoneAt(-1, 0));
+    // Jake's Dunes clip: the zone at arm's length, off its gate's line (its buffer counts a walker in)
+    await walkTo(c(-R, 150), 180_000, 3);
+    await stop('road-w-near', c(-edge, 150), c(-pitch, 150), zoneAt(-1, 0));
+    await walkTo(c(-R, -R), 180_000, 3);
     await stop('road-s', c(0, -R), c(0, -pitch), zoneAt(0, -1));
+    await stop('road-s-near', c(60, -edge), c(60, -pitch), zoneAt(0, -1));
     sampling.on = false; await sampler;
     code = 0; await context.close();
     throw BOARD_DONE;
