@@ -10,7 +10,7 @@
 // never pinned (a first pin is a reviewed `pins.ts refresh`, DEL9) unless `--first` asks for one: meta MOSSGATE-ZONE MZ26,
 // a staging-only shard (production `live: null`, so `pins.ts refresh` skips it) joins the preview pins under staging's name.
 import { agentFetch as fetch } from './agent-requests.mjs';
-import {readFileSync, writeFileSync} from 'node:fs';
+import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {refreshStaging} from './pins-staging.ts';
 
@@ -20,7 +20,7 @@ interface DocumentRow {slug: string; name?: string; revision: number; hash: stri
 interface PinnedDocument {shards: DocumentRow[]}
 
 const {WILDSHARD_API: API = 'https://api.wildshard.io'} = process.env;
-const PINS = 'test/pins/shardfiles.json', CATALOGUE = 'test/pins/catalogue.json';
+const PINS = 'test/pins/shardfiles.json', CATALOGUE = 'test/pins/catalogue.json', SAVES = 'test/pins/saves';
 const HASH = /^[a-f0-9]{64}$/u, SLUG = /^[a-z0-9-]+$/u, REVISION = /^[1-9][0-9]*$/u;
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -38,6 +38,20 @@ export function movePin(pins: PinFile, document: PinnedDocument, pin: Pin, first
     pins: {...pins, shards: pins.shards.map((row, index) => index === at ? pin : row)},
     document: {...document, shards: document.shards.map((row, index) => index === doc ? {...row, revision: pin.revision, hash: pin.hash} : row)},
   };
+}
+
+/** Meta SHARD-COMPAT NB10 (audit B12): a released save fixture names the pin it resumes on (`pin`) or the pin whose
+ *  changed level refuses it (`refused`), and released-save-play checks that name against the slug's pin, so a re-pin
+ *  moved it by hand in a follow-up commit (Nine r6 `32236ee94`, Pine `b93a7c5e8`, Nalati r6 `211ba9d49`). The pin commit
+ *  moves it: `refused` stays a refusal on the new pin, otherwise `pin` names it. The land's released-save-play run is the
+ *  proof that the save still resumes; a pin whose level refuses it goes red there and the lane writes `refused`. */
+export function moveSavePin(save: Readonly<Record<string, unknown>>, hash: string): Record<string, unknown> {
+  if (typeof save['refused'] === 'string') return {...save, refused: hash};
+  if (save['shardfile'] === hash) {
+    const {pin: _pin, ...made} = save;
+    return made;
+  }
+  return {...save, pin: hash};
 }
 
 async function getJson(path: string): Promise<unknown> {
@@ -64,6 +78,8 @@ async function main(argv: readonly string[]): Promise<void> {
   const moved = movePin(JSON.parse(readFileSync(PINS, 'utf8')) as PinFile, JSON.parse(readFileSync(CATALOGUE, 'utf8')) as PinnedDocument, {slug, revision, hash, bytes}, first ? {name: row.name ?? slug} : undefined);
   writeFileSync(PINS, json(moved.pins));
   writeFileSync(CATALOGUE, json(moved.document));
+  const save = `${SAVES}/${slug}.json`;
+  if (existsSync(save)) writeFileSync(save, json(moveSavePin(JSON.parse(readFileSync(save, 'utf8')) as Record<string, unknown>, hash)));
   await refreshStaging(API);
   console.log(`pinned ${slug} rev ${revision} ${hash.slice(0, 8)} (${bytes} bytes) from ${channel}${first ? ' (first pin)' : ''}`);
 }
