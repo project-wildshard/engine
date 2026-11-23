@@ -68,6 +68,8 @@ const whatIsAhead = page => page.evaluate(() => {
   }
   return found;
 }).catch(String);
+// `--chromium`: the same walk on headless Chromium, whose collections can be forced (`--gc-each` then reads live bytes only)
+const onChromium = process.argv.includes('--chromium');
 /** `--heap-at=<stop>` (Chromium): write a heap snapshot at that board stop, after a forced collection @param {Page} page @param {string} name */
 const heapAt = async (page, name) => {
   const wanted = process.argv.find(value => value.startsWith('--heap-at='))?.slice('--heap-at='.length).split(',') ?? [];
@@ -77,7 +79,7 @@ const heapAt = async (page, name) => {
   cdp.on('HeapProfiler.addHeapSnapshotChunk', event => { file.write(event.chunk); });
   await cdp.send('HeapProfiler.collectGarbage');
   await cdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
-  await new Promise(resolve => { file.end(resolve); }); await cdp.detach();
+  await new Promise(_resolve => { file.end(_resolve); }); await cdp.detach();
 };
 /** churn or force a collection: dead ArrayBuffers the ledger still counts drop out, live ones stay @param {Page} page */
 const collect = async page => {
@@ -91,7 +93,7 @@ const collect = async page => {
   await page.evaluate(async () => {
     for (let round = 0; round < 40; round++) {
       let junk = []; for (let i = 0; i < 2000; i++) junk.push(new ArrayBuffer(64 * 1024)); junk = [];
-      await new Promise(resolve => { setTimeout(resolve, 50); });
+      await new Promise(_resolve => { setTimeout(_resolve, 50); });
     }
   }).catch(() => undefined);
   await delay(5000);
@@ -144,8 +146,6 @@ const webkitEnv = () => {
   for (const [key, value] of Object.entries(env)) env[`__XPC_${key}`] = value;
   return { ...process.env, ...env };
 };
-// `--chromium`: the same walk on headless Chromium, whose collections can be forced (`--gc-each` then reads live bytes only)
-const onChromium = process.argv.includes('--chromium');
 const browser = onChromium ? await chromium.launch({ headless: true, args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }) : await webkit.launch({ headless: true, env: webkitEnv() });
 /** @type {Record<string, unknown>} */
 const report = { base, zone, side: flag('side', 'e'), frames: [], shots: [] };
