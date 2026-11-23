@@ -18,7 +18,7 @@ at `cf55c7d262` on 2026-11-07, by source family, not file by file.
 | Physics runtime | `public/assets/physics/rapier.wasm`, copied at build | Rapier | Apache-2.0, Appendix E |
 | Texture transcoder | `public/basis/r186/`, copied at build | Basis Universal | Apache-2.0, Appendices E and F |
 | Free camera | `src/client/engine/explore/FreeCam.ts` | three-freecam 0.2.0 | MIT, Appendix G |
-| Pine Hollow hero props, dragon hook | `public/assets/gpu/models/pine-hollow-hero/`, `public/assets/nine-dragon/lab/grapple/dragon-hook.glb` | TRELLIS.2 | MIT |
+| Pine Hollow hero props | `public/assets/gpu/models/pine-hollow-hero/` | TRELLIS.2 | MIT |
 | Practice dummy hit clips | `public/assets/practice/dummies/unimate-motion.glb` | UniMate v2 | MIT |
 | Textures, skies, props | `public/assets/tex/`, `public/assets/hdri/`, `public/assets/models/`, and their copies in `public/assets/gpu/` | Poly Haven | CC0 |
 | Four agent skills | `.claude/skills/{codebase-design,improve-codebase-architecture,retro,writing-for-agents}/` | Matt Pocock | MIT, each with its `LICENSE` |
