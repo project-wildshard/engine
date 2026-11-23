@@ -74,7 +74,8 @@ async function connect(test, ms = 90000) {
   }
   throw new Error('no inspector page');
 }
-const gamePage = (u) => u.startsWith(`${BASE}/`) && !u.includes('version.json');
+// the leave page (`/leave?to=…`, freshPage.ts) only forwards to the next document: never a page to read
+const gamePage = (u) => u.startsWith(`${BASE}/`) && !u.includes('version.json') && !u.startsWith(`${BASE}/leave`);
 const gesture = async (expression) => {
   const r = await page.send('Runtime.evaluate', { expression, returnByValue: true, emulateUserGesture: true });
   if (r.wasThrown) throw new Error(r.result?.description ?? 'threw'); return r.result?.value;
@@ -125,7 +126,11 @@ if (mode === 'cold') {
   // that session as an exit to title would, so the warm run walks the same flow; caches stay
   const cleared = await page.evaluate(`JSON.stringify((() => { const out = []; localStorage.removeItem('life.alive.once'); out.push('life.alive.once');
     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k || !k.startsWith('wildshard.save')) continue;
-      try { const d = JSON.parse(localStorage.getItem(k)); if (d?.keys?.['session.crash-position']) { delete d.keys['session.crash-position']; localStorage.setItem(k, JSON.stringify(d)); out.push(k + ':session.crash-position'); } } catch { /* already gone */ } }
+      // the alive beat's device copy lives in the device save slot now (lastEnd.ts ALIVE_BACKUP_KEY): left there, the warm
+      // visit opened on 'The game restarted unexpectedly' (opus-phone1, 11-23)
+      try { const d = JSON.parse(localStorage.getItem(k)); let changed = false;
+        for (const key of ['session.crash-position', 'life.alive.once']) if (d?.keys?.[key] !== undefined) { delete d.keys[key]; changed = true; out.push(k + ':' + key); }
+        if (changed) localStorage.setItem(k, JSON.stringify(d)); } catch { /* already gone */ } }
     return out; })())`);
   log({ ev: 'warmPrep', cleared });
   if (mode === 'upgrade') {
@@ -253,7 +258,10 @@ const drain = async () => { const v = await page.evaluate(DRAIN); if (v) { const
 while (controlAt === null ? Date.now() - tapAt < 180000 : Date.now() - controlAt < (PLAY_S + 2) * 1000) {
   let row = null;
   try {
-    row = JSON.parse(await page.evaluate(`(${SAMPLER}, ${READ})`)); // a new document (the world page) gets its sampler at once
+    // a document that navigated away (the warm path's /leave page, freshPage.ts) never answers: the inspector's own 30 s
+    // timeout left the card unread from the tap to control (opus-phone1, 11-23), so a poll gives up after 3 s and reconnects
+    row = JSON.parse(await Promise.race([page.evaluate(`(${SAMPLER}, ${READ})`),
+      sleep(3000).then(() => { throw new Error('poll timeout'); })])); // a new document (the world page) gets its sampler at once
     if (Date.now() - lastDrain > 1000) await drain();
   } catch { try { await connect(gamePage, 5000); } catch { /* already gone */ } continue; }
   log({ ev: 'poll', at: rel(), ...row });

@@ -34,6 +34,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ "${#shards[@]}" -gt 0 ] || { echo 'usage: run.sh [--base <url>] [--out <dir>] [--no-packs] [--upgrade] <shard regex>...' >&2; exit 2; }
+# G563 keeps three named devices; a Mac without wildshard-loading (the MacBook, 11-23) records on wildshard-iphone.
+device=wildshard-loading
+xcrun simctl list devices | grep -q ' wildshard-loading (' || device=wildshard-iphone
 status=0
 for shard in "${shards[@]}"; do
   for download in "${downloads[@]}"; do
@@ -42,7 +45,7 @@ for shard in "${shards[@]}"; do
     mkdir -p "$dir"
     drives=''
     for mode in $modes; do drives="${drives:+$drives && }node scripts/loading-flow/drive.mjs $mode --shard '$shard' --base '$base' --out '$dir' $flag"; done
-    scripts/sim-lane.sh run --max 15 wildshard-loading bash -c "$drives" \
+    scripts/sim-lane.sh run --max 15 "$device" bash -c "$drives" \
       || { echo "run.sh: $shard ($download) recording failed" >&2; status=1; continue; }
     node scripts/loading-flow/analyse.mjs "$dir" || status=1
     python3 -I scripts/loading-flow/board.py "$dir" || status=1
