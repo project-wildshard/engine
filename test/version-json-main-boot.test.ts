@@ -11,8 +11,6 @@ test.each([mainVersion, '0.1.30', '0.1.31', '0.1.32', '0.2.0'])('a %s build ente
   try {
     const document = { clientVersion: version, minClient: clientFloor(version) };
     expect(olderClient(document.clientVersion, document.minClient)).toBe(false);
-    // WR8b: the epoch-2 cut raised the floor to 0.1.36; an older build clamps to itself.
-    expect(document.minClient).toBe(olderClient(version, '0.1.36') ? version : '0.1.36');
     const reload = vi.fn();
     vi.stubGlobal('location', { reload });
     vi.stubGlobal('caches', { has: () => Promise.resolve(false) });
@@ -26,10 +24,9 @@ test.each([mainVersion, '0.1.30', '0.1.31', '0.1.32', '0.2.0'])('a %s build ente
   } finally { scope.dispose(); vi.unstubAllGlobals(); }
 });
 
-// WR8b: the epoch-2 cut. A 0.1.35 page (epoch 1) that reads the 0.1.36 version.json is forced over exactly once; the
-// 0.1.36 page it reloads into meets its own floor and stays. J383 drops caches and the compiled-home cache only.
-test('a 0.1.35 page is forced over once by the epoch-2 release, and the 0.1.36 page stays', async () => {
-  const document = { clientVersion: '0.1.36', minClient: clientFloor('0.1.36') };
+// J492: the previous release yields to the new floor once. The new page stays and J383 keeps the durable save.
+test('the wire release requires an upgrade once, then admits the new page', async () => {
+  const document = { clientVersion: '0.1.73', minClient: clientFloor('0.1.73') };
   const dropped: string[] = [];
   const boot = async (version: string): Promise<number> => {
     const scope = new Scope('test.epoch-cut-floor');
@@ -43,11 +40,15 @@ test('a 0.1.35 page is forced over once by the epoch-2 release, and the 0.1.36 p
       sessionStorage.clear();
       await new ClientUpdater(sessionStorage).install(version, scope);
       await vi.waitFor(() => { expect(fetch).toHaveBeenCalled(); });
-      await new Promise(resolve => { setTimeout(resolve, 50); });
+      if (olderClient(version, document.minClient)) {
+        await vi.waitFor(() => { expect(window.document.querySelector('#ws-force-update strong')?.textContent).toBe('Update required'); });
+        expect(reload).not.toHaveBeenCalled();
+        await vi.waitFor(() => { expect(reload).toHaveBeenCalledOnce(); });
+      }
       return reload.mock.calls.length;
     } finally { scope.dispose(); vi.unstubAllGlobals(); }
   };
-  expect(await boot('0.1.35')).toBe(1);
-  expect(dropped).not.toContain('wildshard-saves@1');
-  expect(await boot('0.1.36')).toBe(0);
+  expect(await boot('0.1.67')).toBe(1);
+  expect(dropped).toEqual(['ws-built-home-v1']);
+  expect(await boot('0.1.73')).toBe(0);
 });

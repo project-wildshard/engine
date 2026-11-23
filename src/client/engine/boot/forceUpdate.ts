@@ -18,10 +18,11 @@ export function olderClient(current: string, minimum: unknown): boolean {
 const RETRIED = 'boot.force-cache.j383';
 function updating(): void {
   if (document.getElementById('ws-force-update') !== null) return;
-  const line = document.createElement('p'); line.id = 'ws-force-update'; line.textContent = engineString('s_force_updating');
-  line.setAttribute('role', 'status');
-  line.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:translateX(-50%);z-index:2147483647;margin:0;padding:6px 10px;border-radius:4px;background:#07131d;color:white;font:14px system-ui;pointer-events:none';
-  document.documentElement.append(line);
+  const card = document.createElement('div'); card.id = 'ws-force-update'; card.setAttribute('role', 'status');
+  card.style.cssText = 'position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 16px);transform:translateX(-50%);z-index:2147483647;padding:12px 16px;border-radius:8px;background:#07131d;color:white;font:14px system-ui;text-align:center;pointer-events:none';
+  const title = document.createElement('strong'); title.style.display = 'block'; title.textContent = engineString('s_force_update_required');
+  card.append(title, engineString('s_force_updating'));
+  document.documentElement.append(card);
 }
 /** One page's recovery lifetime. Construction installs no listeners or services. */
 export class ClientUpdater {
@@ -35,6 +36,7 @@ export class ClientUpdater {
   try { markReload(FORCE_UPDATE_RELOAD); } catch { /* An unavailable diagnostic store cannot block recovery. */ }
   this.resetting = (async () => {
     const owner = new Scope('boot.force-update');
+    const visible = new Promise<void>(resolve => { owner.timeout(400, resolve); });
     const deadline = new Promise<void>(resolve => { owner.timeout(4000, resolve); });
     const clear = (async () => {
     const unregister = 'serviceWorker' in navigator ? navigator.serviceWorker.getRegistrations().then(registrations => Promise.all(registrations.map(registration => registration.unregister()))) : Promise.resolve([]);
@@ -42,8 +44,8 @@ export class ClientUpdater {
     // WebKit's Clear-Site-Data support varies; native deletion above is authoritative.
     await fetch('/clear-cache.json', { cache: 'no-store', signal: AbortSignal.timeout(2000) }).catch(() => undefined);
     })();
-    try { await Promise.race([clear, deadline]); }
-    catch { document.documentElement.dataset['forceUpdateIncomplete'] = 'true'; }
+    try { await Promise.race([Promise.all([clear, visible]), deadline]); }
+    catch { document.documentElement.dataset['forceUpdateIncomplete'] = 'true'; await visible; }
     finally { owner.dispose(); location.reload(); }
   })();
   return this.resetting;
@@ -79,6 +81,7 @@ export class ClientUpdater {
   };
   scope.listen(document, 'visibilitychange', () => { if (!document.hidden) void check(); });
   scope.listen(window, 'pageshow', () => { void check(); });
+  scope.listen(window, 'ws-live-build', () => { void check(); });
   void check();
   return true;
 }

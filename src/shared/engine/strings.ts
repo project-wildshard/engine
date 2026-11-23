@@ -4,6 +4,7 @@ export const ENGINE_STRINGS = {
   "s_update_next_boundary": "New version · reload",
   "s_update_next_boundary_dev": "new ⟦0⟧ · reload",
   "s_update_check_failed_dev": "Update check failed · next in ⟦0⟧ min",
+  "s_force_update_required": "Update required",
   "s_force_updating": "Updating…",
   "s_reloading": "Reloading",
   "s_reloading_update": "Switching to the new build",

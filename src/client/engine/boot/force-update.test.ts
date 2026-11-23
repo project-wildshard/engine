@@ -45,13 +45,15 @@ test('a retired boot unregisters, wipes every download and only the pack databas
   books.set('old-shell', new Map()); books.set('old-packs', new Map());
   const client = new ClientUpdater(sessionStorage);
   await client.install('0.1.23', owner());
+  await vi.waitFor(() => { expect(document.querySelector('#ws-force-update strong')?.textContent).toBe('Update required'); });
+  expect(reload).not.toHaveBeenCalled();
   await vi.waitFor(() => { expect(reload).toHaveBeenCalledTimes(1); });
   await client.force();
   expect(reload).toHaveBeenCalledTimes(1);
   expect(books.has('old-shell')).toBe(false); expect(books.has('old-packs')).toBe(false);
   expect(deletedDatabases).toEqual(['ws-built-home-v1']);
   expect(localStorage.getItem('account-sentinel')).toBe('keep'); expect(localStorage.getItem('settings-sentinel')).toBe('keep');
-  expect(document.getElementById('ws-force-update')?.textContent).toBe('Updating…');
+  expect(document.getElementById('ws-force-update')?.textContent).toContain('Updating…');
 });
 
 test('foreground rechecks a raised floor; the accepted next client does not enter a reset loop', async () => {

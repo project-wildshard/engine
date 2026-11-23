@@ -9,25 +9,63 @@ import { chromium, webkit, devices } from "../scripts/browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from '../scripts/chromium-keychain.mjs';
 
 const entry = resolvePath('epoch-proof-entry.ts');
-const compiler = await rolldown({ input: entry, platform: 'browser', plugins: [{ name: 'epoch-proof-entry', resolveId(id) { if (id === entry) return entry; return null; }, load(id) { if (id === entry) return `
+const compiler = await rolldown({ input: entry, platform: 'browser', transform: { define: { 'import.meta.env': '{"DEV":false,"PROD":true,"MODE":"production"}' } }, plugins: [{ name: 'epoch-proof-entry', resolveId(id) { if (id === entry) return entry; return null; }, load(id) { if (id === entry) return `
 import { installAppIdentity } from './src/shared/engine/app/identity';
 import { WILDSHARD_IDENTITY } from './src/client/game/identity';
 import { SaveStore } from './src/shared/engine/saves/store';
 import { openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport } from './src/client/engine/saves/indexed';
 import { deviceIdentity } from './src/shared/engine/net/identity';
+import { Scope } from './src/shared/engine/app/scope';
+import { installForceUpdate } from './src/client/engine/boot/forceUpdate';
 import * as v from 'valibot';
 installAppIdentity(WILDSHARD_IDENTITY);
 window.epochProof = { SaveStore, openIndexedSaves, serverSaveDatabase, importServerSaves, serverStopsForImport, deviceIdentity, installAppIdentity, WILDSHARD_IDENTITY, v };
+const client = document.documentElement.dataset.client;
+if (client) await installForceUpdate(client, new Scope('proof.wire-floor'));
 `; return null; } }] });
-const bundled = (await compiler.generate({ format: 'esm' })).output.find(file => file.type === 'chunk');
+const bundled = (await compiler.generate({ format: 'esm', codeSplitting: false })).output.find(file => file.type === 'chunk');
 await compiler.close();
 if (bundled === undefined) throw new Error('Missing epoch proof bundle');
-const server = createServer((request, response) => { response.setHeader('content-type', request.url === '/entry.js' ? 'application/javascript' : 'text/html'); response.end(request.url === '/entry.js' ? bundled.code : '<script type="module" src="/entry.js"></script>'); });
+let wireVersion = '0.1.67';
+const server = createServer((request, response) => {
+  const path = request.url;
+  response.setHeader('cache-control', 'no-store');
+  if (path === '/entry.js') {
+    response.setHeader('content-type', 'application/javascript'); response.end(bundled.code);
+  } else if (path === '/version.json' || path === '/clear-cache.json') {
+    response.setHeader('content-type', 'application/json'); response.end(JSON.stringify({ minClient: wireVersion }));
+  } else {
+    response.setHeader('content-type', 'text/html');
+    response.end(`${path === '/wire-rollout' ? `<html data-client="${wireVersion}">` : '<html>'}<script type="module" src="/entry.js"></script>`);
+  }
+});
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const address = server.address();
 if (address === null || typeof address === 'string') throw new Error('No proof server');
 try {
   for (const [name, type] of [['Chromium', chromium], ['WebKit', webkit]]) {
+    await test(`${name}: a stale page shows Update required before one forced reload`, async () => {
+      wireVersion = '0.1.67';
+      const browser = await type.launch({ headless: true, ...(type === chromium ? { args: [...KEYCHAIN_ARGS] } : {}) });
+      try {
+        const page = await browser.newPage();
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.goto(`http://127.0.0.1:${address.port}/wire-rollout`);
+        try { await page.waitForFunction(() => window.epochProof !== undefined, undefined, { timeout: 8000 }); }
+        catch (error) { throw new Error(`Wire proof module failed to start: ${errors.join(', ')}`, { cause: error }); }
+        await page.evaluate(() => localStorage.setItem('wire-proof-identity', 'kept'));
+        wireVersion = '0.1.73';
+        let reloads = 0;
+        page.on('framenavigated', frame => { if (frame === page.mainFrame()) reloads++; });
+        await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+        await page.locator('#ws-force-update strong', { hasText: 'Update required' }).waitFor({ state: 'visible' });
+        await page.waitForFunction(() => document.documentElement.dataset.client === '0.1.73');
+        assert.equal(reloads, 1);
+        assert.equal(await page.evaluate(() => localStorage.getItem('wire-proof-identity')), 'kept');
+        assert.equal(await page.locator('#ws-force-update').count(), 0);
+      } finally { await browser.close(); }
+    });
     await test(`${name}: later epoch boots carry the previous database identity durably without its progress`, { timeout: 10_000 }, async () => {
       const browser = await type.launch({ headless: true, ...(type === chromium ? { args: [...KEYCHAIN_ARGS] } : {}) });
       try {

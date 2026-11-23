@@ -359,6 +359,18 @@ test('production go-live needs one clean staging QA verdict for this build', asy
   expect(fetched(calls).at(-2)).toBe('goLive');
 });
 
+test('production accepts the exact saved live verdict after staging moves on', async () => {
+  const {deps, calls, live} = rig('production');
+  await through(deps, 'upload');
+  live.stagingVersion = {build: 'b'.repeat(40), saveEpoch: 1};
+  deps.qa = qaOn();
+  await expect(runPhase('check', deps)).rejects.toThrow(/exact live verdict/u);
+  deps.qa = {...qaOn(), kind: 'staging', scenarios: QA_LEGS.staging.map(id => ({id, status: 'ran'}))};
+  await runPhase('check', deps);
+  await runPhase('go-live', deps);
+  expect(calls).toContain('goLive');
+});
+
 test('a dirty tree or another HEAD refuses before the host is touched', async () => {
   const {deps, calls} = rig();
   deps.git.clean = () => false;

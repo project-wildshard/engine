@@ -378,8 +378,8 @@ async function checkDeployed(deps, deployed, refuse) {
 }
 
 /**
- * Production comes after staging: the version tag names this build, staging serves it, and (for go-live) the strict
- * staging proofs passed. J205: those proofs ran on staging; nothing here joins production.
+ * Production comes after staging. The version tag and staging proof must name this build. Staging can move on
+ * after it has qualified the build, so a saved live verdict and J451 proof can stand in for its current page.
  * @param {Phase} phase @param {Deps} deps @param {(message: string) => void} refuse
  */
 async function productionGates(phase, deps, refuse) {
@@ -387,8 +387,15 @@ async function productionGates(phase, deps, refuse) {
   const tagged = deps.git.remoteTag(tag);
   if (tagged !== deps.build) refuse(`origin tag ${tag} is ${tagged ?? 'missing'}, not ${deps.build} (release.sh ${tag} --finish first)`);
   const staging = /** @type {{build?: string}} */ (await deps.fetchJSON(`${CHANNELS.staging.origin}/version.json`).catch(() => ({})));
-  if (staging.build !== deps.build) refuse(`staging serves ${staging.build ?? 'nothing'}, not ${deps.build}: staging goes live first`);
-  const qa = phase === 'go-live' ? qaGap(deps.qa, deps.build) ?? zoneEntryGap(deps.qa?.deploy?.zoneEntry, deps.build) : undefined;
+  const exactProof = qaGap(deps.qa, deps.build) ?? zoneEntryGap(deps.qa?.deploy?.zoneEntry, deps.build);
+  if (staging.build !== deps.build) {
+    if (deps.qa?.kind !== 'staging' || exactProof !== undefined) {
+      refuse(`staging serves ${staging.build ?? 'nothing'}, not ${deps.build}: staging goes live first or provide its exact live verdict`);
+    } else {
+      deps.log(`production uses the saved live staging and J451 verdict for ${deps.build}`);
+    }
+  }
+  const qa = phase === 'go-live' ? exactProof : undefined;
   if (qa !== undefined) refuse(`production go-live needs the staging QA verdict from staging go-live for this build: ${qa}`);
 }
 
