@@ -12,11 +12,13 @@
  * - **water**: a shard's open water (its map's `openWater` level). Above the road (G91) the dike holds it; a sea at exactly 0
  *   is kept as 0 (C2-R3-B1), so its seabed edges get the shore rule's revetment (G134 / G149); below 0 none is reported.
  *
- * A proper format field for the observations is sp-x5's follow-up (the coordinator's interim decision).
+ * A product that writes `world/edge`'s `edgeObservations` (format PR6f1, the sdk since PR6f2) is read from that field
+ * instead: its per-side geometry and open water replace the registry's (`ground.structures`, `minimap.openWater`).
  */
 import { versionedUrl } from '@wildshard/engine/boot/bytes';
 import type { GridCell } from '../../../shared/game/grid/assembly';
 import type { GridEdgeObservations, GridEdgeSource } from '../../../shared/game/grid/edgeProfiles';
+import type { EdgeObservationsRows as EdgeObservations } from '@wildshard/format/edgeObservations';
 import type { ShardEntryways } from '@wildshard/format/entryways';
 import type { RuntimeDeclaration } from '@wildshard/format/runtime';
 import { findShard } from '../shard/registry';
@@ -56,16 +58,22 @@ function latticeRows(res: number, height: (i: number, j: number) => number, colo
   return { north: row('north'), east: row('east'), south: row('south'), west: row('west') };
 }
 
-function observe(entries: ShardEntryways, water: number | undefined, geometry: 'ground' | 'void' = 'ground'): GridEdgeObservations {
-  const edge = (side: typeof SIDES[number]): GridEdgeObservations['north'] => ({ entryWidth: entries.find(row => row.edge === side)?.width ?? 0, geometry, ...(water === undefined || !Number.isFinite(water) || water < 0 ? {} : { waterSurface: water }) });
+const reported = (water: number | undefined): { waterSurface?: number } => (water === undefined || !Number.isFinite(water) || water < 0 ? {} : { waterSurface: water });
+/** PR6f2: a product's own `edgeObservations` decide each side (geometry `ground` unless it says `void`, water only where it
+ *  declares one); without the field, the registry's guesses stand. */
+function observe(entries: ShardEntryways, water: number | undefined, geometry: 'ground' | 'void' = 'ground', declared?: EdgeObservations): GridEdgeObservations {
+  const edge = (side: typeof SIDES[number]): GridEdgeObservations['north'] => {
+    const entryWidth = entries.find(row => row.edge === side)?.width ?? 0, file = declared?.[side];
+    return file === undefined ? { entryWidth, geometry, ...reported(water) } : { entryWidth, geometry: file.geometry ?? 'ground', ...reported(file.waterSurface) };
+  };
   return { north: edge('north'), east: edge('east'), south: edge('south'), west: edge('west') };
 }
 
 /** Admitted products and immutable transport can be supplied by the owning composition without replacing modules. */
 export interface GridEdgeReaderPorts {
   /** Index-only edge metadata; it grants no simulation/runtime readiness. */
-  edges?: (slug: string) => Promise<{ edge: Rows; entryways: ShardEntryways }> | null;
-  product?: (slug: string) => Promise<{ admitted: { source: { edge: Rows; entryways: ShardEntryways; runtime?: RuntimeDeclaration | null } }; release?: () => void }> | null;
+  edges?: (slug: string) => Promise<{ edge: Rows; entryways: ShardEntryways; edgeObservations?: EdgeObservations }> | null;
+  product?: (slug: string) => Promise<{ admitted: { source: { edge: Rows; entryways: ShardEntryways; edgeObservations?: EdgeObservations; runtime?: RuntimeDeclaration | null } }; release?: () => void }> | null;
   fetch: (url: string) => Promise<Response>;
   /** Loading-stage module preparation while the already-admitted product lease is still held. */
   prepare?: (source: { readonly runtime?: RuntimeDeclaration | null }) => Promise<void>;
@@ -77,7 +85,7 @@ export async function readGridEdges(cell: GridCell, reader: GridEdgeReaderPorts)
   const indexed = reader.edges?.(cell.slug);
   if (indexed !== undefined && indexed !== null) {
     const source = await indexed, geometry = manifest?.ground.structures === true && manifest.ground.terrain === undefined ? 'void' : 'ground';
-    return { kind: 'declared', profiles: structuredClone(source.edge), observations: observe(source.entryways, water, geometry) };
+    return { kind: 'declared', profiles: structuredClone(source.edge), observations: observe(source.entryways, water, geometry, source.edgeObservations) };
   }
   const product = reader.product?.(cell.slug) ?? null;
   if (product !== null) {
@@ -87,7 +95,7 @@ export async function readGridEdges(cell: GridCell, reader: GridEdgeReaderPorts)
       await reader.prepare?.(source);
       // Admitting a product opens only its declared entries; it does not invent ground around a structures-only world.
       const geometry = manifest?.ground.structures === true && manifest.ground.terrain === undefined ? 'void' : 'ground';
-      return { kind: 'declared', profiles: structuredClone(source.edge), observations: observe(source.entryways, water, geometry) };
+      return { kind: 'declared', profiles: structuredClone(source.edge), observations: observe(source.entryways, water, geometry, source.edgeObservations) };
     }
     finally { lease.release?.(); }
   }

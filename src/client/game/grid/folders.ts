@@ -27,6 +27,7 @@ import { NearPlaceholderSchema } from '@wildshard/format/nearPlaceholder';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { EdgeProfilesSchema } from '@wildshard/format/edgeProfiles';
 import { EntrywaysSchema } from '@wildshard/format/entryways';
+import { EdgeObservationsSchema } from '@wildshard/format/edgeObservations';
 import * as v from 'valibot';
 import type { KeptRow } from '../../../shared/game/loot/Owned';
 
@@ -35,7 +36,8 @@ import { timeClientPreparation } from '../shardfile/preparationTiming';
 import { readCheckedOutputIndex } from '../../../shared/game/shardfile/outputIndexChecks';
 import { packOrLoose, packReads, type PackReads } from '../../../shared/game/shardfile/packReads';
 
-const edgeRows = v.strictObject({ edge: EdgeProfilesSchema, entryways: EntrywaysSchema });
+// PR6f2: a product may carry its edges' observations beside the rows (format PR6f1); an older one has none
+const edgeRows = v.strictObject({ edge: EdgeProfilesSchema, entryways: EntrywaysSchema, edgeObservations: v.exactOptional(EdgeObservationsSchema) });
 const farRow = v.looseObject({ far: v.nullable(v.looseObject({ decoded: v.number(), gpu: v.number() })) });
 const farRows = { tiles: v.looseObject({ far: FarSchema }), props: v.looseObject({ props: v.nullable(v.looseObject({ far: v.nullable(ShardReferenceSchema) })) }),
   look: v.looseObject({ look: v.looseObject({ keys: v.array(v.looseObject({ fog: v.looseObject({ colour: v.tuple([v.number(), v.number(), v.number()]) }) })) }) }),
@@ -45,7 +47,7 @@ const nearRow = v.looseObject({ near: v.optional(NearPlaceholderSchema) });
 const keptRow = v.strictObject({ id: v.string(), kind: v.picklist(['upgrade', 'cosmetic', 'charm', 'trophy', 'gear']), label: v.string(),
   gauge: v.exactOptional(v.strictObject({ name: v.picklist(['sharpen', 'hearts', 'charms']), level: v.number() })) });
 const keptRows = v.looseObject({ items: v.looseObject({ kept: v.exactOptional(v.array(keptRow)) }) });
-type GridEdges = Pick<Shardfile, 'edge' | 'entryways'>;
+type GridEdges = Pick<Shardfile, 'edge' | 'entryways' | 'edgeObservations'>;
 const edges = new WeakMap<ResidencyAllocator, {
   ready: ResidentByteCache<string, GridEdges>;
   reads: Map<string, Promise<GridEdges>>;
