@@ -222,7 +222,7 @@ try {
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, `${shardName}-boot.cpuprofile`), JSON.stringify(profile));
       const loaf = /** @type {any[]} */ (await page.evaluate('window.__loaf'));
-      const after = loaf.filter((f) => f.start >= controlAt - 500).map((f) => ({ ...f, afterControlMs: f.start - controlAt, profileMs: f.start - profiledAt }));
+      const after = loaf.filter((f) => f.start >= controlAt - 500).map((f) => Object.assign(f, { afterControlMs: f.start - controlAt, profileMs: f.start - profiledAt }));
       writeFileSync(join(dir, `${shardName}-boot-frames.json`), JSON.stringify({ profiledAt, controlAt, frames: after }, null, 1));
       for (const f of after) console.log(`  boot frame ${f.ms} ms at control${f.afterControlMs >= 0 ? '+' : ''}${(f.afterControlMs / 1000).toFixed(2)} s (profile ${f.profileMs} ms): render start ${f.renderStart}, style ${f.styleStart}; ${f.scripts.join(' | ')}`);
     }
@@ -282,9 +282,9 @@ try {
     if (values.owners) {
       // DF14 (mini-dwfps): which owners draw the frame, main pass and shadow maps apart (census.mjs's phone census, here)
       const o = await page.evaluate(`new Promise(done => { (function () { ${OWNER_CENSUS} }).apply(null, [30, done]); })`);
-      const rows = [...(o.owners ?? [])].sort((x, y) => y[1] - x[1]);
-      console.log(`  owners (draws a frame over ${String(o.frames)} frames, shadow auto ${String(o.shadowAuto)}): ${rows.reduce((n, r) => n + r[1], 0).toFixed(1)} draws in the top 40`);
-      for (const [owner, draws, tris] of rows) console.log(`    ${String(draws).padStart(6)} ${String(tris).padStart(9)}  ${String(owner)}`);
+      const owners = [...(o.owners ?? [])].sort((x, y) => y[1] - x[1]);
+      console.log(`  owners (draws a frame over ${String(o.frames)} frames, shadow auto ${String(o.shadowAuto)}): ${owners.reduce((n, r) => n + r[1], 0).toFixed(1)} draws in the top 40`);
+      for (const [owner, draws, tris] of owners) console.log(`    ${String(draws).padStart(6)} ${String(tris).padStart(9)}  ${String(owner)}`);
     }
     if (values.probe !== undefined) {
       // --probe <file>: an async page-function body (a file), its value printed as JSON (one-off questions about the frame)
