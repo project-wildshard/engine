@@ -53,6 +53,38 @@ function observeMetal(composer, gl) {
   };
 }
 
+/** DF14: every animation frame of 50 ms or more after control, with the scripts that ran in it (Chromium's
+ * long-animation-frame entries; none on WebKit). A frame whose update and render are small but whose interval is long
+ * shows here what else held the main thread: a script's source and function, or no script at all (style, layout, the GPU).
+ * Runs on the page, so it may use only its own scope. */
+export function observeLongFrames() {
+  /** @type {{at:number,ms:number,blockingMs:number,renderStartMs:number,scripts:{ms:number,source:string,invoker:string}[]}[]} */
+  const frames = [];
+  let t0 = -1;
+  /** @type {PerformanceObserver|null} */
+  let observer = null;
+  const round = (/** @type {number} */ v) => Math.round(v * 10) / 10;
+  return {
+    start() {
+      t0 = performance.now();
+      try {
+        observer = new PerformanceObserver(list => {
+          for (const entry of /** @type {any[]} */ (list.getEntries())) {
+            if (entry.startTime < t0 || frames.length >= 60) continue;
+            frames.push({ at: round((entry.startTime - t0) / 1000), ms: Math.round(entry.duration),
+              blockingMs: Math.round(entry.blockingDuration ?? 0), renderStartMs: Math.round((entry.renderStart ?? entry.startTime) - entry.startTime),
+              scripts: (entry.scripts ?? []).filter((/** @type {any} */ x) => x.duration >= 5).slice(0, 6).map((/** @type {any} */ x) => ({ ms: Math.round(x.duration),
+                source: `${String(x.sourceFunctionName || '?')} ${String(x.sourceURL ?? '').split('/').pop()}:${String(x.sourceCharPosition ?? -1)}`,
+                invoker: String(x.invoker ?? '').slice(0, 80) })) });
+          }
+        });
+        observer.observe({ type: 'long-animation-frame', buffered: false });
+      } catch { observer = null; }
+    },
+    take() { observer?.disconnect(); return observer === null && frames.length === 0 ? null : frames; },
+  };
+}
+
 /** Attach the first measurement before the boot can give control to the player.
  * @param {RouteLeg[]} route @param {Profile} profile @param {RouteLeg[]} approach @param {boolean} passBreakdown */
 export function routeScript(route, profile, approach, passBreakdown) {
@@ -63,7 +95,9 @@ export function routeScript(route, profile, approach, passBreakdown) {
     const observeMetal = (${observeMetal.toString()});
     const observeProgramLinks = (${observeProgramLinks.toString()});
     const observePasses = ${passBreakdown ? `(${observePasses.toString()})` : 'null'};
+    const longFrames = (${observeLongFrames.toString()})();
     document.addEventListener('ws:control-ready', () => {
+      longFrames.start();
       window.__dfRoute = (async () => {
         const game = window.__wildshard.world.game, renderer = game.renderer;
         const gl = renderer.getContext();
@@ -88,7 +122,7 @@ export function routeScript(route, profile, approach, passBreakdown) {
             startPrograms, programLinksAfterControl: links.count() });
           if (result.error) break;
         }
-        return { witness, legs, approach:approached };
+        return { witness, legs, approach:approached, longFrames: longFrames.take() };
         } finally { links.stop(); }
       })();
     }, { once: true });

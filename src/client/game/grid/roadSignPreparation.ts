@@ -1,6 +1,6 @@
 import type { Scope } from '@wildshard/engine/app/scope';
 import { TIER } from '@wildshard/engine/core/tier';
-import { jsonSlot } from '@wildshard/engine/saves/slots';
+import { worldWatchAsync } from '@wildshard/engine/core/worldWatch';
 import type { ResidencyAllocator } from '../../../shared/game/grid/allocator';
 import type { RoadSign } from '../../../shared/game/grid/roadLayout';
 import { coverageTable } from './roadSolid';
@@ -23,7 +23,7 @@ function oneShotSignWorker(): SignWorkerLease {
  * desktop frame while Blink waits for GPU commands. An overlapping bank gets
  * its own worker, and a failed, cancelled or timed out job retires its worker. */
 export function roadSignWorkerSource(owner: Scope,
-  reuse: boolean = TIER === 'desktop' && jsonSlot('debug.worldWatchDrawCheck', 'device').read() === true): SignWorkerSource {
+  reuse: boolean = TIER === 'desktop' && worldWatchAsync()): SignWorkerSource {
   if (!reuse) return oneShotSignWorker;
   let worker: Worker | undefined;
   let busy = false;

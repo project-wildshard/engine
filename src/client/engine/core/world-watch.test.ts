@@ -2,7 +2,8 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { onFault, type Fault } from '../../../shared/engine/core/faults';
-import { canvasHiddenBy, installWorldWatch, judgeWorldPixels, type WorldWatchHost } from './worldWatch';
+import { jsonSlot } from '../saves/slots';
+import { canvasHiddenBy, installWorldWatch, judgeWorldPixels, worldWatchAsync, type WorldWatchHost } from './worldWatch';
 
 /** n RGBA pixels of one colour */
 const fill = (n: number, rgba: readonly [number, number, number, number]): number[] => Array.from({ length: n }, () => [...rgba]).flat();
@@ -16,6 +17,15 @@ test('SB48: a transparent copy (the page shows through) and a flat black one are
   expect(judgeWorldPixels(night)).toBe('drawn');
   // Driftwood's sky and sea
   expect(judgeWorldPixels(fill(400, [120, 190, 240, 255]))).toBe('drawn');
+});
+
+test('DF14: the watch reads in a worker unless the device slot turns it off', () => {
+  const slot = jsonSlot('debug.worldWatchDrawCheck', 'device');
+  try {
+    slot.write(null); expect(worldWatchAsync()).toBe(true);
+    slot.write(false); expect(worldWatchAsync()).toBe(false);
+    slot.write(true); expect(worldWatchAsync()).toBe(true);
+  } finally { slot.write(null); }
 });
 
 test('a canvas style that keeps the world off screen is named', () => {

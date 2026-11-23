@@ -72,15 +72,23 @@ export interface WorldWatchHost {
 /** How long a look waits for the next drawn frame. */
 export const CAPTURE_WAIT_MS = 3000;
 
+/** The device slot `debug.worldWatchDrawCheck`: on, the watch reads its thumbnails in a worker and stands in for DrawCheck's two
+ *  synchronous checks on its own canvas. Default on since DRIFTWOOD-FPS DF14 (mini-dwfps, 2026-11-23): on the Mac mini's native
+ *  High dock the synchronous checks were the frames over 50 ms after control (DrawCheck's checkFramebufferStatus 104 to 106 ms
+ *  at ~2.3 s, the 3 s look's getImageData 112 ms; same-boot CPU profiles), and with the slot on two ABBA pairs kept none of
+ *  them (frames over 50 ms off 2, 3 / on 1, 1, the one left the frame control lands in). On the iPhone 13 it took the page's
+ *  50 to 70 ms of GPU waits a boot to none without moving the dock (DF8, three cooled pairs). `false` is the off switch. */
+export function worldWatchAsync(): boolean {
+  return jsonSlot('debug.worldWatchDrawCheck', 'device').read() !== false;
+}
+
 /** Seconds after control of each look. */
 export const LOOKS_S: readonly number[] = [3, 8, 20, 45];
 
 /** Watch a world reached control: the looks in LOOKS_S, each skipped while it cannot judge. */
 export function installWorldWatch(host: WorldWatchHost, looks: readonly number[] = LOOKS_S): void {
   let reported = false, failed = 0, stopped = false;
-  // meta DRIFTWOOD-FPS DF8 (mini-driftwood13j): the slot is honoured on phones too; on the iPhone 13 it took the looks'
-  // and DrawCheck's 50 to 70 ms of page-thread GPU waits a boot to none (three cooled pairs)
-  const asyncRead = looks.length > 0 && jsonSlot('debug.worldWatchDrawCheck', 'device').read() === true;
+  const asyncRead = looks.length > 0 && worldWatchAsync();
   const readPixels = asyncRead ? watchPixelReader(host.scope) : null;
   const canLook = (): boolean => !stopped && !host.scope.disposed && !host.scope.disposing
     && document.visibilityState === 'visible' && !host.hold && !host.contextLost() && host.playing();
