@@ -13,3 +13,7 @@ test('a grid page keeps skipintro, mute and nolock and drops the level it was na
   expect(url.searchParams.has('at')).toBe(false);
   expect(gridPageUrl('https://play.wildshard.io/?chunk=driftwood-isle').href).toBe('https://play.wildshard.io/');
 });
+
+test('the crash flag reaches a grid page, so a reviewer can force J501\'s exits after Enter MMO', () => {
+  expect(gridPageUrl('https://staging.wildshard.io/?crash=revision&chunk=sunscar-dunes').search).toBe('?crash=revision');
+});

@@ -213,8 +213,10 @@ export function intendGridHome(instance: string, slug: string): void { pageGridI
  *  `?chunk=<slug>&skipintro` link on a world build back under the title (OFFLINE OF18: every Open Plot in the offline proof). */
 export function gridPageUrl(href: string): URL {
   const from = new URL(href).searchParams, to = new URL(new URL(href).pathname, new URL(href).origin);
-  const skipintro = from.get('skipintro'), mute = from.get('mute'), nolock = from.get('nolock');
+  const skipintro = from.get('skipintro'), mute = from.get('mute'), nolock = from.get('nolock'), crash = from.get('crash');
   if (skipintro !== null) to.searchParams.set('skipintro', skipintro);
+  // J501: the dev and reviewer crash flag reaches a grid page too (Enter MMO's way in), so ?crash=revision|seat can force its exits
+  if (crash !== null) to.searchParams.set('crash', crash);
   if (mute !== null) to.searchParams.set('mute', mute);
   if (nolock !== null) to.searchParams.set('nolock', nolock);
   return to;
