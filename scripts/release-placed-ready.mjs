@@ -57,9 +57,10 @@ async function main() {
       if (response === undefined) throw new Error('Placed index read did not run');
       if (response.status === 404) { await response.body?.cancel(); return false; }
       if (!response.ok) { await response.body?.cancel(); throw new Error(`Placed index answered ${response.status}`); }
-      /** @type {{build?: string, hash?: string, slug?: string, check?: {pass?: boolean}} | null} */
       const index = await response.json();
-      if (response.headers.get('access-control-allow-origin') !== 'https://staging.wildshard.io' || index?.build !== build || index.hash !== head.hash || index.slug !== head.slug || index.check?.pass !== true) throw new Error(`Placed ${head.slug} has an invalid exact-build index`);
+      if (response.headers.get('access-control-allow-origin') !== 'https://staging.wildshard.io') throw new Error(`Placed ${head.slug} has an invalid exact-build index: no staging CORS`);
+      const problem = placedIndexProblem(index, {build, slug: head.slug, hash: head.hash});
+      if (problem !== null) throw new Error(`Placed ${head.slug} has an invalid exact-build index: ${problem}`);
       return true;
     },
     cook: async head => {

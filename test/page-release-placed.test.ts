@@ -1,6 +1,6 @@
 // @vitest-environment node
 import {expect, test} from 'vitest';
-import {ensurePlacedHeads, type Snapshot} from '../scripts/page-release/placed-ready.mjs';
+import {ensurePlacedHeads, placedIndexProblem, type Snapshot} from '../scripts/page-release/placed-ready.mjs';
 
 const head = {instance: 'probe', slug: 'probe', hash: 'a'.repeat(64)};
 const base = [{instance: 'home', slug: 'driftwood-isle'}];
@@ -42,4 +42,23 @@ test('a placement without a usable head stays held instead of inventing one', as
     ready: () => Promise.reject(new Error('no head to read')), cook: () => Promise.reject(new Error('no head to cook')),
   });
   expect(result.heads).toEqual([]);
+});
+
+test('NB4: a seeded old revision the candidate cannot open holds the alias', async () => {
+  // meta NEVER-BREAK-LIVE I4: the candidate's own cook reads the exact uploaded bytes; a format it refuses never reaches goLive.
+  await expect(ensurePlacedHeads({base, read: () => Promise.resolve(snapshot),
+    ready: () => Promise.resolve(false), cook: row => Promise.reject(new Error(`Placed ${row.slug}: refused: format 0.0.9 is older than this engine reads`)),
+  })).rejects.toThrow('refused: format');
+});
+
+test('NB4: an exact-build index qualifies only with a passing check and both tiers\' entry manifests', () => {
+  const want = {build: 'b'.repeat(40), slug: head.slug, hash: head.hash};
+  const tier = (name: string) => [{tier: name, set: 'entry'}, {tier: name, set: 'whole'}];
+  const index = {...want, check: {pass: true}, manifests: [...tier('phone'), ...tier('desktop')]};
+  expect(placedIndexProblem(index, want)).toBeNull();
+  expect(placedIndexProblem({...index, manifests: tier('desktop')}, want)).toBe('no phone entry manifest');
+  expect(placedIndexProblem({...index, manifests: []}, want)).toBe('no phone or desktop entry manifest');
+  expect(placedIndexProblem({...index, check: {pass: false}}, want)).toBe('its check did not pass');
+  expect(placedIndexProblem({...index, build: 'c'.repeat(40)}, want)).toBe('another build or head');
+  expect(placedIndexProblem(null, want)).toBe('no index');
 });
