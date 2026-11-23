@@ -58,7 +58,7 @@ export const VOICE_LOG_READ = `return window.__wsVoiceLog ?? null;`;
 export const VOICE_WORKER_READ = `return window.__wildshard?.world?.audio?.voices?.warmWorker ?? null;`;
 
 /** In the page (a WebDriver body): from now on, every frame's interval (rAF to rAF) with what the GL context did in it:
- * program links (and the new programs' names), every collider the page builds (its ms and triangles), renderer.render calls (more than one is an offscreen bake), texture uploads (count, texels), buffer bytes, triangles and geometry
+ * program links (and the new programs' names), every collider the page builds (its ms and triangles), renderer.render calls (more than the usual world and composite draws can show offscreen work), texture uploads (count, texels), buffer bytes, triangles and geometry
  * count, and every object added to or removed from the scene graph (lights left out; removes start with '-'). DW3 (mini-driftwood13e): the dock stands still, so its frames over
  * 50 ms have to be something arriving, not something turning into view. */
 export const FRAME_LOG_START = `
@@ -167,7 +167,7 @@ const tick = (now) => { if (window.__wsFrameLog !== log) return;
   const frame = [Math.round(now), Math.round((now - last) * 10) / 10, cur.links, cur.tex, cur.texels, cur.buf, r.info.render.triangles, r.info.memory.geometries, fresh.join(','), cur.renders, Math.round(cur.uloc * 10) / 10, [...cur.ulocProgs].join(','), gameSplit(), slowSystems.join(','), cur.slow >= 5 ? [Math.round(cur.slow), cur.slowName] : null];
   if (log.count++ === 0) log.from = frame[0];
   // Keep the events and their immediate predecessors as they arrive, including the dock at the start of a long route.
-  if (frame[1] > 45 || cur.links > 0 || cur.texels > 65536 || cur.buf > 65536 || cur.renders > 1 || frame[10] > 5 || slowSystems.length > 0) {
+  if (frame[1] > 45 || cur.links > 0 || cur.texels > 65536 || cur.buf > 65536 || cur.renders > 2 || frame[10] > 5 || slowSystems.length > 0) {
     if (previous !== null && log.frames[log.frames.length - 1] !== previous) log.frames.push(previous);
     log.frames.push(frame);
   }

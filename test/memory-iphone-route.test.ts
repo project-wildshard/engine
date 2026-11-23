@@ -92,7 +92,7 @@ test('the owner census sums each pass\'s draws by owner, per frame, and puts the
 test('the route frame log keeps the dock and its upload after more than 4,000 frames', () => {
   let tick: (time: number) => void = () => undefined;
   const gl = { bufferSubData: (..._args: unknown[]): void => undefined };
-  const renderer = { getContext: () => gl, info: { render: { triangles: 0 }, memory: { geometries: 0 } } };
+  const renderer = { render: () => undefined, getContext: () => gl, info: { render: { triangles: 0 }, memory: { geometries: 0 } } };
   const page = { __wildshard: { world: { game: { renderer, scene: Object.create(null) as object } } } };
   const start = new Function('window', 'requestAnimationFrame', 'performance', FRAME_LOG_START);
   const read = new Function('window', FRAME_LOG_READ);
@@ -101,11 +101,17 @@ test('the route frame log keeps the dock and its upload after more than 4,000 fr
   gl.bufferSubData(0, 4096, new Uint16Array(100), 5, 20);
   tick(32);
   tick(92);
-  for (let frame = 1; frame <= 4100; frame++) tick(92 + frame * 16);
+  for (let frame = 1; frame <= 4100; frame++) {
+    renderer.render();
+    renderer.render();
+    if (frame === 4100) renderer.render();
+    tick(92 + frame * 16);
+  }
   const log = read(page) as { count: number; from: number; frames: number[][] };
   expect(log.count).toBe(4103);
   expect(log.from).toBe(16);
-  expect(log.frames.map(frame => [frame[0], frame[1], frame[5]])).toEqual([[32, 16, 40], [92, 60, 0]]);
+  expect(log.frames.map(frame => [frame[0], frame[1], frame[5], frame[9]])).toEqual([[32, 16, 40, 0], [92, 60, 0, 0],
+    [65_676, 16, 0, 2], [65_692, 16, 0, 3]]);
 });
 
 test('a long frame is named by what ran in the interval before it: a collection, a link, an upload, the update or the render', () => {
