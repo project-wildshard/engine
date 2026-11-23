@@ -7,6 +7,7 @@
 import {readCookData, type CookData} from '@wildshard/format/cookData';
 import {requireCookPreparation} from '@wildshard/format/cookPreparation';
 import type {OutputIndex} from '@wildshard/format/outputIndex';
+import {readTar, writeTar} from '@wildshard/format/tar';
 
 /** The sidecar's bytes: its `cook.json` and the mounts it names that the original lacks or holds differently. */
 export interface CookSidecar {readonly cook: Uint8Array; readonly mounts: ReadonlyMap<string, Uint8Array>}
@@ -47,4 +48,16 @@ export function judgeSidecar(sidecar: CookSidecar, author: CookData, renderer: s
   if (renderer === null || cook.renderer !== renderer) return {kind: 'miss', reason: `recorded on ${cook.renderer.slice(0, 12)}, not this renderer`};
   const broken = bound(files.index, cook, files.hash) ?? mountsHeld(cook, sidecar, files.read, files.hash);
   return broken === undefined ? {kind: 'hit', cook, mounts: sidecar.mounts} : {kind: 'corrupt', reason: broken};
+}
+
+/** SP1b4: a sidecar as it travels to a cook (a file beside the job): a tar of `cook.json` and its `mounts/` files. */
+export function sidecarTar(sidecar: CookSidecar): Uint8Array {
+  return writeTar(new Map([['cook.json', sidecar.cook], ...sidecar.mounts]));
+}
+/** The sidecar in `tar`. Bytes that don't read as one come back empty, so the cook judges them corrupt and falls back. */
+export function readSidecarTar(tar: Uint8Array): CookSidecar {
+  try {
+    const files = readTar(tar);
+    return {cook: files.get('cook.json') ?? new Uint8Array(), mounts: new Map([...files].filter(([path]) => path.startsWith('mounts/')))};
+  } catch { return {cook: new Uint8Array(), mounts: new Map()}; }
 }

@@ -29,7 +29,8 @@ import {Scope} from '@wildshard/engine/app/scope';
 import {shardSlugOf} from '@wildshard/format/standaloneCatalogue';
 import {ShardfileHashSchema, ShardSlugSchema, RevisionNumberSchema} from '@wildshard/format/uploadWire';
 import {MAX_SHARDFILE_BYTES, type CookJobReport} from './cookJob';
-import {stalePreparationLine} from './shardCook';
+import {stalePreparationLine, type PreparationState} from './shardCook';
+import {cookPreparedLine} from './cookSidecar';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {installedRuntimeReads} from './installedRuntimeReads';
 import {cookIndexPath, readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
@@ -144,6 +145,21 @@ export interface JobLauncher {
   /** This engine's renderer fingerprint (J262). A job can't run git under `--permission`, so the worker hands it over;
    *  without it every author preparation cooks as `stale`. */
   readonly renderer?: string;
+  /** SP1b4: a folder of cook preparation sidecars, `<hash>/<renderer>.tar`, recorded on this host (SP1b3). A job reads
+   *  only its own shard's, on this renderer. */
+  readonly sidecars?: string;
+}
+
+/** The sidecar file for `hash` on the launcher's renderer, when the host holds one. */
+function sidecarFile(launcher: JobLauncher, hash: string): string | undefined {
+  if (launcher.sidecars === undefined || launcher.renderer === undefined) return undefined;
+  const file = join(launcher.sidecars, hash, `${launcher.renderer}.tar`);
+  return existsSync(file) ? file : undefined;
+}
+/** The cook row's word on its preparation. */
+function preparationWords(slug: string, preparation: PreparationState): string {
+  if (preparation === 'stale') return stalePreparationLine(slug);
+  return preparation === 'cook' ? cookPreparedLine(slug) : `${preparation} preparation`;
 }
 
 // oxlint-disable-next-line typescript/strict-void-return -- promisify takes execFile's callback form; nothing is dropped.
@@ -156,7 +172,7 @@ const CAPTURE_BYTES = 2_000_000;
 const COOK_PHASE = /^phase (validation|proof|textures|client-packs|server-packs|server-files) (\d{1,8})ms$/gmu;
 
 /** One child. Its stdout is a report or a refusal; anything else, a crash or a limit, is `killed`. */
-export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string, reportPhases?: (phases: string) => void): Promise<JobOutcome> {
+export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string, reportPhases?: (phases: string) => void, sidecar?: string): Promise<JobOutcome> {
   const {root, execPath, loader, script, wrap, limits} = launcher, work = dirname(out);
   const granted = process.env['WS_CPU_SLOTS'];
   const slots = [limits.cpuSlots, granted === undefined ? undefined : Number(granted)].filter((value): value is number => value !== undefined);
@@ -165,14 +181,14 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
   const cache = join(dirname(work), 'cache');
   // Node takes a path that doesn't exist yet for a file, which would deny the folder.
   mkdirSync(cache, {recursive: true});
-  const node = [execPath, '--experimental-transform-types', '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, '--allow-worker',
+  const node = [execPath, '--experimental-transform-types', '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, ...sidecar === undefined ? [] : [`--allow-fs-read=${sidecar}`], '--allow-worker',
     `--max-old-space-size=${limits.heapMB}`, '--stack-size=4000', '--no-warnings', '--import', loader, script, tarball, out, ...expectedSlug === undefined ? [] : [expectedSlug]];
   const [command = '', ...args] = [...wrap, ...node];
   return new Promise(resolve => {
     // No credentials, no home: the cook's only inputs are its arguments. The encoder's cache survives jobs, and each entry
     // is decoded against its hash before use, so one job can't poison the next.
     const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
-      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer})}, stdio: ['ignore', 'pipe', 'pipe']});
+      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer}), ...(sidecar === undefined ? {} : {COOK_SIDECAR: sidecar})}, stdio: ['ignore', 'pipe', 'pipe']});
     let stdout = '', stderr = '', peak = 0, why: string | undefined;
     const take = (text: string, kept: string): string => (kept + text).slice(-CAPTURE_BYTES);
     child.stdout.setEncoding('utf8').on('data', (text: string) => { stdout = take(text, stdout); });
@@ -434,7 +450,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     writeFileSync(file, tarball);
     const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug), phases => {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: phases ${phases}`);
-    });
+    }, sidecarFile(launcher, head.hash));
     if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason, ...(outcome.check === undefined ? {} : {check: outcome.check})};
     if (outcome.kind === 'killed') return {...head, state: 'failed', detail: outcome.reason};
     if (!outcome.report.check?.pass) return {...head, state: 'failed', detail: 'The job supplied no successful full check'};
@@ -503,7 +519,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: try ${tries + 1} failed: ${row.detail ?? ''}`);
     }
     verdicts.set(head.hash, row);
-    log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${row.state}${row.seconds === undefined ? '' : ` in ${row.seconds.toFixed(1)} s`}${row.preparation === undefined ? '' : `, ${row.preparation === 'stale' ? stalePreparationLine(head.slug) : `${row.preparation} preparation`}`}${row.detail === undefined ? '' : `: ${row.detail}`}`);
+    log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${row.state}${row.seconds === undefined ? '' : ` in ${row.seconds.toFixed(1)} s`}${row.preparation === undefined ? '' : `, ${preparationWords(head.slug, row.preparation)}`}${row.detail === undefined ? '' : `: ${row.detail}`}`);
     return row;
   };
   // One cook at a time (a cook takes every core it is given, and J29's clock is the deploy's), in two lines: an upload no build

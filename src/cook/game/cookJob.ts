@@ -19,6 +19,7 @@ import {migrateShardfile, validateMigrated} from '@wildshard/format/migrate';
 import {readTar, writeTar} from '@wildshard/format/tar';
 import {cookShard, openShardfile, serverRows, type CookReport, type CookShardPhase, type OpenShardfile, type WireBytes} from './shardCook';
 import type {PartEncoder} from './spawnParts';
+import type {CookSidecar} from './cookSidecar';
 import {cookProvenance, provenanceRefusal, type CookProvenance, type ExpectedCopy} from './cookProvenance';
 
 /** D31: the largest shardfile, stored or decoded: `api-server`'s cap, which Pine's head needs (J137). */
@@ -50,6 +51,8 @@ export interface CookJobPorts {
   readonly renderer?: string;
   /** FE9a: the API's chain and digest for the copy it serves; a different digest under the same chain refuses by slug. */
   readonly expected?: ExpectedCopy;
+  /** SP1b4: a cook preparation sidecar on this renderer, taken when the author's preparation is stale. */
+  readonly sidecar?: CookSidecar;
 }
 export interface ServerPackReport {readonly files: number; readonly bytes: number}
 export interface CookJobReport {
@@ -169,7 +172,7 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   const proof = check.proof === 'refused' ? 'unmeasured' : check.proof;
   const client = join(out, 'client');
   const renderer = ports.renderer === undefined ? {} : {renderer: ports.renderer};
-  const cook = await cookShard(cooked, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn})});
+  const cook = await cookShard(cooked, client, {wireBytes: ports.wireBytes, now: ports.now, onPhase: phase, ...renderer, ...(ports.encoder === undefined ? {} : {encoder: ports.encoder}), ...(ports.warn === undefined ? {} : {warn: ports.warn}), ...(ports.sidecar === undefined ? {} : {sidecar: ports.sidecar})});
   phase('server-files');
   // Each manifest names the header at its product URL, and no part holds it (DL18); its `?v=` is what caches it.
   const shard = openShardfile(cooked, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);

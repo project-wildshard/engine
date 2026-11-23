@@ -8,6 +8,7 @@ import { brotliCompressSync, constants } from 'node:zlib';
 
 const { runCookJob, ShardfileRefusedError } = await import('../src/cook/game/cookJob.ts');
 const { servedAsIs } = await import('../src/cook/game/shardCook.ts');
+const { readSidecarTar } = await import('../src/cook/game/cookSidecar.ts');
 const { checkShardfile } = await import('../src/server/host/checkShardfile.ts');
 const [tarball, out, expectedSlug] = process.argv.slice(2);
 if (tarball === undefined || out === undefined) throw new Error('usage: cook-job <shardfile.tar> <out>');
@@ -24,6 +25,8 @@ try {
     warn: line => { console.warn(`warning: ${line}`); },
     // J262: the worker computed its renderer fingerprint; this child may not run git.
     ...(process.env.COOK_RENDERER === undefined || process.env.COOK_RENDERER === '' ? {} : { renderer: process.env.COOK_RENDERER }),
+    // SHARD-COMPAT SP1b4: the worker's cook preparation sidecar for this shard on its renderer, when it holds one.
+    ...(process.env.COOK_SIDECAR === undefined || process.env.COOK_SIDECAR === '' ? {} : { sidecar: readSidecarTar(readFileSync(process.env.COOK_SIDECAR)) }),
   });
   // Reports are not constrained by the bounded diagnostic stdout ring.
   writeFileSync(`${resolve(out)}.result.json`, JSON.stringify(report));
