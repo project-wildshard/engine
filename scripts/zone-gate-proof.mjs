@@ -174,7 +174,7 @@ try {
     }
   };
   // the state is read first: a full-size shot can take longer than a count's second on a loaded laptop (the count then read one on)
-  const shoot = async (/** @type {string} */ name) => { const seen = await state(); await page.screenshot({ path: join(out, `${tag}-${name}.png`) }); result.shots.push({ name, ...seen }); };
+  const shoot = async (/** @type {string} */ name) => { const seen = await state(); await page.screenshot({ path: join(out, `${tag}-${name}.png`) }); result.shots.push({ name, ...seen }); return seen; };
   if (online) {
     // the seat walks: W and sprint held toward each point, a hop when a post or rail holds it (no 0.5 m in a second)
     await page.keyboard.down('ShiftLeft');
@@ -210,14 +210,23 @@ try {
   await shoot('road-wall');
   /** Poll the gate until `test` holds (or 8 s). */
   const until = async (/** @type {(gate: any) => boolean} */ test) => { for (const ends = Date.now() + 8000; Date.now() < ends; await sleep(50)) if (test((await state()).gate)) return true; return false; };
+  /** @param {number} count @param {string} name */
+  const captureCount = async (count, name) => {
+    if (await until(gate => gate?.cell === targetSlug && gate.count === count)) {
+      await shoot(name);
+      return;
+    }
+    const at = await shoot(`${name}-held`);
+    throw new Error(`The ${targetSlug} gate did not reach ${count} (feet ${at.x}, ${at.z})`);
+  };
   // in, 2 m past the edge line: the card at 5; back out of the buffer at 3 (so the count can't reach 0 on the way out)
-  await walkTo(nalatiEdge + dir * 2); await until(gate => gate?.count === 5); await shoot('gate-5');
-  await until(gate => gate?.count === 3);
+  await walkTo(nalatiEdge + dir * 2); await captureCount(5, 'gate-5');
+  await until(gate => gate?.cell === targetSlug && gate.count === 3);
   await walkTo(nalatiEdge - dir * 6); await face(yawTo(-dir)); await sleep(600);
   await shoot('backed-away');
   // in again: 5 (the reset), then 2
-  await walkTo(nalatiEdge + dir * 2); await until(gate => gate?.count === 5); await shoot('gate-again');
-  await until(gate => gate?.count === 2); await shoot('gate-2');
+  await walkTo(nalatiEdge + dir * 2); await captureCount(5, 'gate-again');
+  await captureCount(2, 'gate-2');
   if (fire) {
     // stand on: 0 opens the loading screen and the page enters the cell as its home
     const before = page.url(), socketsBefore = online ? await sockets() : null;
@@ -252,8 +261,16 @@ try {
         .then(async () => ({ how: 'same page', at: /** @type {number} */ (await page.evaluate(() => /** @type {any} */ (window).__zeLeftAt)) })),
     ]).catch(() => null);
     const left = departure !== null, leftAt = departure?.at ?? Date.now();
-    await page.screenshot({ path: join(out, `${tag}-gate-0-loading.png`) }).catch(() => undefined);
-    const ready = await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: 180_000, polling: 250 }).then(() => true).catch(() => false);
+    if (left) {
+      await page.locator('.ws-load[data-navigation]:visible').first().screenshot({
+        path: join(out, `${tag}-gate-0-loading.png`), timeout: 500,
+      }).catch(() => undefined);
+    }
+    const ready = await page.waitForFunction(slug => {
+      const st = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.();
+      const live = st?.live?.live;
+      return (live?.home ?? st?.home) === slug && live?.gameplayReady === true;
+    }, targetSlug, { timeout: 180_000, polling: 250 }).then(() => true).catch(() => false);
     const home = await page.evaluate(() => { const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(); return { home: st?.live?.live?.home ?? st?.home ?? null, current: st?.live?.live?.current ?? null, slug: W.__wildshard?.shard?.slug ?? null }; }).catch(() => null);
     if (!ready) {
       await page.screenshot({ path: join(out, `${tag}-not-ready.png`) }).catch(() => undefined);
@@ -334,7 +351,8 @@ try {
   // both clocks: the page's resource timing (exact order, the window's reads only) and the script's request log (the in-page server
   // worker's reads too)
   const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && (fired.residency.script?.readsBefore ?? 0) === 0 && (staging || (typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50));
-  code = at5?.count === 5 && at2?.count === 2 && gone?.cell === null && again?.count === 5 && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false && (!online || fired.oneSocket === true))) ? 0 : 1;
+  const counted = at5?.cell === targetSlug && at5.count === 5 && at2?.cell === targetSlug && at2.count === 2 && again?.cell === targetSlug && again.count === 5;
+  code = counted && gone?.cell === null && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false && (!online || fired.oneSocket === true))) ? 0 : 1;
   }
   }
 } catch (error) {
