@@ -11,7 +11,8 @@
  * root space (a built-in material, or a graph whose program reads no model-space position or object origin).
  *
  * A member that moves, hides (itself or an ancestor below the root), changes material or leaves the root leaves its merge
- * at the next check and draws on its own again for good. Leaving phone Low or the region ends every merge.
+ * at the next check and draws on its own again for good. Leaving phone Low (unless the slot is set) or the region ends
+ * every merge. DF14: a set slot wins on any tier, as `debug.litRestMerge` does; unset, only phone Low merges.
  *
  * DF10 (mini-df10b): a merged mesh links programs its members never did (a flat look's merge drops its normals, three's
  * `vertexNormals` variant; a cell-wide merge draws materials whose members sat outside the spawn view). Swept after
@@ -50,7 +51,7 @@ function staticMergeOn(): boolean {
   try { saved = jsonSlot(STATIC_MERGE_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
   let low = false;
   try { low = graphicsMode() === 'low'; } catch { /* no settings: not Low */ }
-  return TIER === 'phone' && low && staticMerge(saved, true);
+  return staticMerge(saved, TIER === 'phone' && low); // DF14: a set slot wins on any tier (desktop High measures it)
 }
 
 const DEFAULT_RENDER_HOOK: unknown = Reflect.get(Mesh.prototype, 'onBeforeRender'), DEFAULT_AFTER_HOOK: unknown = Reflect.get(Mesh.prototype, 'onAfterRender');
