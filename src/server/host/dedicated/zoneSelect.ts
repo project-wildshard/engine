@@ -48,6 +48,9 @@ export async function readZoneUploads(at: URL): Promise<readonly Upload[]> {
   return v.parse(Uploads, await response.json()).shards;
 }
 
+/** A placeholder open plot or a test shard (J498's list): on the grid it may be, but no player list names it. */
+const PLACEHOLDER = /^(?:open-plot-|walkin-proof|f30-clean$|blender-template$)/u;
+
 const readable = (slug: string): string => slug.split(/[-_]+/u).filter(Boolean)
   .map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
@@ -69,7 +72,9 @@ function cards(slugs: readonly string[], uploads: readonly Upload[], entries: re
 export function zoneSelectTabs(channel: ZoneSelectOptions['channel'], live: LiveZones, uploads: readonly Upload[], counts: readonly ZoneEntryTotal[]): ZoneSelectDocument {
   const name = (a: ZoneSelectCard, b: ZoneSelectCard): number => a.name.localeCompare(b.name, 'en') || a.slug.localeCompare(b.slug, 'en');
   const all = cards(live.slugs, uploads, counts).sort(name);
-  const visible = all.filter(card => card.status !== 'hidden');
+  // QA 11-23-b row 4 (Jake ~12:20 Cancun: "one plot thin ice should not show up in popular lol"; J498): Featured, Popular and
+  // New list only real zones, never a placeholder open plot or a test shard; All, the Developer's list, still names them.
+  const visible = all.filter(card => card.status !== 'hidden' && !PLACEHOLDER.test(card.slug.replace(/^_/u, '')));
   const bySlug = new Map(visible.map(card => [card.slug, card]));
   const featured = live.featured === undefined ? visible : live.featured.flatMap(slug => { const card = bySlug.get(slug); return card === undefined ? [] : [card]; });
   const order = new Map(featured.map((card, index) => [card.slug, index]));
@@ -78,7 +83,7 @@ export function zoneSelectTabs(channel: ZoneSelectOptions['channel'], live: Live
     (a.enters === 0 ? 0 : (unique.get(b.slug) ?? 0) - (unique.get(a.slug) ?? 0)) ||
     (order.get(a.slug) ?? featured.length) - (order.get(b.slug) ?? featured.length) || name(a, b));
   const optedOut = new Set(uploads.filter(row => row.listedNew === false).map(row => row.slug));
-  const fresh = visible.filter(card => card.firstUploadedAt !== null && !optedOut.has(card.slug) && !card.slug.startsWith('open-plot-'))
+  const fresh = visible.filter(card => card.firstUploadedAt !== null && !optedOut.has(card.slug))
     .sort((a, b) => Date.parse(b.firstUploadedAt ?? '') - Date.parse(a.firstUploadedAt ?? '') || name(a, b));
   return { channel, serial: live.serial, all, featured, popular, new: fresh };
 }

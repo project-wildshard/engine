@@ -177,3 +177,14 @@ test('the box reads upload metadata from the API, never from the signed placemen
   expect(zoneCatalogueUrl(undefined).href).toBe('https://api.wildshard.io/api/catalogue');
   expect(zoneCatalogueUrl('http://127.0.0.1:8787/releases/staging-placements.json').href).toBe('http://127.0.0.1:8787/api/catalogue');
 });
+
+// QA-FEEDBACK-2026-11-23-b row 4 (Jake ~12:20 Cancún: "one plot thin ice should not show up in popular lol whats your problem"; J498):
+// Featured, Popular and New name only real zones; a placeholder open plot or a test shard, placed or not, never reaches them.
+test('row 4: no placeholder open plot or test shard reaches Featured, Popular or New, however many entered it', () => {
+  const junk = ['open-plot-thin-ice', 'open-plot-desert-ruin', 'blender-template', 'walkin-proof-20261113', 'f30-clean'];
+  const uploads = [...junk, 'pine-hollow'].map(slug => ({ slug, name: `${slug} name`, firstUploadedAt: '2026-11-20T12:00:00.000Z' }));
+  const totals = junk.map(slug => ({ slug, humans: 50, agents: 0, uniqueHumans: 50 }));
+  const tabs = zoneSelectTabs('staging', { serial: 1, slugs: [...junk, 'pine-hollow'], featured: [...junk, 'pine-hollow'] }, uploads, totals);
+  for (const list of [tabs.featured, tabs.popular, tabs.new]) expect(list.map(card => card.slug)).toEqual(['pine-hollow']);
+  expect(tabs.all.map(card => card.slug)).toEqual(expect.arrayContaining(junk));
+});
