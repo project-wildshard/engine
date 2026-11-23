@@ -28,6 +28,8 @@ export class TickWorkerHost {
   private readonly clock = new BigInt64Array(new SharedArrayBuffer(24));
   private last: HeadlessTickCommit | undefined;
   private pending: { resolve: (value: Reply) => void; reject: (error: Error) => void } | undefined;
+  /** Requests posted behind `pending` (a streamed tape's next segment), answered in order. */
+  private readonly queued: { resolve: (value: Reply) => void; reject: (error: Error) => void }[] = [];
   private requestStarted = 0n;
   private streamStarted = 0n;
   private parts:TapePartBudget|undefined;
@@ -57,7 +59,8 @@ export class TickWorkerHost {
         if(this.parts!==undefined&&!this.finished&&reply.kind!=='verbTapePart')throw new Error('Missing native tape part checkpoint');
         if (reply.kind === 'commit') this.last = structuredClone(reply.value);
         else if(reply.kind==='walk'||reply.kind==='observation')this.last=structuredClone(reply.value.commit);
-        const pending = this.pending; this.pending = undefined; pending?.resolve(reply);
+        const pending = this.pending; this.pending = this.queued.shift(); if (this.pending !== undefined) this.requestStarted = hrtime.bigint();
+        pending?.resolve(reply);
       } catch (error) { this.fail(error instanceof Error ? error : new Error(String(error))); }
     });
     this.worker.on('error', (error: unknown) => { this.fail(error instanceof Error ? error : new Error(String(error))); });
@@ -83,10 +86,17 @@ export class TickWorkerHost {
     this.requestStarted = hrtime.bigint();
     return new Promise((resolve, reject) => { this.pending = { resolve, reject }; });
   }
+  /** A reply slot behind any outstanding one: the worker answers its requests in the order they were posted. */
+  private waitBehind(): Promise<Reply> {
+    if (this.pending === undefined) return this.wait();
+    return new Promise((resolve, reject) => { this.queued.push({ resolve, reject }); });
+  }
   private fail(error: Error): void {
     if (this.closed) return;
     this.closed = true; this.scope.dispose();this.streamReject?.(error);
-    const pending = this.pending; this.pending = undefined; pending?.reject(error); void this.worker.terminate();
+    const pending = this.pending; this.pending = undefined; pending?.reject(error);
+    for (const queued of this.queued.splice(0)) queued.reject(error);
+    void this.worker.terminate();
   }
   async initialized(): Promise<void> { const reply = await this.ready; if (reply.kind !== 'commit') throw new Error('Missing initial worker checkpoint'); }
   get quarantined(): boolean { return this.closed; }
@@ -175,8 +185,10 @@ export class TickWorkerHost {
       guard.accept(reply.value);this.last=structuredClone(reply.value.commit);return reply.value;
     }catch(error){this.fail(error instanceof Error?error:new Error(String(error)));throw error;}
   }
-  /** Terminal bounded tape produced incrementally. Prefetch only the next
-   * recorded segment while the same fresh worker executes its predecessor. */
+  /** Terminal bounded tape produced incrementally. The worker holds at most two
+   * recorded segments (the one it runs and the next) while the caller records
+   * a third, so neither side waits on the other's slower segment (QA 2026-11-23
+   * row 2b: one in flight left Pine's recorder idle 8% of its story). */
   async streamVerbTape(observe:readonly string[],source:AsyncIterable<HeadlessTapeSegment>):Promise<HeadlessTapeReport>{
     if(this.deadline!=='advisory')throw new Error('Verb tape requires advisory offline timing');
     if(this.finished)throw new Error('Headless validation already finished');
@@ -186,6 +198,16 @@ export class TickWorkerHost {
     const failed=new Promise<never>((_resolve,reject)=>{this.streamReject=reject;});
     const observations:HeadlessTapeReport['observations']=[],ids=new Set<string>(),encoder=new TextEncoder();
     let ticks=0,commands=0,bytes=0,committed=0;
+    const inflight:Promise<Reply>[]=[];
+    const settle=async():Promise<void>=>{
+      const pending=inflight.shift();if(pending===undefined)throw new Error('Missing streamed tape request');
+      const reply=await Promise.race([pending,failed]);
+      if(hrtime.bigint()-this.streamStarted>30_000_000_000n)throw new Error('Headless worker request deadline exceeded; quarantined');
+      if(reply.kind!=='verbTape')throw new Error('Missing native verb tape report');
+      committed+=reply.value.ticks;
+      for(const row of reply.value.observations){bytes+=encoder.encode(JSON.stringify(row)).byteLength;observations.push(row);}
+      if(bytes>8_000_000)throw new Error('Tape observation allowance exceeded');
+    };
     try{
       let current=await Promise.race([(async()=>{const next=await iterator.next();return next;})(),failed]);
       while(!current.done){
@@ -198,18 +220,15 @@ export class TickWorkerHost {
           tickCommands([{source:'verb-tape',commands:frame}],this.budget.commandsPerTick);
           if(frame.length+(segment.route===undefined?0:1)>this.budget.commandsPerTick)throw new Error('Aggregate commandsPerTick exceeded');
         }
-        const pending=this.wait();
+        // A refused stream may leave a request unawaited: its rejection is the stream's, already raised.
+        const request=this.waitBehind();request.catch(()=>{ /* raised through `failed` or `settle` */ });inflight.push(request);
         // oxlint-disable-next-line unicorn/require-post-message-target-origin -- Node Worker messages have no browser origin.
         this.worker.postMessage({kind:'verbTape',plan});
         const upcoming=(async()=>{try{return {value:await iterator.next()};}catch(error){return {error};}})();
-        const reply=await Promise.race([pending,failed]);
-        if(hrtime.bigint()-this.streamStarted>30_000_000_000n)throw new Error('Headless worker request deadline exceeded; quarantined');
-        if(reply.kind!=='verbTape')throw new Error('Missing native verb tape report');
-        committed+=reply.value.ticks;
-        for(const row of reply.value.observations){bytes+=encoder.encode(JSON.stringify(row)).byteLength;observations.push(row);}
-        if(bytes>8_000_000)throw new Error('Tape observation allowance exceeded');
+        if(inflight.length>1)await settle();
         const next=await Promise.race([upcoming,failed]);if('error' in next)throw next.error;current=next.value;
       }
+      while(inflight.length>0)await settle();
       if(ids.size===0)throw new Error('Empty streamed tape');
       return v.parse(HeadlessTapeReportSchema,{version:1,ticks:committed,observations});
     }catch(error){this.fail(error instanceof Error?error:new Error(String(error)));throw error;}

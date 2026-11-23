@@ -160,6 +160,8 @@ export function creatureBodyShape(dims: { readonly bodyRadius: number; readonly 
 export interface BandRow { rate: string; brain: TickClock; body: TickClock }
 /** A host's band state as plain JSON (SimSnapshot.bands). */
 export interface BandsState { rates: number; time: number; frame: number; frameDt: number; rows: ({ id: string } & BandRow)[] }
+/** A held row also keeps its rate's table, so choosing its band looks nothing up (never saved). */
+interface HeldRow extends BandRow { readonly table: TickRate }
 
 /**
  * Per-body band clocks for a fixed-step host (the page scheduler's rates plus the creature manager's 'legacy'), keyed by stable body id (serializable, unlike the page scheduler's
@@ -168,7 +170,7 @@ export interface BandsState { rates: number; time: number; frame: number; frameD
  */
 export class BodyBandClocks {
   private readonly rates = new Map<string, TickRate>(DEFAULT_TICK_RATES);
-  private readonly rows = new Map<string, BandRow>();
+  private readonly rows = new Map<string, HeldRow>();
   private readonly contract: number;
   private time = 0;
   private frame = 0;
@@ -183,18 +185,18 @@ export class BodyBandClocks {
   has(rate: string): boolean { return this.rates.has(rate); }
   // QA 2026-11-23 row 2 (opus-qa1): every body and brain asks this each tick, so it makes no object or closure (Pine's
   // story asked it ~500k times)
-  private row(id: string, rate: string): BandRow {
-    let row = this.rows.get(id);
+  private row(id: string, rate: string): HeldRow {
+    const held = this.rows.get(id);
     // A held row's rate is always a known one (every row is made or restored on a known rate), so only a new row asks.
-    if (row?.rate === rate) return row;
-    if (!this.rates.has(rate)) throw new Error(`Unknown tick rate: ${rate}`);
-    row = { rate, brain: freshClock(this.time, this.frameDt), body: freshClock(this.time, this.frameDt) }; this.rows.set(id, row);
+    if (held?.rate === rate) return held;
+    const table = this.rates.get(rate);
+    if (table === undefined) throw new Error(`Unknown tick rate: ${rate}`);
+    const row = { rate, table, brain: freshClock(this.time, this.frameDt), body: freshClock(this.time, this.frameDt) }; this.rows.set(id, row);
     return row;
   }
-  private band(rate: string, distance: number | BandSpan): TickBand {
-    const table = this.rates.get(rate);
-    const band = table === undefined ? undefined : typeof distance === 'number' ? bandAt(table, distance) : bandBetween(table, distance);
-    if (band === undefined) throw new Error(`Uncovered tick distance: ${rate}`);
+  private band(row: HeldRow, distance: number | BandSpan): TickBand {
+    const band = typeof distance === 'number' ? bandAt(row.table, distance) : bandBetween(row.table, distance);
+    if (band === undefined) throw new Error(`Uncovered tick distance: ${row.rate}`);
     return band;
   }
   /** Reuse the existing clock decision when the same body and rate ask again this frame. */
@@ -205,14 +207,17 @@ export class BodyBandClocks {
   }
   /** `settledBodyDt`, else `bodyDt`, on one row lookup (QA 2026-11-23 row 2b, opus-perf1: a host asks every body ~3 times a tick). */
   settledOrBodyDt(id: string, rate: string, distance: number | BandSpan, active: boolean): number {
-    const row = this.rows.get(id);
-    if (row?.rate !== rate || row.body.frame !== this.frame || (active && row.body.dt === 0)) return this.bodyDt(id, rate, distance, active);
-    return active ? Math.min(row.body.dt, this.frameDt) : row.body.dt;
+    const held = this.rows.get(id);
+    if (held?.rate !== rate) return this.bodyStep(this.row(id, rate), id, distance, active);
+    if (held.body.frame !== this.frame || (active && held.body.dt === 0)) return this.bodyStep(held, id, distance, active);
+    return active ? Math.min(held.body.dt, this.frameDt) : held.body.dt;
   }
   /** This frame's body step for `id` at `distance` (m, or the span it runs) on `rate`; 0 = paused or the off frame of 'half'. */
   bodyDt(id: string, rate: string, distance: number | BandSpan, active = false): number {
-    const row = this.row(id, rate);
-    const dt = tickClock(row.body, active ? activeBodyBand : this.band(rate, distance), true, this.time, this.frame,
+    return this.bodyStep(this.row(id, rate), id, distance, active);
+  }
+  private bodyStep(row: HeldRow, id: string, distance: number | BandSpan, active: boolean): number {
+    const dt = tickClock(row.body, active ? activeBodyBand : this.band(row, distance), true, this.time, this.frame,
       active && row.body.frame === this.frame && row.body.dt === 0, id);
     // A newly started attack/impulse never consumes time owed by a previous dormant body phase.
     return active ? Math.min(dt, this.frameDt) : dt;
@@ -224,7 +229,7 @@ export class BodyBandClocks {
     const row = this.row(id, rate);
     const hit = damage !== undefined && (row.brain.damage === undefined || damage > row.brain.damage);
     if (hit) row.brain.damage = damage;
-    const dt = tickClock(row.brain, this.band(rate, distance), false, this.time, this.frame, urgent || hit, undefined, maximumHz);
+    const dt = tickClock(row.brain, this.band(row, distance), false, this.time, this.frame, urgent || hit, undefined, maximumHz);
     row.brain.dt = 0; row.brain.due = false;
     return hit && dt === 0 ? this.frameDt : dt;
   }
@@ -255,6 +260,10 @@ export class BodyBandClocks {
       || new Set(saved.rows.map((row) => row.id)).size !== saved.rows.length) throw new RangeError('Incompatible body band continuation');
     this.time = saved.time; this.frame = saved.frame; this.frameDt = saved.frameDt;
     this.rows.clear();
-    for (const { id, rate, brain, body } of saved.rows) this.rows.set(id, { rate, brain: { ...brain }, body: { ...body } });
+    for (const { id, rate, brain, body } of saved.rows) {
+      const table = this.rates.get(rate);
+      if (table === undefined) throw new RangeError('Incompatible body band continuation');
+      this.rows.set(id, { rate, table, brain: { ...brain }, body: { ...body } });
+    }
   }
 }
