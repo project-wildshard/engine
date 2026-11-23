@@ -51,7 +51,7 @@ test('a placement file signed by the placement key reads back; the release key, 
 
 test('a placed cell takes an empty spot of the 7 × 7 and the next frame number; a slug keeps one cell and a spot holds one', () => {
   expect(placeCell(PLACED)).toBe(true);
-  expect([cellName(PLACED.slug), cellShard(PLACED.instance), cellFrame(PLACED.instance)], 'after J305\'s 24 (J434)').toEqual([PLACED.instance, PLACED.slug, 25]);
+  expect([cellName(PLACED.slug), cellShard(PLACED.instance), cellFrame(PLACED.instance)], 'after J305\'s 22 (J434, J493)').toEqual([PLACED.instance, PLACED.slug, 23]);
   expect(placeCell(PLACED), 'the same placement again changes nothing').toBe(false);
   expect(placedCells()).toEqual([PLACED]);
   expect(() => placeCell({ ...PLACED, cell: [1, 3] }), 'a cell for life').toThrow(/already placed/u);
@@ -62,7 +62,7 @@ test('a placed cell takes an empty spot of the 7 × 7 and the next frame number;
   expect(() => placeCell({ instance: 'brasscap-mesa', slug: 'sa33-steal', cell: [2, 3] }), 'an instance named for a grid shard would take its players').toThrow(/placed shard's name/u);
   expect(() => placeCell({ instance: 'sa33-steal', slug: 'open-plot-2-0', cell: [2, 3] }), 'a slug named for a grid instance').toThrow(/already has a cell/u);
   expect(placeCell({ instance: 'sa33-next', slug: 'sa33-next', cell: [1, 3] })).toBe(true);
-  expect(cellFrame('sa33-next')).toBe(26);
+  expect(cellFrame('sa33-next')).toBe(24);
   expect(cellFrame('driftwood-isle'), 'the catalogue\'s frames do not move').toBe(cellFrame(cellName('driftwood-isle')));
 });
 

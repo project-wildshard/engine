@@ -36,7 +36,7 @@ test('a placed ring-3 cell: its row\'s empty cells are floor squares, its own sq
   expect(covered(0, 3 * p, cells)).toBe(false);
   for (const x of [-2, -1, 1, 2]) expect(covered(x * p, 3 * p, cells)).toBe(true);
   expect(covered(0, 3 * p + p / 2, cells)).toBe(false); // the new outer strip north of it
-  expect(roadLayout(new GridAssembly({ developer: false, devserver: false }, { ...catalogue.grid, cells: [...catalogue.grid.cells, { instance: 'ring', slug: 'ring', cell: [0, 3] }] }), s => s).holes).toHaveLength(5); // ring 3's four, and the Template's empty (1,1) since J434
+  expect(roadLayout(new GridAssembly({ developer: false, devserver: false }, { ...catalogue.grid, cells: [...catalogue.grid.cells, { instance: 'ring', slug: 'ring', cell: [0, 3] }] }), s => s).holes).toHaveLength(7); // ring 3's four, the Template's empty (1,1) since J434, and Pastel's (-1,1) and Ink & Cel's (-1,2) since J493
 });
 
 test('the road world stands a player on the void at road level and stops them at the rail', async () => {

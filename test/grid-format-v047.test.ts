@@ -20,17 +20,17 @@ test('the format is the 7 × 7 and the client draws the 7 × 7 (SA34)', () => {
   expect(FAR_RING.domeRadius).toBeGreaterThan(GRID_SIGHTLINE);
 });
 
-test("J305's cells (24 since J434) read back unchanged, in-tree and pinned", () => {
+test("J305's cells (22 since J434 and J493) read back unchanged, in-tree and pinned", () => {
   expect(parseGridCatalogue(catalogue.grid)).toEqual(catalogue.grid);
   expect(parseGridCatalogue(pinned)).toEqual(pinned);
 });
 
 test('a grid may leave cells empty; ring 3 is admitted and a cell past it refused', () => {
   const short = base(); short.cells.pop();
-  expect(parseGridCatalogue(short).cells).toHaveLength(23);
+  expect(parseGridCatalogue(short).cells).toHaveLength(21);
   for (const cell of [[0, 3], [-3, 3], [3, -3]] as [number, number][]) {
     const ring = base(); ring.cells.push({ instance: 'ring-cell', slug: 'ring-cell', cell });
-    expect(parseGridCatalogue(ring).cells).toHaveLength(25);
+    expect(parseGridCatalogue(ring).cells).toHaveLength(23);
   }
   for (const cell of [[4, 0], [0, -4], [-4, 4]] as [number, number][]) {
     const far = base(); far.cells.push({ instance: 'far-cell', slug: 'far-cell', cell });

@@ -7,7 +7,7 @@
  * tick time; `/metrics` serves the same as `wildshard_cell_tick_seconds{cell}`), COSTS_MEASURED. Re-measure when a shard grows.
  */
 const COST: ReadonlyMap<string, number> = new Map<string, number>([
-  ['nalati-grasslands', 2.741], ['driftwood-isle', 1.755], ['pine-hollow', 1.594], ['blender-template', 1.311], ['far-reach', 0.866], ['sunscar-dunes', 0.682], ['nine-dragon-stack', 0.63], ['pastel-plain', 0.608], ['open-plot-0-3', 0.606], ['ink-cel-valley', 0.576], ['open-plot-0-4', 0.374], ['open-plot-4-2', 0.281], ['open-plot-4-4', 0.269], ['open-plot-4-3', 0.244], ['open-plot-4-0', 0.221], ['open-plot-0-0', 0.211], ['open-plot-4-1', 0.206], ['open-plot-2-4', 0.202], ['open-plot-2-0', 0.195], ['open-plot-0-2', 0.186], ['open-plot-3-4', 0.184], ['open-plot-3-0', 0.183], ['open-plot-1-0', 0.18], ['open-plot-0-1', 0.175],
+  ['nalati-grasslands', 2.741], ['driftwood-isle', 1.755], ['pine-hollow', 1.594], ['blender-template', 1.311], ['far-reach', 0.866], ['sunscar-dunes', 0.682], ['nine-dragon-stack', 0.63], ['open-plot-0-3', 0.606], ['open-plot-0-4', 0.374], ['open-plot-4-2', 0.281], ['open-plot-4-4', 0.269], ['open-plot-4-3', 0.244], ['open-plot-4-0', 0.221], ['open-plot-0-0', 0.211], ['open-plot-4-1', 0.206], ['open-plot-2-4', 0.202], ['open-plot-2-0', 0.195], ['open-plot-0-2', 0.186], ['open-plot-3-4', 0.184], ['open-plot-3-0', 0.183], ['open-plot-1-0', 0.18], ['open-plot-0-1', 0.175],
 ]);
 /** SC8: the measurement the costs come from. */
 export const COSTS_MEASURED = 'opus-cells3, 2026-11-14 ~02:00 Cancún: cell-mem-bench --remote wildshard-agent --counts 25, release 7251ca24 (v0.1.19) packs, a bot in every cell';

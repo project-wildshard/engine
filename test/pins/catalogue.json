@@ -108,36 +108,6 @@
       "status": "hidden"
     },
     {
-      "instance": "pastel-plain-solo",
-      "slug": "pastel-plain",
-      "cell": [
-        -1,
-        1
-      ],
-      "size": [
-        500,
-        500,
-        500
-      ],
-      "order": 9,
-      "status": "hidden"
-    },
-    {
-      "instance": "ink-cel-valley-solo",
-      "slug": "ink-cel-valley",
-      "cell": [
-        1,
-        -1
-      ],
-      "size": [
-        500,
-        500,
-        500
-      ],
-      "order": 10,
-      "status": "hidden"
-    },
-    {
       "instance": "open-plot-thin-ice-solo",
       "slug": "open-plot-thin-ice",
       "cell": [
@@ -438,15 +408,6 @@
         ]
       },
       {
-        "instance": "pastel-plain",
-        "slug": "pastel-plain",
-        "cell": [
-          -1,
-          1
-        ],
-        "speedClass": "road"
-      },
-      {
         "instance": "blender-template",
         "slug": "brasscap-mesa",
         "cell": [
@@ -575,15 +536,6 @@
         "speedClass": "road"
       },
       {
-        "instance": "ink-cel-valley",
-        "slug": "ink-cel-valley",
-        "cell": [
-          -1,
-          2
-        ],
-        "speedClass": "road"
-      },
-      {
         "instance": "open-plot-2-4",
         "slug": "open-plot-saltwind-lighthouse",
         "cell": [
@@ -648,12 +600,6 @@
       "name": "Sky Reach",
       "revision": 4,
       "hash": "5bc5adcf764acfd601d41fcea8c405ddca8ca4e98986f4944edfddea59b1356b"
-    },
-    {
-      "slug": "ink-cel-valley",
-      "name": "Ink & Cel Valley",
-      "revision": 1,
-      "hash": "5764c86a258ac664ced0ba46860089738cca44d2f27a3f84abdd9ad80f79b0c3"
     },
     {
       "slug": "nalati-grasslands",
@@ -768,12 +714,6 @@
       "name": "Open Plot · Thin Ice",
       "revision": 1,
       "hash": "4546f70ddac2dd08771fb315cb8a9156a0e21503ea72c120af73e31f90e64ead"
-    },
-    {
-      "slug": "pastel-plain",
-      "name": "Pastel Plain",
-      "revision": 1,
-      "hash": "e42e2f5f57937695bae0eb0e17fdfbd5f238897d05b167cd38aa2b7ecebb0481"
     },
     {
       "slug": "pine-hollow",

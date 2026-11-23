@@ -94,7 +94,7 @@ test('a verified file adds Thin Ice at ring 3 (0,3) without adding it to player 
   expect(shardCell('open-plot-thin-ice')).toBeUndefined();
   const read = await learnPlacedCells(URL_AT, { keep: device, fetch: answering(signed()), publicKey: api.hex });
   expect(read).toEqual({ added: THIN_ICE, left: [], serial: 1, carded: [] });
-  expect(gridSlugs()).toHaveLength(25);
+  expect(gridSlugs()).toHaveLength(23);
   expect(installedCatalogue()?.placed).toEqual(['open-plot-thin-ice']);
   expect(cards()).toEqual(['driftwood-isle']);
   // the one way in: a world page enters the grid at the placed cell, which the drawn 7 × 7 admits
@@ -136,7 +136,7 @@ test('cells the box would refuse are left out, and the build\'s own cell is kept
   ] });
   expect(placed.added.map(cell => cell.instance)).toEqual(['open-plot-thin-ice', 'corner']);
   expect(placed.left).toHaveLength(3);
-  expect(placed.document.grid.cells).toHaveLength(26);
+  expect(placed.document.grid.cells).toHaveLength(24);
   // the box's other two rules: a slug that names a cell, an instance that is a placed slug
   expect(addPlacedCells(document, { kind: 'placement', channel: 'staging', serial: 3, cells: [
     { instance: 'x', slug: 'open-plot-0-0', cell: [3, 0] }, { instance: 'pine-hollow', slug: 'y', cell: [3, 1] }] }).added).toEqual([]);
@@ -145,11 +145,11 @@ test('cells the box would refuse are left out, and the build\'s own cell is kept
 test('a slug neither this build nor the API\'s catalogue cards stays out, and an answer after the page went on installs nothing', async () => {
   const read = await learnPlacedCells(URL_AT, { keep: device, fetch: routes({ [ENTRY_AT]: () => new Response('{"error":"no such shard"}', { status: 404 }) }), publicKey: api.hex, api: API });
   expect(read).toMatchObject({ added: [], left: [expect.stringContaining('not in this build')] });
-  expect(gridSlugs()).toHaveLength(24);
+  expect(gridSlugs()).toHaveLength(22);
   const late = new AbortController();
   const slow: typeof fetch = () => { late.abort(); return Promise.resolve(new Response(signed(), { status: 200 })); };
   expect(await learnPlacedCells(URL_AT, { keep: device, fetch: slow, publicKey: api.hex, signal: late.signal })).toHaveProperty('kept');
-  expect(gridSlugs()).toHaveLength(24);
+  expect(gridSlugs()).toHaveLength(22);
   expect(cards()).toEqual(['driftwood-isle']);
 });
 
@@ -160,7 +160,7 @@ test('SA46: a placed slug the build has no card for is carded from its catalogue
   expect(read).toEqual({ added: FRESH, left: [], serial: 1, carded: ['new-author-shard'] });
   expect(fetch.asked).toEqual([URL_AT, ENTRY_AT]);
   expect(init).toMatchObject({ cache: 'no-store', credentials: 'omit', redirect: 'error' });
-  expect(gridSlugs()).toHaveLength(25);
+  expect(gridSlugs()).toHaveLength(23);
   expect(cards()).toEqual(['driftwood-isle', 'new-author-shard']);
   const card = titleCards(false, () => null, () => null, () => true)[1];
   expect(card).toMatchObject({ slug: 'new-author-shard', name: 'Glass Orchard' });
@@ -175,7 +175,7 @@ test('HERO-GATE HG4: a placed slug whose upload carried no hero keeps its cell a
   const fetch = routes({ [ENTRY_AT]: () => json(ENTRY) });
   const read = await learnPlacedCells(URL_AT, { keep: device, fetch, publicKey: api.hex, api: API, content: () => Promise.resolve(heroless) });
   expect(read).toEqual({ added: FRESH, left: [], serial: 1, carded: ['new-author-shard'] });
-  expect(gridSlugs()).toHaveLength(25);
+  expect(gridSlugs()).toHaveLength(23);
   expect(cards(), 'no plain card for a player').toEqual(['driftwood-isle']);
   expect(titleCards(true, () => null, () => null, () => true).map(card => [card.slug, card.badge]), 'a developer\'s').toContainEqual(['new-author-shard', 'Developer only']);
   const cell = oneWayIn({ online: true, hosted: true, slug: 'new-author-shard', kept: false }, new GridAssembly(player));
@@ -198,7 +198,7 @@ test('SA46: a 404, a 500, offline, no CORS, junk, another slug\'s entry, no name
     installCatalogue(PIN); installTitleManifests(ROWS);
     const read = await learnPlacedCells(URL_AT, { keep: device, fetch: routes({ [ENTRY_AT]: entry }), publicKey: api.hex, api: API, cardDeadlineMs: 30 });
     expect(read, why).toMatchObject({ added: [], carded: [], left: [expect.stringContaining('not in this build')] });
-    expect(gridSlugs(), why).toHaveLength(24);
+    expect(gridSlugs(), why).toHaveLength(22);
     expect(cards(), why).toEqual(['driftwood-isle']);
   }
 });
@@ -253,9 +253,9 @@ test('OF20: a read that hangs past the page\'s deadline still leaves the kept la
   device.write(URL_AT, signed());
   const late = new AbortController();
   const reading = learnPlacedCells(URL_AT, { keep: device, fetch: hung, publicKey: api.hex, signal: late.signal, deadlineMs: 60_000 });
-  await vi.waitFor(() => { expect(gridSlugs()).toHaveLength(25); });
+  await vi.waitFor(() => { expect(gridSlugs()).toHaveLength(23); });
   late.abort(); // the boot goes on with what is installed
-  expect(gridSlugs()).toHaveLength(25);
+  expect(gridSlugs()).toHaveLength(23);
   await reading;
 });
 
@@ -267,11 +267,11 @@ test('OF20: a fresh file replaces the kept one\'s cells; a 404 drops them; a kep
   expect(device.kept.get(URL_AT)).toBe(signed(moved, 2));
   installCatalogue(PIN);
   expect(await learnPlacedCells(URL_AT, { keep: device, fetch: answering('', 404), publicKey: api.hex })).toHaveProperty('kept');
-  expect(gridSlugs()).toHaveLength(24);
+  expect(gridSlugs()).toHaveLength(22);
   expect(device.kept.has(URL_AT)).toBe(false);
   device.write(URL_AT, signed(THIN_ICE, 1, 'staging', pair().privateKey));
   expect(await learnPlacedCells(URL_AT, { keep: device, fetch: offline, publicKey: api.hex })).toEqual({ kept: 'Failed to fetch' });
-  expect(gridSlugs()).toHaveLength(24);
+  expect(gridSlugs()).toHaveLength(22);
   expect(device.kept.has(URL_AT)).toBe(false);
 });
 

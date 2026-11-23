@@ -35,7 +35,7 @@ test('no stored answer and a timed-out check: the grid, never a one-shard page (
 
 test('GC20: on a world build with no word and no kept answer, every grid shard\'s card enters its cell; the two off-grid shards do not', async () => {
   const assembly = new GridAssembly({ developer: false, devserver: false });
-  expect(assembly.cells, 'the 5 × 5 grid, less the Template\'s (1,1) (J434)').toHaveLength(24);
+  expect(assembly.cells, 'the 5 × 5 grid, less the Template\'s (1,1) (J434), Pastel Plain and Ink & Cel Valley (J493)').toHaveLength(22);
   for (const cell of assembly.cells) {
     pageGridIntents().consume('');
     const entered = await enterByShard({ online: true, slug: cell.slug, kept: false }, WORLD, world => worldHosted(world, 10, memory(), silent));
