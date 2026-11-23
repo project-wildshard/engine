@@ -36,12 +36,15 @@ export class BossContenders {
   private readonly inArena: ArenaPlayer;
   private readonly place: (player: PlayerSim, position: Vector3, yaw: number) => void;
   private readonly beaten: BeatenReturn | undefined;
+  /** OF24x: seats a served world keeps for players who left; a parked seat stands nowhere in a fight. */
+  private readonly parked: ReadonlySet<string> | undefined;
   /** SC5: seconds a beaten boss's arena has stood empty. */
   private emptyFor = 0;
   /** The point `BossBrain` watches, live. */
   readonly player: { readonly position: Vector3; readonly id: string };
-  constructor(players: ReadonlyMap<string, PlayerSim>, inArena: ArenaPlayer, place: (player: PlayerSim, position: Vector3, yaw: number) => void, beaten?: BeatenReturn) {
-    this.players = players; this.inArena = inArena; this.place = place; this.beaten = beaten;
+  constructor(players: ReadonlyMap<string, PlayerSim>, inArena: ArenaPlayer, place: (player: PlayerSim, position: Vector3, yaw: number) => void, beaten?: BeatenReturn,
+    parked?: ReadonlySet<string>) {
+    this.players = players; this.inArena = inArena; this.place = place; this.beaten = beaten; this.parked = parked;
     const contender = (): PlayerSim => this.contender();
     this.player = { get position() { return contender().position; }, get id() { return contender().id; } };
   }
@@ -51,10 +54,15 @@ export class BossContenders {
     return first.value;
   }
   private contender(): PlayerSim {
-    if (this.players.size > 1) for (const player of this.players.values()) if (this.inArena(player.position)) return player;
+    if (this.players.size > 1) {
+      for (const player of this.players.values()) if (this.present(player) && this.inArena(player.position)) return player;
+      for (const player of this.players.values()) if (this.present(player)) return player;
+    }
     return this.first();
   }
-  private inside(): PlayerSim[] { return [...this.players.values()].filter(player => this.inArena(player.position)); }
+  /** OF24x: a seat parked for a player who left the world is not in the fight, so the fight resets once its fighters go. */
+  private present(player: PlayerSim): boolean { return this.parked?.has(player.id) !== true; }
+  private inside(): PlayerSim[] { return [...this.players.values()].filter(player => this.present(player) && this.inArena(player.position)); }
   /** Whom a body deals with: the living player past the threshold nearest it, else the contender. Unread for a lone player. */
   nearest(point: { readonly x: number; readonly y: number; readonly z: number }): PlayerSim {
     if (this.players.size <= 1) return this.first();

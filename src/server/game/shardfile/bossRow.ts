@@ -79,7 +79,7 @@ const Saved = v.strictObject({ version: v.picklist([1, 2]), boss: Boss, fight: v
  */
 export function installBossRow(host: SimHost, spec: BossRowSpec): { boss: BossBrain; party: BossContenders; bounty: BossBounty; summon: () => void; locked: () => boolean } {
   const party = new BossContenders(host.players, point => spec.script.inArena(point), (player, position, yaw) => { player.position.copy(position); player.yaw = yaw; spec.returned?.(player); },
-    { served: () => host.respawn.served, rearm: spec.armed === true });
+    { served: () => host.respawn.served, rearm: spec.armed === true }, host.parked);
   const bounty = new BossBounty(host, spec.body, spec.step);
   host.events.on('world.slept', ({ seconds }) => { party.slept(seconds); }, host.scope);
   const ports = { events: host.events, player: party.player,

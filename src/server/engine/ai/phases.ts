@@ -79,7 +79,7 @@ export class PhaseEncounter {
     const inside = (point: Vector3): boolean => point.distanceTo(nearBody ? actor.position : focus) < spec.arena.radius;
     const party = this.party = new BossContenders(sim.players, inside, (player, position, yaw) => {
       player.position.copy(position); player.yaw = yaw; player.health.attributes.health = player.health.attributes.maxHealth;
-    }, { served: () => sim.respawn.served, rearm: true });
+    }, { served: () => sim.respawn.served, rearm: true }, sim.parked);
     // AC6: a form a script's `despawn` holds out of the world (hidden, not alive) is neither beaten nor revived by its fight
     const held = (): boolean => 'hidden' in actor && actor.hidden === true;
     const phase = (): EncounterPhase => { const value = this.spec.phases[this.boss.phase]; if (!value) throw new Error('Missing encounter phase'); return value; };
