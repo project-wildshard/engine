@@ -3,7 +3,7 @@ import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {expect, test} from 'vitest';
-import {channelHeads, journalCommand, main, notifyCommand, notifyToken, revisionOf, tallyJournal} from '../scripts/admin.mjs';
+import {adminToken, channelHeads, journalCommand, main, notifyCommand, notifyToken, revisionOf, tallyJournal} from '../scripts/admin.mjs';
 
 const HASH = 'a'.repeat(64), OTHER = 'b'.repeat(64), TOKEN = ['planted', 'notify', 'value', '0123456789'].join('-');
 const catalogue = {shards: [
@@ -93,4 +93,24 @@ test('probe and restart are box-ops\'s verbs, production restart still refused',
   const calls = [];
   await expect(main(['restart', 'production'], {run: command => { calls.push(command); return ''; }})).rejects.toThrow(/refused/u);
   expect(calls).toEqual([]);
+});
+
+test('format re-runs a channel move with the admin token, and refuses a bad channel or format first', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'admin-cli-'));
+  try {
+    writeFileSync(join(dir, 'api.env'), `DATABASE_URL=x\nADMIN_TOKEN=${TOKEN}\n`);
+    expect(adminToken({}, join(dir, 'api.env'))).toBe(TOKEN);
+  } finally { rmSync(dir, {recursive: true, force: true}); }
+  /** @type {{url: string, init?: RequestInit}[]} */
+  const calls = [];
+  const fetch = (url, init) => { calls.push({url: String(url), init}); return Promise.resolve(new Response(JSON.stringify({queued: 3}), {status: 202})); };
+  await expect(main(['format', 'prod', '0.1.0.4'], {fetch, env: {ADMIN_TOKEN: TOKEN}})).rejects.toThrow(/usage/u);
+  await expect(main(['format', 'staging', '0.1.0.4; drop'], {fetch, env: {ADMIN_TOKEN: TOKEN}})).rejects.toThrow(/usage/u);
+  expect(calls).toEqual([]);
+  expect(await main(['format', 'staging', '0.1.0.4', '--drop', 'a,b'], {fetch, env: {ADMIN_TOKEN: TOKEN}})).toEqual({channel: 'staging', format: '0.1.0.4', status: 202, answer: {queued: 3}});
+  expect(calls[0]?.url).toBe('https://api.wildshard.io/api/channels/staging/format');
+  expect(calls[0]?.init?.method).toBe('PUT');
+  expect(calls[0]?.init?.body).toBe('{"format":"0.1.0.4","drop":["a","b"]}');
+  const refused = () => Promise.resolve(new Response('{"error":"api-server is at format 0.1.0.4; move its format pin first"}', {status: 409}));
+  await expect(main(['format', 'staging', '9999.0'], {fetch: refused, env: {ADMIN_TOKEN: TOKEN}})).rejects.toThrow(/answered 409: .*format pin first/u);
 });

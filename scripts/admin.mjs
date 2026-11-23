@@ -9,12 +9,18 @@
 //                                                         API's upload notice does); a head already indexed for the cook's build
 //                                                         answers `present` and costs nothing; --wait follows the journal for
 //                                                         the head's verdict (default 0: queue and return)
+//   node scripts/admin.mjs format [<channel> <X.Y.B.A> [--drop a,b]]
+//                                                         no channel: the API's format (public); with one: re-run the channel's
+//                                                         format move (api-server's admin PUT /api/channels/:channel/format,
+//                                                         the publisher's step): it re-queues the missing migrate jobs, or
+//                                                         answers 409 naming the originals that refuse
 //   node scripts/admin.mjs probe <channel> | restart staging     scripts/box-ops.mjs's two verbs (MA7a), unchanged
 // Everything goes over the agents' ssh alias `wildshard-agent` (box-ops.mjs's HOST): loopback reads, the cook's journal (the
 // agents' account is in systemd-journal) and the loopback notify endpoint on 127.0.0.1:8792. The notify token is read from
 // ~/.config/wildshard/cook.env (COOK_NOTIFY_TOKEN, or the environment) and reaches curl on the box's stdin, never an argv.
+// `format` calls the API with ADMIN_TOKEN (the environment, else ~/.config/wildshard/api-server.env).
 // Not here yet (a box change through a signed release): moving the cook to a tag (`sudo wildshard-config cook <tag>`, the
-// release's step) and a rooms catalogue re-read; API migrations stay on api-server's admin routes.
+// release's step) and a rooms catalogue re-read.
 import {spawnSync} from 'node:child_process';
 import {readFileSync} from 'node:fs';
 import {homedir} from 'node:os';
@@ -82,6 +88,20 @@ export function notifyToken(env = process.env, file = join(homedir(), '.config/w
   return token;
 }
 
+/** ADMIN_TOKEN from the environment, else this Mac's api-server.env. @param {NodeJS.ProcessEnv} env */
+export function adminToken(env = process.env, file = join(homedir(), '.config/wildshard/api-server.env')) {
+  if (env.ADMIN_TOKEN) return env.ADMIN_TOKEN;
+  let text = '';
+  try { text = readFileSync(file, 'utf8'); } catch { throw new Error(`no ADMIN_TOKEN: set it or keep it in ${file}`); }
+  const token = /^ADMIN_TOKEN=(.+)$/mu.exec(text)?.[1]?.trim().replace(/^(['"])(.*)\1$/u, '$2') ?? '';
+  if (token.length < 16) throw new Error(`${file} names no ADMIN_TOKEN`);
+  return token;
+}
+
+/** The format a channel move takes (api-server's FORMAT), and the channels it knows. */
+const FORMAT = /^(?:0|[1-9]\d{0,3})\.(?:0|[1-9]\d{0,3})(?:\.(?:0|[1-9]\d{0,3})\.(?:0|[1-9]\d{0,3}))?$/u;
+const FORMAT_CHANNELS = new Set(['preview', 'staging', 'production']);
+
 /** @typedef {(command: string, input?: string) => string} Run */
 /** @typedef {{shards: {slug: string, live?: {revision?: number, hash: string}, preview?: {revision?: number, hash: string}, channels?: Record<string, {raw?: string, revision?: number}>}[]}} Catalogue */
 
@@ -122,6 +142,19 @@ export async function main(argv, ports = {}) {
   const [verb = '', ...rest] = argv;
   const option = (/** @type {string} */ name) => { const at = rest.indexOf(name); return at === -1 ? undefined : rest[at + 1]; };
   if (verb === 'probe' || verb === 'restart') return boxOps([verb, ...rest], command => run(command));
+  if (verb === 'format') {
+    if (rest.length === 0) return json(read, `${API}/api/format`);
+    const [channel = '', format = ''] = rest, drop = option('--drop')?.split(',').filter(Boolean);
+    if (!FORMAT_CHANNELS.has(channel) || !FORMAT.test(format)) throw new Error('usage: admin.mjs format [<preview|staging|production> <X.Y.B.A> [--drop a,b]]');
+    const response = await read(`${API}/api/channels/${channel}/format`, {method: 'PUT', redirect: 'error', signal: AbortSignal.timeout(60_000),
+      headers: {authorization: `Bearer ${adminToken(ports.env)}`, 'content-type': 'application/json'}, body: JSON.stringify(drop === undefined ? {format} : {format, drop})});
+    const text = await response.text();
+    /** @type {unknown} */
+    let body = text;
+    try { body = JSON.parse(text); } catch { /* a plain-text answer stays text */ }
+    if (!response.ok) throw new Error(`the API answered ${String(response.status)}: ${typeof body === 'string' ? body : JSON.stringify(body)}`);
+    return {channel, format, status: response.status, answer: body};
+  }
   if (verb === 'log') return run(journalCommand(Number(option('-n') ?? 40))).trimEnd();
   if (verb === 'status') {
     const channel = rest[0] ?? 'staging';
@@ -161,7 +194,7 @@ export async function main(argv, ports = {}) {
     }
     return {queued: hash, slug, revision, state: wait > 0 ? 'waiting' : 'queued'};
   }
-  throw new Error('usage: admin.mjs status [staging|production] | log [-n N] | recook <slug> <hash> [--revision N] [--wait S] | probe <channel> | restart staging');
+  throw new Error('usage: admin.mjs status [staging|production] | log [-n N] | recook <slug> <hash> [--revision N] [--wait S] | format [<channel> <format>] | probe <channel> | restart staging');
 }
 
 /** @type {Run} */
