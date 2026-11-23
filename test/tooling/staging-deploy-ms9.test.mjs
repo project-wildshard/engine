@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import { expect, test, vi } from 'vitest';
@@ -18,13 +18,17 @@ test('staging moves a qualified alias when rooms have switched and MS9 has no wi
   const { origin } = CHANNELS.staging;
   const ran = ids => ids.map(id => ({ id, status: 'ran' }));
   const base = { qa: true, full: true, release, hold: false };
+  const childOutputs = [];
   spawn.mockImplementation((_file, args) => {
     const child = Object.assign(new EventEmitter(), { stdout: new PassThrough(), exitCode: null });
     queueMicrotask(() => {
       const qualification = args.includes('--deploy-checks');
       const kind = qualification ? 'candidate' : 'staging';
       const tour = args.some(arg => arg.endsWith('/zone-entry-tour.mjs'));
-      const dir = tour ? join(out, 'zone-entry') : join(out, qualification ? 'qualification' : 'live');
+      const dir = tour
+        ? args.find(arg => arg.startsWith('--out=')).slice('--out='.length)
+        : args[args.indexOf('--out') + 1];
+      childOutputs.push(dir);
       mkdirSync(dir, { recursive: true });
       const proof = tour ? {
         build, engine: 'webkit', profile: 'phone', pass: true, expected: 2,
@@ -52,6 +56,11 @@ test('staging moves a qualified alias when rooms have switched and MS9 has no wi
     const verdict = JSON.parse(readFileSync(join(out, 'verdict.json'), 'utf8'));
     expect(verdict).toMatchObject({ status: 'pass', hold: false, aliasMoved: true });
     expect(verdict.findings).toEqual([expect.objectContaining({ key: 'rooms-already-switched', severity: 'P2' })]);
+    expect(JSON.parse(readFileSync(join(out, 'qualification', 'leg.json'), 'utf8'))).toMatchObject({ build, kind: 'candidate' });
+    expect(JSON.parse(readFileSync(join(out, 'live', 'leg.json'), 'utf8'))).toMatchObject({ build, kind: 'staging' });
+    expect(JSON.parse(readFileSync(join(out, 'zone-entry', 'zone-entry.json'), 'utf8'))).toMatchObject({ build, pass: true });
+    expect(childOutputs).toHaveLength(3);
+    expect(childOutputs.some(dir => existsSync(dir))).toBe(false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
