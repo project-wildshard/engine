@@ -8,6 +8,7 @@
 //
 // A session reports when it ends (the page hides) or at the next launch, so a boot shows up after that.
 import { parseArgs } from 'node:util';
+import { agentFetch } from './agent-requests.mjs';
 
 /** The columns printed, in boot order; any other step is in --json. */
 export const COLUMNS = ['page', 'home', 'homePrograms', 'shaders', 'finish', 'control'];
@@ -41,7 +42,7 @@ if (import.meta.main) {
   const url = new URL('/api/telemetry', values.api);
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(url.hostname))) throw new Error('The review read needs HTTPS or loopback');
   url.searchParams.set('boots', values.n); url.searchParams.set('day', values.day);
-  const response = await fetch(url, { headers: { 'x-review-password': password }, redirect: 'error', signal: AbortSignal.timeout(120_000) });
+  const response = await agentFetch(url, { headers: { 'x-review-password': password }, redirect: 'error', signal: AbortSignal.timeout(120_000) });
   if (!response.ok) throw new Error(`boot read refused: HTTP ${String(response.status)}`);
   const body = await response.json();
   if (values.json) console.log(JSON.stringify(body, null, 2));
