@@ -290,8 +290,8 @@ test('GO4 gate: a world with Driftwood alone does not host the grid; one with mo
   };
   try {
     // opus-route2 (QA row 28): the word names the shards the world opens, so a one-shard page of any other shard plays in-page.
-    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid, Driftwood alone').toEqual({ hosts: false, word: { cells: 1, shards: [SHARD], device: 1, saves: 1 } });
-    expect(await asked([SHARD, 'blender-template']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, 'brasscap-mesa'], device: 1, saves: 1 } });
+    expect(await asked([SHARD]), 'WORLD_CELLS unset: the solo grid, Driftwood alone').toEqual({ hosts: false, word: { cells: 1, shards: [SHARD], device: 1, saves: 1, where: 1 } });
+    expect(await asked([SHARD, 'blender-template']), 'the world hosts the grid, each cell named by its shard').toEqual({ hosts: true, word: { cells: 2, shards: [SHARD, 'brasscap-mesa'], device: 1, saves: 1, where: 1 } });
     expect(await worldWord({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, 500), 'unreachable: no word').toBeNull();
     expect(await worldHostsGrid({ release: 'http://127.0.0.1:9/release.json', key: signedFile(RELEASE).publicKey }, hostsGrid, 500), 'unreachable: solo').toBe(false);
     const stalled = createServer(() => undefined);
