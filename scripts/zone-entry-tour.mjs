@@ -567,7 +567,10 @@ async function rejoinFromMenu(page, zone, center) {
   await step('pause', () => page.locator('.ws-touch-pause').tap({timeout:10_000}));
   await step('exit to the main menu', () => page.locator('.ws-gmenu.show .ws-gmenu-exit').tap({timeout:10_000}));
   await step('main menu', () => page.locator('.ws-main-mmo').waitFor({state:'visible', timeout:45_000}));
-  const started = Date.now(), end = started+ENTRY_MS, name = (zone.slug ?? zone.instance).replace(/-/gu, ' ');
+  const started = Date.now(), end = started+ENTRY_MS;
+  // the card shows the zone's public name (Signal Dunes for sunscar-dunes): it must stay one name, and never Driftwood's
+  const driftwood = DRIFTWOOD.replace(/-/gu, ' ');
+  /** @type {string | null} */ let named = null;
   let navigated = false;
   const nav = (/** @type {import('playwright').Frame} */ frame) => { if (frame === page.mainFrame()) navigated = true; };
   page.on('framenavigated', nav);
@@ -581,7 +584,9 @@ async function rejoinFromMenu(page, zone, center) {
         if (at.card) {
           if (now-lastCard > 1500) screens++;
           lastCard = now; seenCard = true;
-          if (at.zone !== '' && at.zone !== name) throw new Error(`menu and back, loading screen: it names ${at.zone}, not ${name}`);
+          if (at.zone !== '' && zone.instance !== DRIFTWOOD && at.zone === driftwood) throw new Error(`menu and back, ${zone.instance}: the loading screen names ${driftwood}`);
+          if (at.zone !== '' && named !== null && at.zone !== named) throw new Error(`menu and back, loading screen: it named ${named}, then ${at.zone}`);
+          if (at.zone !== '') named = at.zone;
         }
         if (at.home !== null && at.home !== zone.instance) throw new Error(`menu and back, ${zone.instance}: it went by way of ${at.home}`);
         if (at.title && navigated && seenCard && !at.card) throw new Error(`menu and back, ${zone.instance}: the loading screen dropped to the main menu`);
