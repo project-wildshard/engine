@@ -521,7 +521,7 @@ const OPENER = 'cross-origin-opener-policy';
 /** DW12: the leave page between two game documents (scripts/app-build/isolation.mjs LEAVE_PAGE, the same bytes): no
  *  opener policy, so the next game document starts in a new WebContent. Held here, so it answers offline too. */
 const LEAVE_PATH = '/leave';
-const LEAVE_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex"><style>html,body{background:#050810}</style><script>(()=>{let to="/";try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}location.replace(to)})()</script></head><body></body></html>';
+const LEAVE_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex"><style>html,body{margin:0;background:#050810}i{position:fixed;left:0;top:50%;width:30%;height:2px;background:#7fd8ff;animation:s 1s linear infinite}@keyframes s{from{transform:translateX(-100%)}to{transform:translateX(340%)}}</style><script>(()=>{let to="/",gone=0;try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}const go=()=>{if(!gone){gone=1;location.replace(to)}};requestAnimationFrame(()=>requestAnimationFrame(go));setTimeout(go,150)})()</script></head><body><i></i></body></html>';
 /** The document baked into this worker: its build's own page, whatever URL asked (the page reads its route from the URL).
  *  @param {string} pathname */
 const bakedDocument = pathname => {

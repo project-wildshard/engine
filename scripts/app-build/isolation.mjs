@@ -69,13 +69,17 @@ export function documentIsolation(text) {
  * document into a new WebContent instead of booting it in the process that held the last world (on the iPhone 13 that
  * second boot is jetsammed at the 1536 MB limit). It sends itself on with `location.replace`, so history keeps one entry; a
  * `to` that is not this origin's, or is the leave page, goes to `/`. pages/worker.ts and the service worker serve the same
- * bytes (a test pins them); src/client/engine/boot/freshPage.ts builds the address.
+ * bytes (a test pins them); src/client/engine/boot/freshPage.ts builds the address. QA 11-23 row 8: it draws a sweeping bar and
+ * leaves two frames later (a timer covers a page that draws none): an inline replace left WebKit's screen still and blank.
  */
 export const LEAVE_PATH = '/leave';
 export const LEAVE_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark">'
-  + '<meta name="robots" content="noindex"><style>html,body{background:#050810}</style><script>(()=>{let to="/";'
+  + '<meta name="robots" content="noindex"><style>html,body{margin:0;background:#050810}i{position:fixed;left:0;top:50%;width:30%;'
+  + 'height:2px;background:#7fd8ff;animation:s 1s linear infinite}@keyframes s{from{transform:translateX(-100%)}to{transform:translateX(340%)}}'
+  + '</style><script>(()=>{let to="/",gone=0;'
   + 'try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);'
-  + 'if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}location.replace(to)})()'
-  + '</script></head><body></body></html>';
+  + 'if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}'
+  + 'const go=()=>{if(!gone){gone=1;location.replace(to)}};requestAnimationFrame(()=>requestAnimationFrame(go));setTimeout(go,150)})()'
+  + '</script></head><body><i></i></body></html>';
 /** The leave page's headers: no opener policy, and never stored. */
 export const LEAVE_HEADERS = Object.freeze({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
