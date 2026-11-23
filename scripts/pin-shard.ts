@@ -46,8 +46,8 @@ export function movePin(pins: PinFile, document: PinnedDocument, pin: Pin, first
  *  moves it: `refused` stays a refusal on the new pin, otherwise `pin` names it. The land's released-save-play run is the
  *  proof that the save still resumes; a pin whose level refuses it goes red there and the lane writes `refused`. */
 export function moveSavePin(save: Readonly<Record<string, unknown>>, hash: string): Record<string, unknown> {
-  if (typeof save['refused'] === 'string') return {...save, refused: hash};
-  if (save['shardfile'] === hash) {
+  if (typeof save.refused === 'string') return {...save, refused: hash};
+  if (save.shardfile === hash) {
     const {pin: _pin, ...made} = save;
     return made;
   }
