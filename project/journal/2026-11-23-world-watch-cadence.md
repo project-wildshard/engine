@@ -1,0 +1,3 @@
+# 2026-11-23 The world watch waits on the loop's own cadence (opus-compat-w10)
+
+Nightly 45148332920: Mossgate (heads 2) and Driftwood (heads 3) failed boot on the world watch's "no world frame drew in 3000 ms of play" on the runner's SwiftShader, where those two shards draw a frame every second or more (Driftwood's 30 draw-phase frames took 54 s on 11-22). Locally on SwiftShader there is no engine regression between 40d5be73d (before DF8 twins, index runs, road slices) and main: Mossgate 14.2 s then 9.3 s per 30 frames, Driftwood 7.9 s then 8.1 s. Same-content heads ran 10 to 25% slower this run. The look now waits three of the loop's drawn-frame intervals since control (3 s at least, 15 s at most).

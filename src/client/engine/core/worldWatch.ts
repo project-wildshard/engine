@@ -65,12 +65,28 @@ export interface WorldWatchHost {
   playing: () => boolean;
   /** what the report carries besides the look (graphics mode, pass split, drawing buffer...) */
   detail: () => Record<string, unknown>;
+  /** frames drawn so far (Game.frameCount); absent: the look waits CAPTURE_WAIT_MS */
+  frames?: () => number;
   /** the page's timers, owned by the level */
   scope: Scope;
 }
 
-/** How long a look waits for the next drawn frame. */
+/** How long a look waits for the next drawn frame, at least. */
 export const CAPTURE_WAIT_MS = 3000;
+/** The longest a look waits, however slow the loop's recent frames were: a loop this far past its own cadence has stalled. */
+export const CAPTURE_WAIT_MAX_MS = 15_000;
+/** A look waits this many of the loop's own drawn-frame intervals before it calls the world undrawn. */
+export const CAPTURE_WAIT_FRAMES = 3;
+
+/** How long a look waits for the next frame: three of the loop's own drawn-frame intervals since control, 3 s at least,
+ *  15 s at most. Nightly 45148332920: on the runner's SwiftShader Mossgate and Driftwood draw a frame every second or more
+ *  (Driftwood's 30 draw-phase frames took 54 s on 11-22), so a flat 3 s wait called a slow, drawn world undrawn. A loop that
+ *  stops after normal frames is still named in 3 s; one that drew nothing since control waits three times that gap.
+ *  `elapsedMs` since control, `drawn` frames drawn in it. */
+export function captureWaitMs(elapsedMs: number, drawn: number): number {
+  const interval = drawn > 0 ? elapsedMs / drawn : elapsedMs;
+  return Math.min(CAPTURE_WAIT_MAX_MS, Math.max(CAPTURE_WAIT_MS, Math.ceil(CAPTURE_WAIT_FRAMES * interval)));
+}
 
 /** The device slot `debug.worldWatchDrawCheck`: on, the watch reads its thumbnails in a worker and stands in for DrawCheck's two
  *  synchronous checks on its own canvas. Default on since DRIFTWOOD-FPS DF14 (mini-dwfps, 2026-11-23): on the Mac mini's native
@@ -88,6 +104,7 @@ export const LOOKS_S: readonly number[] = [3, 8, 20, 45];
 /** Watch a world reached control: the looks in LOOKS_S, each skipped while it cannot judge. */
 export function installWorldWatch(host: WorldWatchHost, looks: readonly number[] = LOOKS_S): void {
   let reported = false, failed = 0, stopped = false;
+  const controlFrames = host.frames?.() ?? 0;
   const asyncRead = looks.length > 0 && worldWatchAsync();
   const readPixels = asyncRead ? watchPixelReader(host.scope) : null;
   const canLook = (): boolean => !stopped && !host.scope.disposed && !host.scope.disposing
@@ -97,7 +114,8 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
     console.warn(`[world-watch] ${why}`, detail);
     emitFault({ system: 'world-watch', error: Object.assign(new Error(`World not drawn: ${why}`), { detail }), verdict: fatal ? 'uncaught' : 'retry' });
   };
-  const lookOnce = async (): Promise<void> => {
+  /** `atMs`: how long after control this look runs (its LOOKS_S entry) */
+  const lookOnce = async (atMs: number): Promise<void> => {
     if (!canLook()) return;
     const hiddenBy = canvasHiddenBy(getComputedStyle(host.canvas));
     if (hiddenBy !== null) {
@@ -106,11 +124,12 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
       host.canvas.style.visibility = 'visible'; host.canvas.style.opacity = ''; if (host.canvas.style.display === 'none') host.canvas.style.display = '';
       return;
     }
-    const copy = await Promise.race([host.captureFrame(48), new Promise<null>((resolve) => { host.scope.timeout(CAPTURE_WAIT_MS, () => { resolve(null); }); })]);
+    const wait = host.frames === undefined ? CAPTURE_WAIT_MS : captureWaitMs(atMs, host.frames() - controlFrames);
+    const copy = await Promise.race([host.captureFrame(48), new Promise<null>((resolve) => { host.scope.timeout(wait, () => { resolve(null); }); })]);
     if (stopped || host.scope.disposed) return;
     if (copy === null) {
       // no frame drew in that time while play shows and the loop is not held: say so once (the loop's own faults name why)
-      if (!reported && !host.hold && document.visibilityState === 'visible') { reported = true; report(`no world frame drew in ${String(CAPTURE_WAIT_MS)} ms of play`, 'black', false); }
+      if (!reported && !host.hold && document.visibilityState === 'visible') { reported = true; report(`no world frame drew in ${String(wait)} ms of play`, 'black', false); }
       return;
     }
     if (copy.width === 0 || copy.height === 0) return;
@@ -129,6 +148,6 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
     stopped = true;
     report(`the world still reads ${look} ${String(failed)} looks after control`, look, true);
   };
-  for (const s of looks) host.scope.timeout(s * 1000, () => { void lookOnce(); });
+  for (const s of looks) host.scope.timeout(s * 1000, () => { void lookOnce(s * 1000); });
   if (asyncRead) bindDrawWatch(host.canvas, host.scope);
 }

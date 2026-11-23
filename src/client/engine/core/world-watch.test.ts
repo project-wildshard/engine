@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { onFault, type Fault } from '../../../shared/engine/core/faults';
 import { jsonSlot } from '../saves/slots';
-import { canvasHiddenBy, installWorldWatch, judgeWorldPixels, worldWatchAsync, type WorldWatchHost } from './worldWatch';
+import { canvasHiddenBy, captureWaitMs, installWorldWatch, judgeWorldPixels, worldWatchAsync, type WorldWatchHost } from './worldWatch';
 
 /** n RGBA pixels of one colour */
 const fill = (n: number, rgba: readonly [number, number, number, number]): number[] => Array.from({ length: n }, () => [...rgba]).flat();
@@ -94,4 +94,38 @@ test('no look while the loop is held or play is not on screen', async () => {
   await vi.advanceTimersByTimeAsync(1100);
   expect(faults).toEqual([]);
   scope.dispose();
+});
+
+test('nightly 45148332920: a look waits three of the loop\'s own frame intervals since control, 3 s at least and 15 s at most', () => {
+  expect(captureWaitMs(3000, 180)).toBe(3000); // 60 fps
+  expect(captureWaitMs(3000, 2)).toBe(4500); // a frame every 1.5 s on SwiftShader
+  expect(captureWaitMs(3000, 0)).toBe(9000); // none since control: three times that gap
+  expect(captureWaitMs(60_000, 1)).toBe(15_000);
+});
+
+test('a slow loop that still draws is not called undrawn; a loop that stops is, after its own cadence', async () => {
+  vi.useFakeTimers();
+  off = onFault((f) => { faults.push(f); });
+  const scope = new Scope('slow'), sky = fill(100, [120, 190, 240, 255]);
+  let drawn = 0;
+  const base = host(() => sky, scope);
+  // a frame every 1.5 s, as Driftwood drew on the runner's SwiftShader: the look's frame lands 3.2 s in
+  scope.interval(1500, () => { drawn++; });
+  const slow: WorldWatchHost = { ...base, frames: () => drawn,
+    captureFrame: (w) => new Promise((resolve) => { scope.timeout(3200, () => { void base.captureFrame(w).then(resolve); }); }) };
+  installWorldWatch(slow, [3]);
+  await vi.advanceTimersByTimeAsync(7000);
+  expect(faults).toEqual([]);
+  scope.dispose();
+  // two frames since control, then the loop never draws again: named once three of its 1.5 s intervals pass
+  const stopped = new Scope('stopped');
+  drawn = 0;
+  const ticking = stopped.interval(1000, () => { drawn++; });
+  stopped.timeout(2900, () => { stopped.cancelTimer(ticking); });
+  installWorldWatch({ ...host(() => sky, stopped), frames: () => drawn, captureFrame: () => new Promise<HTMLCanvasElement>(() => { /* the loop never draws again */ }) }, [3]);
+  await vi.advanceTimersByTimeAsync(3000 + 4400);
+  expect(faults).toEqual([]);
+  await vi.advanceTimersByTimeAsync(200);
+  expect(faults.map((f) => String(f.error))).toEqual(['Error: World not drawn: no world frame drew in 4500 ms of play']);
+  stopped.dispose();
 });
