@@ -14,7 +14,7 @@ import { bakedGridCollision } from '../gridCollision';
 import type { GridCollisionStrip } from '../../../src/shared/game/grid/gridCollision';
 import { memoryPlayerSaves } from '../../../src/server/host/dedicated/playerSaves';
 import { World, type WorkerLink, type WorldOptions } from '../../../src/server/host/dedicated/world';
-import { declaredCells } from '../../../src/server/host/dedicated/workerTable';
+import { declaredCells, type DeclaredCell } from '../../../src/server/host/dedicated/workerTable';
 import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../../../src/server/host/headlessRuntime';
 import { builtFolder } from '../../../src/test/game/builtFolder';
@@ -32,7 +32,10 @@ export async function folderInput(directory: string): Promise<HeadlessRuntimeInp
 }
 /** The real door on a real localhost port, with its workers on this thread over real ports, the same code a worker runs. */
 export interface RoomBench { readonly url: string; readonly world: World; /** The door's HTTP server: a test may answer requests on it, as `/health` does. */ readonly server: Server; readonly room: (slug: string) => DedicatedRoom | undefined; /** GC15: each worker's road, by its name (`roadName`), with `crossing`. */ readonly road: (name: string) => RoadRoom | undefined; readonly lines: Record<string, unknown>[]; readonly crashes: unknown[]; restarts: number; close: () => Promise<void> }
- export async function roomBench(options: Partial<WorldOptions> & { readonly holdMs?: number; readonly emptyMs?: number; readonly newsDelayMs?: number; readonly roomNow?: () => number; /** SC1: each worker's reading period instead of 10 s. */ readonly readingMs?: number; /** J353: an always-on road, on the baked grid's strips. */ readonly crossing?: boolean; /** GC28: the strips the road reads instead (a book with no grid pack reads none). */ readonly strips?: () => Promise<readonly GridCollisionStrip[]>; /** SA47: how a room reads its shard, as a worker's pack reader does; built products by default. */ readonly load?: (slug: string) => Promise<HeadlessRuntimeInput>; /** QA 11-15 row 8: `WORLD_BOOST=off` when false. */ readonly developerBoost?: boolean } = {}): Promise<RoomBench> {
+ /** ONE-FORMAT OF31h3: the awake cost (ms per tick) each of these shards declares in its next pin (`awakeMicros` 2741 and 1755),
+ *  for a bench over pins that predate it. */
+const PENDING_COSTS: Readonly<Record<string, number>> = { 'nalati-grasslands': 2.741, 'driftwood-isle': 1.755 };
+export async function roomBench(options: Partial<WorldOptions> & { readonly holdMs?: number; readonly emptyMs?: number; readonly newsDelayMs?: number; readonly roomNow?: () => number; /** SC1: each worker's reading period instead of 10 s. */ readonly readingMs?: number; /** J353: an always-on road, on the baked grid's strips. */ readonly crossing?: boolean; /** GC28: the strips the road reads instead (a book with no grid pack reads none). */ readonly strips?: () => Promise<readonly GridCollisionStrip[]>; /** SA47: how a room reads its shard, as a worker's pack reader does; built products by default. */ readonly load?: (slug: string) => Promise<HeadlessRuntimeInput>; /** QA 11-15 row 8: `WORLD_BOOST=off` when false. */ readonly developerBoost?: boolean } = {}): Promise<RoomBench> {
   const { holdMs, emptyMs, newsDelayMs = 0, roomNow, readingMs, crossing, strips, load = serverInput, developerBoost, ...door } = options, roads = new Map<string, RoadRoom>(), delivery = new Scope('room bench IPC'), rooms = new Map<string, DedicatedRoom>(), lines: Record<string, unknown>[] = [], crashes: unknown[] = [], stops: (() => void)[] = [], bench: { restarts: number } = { restarts: 0 };
   const boot = (slugs: readonly string[]): WorkerLink => {
     const { port1, port2 } = new MessageChannel();
@@ -43,7 +46,10 @@ export interface RoomBench { readonly url: string; readonly world: World; /** Th
       listen: (news, _ended) => { port1.onmessage = (event: MessageEvent<WorkerNews>): void => { if (newsDelayMs === 0) news(event.data); else delivery.timeout(newsDelayMs, () => { news(event.data); }); }; }, stop };
   };
   // ONE-FORMAT OF31h4: as the box does (main.ts), each cell's own pinned shard header declares its awake cost and shared worker
-  const declared = await declaredCells(options.cells ?? ['driftwood-isle'], cell => Promise.resolve().then(() => JSON.parse(readFileSync(`out/${cell}/shard.json`, 'utf8')) as unknown));
+  const pinned = await declaredCells(options.cells ?? ['driftwood-isle'], cell => Promise.resolve().then(() => JSON.parse(readFileSync(`out/${cell}/shard.json`, 'utf8')) as unknown));
+  // OF31h3's declared awake costs for the shards whose pins don't carry them yet; a pin that declares its own wins (T4, J490)
+  const declared = new Map<string, DeclaredCell>(pinned);
+  for (const [cell, awakeMs] of Object.entries(PENDING_COSTS)) if ((options.cells ?? ['driftwood-isle']).includes(cell) && !declared.has(cell)) declared.set(cell, { awakeMs });
   const world = await World.open({ build: 'bench', cells: ['driftwood-isle'], declared, workers: 4, seats: 32, secret: 'bench', boot, saves: memoryPlayerSaves(), log: line => { lines.push(line); }, crashed: error => { crashes.push(error); }, restart: () => { bench.restarts++; }, ...(crossing === true ? { roads: true } : {}), ...door });
   const server: Server = createServer();
   server.on('upgrade', (request, socket, head) => { world.upgrade(request, socket, head); });
