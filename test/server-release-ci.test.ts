@@ -247,6 +247,15 @@ test('GO7: a release of every pin opens every grid cell, under the slug the grid
   expect(worldCells('grid', served)).toHaveLength(cells.length);
 });
 
+test('NB7: a release that names a retired row is refused at publish, before any server reads it', () => {
+  const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as { shards: { slug: string; revision: number }[] };
+  // meta NEVER-BREAK-LIVE I6: E7 still listed the retired `_template` (J434) and the live rooms preload rejected it at
+  // restart. The release's own pins are the catalogue the engine serves; a row outside them never reaches a signed file.
+  expect(pins.shards.some(row => row.slug === '_template')).toBe(false);
+  expect(() => releaseShards(pins, 'driftwood-isle,_template')).toThrow('No pinned revision for _template');
+  expect(() => releaseShards(pins, 'driftwood-isle,cinder-orchard')).toThrow('No pinned revision for cinder-orchard');
+});
+
 test('J234: every run signs with main\'s publisher and builds in the source\'s own tree', () => {
   const workflow = readFileSync('.github/workflows/server-release.yml', 'utf8'), publish = workflow.slice(workflow.indexOf('\n  publish:'));
   const checkouts = [...publish.matchAll(/- uses: actions\/checkout@[^\n]+\n\s+with:\n((?:\s{10}[^\n]+\n)+)/gu)].map(match => match[1] ?? '');
