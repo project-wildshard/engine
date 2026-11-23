@@ -45,7 +45,8 @@ export function movePin(pins: PinFile, document: PinnedDocument, pin: Pin, first
  *  moved it by hand in a follow-up commit (Nine r6 `32236ee94`, Pine `b93a7c5e8`, Nalati r6 `211ba9d49`). The pin commit
  *  moves it: `refused` stays a refusal on the new pin, otherwise `pin` names it. The land's released-save-play run is the
  *  proof that the save still resumes; a pin whose level refuses it goes red there and the lane writes `refused`. */
-export function moveSavePin(save: Readonly<Record<string, unknown>>, hash: string): Record<string, unknown> {
+type SaveFixture = Readonly<{refused?: unknown; shardfile?: unknown; pin?: unknown; [key: string]: unknown}>;
+export function moveSavePin(save: SaveFixture, hash: string): Record<string, unknown> {
   if (typeof save.refused === 'string') return {...save, refused: hash};
   if (save.shardfile === hash) {
     const {pin: _pin, ...made} = save;
