@@ -28,6 +28,7 @@ import { createQuestLedger } from '@wildshard/engine/game/quest/ledger';
 import { admitLedgerRewards } from '@wildshard/engine/game/ledger';
 import { installCellHome } from '@wildshard/engine/game/grid/cellHome';
 import { serverDiscoveries, serverPlaces } from '@wildshard/engine/game/quest/serverPlaces';
+import { bindCompletionSeen, completionCardRows } from '@wildshard/engine/game/quest/completionSeen';
 import type { PlaceArea } from '@wildshard/engine/quest/lastPlace';
 import { RESPAWN_NOW_ACT, STORY_ACT, UNSTUCK_ACT } from '@wildshard/engine/net/acts';
 import { prepareServerChapters } from '@wildshard/engine/game/quest/serverChapters';
@@ -191,7 +192,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     const installed = chapters === undefined ? around : { ...around, install: (host: SimHost, record: (name: string, entity: string) => void): void => { chapters(host, record); } };
     const resident = await bootTask(snapshot === undefined ? 'server:simulation-and-collision-create' : 'server:continuation-restore', () => createNativeHeadlessResident(input, snapshot, page === undefined ? installed : { ...installed, page })), { host } = resident;
     if (snapshot !== undefined) removeChunkEdgeWalls(host.physics); // GC36: a world saved while lone cells had walls
-    bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined, snapshot !== undefined);
+    bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product)); bindCompletionSeen(host, completionCardRows(input.product, input.shard)); await installServerDoors(host, input.product, seeded ? pageOpenDoors(options.saves, placed) : undefined, snapshot !== undefined);
     host.respawn.served = true; actRoutes(host).introLocks = true;
     const owned = ownedOf(host, input, options.owned, options.profiles, options.shard), fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
     return { host, owned, fallFloor, fall: fallFloor(), resident, dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,
@@ -206,6 +207,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
   installRoomRespawn(host, await dataCellPlaces(input));
   installDeclaredClimate(host, input.shard.rows);
   bindDiscovery(host, input.product === undefined ? [] : await serverDiscoveries(input.product));
+  bindCompletionSeen(host, completionCardRows(input.product, input.shard));
   host.respawn.served = true; actRoutes(host).introLocks = true;
   const fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
   return { host, owned: ownedOf(host, input, options.owned, options.profiles, options.shard), fallFloor, fall: fallFloor(), dispose, fact, effects: () => effects, adopt: saved => { const held = sim(); return held === undefined || (saved === undefined ? importPageProgress(options.saves, placed, input.shard, held) : carryRefusedSave(input.shard, held, saved)); }, step: inputs => {

@@ -1012,6 +1012,7 @@
     "./game/loot/playerOwned": "./src/server/game/loot/playerOwned.ts",
     "./game/roomRespawn": "./src/server/game/roomRespawn.ts",
     "./game/quest/serverPlaces": "./src/server/game/quest/serverPlaces.ts",
+    "./game/quest/completionSeen": "./src/server/game/quest/completionSeen.ts",
     "./game/loadout/itemCatalogue": "./src/shared/game/loadout/itemCatalogue.ts",
     "./game/shardfile/nativePlan": "./src/server/game/shardfile/nativePlan.ts",
     "./game/shardfile/installedSides": "./src/server/game/shardfile/installedSides.ts",

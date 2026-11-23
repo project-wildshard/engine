@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { parseCompletion } from '@wildshard/format/completion';
-import { defaultCompletionRows } from '../src/client/game/complete/defaultCard';
+import { defaultCompletionRows } from '../src/shared/game/quest/defaultCard';
 
 // SHARD-COMPAT CP6 (Q10): a shard without `ui/completion` is admitted and gets the engine's default card, which opens when
 // its last tracked quest completes; a shard with no quest gets none. The rows pass format's own completion schema.

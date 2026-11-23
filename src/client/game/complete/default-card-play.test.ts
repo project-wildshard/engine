@@ -9,7 +9,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { completeEntry } from './ShardComplete';
 import { installShards } from '../shard/list';
 import type { CompletionContext } from './declared';
-import { defaultCompletionRows } from './defaultCard';
+import { defaultCompletionRows } from '../../../shared/game/quest/defaultCard';
 import { installCellCompletion } from '../grid/dataCellCompletion';
 
 afterEach(() => { document.body.replaceChildren(); });

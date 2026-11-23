@@ -25,7 +25,7 @@ import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { bindSceneSourceLooks } from './sceneSources';
 import { bindPaintedMaterialMaps } from '../looks/paintedLook';
 import { installCompletion } from '../complete/declared';
-import { defaultCompletionRows } from '../complete/defaultCard';
+import { defaultCompletionRows } from '../../../shared/game/quest/defaultCard';
 import { retainsRuntimeServices } from '../shard/retainedHooks';
 import { installPageItemContexts } from './pageItems';
 import { ktx2TranscodeSupport } from '@wildshard/engine/core/ktx2';
