@@ -1,7 +1,7 @@
 // SHARD-COMPAT LS1/LS9: the three boot stamps gen:inputs writes from the installed pins (scripts/app-build/gen.ts) are
 // build outputs, ignored by Git and never committed, so gen:inputs leaves `git status` clean in any checkout and land
 // has nothing to commit. A checkout that has never run gen:inputs (a fresh clone, a worktree past the untracking commit)
-// writes them on first need: `pnpm install` (prepare), typecheck, vitest and lint call ensureBootStamps.
+// writes them from the build, test, typecheck and lint entry points. Git tag consumers install without a build hook.
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

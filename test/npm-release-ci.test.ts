@@ -10,6 +10,11 @@ const command = step.slice(step.indexOf('        run: |\n') + '        run: |\n'
   step.indexOf("          node --input-type=module <<'JS'"));
 const build = 'a'.repeat(40);
 const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
+test('the release tag installs without package build lifecycle hooks', () => {
+  const { scripts } = JSON.parse(readFileSync('package.json', 'utf8')) as { scripts: Record<string, string> };
+  expect(['prepare', 'prepublish', 'prepack', 'publish'].filter(name => scripts[name])).toEqual([]);
+});
+
 const run = 44867215030;
 const proof = { build, j475: { releaseCi: run } };
 const ci = {
