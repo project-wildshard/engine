@@ -155,3 +155,36 @@ test('a sliced pool merges every change in slices and holds a parent mask until 
   expect(pool.settle(0, tick)).toBe(true);
   owner.dispose(); expect(culler.plans.size).toBe(0); material.dispose();
 });
+
+// DW3: sliced, a publish during a merge lets that merge land (a busy ring still lands merges), a mask asked after the
+// publish waits for the next merge, and a retirement of a tile the merge reads restarts it
+test('a sliced merge lands through a publish, and a mask waits for the merge that holds its child', () => {
+  const owner = new Scope('road pool sliced busy'), material = new MeshBasicMaterial(), culler: RoadCuller = { pitch: 562.5, tileSize: 62.5, plans: new Map() };
+  const pool = new RoadTilePool(owner, material, culler, 'road');
+  const coarse = fixture(0);
+  const parentData: RoadTileGeometry = { ...coarse, identity: { x: 0, z: 0 },
+    plan: { ...coarse.plan, bins: [{ sphere: new Sphere(undefined, 1), start: 0, count: 3, levels: [], tile: { x: 0, z: 0 } },
+      { sphere: new Sphere(undefined, 1), start: 0, count: 0, levels: [], tile: { x: 1, z: 0 } }] } };
+  pool.slice();
+  const parent = pool.publish({ key: 'p:l1:0,0', instance: 'p', level: 'l1', x: 0, z: 0, type: 'road' }, parentData, owner.child('p'));
+  let clock = 0; const tick = (): number => clock++;
+  while (!pool.settle(0, tick)) { /* slices */ }
+  const a = fixture(1), b = fixture(2);
+  pool.publish(descriptor('a'), a, owner.child('a'));
+  expect(pool.settle(0, tick)).toBe(false); // the merge with `a` has started
+  pool.publish(descriptor('b'), b, owner.child('b')); parent.mask(new Set([1]));
+  const first = pool.mesh();
+  while (pool.mesh() === first) pool.settle(0, tick);
+  expect(pool.mesh().geometry.getAttribute('position').count).toBe(6); // parent + a: landed through b's publish
+  expect(culler.plans.get(pool.mesh())?.bins.map(bin => bin.visibility?.visible)).toEqual([true, true, true]); // mask waits
+  while (!pool.settle(0, tick)) { /* slices */ }
+  expect(pool.mesh().geometry.getAttribute('position').count).toBe(9);
+  expect(culler.plans.get(pool.mesh())?.bins.map(bin => bin.visibility?.visible)).toEqual([true, false, true, true]);
+  // a retirement of a tile the merge reads restarts it
+  const c = fixture(3), cView = pool.publish(descriptor('c'), c, owner.child('c'));
+  expect(pool.settle(0, tick)).toBe(false);
+  cView.dispose();
+  while (!pool.settle(0, tick)) { /* slices */ }
+  expect(pool.mesh().geometry.getAttribute('position').count).toBe(9);
+  owner.dispose(); material.dispose();
+});

@@ -108,10 +108,10 @@ export class RoadTilePool {
   private deferred = false;
   /** DW3 (mini-dw3, `debug.roadPoolSliced`): stays deferred after `settle`; masks wait in `masks` for the merge */
   private sliced = false;
-  private readonly masks = new Map<Map<CullPlan['bins'][number], { visible: boolean }>, () => void>();
+  private readonly masks = new Map<Map<CullPlan['bins'][number], { visible: boolean }>, { readonly revision: number; readonly apply: () => void }>();
   private revision = 0;
   private built = 0;
-  private job: { readonly revision: number; readonly steps: Generator<void, { geometry: BufferGeometry; plan: CullPlan }> } | null = null;
+  private job: { readonly revision: number; readonly steps: Generator<void, { geometry: BufferGeometry; plan: CullPlan }>; readonly entries: ReadonlySet<object> } | null = null;
   constructor(private readonly owner: Scope, private readonly material: Material, private readonly culler: RoadCuller, private readonly name: string, private readonly receiveShadow = true, private readonly renderOrder = 0) {
     if (!Number.isFinite(renderOrder)) throw new Error('Invalid road render order');
     if (owner.disposed || owner.disposing) throw new Error('Road tile pool owner retired');
@@ -146,6 +146,8 @@ export class RoadTilePool {
       if (this.resident.get(tile.key) !== entry) return;
       this.resident.delete(tile.key);
       if (this.owner.disposed || this.owner.disposing) return;
+      // DW3 (sliced): a merge reading this tile cannot finish once its data goes; one that does not read it runs on
+      if (this.sliced && this.job?.entries.has(entry) === true) { abandon(this.job.steps); this.job = null; }
       if (this.deferred) { this.revision++; return; }
       try { this.rebuild(); }
       catch (error) { this.owner.dispose(); throw error; }
@@ -166,7 +168,7 @@ export class RoadTilePool {
         }
       };
       // DW3 (sliced): a merge in flight holds the old draw; the parent's mask shows with the merge that holds its children
-      if (this.sliced && (this.job !== null || this.built !== this.revision)) this.masks.set(flags, apply);
+      if (this.sliced && (this.job !== null || this.built !== this.revision)) this.masks.set(flags, { revision: this.revision, apply });
       else { this.masks.delete(flags); apply(); }
     },
       shadow: () => { /* Road geometry retains its original no-caster contract. */ }, dispose: () => { scope.dispose(); } };
@@ -197,12 +199,13 @@ export class RoadTilePool {
   settle(ms: number, now: () => number): boolean {
     if (!this.deferred) return true;
     if (this.owner.disposed || this.owner.disposing) throw new Error('Road tile pool owner retired');
-    if (this.job === null && this.built === this.revision) { this.showMasks(); if (!this.sliced) this.deferred = false; return true; }
-    if (this.job !== null && this.job.revision !== this.revision) { abandon(this.job.steps); this.job = null; }
+    if (this.job === null && this.built === this.revision) { this.showMasks(this.revision); if (!this.sliced) this.deferred = false; return true; }
+    // DW3 (sliced): a publish meanwhile lets the merge finish (the next one adds it), so a busy ring still lands merges
+    if (!this.sliced && this.job !== null && this.job.revision !== this.revision) { abandon(this.job.steps); this.job = null; }
     if (this.job === null) {
       const entries = [...this.resident.values()];
       const flags = new Map(entries.flatMap(entry => [...entry.flags]));
-      this.job = { revision: this.revision, steps: mergeRoadTileSteps(entries.map(entry => entry.data), flags) };
+      this.job = { revision: this.revision, steps: mergeRoadTileSteps(entries.map(entry => entry.data), flags), entries: new Set(entries) };
     }
     const job = this.job, started = now();
     for (;;) {
@@ -214,19 +217,18 @@ export class RoadTilePool {
         try { this.install(next.value); }
         catch (error) { this.owner.dispose(); throw error; }
         this.built = job.revision;
+        this.showMasks(job.revision);
         if (this.built !== this.revision) return false;
-        this.showMasks();
         if (!this.sliced) this.deferred = false;
         return true;
       }
       if (now() - started >= ms) return false;
     }
   }
-  /** DW3: the masks that waited for this merge show with it. */
-  private showMasks(): void {
-    if (this.masks.size === 0) return;
-    const waiting = [...this.masks.values()]; this.masks.clear();
-    for (const apply of waiting) apply();
+  /** DW3: the masks that waited for this merge show with it: those asked at its revision or before (a mask follows the
+   *  publish or retirement of the children it covers, so the merge that holds those children shows it). */
+  private showMasks(upTo: number): void {
+    for (const [flags, mask] of this.masks) if (mask.revision <= upTo) { this.masks.delete(flags); mask.apply(); }
   }
   private rebuild(): void {
     const entries = [...this.resident.values()];
