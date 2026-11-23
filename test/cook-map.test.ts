@@ -16,7 +16,7 @@ import {readTar} from '@wildshard/format/tar';
 import {cookShard, openShardfile, writeCookedMap} from '../src/cook/game/shardCook';
 import {createPartEncoder} from '../src/cook/game/spawnParts';
 import {COOKED_CELL_SIZE, COOKED_MAP_SIZE, encodeMapPng, renderCookedMap, type MapSource} from '../src/cook/game/cookedMap';
-import {cookedMapPath} from '../src/shared/game/shardfile/cookedMapPath';
+import {cookedMapPath, FLAT_MAP_SPREAD} from '../src/shared/game/shardfile/cookedMapPath';
 import {legacyBrasscap} from './fixtures/stale-preparation';
 
 const root = mkdtempSync(join(tmpdir(), 'cook-map-'));
@@ -124,4 +124,41 @@ test('a platform in the world tiles draws above the old 60 metre cutoff', () => 
   const {rgba, size} = renderCookedMap(source(true, 125), {size: 256});
   const [red, green] = pixel(rgba, size, 120, 120);
   expect(red).toBeGreaterThan((green ?? 0) * 2);
+});
+
+// MAP-NEXT MN5 (J450): a cook never ends without a map. A world render that throws (a GLB the decoder can't take) falls back to
+// the terrain's heights, hillshaded, with the declared water; if that throws too, a ground-colour map with the zone's outline and
+// its name. Both sizes are still written beside the header, so the worker's index lists both keys.
+test('a shard whose GLBs break the world render still writes both maps, drawn from its terrain', {timeout: 120_000}, async () => {
+  const shard = openShardfile(legacyBrasscap()), out = process.env['MN5_OUT'] === undefined ? join(root, 'terrain-fallback') : join(process.env['MN5_OUT'], 'terrain'), warned: string[] = [];
+  const map = await writeCookedMap(shard, out, {warn: line => { warned.push(line); }, world: () => { throw new Error('GLB decoder refused a mesh'); }});
+  expect(map.drawn).toBe('terrain');
+  expect(map.glbs).toBe(0);
+  expect(map.terrainTiles).toBeGreaterThan(0);
+  expect(warned.join('\n')).toContain('GLB decoder refused a mesh');
+  for (const [size, side] of [['full', COOKED_MAP_SIZE], ['cell', COOKED_CELL_SIZE]] as const) {
+    const {data, info} = await sharp(readFileSync(join(out, cookedMapPath(shard.slug, size)))).raw().toBuffer({resolveWithObject: true});
+    expect([info.width, info.height]).toEqual([side, side]);
+    const {sd, colours} = spread(new Uint8Array(data), info.channels);
+    expect(sd).toBeGreaterThan(FLAT_MAP_SPREAD);   // the ground's own relief, not a flat square (the page's flat-map line)
+    expect(colours).toBeGreaterThan(8);             // a palette PNG: Brasscap's sand in many shades, its road, its relief
+  }
+});
+
+test('when the terrain render fails too, the map is the ground colour with the zone outline and its name', async () => {
+  const shard = openShardfile(legacyBrasscap()), out = process.env['MN5_OUT'] === undefined ? join(root, 'plain-fallback') : join(process.env['MN5_OUT'], 'plain'), boom = (): never => { throw new Error('no render'); };
+  const map = await writeCookedMap(shard, out, {world: boom, terrain: boom});
+  expect(map.drawn).toBe('plain');
+  for (const [size, side] of [['full', COOKED_MAP_SIZE], ['cell', COOKED_CELL_SIZE]] as const) {
+    const {data, info} = await sharp(readFileSync(join(out, cookedMapPath(shard.slug, size)))).raw().toBuffer({resolveWithObject: true});
+    expect([info.width, info.height]).toEqual([side, side]);
+    const pixels = new Uint8Array(data), at = (x: number, y: number): number => (y * side + x) * info.channels;
+    expect(spread(pixels, info.channels).colours).toBeGreaterThan(2);
+    // the outline: the frame's edge differs from the ground just inside it
+    expect(pixels[at(1, Math.floor(side / 2))]).not.toBe(pixels[at(Math.floor(side / 8), Math.floor(side / 2))]);
+    // the name: light lettering across the middle band
+    let light = 0;
+    for (let y = Math.floor(side * 0.4); y < side * 0.6; y++) for (let x = 0; x < side; x++) if ((pixels[at(x, y)] ?? 0) > 200) light++;
+    expect(light).toBeGreaterThan(side);
+  }
 });

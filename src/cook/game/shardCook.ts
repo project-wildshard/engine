@@ -29,7 +29,7 @@ import {phoneTier, splatPhoneTier, type Astc6Encode, type SplatPhoneLayer} from 
 import {splatTerrainOf} from '@wildshard/format/splatTerrain';
 import {wasmAstc6} from './astc6Wasm';
 import {createPartEncoder, packable, writeSpawnParts, type CookedMember, type PartEncoder} from './spawnParts';
-import {cookedMapPngs, type CookedMapStats} from './cookedMap';
+import {cookedMapPngs, type CookedMapOptions, type CookedMapStats, type MapDrawn} from './cookedMap';
 import {cookedMapPath} from '../../shared/game/shardfile/cookedMapPath';
 
 export type CookTier = 'phone' | 'desktop';
@@ -386,7 +386,7 @@ export interface CookReport {
   readonly parts: {readonly count: number; readonly rawBytes: number; readonly wireBytes: number};
   readonly server: {readonly url: string; readonly index: string; readonly wireBytes: number; readonly files: number};
   /** J450: the top-down map the cook drew (`cookedMap.ts`), at `cookedMapPath`. */
-  readonly map: {readonly full: number; readonly cell: number} & CookedMapStats;
+  readonly map: {readonly full: number; readonly cell: number; readonly drawn: MapDrawn} & CookedMapStats;
 }
 
 export type CookShardPhase = 'textures' | 'client-packs' | 'server-packs';
@@ -459,15 +459,18 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
     mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, half.shard.read(path));
   }
   // J450: write both maps before the worker can publish the checked upload.
-  const map = await writeCookedMap(half.shard, out);
+  const map = await writeCookedMap(half.shard, out, options.warn === undefined ? {} : {warn: options.warn});
   return {slug: half.shard.slug, preparation: half.shard.preparation, seconds: (options.now() - started) / 1000, manifests, loose: loose.map(row => row.url), map, server: {url: server.url, index: `/${serverIndex}`, wireBytes: [server, ...server.more ?? []].reduce((sum, part) => sum + part.wireBytes, 0), files: [server, ...server.more ?? []].reduce((sum, part) => sum + part.files.length, 0)},
     parts: {count: after.parts - before.parts, rawBytes: after.rawBytes - before.rawBytes, wireBytes: after.wireBytes - before.wireBytes}};
 }
 
 /** J450: draw the shard's map from its own world and write both sizes beside its header.
- * The worker publishes them under the upload's loose folder. A failed write leaves the cook unqualified. */
-export async function writeCookedMap(shard: Pick<OpenShardfile, 'slug' | 'index' | 'sections' | 'read'>, out: string): Promise<CookReport['map']> {
-  const {full, cell, stats} = await cookedMapPngs({files: shard.index.files, sections: shard.sections, read: shard.read});
+ * The worker publishes them under the upload's loose folder. A failed write leaves the cook unqualified. MAP-NEXT MN5: a render
+ * never does; `cookedMapPngs` falls back to the terrain map, then to the plain map with the zone's name (`options` are its seams). */
+export async function writeCookedMap(shard: Pick<OpenShardfile, 'slug' | 'index' | 'sections' | 'read'>, out: string, options: Omit<CookedMapOptions, 'name'> = {}): Promise<CookReport['map']> {
+  const named: unknown = Reflect.get(shard.index.identity, 'name');
+  const name = typeof named === 'string' && named.trim() !== '' ? named : shard.slug.replace(/^_/u, '').replaceAll('-', ' ');
+  const {full, cell, stats} = await cookedMapPngs({files: shard.index.files, sections: shard.sections, read: shard.read}, undefined, {...options, name});
   for (const [path, bytes] of [[cookedMapPath(shard.slug, 'full'), full], [cookedMapPath(shard.slug, 'cell'), cell]] as const) {
     const file = join(out, path);
     mkdirSync(dirname(file), {recursive: true});

@@ -36,6 +36,7 @@ import {cookPreparedLine, sidecarPath} from './cookSidecar';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {installedRuntimeReads} from './installedRuntimeReads';
 import {cookIndexPath, readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
+import {cookedMapPath} from '../../shared/game/shardfile/cookedMapPath';
 
 /** `expected`: the API's migrated copy of this head at the engine's format (CP2b2b), which the cook's own copy must match. */
 export interface CatalogueRow {readonly slug: string; readonly revision?: number; readonly hash: string; readonly expected?: ExpectedCopy}
@@ -468,6 +469,11 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     // CP2b2b: the cook and the API ran one chain on one original; a different digest under the same chain is never published.
     const disagrees = provenanceRefusal(head.slug, outcome.report.provenance, expectations.get(head.hash));
     if (disagrees !== undefined) return {...head, state: 'refused', detail: disagrees};
+    // MAP-NEXT MN5 (J450): a cook always draws both maps (`cookedMapPngs` falls back rather than throw), so a report without one
+    // is a job from before it or a broken one: its index would list no cooked-map-v1, and the page would draw the olive plot.
+    const client = join(work, 'out/client'), report = outcome.report;
+    if (report.cook.map === undefined || !(['full', 'cell'] as const).every(size => existsSync(join(client, cookedMapPath(report.slug, size)))))
+      return {...head, state: 'failed', detail: 'The cook drew no map (J450): its index would list no cooked-map-v1'};
     await publish(work, outcome.report, head.hash);
     const {preparation} = outcome.report.cook;
     return {...head, state: 'cooked', check: outcome.report.check, seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};

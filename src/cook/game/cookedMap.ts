@@ -245,7 +245,7 @@ function worldFiles(source: MapSource): {readonly terrain: readonly MapSourceFil
 }
 
 /** Draw the map: the raster, then the water, the light, the ink and the exposure, as RGBA. */
-export function renderCookedMap(source: MapSource, options: {readonly size?: number; readonly texture?: TextureMean | undefined} = {}): CookedMap {
+export function renderCookedMap(source: MapSource, options: {readonly size?: number; readonly texture?: TextureMean | undefined; readonly objects?: boolean} = {}): CookedMap {
   const size = options.size ?? COOKED_MAP_SIZE, raster = new Raster(size);
   let skipped = 0, terrainTiles = 0, glbs = 0, water = 0;
   const {terrain, glbs: glbFiles} = worldFiles(source);
@@ -278,7 +278,8 @@ export function renderCookedMap(source: MapSource, options: {readonly size?: num
     }
     return tex === undefined ? base : [base[0] * tex[0], base[1] * tex[1], base[2] * tex[2]];
   };
-  for (const row of glbFiles) { try { glbTriangles(raster, source.read(row.path), material); glbs++; } catch { skipped++; } }
+  // MAP-NEXT MN5: `objects: false` is the terrain map, drawn when the world's GLBs broke the full render
+  if (options.objects !== false) for (const row of glbFiles) { try { glbTriangles(raster, source.read(row.path), material); glbs++; } catch { skipped++; } }
 
   const {top, rgb, what} = raster, n = size * size, mpp = METRES / size;
   // water: each declared body at its level, over whatever is under it
@@ -491,10 +492,82 @@ export async function basisuTextureMean(): Promise<TextureMean | undefined> {
   } catch { return undefined; }
 }
 
+/** MAP-NEXT MN5: which drawing a cooked map is. `world` is the full render; `terrain` the terrain's heights, hillshaded, with the
+ *  declared water (the world's GLBs broke the full render); `plain` the ground colour with the zone's outline and name. */
+export type MapDrawn = 'world' | 'terrain' | 'plain';
+
+/** A 5 by 7 capital font for the plain map's name: seven rows of five bits a glyph, the high bit leftmost. */
+const GLYPHS: Readonly<Record<string, string>> = {
+  A: '0e11111f111111', B: '1e11111e11111e', C: '0e11101010110e', D: '1e11111111111e', E: '1f10101e10101f', F: '1f10101e101010',
+  G: '0e11101711110f', H: '1111111f111111', I: '0e04040404040e', J: '0702020202120c', K: '11121418141211',
+  L: '1010101010101f', M: '111b1515111111', N: '11111915131111', O: '0e11111111110e', P: '1e11111e101010', Q: '0e11111115120d',
+  R: '1e11111e141211', S: '0f10100e01011e', T: '1f040404040404', U: '1111111111110e', V: '11111111110a04', W: '1111111515150a',
+  X: '11110a040a1111', Y: '1111110a040404', Z: '1f01020408101f', '0': '0e11131519110e', '1': '040c040404040e',
+  '2': '0e11010204081f', '3': '1f02040201110e', '4': '02060a121f0202', '5': '1f101e0101110e', '6': '0608101e11110e', '7': '1f010204080808',
+  '8': '0e11110e11110e', '9': '0e11110f01020c', '-': '0000000e000000', '.': '00000000000c0c', "'": '04040800000000', ' ': '00000000000000',
+};
+const glyphRows = (char: string): readonly number[] => {
+  const hex = GLYPHS[char] ?? GLYPHS[' '] ?? '';
+  return Array.from({length: 7}, (_, row) => Number.parseInt(hex.slice(row * 2, row * 2 + 2), 16) || 0);
+};
+
+/** MAP-NEXT MN5, the last fallback: the zone's ground colour, its 62.5 m plot grid, its outline and its name, as RGBA. Needs no
+ *  file of the shard, so it cannot fail on one. */
+export function renderPlainMap(name: string, size: number = COOKED_MAP_SIZE): CookedMap {
+  const out = new Uint8Array(size * size * 4), mpp = METRES / size;
+  const GROUND_SRGB = [74, 92, 46], GRID_SRGB = [64, 80, 40], EDGE = [200, 207, 174], INK = [18, 22, 14], LETTER = [242, 240, 224];
+  const paint = (x: number, y: number, rgb: readonly number[]): void => {
+    if (x < 0 || y < 0 || x >= size || y >= size) return;
+    const at = (y * size + x) * 4; out[at] = rgb[0] ?? 0; out[at + 1] = rgb[1] ?? 0; out[at + 2] = rgb[2] ?? 0; out[at + 3] = 255;
+  };
+  const edge = Math.max(2, Math.round(size / 128)), line = (v: number): boolean => Math.abs(((v * mpp) % 62.5 + 62.5) % 62.5) < mpp * 1.2;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const border = x < edge || y < edge || x >= size - edge || y >= size - edge;
+    paint(x, y, border ? EDGE : line(x) || line(y) ? GRID_SRGB : GROUND_SRGB);
+  }
+  // the name in capitals, wrapped by word to 80% of the width, each line centred, with a dark shadow so it reads on the ground
+  const words = name.toUpperCase().replaceAll(/[^A-Z0-9 .'-]+/gu, ' ').trim().split(/\s+/u).filter(word => word !== '');
+  const longest = Math.max(1, ...words.map(word => word.length)), whole = words.join(' ').length;
+  const scale = Math.max(1, Math.min(Math.floor(size / 40), Math.floor(size * 0.8 / (Math.min(whole, Math.max(longest, 14)) * 6))));
+  const perLine = Math.max(longest, Math.floor(size * 0.8 / (6 * scale)));
+  const lines: string[] = [];
+  for (const word of words) { const last = lines.at(-1); if (last !== undefined && last.length + 1 + word.length <= perLine) lines[lines.length - 1] = `${last} ${word}`; else lines.push(word); }
+  const lineHeight = 9 * scale, top = Math.round((size - lines.length * lineHeight + 2 * scale) / 2);
+  for (const [index, letters] of lines.entries()) {
+    const left = Math.round((size - (letters.length * 6 - 1) * scale) / 2), y0 = top + index * lineHeight;
+    for (const pass of [INK, LETTER]) {
+      const shift = pass === INK ? Math.max(1, Math.round(scale / 2)) : 0;
+      for (const [i, char] of letters.split('').entries()) for (const [row, bits] of glyphRows(char).entries()) for (let column = 0; column < 5; column++) {
+        if ((bits & (0x10 >> column)) === 0) continue;
+        for (let dy = 0; dy < scale; dy++) for (let dx = 0; dx < scale; dx++) paint(left + (i * 6 + column) * scale + dx + shift, y0 + row * scale + dy + shift, pass);
+      }
+    }
+  }
+  return {size, rgba: out, stats: {terrainTiles: 0, glbs: 0, triangles: 0, water: 0, skipped: 0, covered: 0}};
+}
+
+/** MAP-NEXT MN5: what draws a map and what it is called. `world` and `terrain` replace the two renders (a test's seam to prove the
+ *  fallbacks); `warn` hears each fallback and why. */
+export interface CookedMapOptions {
+  readonly name?: string;
+  readonly warn?: (line: string) => void;
+  readonly world?: (source: MapSource) => CookedMap | Promise<CookedMap>;
+  readonly terrain?: (source: MapSource) => CookedMap;
+}
+const reason = (error: unknown): string => error instanceof Error ? error.message : String(error);
+
 /** The cook's map for a product: the full PNG (the home cell's minimap), the cell copy (every other cell, the Bag map) and what
- *  drew them. Throws only on a programming error; the caller warns and the cook goes on. */
-export async function cookedMapPngs(source: MapSource, texture?: TextureMean): Promise<{readonly full: Uint8Array; readonly cell: Uint8Array; readonly stats: CookedMapStats}> {
-  await prepareGlbBuffers();
-  const map = renderCookedMap(source, {texture: texture ?? await basisuTextureMean()});
-  return {full: encodeMapPng(map.rgba, map.size, map.size), cell: encodeMapPng(downscaleMap(map.rgba, map.size, COOKED_CELL_SIZE), COOKED_CELL_SIZE, COOKED_CELL_SIZE), stats: map.stats};
+ *  drew them. MAP-NEXT MN5: it always returns both. A world render that throws falls back to the terrain map; a terrain map that
+ *  throws, or that covers nothing, falls back to the plain map, which reads no file. */
+export async function cookedMapPngs(source: MapSource, texture?: TextureMean, options: CookedMapOptions = {}): Promise<{readonly full: Uint8Array; readonly cell: Uint8Array; readonly stats: CookedMapStats & {readonly drawn: MapDrawn}}> {
+  const pngs = (map: CookedMap, drawn: MapDrawn): {readonly full: Uint8Array; readonly cell: Uint8Array; readonly stats: CookedMapStats & {readonly drawn: MapDrawn}} =>
+    ({full: encodeMapPng(map.rgba, map.size, map.size), cell: encodeMapPng(downscaleMap(map.rgba, map.size, COOKED_CELL_SIZE), COOKED_CELL_SIZE, COOKED_CELL_SIZE), stats: {...map.stats, drawn}});
+  const world = options.world ?? (async (from: MapSource): Promise<CookedMap> => { await prepareGlbBuffers(); return renderCookedMap(from, {texture: texture ?? await basisuTextureMean()}); });
+  try { return pngs(await world(source), 'world'); } catch (error) { options.warn?.(`cooked map: the world render failed (${reason(error)}); drawing the terrain map`); }
+  try {
+    const map = (options.terrain ?? ((from: MapSource): CookedMap => renderCookedMap(from, {objects: false})))(source);
+    if (map.stats.covered > 0.01) return pngs(map, 'terrain');
+    options.warn?.('cooked map: the terrain map covers nothing; drawing the plain map');
+  } catch (error) { options.warn?.(`cooked map: the terrain render failed (${reason(error)}); drawing the plain map`); }
+  return pngs(renderPlainMap(options.name ?? ''), 'plain');
 }

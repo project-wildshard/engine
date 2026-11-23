@@ -7,7 +7,7 @@ import {dirname, join} from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {createCookWorker, notifyServer} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
-import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
+import {hashOf, root, slug, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** C4 (J28, J29, J30): a real product and hostile ones through real child processes under their real limits. */
 // These stand in for the page's content and the cook's packed parts without allocating their disk space.
@@ -64,6 +64,16 @@ describe('the cook worker', () => {
     expect(existsSync(join(h.scratch, 'small', 'index'))).toBe(false);
     expect(downloads, 'a permanent publication refusal cannot download and cook the same shard again').toBe(1);
   }, 120_000);
+
+  it('refuses a cook report without its map, and publishes no index (MAP-NEXT MN5, J450)', async () => {
+    const hash = hashOf(h.real), folder = join(h.scratch, 'mapless');
+    const cook = createCookWorker({build: 'b7', store: folderStore(folder), source: h.source(new Map([[hash, h.real]])),
+      launcher: h.launcher(join(root, 'test/fixtures/cook-job-no-map.mjs')), serverPacks: join(h.scratch, 'server'), scratch: join(h.scratch, 'work')});
+    const row = await cook.cook({slug, hash});
+    expect(row).toMatchObject({state: 'failed'});
+    expect(row.detail).toContain('no map');
+    expect(existsSync(join(folder, 'index'))).toBe(false);
+  }, 60_000);
 
   it('still refuses when its own keys are over the default budget', async () => {
     const store = join(h.scratch, 'full');
