@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { attribute, blockingRun, cancelledJobs, failedNames, follow, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { attribute, blockingRun, cancelledJobs, failedNames, follow, fpsNight, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 import '../scripts/test/main-watch-red.test.mjs';
 
@@ -485,5 +485,24 @@ test('FM11: a red failure-mode proof is one fix-row receipt, never main red; gre
   sweep(watched);
   const lines = w.receipts.filter(line => line.includes('FAILMODES'));
   expect(lines).toEqual([`main FAILMODES 652afa6c00 run 42970000031 (schedule) failure: a fix row today, never main red (FM11, J229); receipt artifact failmodes-${sha('652afa6c')}`]);
+  expect(w.sent).toEqual([]);
+});
+
+test('DF7: a red Driftwood floors night names the pushers since the last green night, never main red', () => {
+  const log = ['05:50 UTC opus-red land plan/red-plan landed aaaa111100 on main (652afa6c00..aaaa111100); carried; rounds 1',
+    '05:51 UTC opus-other land plan/other landed bbbb222200 on main (aaaa111100..bbbb222200); exact; rounds 1'].join('\n');
+  const w = world(replay, log), io = fake('driftwood-fps', w);
+  const night = (id: number, conclusion: string | null, build: string, since: string | null, status = 'completed') =>
+    ({ ...run(id, '652afa6c', conclusion, 45, status), event: 'workflow_dispatch', display_title: `driftwood fps ${sha(build)} since ${since === null ? 'none' : sha(since)}` });
+  const fps = [night(45000000001, 'success', '652afa6c', null), night(45000000002, 'failure', 'bbbb2222', '652afa6c'),
+    night(45000000003, 'failure', 'aaaa1111', null, 'in_progress'), { ...night(45000000004, 'failure', 'x', null), display_title: 'driftwood fps no night since none' }];
+  const watched = { ...io, fpsRuns: () => fps };
+  expect(sweep(watched).map(row => row.kind)).not.toContain('red');
+  sweep(watched);
+  expect(w.receipts.filter(line => line.includes('DRIFTWOOD-FPS'))).toEqual([
+    'main DRIFTWOOD-FPS bbbb222200 run 45000000002 failure: a floor miss or a p95 more than 10% over the last green night 652afa6c00; a fix row for opus-other, opus-red, never a red main (DF7, J444)',
+    'main DRIFTWOOD-FPS run 45000000004 failed with no night in its name (see the run; DF7)',
+  ]);
+  expect(fpsNight({ display_title: `driftwood fps ${sha('aaaa1111')} since none` })).toEqual({ build: sha('aaaa1111'), since: null });
   expect(w.sent).toEqual([]);
 });

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 // DF7. Grade one pinned full-route table and compare p95 with a qualified night.
+//   node scripts/fps/nightly.mjs --table T --build SHA --out night.json [--previous night.json] [--since SHA] [--gate]
+//   node scripts/fps/nightly.mjs --receipt night.json [--gate]   the hosted report job: print a night the mini measured
+// The Mac mini measures (scripts/fps/nightly-mini.mjs) and the hosted driftwood-fps.yml job prints its night.
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -17,7 +20,8 @@ const read = (/** @type {string} */ file) => JSON.parse(readFileSync(file, 'utf8
  * cpu:number, floor:number, calibrated:boolean}, cold:Capture, warm:Capture|null}} Run */
 /** @typedef {{scope:string,zone:string,host:string,runs:Run[]}} Table */
 /** @typedef {{name:string, gap:number, fps:number, floor:number, p95:number, misses:string[], factors:string}} Result */
-/** @typedef {{host:string, gpu:string|null, qualifies:boolean, rows:Result[]}} Receipt */
+/** @typedef {{build?:string, host:string, gpu:string|null, hardware?:boolean, exact?:boolean, missing?:string[],
+ * qualifies:boolean, since?:string|null, rows:Result[]}} Receipt */
 
 /** @param {Table} table @param {string} build @param {Receipt|null} [previous] */
 export function reviewNight(table, build, previous = null) {
@@ -63,15 +67,29 @@ export function reviewNight(table, build, previous = null) {
   return {build, host:table.host, gpu, hardware, exact, missing, qualifies, rows};
 }
 
-/** @param {ReturnType<typeof reviewNight>} report @param {boolean} gate */
-function summary(report, gate) {
+/** A night from the mini, as the hosted job receives it: the shape summary() prints, or a throw.
+ * @param {unknown} value @returns {ReturnType<typeof reviewNight> & {since?:string|null}} */
+export function checkedReceipt(value) {
+  const night = /** @type {Record<string, unknown>} */ (value);
+  const sha = (/** @type {unknown} */ v) => typeof v === 'string' && /^[0-9a-f]{7,40}$/u.test(v);
+  const ok = typeof night === 'object' && night !== null && sha(night.build) && (night.since === undefined || night.since === null || sha(night.since)) &&
+    typeof night.qualifies === 'boolean' && Array.isArray(night.rows) && Array.isArray(night.missing) &&
+    night.rows.every(row => typeof row === 'object' && row !== null && profiles.includes(row.name) &&
+      ['gap', 'fps', 'floor', 'p95'].every(key => typeof row[key] === 'number') && Array.isArray(row.misses));
+  if (!ok) throw new Error('not a DF7 night (nightly.mjs --out)');
+  return /** @type {ReturnType<typeof reviewNight> & {since?:string|null}} */ (night);
+}
+
+/** @param {ReturnType<typeof reviewNight> & {since?:string|null}} report @param {boolean} gate */
+export function summary(report, gate) {
   const heading = `### DF7 ${gate ? 'qualification' : 'report only until DF15'}`;
   const errors = [
     ...report.exact ? [] : ['Missing the full route from the exact commit.'],
     ...report.hardware ? [] : ['A hardware Metal renderer was not identified.'],
     ...report.missing.length === 0 ? [] : [`Missing profiles ${report.missing.join(', ')}.`],
   ];
-  return [heading, '', `Build ${report.build} · ${report.host ?? 'unknown host'} · ${report.gpu ?? 'unknown GPU'}`, '',
+  const since = report.since ? ` · since the last green night ${report.since.slice(0, 10)}` : '';
+  return [heading, '', `Build ${report.build} · ${report.host ?? 'unknown host'} · ${report.gpu ?? 'unknown GPU'}${since}`, '',
     '| Profile | Floor | Worst cold FPS | Gap | Worst cold p95 ms | Verdict |',
     '|---|---:|---:|---:|---:|---|',
     ...report.rows.map(row => `| ${row.name} | ${row.floor} | ${row.fps.toFixed(2)} | ${row.gap.toFixed(2)} | ${row.p95.toFixed(2)} | ${row.misses.length > 0 ? row.misses.join(', ') : 'pass'} |`),
@@ -82,10 +100,16 @@ function summary(report, gate) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const {values} = parseArgs({options:{
     table:{type:'string'}, build:{type:'string'}, previous:{type:'string'}, out:{type:'string'}, gate:{type:'boolean',default:false},
+    since:{type:'string'}, receipt:{type:'string'},
   }});
-  if (!values.table || !values.build || !values.out) throw new Error('Supply --table, --build and --out');
-  const report = reviewNight(read(values.table), values.build, values.previous ? read(values.previous) : null);
-  writeFileSync(values.out, `${JSON.stringify(report,null,2)}\n`);
+  /** @type {ReturnType<typeof reviewNight> & {since?:string|null}} */
+  let report;
+  if (values.receipt) report = checkedReceipt(read(values.receipt));
+  else {
+    if (!values.table || !values.build || !values.out) throw new Error('Supply --table, --build and --out (or --receipt)');
+    report = {...reviewNight(read(values.table), values.build, values.previous ? read(values.previous) : null), since:values.since ?? null};
+    writeFileSync(values.out, `${JSON.stringify(report,null,2)}\n`);
+  }
   const markdown = summary(report, values.gate);
   console.log(markdown);
   if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${markdown}\n`);

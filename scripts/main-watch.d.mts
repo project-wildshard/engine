@@ -1,7 +1,7 @@
 import type { MemoryWarning } from './test-amber.mjs';
 import type { BudgetObservation, BudgetResult } from './budgets/watch.mjs';
 
-export interface Run {id:number;head_sha:string;status:string;conclusion:string|null;created_at:string;event:string;run_attempt?:number;blockingChecked?:boolean;advisoryVersion?:number;started?:boolean;blockingFailed?:boolean;nativeInfra?:string}
+export interface Run {id:number;head_sha:string;display_title?:string;status:string;conclusion:string|null;created_at:string;event:string;run_attempt?:number;blockingChecked?:boolean;advisoryVersion?:number;started?:boolean;blockingFailed?:boolean;nativeInfra?:string}
 export interface Job {id?:number;name:string;conclusion:string|null;started_at?:string|null;runner_id?:number|null;steps?:readonly {name:string;conclusion:string|null}[]}
 export interface MemoryQa {id:number;sha:string;created:string;warnings?:MemoryWarning[];pusher?:string;results?:readonly BudgetResult[]}
 export interface RedSpan {run:number;at:number;text:string;keeper:boolean;history?:{commits:string[];files:string[];jobs:string[]}}
@@ -20,6 +20,7 @@ export interface Io {
   nativeRuns?:()=>Run[];
   budgetRuns?:()=>Run[];
   failmodeRuns?:()=>Run[];
+  fpsRuns?:()=>Run[];
   budgetAnnotations?:(id:number)=>string;
   memoryQa?:(rows:MemoryQa[])=>void;
   quotaReset?:()=>number;
@@ -31,6 +32,7 @@ export function advisory(job:Job):boolean;
 export function failedNames(jobs:readonly Job[]):string[];
 export function blockingRun(run:Run,jobs:readonly Job[]):Run;
 export function cancelledJobs(jobs:readonly Job[]):{started:boolean,blockingFailed:boolean};
+export function fpsNight(run:{display_title?:string}):{build:string;since:string|null}|null;
 export function judge(runs:readonly Run[],state:State,tip:string|null):Verdict[];
 export function verdictFor(runs:readonly Run[],sha:string,contains:(ancestor:string,descendant:string)=>boolean):{state:'green'|'red';run:Run}|null;
 export function landers(text:string):Map<string,{lane:string;slug:string;pane?:string;count?:number}>;

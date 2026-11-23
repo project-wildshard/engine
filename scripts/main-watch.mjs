@@ -82,6 +82,12 @@ export const failedNames=jobs=>failedJobs(jobs).map(job=>job.name);
 
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
 const finished=(/** @type {Run} */run)=>run.status==='completed';
+/** The builds a driftwood-fps.yml run graded, from its run name (`driftwood fps <build> since <sha|none>`).
+ * @param {{display_title?:string}} run @returns {{build:string,since:string|null}|null} */
+export function fpsNight(run){
+  const match=/^driftwood fps ([0-9a-f]{40}) since ([0-9a-f]{40}|none)$/u.exec(run.display_title??'');
+  return match===null?null:{build:match[1],since:match[2]==='none'?null:match[2]};
+}
 /** FM11: a failure-mode run older than a nightly's day is history when the watcher first meets it, not today's fix row. */
 const FAILMODE_WINDOW_MS=26*60*60_000;
 /** Superseded, never red: a cancel that hid no blocking failure. Main pushes never cancel a started run (ci.yml's
@@ -435,6 +441,9 @@ export function liveIo(env=process.env){
     // FM11 (meta MMO-FAILURE-MODES, J229): the failure-mode browser proof (nightly, related pushes) reports beside ci.
     failmodeRuns:()=>sharedRuns(`${runsCache}.failmodes`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/failmodes.yml/runs?branch=main&per_page=15`])).workflow_runs)),
+    // DF7 (meta DRIFTWOOD-FPS): the mini's nightly Driftwood floors report; after DF15 a red one is a fix row.
+    fpsRuns:()=>sharedRuns(`${runsCache}.driftwood-fps`,()=>/** @type {Run[]} */(
+      JSON.parse(read(['api',`repos/${repo}/actions/workflows/driftwood-fps.yml/runs?branch=main&per_page=15`])).workflow_runs)),
     runSha:(/** @type {number} */id)=>String(JSON.parse(read(['api',`repos/${repo}/actions/runs/${id}`])).head_sha),
     nativeRuns:()=>sharedRuns(`${runsCache}.memory-footprint`,()=>/** @type {Run[]} */(
       JSON.parse(read(['api',`repos/${repo}/actions/workflows/memory-footprint.yml/runs?branch=main&per_page=15`])).workflow_runs)),
@@ -690,6 +699,23 @@ export function sweep(io,hint={}){
       state.judged.push(run.id);writeState(io.state,state);
       if(run.conclusion==='success'||run.conclusion==='cancelled'||run.conclusion==='skipped'||Date.parse(run.created_at)<dayAgo)continue;
       io.receipt(`main FAILMODES ${short(run.head_sha)} run ${run.id} (${run.event}) ${run.conclusion??'unknown'}: a fix row today, never main red (FM11, J229); receipt artifact failmodes-${run.head_sha}`);
+    }
+    // DF7 (J444, J464): a red Driftwood floors night (DF15 turns the gate on) is a fix row for whoever pushed since the
+    // last green night, never main red. The run name carries both builds (driftwood-fps.yml run-name).
+    let fpsRuns=/** @type {Run[]} */([]);
+    try{fpsRuns=io.fpsRuns?.()??[];}catch(error){
+      io.receipt(`driftwood fps status unavailable: ${error instanceof Error?error.message.split('\n')[0]:String(error)}`);
+    }
+    for(const run of fpsRuns.filter(row=>finished(row)&&!state.judged.includes(row.id)).sort(byCreated)){
+      state.judged.push(run.id);writeState(io.state,state);
+      if(run.conclusion!=='failure')continue;
+      const night=fpsNight(run);
+      if(night===null){io.receipt(`main DRIFTWOOD-FPS run ${run.id} failed with no night in its name (see the run; DF7)`);continue;}
+      let pushers=/** @type {string[]} */([]);
+      try{pushers=[...new Set(attribute(io.commits(night.since,night.build),who).map(row=>row.lander?.lane??'').filter(Boolean))];}
+      catch{/* a build main-watch cannot read still gets its receipt */}
+      io.receipt(`main DRIFTWOOD-FPS ${short(night.build)} run ${run.id} failure: a floor miss or a p95 more than 10% over the last green night`
+        +` ${night.since===null?'(none)':short(night.since)}; a fix row for ${pushers.length>0?pushers.join(', '):'no land receipt (pushed by hand or the queue)'}, never a red main (DF7, J444)`);
     }
     if(state.memoryQa.length>0&&io.memoryQa!==undefined){
       try{io.memoryQa(state.memoryQa);state.memoryQa=[];writeState(io.state,state);}catch(error){

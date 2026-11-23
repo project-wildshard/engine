@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { reviewNight } from '../../scripts/fps/nightly.mjs';
+import { checkedReceipt, reviewNight, summary } from '../../scripts/fps/nightly.mjs';
 import { fpsVerdict } from '../../scripts/fps/verdict.mjs';
 
 const build = 'exact-engine-build';
@@ -65,4 +65,13 @@ test('a quick development table cannot qualify even when its synthetic frames pa
 
 test('an explicitly reduced qualification table never qualifies nightly', () => {
   expect(reviewNight({...makeTable(),scope:'subset',mode:'qualify'},build)).toMatchObject({exact:false,qualifies:false});
+});
+
+test('the hosted job prints only a well-formed night from the mini, with the last green build', () => {
+  const night = { ...reviewNight(makeTable(), 'abcdef1234'), since: '0123456789' };
+  const round = checkedReceipt(JSON.parse(JSON.stringify(night)));
+  expect(summary(round, false)).toContain('since the last green night 0123456789');
+  expect(summary(round, false)).toContain('| phone-low | 60 |');
+  expect(() => checkedReceipt({ ...night, build: '$(rm -rf /)' })).toThrow('not a DF7 night');
+  expect(() => checkedReceipt({ ...night, rows: [{ name: 'phone-low', fps: '60' }] })).toThrow('not a DF7 night');
 });
