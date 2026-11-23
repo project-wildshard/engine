@@ -13,6 +13,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { BOSS_STRIKE,ELITE_TELL,ROAMING_VIEW } from '../src/shared/game/shardfile/wirePrompts';
 
 import { builtFolder } from './fixtures/engine-lift/folder';
+import { loadScaledMs } from './fixtures/loadBudget';
 
 // A page on a server steps no fight, so what a fight tells its views has to be said. Real products on a real resident: what a page
 // would paint or play, heard where a room hears it. Whether a page paints it is the row's browser proof, not this.
@@ -34,7 +35,9 @@ function hear(live: NativeHeadlessResident, ticks: number, each?: () => void,
   return heard;
 }
 
-test('the Roc says each strike, how far through it is and which way it faces', { timeout: 10_000 }, async () => {
+// QA-11-22 row 12b: real-clock fences stretch with the machine's load (red in a land gate under load, green alone);
+// on an idle or hosted machine loadScaledMs keeps every number, and each test proves the same thing.
+test('the Roc says each strike, how far through it is and which way it faces', { timeout: loadScaledMs(10_000) }, async () => {
   const live = await residentOn('far-reach');
   try {
     const { host } = live, lead = leadPlayer(host), body = host.entities.get('far.roc');
@@ -49,7 +52,7 @@ test('the Roc says each strike, how far through it is and which way it faces', {
   } finally { live.dispose(); }
 });
 
-test('an elite says its tells and its cues', { timeout: 10_000 }, async () => {
+test('an elite says its tells and its cues', { timeout: loadScaledMs(10_000) }, async () => {
   const live = await residentOn('pine-hollow');
   try {
     const { host } = live, lead = leadPlayer(host);
@@ -67,7 +70,7 @@ test('an elite says its tells and its cues', { timeout: 10_000 }, async () => {
   } finally { live.dispose(); }
 });
 
-test('a Nalati kernel says its ground ring and its moments', { timeout: 10_000 }, async () => {
+test('a Nalati kernel says its ground ring and its moments', { timeout: loadScaledMs(10_000) }, async () => {
   const live = await residentOn('nalati-grasslands');
   try {
     const { host } = live, lead = leadPlayer(host), id = 'aqbars', word = eliteGroundWord(id);
@@ -90,7 +93,7 @@ test('a Nalati kernel says its ground ring and its moments', { timeout: 10_000 }
   } finally { live.dispose(); }
 });
 
-test('the Antler King says its room, its lanes and its tells', { timeout: 10_000 }, async () => {
+test('the Antler King says its room, its lanes and its tells', { timeout: loadScaledMs(10_000) }, async () => {
   const live = await residentOn('pine-hollow');
   try {
     const { host } = live, lead = leadPlayer(host), { x, z } = ANTLER_KING_FIGHT.origin;
