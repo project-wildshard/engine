@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "499afb079e9d893cdfe7177323f78ea71d9ec4d97ab23ce9ec6c8b6bb16ee5a4",
+  "catalogueHash": "9302b438c275668f20e6a9d0823ddb7eebffc6b22591242a3271ec3f4239c0e8",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -112,36 +112,6 @@
         ],
         "order": 8,
         "status": "earlyAccess"
-      },
-      {
-        "instance": "pastel-plain-solo",
-        "slug": "pastel-plain",
-        "cell": [
-          -1,
-          1
-        ],
-        "size": [
-          500,
-          500,
-          500
-        ],
-        "order": 9,
-        "status": "hidden"
-      },
-      {
-        "instance": "ink-cel-valley-solo",
-        "slug": "ink-cel-valley",
-        "cell": [
-          1,
-          -1
-        ],
-        "size": [
-          500,
-          500,
-          500
-        ],
-        "order": 10,
-        "status": "hidden"
       },
       {
         "instance": "open-plot-frostline-peaks-solo",
@@ -414,15 +384,6 @@
           ]
         },
         {
-          "instance": "pastel-plain",
-          "slug": "pastel-plain",
-          "cell": [
-            0,
-            3
-          ],
-          "speedClass": "road"
-        },
-        {
           "instance": "blender-template",
           "slug": "brasscap-mesa",
           "cell": [
@@ -551,15 +512,6 @@
           "speedClass": "road"
         },
         {
-          "instance": "ink-cel-valley",
-          "slug": "ink-cel-valley",
-          "cell": [
-            1,
-            3
-          ],
-          "speedClass": "road"
-        },
-        {
           "instance": "open-plot-2-4",
           "slug": "open-plot-saltwind-lighthouse",
           "cell": [
@@ -634,8 +586,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 13,
-        "hash": "c0a5acd3fb815e910557931ab3554fbd20eec1a5828718a4f96880fea9468233"
+        "revision": 15,
+        "hash": "c6dbc49b7bdccad67f638d003506e0e0f2a7b7282fc2a6ebd880b5f5b99b2f69"
       },
       {
         "slug": "driftwood-isle",
@@ -654,12 +606,6 @@
         "name": "Glowfen",
         "revision": 5,
         "hash": "a561454cf68d06d30a71368193dd448e03dd4c8b241120c7fd64b819c2ee8d2d"
-      },
-      {
-        "slug": "ink-cel-valley",
-        "name": "Ink & Cel Valley",
-        "revision": 1,
-        "hash": "5764c86a258ac664ced0ba46860089738cca44d2f27a3f84abdd9ad80f79b0c3"
       },
       {
         "slug": "mirror-salt",
@@ -776,12 +722,6 @@
         "hash": "1cc2a9a9efdb7861627746c577ef6285b8d0ac7e8105046dc1655fe19fbed123"
       },
       {
-        "slug": "pastel-plain",
-        "name": "Pastel Plain",
-        "revision": 1,
-        "hash": "e42e2f5f57937695bae0eb0e17fdfbd5f238897d05b167cd38aa2b7ecebb0481"
-      },
-      {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
         "revision": 13,
@@ -799,9 +739,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 13,
-      "hash": "c0a5acd3fb815e910557931ab3554fbd20eec1a5828718a4f96880fea9468233",
-      "bytes": 22462464
+      "revision": 15,
+      "hash": "c6dbc49b7bdccad67f638d003506e0e0f2a7b7282fc2a6ebd880b5f5b99b2f69",
+      "bytes": 22500352
     },
     {
       "slug": "driftwood-isle",
@@ -820,12 +760,6 @@
       "revision": 5,
       "hash": "a561454cf68d06d30a71368193dd448e03dd4c8b241120c7fd64b819c2ee8d2d",
       "bytes": 20577792
-    },
-    {
-      "slug": "ink-cel-valley",
-      "revision": 1,
-      "hash": "5764c86a258ac664ced0ba46860089738cca44d2f27a3f84abdd9ad80f79b0c3",
-      "bytes": 7011840
     },
     {
       "slug": "mirror-salt",
@@ -940,12 +874,6 @@
       "revision": 2,
       "hash": "1cc2a9a9efdb7861627746c577ef6285b8d0ac7e8105046dc1655fe19fbed123",
       "bytes": 11383808
-    },
-    {
-      "slug": "pastel-plain",
-      "revision": 1,
-      "hash": "e42e2f5f57937695bae0eb0e17fdfbd5f238897d05b167cd38aa2b7ecebb0481",
-      "bytes": 6994432
     },
     {
       "slug": "pine-hollow",
