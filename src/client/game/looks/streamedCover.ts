@@ -9,6 +9,7 @@ import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { parseStreamedCover, type StreamedCoverRow } from '@wildshard/format/streamedCover';
 import type { SceneHandles } from '../shardfile/sceneHandles';
 import { coverLowOn } from './coverLow';
+import { applyCoverVertexVariant, COVER_PHASE_ATTRIBUTE, coverVertexPhase, coverVertexSettings } from './coverVertexReject';
 import { CellWindow, instanceTier, type InstanceArrays, type InstanceTier } from '@wildshard/engine/render/streamedInstances';
 
 
@@ -43,6 +44,7 @@ function readCells(bytes: Uint8Array, cell: number): CellFile {
 
 /** the cover's per-instance attributes: the ground's colour, the cover's (rgb, top) and the ground normal + cover side */
 const ATTRS = [{ name: 'aGround', size: 3, normalizedBytes: true }, { name: 'aCover', size: 4, normalizedBytes: true }, { name: 'aNrm', size: 4 }] as const;
+const PHASE_ATTRS = [...ATTRS, { name: COVER_PHASE_ATTRIBUTE, size: 1 }] as const;
 
 interface FarTier {
   set: InstanceTier;
@@ -69,7 +71,7 @@ const ss = (e0: number, e1: number, x: number): number => { const t = Math.min(1
 function writePlant(A: InstanceArrays, n: number, entry: CoverCell, i: number, file: DataView): void {
   const v = entry.values;
   const yaw = v[i + 3] ?? 0, s = v[i + 4] ?? 1, c = Math.cos(yaw) * s, sn = Math.sin(yaw) * s, m = A.matrix, o = n * 16;
-  const [gnd, cov, nrm] = A.attrs, col = A.colour;
+  const [gnd, cov, nrm, phase] = A.attrs, col = A.colour;
   const x = v[i] ?? 0, y = v[i + 1] ?? 0, z = v[i + 2] ?? 0;
   if (A.yawScale !== null) {
     const [origins, bases] = A.yawScale, at = n * 3;
@@ -87,6 +89,7 @@ function writePlant(A: InstanceArrays, n: number, entry: CoverCell, i: number, f
   if (gnd !== undefined) for (let k = 0; k < 3; k++) gnd[n * 3 + k] = file.getUint8(colors + k);
   if (cov !== undefined) for (let k = 0; k < 4; k++) cov[n * 4 + k] = file.getUint8(colors + 3 + k);
   nrm?.set(v.subarray(i + 8, i + 12), n * 4);
+  if (phase !== undefined) phase[n] = coverVertexPhase(c, sn);
 }
 
 /** A ground cover streamed round the viewer (see the module comment). */
@@ -147,11 +150,15 @@ class StreamedCover {
   build(): this {
     // DW3 (mini-dw3): at phone Low, `debug.coverReachLow` scales the reach and `debug.coverKeepLow` thins the far models
     const low = coverLowOn(), row = this.row, K = forTier(row.reachK) * low.reach, capK = forTier(row.capK), sr = row.slopeReach;
+    const vertex = coverVertexSettings(), attrs = vertex.phase ? PHASE_ATTRS : ATTRS;
     const material = (id: string, reach: THREE.Vector3, far: THREE.Vector3, mode: number, keep = 1): THREE.Material => {
       const mat = this.appearance.material(id);
       setLentParam(id, row.params.reach, reach.toArray()); setLentParam(id, row.params.lodReach, far.toArray()); setLentParam(id, row.params.mode, mode); setLentParam(id, row.params.keep, keep);
       this.follow ??= followToonLighting(row.lighting, lentToon(id));
       return mat;
+    };
+    const applyVertex = (set: InstanceTier, value: number, maxScale: number): void => {
+      if (vertex.reject || vertex.phase || vertex.behind) applyCoverVertexVariant(set, { parameter: row.params.mode, lodReach: row.params.lodReach, value }, vertex, maxScale);
     };
     const geometry = (key: string, id: string): THREE.BufferGeometry => this.appearance.geometry(id, this.resources.geometry(key));
     for (let ki = 0; ki < Math.min(row.kinds.length, 32); ki++) {
@@ -167,9 +174,13 @@ class StreamedCover {
         const f = k.far, [fn, ff] = f.reach, keep = Math.min(f.keep, low.keep), fcap = Math.round(f.cap * keep * capK);
         farSpan.set(fn * K, ff * K, (ff - fn) * K * row.growShare);
         this.rFar = Math.max(this.rFar, farSpan.y * sr.up + row.farSlack + row.eyeSlack);
-        farTier = { set: instanceTier(this.group, `${row.meshPrefix}${k.name}-far`, geometry(f.geometry, `${row.look}-${k.name}-far`), material(`${row.look}-${k.name}-far`, reach, farSpan, MODE_FAR), fcap, ATTRS, options), cap: fcap, reach: farSpan, keep };
+        const set = instanceTier(this.group, `${row.meshPrefix}${k.name}-far`, geometry(f.geometry, `${row.look}-${k.name}-far`), material(`${row.look}-${k.name}-far`, reach, farSpan, MODE_FAR), fcap, attrs, options);
+        applyVertex(set, MODE_FAR, Math.max(...k.scale));
+        farTier = { set, cap: fcap, reach: farSpan, keep };
       }
-      const set = instanceTier(this.group, `${row.meshPrefix}${k.name}`, geometry(k.geometry, `${row.look}-${k.name}`), material(`${row.look}-${k.name}`, reach, farSpan, farTier ? MODE_HANDOVER : MODE_NEAR, farTier ? farTier.keep : 1), cap, ATTRS, options);
+      const mode = farTier === null ? MODE_NEAR : MODE_HANDOVER;
+      const set = instanceTier(this.group, `${row.meshPrefix}${k.name}`, geometry(k.geometry, `${row.look}-${k.name}`), material(`${row.look}-${k.name}`, reach, farSpan, mode, farTier?.keep ?? 1), cap, attrs, options);
+      applyVertex(set, mode, Math.max(...k.scale));
       this.kinds.push({ set, cap, far: farTier, reach, scale: k.scale });
     }
     const span = Math.ceil((2 * Math.max(this.rMax, this.rFar)) / row.cell) + 1;

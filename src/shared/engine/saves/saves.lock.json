@@ -467,6 +467,21 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/'debug.coverBehind'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'debug.coverVertexPhase'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/'debug.coverVertexReject'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/'debug.interactStillCoalesce'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

@@ -852,6 +852,7 @@
     "src/client/game/loadout/held.ts": "client",
     "src/client/game/loadout/rangedPage.ts": "client",
     "src/client/game/looks/coverAppearance.ts": "client",
+    "src/client/game/looks/coverVertexReject.ts": "client",
     "src/client/game/looks/daySky.ts": "client",
     "src/client/game/looks/forestGround.ts": "client",
     "src/client/game/looks/forestGroundInputs.ts": "client",
