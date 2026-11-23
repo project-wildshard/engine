@@ -54,6 +54,9 @@ export interface AoTransparencySwitches {
   skipEmpty: () => boolean;
   /** DF14: the objects a pre-pass hid are shown again as the pass's own restore (passVisibility.ts), not as a reveal */
   quietRestore?: () => boolean;
+  /** DF14 (look change, J430 board): a transparent that writes depth (water) takes AO as an opaque does, so the
+   *  depth-writing pre-pass draws nothing and is skipped (cut 3) */
+  opaqueDepthWriters?: () => boolean;
 }
 
 /** n8ao's depth-buffer kinds (its `DepthType`): 3 = reversed */
@@ -68,7 +71,7 @@ const merge = (a: number, b: number): number => a | b;
  * it in each (`was && (transparent && !depthWrite && !treatAsOpaque || cannotReceiveAO)`, then
  * `was && transparent && depthWrite && !treatAsOpaque`, where a multi-material mesh's undefined `transparent` draws).
  */
-function prepassBits(material: THREE.Material | THREE.Material[], userData: Record<string, unknown>, lean: boolean): number {
+function prepassBits(material: THREE.Material | THREE.Material[], userData: Record<string, unknown>, lean: boolean, opaqueWriters = false): number {
   const noAo = Boolean(userData['cannotReceiveAO']);
   if (Array.isArray(material)) {
     let transparent = false;
@@ -76,7 +79,8 @@ function prepassBits(material: THREE.Material | THREE.Material[], userData: Reco
     if (!transparent) return 0; // an opaque multi-material mesh sits both out (cut 1)
     return (noAo ? PASS_FREE : 0) | PASS_WRITE;
   }
-  const opaqueToAo = userData['treatAsOpaque'] === true || (lean && material.transparent && !material.depthWrite); // cut 1
+  const opaqueToAo = userData['treatAsOpaque'] === true || (lean && material.transparent && !material.depthWrite) // cut 1
+    || (opaqueWriters && material.transparent && material.depthWrite); // DF14
   const free = (material.transparent && !material.depthWrite && !opaqueToAo) || noAo;
   const write = material.transparent && material.depthWrite && !opaqueToAo;
   return (free ? PASS_FREE : 0) | (write ? PASS_WRITE : 0);
@@ -103,13 +107,14 @@ export function installAoTransparency(ao: N8AOPostPass, scene: THREE.Scene, came
   /** the viewmodel roots among them (cut 4: their depth clear follows the pass's visibility) */
   const viewmodels: ViewmodelRoot[] = [];
   /** walks the visible graph into `objects` / `bits`; returns the pre-passes something in view draws in (a bit set) */
+  let opaqueWriters = false; // this frame's switches.opaqueDepthWriters
   const collect = (o: THREE.Object3D, lean: boolean): number => {
     if (!o.visible) return 0; // three draws nothing under a hidden object
     if (o instanceof ViewmodelRoot) viewmodels.push(o);
     let work = 0;
     const material = (o as Partial<THREE.Mesh>).material;
     if (material !== undefined) {
-      const b = prepassBits(material, o.userData, lean);
+      const b = prepassBits(material, o.userData, lean, opaqueWriters);
       objects.push(o); bits.push(b);
       if (b !== 0 && inView(o, camera)) work = b;
     }
@@ -207,6 +212,7 @@ export function installAoTransparency(ao: N8AOPostPass, scene: THREE.Scene, came
       camera.updateMatrixWorld();
       viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       frustum.setFromProjectionMatrix(viewProjection, camera.coordinateSystem, camera.reversedDepth);
+      opaqueWriters = switches.opaqueDepthWriters?.() ?? false;
       work = collect(scene, switches.lean());
     }
     const canSkip = switches.skipEmpty() && off instanceof THREE.WebGLRenderTarget && on instanceof THREE.WebGLRenderTarget;

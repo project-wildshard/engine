@@ -797,7 +797,7 @@ export class Game {
       // its transparency pre-passes: without opaque multi-material meshes or depth-free transparents (PH-P2), and not at all
       // when nothing would draw in them (SF69, bit-identical) — aoTransparency.ts
       installAoTransparency(ao, this.rootScene, this.camera, { lean: () => this.aoLeanTransparency, skipEmpty: () => this.aoSkipEmptyTransparency,
-        quietRestore: () => this.aoQuietRestore });
+        quietRestore: () => this.aoQuietRestore, opaqueDepthWriters: () => this.aoOpaqueDepthWriters });
       protectDisplayColourAo(ao);
       composer.addPass(ao);
     }
@@ -1053,6 +1053,9 @@ export class Game {
   /** the pre-passes' hidden objects come back as the pass's own restore, not a reveal (passVisibility.ts; DRIFTWOOD-FPS DF14) — a live
    *  switch for A/B captures, off with the device slot `debug.aoQuietRestore: false` */
   aoQuietRestore: boolean = jsonSlot('debug.aoQuietRestore', 'device').read() !== false;
+  /** a transparent that writes depth (water) takes AO as an opaque does: n8ao's depth-writing pre-pass is skipped (aoTransparency.ts;
+   *  DRIFTWOOD-FPS DF14, a look change awaiting its J430 board) — a live switch, on with the device slot `debug.aoOpaqueDepthWriters: true` */
+  aoOpaqueDepthWriters: boolean = jsonSlot('debug.aoOpaqueDepthWriters', 'device').read() === true;
   /**
    * A cinematic chain's shafts, fringe and grain for a page that runs another chain (`regionCinematic.ts`; the grid's frame);
    * where this page's own chain leaves its god rays out (its tier's `godRays: false`), god rays built as the chain builds its
