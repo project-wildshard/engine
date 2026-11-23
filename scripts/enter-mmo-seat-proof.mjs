@@ -61,16 +61,16 @@ async function openWorld() {
 /** Watch one Enter MMO: every loading-card name shown, and the page's `[grid]` lines. @param {import('playwright').Page} page */
 function watchEntry(page) {
   const names = /** @type {string[]} */ ([]), lines = /** @type {string[]} */ ([]);
-  let live = true;
-  page.on('console', line => { if (live && line.text().startsWith('[grid]')) lines.push(line.text().slice(0, 200)); });
+  const watching = { live: true };
+  page.on('console', line => { if (watching.live && line.text().startsWith('[grid]')) lines.push(line.text().slice(0, 200)); });
   void (async () => {
-    while (live) {
+    while (watching.live) {
       const name = await page.evaluate(() => document.querySelector('.ws-load:not(.hide) [data-el="slug"]')?.textContent ?? null).catch(() => null);
       if (name !== null && name !== '' && names.at(-1) !== name) names.push(name);
       await sleep(100);
     }
   })();
-  return { names, lines, stop: () => { live = false; } };
+  return { names, lines, stop: () => { watching.live = false; } };
 }
 /** ENTER THE MMO on the title this page shows, then into the world; what the entry showed. @param {import('playwright').Page} page */
 async function enterMmo(page, name = '') {
