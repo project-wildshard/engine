@@ -93,7 +93,7 @@ async function main():Promise<void> {
     lines=fingerprintLines(base,{head:fingerprintsOf(sideAt(head),files),base:fingerprintsOf(sideAt(base),files)},head==='HEAD'?await formatOf():undefined).lines;
   } catch(error) {lines=[`fingerprints against ${short(base)}: unknown (${error instanceof Error?error.message:String(error)})`];}
   for(const line of lines)console.info(line);
-  const summary=process.env.GITHUB_STEP_SUMMARY;
+  const summary=process.env['GITHUB_STEP_SUMMARY'];
   if(summary!==undefined&&summary!==''&&existsSync(resolve(summary,'..')))appendFileSync(summary,`\n\`\`\`\n${lines.join('\n')}\n\`\`\`\n`);
 }
 

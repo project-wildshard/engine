@@ -68,6 +68,7 @@
     "fixtures/approved-population-families.json",
     "../scripts/ci-native-fixtures.mjs",
     "boot-audio-packs.test.ts",
+    "fingerprints.test.ts",
     "committed-fast-checks.test.ts",
     "committed-source-tables.test.ts",
     "debug-authored-rows.test.ts",
