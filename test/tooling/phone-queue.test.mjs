@@ -3,7 +3,7 @@
 // priority, each under iphone13.lock held by the runner, never by a lane. A forced void (the origin killed under the job)
 // is retried once, after the origin answers again, and labelled.
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -27,8 +27,19 @@ afterAll(() => { for (const child of children) child.kill('SIGKILL'); rmSync(dir
 /** @param {string} name */
 const fresh = (name) => {
   const root = join(dir, name);
+  const bin = join(root, 'bin'), lockState = join(root, 'lock-state'), reads = join(root, 'lock-reads');
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(lockState, 'false');
+  writeFileSync(join(bin, 'xcrun'), `#!/bin/sh
+[ "$*" = 'devicectl device info lockState --device test-phone' ] || exit 1
+printf 'read\\n' >> "$WS_TEST_LOCK_READS"
+state=$(cat "$WS_TEST_LOCK_STATE")
+[ "$state" != unavailable ] || exit 1
+printf 'Device lock state:\\n  passcodeRequired: %s\\n' "$state"
+`, { mode: 0o755 });
   return { root, env: { ...process.env, WS_LOCK_ROOT: root, WS_PHONE_QUEUE: join(root, 'queue'), WS_PHONE_COOL: 'off', WS_PHONE_PARK: 'off',
-    WS_PHONE_RUNNER_START: 'none', WS_RECEIPTS_LOG: join(root, 'receipts.log'), WS_PHONE_ORIGIN_WAIT_S: '30' } };
+    WS_PHONE_RUNNER_START: 'none', WS_RECEIPTS_LOG: join(root, 'receipts.log'), WS_PHONE_ORIGIN_WAIT_S: '30',
+    WS_PHONE_UDID: 'test-phone', WS_TEST_LOCK_STATE: lockState, WS_TEST_LOCK_READS: reads, PATH: `${bin}:${process.env.PATH ?? ''}` } };
 };
 /** @param {Record<string, string | undefined>} env @param {string[]} [args] */
 const runner = (env, args = ['--serve', '--idle-exit', '3']) => { const child = spawn(process.execPath, [runnerScript, ...args], { env, stdio: 'ignore' }); children.push(child); return child; };
@@ -57,6 +68,52 @@ test('a void is a non-zero exit, a run with an error or no control, or a dead or
   expect(voidReason({ code: 0, timedOut: false, log: 'Error: 502 Bad Gateway', report: null })?.reason).toBe('origin down');
   expect(voidReason({ code: 1, timedOut: false, log: 'PHONE LOCKED at run 1', report: null })).toEqual({ reason: 'phone locked', retry: false });
 });
+
+test.skipIf(!darwin)('keeps queued jobs pending until the passcode lock clears, with one receipt per lock', async () => {
+  const { root, env } = fresh('passcode');
+  const { WS_TEST_LOCK_STATE: state, WS_TEST_LOCK_READS: reads, WS_RECEIPTS_LOG: receipts } = env;
+  const notice = 'PHONE LOCKED: unlock the iPhone 13';
+  const submit = () => {
+    const job = spawnSync(process.execPath, ['--input-type=module', '-e', `const q = await import(${JSON.stringify(queueModule)});
+console.log(q.submit({ argv: ['/usr/bin/true'], coolTo: null }).id);`], { env, encoding: 'utf8' });
+    expect(job.status).toBe(0);
+    return job.stdout.trim();
+  };
+  const countReads = () => existsSync(reads) ? readFileSync(reads, 'utf8').trim().split('\n').length : 0;
+  const countNotices = () => existsSync(receipts) ? readFileSync(receipts, 'utf8').split(notice).length - 1 : 0;
+  const pending = (/** @type {string} */ id) => join(root, 'queue/pending', `${id}.json`);
+  const done = (/** @type {string} */ id) => join(root, 'queue/done', `${id}.json`);
+  writeFileSync(state, 'true');
+  const first = submit();
+  const serving = runner(env, ['--serve']);
+  try {
+    await until(() => countNotices() === 1 || existsSync(done(first)), 4000);
+    expect(existsSync(pending(first))).toBe(true);
+    expect(readdirSync(join(root, 'queue/running'))).toEqual([]);
+    await until(() => countReads() >= 2);
+    writeFileSync(state, 'unavailable');
+    const beforeFailure = countReads();
+    await until(() => countReads() > beforeFailure);
+    expect(existsSync(pending(first))).toBe(true);
+    expect(countNotices()).toBe(1);
+
+    writeFileSync(state, 'false');
+    await until(() => existsSync(done(first)));
+    expect(JSON.parse(readFileSync(done(first), 'utf8')).attempts.map((/** @type {{ void: string | null }} */ a) => a.void)).toEqual([null]);
+
+    writeFileSync(state, 'true');
+    const second = submit();
+    await until(() => countNotices() === 2 || existsSync(done(second)));
+    expect(existsSync(pending(second))).toBe(true);
+    expect(countNotices()).toBe(2);
+    writeFileSync(state, 'false');
+    await until(() => existsSync(done(second)));
+    expect(JSON.parse(readFileSync(done(second), 'utf8')).label).toBe('clean');
+  } finally {
+    serving.kill();
+    await exited(serving);
+  }
+}, 30_000);
 
 test.skipIf(!darwin)('two lanes submit three jobs each at once; all six finish in order, one at a time, under the runner\'s lock', async () => {
   const { root, env } = fresh('order');

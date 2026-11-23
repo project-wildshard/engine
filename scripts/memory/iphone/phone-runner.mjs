@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // meta MINI-DEVEX MD1 (mini-devex-phone, 2026-11-21): the phone runner, the one process that takes iphone13.lock. It works
 // the queue (phone-queue.mjs) one job at a time, in plan priority:
-//   1. cool the phone outside the lock to the job's line (36 °C unless the job says otherwise; at most 30 min), reading
-//      only the battery;
+//   1. leave the job pending while the phone requires a passcode. Then cool it outside the lock to the job's line
+//      (36 °C unless the job says otherwise; at most 30 min), reading only the battery;
 //   2. take iphone13.lock (blocking lockf: a lane's old checkout that still holds it is waited on, never broken) and run
 //      the job under it (this file's --job mode), killing it past its hold limit (30 min unless the job says otherwise);
 //   3. park Safari on about:blank before the lock goes, so the next job's phone starts cool;
@@ -37,6 +37,14 @@ const cancun = () => new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Cancu
 function receipt(line) {
   const file = process.env.WS_RECEIPTS_LOG ?? join(homedir(), '.cache/wildshard/lane-receipts.log');
   try { mkdirSync(dirname(file), { recursive: true }); appendFileSync(file, `${cancun()} Cancún phone-runner ${line}\n`); } catch { /* a receipt never stops the runner */ }
+}
+
+/** True while a passcode is required, false after unlock, or null when CoreDevice can't read it. */
+function phonePasscodeRequired() {
+  const read = spawnSync('xcrun', ['devicectl', 'device', 'info', 'lockState', '--device', UDID], { encoding: 'utf8', timeout: 5000 });
+  if (read.status !== 0) return null;
+  const state = /^[ \t]*passcodeRequired:[ \t]*(true|false)[ \t]*$/mu.exec(read.stdout)?.[1];
+  return state === undefined ? null : state === 'true';
 }
 
 /** Why a finished run is void, and whether a retry can help, or null for a good run.
@@ -192,10 +200,19 @@ async function serve({ idleExitS }) {
   recover();
   console.log(`${new Date().toISOString()} phone-runner ${String(process.pid)} serving ${queueRoot()}`);
   let idleSince = Date.now();
+  let passcodeRequired = false;
   for (;;) {
     const [job] = pendingJobs();
     if (job === undefined) {
       if (idleExitS !== undefined && Date.now() - idleSince > idleExitS * 1000) return;
+      await delay(1000);
+      continue;
+    }
+    const lockState = phonePasscodeRequired();
+    if (lockState === true && !passcodeRequired) receipt('PHONE LOCKED: unlock the iPhone 13');
+    // If the locked device temporarily disappears, require an explicit unlock before taking a job again.
+    passcodeRequired = lockState ?? passcodeRequired;
+    if (passcodeRequired) {
       await delay(1000);
       continue;
     }
