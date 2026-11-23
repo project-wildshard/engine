@@ -392,10 +392,21 @@ function withDeclaredWildlife<P extends AdmittedClientPlan>(product: ShardFolder
     frame: { id: WILDLIFE_FRAME, after: [], before: ['engine.creatures.update'] } };
   return { ...plan, features: [...plan.features, ...readClientPlan(product.shardfile, { version: 1, features: [row] }).features] };
 }
+/** The engine's own system for a page population no plan row names. */
+export const HOMES_SYSTEM = 'engine.population.homes';
+/** ONE-FORMAT OF29e4: a quest page whose plan names no `population.homes` row binds its population from the declared files
+ *  (`sim/runtime-plan`'s homes and the product's declared spawns), as OF29e1 stands the server's family. The row's own facts
+ *  were only names: its system (the engine's here), its witness (read by nothing) and its groups (none, where a page draws
+ *  no trail). A plan naming the row keeps its own (J486). */
+function withDeclaredHomes<P extends AdmittedClientPlan>(product: ShardFolder, plan: P): P {
+  if (!plan.features.some(row => row.kind === 'quest.page') || plan.features.some(row => row.kind === 'population.homes')) return plan;
+  const row = { kind: 'population.homes', system: HOMES_SYSTEM, witness: { kinds: [] } };
+  return { ...plan, features: [...plan.features, ...readClientPlan(product.shardfile, { version: 1, features: [row] }).features] };
+}
 /** Validate the whole plan and all required sections before the first feature can mutate the page. */
 export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedClientPlan {
   try {
-    const plan = withDeclaredWildlife(product, readClientPlan(product.shardfile, input));
+    const plan = withDeclaredHomes(product, withDeclaredWildlife(product, readClientPlan(product.shardfile, input)));
     const limit = stageCpuMicros(product);
     // A row is the smallest host installer we can pace between drawn frames.
     for (const row of plan.features) {
