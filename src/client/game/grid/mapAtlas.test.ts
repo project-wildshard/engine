@@ -125,6 +125,8 @@ test('MAP-NEXT MN9: with every zone\'s map the 7 by 7 is 49 cells, no plain plot
   const empty = overlay.rects.filter(r => r.color === '#2c3029');
   expect(overlay.images.length + empty.length).toBe(49);
   expect(overlay.rects.filter(r => r.color === '#69704f')).toEqual([]);
+  // QA 11-23-b row 16: each empty cell carries 3 survey lines each way, not one flat grey block
+  expect(overlay.rects.filter(r => r.color === '#3d4436')).toHaveLength(6 * empty.length);
   for (const [i, cell] of assembly.cells.entries()) {
     expect(overlay.labels[i]?.fill).toEqual({ x: cell.origin.x - home.origin.x, z: cell.origin.z - home.origin.z, width: assembly.pitch - 24, height: 2 * CHUNK_HALF - 32 });
   }

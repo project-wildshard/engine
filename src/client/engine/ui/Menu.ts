@@ -148,7 +148,9 @@ export class GameMenu {
     // ── MAP: the FullMap canvas lives inside this panel (Map.ts embedded mode) ──
     // row 58 (Jake's A-1.4, J499's 1.3): the map is the panel's full width and 1.3 times as tall, the zoom row and the key under it and
     // nothing below. The map has no name line of its own: the header's subtitle names the zone, or a practice room (MN10)
+    // QA 11-23-b row 16 (polish board, Quest A): the card is one line, the objective; a tap opens its chapter and hint
     this.mapQuest = el('ws-gmenu-mapquest');
+    listenTap(this.scope, this.mapQuest, () => { this.mapQuest.toggleAttribute('data-open'); });
     const frame = el('ws-gmenu-mapframe');
     opts.fullMap.mount(frame);
     const foot = el('ws-gmenu-mapfoot');
@@ -367,8 +369,11 @@ export class GameMenu {
     this.mapQuest.hidden = q === null || q.objective === '';
     if (!q) return;
     const title = el('ws-gmenu-mapquest-title'), objective = el('ws-gmenu-mapquest-obj'), hint = el('ws-gmenu-mapquest-hint');
-    title.textContent = q.title; objective.append(document.createElement('i'), document.createTextNode(q.objective)); hint.textContent = q.hint;
-    this.mapQuest.replaceChildren(title, objective); if (q.hint) this.mapQuest.append(hint);
+    const text = el('ws-gmenu-mapquest-text'), more = el('ws-gmenu-mapquest-more');
+    text.textContent = q.objective; more.setAttribute('aria-hidden', 'true');
+    title.textContent = q.title; objective.append(document.createElement('i'), text); hint.textContent = q.hint;
+    if (q.title !== '' || Boolean(q.hint)) objective.append(more); // ▾ only when there is more to open
+    this.mapQuest.replaceChildren(objective, title); if (q.hint) this.mapQuest.append(hint);
   }
 
   private syncZoom() {

@@ -63,3 +63,11 @@ test('J499: the Bag is the whole screen with no frame of its own, its map 1.3 ta
   expect(css).not.toContain('100cqw * 1.4'); expect(css).not.toContain('aspect-ratio: 5 / 7');
   expect(css).toMatch(/\.ws-gmenu-mapquest \{[^}]*margin-bottom: 16px/u); expect(css).toMatch(/\.ws-gmenu-mapfoot \{[^}]*margin-top: 16px/u);
 });
+
+// QA 11-23-b row 16 (polish board, Quest A): the quest card is one line, the objective, and a tap opens its chapter and hint
+test('row 16: the quest card is one 36 px line until opened', () => {
+  const css = readFileSync('src/client/engine/ui/styles/gmenu.css', 'utf8');
+  expect(css).toMatch(/\.ws-gmenu-mapquest \{[^}]*min-height: 36px/u);
+  expect(css).toContain('.ws-gmenu .ws-gmenu-mapquest:not([data-open]) .ws-gmenu-mapquest-title, .ws-gmenu .ws-gmenu-mapquest:not([data-open]) .ws-gmenu-mapquest-hint { display: none; }');
+  expect(css).toMatch(/\.ws-gmenu-mapquest-text \{[^}]*white-space: nowrap/u);
+});

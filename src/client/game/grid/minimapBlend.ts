@@ -33,6 +33,8 @@ const NAME_RANGE = 101;
 export const CELL_PX = 400;
 /** J455: an empty cell of the 7 by 7 on the full map */
 const EMPTY = '#2c3029';
+/** QA 11-23-b row 16: an empty cell's survey lines, so it reads as open land waiting for a zone, not a flat grey block */
+const SURVEY = '#3d4436', SURVEY_LINES = 3;
 const STRIP = '#3b4038', ROAD = '#2a2e35', LINE = '#c9a640', VOID = '#0b1016', NAME = '#eaf6ff';
 /** Each cell whose name spot is in the disc from the feet (home-frame metres), with an arrow toward it. */
 function roadNames(host: MinimapBlendHost, feet: { readonly x: number; readonly z: number }): MapExtraLabel[] {
@@ -244,7 +246,14 @@ export function fullMapOverlay(host: MinimapBlendHost, rects: readonly MapExtraR
   if (grid !== undefined) {
     const taken = new Set(assembly.cells.map((c) => c.cell.join(',')));
     for (let i = -DRAWN_GRID_RADIUS; i <= DRAWN_GRID_RADIUS; i++) for (let j = -DRAWN_GRID_RADIUS; j <= DRAWN_GRID_RADIUS; j++)
-      if (!taken.has(`${String(i)},${String(j)}`)) ground.push({ x: i * grid.pitch - ox, z: j * grid.pitch - oz, hx: CHUNK_HALF, hz: CHUNK_HALF, color: EMPTY });
+      if (!taken.has(`${String(i)},${String(j)}`)) {
+        const x = i * grid.pitch - ox, z = j * grid.pitch - oz;
+        ground.push({ x, z, hx: CHUNK_HALF, hz: CHUNK_HALF, color: EMPTY });
+        for (let k = 1; k <= SURVEY_LINES; k++) {
+          const at = -CHUNK_HALF + (2 * CHUNK_HALF * k) / (SURVEY_LINES + 1);
+          ground.push({ x: x + at, z, hx: 1.5, hz: CHUNK_HALF - 24, color: SURVEY }, { x, z: z + at, hx: CHUNK_HALF - 24, hz: 1.5, color: SURVEY });
+        }
+      }
   }
   return { outside: VOID, baseAlpha: bareHome ? 1 : 0, rects: [...ground, ...rects, ...plots], images, labels, ...(grid === undefined ? {} : { grid }) };
 }

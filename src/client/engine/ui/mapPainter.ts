@@ -2,12 +2,14 @@ import { CHUNK_HALF, CHUNK_SIZE } from '../../../shared/engine/core/config';
 import { engineString } from '../../../shared/engine/strings';
 import { LAYER_PPM, type MapExtras, type Minimap } from './Minimap';
 import { ROOM_BG, fitRoom, paintRoom } from './roomMap';
-import { fitMapLabel } from './mapLabel';
+import { fitMapLabel, placeInside } from './mapLabel';
 import { cellAt, namesPlaces } from './mapView';
 import type { MapPoi, MapZone } from './Map';
 
 type Pin = MapPoi & { color?: string };
-const FOG_BRIGHTNESS = 0.3, TILE_PX = 256, TILE_CACHE = 64, TILE_BUDGET_MS = 6;
+/** unexplored ground's brightness on the Bag map: 0.55, not the minimap's 0.3 (QA 11-23-b row 16: "the zone's own map is dark and
+ *  flat"); the fog still reads, the ground under it is now legible */
+const FOG_BRIGHTNESS = 0.55, TILE_PX = 256, TILE_CACHE = 64, TILE_BUDGET_MS = 6;
 const CYAN = '#8fe3ff', MERGE_M = 30;
 const NO_DASH: number[] = [];
 const FNV_SEED = 2166136261;
@@ -169,13 +171,32 @@ export class MapPainter {
           // MN9: a name its own box can't hold fills its larger box (the grid's overview: the whole cell)
           let label = fit(l.width, l.height), box = { x: l.x, z: l.z, width: l.width, height: l.height };
           if (label.lines.length === 0 && l.fill !== undefined) { label = fit(l.fill.width, l.fill.height, 7); box = l.fill; }
-          const x = sx(box.x), y = sz(box.z), width = box.width * ppm - 4 * this.view.dpr(), height = box.height * ppm, lineHeight = label.font * 1.15;
+          let x = sx(box.x), y = sz(box.z);
+          const width = box.width * ppm - 4 * this.view.dpr(), height = box.height * ppm, lineHeight = label.font * 1.15;
           ctx.font = `700 ${label.font}px Rajdhani, sans-serif`; ctx.fillStyle = l.color;
+          if (label.lines.length === 0) continue;
+          // QA 11-23-b row 16 (Names A, Rims A): a name stays whole inside the frame, sliding along its cell to what shows,
+          // turned along a thin rim at the frame's side; a corner sliver too small for it goes unnamed
+          const cell = l.fill ?? box, half = { w: cell.width * ppm / 2, h: cell.height * ppm / 2 }, cx = sx(cell.x), cy = sz(cell.z);
+          const textW = Math.max(...label.lines.map((line) => ctx.measureText(line).width)), textH = label.lines.length * lineHeight;
+          const spot = placeInside({ x, y }, { x0: cx - half.w, x1: cx + half.w, y0: cy - half.h, y1: cy + half.h }, { x0: 0, y0: 0, x1: W, y1: H },
+            textW, textH, 4 * this.view.dpr());
+          if (spot === null) continue;
+          if (spot.vertical) {
+            const one = label.lines.join(' ');
+            ctx.save(); ctx.translate(spot.x, spot.y); ctx.rotate(spot.x < W / 2 ? -Math.PI / 2 : Math.PI / 2);
+            ctx.strokeText(one, 0, 0); ctx.fillText(one, 0, 0); ctx.restore();
+            const w = ctx.measureText(one).width;
+            held.push({ x0: spot.x - lineHeight / 2, x1: spot.x + lineHeight / 2, y0: spot.y - w / 2, y1: spot.y + w / 2 });
+            continue;
+          }
+          const moved = spot.x !== x || spot.y !== y;
+          x = spot.x; y = spot.y;
           for (const [i, line] of label.lines.entries()) {
             const at = y + (i - (label.lines.length - 1) / 2) * lineHeight;
             ctx.strokeText(line, x, at); ctx.fillText(line, x, at);
           }
-          if (label.lines.length > 0) held.push({ x0: x - width / 2, x1: x + width / 2, y0: y - height / 2, y1: y + height / 2 });
+          held.push(moved ? { x0: x - textW / 2, x1: x + textW / 2, y0: y - textH / 2, y1: y + textH / 2 } : { x0: x - width / 2, x1: x + width / 2, y0: y - height / 2, y1: y + height / 2 });
           continue;
         }
         ctx.font = `700 ${lh}px Rajdhani, sans-serif`;
@@ -335,11 +356,14 @@ export class MapPainter {
     // off the canvas counts as taken, so a pin at the chunk's edge (a road portal) labels inward instead of cut off (SF66)
     const cw = ctx.canvas.width, ch = ctx.canvas.height, far = Math.max(cw, ch);
     taken.push({ x0: -far, y0: -far, x1: 0, y1: ch + far }, { x0: cw, y0: -far, x1: cw + far, y1: ch + far }, { x0: -far, y0: -far, x1: cw + far, y1: 0 }, { x0: -far, y0: ch, x1: cw + far, y1: ch + far });
+    // QA 11-23-b row 16 (Labels A): every map label is one style, the zone names' bold caps with a dark outline
+    const lfs = fs * 1.12;
+    ctx.font = `700 ${lfs}px Rajdhani, sans-serif`;
     const rank = (m: (typeof pins)[number]): number => (m.glyph ? 0 : m.p.kind === 'place' ? 1 : 2);
     const gw = fs * 0.62, gap = fs * 0.3, pad = 2 * d;
     // (an unfound place's "?" is inside its ring: it carries no label unless a quest marker named it)
     for (const m of pins.filter((q) => q.own && (q.glyph || q.p.kind !== 'unknown')).sort((a, b) => rank(a) - rank(b))) {
-      const w = ctx.measureText(m.text).width + (m.glyph ? gw + gap : 0), h = fs, o = m.r + 3 * d;
+      const text = m.text.toUpperCase(), w = ctx.measureText(text).width + (m.glyph ? gw + gap : 0), h = lfs, o = m.r + 3 * d;
       const spots: [number, number][] = [
         [m.x - w / 2, m.y + o], [m.x - w / 2, m.y - o - h], [m.x + o + d, m.y - h / 2], [m.x - o - d - w, m.y - h / 2],
         [m.x - w / 2, m.y + o + h + pad], [m.x - w / 2, m.y - o - 2 * h - pad], [m.x + o + d, m.y + h / 2 + pad], [m.x - o - d - w, m.y + h / 2 + pad],
@@ -364,7 +388,7 @@ export class MapPainter {
       }
       ctx.fillStyle = m.p.kind === 'unknown' && !m.glyph ? 'rgba(230, 242, 248, 0.7)' : m.p.kind === 'quest' ? CYAN : 'rgba(255, 255, 255, 0.92)';
       ctx.strokeStyle = 'rgba(6, 10, 18, 0.85)'; ctx.lineWidth = 3 * d;
-      ctx.strokeText(m.text, x, y); ctx.fillText(m.text, x, y);
+      ctx.strokeText(text, x, y); ctx.fillText(text, x, y);
     }
     ctx.textAlign = 'center';
   }

@@ -80,10 +80,17 @@
    legend. The panel is a size container, so the frame's height reads the panel's width (388 x 504 on a 402 pt phone) */
 .ws-gmenu .ws-gmenu-panel.map { touch-action: none; padding: 8px 7px; container-type: size; }
 /* the quest card (E51): the chapter title, the full objective and its sub-steps — the HUD carries only the short chip */
-.ws-gmenu .ws-gmenu-mapquest { flex: none; margin-bottom: 16px; padding: 8px 10px 8px 12px; border: 1px solid rgba(143, 227, 255, 0.22); border-left: 2px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.05); }
+/* QA 11-23-b row 16 (Quest A): one line, the objective, 36 px; a tap opens the chapter title and hint under it (data-open) */
+.ws-gmenu .ws-gmenu-mapquest { flex: none; margin-bottom: 16px; padding: 0 10px 0 12px; min-height: 36px; box-sizing: border-box; cursor: pointer; border: 1px solid rgba(143, 227, 255, 0.22); border-left: 2px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.05); }
 .ws-gmenu .ws-gmenu-mapquest[hidden] { display: none; }
-.ws-gmenu .ws-gmenu-mapquest-title { font-size: 8.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-cyan); }
-.ws-gmenu .ws-gmenu-mapquest-obj { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-family: var(--ws-display); font-weight: 600; font-size: 15px; letter-spacing: 0.03em; color: var(--ws-text); }
+.ws-gmenu .ws-gmenu-mapquest:not([data-open]) .ws-gmenu-mapquest-title, .ws-gmenu .ws-gmenu-mapquest:not([data-open]) .ws-gmenu-mapquest-hint { display: none; }
+.ws-gmenu .ws-gmenu-mapquest[data-open] { padding-bottom: 8px; }
+.ws-gmenu .ws-gmenu-mapquest-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-gmenu .ws-gmenu-mapquest-more { flex: none; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--ws-cyan); transition: transform 0.15s; }
+.ws-gmenu .ws-gmenu-mapquest[data-open] .ws-gmenu-mapquest-more { transform: rotate(180deg); }
+.ws-gmenu .ws-gmenu-mapquest[data-open] .ws-gmenu-mapquest-text { white-space: normal; }
+.ws-gmenu .ws-gmenu-mapquest-title { margin-top: 2px; font-size: 8.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-cyan); }
+.ws-gmenu .ws-gmenu-mapquest-obj { display: flex; align-items: center; gap: 8px; min-height: 36px; font-family: var(--ws-display); font-weight: 600; font-size: 15px; letter-spacing: 0.03em; color: var(--ws-text); }
 .ws-gmenu .ws-gmenu-mapquest-obj i { flex: none; width: 7px; height: 7px; transform: rotate(45deg); background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.8); }
 .ws-gmenu .ws-gmenu-mapquest-hint { margin-top: 3px; padding-left: 15px; font-size: 9.5px; letter-spacing: 0.06em; color: var(--ws-text-dim); }
 .ws-gmenu .ws-gmenu-mapframe { position: relative; flex: 0 1 auto; width: 100%; height: calc(100cqw * 1.3); min-height: 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(4, 7, 12, 0.9); overflow: hidden; }
