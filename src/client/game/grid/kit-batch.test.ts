@@ -14,8 +14,8 @@ function box(sway: boolean, indexed = true): THREE.BufferGeometry {
   return geometry;
 }
 
-test('the slot is off unless set', () => {
-  expect(kitBatch(null)).toBe(false);
+test('the phone Low default is on and an explicit boolean wins', () => {
+  expect(kitBatch(null)).toBe(true);
   expect(kitBatch(true)).toBe(true);
   expect(kitBatch(false)).toBe(false);
 });

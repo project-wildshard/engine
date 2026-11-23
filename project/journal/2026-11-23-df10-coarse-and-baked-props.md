@@ -30,3 +30,9 @@ The loader selects their bands and warms the updated batch index under
 the card. During play the existing camera and one-write budget still
 pick the band. Index copies preserve WebKit's vertex order. The baked
 cove tiles keep their existing tiling and lightmap behavior.
+
+With the far copies and all four batches enabled, the complete Low
+grid route measured 59 pooled draws and 394,793 pooled triangles at
+p95 on `518e4f35d`. The road used 60 draws and 397,637 triangles at
+p95. The independent J430 judge passed all 18 dock and road views.
+The four slots now default on at phone Low and accept explicit opt-outs.

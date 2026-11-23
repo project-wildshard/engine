@@ -37,12 +37,12 @@ export const KIT_BATCH_SLOT = 'debug.kitBatch';
 const BAKED_TILE_MEMBER = 'bakedTileBatchMember';
 const bakedTileSlot = jsonSlot('debug.bakedTileBatch', 'device');
 function bakedTileBatchOn(): boolean {
-  try { return bakedTileSlot.read() === true; } catch { return false; }
+  try { return bakedTileSlot.read() !== false; } catch { return true; }
 }
 const kitBatchSlot = jsonSlot(KIT_BATCH_SLOT, 'device');
-/** The slot's value: a boolean wins; unset, off (a cooled iPhone 13 pair decides the phone-Low default). */
-export function kitBatch(saved: unknown): boolean { return typeof saved === 'boolean' ? saved : false; }
-/** On at phone Low only, where the slot is set. */
+/** DF10 defaults the kit batches on for phone Low. A saved boolean wins. */
+export function kitBatch(saved: unknown): boolean { return saved !== false; }
+/** The kit batches only at phone Low. */
 export function kitBatchOn(): boolean {
   let saved: unknown = null;
   try { saved = kitBatchSlot.read(); } catch { /* storage blocked: the default */ }

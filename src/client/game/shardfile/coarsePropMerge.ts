@@ -11,7 +11,7 @@ import { GroundMerge } from './groundMerge';
 
 const slot = jsonSlot('debug.coarsePropMerge', 'device');
 export function coarsePropMergeOn(): boolean {
-  try { return TIER === 'phone' && graphicsMode() === 'low' && slot.read() === true; } catch { return false; }
+  try { return TIER === 'phone' && graphicsMode() === 'low' && slot.read() !== false; } catch { return false; }
 }
 
 const TILE_SIZE = 125, SLOTS = 32, TILE_ATTR = 'wsCoarseTile';

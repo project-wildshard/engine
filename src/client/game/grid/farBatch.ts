@@ -20,9 +20,9 @@ import { farProxyMaterial, type FarProxyView } from './farView';
  */
 export const FAR_BATCH_SLOT = 'debug.farBatch';
 const farBatchSlot = jsonSlot(FAR_BATCH_SLOT, 'device');
-/** The slot's value: a boolean wins; unset, off (a cooled iPhone 13 pair decides the phone-Low default). */
-export function farBatch(saved: unknown): boolean { return typeof saved === 'boolean' ? saved : false; }
-/** On at phone Low only, where the slot is set (the far ring is the phone's horizon). */
+/** DF10 defaults the far ring's batches on for phone Low. A saved boolean wins. */
+export function farBatch(saved: unknown): boolean { return saved !== false; }
+/** The far ring batches only at phone Low. */
 export function farBatchOn(): boolean {
   let saved: unknown = null;
   try { saved = farBatchSlot.read(); } catch { /* storage blocked: the default */ }

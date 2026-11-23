@@ -13,8 +13,8 @@ function proxyGeometry(): THREE.BufferGeometry {
   return geometry;
 }
 
-test('the slot is off unless set', () => {
-  expect(farBatch(null)).toBe(false);
+test('the phone Low default is on and an explicit boolean wins', () => {
+  expect(farBatch(null)).toBe(true);
   expect(farBatch(true)).toBe(true);
   expect(farBatch(false)).toBe(false);
 });
