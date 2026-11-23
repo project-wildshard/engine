@@ -2,7 +2,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--route <name>] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--fenced-gpu <n>] [--leg-census] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>|<slot>=<on>/<off>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--fenced-gpu <n>] [--leg-census] [--out <dir>] [--dry-run]
 //
 // --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
 // --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
@@ -128,7 +128,11 @@ async function bench() {
       .flatMap((ab) => (i % 2 === 0 ? caps : [...caps].reverse()).map((cap) => ({ run: i + 1, cap, ab })))).flat();
     for (const { run, cap, ab } of trials) {
       // DF10 (mini-dfload): `--ab a,b` turns several slots off and on together (farBatch and kitBatch are one trial)
-      const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, ...Object.fromEntries(values.ab.split(',').map((key) => [key, ab])) };
+      // DW3 (mini-dw3): `--ab key=on/off` trials a valued slot (`debug.coverReachLow=0.8/1`); a bare key is a boolean
+      const abValue = (item) => { const at = item.indexOf('='); if (at < 0) return [item, ab];
+        const [on, off] = item.slice(at + 1).split('/'); if (off === undefined) throw new Error(`--ab ${item}: write key=on/off`);
+        return [item.slice(0, at), JSON.parse(ab ? on : off)]; };
+      const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, ...Object.fromEntries(values.ab.split(',').map(abValue)) };
       const temperature = tools === null ? null : await tools.cool();
       const { webkitDriver, driver } = phone ? { webkitDriver: null, driver: await /** @type {NonNullable<typeof tools>} */ (tools).fresh() }
         : await (async () => { if (values.frames === true) process.env.WS_WEBKIT_GC_LOG = '1'; const { startWebKit } = await import('./webkit.mjs'); const started = await startWebKit({ gcLog: values.frames === true }); return { webkitDriver: started, driver: started }; })();
