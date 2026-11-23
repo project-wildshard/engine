@@ -9,7 +9,7 @@ import { execFileSync, spawn } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture repositories stay in the repository scratch root.
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { failingDetail, failureLine, PINS_LEDGER, prePushCause, REF_LOCK } from '../scripts/land.mjs';
 import { BOOT_STAMPS } from '../scripts/boot-stamps.mjs';
