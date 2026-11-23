@@ -2,6 +2,7 @@
 import {readFileSync} from 'node:fs';
 import {beforeAll,expect,test,vi} from 'vitest';
 import {emptyShardfile} from '../src/shared/host/author';
+import type { Shardfile } from '@wildshard/format/shardSchema';
 import {frozenLegacyGuest} from './fixtures/frozen/scriptGuests';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 import {createShardfileSim,bindShardfileSim,prepareShardfileSimRestore} from '../src/server/game/plugin/simulation';
@@ -172,7 +173,8 @@ test.each(['exact','revision','sealed-basis','unsealed-basis','future','corrupt'
   if(mode==='unsealed-basis')changeRegion(storage,data=>{delete data['integrity'];});
   if(mode==='future')changeRegion(storage,data=>{data['revision']=saveRevision(f.source.identity)+1;reseal(data);});
   if(mode==='corrupt')changeRegion(storage,data=>{data['snapshot']='broken';reseal(data);});
-  const source=mode==='revision'?{...f.source,identity:{...f.source.identity,revision:2}}:f.source;
+  // FP26: the save lineage under the spelling the pinned format reads (`saveRevision` from 0.1.0.4, `revision` before)
+  const lineage=f.source.identity,source:Shardfile=mode!=='revision'?f.source:{...f.source,identity:Object.assign({},lineage,'saveRevision' in lineage?{saveRevision:2}:{revision:2}) as Shardfile['identity']};
   const reopened=new GridRegionDurability(store(),identity,source,[]),target=prepareShardfileSimRestore(source,f.assets,{rapier:R,quest:reopened.quest});platform(target.host);
   const freshBasis=target.host.physics.snapshot();
   expect(Buffer.compare(freshBasis,basis)).toBe(0);
