@@ -50,6 +50,8 @@ test('the proof preview acknowledges POST error reports when enabled', async () 
   const root = mkdtempSync(join(base, 'error-report-'));
   mkdirSync(join(root, 'dist'));
   writeFileSync(join(root, 'dist/index.html'), 'fixture');
+  // serve() waits for /version.json, as every real build has; a missing file is a 404 now, never the page (meta QA 11-22 row 10)
+  writeFileSync(join(root, 'dist/version.json'), '{"build":"fixture"}');
   try {
     for (const errorReports of [false, true]) {
       const host = await serve(root, '', true, { errorReports });
