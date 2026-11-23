@@ -4,6 +4,7 @@
 import { spawnSync } from 'node:child_process';
 import {existsSync,lstatSync} from 'node:fs';
 import {lintEnvironment} from './lint-tools.mjs';
+import {ensureBootStamps} from './boot-stamps.mjs';
 import ci21Tests from '../lint/ci21-engine-tests.json' with { type: 'json' };
 
 const TREE = ['src/client/engine', 'src/shared/engine', 'src/server/engine', 'src/client/game', 'src/shared/game', 'src/server/game', 'src/cook/game', 'src/client/host', 'src/shared/host', 'src/server/host', 'src/client/app', 'scripts', 'lint', 'vite'];
@@ -11,6 +12,8 @@ const LIFTED = new RegExp(`^(?:${TREE.join('|')})/`, 'u');
 const ENGINE_TESTS = new Set(ci21Tests);
 const COMPLETE = [...TREE, ...ENGINE_TESTS];
 const asked = process.argv.slice(2);
+// LS1/LS9: type-aware lint resolves the ignored boot stamps; write them when this checkout never ran gen:inputs.
+ensureBootStamps();
 // Full static gates include this global policy even on a disjoint delta retry.
 // Commit-only path checks keep their existing isolation from peer loose files.
 if(asked.length===0){

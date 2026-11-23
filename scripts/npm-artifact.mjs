@@ -2,8 +2,9 @@
 // Pack the engine with the exact format bits used by its frozen build.
 // A private copy keeps pnpm's store links out of the published tarball.
 import { execFileSync } from 'node:child_process';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { BOOT_STAMPS } from './boot-stamps.mjs';
 
 const [destination, nextBuild] = process.argv.slice(2);
 if (destination === undefined || (nextBuild !== undefined && !/^[a-f0-9]{40}$/u.test(nextBuild)))
@@ -20,6 +21,9 @@ try {
   const bare = pack(root, stage);
   execFileSync('tar', ['-xzf', join(stage, bare.filename), '-C', stage]);
   const unpacked = join(stage, 'package'), manifest = join(unpacked, 'package.json');
+  // LS1: the boot stamps are ignored build outputs; the archive carries the ones gen:inputs wrote from the pins.
+  const unstamped = BOOT_STAMPS.filter(path => !existsSync(join(unpacked, path)));
+  if (unstamped.length > 0) throw new Error(`The engine archive lacks its boot stamps (${unstamped.join(', ')}): run node scripts/pins.ts install && pnpm gen:inputs first`);
   const pkg = JSON.parse(readFileSync(manifest, 'utf8'));
   if (nextBuild !== undefined) {
     if (!/^\d+\.\d+\.\d+$/u.test(pkg.version)) throw new Error('An npm next archive needs a stamped release version');

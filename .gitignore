@@ -306,3 +306,8 @@ public/assets/driftwood-isle/map/top.webp
 /scripts/renderer-revision.json
 /scripts/validation-revision.json
 /.owner
+
+# SHARD-COMPAT LS1/LS9: boot stamps are written by gen:inputs from the installed pins (scripts/boot-stamps.mjs), never committed.
+/src/client/game/boot/audio.generated.ts
+/src/client/game/boot/bytes.generated.ts
+/src/client/game/boot/versions.generated.ts

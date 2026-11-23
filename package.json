@@ -51,6 +51,7 @@
     "test:fast": "python3 scripts/heavy-lane.py full-test -- node scripts/vitest-tmp.ts run",
     "gen": "python3 scripts/heavy-lane.py build -- node scripts/gen.mjs",
     "gen:inputs": "node scripts/gen.mjs --inputs-only",
+    "prepare": "node scripts/boot-stamps.mjs",
     "gen:source": "node --import ./scripts/bake-loader.mjs scripts/gen-source.mjs",
     "pins": "node scripts/pins.ts install",
     "build:ring": "python3 scripts/heavy-lane.py build -- bash -c 'node scripts/pins.ts install --ring 1 ${WS_RING_EXTRA_PRODUCTS:-} && node scripts/gen.mjs --inputs-only && WILDSHARD_CATALOGUE=out/.ring-catalogue.json node scripts/build-app.mjs --mode preview && node scripts/check-devserver.mjs dist'",

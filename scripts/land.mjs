@@ -1,5 +1,5 @@
 // J422: one way onto main. After every row, from the plan worktree:
-// rebase -> boot stamps -> push main through the ordinary split pre-push
+// rebase -> gen:inputs (ignored boot stamps) -> push main through the ordinary split pre-push
 // (lint, types, related tests, about 74 s) -> main-watch follows main's
 // hosted full suite. No plan-branch push, no full suite in the lane, no
 // queue. The worktree stays for the next row; --done removes it. A red
@@ -46,15 +46,8 @@ export function localGateHatch(env){
  return reason;
 }
 
-/** DEV-SPEED DS22: the boot stamps the pre-push's gen:inputs rewrites from the tree (scripts/app-build/gen.ts). After a
- * rebase they go stale whenever main changed public/assets, and the pre-push's clean-tree check then refused the push
- * minutes in (58 `pre-push red` receipts in a day). Land runs the same generator first and commits these, and only
- * these, on the plan branch, so they ride the main push and its pre-push like any commit. Hosted CI regenerates them
- * itself (ci.yml runs gen:inputs before the tests) and doesn't yet diff them against the commit (DS22 follow-up). */
-export const STAMPS=Object.freeze(['src/client/game/boot/audio.generated.ts','src/client/game/boot/bytes.generated.ts','src/client/game/boot/versions.generated.ts']);
 /** package.json `gen:inputs`, run directly: pnpm adds nothing here and a fixture's pnpm is a stub. */
 const GEN=Object.freeze(['scripts/gen.mjs','--inputs-only']);
-const STAMPS_MESSAGE='chore(gen): regenerate boot stamps\n\nDEV-SPEED DS22: land ran gen:inputs after its rebase and commits the\nboot stamps it rewrote, so the pre-push sees a clean tree.\n\nAssisted-by: land:ds22-stamps';
 
 /** What to do about one porcelain line that keeps the tree from being clean. Never a fix that deletes new work.
  * @param {string} code @param {string} path @param {string} branch */
@@ -371,30 +364,24 @@ class Landing{
   for(const name of ['rebase-merge','rebase-apply','MERGE_HEAD','CHERRY_PICK_HEAD']){
    if(existsSync(resolve(this.root,git(this.root,['rev-parse','--git-path',name]))))throw new StopError(`a ${name} is in progress in this worktree; finish or abort it first`);
   }
-  return this.preflight('before the gate');
+  this.preflight('before the gate');
  }
 
  /** DS22: the same list push-proof-cache.mjs's clean-tree check refuses (pins outputs this tree's install published
-  * pass), checked in seconds instead of minutes into the pre-push. Modified boot stamps pass when this tree has the
-  * generator that rewrites them; anything else stops land, naming each path and its fix.
-  * @param {string} when @returns {string[]} the modified stamps */
+  * pass), checked in seconds instead of minutes into the pre-push. The boot stamps gen:inputs writes are ignored build
+  * outputs (SHARD-COMPAT LS1, scripts/boot-stamps.mjs), so any dirt stops land, naming each path and its fix.
+  * @param {string} when */
  preflight(when){
-  const generates=existsSync(join(this.root,GEN[0]));
-  /** @type {string[]} */const stamps=[];
   /** @type {{code:string,path:string}[]} */const foreign=[];
-  for(const line of checkedTreeDirt(this.root)){
-   const code=line.slice(0,2),path=line.slice(3);
-   if(generates&&/^(?:M[ M]| M)$/u.test(code)&&STAMPS.includes(path))stamps.push(path);
-   else foreign.push({code,path});
-  }
-  if(foreign.length===0)return stamps;
+  for(const line of checkedTreeDirt(this.root))foreign.push({code:line.slice(0,2),path:line.slice(3)});
+  if(foreign.length===0)return;
   foreign.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
   this.receipt(`STOP tree not clean ${when}: ${foreign.map(row=>row.path).join(', ')}`);
   throw new StopError(`this worktree is not clean ${when}; the pre-push would refuse it ("Push target requires a clean checked tree"). Each path and its fix:\n${foreign.map(({code,path})=>`  ${code} ${path}: ${dirtFix(code,path,this.branch)}`).join('\n')}\nThen run land again.`);
  }
 
- /** DS22: before the gate, run gen:inputs (the pre-push's own first step) and commit the boot stamps it rewrote, on
-  * the plan branch, so they ride the main push. The generator may not commit, and may not touch anything else.
+ /** DS22: before the gate, run gen:inputs (the pre-push's own first step) with stale pin output refused, so a bad pin
+  * install stops here in seconds. Its stamps are ignored (LS1): the tree must stay clean, and nothing is committed.
   * @param {boolean} pinsRefreshed whether this preflight already ran pnpm pins */
  regenerate(pinsRefreshed){
   if(!existsSync(join(this.root,GEN[0])))return;
@@ -409,34 +396,18 @@ class Landing{
    this.receipt(`STOP boot stamps: ${problem}`);
    throw new StopError(`cannot regenerate boot stamps: ${problem}`);
   }
-  // the stamps it writes are committed here, so stale pin output refuses instead of warning (gen.ts, stalePinFolders)
   const ran=spawnSync(process.execPath,[...GEN],{cwd:this.root,env:{...this.env,WS_STALE_PINS:'refuse'},encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:300_000,maxBuffer:64<<20});
   const head=this.head();
   if(head!==before){
    this.receipt(`STOP ${GEN.join(' ')} moved HEAD ${short(before)} -> ${short(head)}`);
-   throw new StopError(`${GEN.join(' ')} made a commit (${short(before)} -> ${short(head)}): land runs it only to rewrite the boot stamps. Fix the generator, reset ${this.branch} to ${short(before)} if that commit is unwanted, and run land again.`);
+   throw new StopError(`${GEN.join(' ')} made a commit (${short(before)} -> ${short(head)}): land runs it only to write the ignored boot stamps. Fix the generator, reset ${this.branch} to ${short(before)} if that commit is unwanted, and run land again.`);
   }
   if(ran.status!==0){
    const why=failureLine(`${ran.stderr}${ran.stdout}`,ran.error);
    this.receipt(`STOP ${GEN.join(' ')} failed: ${why}`);
    throw new StopError(`${GEN.join(' ')} failed before the gate (the pre-push would fail on it too): ${why}\nFix it and run land again.`);
   }
-  const stamps=this.preflight(`after ${GEN.join(' ')}`);
-  if(stamps.length===0)return;
-  // The commit hooks run, but not D25's journal rule (a re-baked shard rewrites dozens of stamp lines, and a journal
-  // line would be a second path in what must stay a stamps-only commit) nor the commit lane's 8 s cap (a loaded
-  // machine would stop land for a generated file). The commit message says why it exists.
-  const committed=spawnSync('git',['commit','--quiet','-m',STAMPS_MESSAGE,'--',...stamps],{cwd:this.root,env:{...this.env,SKIP_JOURNAL:'1',SKIP_BUDGET:'1'},encoding:'utf8',stdio:['ignore','pipe','pipe']});
-  const sha=this.head();
-  const changed=tryGit(this.root,['diff','--name-only',before,sha]).stdout.trim().split('\n').filter(Boolean);
-  if(committed.status!==0||tryGit(this.root,['rev-parse',`${sha}^`]).stdout.trim()!==before||changed.some(path=>!STAMPS.includes(path))){
-   this.receipt(`STOP stamps commit on ${short(before)} failed or changed more than the stamps`);
-   throw new StopError(`committing the regenerated stamps (${stamps.join(', ')}) failed or changed more than them: ${`${committed.stderr}${committed.stdout}`.trim()}\nInspect: git status, git log -2. Then run land again.`);
-  }
-  this.preflight(`after the stamps commit`);
-  this.expected=sha;
-  this.say('stamps',`committed ${stamps.join(', ')} rewritten by gen:inputs (${short(sha)})`);
-  this.receipt(`stamps committed ${short(sha)}: ${stamps.join(', ')}`);
+  this.preflight(`after ${GEN.join(' ')}`);
  }
 
  /** Rebase onto origin/main; a conflict aborts and stops with the paths.
@@ -569,7 +540,7 @@ class Landing{
 
  /** @returns {Promise<number>} */
  run(){
-  const stamps=this.clean();
+  this.clean();
   const start=this.head();this.expected=start;
   const main=this.fetchMain();
   if(start===main||isAncestor(this.root,start,main)){this.say('nothing',`${this.branch} ${short(start)} has nothing main lacks`);return Promise.resolve(0);}
@@ -578,12 +549,6 @@ class Landing{
   if(this.sizeWarning!==null){this.say('warning',this.sizeWarning);this.receipt(`small-plan warning: ${this.sizeWarning}`);}
   // An install a stopped land owed (its rebase had already moved HEAD) runs before anything else (J206 review).
   if(existsSync(this.installMarker()))this.install(['an earlier land\'s rebase']);
-  // DS22: gen:inputs rewrites the stamps from the tree after the rebase, so their stale bytes never block it.
-  if(stamps.length>0&&!isAncestor(this.root,main,start)){
-   git(this.root,['restore','--staged','--worktree','--',...stamps]);
-   this.say('stamps',`set aside ${stamps.join(', ')} for the rebase; gen:inputs rewrites them after it`);
-   this.receipt(`stamps set aside for the rebase: ${stamps.join(', ')}`);
-  }
   if(!isAncestor(this.root,main,start)){
    this.rebase(main);
    if(this.head()===main){this.say('nothing',`every commit on ${this.branch} is already on main`);return Promise.resolve(0);}

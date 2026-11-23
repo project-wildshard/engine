@@ -10,8 +10,11 @@ import { activeQuarantineFiles } from './scripts/test-quarantine.mjs';
 import { withTestEnvironments } from './scripts/vitest-environments';
 import { NIGHTLY_SERIAL_TESTS } from './scripts/vitest-ci-files.ts';
 import { WORKTREE_GLOB, worktreeWatchIgnored } from './scripts/worktree-ignore.mjs';
+import { ensureBootStamps } from './scripts/boot-stamps.mjs';
 
 assertVitestLane();
+// LS1/LS9: the boot stamps are ignored build outputs; a checkout that never ran gen:inputs writes them before any test imports them.
+ensureBootStamps();
 const maxWorkers = vitestMaxWorkers();
 const { CI: ci, GITHUB_ACTIONS: githubActions, WS_PUSH_GATE_PROFILE: pushProfile, WS_TEST_QUARANTINE: quarantine } = process.env;
 const { WS_NIGHTLY_TEST_PHASE: nightlyPhase } = process.env;

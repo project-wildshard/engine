@@ -11,7 +11,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSyn
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { failingDetail, failureLine, PINS_LEDGER, prePushCause, REF_LOCK, STAMPS } from '../scripts/land.mjs';
+import { failingDetail, failureLine, PINS_LEDGER, prePushCause, REF_LOCK } from '../scripts/land.mjs';
+import { BOOT_STAMPS } from '../scripts/boot-stamps.mjs';
 import { cleanLandFixtures, fixture, prepushLines, type Fixture } from './fixtures/land-git';
 
 afterEach(cleanLandFixtures);
@@ -92,37 +93,42 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
     expect(f.read(f.files.receipts)).toMatch(/STOP main push of [0-9a-f]{10} refused: pre-push: planted red check$/mu);
   }, 60_000);
 
-  test('DS22: a dirty bytes.generated.ts is regenerated after the rebase, committed on the plan branch, and lands', () => {
+  test('LS1: gen:inputs rewrites the ignored bytes stamp after the rebase; land commits nothing for it and lands', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     f.commit(wt, 'scripts/gen.mjs', GEN_STAMPS, 'build: a stamp generator');
+    writeFileSync(join(f.repo, '.git/info/exclude'), `/${STAMP}\n`);
     const gen = () => execFileSync(process.execPath, ['scripts/gen.mjs', '--inputs-only'], { cwd: wt, env: f.env });
     gen();
-    f.git(wt, ['add', STAMP]);
-    f.git(wt, ['commit', '--quiet', '-m', 'chore: stamps']);
     f.commit(wt, 'src/feature.ts', 'export const feature = true;\n', 'feat: add feature');
     gen();
-    expect(f.git(wt, ['status', '--porcelain'])).toBe(`M ${STAMP}`);
-    // Main moves before land starts, so the stamp land commits must count main's new file as well as the plan's.
+    expect(f.git(wt, ['status', '--porcelain'])).toBe('');
+    // Main moves before land starts: the stamp gen:inputs writes after the rebase counts main's new file too.
     execFileSync('sh', [f.peerScript('src/other.ts', null, 'export const other = 2;')], { env: f.env });
     const result = f.land(wt);
     expect(result.status, result.stdout).toBe(0);
-    expect(result.stdout).toMatch(/rebased .*\n.*stamps +committed src\/client\/game\/boot\/bytes\.generated\.ts/u);
-    const [subject = '', ...rest] = f.git(f.remote, ['log', '--format=%B', '-1', 'main']).split('\n');
-    expect(subject).toBe('chore(gen): regenerate boot stamps');
-    // The real commit-msg rule passes it, so land's commit goes through engine's own hook.
-    const verdict = execFileSync(process.execPath, ['--input-type=module', '-e',
-      `import {validate} from ${JSON.stringify(resolve('.githooks/check-commit-message.mjs'))};process.stdout.write(String(validate(${JSON.stringify([subject, ...rest].join('\n'))})));`], { encoding: 'utf8' });
-    expect(verdict).toBe('null');
-    expect(f.git(f.remote, ['diff', '--name-only', 'main^', 'main'])).toBe(STAMP);
-    const stamp = f.git(f.remote, ['show', `main:${STAMP}`]);
+    expect(f.git(f.remote, ['log', '--format=%s', '-1', 'main'])).toBe('feat: add feature');
+    expect(f.git(f.remote, ['ls-tree', '--name-only', '-r', 'main'])).not.toContain(STAMP);
+    const stamp = f.read(join(wt, STAMP));
     expect(stamp).toContain('feature.ts:');
     expect(stamp).toContain('other.ts:');
     expect(f.git(wt, ['status', '--porcelain'])).toBe('');
     // One main push: no refusal on the way.
     expect(prepushLines(f)).toHaveLength(1);
-    expect(f.read(f.files.receipts)).toMatch(/plan\/foo stamps committed [0-9a-f]{10}: src\/client\/game\/boot\/bytes\.generated\.ts/u);
-    expect(STAMPS).toContain(STAMP);
+    expect(f.read(f.files.receipts)).not.toMatch(/stamps committed/u);
+    expect(BOOT_STAMPS).toContain(STAMP);
+  }, 60_000);
+
+  test('LS1: a tracked stamp gen:inputs dirties stops land before the gate instead of being committed', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'scripts/gen.mjs', GEN_STAMPS, 'build: a stamp generator');
+    f.commit(wt, STAMP, 'export const bytes = [];\n', 'chore: a tracked stamp');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;\n', 'feat: add feature');
+    const result = f.land(wt);
+    expect(result.status, result.stdout).toBe(1);
+    expect(result.stdout).toContain(`M ${STAMP}: uncommitted change`);
+    expect(f.read(f.files.prepush)).toBe('');
   }, 60_000);
 
   test('DS22: an untracked file outside the pin set stops land before the gate, naming each path and its fix', () => {
@@ -185,7 +191,7 @@ describe('land (J422): the guards around the main push, and Git retries', () => 
     expect(f.land(join(f.repo, '.worktrees', 'x')).stdout).toContain('this checkout is on feature/x');
   }, 60_000);
 
-  test('DS22: a gen:inputs that commits on its own stops land before the gate; land commits only the stamps', () => {
+  test('DS22: a gen:inputs that commits on its own stops land before the gate', () => {
     const f = fixture();
     const wt = f.worktree('foo');
     f.commit(wt, 'scripts/gen.mjs', "import {execSync} from 'node:child_process';import {writeFileSync} from 'node:fs';writeFileSync('src/sneak.ts','export {};\\n');execSync('git add src/sneak.ts && git commit -q -m sneak');", 'build: a generator');

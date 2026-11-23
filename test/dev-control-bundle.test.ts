@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
+import { BOOT_STAMPS, ensureBootStamps } from '../scripts/boot-stamps.mjs';
 
 const scratch = mkdtempSync(join(process.cwd(), 'tmp', 'dev-control-bundle-'));
 afterAll(() => { rmSync(scratch, { recursive: true, force: true }); });
@@ -28,6 +29,9 @@ test('the npm artifact carries the native dev server and frozen format', () => {
   const staged = join(scratch, 'package');
   mkdirSync(staged, { recursive: true });
   cpSync('package.json', join(staged, 'package.json'));
+  // LS1: the ignored boot stamps ride the archive; npm-artifact refuses one without them.
+  ensureBootStamps();
+  for (const stamp of BOOT_STAMPS) { mkdirSync(dirname(join(staged, stamp)), { recursive: true }); cpSync(stamp, join(staged, stamp)); }
   if (existsSync('patches')) cpSync('patches', join(staged, 'patches'), { recursive: true });
   const installedFormat = realpathSync('node_modules/@wildshard/format');
   for (const name of ['@wildshard/format', 'meshoptimizer', 'valibot']) {
@@ -42,6 +46,7 @@ test('the npm artifact carries the native dev server and frozen format', () => {
   expect(pack.status, pack.stderr).toBe(0);
   const archive = JSON.parse(pack.stdout) as { filename: string; files: { path: string }[] };
   const files = archive.files.map(row => row.path);
+  for (const stamp of BOOT_STAMPS) expect(files).toContain(stamp);
   for (const file of ['main.mjs', 'cellWorker.mjs', 'rapier.wasm', 'bundle.json', 'migrations/0001-saves.sql']) {
     expect(files).toContain(`dist/dev-server/${file}`);
   }

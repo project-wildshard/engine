@@ -28,12 +28,14 @@ test.each([
   const tracked = 'public/assets/tracked.bin', mount = 'public/assets/pinned.bin';
   f.commit(wt, tracked, 'tracked', 'test: tracked asset');
   const original = 'export const bytes = { previous: 20 };\n';
-  f.commit(wt, STAMP, original, 'chore: useful stamp');
   const gen = `import { existsSync, writeFileSync } from 'node:fs';
 const rows = ${JSON.stringify([tracked, mount])}.filter(path => existsSync(path));
 writeFileSync(${JSON.stringify(STAMP)}, 'export const bytes = ' + JSON.stringify(rows) + ';\\n');`;
   const tip = f.commit(wt, 'scripts/gen.mjs', gen, 'test: stamp available assets');
-  writeFileSync(join(f.repo, '.git/info/exclude'), `out/\n${mount}\n`);
+  writeFileSync(join(f.repo, '.git/info/exclude'), `out/\n${mount}\n/${STAMP}\n`);
+  // LS1: the stamp is an ignored build output, never committed.
+  mkdirSync(join(wt, 'src/client/game/boot'), { recursive: true });
+  writeFileSync(join(wt, STAMP), original);
   mkdirSync(join(wt, 'out'), { recursive: true });
   if (mode !== 'missing ledger') writeFileSync(join(wt, PINS_LEDGER), JSON.stringify({ published: [mount] }));
   writeManifest(wt, pinsKey(wt, shardfileValidationRevision(wt)), {}, { [mount]: createHash('sha256').update('pinned').digest('hex') });
@@ -74,7 +76,8 @@ ${publish}
   expect(f.read(calls), result.stdout).toBe(install ? 'pins\n' : '');
   if (mode === 'complete' || mode === 'stale manifest') {
     expect(result.status, result.stdout).toBe(0);
-    expect(f.git(f.remote, ['show', `main:${STAMP}`])).toContain(JSON.stringify([tracked, mount]));
+    expect(f.read(join(wt, STAMP))).toContain(JSON.stringify([tracked, mount]));
+    expect(f.git(f.remote, ['ls-tree', '--name-only', '-r', 'main'])).not.toContain(STAMP);
     expect(prepushLines(f)).toHaveLength(1);
   } else {
     expect(result.status, result.stdout).toBe(1);
