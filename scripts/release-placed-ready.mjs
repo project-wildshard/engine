@@ -5,7 +5,7 @@ import {readFileSync, mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
-import {ensurePlacedHeads} from './page-release/placed-ready.mjs';
+import {ensurePlacedHeads, placedIndexProblem} from './page-release/placed-ready.mjs';
 
 async function main() {
   if (process.argv[2] !== 'staging' || process.argv.length !== 3) throw new Error('usage: node --import ./scripts/bake-loader.mjs scripts/release-placed-ready.mjs staging');

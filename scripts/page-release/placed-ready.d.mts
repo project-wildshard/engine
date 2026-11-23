@@ -7,3 +7,4 @@ export interface PlacementReadyPorts {
   cook: (head: Head) => Promise<void>;
 }
 export function ensurePlacedHeads(ports: PlacementReadyPorts): Promise<{serial: number; heads: Head[]; cooked: number}>;
+export function placedIndexProblem(index: unknown, want: {build: string; slug: string; hash: string}): string | null;
