@@ -290,7 +290,9 @@ export function installNativeTaming(host: SimHost, context: NativeTamingContext,
     const put = (key: string, value: number): void => { out.set(ridingRow(key), value); };
     put('phase', ['wild', 'breaking', 'bonded'].indexOf(owner.phase) + 1);
     put('trust', view.trust === null ? 0 : view.trust + 1); put('alert', view.alert); put('round', view.round ?? 0);
-    put('balance', view.balance); put('danger', Number(view.danger)); put('offer', Number(view.offer)); put('cue', view.cue);
+    put('balance', view.balance); put('danger', Number(view.danger)); put('offer', Number(view.offer));
+    // OF24y: the cue row exists only while a cue shows, so a shard with none (Nalati r6) sends the bytes it sent before
+    if (view.cue !== 0) put('cue', view.cue);
     put('beaten', Number(interactable.label === rows.binding.labels.breaking)); put('radius', interactable.radius); put('upgraded', Number(owner.upgraded));
     put('shake', seat.shake); put('roll', seat.roll);
     for (const [key, point] of [['prompt', interactable.position], ['ear', view.ear]] as const) {
