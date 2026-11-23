@@ -23,3 +23,13 @@ what `wildshard prepare` would on the box's renderer: an equal canary opens
 the job and both stale shards get sidecars the cook takes; a canary whose
 fence differs holds both until its recording is accepted; a recorder that
 fails holds the rest.
+
+## SP1b5b (first half): over a worker's catalogue
+
+`recordCatalogue(source, stages, canary, ports)` runs the same job over a
+cook worker's `ShardfileSource`: the head named as the canary records first,
+then every other head at those stages, each downloaded only when its turn
+comes (one shardfile in memory at a time) and never again once it has its
+sidecar. A catalogue without the canary records nothing. What is left for
+the box: its config (the canary's slug, the sidecar folder, the recorder and
+its sandbox) and running the job before the recook a render change starts.

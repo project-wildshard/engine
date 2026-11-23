@@ -14,6 +14,7 @@ import {readTar} from '@wildshard/format/tar';
 import {canaryLine, canaryOpens, canaryVerdict} from './cookCanary';
 import {sidecarTar, type CookSidecar} from './cookSidecar';
 import {openShardfile} from './shardCook';
+import type {CookStage, ShardfileSource} from './cookWorker';
 
 /** One stored shardfile the job may record. */
 export interface RecordInput {readonly slug: string; readonly hash: string; readonly tarball: Uint8Array}
@@ -85,17 +86,43 @@ async function recordOne(input: RecordInput, ports: RecordPorts, canary: boolean
   return {...head, state: 'recorded'};
 }
 
+const rowLine = (row: RecordRow): string => `record ${row.slug}: ${row.state}${row.detail === undefined ? '' : `: ${row.detail}`}`;
+/** Whether a canary row lets the job go on: anything but held or failed. */
+const opens = (row: RecordRow): boolean => row.state !== 'held' && row.state !== 'failed';
+const heldBy = (canary: RecordRow, head: {readonly slug: string; readonly hash: string}): RecordRow => ({slug: head.slug, hash: head.hash, state: 'held', detail: `canary ${canary.slug} ${canary.state}`});
+
 /** The job: the canary first; past it, every other shard in order. A held canary holds them all. */
 export async function recordSidecars(canary: RecordInput, rest: readonly RecordInput[], ports: RecordPorts): Promise<readonly RecordRow[]> {
   const first = await recordOne(canary, ports, true);
-  ports.log(`record ${canary.slug}: ${first.state}${first.detail === undefined ? '' : `: ${first.detail}`}`);
-  if (first.state === 'held' || first.state === 'failed') {
-    return [first, ...rest.map(input => ({slug: input.slug, hash: input.hash, state: 'held' as const, detail: `canary ${canary.slug} ${first.state}`}))];
-  }
+  ports.log(rowLine(first));
+  if (!opens(first)) return [first, ...rest.map(input => heldBy(first, input))];
   const rows: RecordRow[] = [first];
   for (const input of rest) {
     const row = await recordOne(input, ports, false);
-    ports.log(`record ${input.slug}: ${row.state}${row.detail === undefined ? '' : `: ${row.detail}`}`);
+    ports.log(rowLine(row));
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** SP1b5b: the job over a cook worker's catalogue: every head at `stages`, the one named `canary` first, each downloaded
+ *  only when its turn comes (one shardfile in memory at a time). A catalogue without the canary records nothing. */
+export async function recordCatalogue(source: ShardfileSource, stages: readonly CookStage[], canary: string, ports: RecordPorts): Promise<readonly RecordRow[]> {
+  const seen = new Map<string, {readonly slug: string; readonly hash: string}>();
+  for (const stage of stages) for (const row of await source.heads(stage)) seen.set(row.hash, {slug: row.slug, hash: row.hash});
+  const heads = [...seen.values()], named = new Set([canary]), first = heads.find(head => named.has(head.slug));
+  if (first === undefined) { ports.log(`record: no canary ${canary} in the catalogue; nothing records`); return []; }
+  // A head that has its sidecar is never downloaded again.
+  const record = async (head: {readonly slug: string; readonly hash: string}, isCanary: boolean): Promise<RecordRow> =>
+    existsSync(sidecarFile(ports, head.hash)) ? {...head, state: 'kept'} : recordOne({...head, tarball: await source.download(head.hash)}, ports, isCanary);
+  const lead = await record(first, true);
+  ports.log(rowLine(lead));
+  const rest = heads.filter(head => head.hash !== first.hash);
+  if (!opens(lead)) return [lead, ...rest.map(head => heldBy(lead, head))];
+  const rows: RecordRow[] = [lead];
+  for (const head of rest) {
+    const row = await record(head, false);
+    ports.log(rowLine(row));
     rows.push(row);
   }
   return rows;

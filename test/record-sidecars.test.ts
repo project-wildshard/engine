@@ -8,7 +8,7 @@ import {dirname, join, resolve} from 'node:path';
 import {afterAll, expect, test} from 'vitest';
 import {readTar, writeTar} from '@wildshard/format/tar';
 import {readSidecarTar} from '../src/cook/game/cookSidecar';
-import {recordSidecars, type RecordInput} from '../src/cook/game/recordSidecars';
+import {recordCatalogue, recordSidecars, type RecordInput} from '../src/cook/game/recordSidecars';
 import {openShardfile} from '../src/cook/game/shardCook';
 import {digest, legacyBrasscap, MOVED, PREPARED, prepared} from './fixtures/stale-preparation';
 
@@ -72,4 +72,18 @@ test('a recorder that fails leaves the shard stale and holds the rest when it is
   expect(await recordSidecars(canary, [other], job)).toEqual([
     {slug: 'brasscap-mesa', hash: canary.hash, state: 'failed', detail: 'headless WebKit did not start'},
     {slug: 'brasscap-mesa', hash: other.hash, state: 'held', detail: 'canary brasscap-mesa failed'}]);
+});
+
+test('over a worker catalogue the named canary records first, each head downloads in its turn, and a kept one never again', async () => {
+  const other = input('brasscap-other', false), canary = input('brasscap-mesa', true), byHash = new Map([other, canary].map(row => [row.hash, row.tarball]));
+  const downloads: string[] = [];
+  const source = {heads: () => Promise.resolve([{slug: other.slug, hash: other.hash, revision: 1}, {slug: canary.slug, hash: canary.hash, revision: 1}]),
+    download: (hash: string) => { downloads.push(hash); const bytes = byHash.get(hash); return bytes === undefined ? Promise.reject(new Error('unknown')) : Promise.resolve(bytes); }};
+  const {lines, ports: job} = ports('catalogue', recorder());
+  expect((await recordCatalogue(source, ['live', 'staging'], 'brasscap-mesa', job)).map(row => `${row.slug} ${row.state}`)).toEqual(['brasscap-mesa recorded', 'brasscap-other recorded']);
+  expect(downloads).toEqual([canary.hash, other.hash]);
+  expect(lines[0]).toBe('canary equal: brasscap-mesa');
+  expect((await recordCatalogue(source, ['live'], 'brasscap-mesa', job)).map(row => row.state)).toEqual(['kept', 'kept']);
+  expect(downloads).toHaveLength(2);
+  expect(await recordCatalogue(source, ['live'], 'no-such-shard', job)).toEqual([]);
 });
