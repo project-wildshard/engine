@@ -132,7 +132,7 @@ async function bench() {
     for (const { run, cap, ab } of trials) {
       // DF10 (mini-dfload): `--ab a,b` turns several slots off and on together (farBatch and kitBatch are one trial)
       // DW3 (mini-dw3): `--ab key=on/off` trials a valued slot (`debug.coverReachLow=0.8/1`); a bare key is a boolean
-      const abValue = (/** @type {string} */ item) => { const at = item.indexOf('='); if (at < 0) return [item, ab];
+      const abValue = (/** @type {string} */ item) => { const at = item.indexOf('='); if (at === -1) return [item, ab];
         const [on, off] = item.slice(at + 1).split('/'); if (off === undefined) throw new Error(`--ab ${item}: write key=on/off`);
         return [item.slice(0, at), JSON.parse(ab ? on : off)]; };
       const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, ...Object.fromEntries(values.ab.split(',').map(abValue)) };
@@ -205,13 +205,13 @@ async function bench() {
               ${legCensus ? `out.census = (() => { ${LEG_CENSUS_START} })();` : ''} ${legAlloc ? `out.alloc = (() => { ${LEG_ALLOC_START} })();` : ''} ${legVsync ? `out.vsync = (() => { ${LEG_VSYNC_START} })();` : ''} return out;`,
             stop: `const out = {}; ${every > 0 ? 'const stop = window.__wsFenced; window.__wsFenced = undefined; out.fenced = stop === undefined ? null : stop();' : ''}
               ${legCensus ? `out.census = (() => { ${LEG_CENSUS_STOP} })();` : ''} ${legAlloc ? `out.alloc = (() => { ${LEG_ALLOC_STOP} })();` : ''} ${legVsync ? `out.vsync = (() => { ${LEG_VSYNC_STOP} })();` : ''}
-              ${legShots ? `return window.__wildshard.world.game.captureFrame(390).then((c) => { out.shot = c.toDataURL('image/jpeg', 0.9); return out; });` : `return ${many ? 'out' : 'out.fenced'};`}` } : undefined;
+              ${legShots ? `return window.__wildshard.world.game.captureFrame(390).then((c) => new Promise((done) => { c.toBlob(done, 'image/jpeg', 0.9); })).then((b) => b.arrayBuffer()).then((bytes) => { out.shot = Array.from(new Uint8Array(bytes)); return out; });` : `return ${many ? 'out' : 'out.fenced'};`}` } : undefined;
           row.legs = await playRoute(driver, { slug: route, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), probe, log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
           if (every > 0) for (const leg of row.legs) console.log(`  fenced ${leg.name}: ${JSON.stringify(many ? leg.probe?.fenced : leg.probe)}`);
           if (legShots) for (const [i, leg] of row.legs.entries()) {
-            const shot = leg.probe?.shot; if (typeof shot !== 'string' || !shot.startsWith('data:image/jpeg;base64,')) { console.log(`  leg shot ${leg.name}: none`); continue; }
+            const shot = leg.probe?.shot; if (!Array.isArray(shot) || shot.length === 0) { console.log(`  leg shot ${leg.name}: none`); continue; }
             const file = join(directory, `shot-${String(i + 1).padStart(2, '0')}-${leg.name.replaceAll(/[^a-z0-9]+/giu, '-').toLowerCase()}.jpg`);
-            writeFileSync(file, Buffer.from(shot.slice('data:image/jpeg;base64,'.length), 'base64')); delete leg.probe.shot;
+            writeFileSync(file, Uint8Array.from(shot)); delete leg.probe.shot;
             console.log(`  leg shot ${leg.name}: ${file}`);
           }
           if (legVsync) for (const leg of row.legs) console.log(`  leg vsync ${leg.name}: ${JSON.stringify(leg.probe?.vsync ?? null)} (game clock p95 ${String(leg.summary?.p95Ms ?? '?')})`);
