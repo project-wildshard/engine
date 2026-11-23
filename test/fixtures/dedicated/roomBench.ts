@@ -14,6 +14,7 @@ import { bakedGridCollision } from '../gridCollision';
 import type { GridCollisionStrip } from '../../../src/shared/game/grid/gridCollision';
 import { memoryPlayerSaves } from '../../../src/server/host/dedicated/playerSaves';
 import { World, type WorkerLink, type WorldOptions } from '../../../src/server/host/dedicated/world';
+import { declaredCells } from '../../../src/server/host/dedicated/workerTable';
 import { loadHeadlessFolder } from '../../../src/server/host/headlessFolder';
 import type { HeadlessRuntimeInput } from '../../../src/server/host/headlessRuntime';
 import { builtFolder } from '../../../src/test/game/builtFolder';
@@ -41,7 +42,9 @@ export interface RoomBench { readonly url: string; readonly world: World; /** Th
     return { send: (order, transfer = []) => { port1.postMessage(order, transfer as Transferable[]); },
       listen: (news, _ended) => { port1.onmessage = (event: MessageEvent<WorkerNews>): void => { if (newsDelayMs === 0) news(event.data); else delivery.timeout(newsDelayMs, () => { news(event.data); }); }; }, stop };
   };
-  const world = await World.open({ build: 'bench', cells: ['driftwood-isle'], workers: 4, seats: 32, secret: 'bench', boot, saves: memoryPlayerSaves(), log: line => { lines.push(line); }, crashed: error => { crashes.push(error); }, restart: () => { bench.restarts++; }, ...(crossing === true ? { roads: true } : {}), ...door });
+  // ONE-FORMAT OF31h4: as the box does (main.ts), each cell's own pinned shard header declares its awake cost and shared worker
+  const declared = await declaredCells(options.cells ?? ['driftwood-isle'], cell => Promise.resolve().then(() => JSON.parse(readFileSync(`out/${cell}/shard.json`, 'utf8')) as unknown));
+  const world = await World.open({ build: 'bench', cells: ['driftwood-isle'], declared, workers: 4, seats: 32, secret: 'bench', boot, saves: memoryPlayerSaves(), log: line => { lines.push(line); }, crashed: error => { crashes.push(error); }, restart: () => { bench.restarts++; }, ...(crossing === true ? { roads: true } : {}), ...door });
   const server: Server = createServer();
   server.on('upgrade', (request, socket, head) => { world.upgrade(request, socket, head); });
   await new Promise<void>(resolve => { server.listen(0, '127.0.0.1', resolve); });
