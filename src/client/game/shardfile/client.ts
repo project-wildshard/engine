@@ -99,6 +99,7 @@ import { declaredLever } from '../plugin/weaponFamily';
 import { runtimeBinds, runtimeBoundWorldFiles, withoutRuntimeRows } from "../../../shared/game/plugin/runtimeRows";
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { nearPlaceholderRoots } from '@wildshard/format/nearPlaceholder';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 function isProofMesh(value: Object3D): value is Mesh { return value instanceof Mesh; }
 
@@ -583,7 +584,7 @@ export class ShardfileClient {
     const runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play, items = this.items ?? (this.runtimeItems ? RUNTIME_OWNED_ITEMS : undefined), tiles = this.worldTiles;
     const health = ctx.app.player;
     if (runtime === undefined || world === null || world === undefined || play === null || play === undefined || items === undefined || tiles === undefined || health === null) throw new Error('Shardfile requires the normal play stage');
-    const source = this.source, identity = { instance: this.bindings.instance, shard: source.identity.slug, revision: source.identity.revision };
+    const source = this.source, identity = { instance: this.bindings.instance, shard: source.identity.slug, revision: saveRevision(source.identity) };
     yield;
     const equipmentHost = ctx.app.equipmentHost;
     if (equipmentHost === null) throw new Error('Declared items require the normal equipment view host');

@@ -12,6 +12,7 @@ import { restoreSimHost } from '../../../src/server/engine/sim/restore';
 import type { SimHost } from '../../../src/server/engine/sim';
 import { ItemRuntime, scriptItemHook } from '../../../src/shared/engine/combat/items';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { saveRevision } from '../../../src/shared/game/shardfile/saveRevision';
 
 type ProofSimulation = ShardfileSimulation & { items: ReadonlyMap<string, ItemRuntime> };
 
@@ -24,7 +25,7 @@ class ProfileStorage implements SaveStorage {
   removeItem(key: string): void { this.data.delete(key); }
   copy(): ProfileStorage { const next = new ProfileStorage(); for (const [key, value] of this.data) next.setItem(key, value); return next; }
 }
-const identity = { instance: 'pastel-solo', shard: source.identity.slug, revision: source.identity.revision };
+const identity = { instance: 'pastel-solo', shard: source.identity.slug, revision: saveRevision(source.identity) };
 const origin = { kind: 'engine' as const, source: 'quest.complete' };
 const assets = pastelAssets();
 /** A continuation's hash: the snapshot in canonical form (test/fake/simState.ts: Rapier's snapshot bytes are not canonical) */

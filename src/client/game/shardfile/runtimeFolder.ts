@@ -36,6 +36,7 @@ import { folderResourceRole } from '../../../shared/game/shardfile/resourceRole'
 import { entryTransport } from './entryTransport';
 import { currentSpawnDownload, releaseSpawnMembers } from '../boot/spawnDownload';
 import { contentURL } from '@wildshard/engine/boot/contentBase';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 /**
  * The native runtime's product reader (SHARD-PLATFORM M3 tiles-swap, G227, E435): the same `ClientAssets` in both modes,
@@ -235,7 +236,7 @@ export async function loadShardFolder(expectedIdentity: string, options: FolderO
       const { slug: actualIdentity } = source.identity;
       if (actualIdentity !== expectedIdentity) throw new Error('Built shard product identity mismatch');
       const descriptor = outputDescriptor(source);
-      const key = `${base}|${descriptor?.indexHash ?? source.identity.revision}|${folderPolicy(options)}`;
+      const key = `${base}|${descriptor?.indexHash ?? saveRevision(source.identity)}|${folderPolicy(options)}`;
       let entry = foldersByIndex.get(key);
       if (entry === undefined) {
         const assets = new ClientAssets(source, new Map(), options);

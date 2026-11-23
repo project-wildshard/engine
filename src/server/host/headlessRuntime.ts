@@ -42,6 +42,7 @@ import { installCellHome } from '@wildshard/engine/game/grid/cellHome';
 import { vehicleHulls } from '@wildshard/engine/game/shardfile/vehicleHulls';
 import { folderVehicles, shardVehicles } from '@wildshard/engine/game/shardfile/shardVehicles';
 import { installVehicles } from '@wildshard/engine/game/plugin/vehicleRuntime';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 /** The same admitted bytes and native physics implementation used by the ordinary headless worker. */
 export interface HeadlessRuntimePreparation { shard: Shardfile; assets: ReadonlyMap<string, Uint8Array>; rapier: Rapier; readonly product: ShardFolder }
@@ -196,7 +197,7 @@ export async function prepareNativeRuntime(provided: HeadlessRuntimeInput, room?
       product = await loadHeadlessFolder(`out/${provided.shard.identity.slug}`);
     }
     const { slug: actualIdentity } = product, { slug: expectedIdentity } = provided.shard.identity;
-    if (actualIdentity !== expectedIdentity || product.revision !== provided.shard.identity.revision) throw new Error('Native product and admitted identity differ');
+    if (actualIdentity !== expectedIdentity || product.revision !== saveRevision(provided.shard.identity)) throw new Error('Native product and admitted identity differ');
     source = product.shardfile; decks = product;
     plan = await prepareFolderRuntimePlan(product, provided.assets, headlessAssemblyPorts(provided.rapier, room));
     if (product.has('economy/loot')) plan = { ...plan, economy: product.section('economy/loot') };

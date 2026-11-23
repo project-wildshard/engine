@@ -2025,6 +2025,7 @@
     "src/shared/game/shardfile/portalRide.ts": "shared",
     "src/shared/game/shardfile/portalTraversal.ts": "shared",
     "src/shared/game/shardfile/folderData.ts": "shared",
+    "src/shared/game/shardfile/saveRevision.ts": "shared",
     "src/shared/game/shardfile/productionDebug.ts": "shared",
     "src/shared/game/shardfile/props.ts": "shared",
     "src/shared/game/shardfile/resourceRole.ts": "shared",

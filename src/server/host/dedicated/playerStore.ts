@@ -9,6 +9,7 @@ import * as v from 'valibot';
 import type { SaveReceipt } from './saves/saveStore';
 import type { PlayerDoc } from './playerDoc';
 import type { HeadlessRuntimeInput } from '../headlessRuntime';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 const StoredDocument = v.object({ keys: v.record(v.string(), v.unknown()), reset: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))) });
 /** Validate every persisted slot without SaveStore's playable-page fallback or mutation.
@@ -70,7 +71,7 @@ export function recoverPlayer(doc: PlayerDoc, receipts: readonly SaveReceipt[], 
   for (const receipt of receipts) {
     if (receipt.serial <= serial) throw new Error('Recovery receipts are out of order');
     if (receipt.grant === 'fact') {
-      const identity = v.parse(v.tuple([v.literal(shard), v.literal(input.shard.identity.slug), v.literal(input.shard.identity.revision), v.string(), v.number(), v.number()]), JSON.parse(receipt.factId));
+      const identity = v.parse(v.tuple([v.literal(shard), v.literal(input.shard.identity.slug), v.literal(saveRevision(input.shard.identity)), v.string(), v.number(), v.number()]), JSON.parse(receipt.factId));
       const recovered = store.facts(input, shard)(receipt.name, identity[3]);
       if (recovered.id !== receipt.factId || recovered.status === 'pending') throw new Error('Recovery fact identity does not match');
     } else if (receipt.grant === 'coins' || receipt.grant === 'item') goods.file({ grant: receipt.grant, name: receipt.name, amount: receipt.amount });

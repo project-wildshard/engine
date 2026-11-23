@@ -34,6 +34,7 @@ import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
 import { setPageMode } from '../src/shared/game/grid/pageMode';
 import { PageResidency } from '../src/client/game/grid/pageResidency';
 import { outputIndexEnvelope } from '@wildshard/format/version';
+import { saveRevision } from '../src/shared/game/shardfile/saveRevision';
 
 await installCatalogueFixture();
 
@@ -503,7 +504,7 @@ test('historical transport never loads current host grammar or grants a model pr
   const read = vi.fn(sectionReader(wires));
   try {
     const previous = await resolveOutputDescriptor(historical, { lineage: true, offline: false, hash, read });
-    expect(parseStateLineage(previous)).toEqual({ identity: { slug: source.identity.slug, revision: source.identity.revision }, state: source.state });
+    expect(parseStateLineage(previous)).toEqual({ identity: { slug: source.identity.slug, revision: saveRevision(source.identity) }, state: source.state });
     expect(grammar).not.toHaveBeenCalled();
     expect(read.mock.calls.map(([path]) => path)).toEqual(index.sections.map(row => row.path));
     expect(isBuildValidatedOutput(previous)).toBe(false);

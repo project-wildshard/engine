@@ -16,10 +16,11 @@ import catalogue from '../../../src/shared/game/grid/singleplayer.json' with { t
 import { GridAssembly } from '../../../src/shared/game/grid/assembly.ts';
 import { GridSimulation } from '../../../src/server/game/grid/simulation.ts';
 import { ResidencyAllocator } from '../../../src/shared/game/grid/allocator.ts';
+import { saveRevision } from '../../../src/shared/game/shardfile/saveRevision.ts';
 
 const shard = emptyShardfile({ slug: 'trusted-fixture', name: 'Trusted fixture', author: 'Test', revision: 1, seed: 435 });
 const rapier = await loadRapier(readFileSync(new URL('../../../public/assets/physics/rapier.wasm', import.meta.url)));
-const product=createShardFolder({slug:shard.identity.slug,revision:shard.identity.revision,shardfile:shard,sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No named files in direct fixture'))});
+const product=createShardFolder({slug:shard.identity.slug,revision:saveRevision(shard.identity),shardfile:shard,sections:new Map(),files:new Map(),read:()=>Promise.reject(new Error('No named files in direct fixture'))});
 const preparation = { shard, product, assets: new Map(), rapier }, entry = prepareHeadlessRuntime;
 const tape = tick => [{ kind: 'player', moveX: 0, moveZ: 0, yaw: 0, ...(tick === 0 ? { attack: { targetId: 'fixture.actor' } } : {}) }, { kind: 'script', actorId: 'fixture.actor', value: tick }];
 const wire = host => serializeSimSnapshot(snapshotSimHost(host));

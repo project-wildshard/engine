@@ -32,6 +32,7 @@ import { canonicalSimDigest, simWireV1 } from '../../../src/test/engine/simState
 import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/store';
 import { Ledger, LedgerEmitter, type LedgerReceipt } from '../../../src/shared/game/ledger';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { saveRevision } from '../../../src/shared/game/shardfile/saveRevision';
 
 
 /**
@@ -254,7 +255,7 @@ export async function replayProof(rapier: Rapier): Promise<object> {
   } finally { replay?.host.dispose(); original.session.host.dispose(); }
 }
 
-const identity = { instance: 'pine-hollow-witness', shard: source.identity.slug, revision: source.identity.revision };
+const identity = { instance: 'pine-hollow-witness', shard: source.identity.slug, revision: saveRevision(source.identity) };
 class ProfileStorage implements SaveStorage {
   private readonly data = new Map<string, string>();
   refuse = false;

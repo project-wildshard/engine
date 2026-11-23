@@ -10,6 +10,7 @@ import { restoreSimHost } from '../src/server/engine/sim/restore';
 import { questBooks } from '../src/shared/engine/quest/players';
 import { captureClientState, restoreClientState } from '../src/shared/game/shardfile/clientState';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
+import { saveRevision } from '../src/shared/game/shardfile/saveRevision';
 
 // TEMPLATE-E2E TC-E2 (J361): a data spawn's `respawn` (shard-format 0.5.8) brings its body back, whole, at its `at` that
 // many seconds after it dies; a spawn without one stays dead. The wait is host state: a save keeps the clock.
@@ -87,7 +88,8 @@ test('a new revision carries a dead body and resumes its authored timer without 
   try {
     kill(sim, 'back'); kill(sim, 'gone'); sim.host.step();
     const saved = captureClientState(f.source, sim, new Map());
-    f.source.identity.revision++;
+    // FP26: bump the save lineage under whichever spelling this format pin gives it.
+    Object.assign(f.source.identity, { ['saveRevision' in f.source.identity ? 'saveRevision' : 'revision']: saveRevision(f.source.identity) + 1 });
     next = createShardfileSim(f.source, f.assets, { sections: f.sections, rapier: R });
     expect(restoreClientState(f.source, next, new Map(), saved)).toBe(true);
     const body = next.host.entities.get('back'); if (body === undefined) throw new Error('Missing body');

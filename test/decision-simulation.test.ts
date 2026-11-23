@@ -25,6 +25,7 @@ import { SaveStore } from '../src/shared/engine/saves/store';
 import { GridRegionDurability } from '../src/server/game/grid/durability';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { saveRevision } from '../src/shared/game/shardfile/saveRevision';
 
 const rapier = loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
 const io = scriptV1Layout(1, 0), state = 16384 + io.state * 8, out = 16384 + io.outbox * 8;
@@ -601,7 +602,7 @@ test('a region re-entered after a revision keeps its decision clock in step', as
     for (let i = 0; i < 9; i++) first.host.step();
     expect(first.decisions?.host.snapshot().tick).toBe(9);
     expect(before.checkpoint(snapshotSimHost(first.host))).toBe(true);
-    const revised = { ...f.source, identity: { ...f.source.identity, revision: f.source.identity.revision + 1 } };
+    const revised = { ...f.source, identity: { ...f.source.identity, revision: saveRevision(f.source.identity) + 1 } };
     const after = new GridRegionDurability(new SaveStore({ local: storage, session: null }), identity, revised, []);
     fresh = createShardfileSim(revised, f.assets, { ...f.options, rapier: R, quest: after.quest });
     after.setPhysicsBasis(fresh.host.physics.snapshot());

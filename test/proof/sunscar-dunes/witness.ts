@@ -29,6 +29,7 @@ import { SIGNAL_PHYSICS } from '../../../src/shards/sunscar-dunes/generators/phy
 import { bindHeadlessPrompts, createHeadlessPromptPicker, parsePromptRegistrations, type HeadlessPrompt } from '../../../src/shared/game/quest/interactionRows';
 import * as v from 'valibot';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { saveRevision } from '../../../src/shared/game/shardfile/saveRevision';
 
 // Preserve the original plain JSON boundary, including signed-zero normalization.
 const physicsDocument = JSON.stringify(SIGNAL_PHYSICS);
@@ -58,7 +59,7 @@ function folderAssets(product: Awaited<ReturnType<typeof loadHeadlessFolder>>): 
 const admitted = await loadHeadlessFolder('out/sunscar-dunes'), source = admitted.shardfile;
 const assets = folderAssets(admitted);
 const EYE = 1.68;
-const identity = { instance: 'sunscar-witness', shard: source.identity.slug, revision: source.identity.revision };
+const identity = { instance: 'sunscar-witness', shard: source.identity.slug, revision: saveRevision(source.identity) };
 
 class ProfileStorage implements SaveStorage {
   private readonly data = new Map<string, string>();

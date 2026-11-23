@@ -4,6 +4,7 @@ import { TIER } from '@wildshard/engine/core/tier';
 import { timeClientPreparation } from './preparationTiming';
 import { HomeGeometrySnapshotSchema, homeGeometryBytes, restoreHomeGeometry, snapshotHomeGeometry,
   type HomeGeometryView, type HomeGeometrySnapshot } from './homeGeometrySnapshot';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 declare const __BUILD_ID__: string;
 /** One home's completed static geometry: at most 64 MiB of payload and 256 entries, shared across all builds. */
@@ -17,7 +18,7 @@ let database: Promise<IDBDatabase | null> | undefined;
 /** The composition root calls this only for its actual Home instance, never a neighbour. */
 export function bindHomeBuildCache(source: Shardfile): void {
   if (typeof __BUILD_ID__ !== 'string' || typeof indexedDB === 'undefined') return;
-  homes.set(source, JSON.stringify([__BUILD_ID__, source.identity.slug, source.identity.revision, TIER]));
+  homes.set(source, JSON.stringify([__BUILD_ID__, source.identity.slug, saveRevision(source.identity), TIER]));
 }
 
 function open(): Promise<IDBDatabase | null> {

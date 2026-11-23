@@ -30,6 +30,7 @@ import { simMismatchError } from '../../fake/simMismatch';
 import { playDriftwood } from './tape';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { leadSnapshot } from '@wildshard/engine/sim/snapshot';
+import { saveRevision } from '../../../src/shared/game/shardfile/saveRevision';
 
 const { actions: DRIFTWOOD_ACT, actor: DRIFTWOOD_INTERACT, step: QUEST_STEP } = policy;
 
@@ -58,7 +59,7 @@ type Recorded = v.InferOutput<typeof Manifest>;
 const hash = (bytes: Uint8Array | string): string => createHash('sha256').update(bytes).digest('hex');
 const digest = (session: NativeHeadlessResident): string => canonicalSimDigest(snapshotSimHost(session.host));
 const save = (session: NativeHeadlessResident): string => simWireV1(serializeSimSnapshot(snapshotSimHost(session.host)));
-const identity = { instance: 'driftwood-witness', shard: source.identity.slug, revision: source.identity.revision };
+const identity = { instance: 'driftwood-witness', shard: source.identity.slug, revision: saveRevision(source.identity) };
 
 /** Every named result is scoped; the remaining page laws below keep whole-shard admission closed. */
 export const OPEN = [

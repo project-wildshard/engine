@@ -2,6 +2,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import { outputBlobUrl, outputDescriptor } from './outputDescriptor';
 import { createShardFolder, type ShardFolder, type ShardFolderInput } from './shardFolder';
+import { saveRevision } from './saveRevision';
 
 /** Bind the verified reader to the synchronous runtime API. No renderer or browser enters native preparation.
  * `server` admits the J91 server class into the names; a browser caller never passes it. */
@@ -17,6 +18,6 @@ export function shardFolderData(source: Shardfile, base: string, read: (hash: st
     ...(file.schema === undefined ? {} : { jsonSchema: { $schema: 'http://json-schema.org/draft-07/schema#', $comment: file.schema } }) });
   // Native APIs may supply an already checked in-memory Shardfile. This does
   // not read an older disk format or fabricate custom sections/logical names.
-  return createShardFolder({ slug: source.identity.slug, revision: source.identity.revision, shardfile: source,
+  return createShardFolder({ slug: source.identity.slug, revision: saveRevision(source.identity), shardfile: source,
     sections: descriptor?.sections ?? outputSectionPayloads(source), files, read, check, builtJson, ...(jsonCheck === undefined ? {} : { jsonCheck }) });
 }

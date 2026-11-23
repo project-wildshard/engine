@@ -45,6 +45,7 @@ import type { HeadlessEffect } from '../../../shared/host/tickProtocol';
 import { FallFloor, shardFallFloor, shardPlayArea } from './fallFloor';
 import { stepResident } from '../../../shared/host/standalone/netInput';
 import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 /** The host's own player: the seat its systems are bound to. */
 export const LEAD_SEAT = 'actor.player';
@@ -193,7 +194,7 @@ export async function openCellWorld(cell: Pick<GridCell, 'instance'>, input: Hea
     host.respawn.served = true; actRoutes(host).introLocks = true;
     const owned = ownedOf(host, input, options.owned, options.profiles, options.shard), fallFloor = (): FallFloor => fallFloorOf(input, host, lone);
     return { host, owned, fallFloor, fall: fallFloor(), resident, dispose: () => { resident.dispose(); }, fact, effects: () => resident.effects,
-      adopt: () => { regionalRuntimeCheckpoint(options.saves, placed, input.shard.identity.revision).restore({ animals: [...host.entities.values()] }); return true; }, step: inputs => {
+      adopt: () => { regionalRuntimeCheckpoint(options.saves, placed, saveRevision(input.shard.identity)).restore({ animals: [...host.entities.values()] }); return true; }, step: inputs => {
       const player = leadSeat(host);
       near?.update(player.position.x, player.position.z);
       stepResident(resident, player.id, inputs);

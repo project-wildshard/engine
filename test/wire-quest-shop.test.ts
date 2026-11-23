@@ -21,6 +21,7 @@ import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { declaredLootEconomy } from '../src/shared/game/shard/declaredRows';
 import type { Transport } from '../src/shared/engine/net/transport';
+import { saveRevision } from '../src/shared/game/shardfile/saveRevision';
 
 const { shardfile: source } = await loadHeadlessFolder(builtFolder('driftwood-isle'));
 const TEMPLATE = sourceManifest({ identity: source.identity, accent: source.accent, spawn: source.spawn, look: source.look });
@@ -35,7 +36,7 @@ const coinRows = { name: 'Maren', reopen: false, shop: {
 function page(loot: unknown = source.rows.loot) {
   const scope = new Scope('shop-entry'), host = new App(), events: string[] = [], owned = new Owned('shop-entry', undefined, keptItems({ kept: DRIFTWOOD_KEPT }));
   for (const id of owned.all) owned.revoke(id);
-  const product = createShardFolder({ slug: source.identity.slug, revision: source.identity.revision, shardfile: source,
+  const product = createShardFolder({ slug: source.identity.slug, revision: saveRevision(source.identity), shardfile: source,
     sections: new Map([['economy/loot', { rows: { loot } }]]), files: new Map(), read: () => Promise.reject(new Error('No shop file read')) });
   const level = createLevelInstallation(host, scope, {}, () => ({ set: () => undefined, detail: () => undefined }));
   const ctx = shardContext(level.context, TEMPLATE, { shard: TEMPLATE, rows: new Map(), bag: { tab: () => () => undefined, fragment: () => () => undefined } }, product);

@@ -9,6 +9,7 @@ import {writeTar} from '@wildshard/format/tar';
 import {assertKtx2TableTargets} from '../src/shared/game/shardfile/ktx2Targets.ts';
 import {folderName, insideTree, mountPath} from './pins-reuse.mjs';
 import {trackedPublic} from './tracked-public.mjs';
+import { saveRevision } from '../src/shared/game/shardfile/saveRevision.ts';
 
 const hash = (body: Uint8Array): string => createHash('sha256').update(body).digest('hex');
 const discovery = /^mounts\/shardfiles\/([^/]+)\/discovery\.json$/u;
@@ -123,6 +124,6 @@ export async function localProduct(path: string, root: string): Promise<LocalPro
   insideTree(root, `out/${folder}`);
   const preservedMounts = conflicts(root, folder, mounts(files));
   const bytes = writeTar(files);
-  return {pin: {slug, revision: index.identity.revision, hash: hash(bytes), bytes: bytes.length}, bytes, folder, preservedMounts,
+  return {pin: {slug, revision: saveRevision(index.identity), hash: hash(bytes), bytes: bytes.length}, bytes, folder, preservedMounts,
     source: {kind: 'local-directory', path: canonical, indexHash: hash(indexBytes)}};
 }

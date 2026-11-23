@@ -7,12 +7,13 @@ import type { SaveStore } from '@wildshard/engine/saves/store';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { Ledger, LedgerCatalogueItem } from '../../../shared/game/ledger';
 import { placementLedger, recordWireFacts } from '../shardfile/wireFacts';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 /** The ledger the facts go into and what tells progress: the page's (`enterDataCellFacts`), or a test's. */
 export interface DataCellFactPorts { readonly ledger: Pick<Ledger, 'record'>; readonly refresh: () => void }
 
 const identityOf = (source: Pick<Shardfile, 'identity'>, instance: string): { instance: string; shard: string; revision: number } =>
-  ({ instance, shard: source.identity.slug, revision: source.identity.revision });
+  ({ instance, shard: source.identity.slug, revision: saveRevision(source.identity) });
 
 /** Install a copy's facts for one stay in it. `here` says whether the wire is this cell's. */
 export function installCellFacts(source: Pick<Shardfile, 'ledger' | 'identity'>, instance: string, stay: Scope, here: () => boolean, ports: DataCellFactPorts): void {

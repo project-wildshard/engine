@@ -25,6 +25,7 @@ import type { TickWorkerAdapter } from '../../../src/server/host/tickWorkerLoop'
 import headlessAssembly from '../../../src/shards/nine-dragon-stack/data/headlessAssembly.json' with { type: 'json' };
 import grappleProfile from '../../../src/shards/nine-dragon-stack/data/grappleProfile.json' with { type: 'json' };
 import { portalPlanRows } from '../../../src/shards/nine-dragon-stack/generators/portalEntries';
+import { saveRevision } from '../../../src/shared/game/shardfile/saveRevision';
 
 const portalPlan = portalPlanRows();
 
@@ -261,7 +262,7 @@ export async function replayProof(rapier: Rapier, inputs: string, name: Checkpoi
   } catch (error) { return { status: 'failed', dependency: reason(error), checkpointCaptured: false, suffixTicksExecuted: 0 }; } finally { await worker?.dispose(); sim?.dispose(); replay?.dispose(); }
 }
 
-const identity = { instance: 'nine-dragon-stack-witness', shard: source.identity.slug, revision: source.identity.revision };
+const identity = { instance: 'nine-dragon-stack-witness', shard: source.identity.slug, revision: saveRevision(source.identity) };
 class ProfileStorage implements SaveStorage {
   private readonly data = new Map<string, string>();
   get length(): number { return this.data.size; }

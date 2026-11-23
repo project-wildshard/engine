@@ -22,6 +22,7 @@ import { runStandaloneServer } from '../src/server/host/standalone/serverHost';
 import { importPageSaves, type IndexedSaves } from '../src/client/engine/saves/indexed';
 import { connectStandalone, type StandaloneShell } from '../src/client/host/standalone/shell';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { saveRevision } from '../src/shared/game/shardfile/saveRevision';
 
 // A player's saves are the page's: the server opens them, with its own world rebuilt, and carries on from what they say.
 const PREFIX = 'wildshard.save.v2.';
@@ -112,7 +113,7 @@ test('a session opens where the page\'s save stood, and a creature keeps its hea
   const hurt = new PageStorage();
   pageSaves(hurt);
   gridRecovery(saves).save(assembly, cell, road, { kind: 'cell', x: 40, y: 12, z: -60, yaw: 1 });
-  regionalRuntimeCheckpoint(saves, placed, input.shard.identity.revision).checkpoint({ animals: [{ entityId: id, kind: creature.kind, hp: 1, maxHp: creature.maxHp, alive: true, position: creature.position, yaw: creature.yaw, snapshot: () => creature.snapshot(), restore: () => undefined }] });
+  regionalRuntimeCheckpoint(saves, placed, saveRevision(input.shard.identity)).checkpoint({ animals: [{ entityId: id, kind: creature.kind, hp: 1, maxHp: creature.maxHp, alive: true, position: creature.position, yaw: creature.yaw, snapshot: () => creature.snapshot(), restore: () => undefined }] });
   const again = boot(hurt, 'sunscar-dunes');
   await again.booted;
   expect(running?.host.entities.get(id)?.hp).toBe(1);

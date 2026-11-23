@@ -11,6 +11,7 @@ import { GridWallet } from '../../../shared/game/grid/wallet';
 import { clientStateFromRegion, clientStateSave, restoreClientState } from '../../../shared/game/shardfile/clientState';
 import { ClientCheckpointSchema, type ClientCheckpoint } from '@wildshard/format/clientState';
 import type { ShardfileSimulation } from '../plugin/simulation';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 const schema = v.nullable(v.looseObject({ revision: v.pipe(v.number(), v.integer(), v.minValue(1)),
   snapshot: v.nullable(v.pipe(v.string(), v.minLength(1), v.maxLength(128 * 1024 * 1024))), logical: v.optional(v.nullable(ClientCheckpointSchema), null),
@@ -66,11 +67,11 @@ export class GridRegionDurability {
 
   constructor(store: SaveStore, placement: LocalSaveInstance, source: Shardfile, catalogue: readonly LedgerCatalogueItem[]) {
     this.source = source;
-    this.identity = { instance: placement.id, shard: source.identity.slug, revision: source.identity.revision };
+    this.identity = { instance: placement.id, shard: source.identity.slug, revision: saveRevision(source.identity) };
     this.saved = instanceSave(store, continuation, placement);
     this.wallet = new GridWallet(store, placement);
     this.ledger = new Ledger(store, [{ id: placement.id, shard: source.identity.slug }],
-      [{ shard: source.identity.slug, revision: source.identity.revision, rules: source.ledger }], catalogue);
+      [{ shard: source.identity.slug, revision: saveRevision(source.identity), rules: source.ledger }], catalogue);
     this.quest = {
       fact: (name, entity) => {
         const emitter = this.emitters.get('quest.complete');

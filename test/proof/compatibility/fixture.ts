@@ -5,6 +5,7 @@ import { SaveStore, type SaveStorage } from '../../../src/shared/engine/saves/st
 import { WILDSHARD_IDENTITY } from '../../../src/client/game/identity';
 import { Ledger } from '../../../src/shared/game/ledger';
 import { parseShardfile, type Shardfile } from '@wildshard/format/shardSchema';
+import { saveRevision } from '../../../src/shared/game/shardfile/saveRevision';
 
 /** Test storage is an actual SaveStore backend; refusal never replaces gameplay or fabricates a grant. */
 class ProfileStorage implements SaveStorage {
@@ -29,10 +30,10 @@ async function sourceOf(slug: string): Promise<Shardfile> {
 function ledgerContract(source: Shardfile): object {
   const local = new ProfileStorage(), identity = source.identity;
   const open = (): Ledger => new Ledger(new SaveStore({ local, session: null }), [{ id: identity.slug, shard: identity.slug }],
-    [{ shard: identity.slug, revision: identity.revision, rules: source.ledger }], []);
+    [{ shard: identity.slug, revision: saveRevision(identity), rules: source.ledger }], []);
   const ledger = open();
   if (source.ledger.length === 0) return { status: 'not-declared', rules: 0, gameplayEmissionProven: false };
-  const facts = source.ledger.map((rule, ordinal) => ({ instance: identity.slug, shard: identity.slug, revision: identity.revision,
+  const facts = source.ledger.map((rule, ordinal) => ({ instance: identity.slug, shard: identity.slug, revision: saveRevision(identity),
     entity: `witness.${String(ordinal)}`, tick: 60, ordinal, name: rule.fact, origin: rule.origin }));
   const first = facts[0]; if (first === undefined) throw new Error('Missing declared fact');
   local.refuse = true;

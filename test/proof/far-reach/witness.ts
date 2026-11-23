@@ -21,6 +21,7 @@ import FLAGS from '../../../src/shards/far-reach/data/flags.json' with { type: '
 import {SkyTape} from './tape';
 import { ROC_STEP, ROC_ID } from '../../../src/shards/far-reach/generators/rows/rocFight';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { saveRevision } from '../../../src/shared/game/shardfile/saveRevision';
 
 /**
  * Sky Reach's whole-shard witness (E435 §C / SF72) on its native renderer-free entry, `runtime/headless.ts`, composed
@@ -38,7 +39,7 @@ const ROOT = new URL('../../../', import.meta.url);
 const product = await loadHeadlessFolder('out/far-reach'), source = product.shardfile;
 const refs = [...source.files.map(file => file.hash), ...source.requires.commons.map(hash => `commons:${hash}`)];
 const assets = new Map(await Promise.all(refs.map(async (ref): Promise<[string, Uint8Array]> => [ref, await folderClosureFile(product, ref)])));
-const identity = { instance: 'far-reach-witness', shard: source.identity.slug, revision: source.identity.revision };
+const identity = { instance: 'far-reach-witness', shard: source.identity.slug, revision: saveRevision(source.identity) };
 
 class ProfileStorage implements SaveStorage {
   private readonly data = new Map<string, string>();

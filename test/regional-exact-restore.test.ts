@@ -22,6 +22,7 @@ import * as v from 'valibot';
 import {encodeMeshCollision} from '@wildshard/format/meshCollisionBytes';
 import {SIM_LEVEL} from './fixtures/sim-level/level';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { saveRevision } from '../src/shared/game/shardfile/saveRevision';
 
 const rapier=loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 let fixed:Uint8Array=new Uint8Array(),grown:Uint8Array=new Uint8Array();
@@ -169,7 +170,7 @@ test.each(['exact','revision','sealed-basis','unsealed-basis','future','corrupt'
   const basis=original.host.physics.snapshot();owner.setPhysicsBasis(basis);owner.bind(original.host,original.colliders);
   original.host.flags.set('kept');original.host.step();expect(owner.checkpoint(snapshotSimHost(original.host))).toBe(true);original.dispose();
   if(mode==='unsealed-basis')changeRegion(storage,data=>{delete data['integrity'];});
-  if(mode==='future')changeRegion(storage,data=>{data['revision']=f.source.identity.revision+1;reseal(data);});
+  if(mode==='future')changeRegion(storage,data=>{data['revision']=saveRevision(f.source.identity)+1;reseal(data);});
   if(mode==='corrupt')changeRegion(storage,data=>{data['snapshot']='broken';reseal(data);});
   const source=mode==='revision'?{...f.source,identity:{...f.source.identity,revision:2}}:f.source;
   const reopened=new GridRegionDurability(store(),identity,source,[]),target=prepareShardfileSimRestore(source,f.assets,{rapier:R,quest:reopened.quest});platform(target.host);

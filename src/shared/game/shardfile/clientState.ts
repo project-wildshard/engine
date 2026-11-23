@@ -11,6 +11,7 @@ import { portalTransitioning } from './portalTraversal';
 import type { SimSnapshot } from '@wildshard/engine/sim/snapshot';
 
 import { ClientCheckpointSchema, ItemCheckpointStatesSchema as itemsSchema, LogicalClientCheckpointSchema as logicalCheckpoint, type ClientCheckpoint, type ClientCheckpointInput } from '@wildshard/format/clientState';
+import { saveRevision } from './saveRevision';
 
 /** Logical level progress, independent of the Game's borrowed physics world and player motor. */
 export const clientStateSave: { key: string; scope: "shard"; version: number; schema: v.NullableSchema<v.GenericSchema<ClientCheckpointInput, ClientCheckpoint>, undefined>; initial: () => ClientCheckpoint | null; } = { key: 'platform.continuation', scope: 'shard' as const, version: 1,
@@ -31,7 +32,7 @@ export function captureClientState(source: Shardfile, sim: ShardfileSimulation, 
   const lane = sim.lane?.snapshot() ?? null;
   // The live lane's world gives the same logical state as parsing its snapshot text back, without that parse.
   const logical = sim.lane === undefined ? logicalStateFromLane(source.state.version, null) : logicalStateFromWorld(source.state.version, sim.lane.world);
-  return v.parse(logicalCheckpoint, { version: 2, shard: source.identity.slug, state: migrateLogicalState(logical, source.state), revision: source.identity.revision, tick: sim.host.state.tick,
+  return v.parse(logicalCheckpoint, { version: 2, shard: source.identity.slug, state: migrateLogicalState(logical, source.state), revision: saveRevision(source.identity), tick: sim.host.state.tick,
     lane, ...clientStateParts(source, sim, items) });
 }
 /** Every continuation field except the clock and the script lane (and the logical state read from that lane), unparsed:
@@ -43,7 +44,7 @@ export function clientStateParts(source: Shardfile, sim: ShardfileSimulation, it
     quests: sim.quest.quests.map((quest) => quest.snapshot()), dialogue: sim.quest.snapshot() };
 }
 /** Persist a portable companion to a same-engine region snapshot, so later revisions never need its old Rapier bytes. Legacy regions supply their known state-version-1 origin. */
-export function clientStateFromRegion(source: Shardfile, snapshot: Omit<SimSnapshot, 'physics'>, revision: number = source.identity.revision, stateVersion: number = source.state.version, props: Readonly<Record<string, boolean>> = {}): ClientCheckpoint {
+export function clientStateFromRegion(source: Shardfile, snapshot: Omit<SimSnapshot, 'physics'>, revision: number = saveRevision(source.identity), stateVersion: number = source.state.version, props: Readonly<Record<string, boolean>> = {}): ClientCheckpoint {
   v.parse(v.literal(source.identity.slug), snapshot.levelId);
   const lane = snapshot.adapters.find((adapter) => adapter.id === 'script.declared')?.state ?? null;
   if (lane !== null && typeof lane !== 'string') throw new Error('Invalid regional script state');
@@ -118,11 +119,11 @@ function applyMigrated(source: Shardfile, sim: ShardfileSimulation, items: Runti
  * rows against. Neither is the player's progress, which the logical state carries.
  */
 export function restoreClientState(source: Shardfile, sim: ShardfileSimulation, items: Runtimes, input: unknown): boolean {
-  const result = v.safeParse(ClientCheckpointSchema, input); if (!result.success || result.output.revision > source.identity.revision
+  const result = v.safeParse(ClientCheckpointSchema, input); if (!result.success || result.output.revision > saveRevision(source.identity)
     || !v.safeParse(v.literal(source.identity.slug), sim.host.level.id).success
     || (result.output.version === 2 && !v.safeParse(v.literal(source.identity.slug), result.output.shard).success)
     || (source.entryways.some(entry => entry.kind === 'socketLift') && (sim.lane?.host.currentTick ?? -1) >= 0)) return false;
-  const previous = captureClientState(source, sim, items), saved = result.output, sameRevision = saved.revision === source.identity.revision;
+  const previous = captureClientState(source, sim, items), saved = result.output, sameRevision = saved.revision === saveRevision(source.identity);
   const tries = sameRevision && !(saved.version === 2 && saved.lane === null)
     ? [() => { apply(source, sim, items, saved); }, () => { applyMigrated(source, sim, items, saved, false); }] : [() => { applyMigrated(source, sim, items, saved, sameRevision); }];
   for (const attempt of tries) {

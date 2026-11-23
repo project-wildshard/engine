@@ -18,6 +18,7 @@ import { restoreSimHost } from '../../server/engine/sim/restore';
 import { simPlayerCommand, type HeadlessCommand, type HeadlessEffect } from '../../shared/host/tickProtocol';
 import type { TickWorkerAdapter } from '../../server/host/tickWorkerLoop';
 import { leadCommands, leadPlayer } from '@wildshard/engine/sim/leadPlayer';
+import { saveRevision } from '../../shared/game/shardfile/saveRevision';
 
 /** The world a product's own native plan builds: what the tick worker runs, for proofs that wrap or drive it. */
 export const prepareFolderPlan: PrepareHeadlessRuntime = ({ product, assets, rapier }) => prepareFolderRuntimePlan(product, assets, headlessAssemblyPorts(rapier));
@@ -27,7 +28,7 @@ export async function prepareNativeProof(provided: HeadlessRuntimeInput, prepare
   if (!/^[a-z0-9][a-z0-9-]*$/u.test(provided.shard.identity.slug)) throw new Error('Invalid native product identity');
   await prepareAssetDecoders();
   const product=provided.product ?? await loadHeadlessFolder(`out/${provided.shard.identity.slug}`);
-  if(product.slug!==provided.shard.identity.slug || product.revision!==provided.shard.identity.revision) throw new Error('Native product and admitted identity differ');
+  if(product.slug!==provided.shard.identity.slug || product.revision!==saveRevision(provided.shard.identity)) throw new Error('Native product and admitted identity differ');
   const preparation: HeadlessRuntimePreparation={...provided,product};
   const source=product.shardfile,plan=await prepare(preparation);
   const identity = { id: source.identity.slug, seed: source.identity.seed };

@@ -117,6 +117,7 @@ import type { GrappleTickContext, NativeGrapple } from '../grapple/native';
 import { installDeclaredPatrols } from '../shardfile/declaredPatrols';
 import { installDeclaredRanks } from '../shardfile/declaredRanks';
 import { recordPrimitives } from '../shardfile/hostPrimitives';
+import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
 
 type Physics = SimHost['physics'];
 type PropColliderPort = NonNullable<ReturnType<ReturnType<typeof installShardfileColliders>['get']>>;
@@ -989,7 +990,7 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
     const storage = { get length() { return values.size; }, key: (index: number) => [...values.keys()][index] ?? null,
       getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); } };
     const ledger = () => new Ledger(new SaveStore({ local: storage, session: null }), [{ id: instance, shard: source.identity.slug }],
-      [{ shard: source.identity.slug, revision: source.identity.revision, rules: source.ledger }], []);
+      [{ shard: source.identity.slug, revision: saveRevision(source.identity), rules: source.ledger }], []);
     const owner = ledger(); let granted = 0;
     // A fact is filed as the game files it (grid/durability.ts): under its ledger rule's own origin, and only when a rule maps it
     // (a fact no rule rewards is still a fact the tape may require). MU6: the proof filed every fact as `quest:<id>`, which no
@@ -1000,7 +1001,7 @@ export async function proveAuthoredGrid(source: Shardfile, assets: ReadonlyMap<s
         || (source.quests.races ?? []).some(race => race.id === fact.actorId && race.fact === fact.name);
       if (!declared) throw new Error('Missing native quest fact provenance');
       const rule = source.ledger.find(row => row.fact === fact.name);
-      return rule === undefined ? [] : [{ instance, shard: source.identity.slug, revision: source.identity.revision, entity: fact.actorId, tick: fact.tick, ordinal,
+      return rule === undefined ? [] : [{ instance, shard: source.identity.slug, revision: saveRevision(source.identity), entity: fact.actorId, tick: fact.tick, ordinal,
         name: fact.name, origin: rule.origin }];
     });
     for (const fact of filed) { const receipt = owner.record(fact); insist(receipt.status !== 'pending', 'ledger write pending'); if (receipt.status === 'granted') granted++; }

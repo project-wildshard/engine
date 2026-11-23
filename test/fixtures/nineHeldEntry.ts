@@ -20,6 +20,7 @@ import { GrappleProfileSchema, GrappleHooksSchema } from '@wildshard/format/grap
 import { SHARDS } from './shardCatalogue';
 import { fixtureFolderFile, fixtureJsonCheck } from './folderFile';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
+import { saveRevision } from '../../src/shared/game/shardfile/saveRevision';
 
 function pinnedManifest() {
  const row = SHARDS.find(candidate => candidate.slug === 'nine-dragon-stack');
@@ -46,7 +47,7 @@ export async function heldEntry(prepare = true) {
   const bytes = frozenRuntimeBytes('nine-grapple-source.json');
   let pending: Promise<Uint8Array> | null = null;
   const presentation = nineHeldPresentationBytes();
-  const product = createShardFolder({ slug: manifest.slug, revision: source.identity.revision, shardfile: source, jsonCheck: fixtureJsonCheck,
+  const product = createShardFolder({ slug: manifest.slug, revision: saveRevision(source.identity), shardfile: source, jsonCheck: fixtureJsonCheck,
     sections: new Map<string, unknown>([['held/arms', { kind: 'declared-primary', primary: { item: 'weapon.jian', blade: 'wood', file: enteredRows.grapple.presentation }, tools: ['tool.fei-zhua'] }],
       ['client/plan', { version: 1, features: [{ kind: 'held.claims.prepare', id: 'held.primary' }, { kind: 'held.claims.install', claims: 'held.primary' }, { kind: 'held.claims.enter', claims: 'held.primary', ...enteredRows }] }]]),
     files: new Map([[enteredRows.grapple.presentation, fixtureFolderFile(enteredRows.grapple.presentation, { hash: '0'.repeat(64), url: '/jian-row.json' })], [slottedEnteredRows.grapple.source, { hash: '1'.repeat(64), url: '/constants.json' }]]),
