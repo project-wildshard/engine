@@ -53,7 +53,9 @@ r.renderBufferDirect = function (...args) {
   try { return draw.apply(this, args); } finally {
     const chain = [];
     for (let n = args[4]; n; n = n.parent) chain.push(n.name === '' ? n.type : n.name);
-    const key = (shadow > 0 ? 'shadow' : 'main') + '|' + chain.reverse().slice(0, 4).join('>');
+    chain.reverse();
+    // past four names, the drawn object's own name too (the cover's kinds share one four-name owner)
+    const key = (shadow > 0 ? 'shadow' : 'main') + '|' + chain.slice(0, 4).join('>') + (chain.length > 4 ? '…' + chain[chain.length - 1] : '');
     const o = owners.get(key) ?? [0, 0];
     o[0] += r.info.render.calls - calls; o[1] += r.info.render.triangles - tris; owners.set(key, o);
   }
