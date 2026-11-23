@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
 import { patchShader } from '@wildshard/engine/render/shaderPatches';
+import { prepareFarCopyIndices, resetFarLod, settleFarCopies } from '@wildshard/engine/render/farLod';
 import { batchableMesh, buildKitBatches, kitBatch, prepareBakedTileBatch } from './kitBatch';
 
 // DF10 (mini-df10e): the level's plain meshes of one material draw as one batch; each member stays the source of its pose,
@@ -46,6 +47,32 @@ test('opaque baked tiles keep their lightmap UVs and changing draw ranges in a b
   batch.sync();
   const ranges = Reflect.get(batch, '_geometryInfo') as { count: number }[];
   expect(ranges[member.geometryId]?.count).toBe(3);
+});
+
+test('a kit batch keeps each wide member’s far indices and is warmed as one draw', async () => {
+  resetFarLod(true);
+  try {
+    const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(), material = new THREE.MeshBasicMaterial();
+    const first = new THREE.Mesh(new THREE.PlaneGeometry(140, 140, 64, 64), material);
+    const next = new THREE.Mesh(first.geometry.toNonIndexed(), material);
+    scene.add(first, next);
+    const [batch] = buildKitBatches(scene);
+    if (batch === undefined) throw new Error('one kit batch');
+    expect(first.layers.mask).toBe(0);
+    expect(next.geometry.index).not.toBeNull();
+    await settleFarCopies({ scene });
+    camera.position.set(-220, 10, -220);
+    const refresh = await prepareFarCopyIndices(scene, camera, () => true, () => Promise.resolve());
+    expect(refresh).toEqual(new Set([batch]));
+    batch.sync();
+    const ranges = Reflect.get(batch, '_geometryInfo') as { count: number }[];
+    for (const member of batch.members) {
+      expect(member.geometry.drawRange.count).toBeLessThan(member.drawn);
+      expect(ranges[member.geometryId]?.count).toBe(member.geometry.drawRange.count);
+    }
+    batch.retire();
+    expect(first.layers.mask).toBe(1);
+  } finally { resetFarLod(); }
 });
 
 test('a returning region owns its kit in cell coordinates', () => {

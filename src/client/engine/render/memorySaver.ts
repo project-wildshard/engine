@@ -159,6 +159,18 @@ const releasedBuffers = new WeakMap<object, { readonly gl: WebGL2RenderingContex
 /** MG10: whether `index`'s triangles draw turned now (WebKit's first-vertex convention, `drawHooks.ts` `rotateTriangles`) */
 export function indexTurned(index: THREE.BufferAttribute): boolean { return indexRotated(index); }
 
+/** Copy a CPU-backed member's triangles into its batch, respecting each index's provoking-vertex convention. */
+export function copyBatchIndex(target: THREE.BufferAttribute, source: THREE.BufferAttribute, start: number, vertex: number, count: number): void {
+  const turned = indexRotated(target), shift = (Number(indexRotated(source)) - Number(turned) + 3) % 3;
+  let at = 0;
+  if (shift !== 0) for (; at + 2 < count; at += 3) {
+    for (let corner = 0; corner < 3; corner++) target.setX(start + at + corner, vertex + source.getX(at + (corner + shift) % 3));
+  }
+  for (; at < count; at++) target.setX(start + at, vertex + source.getX(at));
+  target.addUpdateRange(start, count); target.needsUpdate = true;
+  if (turned) keepRotated(target);
+}
+
 /**
  * MG10: replace runs of `index`'s triangles (each `triangles` from element `at`), given turned or not (`sentTurned`), so they
  * draw as the index draws now (`indexTurned`). When the Memory saver let the CPU copy go they go straight into the GPU

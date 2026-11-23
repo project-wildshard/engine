@@ -8,6 +8,8 @@ import { isGpuOnlyAttribute } from '@wildshard/engine/core/gpuOnly';
 import { BATCHED_VIEW, MERGED_VIEW } from '@wildshard/engine/core/shadowLayer';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { skipEmptyBatches } from '@wildshard/engine/render/drawGuards';
+import { retainBatchFarLod } from '@wildshard/engine/render/farLod';
+import { copyBatchIndex } from '@wildshard/engine/render/memorySaver';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { programFoldOn } from '@wildshard/engine/render/programFold';
 import { hasShaderPatch } from '@wildshard/engine/render/shaderPatches';
@@ -115,7 +117,7 @@ interface Member {
   /** each channel's (and the index's) change count when copied */
   readonly versions: number[]; readonly attributes: (Attribute | null)[];
   /** its channels' CPU copies went with the copy: it cannot draw itself again */
-  readonly released: boolean; readonly mask: number; readonly drawn: number;
+  readonly released: boolean; readonly mask: number; readonly drawn: number; readonly farLod: ReturnType<typeof retainBatchFarLod>;
   instance: number; geometryId: number; gone: boolean; at: Float64Array; spaceRevision: number;
   /** why it left (the census) */
   left?: string;
@@ -160,6 +162,7 @@ export class KitBatch extends ChangedBatchedMesh {
     batch.space = space; batch.refreshSpace();
     const hooks = new Set<() => void>();
     for (const mesh of meshes) {
+      const farLod = mesh.userData[BAKED_TILE_MEMBER] === true ? null : retainBatchFarLod(mesh, batch);
       const geometry = mesh.geometry, position = geometry.getAttribute('position');
       // the copy: the member's own channels, a filled one for each custom channel it lacks, an identity index if it has none
       const copy = new THREE.BufferGeometry();
@@ -185,7 +188,7 @@ export class KitBatch extends ChangedBatchedMesh {
       const attributes: (Attribute | null)[] = [...Object.values(geometry.attributes).map(a => a as Attribute), geometry.index];
       const released = attributes.some(a => a !== null && isGpuOnlyAttribute(a));
       batch.members.push({ mesh, geometry, material, attributes, versions: attributes.map(a => a?.version ?? 0), released, mask: mesh.layers.mask,
-        drawn: geometry.index?.count ?? position.count, instance, geometryId, gone: false, at: Float64Array.from(mesh.matrixWorld.elements),
+        drawn: geometry.index?.count ?? position.count, farLod, instance, geometryId, gone: false, at: Float64Array.from(mesh.matrixWorld.elements),
         spaceRevision: batch.spaceRevision });
       // a channel that gives its CPU copy up at upload goes now: the member never uploads, and the batch holds its copy
       for (const attribute of attributes) if (attribute !== null && isGpuOnlyAttribute(attribute)) attribute.onUploadCallback();
@@ -206,7 +209,11 @@ export class KitBatch extends ChangedBatchedMesh {
   retire(): void {
     if (this.retired) return;
     this.retired = true;
-    for (const member of this.members) { Reflect.deleteProperty(member.mesh.userData, BATCHED_VIEW); if (!member.gone && !member.released) member.mesh.layers.mask = member.mask; }
+    for (const member of this.members) {
+      member.farLod?.release();
+      Reflect.deleteProperty(member.mesh.userData, BATCHED_VIEW);
+      if (!member.gone && !member.released) member.mesh.layers.mask = member.mask;
+    }
     this.removeFromParent(); this.dispose();
   }
   /** Batch matrices are relative to the cell that owns the draw. Recompute its inverse only when that frame moves. */
@@ -246,6 +253,7 @@ export class KitBatch extends ChangedBatchedMesh {
         || member.attributes.some((a, i) => (a?.version ?? 0) !== member.versions[i]);
       if (changed) {
         member.gone = true; Reflect.deleteProperty(mesh.userData, BATCHED_VIEW);
+        member.farLod?.release();
         member.left = mesh.geometry !== member.geometry ? 'geometry' : mesh.material !== member.material ? 'material' : `vertices:${String(member.attributes.findIndex((a, i) => (a?.version ?? 0) !== member.versions[i]))}`;
         this.setVisibleAt(member.instance, false);
         // its own copies are whole (or it has a new geometry): it draws itself again
@@ -273,11 +281,11 @@ export class KitBatch extends ChangedBatchedMesh {
     const info: unknown = Reflect.get(this, '_geometryInfo'), row: unknown = Array.isArray(info) ? info[member.geometryId] : undefined, target = this.geometry.index;
     if (typeof row !== 'object' || row === null || target === null) return;
     const indexStart = Number(Reflect.get(row, 'indexStart')), vertexStart = Number(Reflect.get(row, 'vertexStart')), count = Math.min(index.count, member.drawn);
-    for (let i = 0; i < count; i++) target.setX(indexStart + i, vertexStart + index.getX(i));
-    target.addUpdateRange(indexStart, count); target.needsUpdate = true;
+    copyBatchIndex(target, index, indexStart, vertexStart, count);
   }
   override onBeforeRender(...args: Parameters<ChangedBatchedMesh['onBeforeRender']>): void {
     for (const hook of this.hooks) hook();
+    for (const member of this.members) if (!member.gone) member.farLod?.update(args[0], args[2]);
     this.sync();
     super.onBeforeRender(...args);
   }

@@ -100,6 +100,7 @@ export const farLodReport = { meshes: 0, tiled: 0, squares: 0, ready: 0, reused:
   whole: {} as Record<string, number>, log: [] as [string, number, number][] };
 
 const tracked = new WeakMap<THREE.BufferGeometry, Tracked | null>();
+const batchDraws = new WeakMap<THREE.Mesh, THREE.Mesh>();
 /** DF9 (mini-dfload): square-levels still to build (each a yield of `builds`) */
 let pending = 0;
 const queue: Tracked[] = [];
@@ -297,6 +298,30 @@ function capture(mesh: THREE.Mesh, geometry: THREE.BufferGeometry): Tracked {
   };
   farLodReport.captureMs += diagnosticNow() - t0;
   return track(mesh, sorted.squares, sorted.positions, apply, key);
+}
+
+/** A batch takes over the draw. Keep each eligible member's camera-space LOD and warm the batch's upload. */
+export function retainBatchFarLod(mesh: THREE.Mesh, batch: THREE.Mesh): { update: (renderer: Renderer, camera: THREE.Camera) => void; release: () => void } | null {
+  if (!farLodOn()) return null;
+  const geometry = mesh.geometry, prior = tracked.get(geometry);
+  if (prior === null || (prior !== undefined && prior.mesh !== mesh)) return null;
+  if (prior === undefined) {
+    mesh.updateWorldMatrix(true, false);
+    if (refusal(mesh, geometry) !== null) return null;
+  }
+  // A soup needs a stable index before the batch copies it. The far bands rewrite that same attribute.
+  if (geometry.index === null) {
+    const count = geometry.getAttribute('position').count;
+    const identity = count <= 65535 ? ownedArray(Uint16Array, count, SOUP) : ownedArray(Uint32Array, count, SOUP);
+    for (let i = 0; i < count; i++) identity[i] = i;
+    geometry.setIndex(new THREE.BufferAttribute(identity, 1));
+  }
+  if (prior === undefined) tracked.set(geometry, capture(mesh, geometry));
+  batchDraws.set(mesh, batch);
+  return {
+    update(renderer, camera) { if (mesh.geometry === geometry) drawHooks(renderer).lod?.(camera, geometry, mesh); },
+    release() { if (batchDraws.get(mesh) === batch) batchDraws.delete(mesh); },
+  };
 }
 
 /** `geometry`'s triangles sorted into SQUARE m squares, with its local positions for the build. */
@@ -677,7 +702,9 @@ export async function prepareFarCopyIndices(scene: THREE.Object3D, camera: THREE
   current: () => boolean, pause: () => Promise<void>): Promise<ReadonlySet<THREE.Mesh>> {
   const entries: Tracked[] = [], refresh = new Set<THREE.Mesh>();
   scene.traverseVisible(object => {
-    if (!isMesh(object) || !object.layers.test(camera.layers)) return;
+    if (!isMesh(object)) return;
+    const draw = batchDraws.get(object) ?? object;
+    if (!draw.visible || !draw.layers.test(camera.layers)) return;
     const entry = tracked.get(object.geometry);
     if (entry?.ready === true && entry.mesh === object) entries.push(entry);
   });
@@ -688,7 +715,7 @@ export async function prepareFarCopyIndices(scene: THREE.Object3D, camera: THREE
     if (mesh.parent === null || tracked.get(geometry) !== entry) continue;
     const previous = geometry.index, version = previous?.version;
     if (!look(entry, camera, null)) tracked.set(geometry, null);
-    else if (geometry.index !== previous || geometry.index?.version !== version) refresh.add(mesh);
+    else if (geometry.index !== previous || geometry.index?.version !== version) refresh.add(batchDraws.get(mesh) ?? mesh);
     if (diagnosticNow() - slice >= LOAD_SLICE_MS) { await pause(); slice = diagnosticNow(); }
   }
   return refresh;

@@ -19,3 +19,14 @@ before that release, with shader warming left to the ordinary loader.
 The merge transforms rotated coarse-prop normals into cell space. The
 road kit test exercises the enabled path through both content fences and
 the final look before the existing warm-up.
+
+With the DF9 default enabled, the matched short dock checks isolated
+the extra triangle work to the kit batch. The unbatched control was
+341,873 triangles p95. The far batch alone reached 342,100 and the kit
+batch alone reached 440,699.
+
+A kit batch now retains the ordinary far LOD of each eligible member.
+The loader selects their bands and warms the updated batch index under
+the card. During play the existing camera and one-write budget still
+pick the band. Index copies preserve WebKit's vertex order. The baked
+cove tiles keep their existing tiling and lightmap behavior.
