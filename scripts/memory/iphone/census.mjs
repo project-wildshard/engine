@@ -37,6 +37,46 @@ const tick = () => {
 requestAnimationFrame(tick);
 `;
 
+/** A route probe body (route.mjs `probe.start`, a plain function body that returns): every tenth drawn frame of a leg,
+ * the triangles and draws by pass and owner (the first four names from the scene down). DRIFTWOOD-FPS DW3 (mini-dw3):
+ * `--census` reads only at the route's end, and the west path's p95 frames are not the end's view. Must not close over
+ * anything outside itself. */
+export const LEG_CENSUS_START = `
+const g = window.__wildshard?.world?.game, r = g?.renderer;
+if (r === undefined) return 'no game';
+const frames = [], draw = r.renderBufferDirect, shadowRender = r.shadowMap.render;
+let shadow = 0, frame = -1, owners = null;
+r.renderBufferDirect = function (...args) {
+  if (g.frameCount % 10 !== 0) return draw.apply(this, args);
+  if (frame !== g.frameCount) { frame = g.frameCount; owners = new Map(); frames.push(owners); }
+  const tris = r.info.render.triangles, calls = r.info.render.calls;
+  try { return draw.apply(this, args); } finally {
+    const chain = [];
+    for (let n = args[4]; n; n = n.parent) chain.push(n.name === '' ? n.type : n.name);
+    const key = (shadow > 0 ? 'shadow' : 'main') + '|' + chain.reverse().slice(0, 4).join('>');
+    const o = owners.get(key) ?? [0, 0];
+    o[0] += r.info.render.calls - calls; o[1] += r.info.render.triangles - tris; owners.set(key, o);
+  }
+};
+r.shadowMap.render = function (...args) { shadow++; try { return shadowRender.apply(this, args); } finally { shadow--; } };
+window.__wsLegCensus = () => { r.renderBufferDirect = draw; r.shadowMap.render = shadowRender; return frames; };
+return 'leg census';
+`;
+
+/** The probe's stop body: the owners over the leg's heaviest tenth of sampled frames (by triangles), the view the leg's
+ * p95 frame draws, and the mean over all sampled frames. */
+export const LEG_CENSUS_STOP = `
+const stop = window.__wsLegCensus; window.__wsLegCensus = undefined;
+if (stop === undefined) return null;
+const frames = stop(), total = (m) => { let t = 0; for (const [, [, tr]] of m) t += tr; return t; };
+const sorted = frames.map((m) => [total(m), m]).sort((a, b) => b[0] - a[0]);
+const sum = (list) => { const acc = new Map(); for (const [, m] of list) for (const [k, [c, t]] of m) { const o = acc.get(k) ?? [0, 0]; o[0] += c; o[1] += t; acc.set(k, o); }
+  const n = Math.max(1, list.length); return [...acc].map(([k, [c, t]]) => [k, Math.round(c / n * 10) / 10, Math.round(t / n)]).sort((a, b) => b[2] - a[2]).slice(0, 25); };
+const heavy = sorted.slice(0, Math.max(1, Math.ceil(sorted.length / 10)));
+return { sampled: frames.length, heavyTriangles: heavy.length ? Math.round(heavy.reduce((s, [t]) => s + t, 0) / heavy.length) : 0,
+  meanTriangles: frames.length ? Math.round(sorted.reduce((s, [t]) => s + t, 0) / frames.length) : 0, heavy: sum(heavy), mean: sum(sorted).slice(0, 12) };
+`;
+
 /** In the page (a WebDriver body): time every procedural voice render (Voices.variant: a prewarm slice, or a play that
  * finds its family unrendered) from now on, by family, against the page clock. DW3: the pier's first-turn bursts were
  * main-thread renders, not GPU work. */
