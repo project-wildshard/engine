@@ -2,7 +2,7 @@
 // D24 (G799: no Vite plugins): serve a finished build the way production does, as a plain Node server. It replaces
 // `vite preview` and its two plugins (the header replay, now of `_headers`, and Rapier's brotli copy), and keeps what the
 // preview server did that callers rely on: encoded files, weak ETags with 304s, byte ranges, `.html`
-// rewrites, index.html for any missing path a page or fetch asks for, and localhost CORS.
+// rewrites, index.html for any missing page path a page or fetch asks for, and localhost CORS.
 //
 //   node scripts/preview-server.mjs [--outDir dist] [--port 4173] [--host 127.0.0.1] [--root <repo>]
 //
@@ -196,9 +196,14 @@ const server = createServer((req, res) => {
   if (found === null && part) { res.removeHeader('Content-Encoding'); res.statusCode = 404; res.end(); return; }
   if (found === null) {
     const accept = req.headers.accept;
-    // the preview server's SPA fallback: index.html for a missing path a page or a fetch (`*/*`) asks for
-    if (accept === undefined || accept === '' || accept.includes('text/html') || accept.includes('*/*')) found = lookup('/index.html');
-    if (found === null) { res.statusCode = 404; res.end(); return; }
+    // the preview server's SPA fallback: index.html for a missing path a page or a fetch (`*/*`) asks for. A missing file
+    // (an extension other than .html) a fetch asks for is a 404, as production's asset host answers (pages/wrangler.jsonc
+    // not_found_handling none): meta QA-FEEDBACK-2026-11-22 row 10, a phone page's cooked `.t512-*.glb` stand-in a local
+    // install lacks got the page's HTML with a 200, so the loader never retired it (WILDSHARD-GAME-89) and Sky Reach's
+    // painted models failed ("Scene material overlay requires a mapped library model").
+    const asset = extname(pathname) !== '' && extname(pathname) !== '.html';
+    if (accept?.includes('text/html') === true || !asset && (accept === undefined || accept === '' || accept.includes('*/*'))) found = lookup('/index.html');
+    if (found === null) { res.setHeader('Cache-Control', 'no-store'); res.statusCode = 404; res.end(); return; }
   }
   const { file, stat } = found, etag = `W/"${stat.size}-${stat.mtime.getTime()}"`;
   res.setHeader('Content-Type', type(file)); res.setHeader('Last-Modified', stat.mtime.toUTCString()); res.setHeader('ETag', etag);

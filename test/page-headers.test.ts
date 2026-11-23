@@ -341,3 +341,27 @@ test('spawn parts: br as-is, gzip for gzip-only clients, decoded for identity, 4
     expect((await wire(new URL(good, base), { ...all, 'accept-encoding': 'br' })).status).toBe(200);
   } finally { await server.close(); rmSync(root, { recursive: true, force: true, maxRetries: 5 }); }
 });
+
+// Meta QA-FEEDBACK-2026-11-22 row 10: a missing file a fetch asks for is a 404 on the preview server too, as production's
+// asset host answers. The SPA fallback's 200 HTML for a phone's cooked `.t512-*.glb` stand-in kept the loader from retiring
+// it (WILDSHARD-GAME-89), so a local Sky Reach build failed its painted models; a page path still gets the page.
+test('the preview server: a missing file a fetch asks for is a 404, a missing page path is the page', async () => {
+  mkdirSync(resolve('tmp'), { recursive: true });
+  const root = mkdtempSync(resolve('tmp/preview-miss-'));
+  mkdirSync(join(root, 'dist'));
+  writeFileSync(join(root, 'dist/index.html'), '<!doctype html><title>game</title>');
+  const server = await previewServer(root);
+  try {
+    const { base } = server, fetchAll = { accept: '*/*' };
+    for (const path of [`/shardfiles/far-reach/blobs/glb/${'a'.repeat(64)}.t512-97db17e8.glb`, '/assets/gone.json', '/assets/gone.ktx2']) {
+      for (const headers of [fetchAll, {}]) {
+        const missing = await wire(new URL(path, base), headers);
+        expect([missing.status, missing.headers['cache-control'], missing.bytes.length], `${path} ${JSON.stringify(headers)}`).toEqual([404, 'no-store', 0]);
+      }
+    }
+    for (const [path, headers] of [['/slug/far-reach', fetchAll], ['/slug/far-reach', {}], ['/leave-later', { accept: 'text/html' }], ['/a.b', { accept: 'text/html,*/*' }]] as const) {
+      const page = await wire(new URL(path, base), headers);
+      expect([page.status, page.bytes.toString()], path).toEqual([200, '<!doctype html><title>game</title>']);
+    }
+  } finally { await server.close(); rmSync(root, { recursive: true, force: true, maxRetries: 5 }); }
+});
