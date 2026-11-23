@@ -154,13 +154,13 @@ jobs:
         with:
           pins-cache-scope: full
       # SHARD-COMPAT SP4: the renderer, cook, format and chain fingerprints this push moves, in job 1's summary (after
-      # either ring-setup above). It never fails the run: a fingerprint it cannot read prints `unknown`.
+      # either ring-setup above). It never fails the run: a fingerprint it cannot read prints `unknown`, and the step
+      # swallows its own exit, since J400 keeps `continue-on-error` off the tests job.
       - name: Print the fingerprints this push moves
         if: matrix.job == 1
-        continue-on-error: true
         env:
           BASE_SHA: ${{ github.event.before || github.event.pull_request.base.sha || '' }}
-        run: node scripts/fingerprints.ts --base "${BASE_SHA:-HEAD~1}"
+        run: node scripts/fingerprints.ts --base "${BASE_SHA:-HEAD~1}" || true
       # BROWSER-TESTS-BENCH BB2/BB5 (J231): e2e's headless shell and products' Chromium, cached by Playwright version.
       - id: playwright
         if: steps.code.outputs.run == 'true'
