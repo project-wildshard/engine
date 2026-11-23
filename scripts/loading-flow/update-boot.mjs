@@ -87,7 +87,7 @@ async function visit(name) {
   const ms = Date.now() - tapAt;
   if (!reached) {
     const dump = await page.evaluate(`JSON.stringify({ href: location.href, rows: window.__ubRows?.rows ?? [], error: document.querySelector('#wsstuck')?.textContent ?? document.querySelector('#wserr .msg')?.textContent ?? null,
-      reveal: window.__wsReveal ?? null, world: (() => { const w = window.__wildshard?.world; try { return w ? { entered: w.hud?.entered, paused: w.hud?.paused, gate: w.game.frameGate() } : null; } catch (e) { return String(e); } })() })`).catch(e => String(e));
+      reveal: window.__wsReveal ?? null, world: (() => { const w = window.__wildshard?.world; try { return w ? { entered: w.hud?.entered, paused: w.hud?.paused, gate: w.game.frameGate() } : null; } catch (e) { return String(e); } })() })`).catch(String);
     if (values.json !== undefined) await page.screenshot({ path: values.json.replace(/\.json$/u, `-${name}.png`) }).catch(() => undefined);
     throw new Error(`${name}: never reached control: ${dump}`);
   }
