@@ -7,7 +7,7 @@ import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { encounterRows } from '../src/shared/engine/sim/encounterRows';
 import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 
-// SERVER-PARITY HS3: the Storm Roc is a held boss, a home body. Far Reach's home kill plane (killY 6) killed it when it fell
+// SERVER-PARITY HS3: the Storm Roc is a boss (held until Sky r7, a declared boss encounter since). Far Reach's home kill plane (killY 6) killed it when it fell
 // off the crown, and its fight paid the victory, the Ledger fact and 25 coins for a death no player dealt (shard-sky-reach
 // 636d12e, SKY-2). A held boss under the plane goes back to its anchor, alive, and the fight carries on unpaid.
 const KILL_Y = 6;
@@ -46,9 +46,14 @@ test('a Roc the world kills pays nothing; one a player strikes down pays once', 
   } finally { live.dispose(); }
   const struck = await inFight();
   try {
-    const { host } = struck.live, at = struck.roc.position.clone();
-    // A player's melee is an `env` request tagged `actor.player` (Melee.contact): a blow, not the world.
-    host.combat.hit({ source: 'env', sourceTags: ['actor.player', 'dmg.melee'], target: struck.roc.combatActor(), amount: 1e6, point: at, dir: at.clone().set(0, 0, -1), throughWalls: true });
+    const { host } = struck.live;
+    // A player's melee is an `env` request tagged `actor.player` (Melee.contact): a blow, not the world. The declared boss
+    // encounter (Sky r7) stops each blow at its next phase, so the Roc falls to its third.
+    for (let blow = 0; blow < 6 && struck.roc.alive; blow++) {
+      const at = struck.roc.position.clone();
+      host.combat.hit({ source: 'env', sourceTags: ['actor.player', 'dmg.melee'], target: struck.roc.combatActor(), amount: 1e6, point: at, dir: at.clone().set(0, 0, -1), throughWalls: true });
+      for (let tick = 0; tick < 120 && struck.roc.alive; tick++) struck.live.step([]); // the next phase opens
+    }
     expect(struck.roc.alive).toBe(false);
     const paid = run(struck.live, 60);
     expect(paid.filter(effect => effect.kind === 'coins'), 'a player kill pays once').toHaveLength(1);

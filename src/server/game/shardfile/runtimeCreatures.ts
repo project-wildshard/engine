@@ -122,8 +122,16 @@ function installDeclaredWorld(host: SimHost, shard: Shardfile, world: RuntimeCre
   const killY = world?.killY;
   if (killY === undefined) return;
   const plane = { killY };
+  // A declared boss is fought, never felled by the world: its flight follows a player down, and the plane would pay it out
+  // unstruck. Under the plane it goes back to its spawn, alive, as a keeper's held boss goes back to its anchor (HS3).
+  const bosses = new Map(shard.creatures.spawns.filter(row => shard.encounters.some(entry => entry.kind === 'boss' && entry.entity === row.id)).map(row => [row.id, row]));
   host.onStep(DECLARED_KILL_STEP, () => {
-    for (const id of bodies) { const actor = host.entities.get(id); if (actor?.alive === true) killBelowWorld(actor, plane, host.combat); }
+    for (const id of bodies) {
+      const actor = host.entities.get(id); if (actor?.alive !== true) continue;
+      const boss = bosses.get(id);
+      if (boss === undefined) killBelowWorld(actor, plane, host.combat);
+      else if (actor.position.y < killY) actor.place(boss.at[0], boss.at[2], boss.yaw, boss.at[1]);
+    }
   });
 }
 /** A declared encounter beside a runtime plan, as the quest page's summon and the plan's loadout lock read it. */

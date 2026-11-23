@@ -158,8 +158,12 @@ test('Far Reach lands its held roster headless with the ids and kinds its browse
   try {
     live.step([]);
     const landed = populationCensus(live.host), page = [...declared.bosses, ...declared.actors ?? []];
-    expect(landed.bodies.map(body => [body.id, body.kind])).toEqual(page.map(row => [row.id, row.kind]).sort(([a = ''], [b = '']) => a < b ? -1 : a > b ? 1 : 0));
-    expect(landed.alive).toBe(page.length);
+    // Since Sky r7 the flock and the Roc are declared spawns beside the plan (OF20b, OF20c): the census holds both.
+    const spawns = product.shardfile.creatures.spawns.map(row => row.id), held = new Set(page.map(row => row.id));
+    const byId = ([a = '']: readonly string[], [b = '']: readonly string[]): number => a < b ? -1 : a > b ? 1 : 0;
+    expect(landed.bodies.map(body => body.id).sort()).toEqual([...held, ...spawns].sort());
+    expect(landed.bodies.filter(body => held.has(body.id)).map(body => [body.id, body.kind])).toEqual(page.map(row => [row.id, row.kind]).sort(byId));
+    expect(landed.alive).toBe(page.length + spawns.length);
     expect(landed.homes.every(entry => entry.body === entry.id && entry.wait === 0)).toBe(true);
   } finally { live.dispose(); }
 }, 120_000);
