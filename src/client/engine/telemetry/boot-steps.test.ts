@@ -27,10 +27,10 @@ test('QA 2026-11-23 row 10: a boot after another build reached control is an upd
 
 test('the steps are the splash, first control and each loading stage at its longest span', () => {
   const steps = bootStepTimes({ serviceWorker: { controller: 'https://staging.wildshard.io/sw.js' }, entries: [
-    entry('app:loader-complete', 812.4, 812.4), entry('stage:home', 3000, 8600), entry('stage:shaders', 9000, 15100),
+    entry('app:document-and-module-graph', 3, 812.4), entry('wait:Spawn download', 165, 2400), entry('stage:home', 3000, 8600), entry('stage:shaders', 9000, 15100),
     entry('stage:shaders', 9001, 15000), entry('stage:finish', 2900, null), entry('stage:bad key!', 1, 2),
     entry('app:control-ready', 16000.6, 16000.6), entry('app:control-ready', 20000, 20000)] });
-  expect(steps).toEqual({ page: 812, control: 16001, serviceWorker: 1, home: 5600, shaders: 6100 });
+  expect(steps).toEqual({ document: 809, download: 2235, control: 16001, serviceWorker: 1, home: 5600, shaders: 6100 });
 });
 
 test('the step count is bounded', () => {

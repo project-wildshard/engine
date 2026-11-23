@@ -6,9 +6,10 @@ import type { BootTiming } from '../../../shared/engine/boot/timing';
  *
  *  - `update`: the first boot of a build on this device after another build reached control here; `normal`: the same build
  *    again; `first`: no build reached control here before (a new install, or storage cleared).
- *  - Steps, in ms: `page` (navigation to the boot loader's end: the splash), `control` (navigation to first control), and
- *    every loading stage by its key (`stage:<key>`, the loading card's rows: `home`, `shaders`, `homePrograms`, `finish`,
- *    `level.world`, ...), each its longest span. `serviceWorker` is 1 when a service worker controlled the page. */
+ *  - Steps, in ms, on the entered document's clock: `document` (its HTML and module graph), `download` (the spawn
+ *    download's wait), `control` (navigation to first control), and every loading stage by its key (`stage:<key>`, the
+ *    loading card's rows: `home`, `shaders`, `homePrograms`, `finish`, `level.world`, ...), each its longest span.
+ *    `serviceWorker` is 1 when a service worker controlled the page. */
 export type BootKind = 'first' | 'update' | 'normal';
 const BOOT_STEP_KEY = /^[a-zA-Z][a-zA-Z0-9.]{0,31}$/u;
 /** A step key the server stores: a stage key, at most 32 characters. */
@@ -33,13 +34,12 @@ export function bootStepTimes(timing: Pick<BootTiming, 'entries' | 'serviceWorke
     if (count >= MAX_BOOT_STEPS) return;
     steps[key] = value; count++;
   };
-  let page: number | undefined, control: number | undefined;
   for (const entry of timing.entries) {
-    if (entry.operation === 'app:loader-complete') page ??= entry.start;
-    else if (entry.operation === 'app:control-ready') control ??= entry.start;
+    const span = entry.end === null ? undefined : entry.end - entry.start;
+    if (entry.operation === 'app:control-ready' && !('control' in steps)) put('control', entry.start);
+    else if (entry.operation === 'app:document-and-module-graph' && span !== undefined) put('document', span);
+    else if (entry.operation === 'wait:Spawn download' && span !== undefined) put('download', span);
   }
-  if (page !== undefined) put('page', page);
-  if (control !== undefined) put('control', control);
   if (timing.serviceWorker !== undefined) put('serviceWorker', typeof timing.serviceWorker['controller'] === 'string' ? 1 : 0);
   for (const entry of timing.entries)
     if (entry.operation.startsWith('stage:') && entry.end !== null) put(entry.operation.slice('stage:'.length), entry.end - entry.start);
