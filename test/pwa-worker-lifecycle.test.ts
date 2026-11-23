@@ -34,6 +34,7 @@ interface WorkerEvent {
   ports?: { postMessage: (value: unknown) => void }[];
   source?: { postMessage: (value: unknown) => void; id?: string };
   clientId?: string;
+  resultingClientId?: string;
   waitUntil: (work: Promise<unknown>) => void;
   respondWith: (work: Response | Promise<Response>) => void;
 }
@@ -54,7 +55,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
   const books = new Map<string, StoredCache>();
   /** STALESHELL: the build of the worker that already runs the origin (`registration.active`, answering BUILD), so the next
    *  one loaded is an update; null for none */
-  const origin_: { active: string | null } = { active: null };
+  const origin_: { active: string | null; installing?: { postMessage: (message: unknown) => void } | null } = { active: null };
   const open = (name: string): Promise<StoredCache> => {
     let cache = books.get(name);
     if (cache === undefined) { cache = new StoredCache(); books.set(name, cache); }
@@ -70,7 +71,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
     const live = new Set<string>(), workers = new Set<string>();
     const navigate = vi.fn((_address: string) => Promise.resolve(null));
     const get = (id: string): Promise<{ id: string; type?: string } | undefined> => Promise.resolve(workers.has(id) ? { id, type: 'worker' } : live.has(id) ? { id } : undefined);
-    const self = { location: new URL(origin), registration: { scope: `${origin}/`, get active() { const build = origin_.active; return build === null ? null : { postMessage: (_message: unknown, [port]: MessagePort[]) => { port?.postMessage({ type: 'BUILD', build }); } }; } }, clients: { claim, get, matchAll: () => Promise.resolve([...live].map(id => ({ id, url: url(`/slug/${id}`), navigate }))) }, skipWaiting,
+    const self = { location: new URL(origin), registration: { scope: `${origin}/`, get active() { const build = origin_.active; return build === null ? null : { postMessage: (_message: unknown, [port]: MessagePort[]) => { port?.postMessage({ type: 'BUILD', build }); } }; }, get installing() { return origin_.installing ?? null; }, waiting: null }, clients: { claim, get, matchAll: () => Promise.resolve([...live].map(id => ({ id, url: url(`/slug/${id}`), navigate }))) }, skipWaiting,
       addEventListener: (kind: string, listener: (event: WorkerEvent) => void) => { listeners.set(kind, [...listeners.get(kind) ?? [], listener]); } };
     const source = bundled.replaceAll('__BUILD_ID__', build)
       .replaceAll('__ASSET_CACHE__', ASSET_CACHE_NAME).replace(/['"]__DOCUMENT__['"]/u, () => JSON.stringify(page)).replace(/['"]__FILES__['"]/u, () => JSON.stringify(JSON.stringify(files)))
@@ -79,7 +80,7 @@ function fixture(read?: (request: Request) => Promise<Response>, nativeRoutes = 
       .replace(/['"]__DOCUMENT_HEADERS__['"]/u, () => JSON.stringify(JSON.stringify(documentHeaders)));
     // Deliberately no crypto, scheduler or accounting ports; timers only for the precache's bounded pause.
     runInNewContext(source, { self, caches, fetch, URL, Request, Response, Headers, Set, JSON, encodeURIComponent, AbortController, MessageChannel, setTimeout, clearTimeout, performance });
-    const dispatch = async (kind: string, payload: Pick<WorkerEvent, 'request' | 'data' | 'ports' | 'source' | 'clientId'> = {}): Promise<Response | undefined> => {
+    const dispatch = async (kind: string, payload: Pick<WorkerEvent, 'request' | 'data' | 'ports' | 'source' | 'clientId' | 'resultingClientId'> = {}): Promise<Response | undefined> => {
       const work: Promise<unknown>[] = []; let response: Response | undefined;
       for (const listener of listeners.get(kind) ?? []) listener({ ...payload, ...(nativeRoutes && kind === 'install' ? {addRoutes: routes} : {}),
         waitUntil: promise => { work.push(promise); }, respondWith: promise => { work.push(Promise.resolve(promise).then(value => { response = value; return value; })); } });
@@ -361,6 +362,32 @@ test('STALESHELL: a worker that does not hold its code never serves its stale do
   // offline it still boots what it has: offline play is unchanged
   online = false;
   expect(await (await old.dispatch('fetch', { request: nav('/slug/blender-template') }))?.text()).toBe(document);
+});
+
+test('QA 11-23 row 8: a navigation pauses an update installing behind the worker, for the page it loads', async () => {
+  const f = fixture(request => Promise.resolve(new URL(request.url).pathname === '/' ? page('B') : new Response(`body:${request.url}`)));
+  const held = f.load('A', ['/b/A/entry-aaaaaaaa.js']); await held.dispatch('install'); await held.dispatch('activate'); await held.dispatch('message', precached);
+  const heard: unknown[] = [];
+  f.origin.installing = { postMessage: message => { heard.push(message); } };
+  await held.dispatch('fetch', { request: nav('/slug/blender-template'), resultingClientId: 'page-9' });
+  // the update's generation download gives the link to the document before the page's own code can ask it (boot/sw.ts PAUSE)
+  expect(heard).toEqual([{ type: 'PAUSE', client: 'page-9' }]);
+  heard.length = 0;
+  await held.dispatch('fetch', { request: new Request(url('/b/A/entry-aaaaaaaa.js')), clientId: 'page-9' });
+  expect(heard).toEqual([]); // only a navigation pauses it from here
+});
+
+test('QA 11-23 row 8: an update paused for a page by the worker in front of it resumes on that page\'s control', async () => {
+  const held = heldPrecache(), waiting = held.f.load('B', held.files, []);
+  await waiting.dispatch('install');
+  const background = waiting.dispatch('message', { ...precached, source: held.source('page-1') });
+  await vi.waitFor(() => { expect(held.f.fetch).toHaveBeenCalledTimes(6); });
+  // the controlling worker forwards a navigation's PAUSE, naming the page (its own source is a worker, not that page)
+  await waiting.dispatch('message', { data: { type: 'PAUSE', client: 'page-2' } as { type: string }, source: {} as { postMessage: (value: unknown) => void } });
+  held.release(); await new Promise(resolve => { setTimeout(resolve, 0); });
+  expect(held.f.fetch).toHaveBeenCalledTimes(6);
+  await waiting.dispatch('message', { ...precached, source: held.source('page-2') }); await background;
+  expect(held.f.fetch).toHaveBeenCalledTimes(14);
 });
 
 test('STALESHELL: a worker holding its whole generation boots its own document at once, with no network', async () => {

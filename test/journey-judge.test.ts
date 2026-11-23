@@ -25,6 +25,19 @@ test('MS5: a plain loading card fails, and the main menu is allowed only before 
   expect(judge(path([{ title: true }, { title: true, loading: true, detailed: true }, { title: true }, { hud: true }])).map((p) => p.text)).toEqual(['the main menu came back after Enter World']);
 });
 
+// QA 11-23 row 8 (Jake: an update boot's splash "frozen"): from the tap to the world's card the screen moves at least once a second
+test('row 8: a still screen over a second before the loading card fails; motion, a new screen or the card itself does not', () => {
+  const path = (rows: readonly Record<string, boolean>[]) => rows.map((over, i) => ({ t: i * 250, s: screen(over) }));
+  const still = { title: true, moving: false }, swept = { title: true, moving: true };
+  const card = { loading: true, detailed: true, moving: false };
+  expect(judge(path([still, still, still, still, still, still, card, { hud: true }])).map((p) => p.text))
+    .toEqual(['nothing moved on screen for over 1000 ms before the loading card']);
+  expect(judge(path([still, swept, swept, swept, swept, swept, card, { hud: true }]))).toEqual([]);
+  // the card itself is judged by its clock and tracks, not here; samples with no word on motion are not judged
+  expect(judge(path([still, card, card, card, card, card, card, { hud: true }]))).toEqual([]);
+  expect(judge(path([{ title: true }, { title: true }, { title: true }, { title: true }, { title: true }, { title: true }, card, { hud: true }]))).toEqual([]);
+});
+
 // meta SHARD-SOURCE SS-JP1 (F17): a shard the API placed after the build has no row in `#ws-title-rows`; its Shard Select card is
 // carded from the catalogue (SA46), so the journey takes it by the slug as words.
 test('SS-JP1: the card is found by its title row, else by the slug, else by the slug as words', () => {

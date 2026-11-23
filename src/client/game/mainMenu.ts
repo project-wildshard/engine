@@ -137,7 +137,16 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const owner = pageScope.child('title-prefetch');
   let leavingTitle = false;
   let stopReadAhead: (() => void) | undefined;
-  const leaveTitle = (): void => { leavingTitle = true; stopReadAhead?.(); };
+  // QA 11-23 row 8 (Jake, 11-23: an update boot is "frozen"): from the tap until the next document paints the page shows
+  // motion. Leaving waits on the network (a first visit's worker install, an old worker's network-first wait for a newer
+  // build's page), so a bar sweeps along the top until the page goes (mainMenu.css .ws-main-leaving).
+  let leavingHost: HTMLElement | null = null; // the title's full-screen layer, once built below
+  const leaveTitle = (): void => {
+    leavingTitle = true; stopReadAhead?.();
+    if (leavingHost === null || leavingHost.querySelector('.ws-main-leaving') !== null) return;
+    const bar = document.createElement('div'); bar.className = 'ws-main-leaving'; bar.setAttribute('aria-hidden', 'true');
+    leavingHost.append(bar); // .ws-main is the title's full-screen layer (its size containment holds the fixed bar)
+  };
   const mode = opts.mode ?? menuMode;
   const { notice, onGrid, screen: first, zoneSelect, whatsNew = WHATS_NEW, whatsNewStore, ...deckOpts } = opts;
   const dev = mode().developer;
@@ -156,6 +165,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   const root = document.createElement('div');
   root.className = 'ws-title-stack';
   const main = document.createElement('div');
+  leavingHost = main;
   main.className = 'ws-main';
   main.innerHTML = `
     <div class="ws-main-hero"></div>
@@ -259,7 +269,12 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     const go = (): void => { dropFirstPlay(); onGrid(); leaveTitle(); };
     if (deckOpts.gate === undefined) { go(); return; }
     entering = true;
-    mmoIdle = Promise.resolve(deckOpts.gate(go)).catch(() => undefined).finally(() => { entering = false; });
+    // QA 11-23 row 8: the gate asks the world (its code and a read, seconds on a phone); the tapped button sweeps meanwhile
+    mmoCard.setAttribute('aria-busy', 'true');
+    mmoIdle = Promise.resolve(deckOpts.gate(go)).catch(() => undefined).finally(() => {
+      entering = false;
+      if (!leavingTitle) mmoCard.removeAttribute('aria-busy');
+    });
   }); };
   // SB49 (staging, "Navigation shell requires a live owner"): the late catalogue's refresh disposed this menu while the world gate
   // held ENTER ZONE, so the gate's go reached a dead deck. Idle is no name prompt, no held tap and no entry under way, all at once

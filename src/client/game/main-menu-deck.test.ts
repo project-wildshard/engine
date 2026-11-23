@@ -227,6 +227,35 @@ test('SB49: a held ENTER ZONE the player cancels lets the late catalogue refresh
   expect(onEnter).not.toHaveBeenCalled();
 });
 
+// QA 11-23 row 8 (Jake, an update boot "frozen"): ENTER THE MMO sweeps while the world gate asks, and once the title leaves a
+// bar sweeps along the top until the page goes; a held tap the gate lets go of stops sweeping
+test('row 8: ENTER THE MMO is busy while the gate asks, and leaving puts up the sweeping bar', async () => {
+  finishFirstPlay();
+  const { view, held } = gated(() => undefined);
+  const mmo = view.root.querySelector('.ws-main-mmo');
+  tap(mmo);
+  await frames();
+  expect(held).toHaveLength(1);
+  expect(mmo?.getAttribute('aria-busy')).toBe('true');
+  expect(document.querySelector('.ws-main-leaving')).toBeNull();
+  held[0]?.go(); held[0]?.settle();
+  await frames();
+  expect(mmo?.getAttribute('aria-busy')).toBe('true'); // leaving: it stays busy until the page goes
+  expect(view.root.querySelectorAll('.ws-main-leaving')).toHaveLength(1);
+});
+
+test('row 8: a gate that holds the MMO tap without leaving clears its busy state', async () => {
+  finishFirstPlay();
+  const { view, held } = gated(() => undefined);
+  const mmo = view.root.querySelector('.ws-main-mmo');
+  tap(mmo);
+  await frames();
+  held[0]?.settle();
+  await frames();
+  expect(mmo?.hasAttribute('aria-busy')).toBe(false);
+  expect(document.querySelector('.ws-main-leaving')).toBeNull();
+});
+
 // meta EXPLORE-MODE EX1 (J460, QA 2026-11-19 rows 47 and 48; Jake ~14:17: "In Zone Select, we can now hide the Explore button";
 // ~14:18: "We don't need the settings button here underneath enter zone"): ZONE SELECT has neither, in every mode
 for (const [name, mode] of [['player', { developer: false, devserver: false }], ['Developer', { developer: true, devserver: false }], ['DEVSERVER', { developer: false, devserver: true }]] as const) {

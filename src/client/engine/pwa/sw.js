@@ -258,6 +258,17 @@ async function resumeIfLoadersGone() {
   for (const id of Array.from(loading)) if (await self.clients.get(id) === undefined) loading.delete(id);
   if (paused && loading.size === 0) resumePrecache();
 }
+/** QA 11-23 row 8 (Jake, 11-23: an update boot is "frozen"): a navigation pauses an update installing or waiting behind this
+ *  worker too. Its generation download sees none of the page's fetches, and until the page's own code tells it (boot/sw.ts
+ *  PAUSE) its lanes held the link while the document itself (network-first once a newer build is live) waited on it. That
+ *  page's control resumes it (PRECACHE), as it does the page's own PAUSE. */
+function pauseUpdate(client) {
+  for (const worker of [self.registration?.installing, self.registration?.waiting]) {
+    if (worker === null || worker === undefined || worker === self.serviceWorker) continue;
+    // oxlint-disable-next-line unicorn/require-post-message-target-origin -- ServiceWorker.postMessage has no targetOrigin parameter.
+    try { worker.postMessage({ type: 'PAUSE', client }); } catch { /* a retired worker has nothing to pause */ }
+  }
+}
 /** Resolves at once, or on the resume that ends the current pause. */
 function whilePaused() {
   if (!paused) return Promise.resolve();
@@ -565,7 +576,7 @@ workerScope.listen(self, 'fetch', event => {
     return;
   }
   // A loading page (a navigation, or a client that has not reported control) gets the link: the precache waits.
-  if (request.mode === 'navigate') pausePrecache(event.resultingClientId);
+  if (request.mode === 'navigate') { pausePrecache(event.resultingClientId); pauseUpdate(event.resultingClientId); }
   else if (!controlled.has(event.clientId)) event.waitUntil(pauseForClient(event.clientId));
   else if (paused) event.waitUntil(resumeIfLoadersGone());
   if (request.method !== 'GET' || url.searchParams.get('sw') === '0') return;
@@ -599,7 +610,7 @@ workerScope.listen(self, 'message', event => {
   if (type === 'SKIP_WAITING') { event.waitUntil(self.skipWaiting()); return; }
   // row 50: the page read /version.json; its build is what the network's page now is (src/client/engine/boot/sw.ts)
   if (type === 'LIVE') { const build = event.data?.build; if (typeof build === 'string' && build !== '') liveBuild = build; return; }
-  if (type === 'PAUSE') { pausePrecache(event.source?.id); return; }
+  if (type === 'PAUSE') { const client = event.data?.client; pausePrecache(typeof client === 'string' && client !== '' ? client : event.source?.id); return; }
   if (type === 'PRECACHE') {
     // Adoption waits on this reply: a build is offered as the next document's worker only once its code is held.
     // A page asks once it reaches control, so it no longer counts as loading, and the precache resumes.

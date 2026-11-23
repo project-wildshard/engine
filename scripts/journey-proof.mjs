@@ -55,7 +55,7 @@ export async function readOnlyPhoneLoad(base, build) {
 }
 
 /** @typedef {import('playwright').Page} Page */
-/** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, errorCard?: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string }} Screen */
+/** @typedef {{ doc: number|string, path: string, shell: boolean, title: boolean, select: boolean, loading: boolean, bar: boolean, hud: boolean, modal: boolean, errorCard?: boolean, reveal?: boolean, origin?: number, detailed?: boolean, zone?: string, moving?: boolean }} Screen */
 /** @typedef {'select' | 'mmo' | 'deeplink'} JourneyPath */
 /** @typedef {{ t: number, s: Screen | null }} Sample */
 /** @typedef {{ at: number, text: string }} Problem */
@@ -101,7 +101,22 @@ export function screenNow() {
   const load = [...document.querySelectorAll('.ws-load:not(.hide)')].find(seen);
   const loadHeight = load === undefined ? 0 : load.getBoundingClientRect().height;
   const errorCard = shown('#wserr, .ws-fail');
+  // QA 11-23 row 8: whether anything on screen moves, a running animation (a sweep, a pulse) on a laid-out element. A thin bar
+  // counts, so no 4 px floor here.
+  /** @param {Element} el */
+  const laidOut = (el) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0 || rect.bottom <= 0 || rect.top >= innerHeight) return false;
+    for (let node = /** @type {Element | null} */ (el); node !== null; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) < 0.05) return false;
+    }
+    return true;
+  };
+  const moving = typeof document.getAnimations === 'function' && document.getAnimations().some((a) => a.playState === 'running'
+    && a.effect instanceof KeyframeEffect && a.effect.target instanceof Element && laidOut(a.effect.target));
   return {
+    moving,
     doc, origin: performance.timeOrigin, path: location.pathname + location.search,
     shell: shown('[data-title-shell]'), title: shown('.ws-main:not(.hide)'), select: shown('.ws-menu:not(.hide)'),
     loading: load !== undefined && loadHeight >= innerHeight * 0.8, bar: load !== undefined && loadHeight < innerHeight * 0.8,
@@ -134,7 +149,10 @@ export function label(s) {
 // blankMs (STAGING-BUGBASH SB5): no blank wait past half a second. The grid's sky-down arrival is its own screen ('arrival');
 // the loading card leaves a still copy over a canvas the reveal still hides (ui/Loading.ts `holdLoadingVeil`). The loops this
 // guards held a blank screen for 5 to 30 s.
-export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
+// stillMs (QA 11-23 row 8, Jake 2026-11-23: an update boot's splash "frozen"): from the tap until the world's loading card,
+// nothing on screen may sit unchanged for over a second: the same screen of the same document with nothing moving. Samples
+// that say nothing of motion (an older Screen) are not judged.
+export function judge(samples, { blankMs = 500, budgetMs = 90_000, stillMs = 1000 } = {}) {
   /** @type {Problem[]} */
   const problems = [];
   const tapDoc = samples[0]?.s?.doc;
@@ -143,6 +161,9 @@ export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
   let played = false;
   // ENTER THE MMO is tapped on the main menu, so the first samples may show it; once anything else shows, it never comes back
   let left = false;
+  let carded = false, stillSig = '';
+  /** @type {number | null} */
+  let stillFrom = null;
   /** @param {number} at @param {string} text */
   const say = (at, text) => { if (!problems.some((p) => p.text === text)) problems.push({ at, text }); };
   for (const { t, s } of samples) {
@@ -164,6 +185,13 @@ export function judge(samples, { blankMs = 500, budgetMs = 90_000 } = {}) {
       if (t - blankFrom > blankMs) say(blankFrom, `a blank screen for over ${String(blankMs)} ms`);
     } else blankFrom = null;
     if (what === 'play') played = true;
+    if (s?.loading === true || s?.bar === true || what === 'play') carded = true;
+    if (!carded && s !== null && s.moving !== undefined) {
+      const sig = `${what}|${String(s.doc)}|${s.path}`;
+      if (s.moving || sig !== stillSig) stillFrom = t;
+      else if (stillFrom !== null && t - stillFrom > stillMs) say(stillFrom, `nothing moved on screen for over ${String(stillMs)} ms before the loading card`);
+      stillSig = sig;
+    }
   }
   if (!played) say(samples.at(-1)?.t ?? 0, `never reached play within ${String(budgetMs)} ms`);
   return problems;
