@@ -80,3 +80,7 @@
   one on the same world draws the earlier boots' bodies: every cold ABBA on a dev world, and every cell of the nightly
   `table.mjs` (one cell every 6 to 13 minutes, and a cell's warm boot right after its cold one). The nightly world now
   runs with `HOLD_MS=1000`; bench worlds should too (`HOLD_MS=1000 node scripts/dev.mjs ...`).
+- The J430 board passed both slots on stills (07:22); the judge asked for a moving check of the cadence. Every 7th
+  frame of a 1.2 rad/s pan and a walk, the frame as drawn against the same instant with every cascade fresh (both at
+  dt 0; a repeat control differs by 0 px): the stagger on main errs on p90 0.002% of pixels, worst 0.18%; one map a
+  frame p90 0.008%, worst 2.8% (a one-frame shadow pop). `debug.shadowOneMap` stays off; water AO is on.
