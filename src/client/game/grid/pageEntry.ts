@@ -20,6 +20,7 @@ import { entersInPage, travel, travelSlot } from '../travel/travel';
 import { startEntryDownload } from '../shardfile/entryTransport';
 import { startGridStripDownload } from './entryDownloads';
 import { titlePrefetchChoice } from './titlePrefetchChoice';
+import { seatForEntry, settledSeat } from './seatAsk';
 
 // P0 (Jake's phone, tap -> loader): the page entry routes on these before anything else, so this module stays off
 // three.js and the game graph (src/client/app/entry.ts imports it first; plugin/ui's 3.2 MB closure evaluated in that task).
@@ -128,35 +129,71 @@ export function reenterShard(instance: string): void {
 export const SERVER_PLACED: SaveKeyDef<boolean> = { key: 'grid.server-placed', scope: 'device', version: 1, schema: v.boolean(), initial: () => false };
 
 /** The cell a grid tap boots in. GO5: on a build with a world (play, staging) the server's place is the one save, and this device's last
- *  place is its hint, rewritten by every `resume`; elsewhere the home, and the page's own server restores where it was. */
-function entryCell(): GridCell {
-  const home = gridHome();
-  if ((globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ === undefined || saves.define(SERVER_PLACED).peek() !== true) return home;
-  const assembly = new GridAssembly(gridMode(DEVSERVER)), place = gridRecovery(saves).lastPlace(assembly);
+ *  place is its hint, rewritten by every `resume`; elsewhere the home, and the page's own server restores where it was.
+ *  QA 11-23-b row 19 (Jake ~11:30 Cancún: "ask the server where [...] I am, and then like load the correct zone, and like not spawn me
+ *  in Driftwood, and then not teleport me"): the door's own answer (`server`, asked at the tap) comes first; the hint is read by its cell
+ *  alone, since the door seats the pose, so a placement change that voids the hint's catalogue seal no longer boots home. */
+export function entryCell(assembly: GridAssembly, store: SaveStore, world: boolean, server: string | null = null): GridCell {
+  const home = assembly.at(0, 0);
+  if (home === undefined) throw new Error('The grid catalogue has no home cell at (0, 0)');
+  if (!world) return home;
+  const asked = server === null ? undefined : assembly.cells.find(cell => cell.instance === server);
+  if (asked !== undefined) return asked;
+  if (store.define(SERVER_PLACED).peek() !== true) return home;
+  const place = gridRecovery(store).lastCell(assembly);
   return place === null ? home : assembly.cells.find(cell => cell.instance === place.instance) ?? home;
 }
 
-/** Paint the loading shell before the title's durable handoff and fresh-page navigation. */
+/** Paint the loading shell before the title's durable handoff and fresh-page navigation. QA 11-23-b row 19: on a world build the
+ *  shell waits (at most `SEAT_WAIT_MS`, usually not at all: the title asked as it painted) for the door's word on where this player
+ *  stands, and enters that cell; the device's hint only names the card and starts the read until it comes. */
 export function enterGrid(): void {
   if (navigating !== null && !navigating.disposed) return;
-  const home = entryCell();
-  const target = findTitleManifest(home.slug);
-  if (target === undefined) throw new Error(`The grid's home cell names no shard: ${home.slug}`);
-  const shown = gridDestination(gridRecovery(saves).lastPlace(new GridAssembly(gridMode(DEVSERVER))), target);
-  document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
-  startEntryDownload(target.slug, 'grid');
-  titlePrefetchChoice(saves).remember(target.slug, 'grid');
-  startGridStripDownload(gridMode(DEVSERVER), home.instance, 'metadata');
-  navigating = beginNavigationShell(shown.name, pageScope, () => {
+  const assembly = new GridAssembly(gridMode(DEVSERVER)), world = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__ !== undefined;
+  const openable = (cell: GridCell): { readonly cell: GridCell; readonly row: TitleManifest } | undefined => {
+    const row = findTitleManifest(cell.slug);
+    return row === undefined ? undefined : { cell, row };
+  };
+  // a cell this build has no card for (an upload the title never carded) boots home, and the door moves it (GO5)
+  const guess = openable(entryCell(assembly, saves, world, world ? settledSeat() : null)) ?? openable(gridHome());
+  if (guess === undefined) throw new Error(`The grid's home cell names no shard: ${gridHome().slug}`);
+  const read = (to: { readonly cell: GridCell; readonly row: TitleManifest }): { readonly name: string; readonly art: string } => {
+    const shown = gridDestination({ slug: to.row.slug }, to.row);
+    document.documentElement.style.setProperty('--ws-load-portrait', shown.art === '' ? 'none' : `url("${shown.art}")`);
+    startEntryDownload(to.row.slug, 'grid');
+    titlePrefetchChoice(saves).remember(to.row.slug, 'grid');
+    startGridStripDownload(gridMode(DEVSERVER), to.cell.instance, 'metadata');
+    return shown;
+  };
+  const guessed = read(guess);
+  const go = (to: { readonly cell: GridCell; readonly row: TitleManifest }, shown: { readonly name: string; readonly art: string }): void => {
     // A deliberate new player attempt starts a new guard window; automatic reloads cannot clear it.
     if (!gridRecovery(saves).clearLoop()) throw new Error('Grid recovery guard could not be cleared');
     clearGridRecovery();
-    pageGridIntents().set({ instance: home.instance, slug: target.slug });
-    travel({ to: target.slug, mode: 'enter', shown });
+    pageGridIntents().set({ instance: to.cell.instance, slug: to.row.slug });
+    travel({ to: to.row.slug, mode: 'enter', shown });
+  };
+  navigating = beginNavigationShell(guessed.name, pageScope, () => {
+    if (!world) { go(guess, guessed); return; }
+    const attempt = navigating;
+    void (async (): Promise<void> => {
+      try {
+        const seat = await seatForEntry();
+        if (attempt === null || attempt.disposed) return;
+        const asked = seat === null ? undefined : openable(entryCell(assembly, saves, true, seat));
+        console.info(`[grid] enter: the door ${seat === null ? 'said nothing; the hint' : 'seats this player in'} ${seat ?? guess.cell.instance}`);
+        if (asked === undefined || asked.cell.instance === guess.cell.instance) { go(guess, guessed); return; }
+        // the door's cell, not the hint's: the card and the read follow it before the page goes
+        const shown = read(asked);
+        showGridDestination(asked.row.slug);
+        go(asked, shown);
+      } catch (error) {
+        attempt?.dispose();
+        endPlay({ code: 'BOOT-FAIL', what: 'Couldn\'t enter the MMO', why: 'Enter MMO hit an error while starting the zone.', error, retry: true });
+      }
+    })();
   }, document.querySelector<HTMLButtonElement>('.ws-main-grid'));
 }
-
-
 
 /** ZONE-ENTRY ZE10 (J352, Jake 2026-11-15: "you pop up the full loading screen, the same loading screen that you get in shard select
  *  [...] you've evicted the previous zone from memory, you've loaded a new zone into memory"): a gate's count reached 0. The page

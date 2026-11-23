@@ -25,6 +25,7 @@ import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type DeckTab, type TitleDeck, type TitleDeckOptions } from './titleDeck';
 import { menuMode, gridMode } from './grid/menu';
 import { dropGridIntent, enterGrid, gridRecoveryLoop } from './grid/pageEntry';
+import { prefetchSeat } from './grid/seatAsk';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { saves } from '@wildshard/engine/saves/runtime';
 import { findTitleManifest, titleManifests } from './shard/titleList';
@@ -294,6 +295,9 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     if (leavingTitle) await new Promise<never>(() => { /* never settles */ });
   };
   deck.onTap(mmoCard, enterMmo);
+  // QA 11-23-b row 19: a world build asks the door where this player stands once the title paints, so ENTER THE MMO boots that zone
+  // straight away (one loading screen, never home and then a move); a build with no world asks nothing
+  owner.raf(() => { if (!leavingTitle && !owner.disposed) prefetchSeat(); });
   // S2: only the player's last product, after the title paints; a first visit reads nothing. This is verified
   // disk prefetch, never world construction or a hidden offline-size scan. It shows nothing (QB2).
   let started = false;

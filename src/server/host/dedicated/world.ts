@@ -17,7 +17,7 @@ import { NetIdentitySchema } from '@wildshard/engine/net/identity';
 import { PLAYER_TICKET_PUBLIC_KEY, admit, passOf } from './ticket';
 import { decodeFirstMessage, encodeHello, type Hello } from '@wildshard/wire/handshake';
 import { WIRE_MINOR } from '@wildshard/wire/major';
-import { decodeEnter, decodeSavesAsk, encodeArrive, encodeCountdown, encodeEnter, encodeSaves, type RoomSave, type WorldWord } from '@wildshard/engine/net/socketFrames';
+import { decodeEnter, decodeSavesAsk, decodeWhereAsk, encodeArrive, encodeCountdown, encodeEnter, encodeSaves, encodeWhere, type RoomSave, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { deviceLine, readDeviceWord, type DeviceSnapshot, type DeviceWho } from '@wildshard/engine/net/deviceWord';
 import { AGENT_HEADER, classifyActor, type ActorMark, type ActorTags } from '@wildshard/engine/app/actor';
 import {CorrectionSchema} from '@wildshard/engine/net/measurements';
@@ -611,8 +611,14 @@ export class World {
     const moving = this.grace === null ? {} : { moving: { inS: Math.max(0, Math.ceil((this.grace.endsAt - diagnosticNow()) / 1000)) } };
     // row 9: `saves: 1` says this door answers a seated page's `saves` word (its saves here, and New Game)
     const saves = this.options.saves.reset === undefined ? {} : { saves: 1 as const };
-    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving,...saves} satisfies WorldWord)).buffer);
-    end.onControl((control, bytes) => { if (control === 'device') this.deviceWord(end, bytes); else if (control === 'saves') void this.savesWord(end, bytes); });
+    // QA 11-23-b row 19: `where: 1` says this door answers a title's `where` word (the cell it would seat that player in), before any hello
+    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving,...saves,where:1} satisfies WorldWord)).buffer);
+    let whereAsked = false;
+    end.onControl((control, bytes) => {
+      if (control === 'device') this.deviceWord(end, bytes);
+      else if (control === 'saves') void this.savesWord(end, bytes);
+      else if (control === 'where' && !spoke && !whereAsked) { whereAsked = true; void this.whereWord(end, bytes); }
+    });
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { timedOut = true; this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { spoke = true; off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto, spawn); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
@@ -731,6 +737,34 @@ export class World {
    * read "QUESTS 0 DONE · EMPTY" mid-quest) nor reset it (New Game reloaded into every flag). The seat is the one this socket's hello
    * was admitted as, so a player only ever reads or resets their own save. A word from a socket with no seat is refused.
    */
+  /**
+   * QA 11-23-b row 19 (Jake ~11:30 Cancún: "Enter MMO should, ask the server where [...] I am, and then like load the correct zone, and
+   * like not spawn me in Driftwood, and then not teleport me"): a title's ask, on a socket with no hello, for the cell this player's
+   * next join would be seated in, as `join` reads it: the zone entry its last socket left mid-load, else the cell holding its body,
+   * else its saved place through `cellFor` (the first cell for a new player). Nothing is seated, held or written; a player the door
+   * would not admit hears null. The player string is a bearer credential and is never logged.
+   */
+  private async whereWord(end: SocketTransport, bytes: ArrayBuffer): Promise<void> {
+    const ask = decodeWhereAsk(bytes);
+    let cell: string | null = null;
+    try {
+      const ticketed = ask === null ? undefined : await admit(ask.player, this.options.ticketKey ?? PLAYER_TICKET_PUBLIC_KEY, Date.now());
+      if (ticketed !== undefined && ticketed.expired !== true) {
+        // review 2 M1, as at a hello: a live ticket for an account deleted here plays as its device's guest
+        const seat = ticketed.from !== undefined && (this.gone.get(ticketed.seat) ?? 0) > Date.now() ? ticketed.from : ticketed.seat;
+        const holding = this.seated.get(seat), redial = this.redials.get(seat);
+        if (redial !== undefined && redial.from === holding && this.links.has(redial.to)) cell = redial.to;
+        else if (holding !== undefined) cell = holding;
+        else {
+          // MP2.2d: a first sign-in's join claims the device's guest place into the account
+          const last = await this.options.saves.where(seat) ?? (ticketed.from === undefined || seat === ticketed.from ? null : await this.options.saves.where(ticketed.from));
+          cell = this.cellFor(last);
+        }
+      }
+    } catch { cell = null; }
+    if (ask === null) this.refuse('where-word');
+    if (end.isOpen) end.control('where', encodeWhere({ cell }));
+  }
   private async savesWord(end: SocketTransport, bytes: ArrayBuffer): Promise<void> {
     const ask = decodeSavesAsk(bytes), device = [...this.seatSockets].find(([, socket]) => socket.end === end)?.[0];
     if (ask === null || device === undefined) { this.refuse('saves-word'); return; }

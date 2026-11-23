@@ -69,6 +69,9 @@ export interface GridRecoveryService {
   clearLoop: () => boolean;
   /** The last durable place, for a server opening a page's save for the first time. */
   lastPlace: (assembly: GridAssembly) => GridSavedPlace | null;
+  /** QA 11-23-b row 19: the cell (only) of the last place the world named, for Enter MMO to boot in. A world build's door seats the
+   *  pose, so this needs no catalogue seal: a placement that adds, cards or moves another cell (every staging publish) leaves it. */
+  lastCell: (assembly: GridAssembly) => { readonly instance: string; readonly slug: string } | null;
   /** An abrupt end may resume only an already durable, catalogue-bound checkpoint. SR4: the page's place is lazily committed
    *  storage and a killed browser can lose its newest writes, while the server's continuation is durable. `server` is every
    *  site document of the server's that exists: a place must stand where each of them does, so whichever one the
@@ -118,6 +121,12 @@ export function gridRecovery(store: SaveStore, now: () => number = Date.now): Gr
     },
     clearLoop: () => guard.write(null),
     lastPlace: assembly => { const saved = last.peek(); return saved !== null && validSaved(saved, assembly) ? saved : null; },
+    lastCell: assembly => {
+      let saved: v.InferOutput<typeof savedSchema> | null;
+      try { saved = last.peek(); } catch { return null; }
+      const cell = saved === null ? undefined : assembly.cells.find(row => row.instance === saved.instance && [saved.slug].includes(row.slug));
+      return cell === undefined ? null : { instance: cell.instance, slug: cell.slug };
+    },
     restoreLast: (assembly, server) => {
       if ([last.status?.(), session.status?.(), device.status?.(), pendingReset.status?.()].includes('future')
         || session.peek() !== null || device.peek() !== null) return false;

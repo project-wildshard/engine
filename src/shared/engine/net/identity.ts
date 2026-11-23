@@ -32,6 +32,8 @@ const identityKey = (prefix: string): string => {
 };
 /** The Name this device keeps, or null before one is kept. It mints nothing (the Name prompt and Settings read it). */
 export function heldName(storage: SaveStorage, prefix: string): string | null { return stored(storage.getItem(identityKey(prefix)))?.name ?? null; }
+/** QA 11-23-b row 19: the player id this device keeps, or null before one is kept. It mints nothing (Enter MMO's ask of the door). */
+export function heldPlayer(storage: SaveStorage, prefix: string): string | null { return stored(storage.getItem(identityKey(prefix)))?.player ?? null; }
 /** This device's identity, minted once and kept in the page's storage. A Name typed later replaces the Name, never the id. */
 export function deviceIdentity(storage: SaveStorage, prefix: string, name?: string): NetIdentity {
   const key = identityKey(prefix), held = stored(storage.getItem(key)), typed = name?.slice(0, MAX_NAME_LENGTH) ?? '';

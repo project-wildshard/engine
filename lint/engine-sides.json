@@ -769,6 +769,7 @@
     "src/client/game/grid/placedCards.ts": "client",
     "src/client/game/grid/onlineGate.ts": "client",
     "src/client/game/grid/pageEntry.ts": "client",
+    "src/client/game/grid/seatAsk.ts": "client",
     "src/client/game/grid/regridLater.ts": "client",
     "src/client/game/grid/pageResidency.ts": "client",
     "src/client/game/grid/pageShell.ts": "client",

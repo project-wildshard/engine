@@ -1,7 +1,7 @@
 import { Scope } from '../../../shared/engine/app/scope';
 import { AGENT_QUERY, doorPassLane } from '../../../shared/engine/app/actor';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
-import { channelPrefix, closeCode, closeReason, COMMAND_SKIP_BYTES, controlPrefix, decodePong, encodePing, framed, PING_MS, SOCKET_ARRIVE, SOCKET_COUNTDOWN, SOCKET_ENTER, SOCKET_PLAYTEST, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME, SOCKET_SAVES, SOCKET_UNRELIABLE, SOCKET_VOICE, SOCKET_WORLD, type SocketControl } from '../../../shared/engine/net/socketFrames';
+import { channelPrefix, closeCode, closeReason, COMMAND_SKIP_BYTES, controlPrefix, decodePong, encodePing, framed, PING_MS, SOCKET_ARRIVE, SOCKET_COUNTDOWN, SOCKET_ENTER, SOCKET_PLAYTEST, SOCKET_PONG, SOCKET_RELIABLE, SOCKET_RESUME, SOCKET_SAVES, SOCKET_UNRELIABLE, SOCKET_VOICE, SOCKET_WHERE, SOCKET_WORLD, type SocketControl } from '../../../shared/engine/net/socketFrames';
 import { decodeSocketCloseInfo, type SocketCloseInfo } from '../../../shared/engine/net/socketClose';
 import type { NetChannel, Transport, TransportStats } from '../../../shared/engine/net/transport';
 import { pageActor } from '../telemetry/pageActor';
@@ -97,7 +97,7 @@ export class WebSocketTransport implements Transport {
     const view = new DataView(data), prefix = view.getUint8(0), body = data.slice(1);
     if (prefix === SOCKET_RELIABLE || prefix === SOCKET_UNRELIABLE) { const channel = prefix === SOCKET_RELIABLE ? 'reliable' : 'unreliable'; for (const listener of this.messages) listener(channel, body); }
     else if (prefix === SOCKET_PONG) { const pong = decodePong(view); if (pong !== null) { this.rttMs = this.now() - pong.clock; this.lossPct = pong.lossPct; } }
-    else if (prefix === SOCKET_RESUME || prefix === SOCKET_COUNTDOWN || prefix===SOCKET_PLAYTEST || prefix === SOCKET_VOICE || prefix === SOCKET_WORLD || prefix === SOCKET_ENTER || prefix === SOCKET_ARRIVE || prefix === SOCKET_SAVES) for (const listener of this.controls) listener(prefix === SOCKET_RESUME ? 'resume' : prefix===SOCKET_PLAYTEST?'playtest':prefix === SOCKET_VOICE ? 'voice' : prefix === SOCKET_WORLD ? 'world' : prefix === SOCKET_ENTER ? 'enter' : prefix === SOCKET_ARRIVE ? 'arrive' : prefix === SOCKET_SAVES ? 'saves' : 'countdown', body);
+    else if (prefix === SOCKET_RESUME || prefix === SOCKET_COUNTDOWN || prefix===SOCKET_PLAYTEST || prefix === SOCKET_VOICE || prefix === SOCKET_WORLD || prefix === SOCKET_ENTER || prefix === SOCKET_ARRIVE || prefix === SOCKET_SAVES || prefix === SOCKET_WHERE) for (const listener of this.controls) listener(prefix === SOCKET_RESUME ? 'resume' : prefix===SOCKET_PLAYTEST?'playtest':prefix === SOCKET_VOICE ? 'voice' : prefix === SOCKET_WORLD ? 'world' : prefix === SOCKET_ENTER ? 'enter' : prefix === SOCKET_ARRIVE ? 'arrive' : prefix === SOCKET_SAVES ? 'saves' : prefix === SOCKET_WHERE ? 'where' : 'countdown', body);
   }
   private end(reason: string, info: SocketCloseInfo | null = null): void {
     if (this.ended) return;
