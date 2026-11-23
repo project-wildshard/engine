@@ -17,3 +17,8 @@
 - What the card itself lacked: before Loading adopts the spawn download, `paintSpawnDownload` filled the download bar but
   left the foot empty, so the first 2 to 3.5 s of the new page read as an unnamed step. It now names 'Spawn download ·
   N / M files' until the download closes.
+- The recorder now reads each page's first contentful paint (`fcp`), and the analyser counts a fresh document's
+  inline card as painted then (`withFirstPaints`), not when the inspector meets it 0.3 to 0.6 s later. WebKit reports
+  the game page's paint ~40 ms after its origin.
+- Proof, all three DL21 commits, Nine packs on the Simulator at load 12 to 23: cold 12.1 s and warm 8.4 s to control,
+  no card still for a second and no unnamed step (the first pair, before `fcp`, read only the 1.2 to 1.3 s swap).

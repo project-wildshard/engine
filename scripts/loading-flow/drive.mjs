@@ -226,7 +226,9 @@ const READ = `JSON.stringify((() => {
     player: (() => { try { const p = w?.player; if (!p) return null; const r = v => Math.round(v * 10) / 10;
       return { x: r(p.position.x), y: r(p.position.y), z: r(p.position.z), v: r(Math.hypot(p.velocity.x, p.velocity.z)), hover: p.hover, boost: p.hoverBoost }; } catch { return null; } })(),
     play: window.__lfPlay?.phase ?? null,
-    control, sw: navigator.serviceWorker?.controller ? 'controlled' : 'none', now: performance.now(), origin: performance.timeOrigin };
+    control, sw: navigator.serviceWorker?.controller ? 'controlled' : 'none', now: performance.now(), origin: performance.timeOrigin,
+    // DL21c: the page's own first contentful paint (its inline shell card), which the recorder meets 0.3 to 0.6 s later
+    fcp: performance.getEntriesByType('paint').find(e => e.name === 'first-contentful-paint')?.startTime ?? null };
 })())`;
 let controlAt = null, lastHref = '', lastDrain = 0;
 let profiling = null;

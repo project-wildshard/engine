@@ -241,3 +241,16 @@ test('the real recorder token survives repeated sampler installs but changes wit
   const next = {}; runInNewContext(script, { ...env, window: next });
   expect(next.__lf.documentId).not.toBe(first);
 });
+
+// DL21c: the recorder meets a fresh document 0.3 to 0.6 s after it starts; its inline card painted at its first contentful paint
+test('a fresh document\'s first paint ends the still card of the swap; without a paint time the swap reads still', () => {
+  const swap = (fcp) => {
+    const rows = [{ ev: 'tapEnter', t: TAP }, card(0, { documentId: 'title', su: '—', suPct: '0', dl: '—', foot: '' }), card(0.2, { documentId: 'title', su: '—', suPct: '0', dl: '—', foot: '' })];
+    rows.push(card(1.3, { origin: TAP + 700, fcp }));
+    for (let s = 1.5; s <= 3; s += 0.2) rows.push(card(s, { suPct: String(Math.round(s * 10)) }));
+    rows.push(card(3.2, { shown: false, control: true }), frames(0, 40, 16.7));
+    return analyse(rows).cardStill_ge1s;
+  };
+  expect(swap(150)).toEqual([]);
+  expect(swap(null)).toMatchObject([{ from: 0, s: 1.3 }]);
+});

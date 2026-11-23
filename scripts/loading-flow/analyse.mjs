@@ -36,6 +36,24 @@ const waitName = (foot) => foot.replaceAll(/ · \d+(?:\.\d+)? s\b/gu, '').replac
  * and changes on a same-URL reload. URL and timeOrigin are never identity. */
 const documentId = row => typeof row?.documentId === 'string' && row.documentId !== '' ? row.documentId : null;
 const sameDocument = (a, b) => documentId(a) !== null && documentId(a) === documentId(b);
+/**
+ * DL21c: each later document's first poll, preceded by a row at that document's first contentful paint when the page
+ * reports one (`fcp`, ms from its `origin`) between the last poll of the document before and its own first poll.
+ * @param {Array<Record<string, any>>} polls
+ */
+export function withFirstPaints(polls) {
+  const out = [], seen = new Set();
+  for (const row of polls) {
+    const id = documentId(row), last = out.at(-1);
+    if (id !== null && !seen.has(id)) {
+      seen.add(id);
+      const at = Number.isFinite(row.origin) && Number.isFinite(row.fcp) ? row.origin + row.fcp : null;
+      if (at !== null && last !== undefined && !sameDocument(last, row) && at > last.t && at < row.t) out.push({ ...row, t: at, dl: 'first paint', painted: true });
+    }
+    out.push(row);
+  }
+  return out;
+}
 
 /** Anchor each document's relative frame clock once. A later timeOrigin read
  * can jitter on Safari; durations come from that document's performance clock. */
@@ -92,7 +110,9 @@ export function analyse(rows, servedBuild = null) {
   // card unchanged for a second or more between the tap and control (clock excluded: it ticks on a frozen card)
   const still = [];
   let from = null;
-  const loading = polls.filter(row => row.t <= end);
+  // DL21c: a fresh document (the `/leave` swap) paints its inline shell card at its first contentful paint, 0.3 to 0.6 s
+  // before the recorder re-attaches to it on the Simulator: that paint is a card change the player saw
+  const loading = withFirstPaints(polls.filter(row => row.t <= end));
   for (let i = 0; i < loading.length; i++) {
     const row = loading[i];
     if (from === null) { from = row; continue; }
