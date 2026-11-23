@@ -667,7 +667,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
                 // PZ3: on the content base only content moves; code and rapier stay with the page (a J138 home holds all of it).
                 const source = new URL(url), page = new URL(base);
                 // SA48: a slug placed after the build reads its loose files from its upload's own folder in the store
-                const target = source.origin !== page.origin ? url : storedLoose(source.pathname, source.search) ?? (packs === contentBase() ? contentURL(url)
+                const target = source.origin !== page.origin ? url : manifestLoose(source.pathname, source.search, manifest.shard) ?? (packs === contentBase() ? contentURL(url)
                   : new URL(source.pathname + source.search, packs).href);
                 return ports.fetch(target, signal, init);
               },
@@ -961,6 +961,14 @@ function bakedLoose(pathname: string, search = ''): string | undefined {
   }
   const folder = bakedHome.folders.get(owner);
   return folder === undefined ? undefined : new URL(`.${pathname}${search}`, folder).href;
+}
+/** QA 11-23-b row 20 (staging, 16:50 UTC: every fresh boot failed "Download paused · the connection dropped"): a spawn
+ *  manifest lists a neighbour's loose files (its discovery) at the bytes this build baked. When the rooms move that neighbour to an
+ *  upload (NB2), its upload folder holds other bytes, or none yet, and the size check failed the whole download. A manifest reads
+ *  its own slug's files where they are stored; a neighbour's stay the build's own copy, which matches the manifest. */
+function manifestLoose(pathname: string, search: string, shard: string): string | undefined {
+  const owner = looseSlug(pathname);
+  return owner !== undefined && owner !== bareSlug(shard) ? bakedLoose(pathname, search) : storedLoose(pathname, search);
 }
 /** Where a loose page path is read: a placed slug's upload folder, a baked stored cook's, or undefined (this page or the base). */
 function storedLoose(pathname: string, search = ''): string | undefined { return placedLoose(pathname, search) ?? bakedLoose(pathname, search); }

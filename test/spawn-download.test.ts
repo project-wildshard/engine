@@ -229,3 +229,29 @@ test('a neighbour\'s file that differs never blocks the zone\'s boot; the zone\'
     await expect(refused.ready).rejects.toThrow('size differs');
   } finally { warn.mockRestore(); }
 });
+
+// QA 11-23-b row 20 (staging, 2026-11-23 16:50 UTC: every fresh boot stopped at "Download paused · the connection dropped"). Driftwood's
+// manifest lists Brasscap's discovery at the bytes the build baked; the rooms had moved Brasscap to an upload (NB2), so the read went
+// to the upload's folder, met other bytes (or a 404 page) and failed the size check. A neighbour's file stays the build's own copy.
+test('a manifest reads a placed neighbour\'s loose file from the build, and only its own slug\'s from the upload', async () => {
+  const {installPlacedContent} = await import('../src/client/game/grid/placedContent');
+  const {clearPlacedSpawns} = await import('../src/client/game/boot/placedSpawn');
+  const hash = 'c0'.repeat(32), loose = `https://packs.example/loose/${hash}/`;
+  installPlacedContent({spawn: {slug: 'neighbour', entry: {phone: {url: `/loose/${hash}/m.json`, bytes: 1, totalBytes: 1, files: 1}} as never,
+    whole: {}, base: 'https://packs.example/', loose, programs: false}, verdict: null});
+  const discovery = {url: '/shardfiles/neighbour/discovery.json?v=b649bfae', bytes: 5, hash: 'd'.repeat(64)};
+  const run = async (shard: string): Promise<string[]> => {
+    const listed = {version: 1, shard, tier: 'phone', flow: 'grid', files: [discovery], totalBytes: 5}, body = JSON.stringify(listed);
+    const reads: string[] = [];
+    const download = downloadSpawnManifest({url: `/assets/spawn/${shard}-grid-phone-1234567890abcdef.json`, bytes: body.length, totalBytes: 5, files: 1}, {
+      cached: () => Promise.resolve(undefined),
+      fetch: url => { reads.push(url); return Promise.resolve(new Response(url.includes('/assets/spawn/') ? body : new Uint8Array(5))); }}, base);
+    await download.ready;
+    expect(download.snapshot().complete).toBe(true);
+    return reads.filter(url => url.includes('discovery'));
+  };
+  try {
+    expect(await run('example'), 'a neighbour: the build\'s own copy').toEqual([`${base}shardfiles/neighbour/discovery.json?v=b649bfae`]);
+    expect(await run('neighbour'), 'its own slug: the upload').toEqual([`${loose}shardfiles/neighbour/discovery.json?v=b649bfae`]);
+  } finally { clearPlacedSpawns(); }
+});

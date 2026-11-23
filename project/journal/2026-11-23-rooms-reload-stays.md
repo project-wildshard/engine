@@ -19,3 +19,17 @@ a required argument, so no other caller can leave unmarked.
 Staging's current build bakes Dunes at its live hash, so the drop does not
 reproduce there now. The J451 zone-entry smoke's menu-and-back step
 checks it on every release.
+
+## A neighbour's file stays the build's own
+
+While proving the smoke, every fresh WebKit boot of staging's Driftwood
+stopped at "Download paused · the connection dropped" (16:50 UTC, the
+placement file at serial 90 and 91). Copy diagnostics named
+`/shardfiles/brasscap-mesa/discovery.json`: Driftwood's grid manifest
+lists Brasscap's discovery at the bytes the build baked, but the rooms had
+moved Brasscap to an upload, so SA48's `placedLoose` sent the read to that
+upload's folder. The folder had no such file yet (a 27 kB 404 page, over
+the 6 kB cap), so the size check failed the whole Driftwood download. A
+new upload with other discovery bytes would fail the same way. A manifest
+now reads only its own slug's loose files from the upload; a neighbour's
+stay the build's copy, which is what the manifest lists.
