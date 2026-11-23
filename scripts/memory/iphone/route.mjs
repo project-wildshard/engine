@@ -407,8 +407,9 @@ const recRead = `
 /** Play `slug`'s route on a driver at control, one leg at a time.
  * @param {{ evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<any> }} driver
  * @param {{ slug: string, cap: 30 | 60 | null, rec?: string[], legs?: number, log?: (line: string) => void,
- *   probe?: { start: string, stop: string } }} options probe: page scripts run around each leg (route-bench --fenced-gpu); stop's value is the leg's `probe` */
-export async function playRoute(driver, { slug, cap, rec = [], legs: count, log = () => undefined, probe }) {
+ *   probe?: { start: string, stop: string }, heapAt?: string[] }} options probe: page scripts run around each leg (route-bench --fenced-gpu); stop's value is the leg's `probe`.
+ *   heapAt: legs after which the driver (`heapSnapshot`, the iPhone's Web Inspector) sums the live JavaScript heap (DF18) */
+export async function playRoute(driver, { slug, cap, rec = [], legs: count, log = () => undefined, probe, heapAt = [] }) {
   const legs = [];
   // the grid's sky-down reveal (grid/reveal.ts: the camera comes down from ~400 m over the pier, 3 s) runs after control;
   // the route measures play, so it starts once the reveal has ended, and says how long the reveal took
@@ -434,8 +435,11 @@ export async function playRoute(driver, { slug, cap, rec = [], legs: count, log 
       .catch((/** @type {unknown} */ error) => ({ error: String(error) }));
     const summary = result?.samples?.length ? legSummary(result.samples) : null;
     const recText = recording ? await driver.evaluateAsync(recRead, [], 45_000).catch((/** @type {unknown} */ error) => `REC unread: ${String(error)}`) : null;
+    const snapshot = /** @type {{ heapSnapshot?: () => Promise<unknown> }} */ (driver).heapSnapshot;
+    const heap = heapAt.includes(leg.name) && typeof snapshot === 'function'
+      ? await snapshot.call(driver).catch((/** @type {unknown} */ error) => ({ error: String(error) })) : undefined;
     legs.push({ name: leg.name, kind: leg.kind, cap, error: result?.error ?? null, nav: result?.nav ?? null, summary, samples: result?.samples ?? [], rec: recText,
-      ...(probed === undefined ? {} : { probe: probed }) });
+      ...(probed === undefined ? {} : { probe: probed }), ...(heap === undefined ? {} : { heap }) });
     log(`${leg.name}: ${summary === null ? `no frames (${String(result?.error)})` : `${String(summary.fps)} fps p95 ${String(summary.p95Ms)} ms >50 ${String(summary.over50)}`}${result?.nav?.stuck?.length ? ` stuck ${String(result.nav.stuck.length)}` : ''}`);
     if (result?.error) {
       // the coordinator, 2026-11-19: a broken leg brings back the page's console errors with their stacks and the error card

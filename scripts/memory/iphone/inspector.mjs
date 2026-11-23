@@ -31,6 +31,24 @@ export function syncExpression(script, args) {
   })()`;
 }
 
+/** DF18 (mini-dw3): a JavaScriptCore heap snapshot (Inspector type: id, size, class name index, flags per node; the
+ *  GCDebugging type adds three more) summed by class name: object count and bytes, the internal cells apart.
+ * @param {string} text */
+export function summarizeJscSnapshot(text) {
+  const snap = JSON.parse(text);
+  const nodes = snap.nodes ?? [], names = snap.nodeClassNames ?? [], width = snap.type === 'GCDebugging' ? 7 : 4;
+  /** @type {Map<string, { count: number, bytes: number }>} */ const classes = new Map();
+  let count = 0, bytes = 0;
+  for (let i = 0; i + width <= nodes.length; i += width) {
+    const size = Number(nodes[i + 1]), internal = (Number(nodes[i + 3]) & 1) === 1;
+    const name = `${internal ? '(internal) ' : ''}${String(names[nodes[i + 2]] ?? '?')}`;
+    const row = classes.get(name) ?? { count: 0, bytes: 0 };
+    row.count++; row.bytes += size; classes.set(name, row); count++; bytes += size;
+  }
+  const top = [...classes.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 60).map(([name, row]) => ({ name, count: row.count, bytes: row.bytes }));
+  return { version: snap.version ?? null, type: snap.type ?? null, nodes: count, bytes, edges: Math.floor((snap.edges?.length ?? 0) / 4), top };
+}
+
 /** An async WebDriver body takes its callback as the last argument. @param {string} script @param {unknown[]} args */
 export function asyncExpression(script, args) {
   return `new Promise((done) => { (function () {\n${script}\n}).apply(null, [...${JSON.stringify(args)}, done]); })`;
@@ -233,6 +251,15 @@ async function attach(socketUrl, { overrides = [] }) {
         const params = await Promise.race([complete, pause(60_000).then(() => null)]);
         return params?.samples?.stackTraces ?? [];
       } finally { listeners.delete(listener); }
+    },
+    /** DF18 (mini-dw3): JavaScriptCore's live heap now, summed by class (the Heap agent's snapshot, parsed here so the
+     *  hundreds of MB of snapshot text never reach the caller): what a full collection marks. The snapshot itself runs a
+     *  full collection and holds the page for seconds, so a route takes it after a leg, never inside one. */
+    async heapSnapshot() {
+      await ready;
+      await send('Heap.enable', {}, 15_000);
+      const result = await send('Heap.snapshot', {}, 180_000);
+      return summarizeJscSnapshot(String(result?.snapshotData ?? '{}'));
     },
     /** DF8 (mini-driftwood13h): JavaScriptCore's collections from now on (the Heap agent's garbageCollected events). */
     async heapStart() {

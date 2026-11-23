@@ -2,7 +2,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--route <name>] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>|<slot>=<on>/<off>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--fenced-gpu <n>] [--leg-census] [--leg-alloc] [--leg-shots] [--leg-vsync] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>|<slot>=<on>/<off>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--fenced-gpu <n>] [--leg-census] [--leg-alloc] [--leg-shots] [--leg-vsync] [--heap-at <leg> ...] [--out <dir>] [--dry-run]
 //
 // --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
 // --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
@@ -12,6 +12,7 @@
 // sentinel (gpuFence.mjs): whether each long frame waited on the GPU or ran a full collection.
 // --fenced-gpu <n> fences one frame in n with readPixels on each leg (fps/gpuProbe.mjs, DF5): the GPU time the 30 fps cap hides.
 // --leg-vsync reads each leg's drawn frames by their vsync timestamps (the cadence shown) and how late each callback ran.
+// --heap-at <leg> (DF18, inspector driver) sums JavaScriptCore's live heap by class after that leg: what a full collection marks.
 // --leg-shots saves the world canvas at each leg's end (shot-<n>-<leg>.jpg in the run's folder): a look board off the route.
 // --leg-alloc counts, on every leg, the new typed-array storage and its largest call sites (JSC's full-collection pressure).
 // --leg-census reads, on every leg, which owners draw the triangles of the leg's heaviest tenth of sampled frames (DW3).
@@ -37,7 +38,7 @@ import { lockKind, underLock } from './locks.mjs';
 const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, route: { type: 'string' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
-  slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, 'cool-outside': { type: 'boolean' }, cooled: { type: 'boolean' }, out: { type: 'string' }, udid: { type: 'string' },
+  slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, 'heap-at': { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, 'cool-outside': { type: 'boolean' }, cooled: { type: 'boolean' }, out: { type: 'string' }, udid: { type: 'string' },
   'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'cache-off': { type: 'boolean' }, frames: { type: 'boolean' }, 'gpu-fence': { type: 'boolean' }, 'fenced-gpu': { type: 'string' }, 'leg-census': { type: 'boolean' }, 'leg-alloc': { type: 'boolean' }, 'leg-shots': { type: 'boolean' }, 'leg-vsync': { type: 'boolean' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
@@ -206,7 +207,7 @@ async function bench() {
             stop: `const out = {}; ${every > 0 ? 'const stop = window.__wsFenced; window.__wsFenced = undefined; out.fenced = stop === undefined ? null : stop();' : ''}
               ${legCensus ? `out.census = (() => { ${LEG_CENSUS_STOP} })();` : ''} ${legAlloc ? `out.alloc = (() => { ${LEG_ALLOC_STOP} })();` : ''} ${legVsync ? `out.vsync = (() => { ${LEG_VSYNC_STOP} })();` : ''}
               ${legShots ? `return window.__wildshard.world.game.captureFrame(390).then((c) => new Promise((done) => { c.toBlob(done, 'image/jpeg', 0.9); })).then((b) => b.arrayBuffer()).then((bytes) => { out.shot = Array.from(new Uint8Array(bytes)); return out; });` : `return ${many ? 'out' : 'out.fenced'};`}` } : undefined;
-          row.legs = await playRoute(driver, { slug: route, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), probe, log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+          row.legs = await playRoute(driver, { slug: route, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), probe, heapAt: values['heap-at'] ?? [], log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
           if (every > 0) for (const leg of row.legs) console.log(`  fenced ${leg.name}: ${JSON.stringify(many ? leg.probe?.fenced : leg.probe)}`);
           if (legShots) for (const [i, leg] of row.legs.entries()) {
             const shot = leg.probe?.shot; if (!Array.isArray(shot) || shot.length === 0) { console.log(`  leg shot ${leg.name}: none`); continue; }
@@ -214,6 +215,8 @@ async function bench() {
             writeFileSync(file, Uint8Array.from(shot)); delete leg.probe.shot;
             console.log(`  leg shot ${leg.name}: ${file}`);
           }
+          // DF18 (mini-dw3): --heap-at <leg> sums JavaScriptCore's live heap by class after that leg (what a full collection marks)
+          for (const leg of row.legs) if (leg.heap !== undefined) console.log(`  heap after ${leg.name}: ${JSON.stringify(leg.heap).slice(0, 2400)}`);
           if (legVsync) for (const leg of row.legs) console.log(`  leg vsync ${leg.name}: ${JSON.stringify(leg.probe?.vsync ?? null)} (game clock p95 ${String(leg.summary?.p95Ms ?? '?')})`);
           if (legAlloc) for (const leg of row.legs) {
             const a = leg.probe?.alloc;
