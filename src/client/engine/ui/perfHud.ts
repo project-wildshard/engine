@@ -233,7 +233,7 @@ export class PerfHud {
     L.push(`physics ${f1(b.physics)} · animals ${f1(b.animals)} · elites ${f1(b.elites)}`);
     L.push(`player ${f1(b.player)} · hud ${f1(b.hud)} · audio ${f1(b.audio)}`);
     L.push(`world ${f1(b.world)} · quest ${f1(b.quest)} · other ${f1(b.other)}`);
-    const other = namedUpdateParts(s.otherParts, 1);
+    const other = namedUpdateParts(s.otherParts, 1, b.other);
     if (other.length > 0) L.push(` other: ${other}`);
     L.push(` animals: think ${f1(u.think)} pose ${f1(u.pose)} motor ${f1(u.motor)}`);
     L.push(` nav ${f1(u.nav)} ms · ${f1(s.navQueries)} queries/frame`);
@@ -307,9 +307,17 @@ function textureLine(): string {
 function pct(v: number[], p: number): number { const s = [...v].sort((a, b) => a - b); return s[Math.min(s.length - 1, Math.floor(s.length * p))] ?? 0; }
 
 /** the recording's summary: what Jake pastes back */
-function namedUpdateParts(parts: ReadonlyMap<string, number>, frames: number): string {
-  return [...parts].filter(([, ms]) => ms / frames >= 0.3).sort((a, b) => b[1] - a[1])
-    .map(([name, ms]) => `${name} ${f1(ms / frames)}`).join(' · ');
+/** meta DRIFTWOOD-FPS DF13 (mini-dwfps2, 2026-11-23): "other" read 1.8 ms on the 2x dock with no part listed, because no single
+ *  part reached 0.3 ms; the reader could not tell spread work from unmeasured work. The line now lists the largest parts (0.1 ms
+ *  or more, at most eight), sums the rest, and names what no part claims as `unnamed`. */
+export function namedUpdateParts(parts: ReadonlyMap<string, number>, frames: number, otherMs?: number): string {
+  const all = [...parts].map(([name, ms]) => [name, ms / frames] as const).sort((a, b) => b[1] - a[1]);
+  const shown = all.filter(([, ms]) => ms >= 0.1).slice(0, 8), rest = all.slice(shown.length);
+  const out = shown.map(([name, ms]) => `${name} ${f1(ms)}`);
+  const restMs = rest.reduce((sum, [, ms]) => sum + ms, 0);
+  if (rest.length > 0 && restMs >= 0.05) out.push(`${rest.length} more ${f1(restMs)}`);
+  if (otherMs !== undefined && out.length > 0) out.push(`unnamed ${f1(Math.max(0, otherMs - all.reduce((sum, [, ms]) => sum + ms, 0)))}`);
+  return out.join(' · ');
 }
 
 function recSummary(frames: readonly RecFrame[], otherParts: ReadonlyMap<string, number>, max: Counts, game: Game, abOff: string): string {
@@ -329,7 +337,7 @@ function recSummary(frames: readonly RecFrame[], otherParts: ReadonlyMap<string,
   const parts = BUCKETS.map((name, i) => `${name} ${f1(mean((f) => f.buckets[i] ?? 0))}`);
   const other = mean((f) => Math.max(0, f.update - f.buckets.reduce((s, x) => s + x, 0)));
   L.push(`update mean: ${parts.join(' · ')} · other ${f1(other)}`);
-  const named = namedUpdateParts(otherParts, m);
+  const named = namedUpdateParts(otherParts, m, other);
   if (named.length > 0) L.push(`other: ${named}`);
   L.push(`animals: ${SUBS.map((name, i) => `${name} ${f1(mean((f) => f.subs[i] ?? 0))}`).join(' · ')} · nav ${f1(mean((f) => f.nav))} q/frame`);
   L.push(`frames > 50 ms: ${frames.filter((f) => f.frame > 50).length} · > 100 ms: ${frames.filter((f) => f.frame > 100).length}`);
