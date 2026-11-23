@@ -195,6 +195,11 @@ try {
             await page.waitForFunction(({from, frames}) => {
               const world = window.__wildshard?.world;
               if (world === undefined) return false;
+              // FS30e: each change of the board, with the seat's corrections, for a mount that flicks on and drops
+              const trace = (window as unknown as {__wsHoverTrace?: unknown[][]}).__wsHoverTrace ??= [];
+              const corrections = world.player.link === null ? null : Reflect.get(Object(Reflect.get(world.player.link, 'predictor')), 'corrections') as unknown;
+              const last = trace.at(-1);
+              if (trace.length < 40 && (last === undefined || last[1] !== world.player.hover || last[2] !== corrections)) trace.push([world.game.frameCount, world.player.hover, corrections]);
               if (world.game.frameCount - from > frames) throw new Error(`no mount within ${frames} frames of the tap`);
               return world.player.hover && world.player.hoverBlend > 0.5 &&
                 world.weapons.tools.some(tool => tool.id === 'tool.hoverboard' && tool.enabled && 'model' in tool && tool.model instanceof Object && 'visible' in tool.model && tool.model.visible === true);
@@ -216,7 +221,8 @@ try {
               throw new Error(`${head.slug}: hover ${action} failed: ${String(error)}; ${JSON.stringify({before, after})}`, {cause: error});
             } finally {
               const events = await probe.evaluate(value => {value.controller.abort(); return value.events;});
-              writeFileSync(join(evidence, 'hover.json'), JSON.stringify({action, before, after: await observeHover(), events}, null, 2));
+              const trace = await page.evaluate(() => (window as unknown as {__wsHoverTrace?: unknown[][]}).__wsHoverTrace ?? []).catch(() => null);
+              writeFileSync(join(evidence, 'hover.json'), JSON.stringify({action, before, after: await observeHover(), events, trace}, null, 2));
               await probe.dispose();
             }
             return {mounted: true, unmounted: true, input: 'real touch', actualCap, expectedCap};
