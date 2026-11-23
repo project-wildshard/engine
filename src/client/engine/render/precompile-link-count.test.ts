@@ -5,8 +5,10 @@ import { linkedGl } from '../../../test/engine/linkedGl';
 import { offscreenBakesHeld, withoutOffscreenBakes } from './offscreenPreparation';
 import { runPrecompile, unbuiltObjects, type CompileJob } from './precompile';
 
-// DL21: under the loader the resolve loop waits on one program while the GPU process links the rest. The card counts those.
-test('a resolve held on one program counts the links landing behind it', async () => {
+// DL21: under the loader the resolve loop waited on one program while the GPU process linked the rest, counting those. DL21b
+// (isolated path, opus-phone1): the loader now waits for a batch's links in a named chunk as it issues them, so the resolve
+// after finds every program linked and moves one program a step.
+test('under the loader an isolated batch links in a chunk before its resolves', async () => {
   const renderer: unknown = Object.create(WebGLRenderer.prototype);
   if (!(renderer instanceof WebGLRenderer)) throw new Error('Renderer missing');
   const geometry = new BoxGeometry(), materials = Array.from({ length: 4 }, () => new MeshBasicMaterial());
@@ -33,9 +35,11 @@ test('a resolve held on one program counts the links landing behind it', async (
   for (const [key, value] of Object.entries(fields)) Reflect.set(renderer, key, value);
   await runPrecompile(renderer, new PerspectiveCamera(), jobs, materials.length, (_done, _total, detail) => { details.push(detail); }, [], () => true,
     true, () => { frame++; return Promise.resolve(); }, undefined, undefined, 6);
-  const counts = details.flatMap(detail => /^0 \/ 4 programs resolved · (\d+) linked/u.exec(detail)?.[1] ?? []);
-  expect(counts).toEqual(['1', '2', '3']);
-  expect(details.at(-1)).toContain('4 / 4 programs resolved');
+  expect(details.filter(detail => detail.includes('linking'))).toEqual(['4 materials · 4 / 4 batches · linking 4 · parallel']);
+  // no resolve waits behind an unlinked program: none counts links landing behind it
+  expect(details.filter(detail => / linked · /u.test(detail))).toEqual([]);
+  // what the issue loop already settled is not resolved again; the rest resolve one by one, all linked
+  expect(details.at(-1)).toMatch(/^(\d) \/ \1 programs resolved · parallel$/u);
 });
 
 test('a second pass looks only at what no pass has built', () => {

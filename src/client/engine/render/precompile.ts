@@ -1054,9 +1054,14 @@ const linkPollMs = (): number => (presenting() ? LIVE_LINK_POLL_MS : 0);
 /**
  * DL21b: how many programs a boot warm-up issues before it waits for their links. WebKit's GPU process reports no link of
  * a batch done until the whole batch is: Nine Dragon's 61 entry programs held the card 3.6 s on 'Link 61 shader programs'
- * on the iPhone Simulator (11-23), then all landed at once. A chunk lands as one, so the card moves every chunk.
+ * on the iPhone Simulator (11-23), then all landed at once. A chunk lands as one, so the card moves every chunk. The first
+ * chunk is this size; later ones follow LINK_CHUNK_TARGET_MS: a fixed 8 took up to 1.0 s on Sky Reach (Simulator, load 10),
+ * and a fixed 4 cost Pine's cold boot 2.6 s in waits.
  */
 export const BOOT_LINK_CHUNK = 8;
+/** DL21b: the next chunk is sized so it lands in about this long (ms), from how long the last one took: 2 to 16 programs, and
+ *  at most half again the last (programs differ: Pine's 8 landed fast, then 19 took 1.6 s on the Simulator). */
+export const LINK_CHUNK_TARGET_MS = 500;
 /** How long a parallel link is waited on before its caller links it synchronously (ms; `boundedLinkWait`). */
 export const LINK_WAIT_MS = 10_000;
 /**
@@ -1292,9 +1297,11 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
   // query, and the bar sat still while its total grew by 75 programs. Under a loading screen each job's new programs are
   // resolved inside its own slice, so the slice clock counts the link and the painted pause follows it.
   const linkPerJob = serialLoading(renderer, isolateImageUploads), settledPause = gpuSettled(renderer, pause, current);
-  // DL21b: under a loading card, parallel links are waited on in chunks as they are issued (BOOT_LINK_CHUNK)
-  const chunkLinks = parallel && !isolateImageUploads && onProgress !== undefined && !presenting();
-  let linkChunk: ProgramLike[] = [], chunkLinked = 0;
+  // DL21b: under a loading card, parallel links are waited on in chunks as they are issued (BOOT_LINK_CHUNK). Also on the
+  // isolated path (a home region's warm-up under the card): Sky Reach's 'Link 32 shader programs' held its card 3.1 s on
+  // the Simulator, its resolve counting links that WebKit reported only once all had landed (opus-phone1, 11-23)
+  const chunkLinks = parallel && onProgress !== undefined && !presenting();
+  let linkChunk: ProgramLike[] = [], chunkLinked = 0, chunkSize = BOOT_LINK_CHUNK;
   const chunked = new Set<ProgramLike>();
   const before = snapshotPrograms(renderer);
   const created: ProgramLike[] = [];
@@ -1471,14 +1478,15 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
       for (const program of snapshotPrograms(renderer)) {
         if (issuedPrograms.has(program) && needsPreparation(program) && !chunked.has(program)) { chunked.add(program); linkChunk.push(program); }
       }
-      if (linkChunk.length >= BOOT_LINK_CHUNK || i === jobs.length - 1 && linkChunk.length > 0) {
-        const chunk = linkChunk; linkChunk = [];
+      if (linkChunk.length >= chunkSize || i === jobs.length - 1 && linkChunk.length > 0) {
+        const chunk = linkChunk, waitStart = performance.now(); linkChunk = [];
         onProgress?.(i + 1, total(), `${materials} materials · ${i + 1} / ${jobs.length} batches · linking ${chunk.length} · ${mode}`);
         // past the bound, Phase A below and the resolve take what is left. The wait names its programs' range, so the
         // card's foot moves as each chunk lands (the bar's share for links is the tail of this step)
         await waitFor(`Link shader programs ${chunkLinked + 1}–${chunkLinked + chunk.length}`, boundedLinkWait(() => { checkCurrent(); return chunk.every(p => nativeRetired(p) || p.isReady()); },
           async () => { await pause(); checkCurrent(); }), 'shader');
         chunkLinked += chunk.length;
+        chunkSize = Math.max(2, Math.min(16, Math.ceil(chunk.length * 1.5), Math.round(chunk.length * LINK_CHUNK_TARGET_MS / Math.max(performance.now() - waitStart, 1))));
         tFrame = performance.now(); programsAtFrame = programCount(renderer); nativeInSlice = false;
       }
     }

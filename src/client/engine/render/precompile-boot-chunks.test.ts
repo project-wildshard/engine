@@ -44,12 +44,10 @@ test('DL21b: a boot warm-up links its programs in named chunks as it issues them
     // every program of a chunk reports linked before the next chunk is issued
     const at = (event: string): number => events.indexOf(event);
     for (let id = 0; id < BOOT_LINK_CHUNK; id++) expect(at(`ready ${id}`)).toBeLessThan(at(`compile ${BOOT_LINK_CHUNK}`));
-    for (let id = BOOT_LINK_CHUNK; id < 2 * BOOT_LINK_CHUNK; id++) expect(at(`ready ${id}`)).toBeLessThan(at(`compile ${2 * BOOT_LINK_CHUNK}`));
-    // the last, short chunk is waited on too
-    expect(details.filter(detail => detail.includes('linking'))).toEqual([
-      `20 materials · ${BOOT_LINK_CHUNK} / 20 batches · linking ${BOOT_LINK_CHUNK} · parallel`,
-      `20 materials · ${2 * BOOT_LINK_CHUNK} / 20 batches · linking ${BOOT_LINK_CHUNK} · parallel`,
-      `20 materials · 20 / 20 batches · linking ${20 - 2 * BOOT_LINK_CHUNK} · parallel`]);
+    // every chunk is waited on, the last too; the first is BOOT_LINK_CHUNK, later ones sized from how fast the last landed
+    const sizes = details.flatMap(detail => /linking (\d+) · parallel$/u.exec(detail)?.[1] ?? []).map(Number);
+    expect(sizes[0]).toBe(BOOT_LINK_CHUNK);
+    expect(sizes.reduce((sum, size) => sum + size, 0)).toBe(20);
   } finally {
     noteFrameDrawn(Number.NEGATIVE_INFINITY); clock.mockRestore();
     geometry.dispose(); for (const material of materials) material.dispose();

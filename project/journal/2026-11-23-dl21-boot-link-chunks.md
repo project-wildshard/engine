@@ -22,3 +22,15 @@
   the game page's paint ~40 ms after its origin.
 - Proof, all three DL21 commits, Nine packs on the Simulator at load 12 to 23: cold 12.1 s and warm 8.4 s to control,
   no card still for a second and no unnamed step (the first pair, before `fcp`, read only the 1.2 to 1.3 s swap).
+
+## Follow-ups (opus-phone1, 03:00 to 04:00 Cancún)
+
+- The isolated warm-up path under the card (a home region's) now chunks its links too; `precompile-link-count.test.ts`
+  asserted the old counted-behind-a-resolve behaviour and now asserts the chunk.
+- A fixed 8 still took 1.0 s on Sky Reach; a fixed 4 cost Pine's cold boot 2.6 s in waits. Chunks are now sized from the
+  last one (`LINK_CHUNK_TARGET_MS` 500, 2 to 16, at most 1.5x the last), first 8.
+- Signal Dunes' home tiles held the card 1.4 to 1.7 s on 'native presentation tiles' while they uploaded one a frame;
+  the boot ring pump (`stepRingsUntil`) now counts each upload on a 'Home tiles · N uploaded' wait.
+- DL24 (play's first second): Pine's 21 to 23 fps for 4 s after control is the grid outer ring's preparation (measures
+  `outer-ring.strips`/`road`, 0.5 to 4.6 s after control); no play frame over 250 ms. Its pacing is iPhone 13-tuned
+  (`outerPaced.ts`, `OUTER_RING_SLICE_MS`), left alone.
