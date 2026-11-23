@@ -22,6 +22,7 @@ function finishPrefix(roadLanded: () => Promise<void>) {
     registerBeforeReload: () => {calls.push('reload');},
     macrotask: () => Promise.resolve(),
     enterSkyClock: () => {calls.push('sky-clock');}, app: {},
+    programTwinsOn: () => false,
   });
   if (typeof method !== 'function') throw new Error('Boot finish prefix is not callable');
   const ctx = {

@@ -6,7 +6,7 @@ import {stripTypeScriptTypes} from 'node:module';
 // oxlint-disable-next-line import/no-nodejs-modules -- Run the real prefix with explicit controlled preparation ports.
 import {runInNewContext} from 'node:vm';
 
-function fixture(options: {owned?: boolean; live?: boolean; standalone?: boolean; refuseComposer?: boolean} = {}) {
+function fixture(options: {owned?: boolean; live?: boolean; standalone?: boolean; refuseComposer?: boolean; twins?: boolean} = {}) {
   const source = readFileSync(new URL('finish.ts', import.meta.url), 'utf8');
   const start = source.indexOf('export async function finishStage('), end = source.indexOf('  const programs =', start);
   if (start === -1 || end < start) throw new Error('Boot composer prefix missing');
@@ -18,6 +18,7 @@ function fixture(options: {owned?: boolean; live?: boolean; standalone?: boolean
     registerBeforeReload: () => {calls.push('reload');},
     macrotask: () => {calls.push('turn'); return Promise.resolve();},
     enterSkyClock: () => {calls.push('sky-clock');}, app: {},
+    programTwinsOn: () => options.twins === true,
   });
   if (typeof method !== 'function') throw new Error('Boot composer prefix is not callable');
   const ctx = {
@@ -49,6 +50,15 @@ test('initial owned home prepares one composer before world construction', async
 test('legacy grid entry retains late composer preparation', async () => {
   const f = fixture({owned: false}); await f.run();
   expect(f.calls).toEqual(['home', 'reload', 'road', 'turn', 'road-ready', 'prepare', 'build', 'warm-rigs', 'frame', 'layers']);
+});
+
+// DRIFTWOOD-FPS DF8 (`debug.programTwins`, on at phone Low): a grid page leaves the page's warm rigs out, since every
+// row draws in a region whose own rigs carry its look; a standalone page still stages them.
+test('program twins leave the page warm rigs out of a grid page only', async () => {
+  const grid = fixture({twins: true}); await grid.run();
+  expect(grid.calls).toEqual(['prepare', 'build', 'home', 'metadata', 'enter', 'reload', 'road', 'turn', 'road-ready', 'frame', 'layers']);
+  const alone = fixture({owned: false, live: false, standalone: true, twins: true}); await alone.run();
+  expect(alone.calls).toContain('warm-rigs');
 });
 
 test('standalone retains its sky clock before composer allocation', async () => {
