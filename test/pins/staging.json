@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "9302b438c275668f20e6a9d0823ddb7eebffc6b22591242a3271ec3f4239c0e8",
+  "catalogueHash": "3b8134cd6cc18366c110f68509a9a363fb0d4b72066b067e2cd7ee6807913086",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -604,8 +604,8 @@
       {
         "slug": "glowfen",
         "name": "Glowfen",
-        "revision": 5,
-        "hash": "a561454cf68d06d30a71368193dd448e03dd4c8b241120c7fd64b819c2ee8d2d"
+        "revision": 6,
+        "hash": "8f28181d2ee8dc9b38a9505212d2e3a0add459bd576f95ac0f057395eba45093"
       },
       {
         "slug": "mirror-salt",
@@ -622,20 +622,20 @@
       {
         "slug": "nalati-grasslands",
         "name": "Nalati Grasslands",
-        "revision": 6,
-        "hash": "4e99b83cde17151cacce01b6e8a755cc4442049ff73cabf769c21b3a6f9bbf6f"
+        "revision": 7,
+        "hash": "e99c258c2deef063e87ca720e149695b609de89814598fc139c0ca18e4de5dab"
       },
       {
         "slug": "nine-dragon-stack",
         "name": "Nine Dragon Stack",
-        "revision": 7,
-        "hash": "9cf0e39315150c415e54de4797c3d84e748be7faec86ffd79e094d34fa7bba3e"
+        "revision": 8,
+        "hash": "9e94a8012a51f1c1f3114eb80708488f8ddf3a436cef62d8b5a3b72c1d184de0"
       },
       {
         "slug": "open-plot-alien-plain",
         "name": "Open Plot · Pastel Alien Plain",
-        "revision": 2,
-        "hash": "c1ed1cacbfc41423c16b2196833d342f56906674eaf583a711a89bc26e38d392"
+        "revision": 3,
+        "hash": "dc9530e30ae211dc1319ea380b97c13ecd6b15d47697dde1ef7b8976542f0234"
       },
       {
         "slug": "open-plot-clockwork-canyon",
@@ -757,9 +757,9 @@
     },
     {
       "slug": "glowfen",
-      "revision": 5,
-      "hash": "a561454cf68d06d30a71368193dd448e03dd4c8b241120c7fd64b819c2ee8d2d",
-      "bytes": 20577792
+      "revision": 6,
+      "hash": "8f28181d2ee8dc9b38a9505212d2e3a0add459bd576f95ac0f057395eba45093",
+      "bytes": 20787200
     },
     {
       "slug": "mirror-salt",
@@ -775,21 +775,21 @@
     },
     {
       "slug": "nalati-grasslands",
-      "revision": 6,
-      "hash": "4e99b83cde17151cacce01b6e8a755cc4442049ff73cabf769c21b3a6f9bbf6f",
-      "bytes": 223361024
+      "revision": 7,
+      "hash": "e99c258c2deef063e87ca720e149695b609de89814598fc139c0ca18e4de5dab",
+      "bytes": 235185152
     },
     {
       "slug": "nine-dragon-stack",
-      "revision": 7,
-      "hash": "9cf0e39315150c415e54de4797c3d84e748be7faec86ffd79e094d34fa7bba3e",
-      "bytes": 118896640
+      "revision": 8,
+      "hash": "9e94a8012a51f1c1f3114eb80708488f8ddf3a436cef62d8b5a3b72c1d184de0",
+      "bytes": 119147008
     },
     {
       "slug": "open-plot-alien-plain",
-      "revision": 2,
-      "hash": "c1ed1cacbfc41423c16b2196833d342f56906674eaf583a711a89bc26e38d392",
-      "bytes": 8543232
+      "revision": 3,
+      "hash": "dc9530e30ae211dc1319ea380b97c13ecd6b15d47697dde1ef7b8976542f0234",
+      "bytes": 8552960
     },
     {
       "slug": "open-plot-clockwork-canyon",
