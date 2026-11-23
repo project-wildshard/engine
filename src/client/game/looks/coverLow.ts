@@ -18,8 +18,11 @@ export const COVER_KEEP_LOW_SLOT = 'debug.coverKeepLow';
 export const COVER_REACH_PHONE_LOW = 1;
 export const COVER_KEEP_PHONE_LOW = 1;
 
-const clamp = (saved: unknown, lo: number, fallback: number): number =>
-  typeof saved === 'number' && Number.isFinite(saved) ? Math.min(1, Math.max(lo, saved)) : fallback;
+const clamp = (saved: unknown, lo: number, fallback: number): number => {
+  // a number, or its text (the look loop's `--save` writes text)
+  const value = typeof saved === 'string' && saved.trim() !== '' ? Number(saved) : saved;
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(lo, value)) : fallback;
+};
 /** The factors for a saved pair: a number in range wins (clamped); unset, the phone Low defaults at phone Low, else 1. */
 export function coverLow(saved: { reach: unknown; keep: unknown }, phoneLow: boolean): { reach: number; keep: number } {
   if (!phoneLow) return { reach: 1, keep: 1 };
