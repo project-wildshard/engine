@@ -104,8 +104,10 @@ async function measure(build, hours, dispatch, extra) {
   mkdirSync(out, { recursive: true });
   const short = build.slice(0, 10);
   const logFd = openSync(join(out, 'dev.log'), 'a');
+  // DF15: a dropped player's body stands 5 minutes (cellProtocol.ts HOLD_MS), so back-to-back boots measured the dock with the
+  // last boots' bodies in view; a 1 s hold lets each cell boot alone
   const dev = spawn(process.execPath, ['scripts/dev.mjs', '--staging', '--shard', 'driftwood-isle', '--port', '0', '--saves', 'memory',
-    '--no-watch', '--work', join(out, 'world')], { cwd: root, detached: true, stdio: ['ignore', logFd, logFd], env: { ...process.env, WS_BUILD_ID: build } });
+    '--no-watch', '--work', join(out, 'world')], { cwd: root, detached: true, stdio: ['ignore', logFd, logFd], env: { ...process.env, WS_BUILD_ID: build, HOLD_MS: '1000' } });
   const stopDev = () => { try { if (dev.pid !== undefined) process.kill(-dev.pid, 'SIGTERM'); } catch { /* already gone */ } };
   exitedFlag.dev = false;
   dev.once('exit', () => { exitedFlag.dev = true; });
