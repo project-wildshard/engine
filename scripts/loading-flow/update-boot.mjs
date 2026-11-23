@@ -96,7 +96,11 @@ async function visit(name) {
   const state = await page.evaluate(`JSON.stringify({ build: globalThis.__WS_BUILD_ID__ ?? null, rows: window.__ubRows?.rows ?? [],
     book: document.documentElement.dataset.shaderSourceCache ?? null,
     homeCache: performance.getEntriesByType('measure').filter(e => /:home\\.cache\\./u.test(e.name)).map(e => [e.name.split(':').at(-1), Math.round(e.duration)]),
-    stages: (globalThis.__bootTiming?.read?.().entries ?? []).filter(e => e.end !== null && e.operation.startsWith('stage:')).map(e => [e.operation, Math.round(e.end - e.start)]) })`);
+    stages: (globalThis.__bootTiming?.read?.().entries ?? []).filter(e => e.end !== null && e.operation.startsWith('stage:')).map(e => [e.operation, Math.round(e.end - e.start)]),
+    // QA row 10: the boot's kind and steps as the session summary keeps them (the saved heartbeat, telemetry/health.ts)
+    vitals: (() => { const find = v => { if (v === null || typeof v !== 'object') return null; if (v.summary?.bootSteps) return v.summary;
+      for (const x of Object.values(v)) { const f = find(typeof x === 'string' && x.startsWith('{') ? (() => { try { return JSON.parse(x); } catch { return null; } })() : x); if (f) return f; } return null; };
+      for (const k of Object.keys(localStorage)) { try { const f = find(JSON.parse(localStorage.getItem(k))); if (f) return f; } catch {} } return null; })() })`);
   // the built-Home cache's identity row (homeBuildCache.ts): what its entries were built for
   const home = await page.evaluate(async () => (await indexedDB.databases()).some(db => db.name === 'ws-built-home-v1') ? new Promise(resolve => {
     // only an existing database: an open of a missing one would create it without its store

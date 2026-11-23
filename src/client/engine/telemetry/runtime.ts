@@ -14,7 +14,7 @@ import { pageActor } from './pageActor';
 import { SessionVitals, sessionDevice, type BootStep, type SessionSummary } from './sessionVitals';
 import { bootKind, bootStepTimes } from './bootSteps';
 import { bootTiming } from '../../../shared/engine/boot/timing';
-import { saveStorage } from '../saves/slots';
+import * as v from 'valibot';
 
 declare const __BUILD_ID__: string;
 let vitals: SessionVitals | undefined;
@@ -32,15 +32,12 @@ export function noteWorldStep(step?: BootStep): void {
 }
 export function noteWorldFrame(): void { vitals?.frame(diagnosticNow()); }
 /** QA 2026-11-23 row 10: the last build that reached control on this device, so the next boot knows it is an update. */
-const BOOTED_BUILD = 'telemetry.bootedBuild';
+const bootedBuild = saves.define({ key: 'telemetry.bootedBuild', scope: 'device', version: 1, schema: v.string(), initial: () => '' });
 function noteBootSteps(): void {
   const build = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '';
   if (vitals === undefined || build === '') return;
-  const device = saveStorage('device');
-  let previous: string | null = null;
-  try { previous = device.getItem(BOOTED_BUILD); } catch { /* private mode: read as a first boot */ }
-  vitals.booted(bootKind(previous, build), bootStepTimes(bootTiming()));
-  try { device.setItem(BOOTED_BUILD, build); } catch { /* private mode: this load only */ }
+  vitals.booted(bootKind(bootedBuild.read(), build), bootStepTimes(bootTiming()));
+  bootedBuild.write(build);
 }
 function noteWorldJoined(): void {
   if (vitals === undefined) return;
