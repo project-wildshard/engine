@@ -53,6 +53,9 @@
 .ws-ride-hold svg { width: 340px; height: 58px; overflow: visible; }
 .ws-ride-hold .ws-ride-cap { font-family: var(--ws-mono); font-size: 10px; letter-spacing: 0.34em; text-transform: uppercase; color: #fff; text-shadow: 0 0 8px rgba(0, 0, 0, 0.8); }
 .ws-ride-hold.danger .ws-ride-cap { color: #ff7a6a; }
+/* OF24y: the telegraphed buck's lean, an arrow at the arc's end the rider should lean towards */
+.ws-ride-hold .cue { fill: #ffd84a; opacity: 0; transition: opacity 60ms linear; }
+.ws-ride-hold.cue-l .cue.l, .ws-ride-hold.cue-r .cue.r { opacity: 1; }
 #hud.touch .ws-ride-hold { bottom: calc(max(15vh, 104px) + 150px); width: 300px; margin-left: -150px; }
 #hud.touch .ws-ride-hold svg { width: 300px; }
 /* a mountable horse's name tag (TULPAR ♥) */

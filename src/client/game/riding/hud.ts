@@ -21,6 +21,8 @@ export interface TamingView {
   danger: boolean;
   /** OFFER is possible (inside 12 m, alert grey) */
   offer: boolean;
+  /** OF24y: the telegraphed buck's lean, -1 left, 1 right, 0 none (absent on a view that has none) */
+  cue?: number;
 }
 
 const SVG_HORSE = '<svg viewBox="0 0 24 24"><path d="M19.5 3.2c-1.6.2-3 .9-4.1 2L8.3 8.4c-1.2.5-2.2 1.4-2.8 2.6L3.6 14.8c-.3.6-.1 1.3.5 1.6.5.2 1 .1 1.4-.3l1.9-2.2.3 5.6c0 .6.5 1 1.1 1s1-.5 1-1.1l.2-3.9h4.4l.6 4c.1.6.6 1 1.2.9.6-.1 1-.6.9-1.2l-.8-5.8c1.3-.9 2.1-2.4 2.1-4l.1-1.3 1.7-.5c.6-.2.9-.8.7-1.4l-.3-1c.6-.5.8-1.4.4-2.1z"/></svg>';
@@ -72,7 +74,7 @@ export class RideHUD {
     this.trustFill = tf;
     this.trustRow = el('ws-ride-trustrow', '<span>Trust</span><b><i></i></b>'); this.trustRowFill = this.q(this.trustRow, 'b i');
     this.ear = el('ws-ride-ear');
-    this.hold = el('ws-ride-hold', `<span class="ws-ride-round">TAMING 1/5</span><svg viewBox="0 0 340 58"><defs><linearGradient id="wsRideHoldG" x1="0" x2="1"><stop offset="0" stop-color="#ff4a3a"/><stop offset="0.22" stop-color="#ff9a3a"/><stop offset="0.36" stop-color="#43d66a"/><stop offset="0.64" stop-color="#43d66a"/><stop offset="0.78" stop-color="#ff9a3a"/><stop offset="1" stop-color="#ff4a3a"/></linearGradient></defs><path d="${arcPath(170, 250, 240, Math.PI * 1.29, Math.PI * 1.71)}" fill="none" stroke="rgba(6,10,18,0.7)" stroke-width="14" stroke-linecap="round"/><path d="${arcPath(170, 250, 240, Math.PI * 1.29, Math.PI * 1.71)}" fill="none" stroke="url(#wsRideHoldG)" stroke-width="8" stroke-linecap="round"/><g class="m"><path d="M0 -14 L0 10" stroke="#8fe3ff" stroke-width="3"/><path d="M0 -20 L9 -15 L0 -10 Z" fill="#8fe3ff"/></g></svg><span class="ws-ride-cap">Hold on</span>`);
+    this.hold = el('ws-ride-hold', `<span class="ws-ride-round">TAMING 1/5</span><svg viewBox="0 0 340 58"><defs><linearGradient id="wsRideHoldG" x1="0" x2="1"><stop offset="0" stop-color="#ff4a3a"/><stop offset="0.22" stop-color="#ff9a3a"/><stop offset="0.36" stop-color="#43d66a"/><stop offset="0.64" stop-color="#43d66a"/><stop offset="0.78" stop-color="#ff9a3a"/><stop offset="1" stop-color="#ff4a3a"/></linearGradient></defs><path d="${arcPath(170, 250, 240, Math.PI * 1.29, Math.PI * 1.71)}" fill="none" stroke="rgba(6,10,18,0.7)" stroke-width="14" stroke-linecap="round"/><path d="${arcPath(170, 250, 240, Math.PI * 1.29, Math.PI * 1.71)}" fill="none" stroke="url(#wsRideHoldG)" stroke-width="8" stroke-linecap="round"/><g class="m"><path d="M0 -14 L0 10" stroke="#8fe3ff" stroke-width="3"/><path d="M0 -20 L9 -15 L0 -10 Z" fill="#8fe3ff"/></g><path class="cue l" d="M28 30 L50 18 L50 42 Z"/><path class="cue r" d="M312 30 L290 18 L290 42 Z"/></svg><span class="ws-ride-cap">Hold on</span>`);
     this.holdRound = this.q(this.hold, '.ws-ride-round');
     const mk = this.hold.querySelector<SVGGElement>('g.m');
     if (mk === null) throw new Error('RideHUD: hold marker');
@@ -212,6 +214,8 @@ export class RideHUD {
       const x = 170 + 240 * Math.cos(ang), y = 250 + 240 * Math.sin(ang);
       this.holdMark.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${((ang - Math.PI * 1.5) * 180 / Math.PI).toFixed(1)})`);
       this.hold.classList.toggle('danger', view.danger);
+      // OF24y (J491): the buck's telegraph, the way to lean before it lands
+      const cue = view.cue ?? 0; this.hold.classList.toggle('cue-l', cue < 0); this.hold.classList.toggle('cue-r', cue > 0);
     }
     // HORSE: only once you have a horse to call (Taming marks the bonded one mem.whistle = 1), or while riding one
     const horseTab = !breaking && (mounted || m.mountables.some((mt) => mt.whistle));

@@ -12,7 +12,10 @@ export interface TamingHerd<A extends TamingHorse> {
   readonly addTrust: (value: number) => void; readonly leadAway: (x: number, z: number) => void; readonly releaseStallion: () => void;
 }
 /** The shipping taming HUD values are observations of the law, never decisions. */
-export interface TamingObservation { trust: number | null; alert: number; ear: THREE.Vector3 | null; round: number | null; balance: number; danger: boolean; offer: boolean }
+export interface TamingObservation { trust: number | null; alert: number; ear: THREE.Vector3 | null; round: number | null; balance: number; danger: boolean; offer: boolean;
+  /** ONE-FORMAT OF24y (J491): the way to lean against the buck the horse is telegraphing, -1 left, 1 right, 0 none. A shard
+   *  program that publishes no cue reads 0. */
+  cue: number }
 /** Internal native service binding; authored installs receive only profile rows. */
 export interface TamingServices<A extends TamingHorse, H extends TamingHerd<A>> {
   readonly profile: TamingBindingProfile;

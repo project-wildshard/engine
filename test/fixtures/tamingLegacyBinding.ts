@@ -16,7 +16,7 @@ export class TamingBinding<A extends TamingHorse, H extends TamingHerd<A>> {
   private readonly direction = new THREE.Vector3();
   private readonly toward = new THREE.Vector3();
   readonly interactable = { position: new THREE.Vector3(0, -1e4, 0), radius: 0, label: '', onInteract: (): void => { this.startBreaking(); } };
-  readonly view: TamingObservation = { trust: null, alert: 0, ear: null, round: null, balance: 0, danger: false, offer: false };
+  readonly view: TamingObservation = { trust: null, alert: 0, ear: null, round: null, balance: 0, danger: false, offer: false, cue: 0 };
   onBonded?: ((horse: A) => void) | undefined;
   onBreaking?: ((on: boolean) => void) | undefined;
   input: { readonly held: (action: 'ride.offer' | 'lean.right' | 'lean.left') => boolean } | null = null;

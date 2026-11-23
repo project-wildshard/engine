@@ -73,7 +73,7 @@ export function createPageTaming(ctx: LevelContext, _player: Player, _animals: R
     for (const [name, value] of wirePage.client?.owned ?? []) if (value > 0 && name.startsWith(`${RIDING_ROW}${key}:`)) return wirePage.namedBody(name.slice(RIDING_ROW.length + key.length + 1));
     return null;
   };
-  const ear = new THREE.Vector3(), view: TamingObservation = { trust: null, alert: 0, ear: null, round: null, balance: 0, danger: false, offer: false };
+  const ear = new THREE.Vector3(), view: TamingObservation = { trust: null, alert: 0, ear: null, round: null, balance: 0, danger: false, offer: false, cue: 0 };
   const start = (): void => { wirePage.client?.act({ kind: 'ride', seq: 0, action: 'mount' }); };
   const interactable = { position: new THREE.Vector3(0, -1e4, 0), radius: 0, label: profile.labels.mount, onInteract: start };
   return {
@@ -91,7 +91,7 @@ export function createPageTaming(ctx: LevelContext, _player: Player, _animals: R
       }
       mount.breaking = breaking; mount.breakShake = read('shake'); mount.breakRoll = read('roll');
       view.trust = read('trust') > 0 ? read('trust') - 1 : null; view.alert = read('alert'); view.round = read('round') || null;
-      view.balance = read('balance'); view.danger = read('danger') === 1; view.offer = read('offer') === 1;
+      view.balance = read('balance'); view.danger = read('danger') === 1; view.offer = read('offer') === 1; view.cue = Math.sign(read('cue'));
       view.ear = read('ear.on') === 1 ? ear.set(read('ear.x'), read('ear.y'), read('ear.z')) : null;
       interactable.radius = read('radius'); interactable.position.set(read('prompt.x'), read('prompt.y'), read('prompt.z'));
       interactable.label = read('beaten') === 1 ? profile.labels.breaking : profile.labels.mount;

@@ -58,7 +58,9 @@ export class TamingSession<A extends TamingHorse,H extends TamingHerd<A>> {
   private readonly lenders:readonly unknown[];private readonly ear=new THREE.Vector3();private readonly direction=new THREE.Vector3();private readonly toward=new THREE.Vector3();
   private readonly visual={trust:-1,alert:0,ear:0,earOffset:0,round:-1,balance:0,danger:0,offer:0,radius:0,beaten:0,roll:0,shake:0};
   readonly interactable: { position: THREE.Vector3; radius: number; label: string; onInteract: () => void; }={position:new THREE.Vector3(0,-1e4,0),radius:0,label:'',onInteract:():void=>{this.startBreaking();}};
-  readonly view:TamingObservation={trust:null,alert:0,ear:null,round:null,balance:0,danger:false,offer:false};
+  readonly view:TamingObservation={trust:null,alert:0,ear:null,round:null,balance:0,danger:false,offer:false,cue:0};
+  /** OF24y: the telegraphed buck's lean, an output only (never saved): a program that publishes none reads 0. */
+  private cue=0;
   onBonded?:((horse:A)=>void)|undefined;onBreaking?:((on:boolean)=>void)|undefined;
   input:{readonly held:(action:'ride.offer'|'lean.right'|'lean.left')=>boolean}|null=null;
   get companion():A|null{return this.bonded===null?null:this.actors.get(this.bonded)??null;}
@@ -136,6 +138,7 @@ export class TamingSession<A extends TamingHorse,H extends TamingHerd<A>> {
       const actor=(key:string):string|null=>{const index=number(key);if(!Number.isInteger(index)||index<0||index>actors.length)throw new Error('Invalid taming actor output');return index===0?null:actors[index-1]?.entityId??null;};
       const next=this.admit({version:3,phase:['wild','breaking','bonded'][number('phase')],bonded:actor('bonded'),upgraded:bit('upgraded')===1,herd:number('herd')===-1?null:number('herd'),stallion:actor('stallion'),drove:DROVE_OUT.map(key=>number(key)).filter(i=>i!==-1),state:Object.fromEntries(Object.keys(this.state).map(key=>[key,named(prefixed('zz_s_',key))])),clock:number('clock'),prev:bit('previous')===0?null:[number('prevX'),number('prevY'),number('prevZ')]},actors.map(a=>a.entityId),8,this.opts.mount.horse?.entityId??null,false);
       const visual=Object.fromEntries(Object.keys(this.visual).map(key=>[key,named(prefixed('zz_v_',key))]));
+      const cue=result[prefixed('zz_v_','cue')];this.cue=cue!==undefined&&Number.isFinite(cue)?Math.sign(cue):0;
       for(const key of ['ear','danger','offer','beaten'])if(visual[key]!==0&&visual[key]!==1)throw new Error('Invalid taming visual flag');
       const herds=prepared.actions.some(a=>a.target.startsWith('herd:'))?this.opts.herds():[];if(observed.herds.length>0&&herds.some((herd,index)=>herd!==observed.herds[index]))throw new Error('Changed taming herd owner');
       const identity={binding:'taming',scope:this.scope},loans:V2WorldActionLoan<A,H>[]=[{...identity,target:'service',kind:'taming',owner:this.opts,services:this.opts,presentation:this},{...identity,target:'mount',kind:'mount',owner:this.opts.mount},...herds.map((h,i):V2WorldActionLoan<A,H>=>({binding:'taming',scope:this.scope,target:`herd:${String(i)}`,kind:'taming-herd',owner:h})),...actors.map((a):V2WorldActionLoan<A,H>=>({binding:'taming',scope:this.scope,target:a.entityId,kind:'taming-actor',owner:a,services:this.opts,presentation:this}))];
@@ -147,7 +150,7 @@ export class TamingSession<A extends TamingHorse,H extends TamingHerd<A>> {
     throw new Error('Taming same-call barrier capacity');
   }
   private present():void{const a=this.promptHorse,s=this.visual,m=this.opts.mount;this.interactable.radius=s.radius;this.interactable.label=s.beaten===1?this.opts.profile.labels.breaking:this.opts.profile.labels.mount;if(a!==null)this.interactable.position.copy(a.position);
-    if(s.ear===1&&a!==null){a.headWorld(this.ear);this.ear.y+=s.earOffset;}Object.assign(this.view,{trust:s.trust<0?null:s.trust,alert:s.alert,round:s.round<0?null:s.round,balance:s.balance,danger:s.danger===1,offer:s.offer===1,ear:s.ear===1?this.ear:null});m.breakRoll=s.roll;m.breakShake=s.shake;}
+    if(s.ear===1&&a!==null){a.headWorld(this.ear);this.ear.y+=s.earOffset;}Object.assign(this.view,{trust:s.trust<0?null:s.trust,alert:s.alert,round:s.round<0?null:s.round,balance:s.balance,danger:s.danger===1,offer:s.offer===1,cue:this.cue,ear:s.ear===1?this.ear:null});m.breakRoll=s.roll;m.breakShake=s.shake;}
   update(dt:number):void{if(!Number.isFinite(dt)||dt<0)throw new Error('Invalid taming elapsed time');this.run('zz_probe',{zz_dt:dt});}
   noteEvent(name:string,x:number,z:number):void{if(name==='pack-driven-off'||name==='pack-break')this.run('zz_event',{zz_eventX:x,zz_eventZ:z,zz_shot:0},1);}
   noteShot(x:number,z:number):void{this.run('zz_event',{zz_eventX:x,zz_eventZ:z,zz_shot:1},1);}
