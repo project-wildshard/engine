@@ -15,6 +15,7 @@ import {dirname, join} from 'node:path';
 import {assetIdentities, identityFiles, resolveFenceReads, sectionRefs} from './fenceReads';
 import {COOK_DATA_PATH, readCookData, type CookData, type CookMount} from '@wildshard/format/cookData';
 import {requireCookPreparation} from '@wildshard/format/cookPreparation';
+import {cookPreparedLine, judgeSidecar, sidecarRefusedLine, type CookSidecar} from './cookSidecar';
 import {rendererRevision} from '../../../scripts/renderer-revision.mjs';
 import {assembleOutputShardfile, parseOutputIndex, type OutputIndex} from '@wildshard/format/outputIndex';
 import {SPAWN_PART_ALIGN, readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnPart} from '../../shared/game/shardfile/spawnManifest';
@@ -49,8 +50,8 @@ const CONTENT_NAMED = /\/[a-f0-9]{64}\.[a-z0-9]+$/u;
  *  hitches after control, never a wrong frame, and nobody re-uploads. `none`: no author preparation (no preparation spec),
  *  or a capture-only open. SHARD-COMPAT PR4 (J487): preparation spec 4 names no renderer, so any engine that reads the spec
  *  takes it as `current`; only spec 3 still compares the renderer fingerprint. A cook preparation made for this renderer
- *  (SP1b) is not built yet. */
-export type PreparationState = 'current' | 'stale' | 'none';
+ *  (SP1b2): `cook`, the author's was stale and a cook preparation sidecar recorded on this renderer stood in for it. */
+export type PreparationState = 'current' | 'stale' | 'cook' | 'none';
 /** The line every entry point prints for a cook that took the stale path, so `grep 'stale preparation'` finds them all. */
 export const stalePreparationLine = (slug: string): string => `stale preparation: ${slug}`;
 
@@ -79,8 +80,8 @@ function parsedCook(bytes: Uint8Array, slug: string): CookData {
   try { return readCookData(JSON.parse(new TextDecoder().decode(bytes))); }
   catch (cause) { throw new Error(`Invalid cook preparation for ${slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`, {cause}); }
 }
-export function openShardfile(tarball: Uint8Array, options: Readonly<{preparationOnly?: boolean; renderer?: string}> = {}): OpenShardfile {
-  const files = readTar(tarball);
+export function openShardfile(tarball: Uint8Array, options: Readonly<{preparationOnly?: boolean; renderer?: string; sidecar?: CookSidecar; warn?: (line: string) => void}> = {}): OpenShardfile {
+  const files = new Map(readTar(tarball));
   const read = (path: string): Uint8Array => { const bytes = files.get(path); if (bytes === undefined) throw new Error(`No ${path} in the shardfile`); return bytes; };
   const header = read('shard.json'), raw: unknown = JSON.parse(new TextDecoder().decode(header)), index = parseOutputIndex(raw);
   const sections = new Map<string, unknown>();
@@ -94,7 +95,7 @@ export function openShardfile(tarball: Uint8Array, options: Readonly<{preparatio
   if (cookBytes !== undefined && (cookBytes.length !== index.cook?.bytes || sha256(cookBytes) !== index.cook.hash)) {
     throw new Error(`Stale cook preparation bytes for ${index.identity.slug}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
   }
-  const cook = cookBytes === undefined ? undefined : parsedCook(cookBytes, index.identity.slug);
+  let cook = cookBytes === undefined ? undefined : parsedCook(cookBytes, index.identity.slug);
   for (const mount of cook?.mounts ?? []) {
     const bytes = files.get(mount.path);
     if (bytes === undefined || bytes.length !== mount.bytes || sha256(bytes) !== mount.hash) throw new Error(`Stale cook preparation mount ${mount.url}: run wildshard prepare <product-dir> --base <exact-preview-url>`);
@@ -106,6 +107,13 @@ export function openShardfile(tarball: Uint8Array, options: Readonly<{preparatio
     // J262: a renderer move no longer refuses. The cook goes by the author's lists and says so (SP1a).
     if (cook?.version === 3) preparation = cook.renderer === (options.renderer ?? engineRenderer()) ? 'current' : 'stale';
     if (cook?.version === 4) preparation = 'current';
+    if (preparation === 'stale' && cook !== undefined && options.sidecar !== undefined) {
+      const outcome = judgeSidecar(options.sidecar, cook, options.renderer ?? engineRenderer(), {index, read: path => files.get(path), hash: sha256});
+      if (outcome.kind === 'hit') {
+        for (const [path, bytes] of outcome.mounts) files.set(path, bytes);
+        cook = outcome.cook; preparation = 'cook';
+      } else options.warn?.(sidecarRefusedLine(index.identity.slug, outcome));
+    }
   }
   return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header, read, preparationOnly: options.preparationOnly === true, preparation};
 }
@@ -393,6 +401,8 @@ export interface CookShardOptions {
   readonly renderer?: string;
   /** S12b: per-tier texture files; `defaultCookTiers()` (the phone tier, 6×6) unless a cook names its own. `{}` turns them off. */
   readonly tiers?: CookTiers;
+  /** SP1b2: a cook preparation recorded on this renderer, taken in place of a stale author preparation. */
+  readonly sidecar?: CookSidecar;
 }
 
 /** `cook <shardfile> → <packs>`: the shard's half of every manifest, its parts, and its loose mounts at their URLs. */
@@ -405,8 +415,10 @@ export async function cookShard(tarball: Uint8Array, out: string, options: CookS
 
 async function cookWith(tarball: Uint8Array, out: string, options: CookShardOptions, encoder: PartEncoder): Promise<CookReport> {
   options.onPhase?.('textures');
-  const started = options.now(), shard = openShardfile(tarball, options.renderer === undefined ? {} : {renderer: options.renderer});
+  const opened = {...(options.renderer === undefined ? {} : {renderer: options.renderer}), ...(options.sidecar === undefined ? {} : {sidecar: options.sidecar}), ...(options.warn === undefined ? {} : {warn: options.warn})};
+  const started = options.now(), shard = openShardfile(tarball, opened);
   if (shard.preparation === 'stale') options.warn?.(stalePreparationLine(shard.slug));
+  if (shard.preparation === 'cook') options.warn?.(cookPreparedLine(shard.slug));
   const half = await preparedShardHalf(shard, options.wireBytes, options.warn, shard.slug, options.tiers ?? await defaultCookTiers());
   options.onPhase?.('client-packs');
   const before = encoder.stats();
