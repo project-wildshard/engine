@@ -36,7 +36,7 @@ function world(options: {drop?: {hash: string; size: 'full' | 'cell'}; unserved?
     throw new Error(`unexpected ${url}`);
   }) as typeof fetch;
 }
-const audit = (fetch: typeof fetch) => auditCookedMaps({fetch, origins, packs: PACKS, api: API, now: () => 0});
+const audit = (read: typeof fetch): ReturnType<typeof auditCookedMaps> => auditCookedMaps({fetch: read, origins, packs: PACKS, api: API, now: () => 0});
 
 test('every cooked head with both keys served is mapped; a catalogue head no page of the build reads is only noted', async () => {
   const rows = await audit(world());
