@@ -85,6 +85,11 @@ export interface CookIndex {
   /** SA48: the page's admission row for these bytes (`folderVerdict`'s, but for its path), under the validator revision the worker
    *  cooks with (`CookWorkerOptions.validator`). A page whose validator differs, or an index with none, leaves the shard out. */
   readonly verdict?: NonNullable<CookJobReport['receipt']> & {readonly revision: string};
+  /** SHARD-COMPAT SP7: the cook revision (`scripts/cook-revision.ts`) whose code made these bytes, then `+` and the validator
+   *  revision when the worker had one (`carryKey`). An index with none never carries to another build. */
+  readonly cook?: string;
+  /** SP7: the build this index was carried from, unchanged but for `build`; absent on an index this build cooked. */
+  readonly carried?: string;
 }
 
 /** SA47: a box reads the same key (`serverFolder.ts`), so it lives with the server pack's paths. */
@@ -334,6 +339,10 @@ export interface CookWorkerOptions {
   /** SA48: this engine's shardfile validator revision (`shardfileValidationRevision`), the one each job validates with; with it an
    *  index carries the page's admission row (`CookIndex.verdict`). */
   readonly validator?: string;
+  /** SHARD-COMPAT SP7 (the recook rule): this build's cook revision. With it, a head another build cooked under the same
+   *  revision (and validator) is carried: its index is copied under this build, with no download and no job. A moved
+   *  revision recooks every head. Without it every head cooks, as before. */
+  readonly cook?: string;
 }
 export interface CookRow {
   readonly slug: string; readonly hash: string; readonly state: 'cooked' | 'present' | 'refused' | 'failed'; readonly detail?: string; readonly seconds?: number; readonly peakMB?: number;
@@ -365,6 +374,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const {build, store, source, launcher, serverPacks, scratch} = options, budget = options.budgetBytes ?? PACK_BUDGET_BYTES;
   const log = options.log ?? ((): void => undefined), clock = options.now ?? Date.now;
   if (!/^[\w.-]{1,64}$/u.test(build)) throw new Error('A build id names a store folder');
+  // SP7: an index carries only between builds of the same cook revision and the same validator (its verdict's revision).
+  const carryKey = options.cook === undefined ? undefined : `${options.cook}${options.validator === undefined ? '' : `+${options.validator}`}`;
   /** One verdict per hash for this process: hostile bytes get one child, however many notices name them. */
   const verdicts = new Map<string, CookRow>();
   /** SP6: how often each upload has failed in a row, and when it last did. */
@@ -414,7 +425,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
     const index: CookIndex = {version: 1, build, slug: report.slug, hash, header: report.header, manifests: report.cook.manifests, keys: [...shared, ...loose.map(key => folder + key)], loose: folder, server: report.server, serverPack: report.cook.server, proof: indexProof(report.proof), check: report.check, seconds: report.seconds,
       ...(report.cook.preparation === undefined ? {} : {preparation: report.cook.preparation}),
-      ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}})};
+      ...(report.receipt === undefined || options.validator === undefined ? {} : {verdict: {...report.receipt, revision: options.validator}}),
+      ...(carryKey === undefined ? {} : {cook: carryKey})};
     await put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
   };
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
@@ -432,6 +444,40 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const {preparation} = outcome.report.cook;
     return {...head, state: 'cooked', check: outcome.report.check, seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};
   };
+  // SP7: which builds hold an index for each hash, from one `index/` listing kept LISTING_MAX_AGE_MS (a recook asks once per head).
+  let donorListing: {readonly byHash: ReadonlyMap<string, readonly string[]>; readonly at: number} | undefined;
+  const donorsOf = async (hash: string): Promise<readonly string[]> => {
+    if (donorListing === undefined || clock() - donorListing.at >= LISTING_MAX_AGE_MS) {
+      const byHash = new Map<string, string[]>();
+      for (const row of await store.list('index/')) {
+        const match = /^index\/([\w.-]{1,64})\/([a-f0-9]{64})\.json$/u.exec(row.key);
+        if (match?.[1] === undefined || match[2] === undefined || match[1] === build) continue;
+        byHash.set(match[2], [...byHash.get(match[2]) ?? [], match[1]]);
+      }
+      donorListing = {byHash, at: clock()};
+    }
+    return donorListing.byHash.get(hash) ?? [];
+  };
+  /** SP7, the recook rule: a build whose cook revision is unchanged copies another build's index for the same bytes, so a
+   *  docs-only release cooks nothing. Same cook revision, same validator, a passing check, the same slug and the room's
+   *  folder on this host; anything else, or a store that can't list, cooks. */
+  const carry = async (head: {readonly slug: string; readonly hash: string}): Promise<CookRow | undefined> => {
+    if (carryKey === undefined) return undefined;
+    let donors: readonly string[];
+    try { donors = await donorsOf(head.hash); } catch { return undefined; }
+    for (const donor of donors) {
+      const body = await store.get(indexKey(donor, head.hash));
+      if (body === undefined) continue;
+      const index = JSON.parse(new TextDecoder().decode(body)) as CookIndex;
+      if (index.cook !== carryKey || index.check?.pass !== true || index.hash !== head.hash || !new Set([shardSlugOf(head.slug)]).has(index.slug)) continue;
+      if (!existsSync(join(serverPacks, index.slug, head.hash))) continue;
+      if (index.loose !== undefined && !await store.has(index.loose + index.header)) continue;
+      const {carried: _from, ...own} = index, copy: CookIndex = {...own, build, carried: donor};
+      await put(indexKey(build, head.hash), new TextEncoder().encode(JSON.stringify(copy)), {type: 'application/json', cache: 'public, max-age=300'});
+      return {...head, state: 'present', detail: `carried from ${donor}`, check: index.check};
+    }
+    return undefined;
+  };
   const cookOnce = async (head: {readonly slug: string; readonly hash: string}): Promise<CookRow> => {
     const known = verdicts.get(head.hash);
     if (known?.state === 'refused' && new Set([head.slug]).has(known.slug)) return known;
@@ -440,6 +486,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       const index = JSON.parse(new TextDecoder().decode(held)) as CookIndex;
       if (index.check?.pass && index.hash === head.hash && new Set([shardSlugOf(head.slug)]).has(index.slug)) return {...head, state: 'present', check: index.check};
     }
+    const carried = await carry(head);
+    if (carried !== undefined) return carried;
     mkdirSync(scratch, {recursive: true});
     const work = mkdtempSync(join(scratch, 'job-'));
     try { return await attempt(head, await source.download(head.hash), work); }
@@ -530,6 +578,15 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       return Promise.all(fresh.map(head => schedule(head, true)));
     },
   };
+}
+
+/** SHARD-COMPAT SP7 (J29): a build takes no traffic with a live shard it has no index for. The refusal names each one, with
+ *  why, so a promotion stops by name; `undefined` when every live head is cooked or present. */
+export function uncookedLiveRefusal(build: string, rows: readonly CookRow[]): string | undefined {
+  const missing = rows.filter(row => row.state !== 'cooked' && row.state !== 'present');
+  if (missing.length === 0) return undefined;
+  const named = missing.map(row => `${row.slug} (${row.state}${row.detail === undefined ? '' : `: ${row.detail}`})`).join(', ');
+  return `Promotion refused: build ${build} has no cook index for live shard${missing.length === 1 ? '' : 's'} ${named}`;
 }
 
 /** SP6: between sweeps, inside J175's 30 to 60 s. */

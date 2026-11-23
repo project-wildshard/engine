@@ -18,7 +18,7 @@ import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, pollCatalogue, PACK_BUDGET_BYTES, POLL_EVERY_MS, storeUsage } = await import('../src/cook/game/cookWorker.ts');
+const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, pollCatalogue, PACK_BUDGET_BYTES, POLL_EVERY_MS, storeUsage, uncookedLiveRefusal } = await import('../src/cook/game/cookWorker.ts');
 const {activationDelivery, gameActivationClient, cookApi, pendingSource, uploadDelivery, VerdictOutbox} = await import('../src/cook/game/uploadTransport.ts');
 const { MAX_SHARDFILE_BYTES } = await import('../src/cook/game/cookJob.ts');
 const { addStoredShards } = await import('./app-build/catalogue.ts');
@@ -41,6 +41,10 @@ const maxBytes = Number(env.COOK_MAX_SHARDFILE_BYTES ?? MAX_SHARDFILE_BYTES);
 const renderer = (() => { try { return rendererRevision(root); } catch { return undefined; } })();
 /** SA48: the validator each job validates with; an index stamped with it lets a page of the same validator admit the shard. */
 const validator = (() => { try { return shardfileValidationRevision(root); } catch { return undefined; } })();
+/** SHARD-COMPAT SP7, the recook rule: a build whose cook revision is unchanged carries another build's index for the same
+ *  bytes instead of cooking them again. A host that can't compute it cooks every head, as before. */
+const cookRevisionId = await (async () => { try { return (await import('./cook-revision.ts')).cookRevision(root).revision; } catch { return undefined; } })();
+if (cookRevisionId === undefined) console.warn('cook-worker: no cook revision, so every head cooks again for this build (SP7)');
 if (validator === undefined) console.warn('cook-worker: no shardfile validator revision, so no index carries a verdict and no page enters a placed slug from it (SA48)');
 const uploadApi = env.COOK_SIGNING_KEY === undefined || env.COOK_SIGNING_KEY === '' ? undefined : cookApi(need('WILDSHARD_API_URL'), env.COOK_SIGNING_KEY, fetch, Date.now, maxBytes);
 const publicSource = apiSource(env.WILDSHARD_API_URL ?? 'https://api.wildshard.io', fetch, maxBytes);
@@ -50,7 +54,7 @@ const [command, ...rest] = process.argv.slice(2);
 const worker = () => createCookWorker({
   build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); },
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch: resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch'),
-  ...(validator === undefined ? {} : { validator }),
+  ...(validator === undefined ? {} : { validator }), ...(cookRevisionId === undefined ? {} : { cook: cookRevisionId }),
   launcher: {
     root, execPath: process.execPath, loader: fileURLToPath(new URL('bake-loader.mjs', import.meta.url)), script: fileURLToPath(new URL('cook-job.mjs', import.meta.url)),
     wrap: JSON.parse(env.COOK_JOB_WRAP ?? '[]'), ...(renderer === undefined ? {} : { renderer }),
@@ -89,7 +93,10 @@ if (command === 'serve') {
   console.log(JSON.stringify([...rows, ...preview]));
   // J29: a build takes no traffic with a live shard it couldn't cook. A refused head is already live, so it stops a deploy
   // too. A preview or staging head's verdict is the author's and stops nothing (MS2.4: staging is where a new author uploads).
-  process.exit(rows.every(row => row.state === 'cooked' || row.state === 'present') ? 0 : 1);
+  // SP7: the refusal names every live shard this build has no index for, so the deploy log says which to fix.
+  const refusal = uncookedLiveRefusal(need('WILDSHARD_BUILD'), rows);
+  if (refusal !== undefined) console.error(refusal);
+  process.exit(refusal === undefined ? 0 : 1);
 } else if (command === 'bake') {
   // A deploy's step after `recook`: a page reads each head's packs from the store (J138), with no client rebuild.
   const [dist, origin] = rest, api = need('WILDSHARD_API_URL'), source = apiSource(api, fetch, maxBytes);
