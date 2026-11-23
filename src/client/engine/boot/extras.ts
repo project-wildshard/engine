@@ -205,11 +205,14 @@ const downloaded = new Set<string>();
 /** A decoder that runs one file at a time. decodeStyle and decodeSfxSet both start every file at once; gating their
  *  decoder, not their reads, means WebKit never holds dozens of simultaneous native PCM outputs (E246 memory A/B). */
 function serialDecoder(decoded?: (bytes: ArrayBuffer) => void): AudioDecode {
-  let tail: Promise<void> = Promise.resolve();
+  let tail: Promise<void> = Promise.resolve(), clips = 0;
   return (bytes, purpose) => {
+    // DL21c: each clip's wait carries its number, so the foot moves clip by clip (one label for all held Nine Dragon's
+    // card 1.2 s at 'Audio · music + sound effects' on the Simulator, 11-23)
+    const clip = ++clips;
     const next = tail.then(async () => {
       await macrotask();
-      const buffer = await waitFor('Decode selected audio clip', decodeBytes(bytes, purpose));
+      const buffer = await waitFor(`Decode selected audio clip ${clip}`, decodeBytes(bytes, purpose));
       decoded?.(bytes);
       return buffer;
     });
