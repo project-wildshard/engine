@@ -25,3 +25,7 @@ first. Freeing things on teardown (Rapier from bytes) did not help.
   no worker): the warm game reuses the cold game's pid after a swap out
   to robots.txt (the visible pid goes cold -> robots -> cold), and 3 of
   3 warm returns held control with no WebContent jetsam.
+- `scripts/memory/iphone/warm-return.mjs`: the warm-return proof as one
+  queued command (cold, then `hop` via robots.txt or `direct`, a 40 s
+  hold, jetsam reports and RunningBoard's visible pid per round), for
+  DW11's staging run.
