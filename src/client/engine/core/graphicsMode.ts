@@ -52,19 +52,27 @@ export function noteFastFrames(): void {
 }
 /** MG3: whether Low Power Mode looks on (the idle title read rAF capped near 30 Hz this tab, and nothing faster since) */
 export function lowPowerOn(): boolean { return lowPowerReading()?.verdict === 'likely' && (outrun === null || outrun !== titleReading()); }
+/** QA 2026-11-23-b row 8 (Jake on his iPhone 17 Pro, staging v0.1.74: *"Graphics feel pretty bad and pixelated on driftwood"*; the
+ *  card read "low power likely"): the guess no longer holds a phone on Low. MG3's hold ran Low (1 drawing pixel per CSS pixel and
+ *  every DRIFTWOOD-FPS phone Low cut) on a rAF cadence read off the title, a guess a busy title or a flagship can trip. Low is
+ *  now only a pick (Settings, or a bench's saved `graphics`); the reading stays diagnostics (the loading card, Copy
+ *  diagnostics). A Low that Low Power Mode forces comes back only behind a measured frame-rate need of the play itself. */
+const GUESS_HOLDS_LOW = false;
+/** Whether the Low Power reading holds this phone on Low and refuses High: never while `GUESS_HOLDS_LOW` is off. */
+export function lowPowerHolds(): boolean { return GUESS_HOLDS_LOW && lowPowerOn(); }
 /** Tests only. */
 export function resetFastFrames(): void { outrun = null; }
 
-/** Save a pick and tell the page. High under Low Power Mode is refused (false); the saved pick stays as it was. */
+/** Save a pick and tell the page. High is refused (false) only while the Low Power reading holds Low; the saved pick stays as it was. */
 export function saveGraphicsMode(mode: GraphicsMode): boolean {
-  if (mode === 'high' && lowPowerOn()) return false;
+  if (mode === 'high' && lowPowerHolds()) return false;
   try { slot.write(mode); } catch { /* storage blocked: this page only */ }
   if (typeof document !== 'undefined') document.dispatchEvent(new CustomEvent(PIXELS_EVENT));
   return true;
 }
 
-/** The mode in force on a phone: Low while Low Power Mode looks on, else the saved pick. */
-export function graphicsMode(): GraphicsMode { return lowPowerOn() ? 'low' : savedGraphicsMode(); }
+/** The mode in force on a phone: the saved pick (Low while the Low Power reading holds it, which it no longer does: row 8). */
+export function graphicsMode(): GraphicsMode { return lowPowerHolds() ? 'low' : savedGraphicsMode(); }
 
 export const FAR_BATCH_SLOT = 'debug.farBatch';
 const farBatchSlot = jsonSlot(FAR_BATCH_SLOT, 'device');

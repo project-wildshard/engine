@@ -15,7 +15,7 @@
 import { titleAssetURL } from './titleAssets';
 import { mobileDevice } from '@wildshard/engine/boot/titleArrival';
 import { dropFirstPlay, firstPlayDone, startFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
-import { lowPowerOn } from '@wildshard/engine/core/graphicsMode';
+import { lowPowerHolds } from '@wildshard/engine/core/graphicsMode';
 import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
 import { openSignIn, saveFile, takeLinkOutcome, titleLogin, titleSignedIn, type AccountPorts } from '@wildshard/engine/ui/signInCard';
 import { engineString } from '@wildshard/engine/strings';
@@ -196,7 +196,7 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
   if (phone) {
     const power = document.createElement('div');
     power.className = 'ws-main-notice ws-main-power'; power.setAttribute('role', 'status'); power.textContent = LOW_POWER_BANNER;
-    const paint = (): void => { power.hidden = !lowPowerOn(); };
+    const paint = (): void => { power.hidden = !lowPowerHolds(); };
     paint(); owner.interval(1000, paint);
     required(main, '.ws-main-head', HTMLElement).append(power);
   }

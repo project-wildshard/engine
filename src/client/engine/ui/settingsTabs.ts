@@ -3,7 +3,7 @@ import type { Scope } from '../../../shared/engine/app/scope';
 import { engineString, type EngineStringKey } from '../../../shared/engine/strings';
 import { isDev, onDev } from '../core/devMode';
 import { TIER, automaticTier, gfxPrefs, saveGfxPrefs } from '../core/tier';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, saveGraphicsMode, PIXELS_EVENT } from '../core/graphicsMode';
+import { graphicsMode, lowPowerHolds, lowPowerRefusal, saveGraphicsMode, PIXELS_EVENT } from '../core/graphicsMode';
 import { firstPlayDone, resetFirstPlay } from '../boot/firstPlayMark';
 import { pendingReload, saveSetting, savedSetting } from './Settings';
 import { reloadWithPicks } from './ReloadPrompt';
@@ -204,7 +204,7 @@ function builtinGraphics(scope: Scope, applyPending: () => void): { controls: Gr
         cards.append(card);
       }
       paints.push(() => {
-        const now = graphicsMode(), locked = lowPowerOn();
+        const now = graphicsMode(), locked = lowPowerHolds();
         for (const card of cards.children) {
           const mode = (card as HTMLElement).dataset['mode'], on = mode === now;
           card.classList.toggle('active', on); card.setAttribute('aria-pressed', String(on)); card.classList.toggle('locked', locked && mode === 'high');

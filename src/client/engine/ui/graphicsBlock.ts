@@ -3,7 +3,7 @@ import { engineString, type EngineStringKey } from '../../../shared/engine/strin
 import { listenTap } from '../input/dom';
 import { TIER, TIER_CONFIG, automaticTier, gfxPrefs, saveGfxPrefs } from '../core/tier';
 import { drawingBuffer, drawingPixelRatio } from '../core/devPixels';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode } from '../core/graphicsMode';
+import { graphicsMode, lowPowerHolds, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode } from '../core/graphicsMode';
 import { saveDesktopMedium, savedDesktopMedium, type DesktopPreset } from '../core/desktopPreset';
 import {
   applyPreset, DENSITIES, densityIn, flagOn, frameReadout, presetLabel, saveDensity, saveFlag, saveWorldToggle, shippedLook, worldToggleOn,
@@ -70,7 +70,7 @@ export function graphicsRow(id: RowId, scope: Scope): Row {
         cards.append(card);
       }
       paints.push(() => {
-        const now = presetLabel(), locked = lowPowerOn();
+        const now = presetLabel(), locked = lowPowerHolds();
         for (const card of cards.children) {
           const mode = (card as HTMLElement).dataset['mode'], on = mode === now;
           card.classList.toggle('active', on); card.setAttribute('aria-pressed', String(on)); card.classList.toggle('locked', locked && mode === 'high');
@@ -83,7 +83,7 @@ export function graphicsRow(id: RowId, scope: Scope): Row {
       root.append(seg(s('s_gfx_mode'), [{ v: 'low', text: s('s_gfx_low_start') }, { v: 'high', text: s('s_gfx_high_start') }, { v: 'custom', text: s('s_st_custom'), indicator: true }],
         () => presetLabel(), (v) => { if (v === 'low' || v === 'high') press(v); }), refusal, el('ws-gmenu-note', s('s_gfx_block_note')));
     }
-    paints.push(() => { if (!lowPowerOn()) refused = false; refusal.textContent = lowPowerRefusal(); refusal.hidden = !refused && !lowPowerOn(); });
+    paints.push(() => { if (!lowPowerHolds()) refused = false; refusal.textContent = lowPowerRefusal(); refusal.hidden = !refused && !lowPowerHolds(); });
   } else if (id === 'drawing') {
     // J458: the pixel count is a developer row (DEV ▸ Graphics); Pixel density itself stays in Graphics
     root = el('ws-gmenu-note');

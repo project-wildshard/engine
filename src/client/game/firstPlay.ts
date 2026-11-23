@@ -2,7 +2,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { listenTap } from '@wildshard/engine/input/dom';
 import { mountUi } from '@wildshard/engine/ui/ownership';
 import { FIRST_PLAY_EVENT, finishFirstPlay, firstPlayCardShown, firstPlayPending, takeFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
-import { lowPowerOn, lowPowerRefusal, PIXELS_EVENT, type GraphicsMode } from '@wildshard/engine/core/graphicsMode';
+import { lowPowerHolds, lowPowerRefusal, PIXELS_EVENT, type GraphicsMode } from '@wildshard/engine/core/graphicsMode';
 import { applyPreset, modeLine, presetLabel, PROTO_EVENT, worldToggleOn } from '@wildshard/engine/core/graphicsQuality';
 import './firstPlay.css';
 
@@ -69,11 +69,11 @@ export function showToggle(parent: Scope, root: HTMLElement, closed: () => void 
   const finish = el('button', 'ws-firstplay-vdone', COPY.done) as HTMLButtonElement; finish.type = 'button';
   let refused = false;
   const paint = (): void => {
-    if (!lowPowerOn()) refused = false;
+    if (!lowPowerHolds()) refused = false;
     const mode = presetLabel();
     for (const [key, b] of buttons) b.setAttribute('aria-pressed', String(key === mode));
-    line.textContent = refused || lowPowerOn() ? lowPowerRefusal() : mode === 'custom' ? COPY.custom : modeLine(mode);
-    line.dataset['tone'] = refused ? 'refused' : lowPowerOn() ? 'on' : 'off';
+    line.textContent = refused || lowPowerHolds() ? lowPowerRefusal() : mode === 'custom' ? COPY.custom : modeLine(mode);
+    line.dataset['tone'] = refused ? 'refused' : lowPowerHolds() ? 'on' : 'off';
     box.dataset['mode'] = mode;
   };
   // faint at rest; a touch brings it up to the peak at once, and it fades back over FADE_MS
