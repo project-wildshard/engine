@@ -11,8 +11,8 @@ import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { FIXED_STEP } from '../src/shared/engine/core/fixedStep';
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
-import { ClientPopulationSchema } from '@wildshard/format/clientNative';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
+import { HOMES_SYSTEM } from '../src/client/game/shardfile/clientPlan';
 import { pagePopulationRows } from '../src/shared/game/population/pageRows';
 import { bindPageHomes } from '../src/shared/game/population/pageHomes';
 import { installPageReturns } from '../src/client/game/population/pageReturns';
@@ -105,12 +105,9 @@ test('Sunscar spawns, moves, kills and refills its creatures headless, and its c
 
 test('the browser page population is the server\'s: a herdless page holds no home body and never listens for a death', async () => {
   // SR12: the page's RowBodies is herdless, so its homes spawn nothing and match no death.
-  // The legacy keeper still owns those homes when a product declares them.
-  const fixture = await dunesKeeper(), { product } = fixture;
+  // The legacy keeper fixture owns these homes, even when the shipped product uses declared spawns.
+  const fixture = await dunesKeeper();
   const declared = pagePopulationRows(fixture.plan);
-  const feature = product.section('client/plan').features.find(row => row.kind === 'population.homes');
-  if (feature === undefined) throw new Error('Sunscar declares its page population');
-  const row = parse(ClientPopulationSchema, feature);
   const subscribed: string[] = [], systems: Parameters<ShardContext['system']>[0][] = [], spawned: string[] = [], prepared: string[] = [];
   // The page's own manager, RowBodies: its draw reduced to the factory a herdless page prepares models through.
   const rowBodies = new RowBodies(legacyDouble<ConstructorParameters<typeof RowBodies>[0]>({
@@ -122,9 +119,9 @@ test('the browser page population is the server\'s: a herdless page holds no hom
     game: legacyDouble<ShardContext['game']>({ runtime: legacyDouble<ShardRuntime>({ play: legacyDouble<ShardPlayHost>({ animals: rowBodies }) }) }),
     on: name => { subscribed.push(name); },
     system: spec => { systems.push(spec); } });
-  const page = bindPageHomes(ctx, declared, { system: row.system,
-    decisionActors: parseDecisionScripts(product.section('sim/scripts')).filter(script => 'spawnGroup' in script.binding).flatMap(script => Object.values(script.actors)),
-    ...(row.holds === undefined ? {} : { holds: { ...row.holds, flags: { has: () => false } } }) });
+  const decisions = parseDecisionScripts(fixture.sections.get('sim/scripts'));
+  const page = bindPageHomes(ctx, declared, { system: HOMES_SYSTEM,
+    decisionActors: decisions.filter(script => 'spawnGroup' in script.binding).flatMap(script => Object.values(script.actors)) });
   const live = await createNativeHeadlessResident(fixture);
   try {
     live.step([]);
