@@ -37,7 +37,7 @@ export function visibleTimeline(lines) {
   /** @type {[string, number][]} */ const out = [];
   for (const line of lines) {
     const match = /^\w+ +\d+ (?<at>\d\d:\d\d:\d\d\.\d{3})\d* runningboardd.*WebContent.*:(?<pid>\d+)\] visiblity is yes/u.exec(line);
-    if (match?.groups?.['at'] !== undefined && match.groups['pid'] !== undefined) out.push([match.groups['at'], Number(match.groups['pid'])]);
+    if (match?.groups?.at !== undefined && match.groups.pid !== undefined) out.push([match.groups.at, Number(match.groups.pid)]);
   }
   return out;
 }
@@ -49,11 +49,11 @@ export function kernelKills(lines) {
   /** @type {[string, number, number | null, string][]} */ const out = [];
   for (const line of lines) {
     const match = /^\w+ +\d+ (?<at>\d\d:\d\d:\d\d\.\d{3})\d* kernel.*memorystatus: (?<what>killing\w*(?: process| pid)+ (?<pid>\d+) \[com\.apple\.WebKit\.WebContent\][^-]*)/u.exec(line);
-    if (match?.groups?.['at'] === undefined || match.groups['pid'] === undefined) continue;
+    if (match?.groups?.at === undefined || match.groups.pid === undefined) continue;
     // an idle WebContent the kernel reclaims (a spare, a few MB) is not a page kill
     if (/killing_idle_process/u.test(line)) continue;
-    const kb = /(?<n>\d+)KB/u.exec(line)?.groups?.['n'];
-    out.push([match.groups['at'], Number(match.groups['pid']), kb === undefined ? null : Number(kb), (match.groups['what'] ?? '').trim()]);
+    const kb = /(?<n>\d+)KB/u.exec(line)?.groups?.n;
+    out.push([match.groups.at, Number(match.groups.pid), kb === undefined ? null : Number(kb), (match.groups.what ?? '').trim()]);
   }
   return out;
 }
@@ -77,7 +77,7 @@ function webContentPids(file) {
       if (Array.isArray(value)) { value.forEach(walk); return; }
       if (value === null || typeof value !== 'object') return;
       const row = /** @type {Record<string, unknown>} */ (value);
-      if (/WebContent/u.test(String(row['executable'] ?? ''))) found.push(Number(row['processIdentifier']));
+      if (typeof row.executable === 'string' && /WebContent/u.test(row.executable)) found.push(Number(row.processIdentifier));
       else Object.values(row).forEach(walk);
     };
     walk(JSON.parse(readFileSync(file, 'utf8')));
@@ -100,7 +100,7 @@ function deviceLog(dir) {
     lines,
     stop: async () => {
       if (live.exitCode === null && live.signalCode === null) {
-        const closed = new Promise(done => { live.once('close', done); });
+        const closed = new Promise(_resolve => { live.once('close', _resolve); });
         live.kill('SIGINT');
         await Promise.race([closed, pause(2000)]);
         live.kill('SIGKILL');
@@ -161,13 +161,15 @@ async function boot(page, base, zone, nav, via = `/slug/${zone}`) {
   const before = Number(await settled(() => page.evaluate('return performance.timeOrigin;')));
   await go(page, new URL(via, base).href, nav);
   await pause(1500);
-  for (const end = Date.now() + 30_000; Math.abs(Number(await settled(() => page.evaluate('return performance.timeOrigin;'))) - before) <= 5; await pause(300)) {
-    assert(Date.now() < end, 'the page was not replaced');
+  const replacedBy = Date.now() + 30_000;
+  while (Math.abs(Number(await settled(() => page.evaluate('return performance.timeOrigin;'))) - before) <= 5) {
+    assert.ok(Date.now() < replacedBy, 'the page was not replaced');
+    await pause(300);
   }
   const driver = /** @type {any} */ (page);
   const entryBy = Date.now() + 90_000;
   let button;
-  while (!(button = await settled(() => findButton(driver, ['enter zone', 'enter world', 'play'])))) { assert(Date.now() < entryBy, 'no ENTER ZONE'); await pause(400); }
+  while (!(button = await settled(() => findButton(driver, ['enter zone', 'enter world', 'play'])))) { assert.ok(Date.now() < entryBy, 'no ENTER ZONE'); await pause(400); }
   await watchPageErrors(driver);
   const start = Date.now();
   await page.click(/** @type {{ el: { __wsElement: number } }} */ (button).el);
@@ -181,12 +183,13 @@ async function boot(page, base, zone, nav, via = `/slug/${zone}`) {
  * @param {Page} page @param {Boot} warm @param {number} seconds */
 async function hold(page, warm, seconds) {
   warm.hold = { seconds, answered: 0, lost: null };
-  for (const end = Date.now() + seconds * 1000; Date.now() < end; await pause(1000)) {
+  for (const end = Date.now() + seconds * 1000; Date.now() < end;) {
     try {
       const origin = Number(await settled(() => page.evaluate('return performance.timeOrigin;'), 1));
       if (Math.abs(origin - Number(warm.timeOrigin)) > 5) { warm.hold.lost = { at: new Date().toISOString(), why: 'another document (a reload)' }; return; }
       warm.hold.answered++;
     } catch (error) { warm.hold.lost = { at: new Date().toISOString(), why: String(error) }; return; }
+    await pause(1000);
   }
 }
 
@@ -199,29 +202,30 @@ async function resetOrigin(page, base) {
     await Promise.all((await globalThis.caches?.keys() ?? []).map(k => caches.delete(k)));
     await Promise.all(((await indexedDB.databases?.()) ?? []).filter(d => d.name).map(d => new Promise(r => { const q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r; })));
     window.__wsReset.done = true; })().catch(e => { window.__wsReset = { done: true, error: String(e) }; }); return true;`), 3);
-  for (const end = Date.now() + 45_000; ; await pause(500)) {
+  for (const end = Date.now() + 45_000; ;) {
     const reset = /** @type {{ done: boolean, error?: string } | null} */ (await settled(() => page.evaluate('return window.__wsReset;'), 3));
-    if (reset?.done === true) { assert(reset.error === undefined, reset.error); return; }
-    assert(Date.now() < end, 'the origin reset did not finish');
+    if (reset?.done === true) { assert.ok(reset.error === undefined, reset.error); return; }
+    assert.ok(Date.now() < end, 'the origin reset did not finish');
+    await pause(500);
   }
 }
 
 async function main() {
-  assert(process.env['WS_PHONE_JOB'], 'warm-return runs through the MD1 phone queue (phone-queue.mjs submit)');
+  assert.ok(process.env.WS_PHONE_JOB, 'warm-return runs through the MD1 phone queue (phone-queue.mjs submit)');
   const { values } = parseArgs({ options: { base: { type: 'string' }, zone: { type: 'string', default: 'driftwood-isle' },
     arms: { type: 'string', default: 'hop,hop,hop' }, hold: { type: 'string', default: '40' }, out: { type: 'string' },
     nav: { type: 'string', default: 'replace' } } });
-  assert(values.base !== undefined, '--base <origin> is required');
+  assert.ok(values.base !== undefined, '--base <origin> is required');
   const base = new URL(values.base), zone = values.zone, arms = values.arms.split(',');
-  assert(arms.every(arm => arm === 'hop' || arm === 'direct' || arm === 'leave'), '--arms is a list of hop, direct and leave');
+  assert.ok(arms.every(arm => arm === 'hop' || arm === 'direct' || arm === 'leave'), '--arms is a list of hop, direct and leave');
   const nav = /** @type {'replace' | 'load'} */ (values.nav);
-  assert(nav === 'replace' || nav === 'load', '--nav is replace or load');
+  assert.ok(nav === 'replace' || nav === 'load', '--nav is replace or load');
   const out = resolve(values.out ?? `tmp/warm-return/${new Date().toISOString().replaceAll(/[:.]/gu, '-')}`);
   mkdirSync(out, { recursive: true });
   /** @type {Record<string, unknown> & { rounds: Record<string, unknown>[] }} */
-  const report = { job: process.env['WS_PHONE_JOB'], base: base.href, zone, nav, startedAt: new Date().toISOString(), rounds: [] };
+  const report = { job: process.env.WS_PHONE_JOB, base: base.href, zone, nav, startedAt: new Date().toISOString(), rounds: [] };
   const save = () => { writeFileSync(join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`); };
-  report['phone'] = doctor({ udid: UDID, sharedPort: '4444' });
+  report.phone = doctor({ udid: UDID, sharedPort: '4444' });
   for (const [index, arm] of arms.entries()) {
     const dir = join(out, `round-${String(index + 1)}`);
     mkdirSync(dir, { recursive: true });
@@ -240,44 +244,44 @@ async function main() {
         catch (error) { if (attempt >= 3) throw error; console.error(`round ${String(index + 1)}: origin reset try ${String(attempt)}:`, String(error)); await pause(2000); }
       }
       await fresh.evaluate(`const write = (${writeSaveFixture.toString()}); for (const f of arguments[0]) write(f); return true;`, [phoneSlots({ graphics: 'low' })]);
-      round['pidsStart'] = webContentPids(join(dir, 'pids-start.json'));
-      round['cold'] = await boot(fresh, base, zone, nav);
-      round['pidsCold'] = webContentPids(join(dir, 'pids-cold.json')); save();
-      if (round['cold'].outcome !== 'control') throw new Error(`cold boot: ${String(round['cold'].outcome)}`);
+      round.pidsStart = webContentPids(join(dir, 'pids-start.json'));
+      round.cold = await boot(fresh, base, zone, nav);
+      round.pidsCold = webContentPids(join(dir, 'pids-cold.json')); save();
+      if (round.cold.outcome !== 'control') throw new Error(`cold boot: ${String(round.cold.outcome)}`);
       await pause(5000);
       if (arm === 'hop') { await go(fresh, new URL('/robots.txt', base).href, nav); await pause(1500); }
-      round['warm'] = arm === 'leave' ? await boot(fresh, base, zone, nav, `/leave?to=${encodeURIComponent(`/slug/${zone}`)}`)
+      round.warm = arm === 'leave' ? await boot(fresh, base, zone, nav, `/leave?to=${encodeURIComponent(`/slug/${zone}`)}`)
         : await boot(fresh, base, zone, nav);
-      round['pidsWarm'] = webContentPids(join(dir, 'pids-warm.json')); save();
-      if (round['warm'].outcome === 'control') await hold(fresh, round['warm'], Number(values.hold));
-      round['pidsEnd'] = webContentPids(join(dir, 'pids-end.json'));
-    } catch (error) { round['error'] = String(error); console.error(`round ${String(index + 1)}:`, error); }
+      round.pidsWarm = webContentPids(join(dir, 'pids-warm.json')); save();
+      if (round.warm.outcome === 'control') await hold(fresh, round.warm, Number(values.hold));
+      round.pidsEnd = webContentPids(join(dir, 'pids-end.json'));
+    } catch (error) { round.error = String(error); console.error(`round ${String(index + 1)}:`, error); }
     finally {
-      round['finishedAt'] = new Date().toISOString();
+      round.finishedAt = new Date().toISOString();
       await log.stop();
-      round['jetsam'] = jetsamReports(dir, String(round['startedAt']), String(round['finishedAt']));
+      round.jetsam = jetsamReports(dir, String(round.startedAt), String(round.finishedAt));
       const timeline = visibleTimeline(log.lines);
-      round['visible'] = {
-        cold: round['cold']?.controlAt === undefined ? null : visibleAt(timeline, new Date(round['cold'].controlAt)),
-        warm: round['warm']?.controlAt === undefined ? null : visibleAt(timeline, new Date(round['warm'].controlAt)),
+      round.visible = {
+        cold: round.cold?.controlAt === undefined ? null : visibleAt(timeline, new Date(round.cold.controlAt)),
+        warm: round.warm?.controlAt === undefined ? null : visibleAt(timeline, new Date(round.warm.controlAt)),
         timeline,
       };
-      const killed = /** @type {{ killed?: { name: string, pid: number, bytes: number, reason: string }[] }[]} */ (round['jetsam'])
+      const killed = /** @type {{ killed?: { name: string, pid: number, bytes: number, reason: string }[] }[]} */ (round.jetsam)
         .flatMap(r => r.killed ?? []).filter(k => /WebContent/u.test(k.name));
-      round['webContentKilled'] = killed;
-      round['kernelKills'] = kernelKills(log.lines);
-      round['pass'] = round['warm']?.outcome === 'control' && round['warm']?.hold?.lost === null && killed.length === 0 && round['kernelKills'].length === 0;
+      round.webContentKilled = killed;
+      round.kernelKills = kernelKills(log.lines);
+      round.pass = round.warm?.outcome === 'control' && round.warm?.hold?.lost === null && killed.length === 0 && round.kernelKills.length === 0;
       if (page !== undefined) { await page.navigate('about:blank').catch(() => undefined); await page.close().catch(() => undefined); }
       await inspector.stop();
       save();
-      console.log(JSON.stringify({ round: index + 1, arm, cold: round['cold']?.outcome ?? null, warm: round['warm']?.outcome ?? null,
-        warmMs: round['warm']?.clickToControlMs ?? null, held: round['warm']?.hold ?? null, visible: { cold: round['visible'].cold, warm: round['visible'].warm },
+      console.log(JSON.stringify({ round: index + 1, arm, cold: round.cold?.outcome ?? null, warm: round.warm?.outcome ?? null,
+        warmMs: round.warm?.clickToControlMs ?? null, held: round.warm?.hold ?? null, visible: { cold: round.visible.cold, warm: round.visible.warm },
         killed: [...killed.map(k => `${k.name}[${String(k.pid)}] ${String(Math.round(k.bytes / 1_048_576))} MB ${k.reason}`),
-          ...round['kernelKills'].map((/** @type {[string, number, number | null, string]} */ k) => `${k[0]} kernel: ${k[3]}${k[2] === null ? '' : ` ${String(k[2])} KB`}`)], pass: round['pass'], error: round['error'] ?? null }));
+          ...round.kernelKills.map((/** @type {[string, number, number | null, string]} */ k) => `${k[0]} kernel: ${k[3]}${k[2] === null ? '' : ` ${String(k[2])} KB`}`)], pass: round.pass, error: round.error ?? null }));
     }
   }
-  report['finishedAt'] = new Date().toISOString(); save();
-  const passed = report.rounds.filter(r => r['pass'] === true).length;
+  report.finishedAt = new Date().toISOString(); save();
+  const passed = report.rounds.filter(r => r.pass === true).length;
   console.log(`warm-return: ${String(passed)} of ${String(arms.length)} rounds passed (${out}/report.json)`);
 }
 
