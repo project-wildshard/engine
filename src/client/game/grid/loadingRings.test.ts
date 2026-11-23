@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { loadingWaitState } from '@wildshard/engine/boot/loadingWaits';
 import { bootSteppedTiles, stepRingsUntil } from './loadingRings';
 
 // GO7: Shard select's Template card boots a grid page whose initial home is a data cell (template-2). Its entry pins its
@@ -90,4 +91,16 @@ test('entries waiting together share one pump: one ring step a turn, however man
   expect(steps).toBe(5);
   await stepped.enterOffered('far-reach', scope, start);
   expect(steps).toBe(8);
+});
+
+// DL21c: the pump names its work and counts each tile upload it steps in, so the card moves while the home's tiles land
+test('the pump counts the tile uploads it steps in on a named wait, and ends it', async () => {
+  let steps = 0, publish: () => void = () => undefined;
+  const entry = new Promise<void>(resolve => { publish = resolve; });
+  const seen: string[] = [];
+  const done = stepRingsUntil(entry, { frames: () => 0, wait: later, uploads: () => steps * 2,
+    step: () => { steps++; for (const wait of loadingWaitState().pending.values()) if (wait.label.startsWith('Home tiles')) seen.push(wait.label); if (steps === 3) publish(); } });
+  await done;
+  expect(seen).toEqual(['Home tiles', 'Home tiles · 2 uploaded', 'Home tiles · 4 uploaded']);
+  expect([...loadingWaitState().pending.values()].some(wait => wait.label.startsWith('Home tiles'))).toBe(false);
 });

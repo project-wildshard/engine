@@ -1,3 +1,4 @@
+import { countedWait } from '@wildshard/engine/boot/waits';
 import type { ClientTileRegistration } from '../shardfile/tileContent';
 
 /** The ports `stepRingsUntil` needs: the page loop's late-frame count, one ring step, and one turn's wait. */
@@ -8,6 +9,8 @@ export interface LoadingRingPorts {
   readonly step: () => void;
   /** One turn: a frame's length while loading. */
   readonly wait: () => Promise<void>;
+  /** The streamer's tile uploads so far: the pump counts the ones it steps in on the card ('Home tiles · 3 uploaded'). */
+  readonly uploads?: () => number;
 }
 
 /** GO7: a grid page whose initial home is a data cell (Shard select's Template card enters template-2) pins its spawn tiles
@@ -20,11 +23,19 @@ export async function stepRingsUntil<T>(entry: Promise<T>, ports: LoadingRingPor
   const ended = result.then(() => 'settled' as const, () => 'settled' as const);
   // Once the loop has run one late frame it steps the rings every frame, slower than this wait or not (Codex: at 30 fps a
   // per-turn check stepped between its frames, a second upload budget in play), so this stops for good at its first.
-  for (;;) {
-    if (state.settled || ports.frames() !== 0) break;
-    if (await Promise.race([ports.wait(), ended]) === 'settled' || ports.frames() !== 0) break;
-    ports.step();
-  }
+  // DL21c (Dunes): a home's ring tiles held the card 1.4 to 1.7 s on 'Home region · native presentation tiles' on the
+  // Simulator (11-23) while they uploaded one a frame; the pump counts each upload it steps in on a named wait
+  const counted = ports.uploads === undefined ? undefined : countedWait('Home tiles', 'uploaded', 'work');
+  let uploads = ports.uploads?.() ?? 0;
+  try {
+    for (;;) {
+      if (state.settled || ports.frames() !== 0) break;
+      if (await Promise.race([ports.wait(), ended]) === 'settled' || ports.frames() !== 0) break;
+      ports.step();
+      const now = ports.uploads?.() ?? uploads;
+      for (; uploads < now; uploads++) counted?.add();
+    }
+  } finally { counted?.end(); }
   return result;
 }
 

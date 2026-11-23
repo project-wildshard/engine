@@ -1170,7 +1170,8 @@ export class GridSession {
     const tiles = bootSteppedTiles(this.clientTiles, { frames: () => this.lateFrames,
       step: () => { if (!this.host.scope.disposed) { const at = this.world(); this.rings.step({ x: at.x, z: at.z, vx: 0, vz: 0 }); } },
       // a left page never wakes the wait: its entry's release settles it
-      wait: () => new Promise<void>(resolve => { if (!this.host.scope.disposed) this.host.scope.timeout(16, resolve); }) });
+      wait: () => new Promise<void>(resolve => { if (!this.host.scope.disposed) this.host.scope.timeout(16, resolve); }),
+      uploads: () => this.rings.stats().uploads });
     this.live = new LiveGridSession({ assembly: this.assembly, home: this.home, physics: this.host.physics, scope: this.host.scope, walls: this.walls, strips: this.strips, initialStripBytes: this.initialStripBytes,
       prepareStrips: cell => Math.max(Math.abs(cell.cell[0] - this.home.cell[0]), Math.abs(cell.cell[1] - this.home.cell[1])) <= 1 ? Promise.resolve() : this.prepareOuterStrips(), allocator: this.allocator,
       residency: this.host.residency.home(), tiles, lightingSettled: () => { this.prelinkViews(); }, backgroundReady: () => this.host.backgroundReady?.() !== false,

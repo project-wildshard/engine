@@ -34,3 +34,4 @@
 - DL24 (play's first second): Pine's 21 to 23 fps for 4 s after control is the grid outer ring's preparation (measures
   `outer-ring.strips`/`road`, 0.5 to 4.6 s after control); no play frame over 250 ms. Its pacing is iPhone 13-tuned
   (`outerPaced.ts`, `OUTER_RING_SLICE_MS`), left alone.
+- The home tiles count landed as its own commit (loadingRings.ts, session.ts's `uploads` port).
