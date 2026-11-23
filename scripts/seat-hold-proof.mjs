@@ -40,7 +40,7 @@ const whereIs = page => page.evaluate(() => {
 /** The names a page sees in its world. @param {import('playwright').Page} page */
 const seen = page => page.evaluate(() => (/** @type {any} */ (window).__onlinePlayers?.() ?? []).map((/** @type {any} */ row) => String(row.name)));
 /** Whether `name` is among the rows `page` sees. @param {import('playwright').Page} page @param {string} name */
-const sees = async (page, name) => (await seen(page)).some(row => row.startsWith(name));
+const sees = async (page, name) => (await seen(page)).some((/** @type {string} */ row) => row.startsWith(name));
 /** Poll until `test` holds or `ms` pass. @param {() => Promise<boolean>} test @param {number} ms */
 async function until(test, ms) { const end = Date.now() + ms; for (;;) { if (await test()) return true; if (Date.now() > end) return false; await sleep(1000); } }
 /** Walk the phone forward a moment, as its stick does. @param {import('playwright').Page} page */
@@ -73,10 +73,11 @@ async function openWorld() {
 
 const rig = await openWorld(), url = (/** @type {string} */ slug) => `${rig.base}/?chunk=${slug}&mute=1&nolock=1&skipintro=1`;
 const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] });
+/** @type {typeof devices[string] & { screen?: { width: number, height: number } }} */
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
 let code = 1;
 try {
-  note('phone layout', phone.screen.width === 402 && phone.screen.height === 874 && phone.deviceScaleFactor === 3 && phone.hasTouch, phone.screen);
+  note('phone layout', phone.screen?.width === 402 && phone.screen?.height === 874 && phone.deviceScaleFactor === 3 && phone.hasTouch, phone.screen);
   const desk = await enterPage(browser, { viewport: { width: 1280, height: 800 } }, url(DRIFTWOOD), 'Desk');
   await intoWorld(desk.page);
   note('desktop plays Driftwood', (await whereIs(desk.page)).level.includes('driftwood'), await whereIs(desk.page));
