@@ -7,3 +7,6 @@ device hint (`grid.last-played`) was read only while its catalogue seal matched 
 placement change voided it. The door now answers a pre-hello `where` word (prefix 14, `where: 1` in the world word) with the cell
 the next join would seat; the title asks as it paints and Enter MMO boots that cell. The hint is read by its cell alone as the
 fallback. Test: `test/enter-mmo-seat.test.ts`.
+
+Proof: `scripts/enter-mmo-seat-proof.mjs <work>` (headless WebKit, 402x874, loopback grid with Driftwood and Sunscar Dunes): the
+hint wiped and kept, Enter MMO lands in Signal Dunes with no Driftwood card and no door move; a fresh player lands in Driftwood.
