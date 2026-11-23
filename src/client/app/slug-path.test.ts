@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
 import { currentSlug, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
+import { adoptSlugAliases } from '@wildshard/engine/game/slugNames';
+
+// OF31i4: the retired slug is world data; the placement file lays it in (as the box and page do)
+adoptSlugAliases({ 'blender-template': 'brasscap-mesa' });
 
 /** SA36: the entry opens the slug page for exactly the paths pages/worker.ts serves it on (test/page-workers.test.ts). */
 test('only /slug/<slug> names a slug', () => {

@@ -297,7 +297,6 @@
     "../pages/worker.ts",
     "../pages/placed-slug.ts",
     "../pages/slug-meta.ts",
-    "../pages/slug-names.ts",
     "schema-code-memory.test.ts",
     "world-scene-graph-pages.test.ts"
   ]

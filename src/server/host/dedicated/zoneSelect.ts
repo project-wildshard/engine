@@ -2,7 +2,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import * as v from 'valibot';
 import { catalogueDocument } from '@wildshard/engine/game/grid/catalogueDocument';
-import { FEATURED_ZONES } from '@wildshard/engine/game/zoneSelect/featured';
 import type { ZoneSelectCard, ZoneSelectDocument } from '@wildshard/engine/game/grid/zoneSelectRows';
 import { originAllowed } from './doorTrust';
 import type { ZoneEntryTotal } from './saves/zoneEntries';
@@ -21,7 +20,7 @@ const Uploads: v.GenericSchema<{ readonly shards: readonly Upload[] }> = v.objec
   slug: v.string(), name: v.pipe(v.string(), v.trim(), v.maxLength(128)), listedNew: v.optional(v.boolean()),
   firstUploadedAt: v.optional(v.pipe(v.string(), v.isoTimestamp())),
 })) });
-/** `featured`: the placement file's order (OF31i); without one the build's `featured.json` stands. */
+/** `featured`: the placement file's order (OF31i, world data); without one Featured lists every visible zone by name (OF31i4). */
 interface LiveZones { readonly serial: number; readonly slugs: readonly string[]; readonly featured?: readonly string[] | undefined }
 interface ZoneSelectOptions {
   readonly channel: ZoneSelectDocument['channel'];
@@ -72,7 +71,7 @@ export function zoneSelectTabs(channel: ZoneSelectOptions['channel'], live: Live
   const all = cards(live.slugs, uploads, counts).sort(name);
   const visible = all.filter(card => card.status !== 'hidden');
   const bySlug = new Map(visible.map(card => [card.slug, card]));
-  const featured = (live.featured ?? FEATURED_ZONES).flatMap(slug => { const card = bySlug.get(slug); return card === undefined ? [] : [card]; });
+  const featured = live.featured === undefined ? visible : live.featured.flatMap(slug => { const card = bySlug.get(slug); return card === undefined ? [] : [card]; });
   const order = new Map(featured.map((card, index) => [card.slug, index]));
   const unique = new Map(counts.map(row => [row.slug, row.uniqueHumans]));
   const popular = [...visible].sort((a, b) => b.enters - a.enters ||

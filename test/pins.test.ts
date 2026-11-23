@@ -190,8 +190,6 @@ test('a missing mirrored slice rebuilds exact pinned bytes and refuses changed d
   save('slices.json', {slices: [row]});
   save('rings.json', {'1': {products: [row.slug], slices: [row.slug]}});
   save('catalogue.json', {shards: [{slug: row.slug}], placements: [], grid: {cells: []}});
-  mkdirSync(join(root, 'src/shared/game'), {recursive: true});
-  writeFileSync(join(root, 'src/shared/game/slugNames.json'), readFileSync('src/shared/game/slugNames.json'));
   const server = createServer((request, response) => {
     if (request.url === `/api/shardfiles/${product.pin.hash}`) response.end(product.bytes);
     else {response.statusCode = 404; response.end();}

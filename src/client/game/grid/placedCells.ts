@@ -231,7 +231,7 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     else await keep.write(url, text);
     if (wentOn()) return await fallBack('the page went on before the placement file was read');
     fresh = true;
-    adoptSlugAliases(file.aliases); // OF31i: the file's retired slugs beat the build's slugNames.json
+    adoptSlugAliases(file.aliases); // OF31i: the file's retired slugs (world data, OF31i4)
     // from the build's own catalogue, so the fresh file replaces the kept one's cells
     if (placed.added.length > 0 || cached !== undefined) installCatalogue(placed.document);
     // SA46: a cell the box would open whose slug this build has no card for (an upload after the build) is carded from its catalogue

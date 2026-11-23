@@ -62,10 +62,16 @@ async function verifiedBody(file: unknown): Promise<unknown> {
   }
 }
 
+/** The channel's believed placement file body, or undefined. */
+async function placementBody(channel: 'production' | 'staging'): Promise<Readonly<Record<string, unknown>> | undefined> {
+  const body = await verifiedBody(await edgeJson(`${PACKS}/releases/${channel}-placements.json`))
+  return record(body) && body['kind'] === 'placement' && body['channel'] === channel ? body : undefined
+}
+
 /** Whether the channel's placement file gives `slug` a cell. */
 async function placed(channel: 'production' | 'staging', slug: string): Promise<boolean> {
-  const body = await verifiedBody(await edgeJson(`${PACKS}/releases/${channel}-placements.json`))
-  if (!record(body) || body['kind'] !== 'placement' || body['channel'] !== channel || !Array.isArray(body['cells'])) {
+  const body = await placementBody(channel)
+  if (body === undefined || !Array.isArray(body['cells'])) {
     return false
   }
   return body['cells'].some((cell: unknown): boolean => record(cell) && typeof cell['slug'] === 'string' && cell['slug'].replace(/^_/u, '') === slug.replace(/^_/u, ''))
@@ -81,4 +87,20 @@ async function placedName(host: string, slug: string): Promise<string | undefine
   return record(row) && row['slug'] === slug.replace(/^_/u, '') && typeof row['name'] === 'string' && row['name'] !== '' ? row['name'] : undefined
 }
 
-export { PLACEMENT_PUBLIC_KEY, placedName }
+/**
+ * OF31i4: the slug that replaced a retired one, from the channel's placement file (`aliases`, world data the API signs;
+ * engine keeps no copy), for a host that plays a channel; undefined for any other slug, host or failure. TC-B12: Brasscap
+ * Mesa's old slug blender-template is the one alias today.
+ */
+async function retiredName(host: string, slug: string): Promise<string | undefined> {
+  const channel = CHANNELS[host]
+  if (channel === undefined) {
+    return undefined
+  }
+  const body = await placementBody(channel)
+  const aliases = body?.['aliases']
+  const now = record(aliases) ? aliases[slug] : undefined
+  return typeof now === 'string' && now !== slug ? now : undefined
+}
+
+export { PLACEMENT_PUBLIC_KEY, placedName, retiredName }

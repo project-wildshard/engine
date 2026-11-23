@@ -879,7 +879,6 @@
     "./game/slugNames": "./src/shared/game/slugNames.ts",
     "./game/grid/cellHome": "./src/server/game/grid/cellHome.ts",
     "./game/grid/zoneSelectRows": "./src/shared/game/grid/zoneSelectRows.ts",
-    "./game/zoneSelect/featured": "./src/server/game/zoneSelect/featured.ts",
     "./game/loot/platformCatalogue": "./src/shared/game/loot/platformCatalogue.ts",
     "./game/quest/legacyRecords": "./src/shared/game/quest/legacyRecords.ts",
     "./game/shardfile/pageWater": "./src/client/game/shardfile/pageWater.ts",

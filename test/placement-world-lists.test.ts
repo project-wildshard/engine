@@ -1,11 +1,10 @@
 // OF31i: Zone Select's featured order and the retired-slug aliases are world data. The placement file carries them as
-// optional fields an old box drops, and each beats the build's own list (zoneSelect/featured.json, slugNames.json).
+// optional fields an old box drops; since OF31i4 engine keeps no list of its own.
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { PlacementSchema, type PlacementFile } from '../src/shared/game/grid/placementRows';
 import { PlacementWatch } from '../src/server/host/dedicated/placementFile';
 import { zoneSelectTabs } from '../src/server/host/dedicated/zoneSelect';
-import { FEATURED_ZONES } from '../src/server/game/zoneSelect/featured';
 import { SLUG_NAMES, retiredSlugs } from '../src/shared/game/slugNames';
 import { currentSlug, slugOfPath } from '../src/client/app/slugPath';
 
@@ -24,15 +23,15 @@ test('a placement file may carry featured and aliases; a box from before OF31i d
   expect(v.parse(before, body)).toEqual(file(4));
 });
 
-test('Zone Select takes the placement file\'s featured order; without one the build\'s list stands', () => {
-  const slugs = ['driftwood-isle', 'pine-hollow', 'nalati-grasslands'];
+test('Zone Select takes the placement file\'s featured order; without one Featured lists every visible zone by name', () => {
+  const slugs = ['pine-hollow', 'nalati-grasslands', 'driftwood-isle'];
   const built = zoneSelectTabs('staging', { serial: 1, slugs }, [], []).featured.map(card => card.slug);
-  expect(built).toEqual(FEATURED_ZONES.filter(slug => slugs.includes(slug)));
+  expect(built).toEqual(['driftwood-isle', 'nalati-grasslands', 'pine-hollow']);
   const placed = zoneSelectTabs('staging', { serial: 1, slugs, featured: ['nalati-grasslands', 'pine-hollow', 'not-open'] }, [], []);
   expect(placed.featured.map(card => card.slug)).toEqual(['nalati-grasslands', 'pine-hollow']);
 });
 
-test('the box\'s watch keeps the newest file\'s featured order and lays its aliases over slugNames.json', async () => {
+test('the box\'s watch keeps the newest file\'s featured order and lays in its aliases', async () => {
   let next = file(1);
   const watch = new PlacementWatch({ channel: 'staging', everyMs: 3_600_000, failed: () => undefined, read: () => Promise.resolve(next),
     open: cells => Promise.resolve(cells.map(row => row.instance)) });
@@ -46,8 +45,8 @@ test('the box\'s watch keeps the newest file\'s featured order and lays its alia
     expect(slugOfPath('/slug/old-pine/')).toBe('pine-hollow');
     expect(currentSlug('old-pine')).toBe('pine-hollow');
     expect(retiredSlugs()).toContainEqual(['old-pine', 'pine-hollow']);
-    expect(SLUG_NAMES['blender-template'], 'the built map stays under it').toBe('brasscap-mesa');
+    expect(SLUG_NAMES['blender-template'], 'engine keeps no map of its own').toBeUndefined();
     next = file(3); await watch.look();
-    expect(watch.featured, 'a file naming none hands the order back to the build').toBeUndefined();
+    expect(watch.featured, 'a file naming none hands Featured back to every visible zone').toBeUndefined();
   } finally { watch.dispose(); }
 });

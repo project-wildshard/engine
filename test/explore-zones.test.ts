@@ -14,8 +14,8 @@ const catalogue: CatalogueDocument = {
   shards: [{ slug: 'new-cell', name: 'New cell', revision: 1, hash: 'a'.repeat(64) }],
 };
 
-test('the offline list shows every visible placement with Featured first', () => {
-  expect(exploreZones(catalogue, titles).map(zone => zone.slug)).toEqual(['driftwood-isle', 'mossgate', 'new-cell']);
+test('the offline list shows every visible placement in title order (OF31i4: no built Featured list)', () => {
+  expect(exploreZones(catalogue, titles).map(zone => zone.slug)).toEqual(['mossgate', 'driftwood-isle', 'new-cell']);
 });
 
 test('the served staging cards order and name installed zones without duplicating them', async () => {

@@ -2,6 +2,10 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { freshPageArrival, setTitleArrival, consumeTitleArrival, dropTabArrival, pendingTitleArrival } from '../src/client/engine/boot/titleArrival';
 import { saveStorage } from '../src/client/engine/saves/slots';
 import { exploreSlugOfPath } from '../src/client/app/slugPath';
+import { adoptSlugAliases } from '../src/shared/game/slugNames';
+
+// OF31i4: the retired slug is world data; the placement file lays it in (as the box and page do)
+adoptSlugAliases({ 'blender-template': 'brasscap-mesa' });
 import { bootRoute, exploreBootParams, onlineTitleFirst } from '../src/client/app/bootRoute';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { gridIntents } from '../src/client/game/grid/intent';

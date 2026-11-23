@@ -1,6 +1,6 @@
 import { retiredSlugs as retired, SLUG_NAMES } from '@wildshard/engine/game/slugNames';
 
-/** A retired `/slug/` name and the slug that replaced it (`slugNames.json`): Brasscap Mesa was the API's old corpus slug
+/** A retired `/slug/` name and the slug that replaced it (the placement file's `aliases`, OF31i4): Brasscap Mesa was the API's old corpus slug
  *  blender-template (Jake, 2026-11-15: "I don't know why the fuck this slug is called Blender template"); since TC-SHIP-a
  *  the catalogue names it brasscap-mesa. pages/worker.ts sends the old link to the new one; the page reads it as the new. */
 const PUBLIC = SLUG_NAMES;

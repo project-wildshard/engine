@@ -33,7 +33,7 @@ async function tourFixture(checkout, seed) {
   const home = (/** @type {string} */ path) => JSON.parse(readFileSync(join(checkout, path), 'utf8'));
   const catalogue = home('test/pins/catalogue.json');
   const snapshot = home('test/pins/staging.json').catalogue;
-  /** @type {string[]} */ const featured = home('src/server/game/zoneSelect/featured.json');
+  const {TOUR_FEATURED: featured} = /** @type {{TOUR_FEATURED: readonly string[]}} */ (await import(pathToFileURL(join(checkout, 'scripts/zone-entry-featured.mjs')).href));
   /** @type {import('./zone-entry-tour.mjs').Cell[]} */ const cells = catalogue.grid.cells;
   /** @type {import('./zone-entry-tour.mjs').Cell[]} */ const reviewed = snapshot.grid.cells;
   for (const cell of reviewed) {

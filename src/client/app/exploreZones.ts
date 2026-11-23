@@ -2,9 +2,6 @@ import { apiOrigin } from '@wildshard/engine/core/apiOrigin';
 import { bareSlug, type CatalogueDocument } from '@wildshard/engine/game/grid/catalogueSlot';
 import type { TitleManifest } from '@wildshard/engine/game/shard/titleList';
 
-/** J461's Featured order, used when the installed build can't reach Zone Select. */
-const FEATURED = ['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack', 'mossgate', 'brasscap-mesa', 'sunscar-dunes', 'far-reach'];
-
 export interface ExploreZone {
   readonly slug: string;
   readonly name: string;
@@ -57,13 +54,9 @@ export function exploreZones(catalogue: CatalogueDocument | undefined, titles: r
     if (available.has(row.slug) || !placed.has(row.slug) || /^open-plot(?:-|$)/u.test(row.slug) || status.get(row.slug) === 'hidden') continue;
     available.set(row.slug, { slug: row.slug, name: row.name });
   }
+  // OF31i4: the served Featured order (J461) leads; a build that can't reach Zone Select keeps its title order
   const ordered = new Map<string, ExploreZone>();
-  for (const slug of FEATURED) {
-    const row = available.get(slug);
-    if (row !== undefined) ordered.set(slug, row);
-  }
   if (served !== null) {
-    ordered.clear();
     for (const card of served) {
       const row = available.get(card.slug);
       if (row !== undefined && !ordered.has(card.slug)) ordered.set(card.slug, { ...row, name: card.name });

@@ -14,10 +14,10 @@ export interface PlacementFile {
    *  cook's `index/<build>/<hash>.json`. A file from before SA47 names none. `speedClass` is the grid row's (QA 11-15 row 8): the
    *  server reads no manifest, so a placed road-class cell keeps the page's 30 m/s board only when the file carries it. */
   readonly cells: readonly { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number]; readonly hash?: string; readonly speedClass?: 'road' }[];
-  /** OF31i: Zone Select's featured order, world data rather than engine data (it beats `zoneSelect/featured.json`). A box from
-   *  before OF31i reads the file with `v.object`, which drops a key it doesn't know, so it keeps its own list. */
+  /** OF31i: Zone Select's featured order, world data rather than engine data (the only list since OF31i4). A box
+   *  from before OF31i reads the file with `v.object`, which drops a key it doesn't know, so it keeps its own list. */
   readonly featured?: readonly string[];
-  /** OF31i: a retired slug and the slug that replaced it (it beats `slugNames.json`), for links, saves and the ledger. */
+  /** OF31i: a retired slug and the slug that replaced it (the only map since OF31i4), for links, saves and the ledger. */
   readonly aliases?: Readonly<Record<string, string>>;
 }
 const placedId = v.pipe(v.string(), v.regex(/^_?[a-z0-9]+(?:-[a-z0-9]+)*$/u), v.maxLength(64));

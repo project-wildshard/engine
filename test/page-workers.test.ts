@@ -12,8 +12,6 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { unstable_readConfig } from 'wrangler';
 import worker, { type Env } from '../pages/worker.ts';
 import { PLACEMENT_PUBLIC_KEY as WORKER_KEY } from '../pages/placed-slug.ts';
-import { SLUG_NAMES } from '../pages/slug-names.ts';
-import pageSlugNames from '../src/shared/game/slugNames.json' with { type: 'json' };
 import { PLACEMENT_PUBLIC_KEY } from '../src/shared/game/grid/placementRows';
 
 
@@ -54,7 +52,7 @@ test('wrangler deploy --dry-run passes for all four channels', async () => {
   try {
     mkdirSync(join(root, 'pages'));
     mkdirSync(join(root, 'dist'));
-    for (const file of ['wrangler.jsonc', 'worker.ts', 'slug-meta.ts', 'placed-slug.ts', 'slug-names.ts']) copyFileSync(resolve('pages', file), join(root, 'pages', file));
+    for (const file of ['wrangler.jsonc', 'worker.ts', 'slug-meta.ts', 'placed-slug.ts']) copyFileSync(resolve('pages', file), join(root, 'pages', file));
     writeFileSync(join(root, 'dist', 'index.html'), '<!doctype html>');
     const wrangler = resolve('node_modules/.bin/wrangler');
     const env = { ...process.env, WRANGLER_SEND_METRICS: 'false', WRANGLER_LOG_PATH: join(root, 'logs'), CLOUDFLARE_API_TOKEN: '', CI: '1' };
@@ -283,14 +281,25 @@ test('SA49: a slug placed after the build unfurls with its API name; an unplaced
 })
 
 // TC-B12 (Jake, 2026-11-15: "I don't know why the fuck this slug is called Blender template"), TC-SHIP-a: Brasscap Mesa's
-// slug is brasscap-mesa; the retired slug's old link goes there, and the page and the worker share one map
+// slug is brasscap-mesa; the retired slug's old link goes there. OF31i4: the map is the channel's signed placement file's
+// `aliases` (world data the API signs), the same file the box and the page read; the Worker keeps no copy.
 test('a slug serves its page, and a retired slug\'s old link goes to the new one', async () => {
+  const pub = keys.publicKey.export({ type: 'spki', format: 'der' }).toString('hex')
+  const importKey = crypto.subtle.importKey.bind(crypto.subtle)
+  vi.spyOn(crypto.subtle, 'importKey').mockImplementation(((format: 'spki', _data: BufferSource, algorithm: AlgorithmIdentifier, extractable: boolean, usages: KeyUsage[]) => importKey(format, Buffer.from(pub, 'hex'), algorithm, extractable, usages)) as never)
+  network = url => url === 'https://packs.wildshard.io/releases/staging-placements.json'
+    ? new Response(signedFile({ ...(placementBody('staging', ['brasscap-mesa']) as object), aliases: { 'blender-template': 'brasscap-mesa' } }))
+    : new Response('missing', { status: 404 })
   const response = await worker.fetch(new Request('https://staging.wildshard.io/slug/brasscap-mesa'), { ASSETS: site([]) })
   expect(response.status).toBe(200)
   expect(og(await response.text())).toMatchObject({ title: 'Brasscap Mesa', url: 'https://staging.wildshard.io/slug/brasscap-mesa' })
+  expect(asked, 'a slug the page names asks nothing').toEqual([])
   const old = await worker.fetch(new Request('https://staging.wildshard.io/slug/blender-template?x=1'), { ASSETS: site([]) })
   expect([old.status, old.headers.get('location')]).toEqual([302, 'https://staging.wildshard.io/slug/brasscap-mesa?x=1'])
-  expect(SLUG_NAMES).toEqual(pageSlugNames.names)
+  const explore = await worker.fetch(new Request('https://explore.wildshard.io/blender-template'), { ASSETS: site([]) })
+  expect([explore.status, explore.headers.get('location')]).toEqual([302, 'https://explore.wildshard.io/brasscap-mesa'])
+  network = () => new Response('missing', { status: 404 })
+  expect((await worker.fetch(new Request('https://staging.wildshard.io/slug/blender-template'), { ASSETS: site([]) })).status, 'no file, no alias').toBe(404)
 })
 
 test('MMO Explore links redirect before reading the shell and keep view parameters', async () => {

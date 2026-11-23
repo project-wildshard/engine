@@ -47,7 +47,7 @@ export class PlacementWatch {
   }
   /** The newest serial this server has believed, or -1. */
   get serial(): number { return this.seen; }
-  /** OF31i: the newest believed file's featured order, or undefined when it names none (the build's list stands). */
+  /** OF31i: the newest believed file's featured order, or undefined when it names none (Featured then lists every visible zone). */
   get featured(): readonly string[] | undefined { return this.featuredOrder; }
   /** One look. An older file than one already believed changes nothing. */
   async look(): Promise<void> {

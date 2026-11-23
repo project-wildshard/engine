@@ -3,6 +3,10 @@ import type { LedgerRule } from '@wildshard/format/ledger';
 import { PlayerStore } from '../src/server/host/dedicated/playerStore';
 import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { carryRetiredLedger, Ledger, type LedgerCatalogueItem, type LedgerState } from '../src/shared/game/ledger';
+import { adoptSlugAliases } from '../src/shared/game/slugNames';
+
+// OF31i4: the retired slug is world data; the placement file lays it in (as the box and page do)
+adoptSlugAliases({ 'blender-template': 'brasscap-mesa' });
 
 // TEMPLATE-E2E TC-SHIP-g: Brasscap Mesa's API slug was blender-template until TC-SHIP-a. The profile ledger keys achievements
 // and catalogue entitlements by shard slug, so what a player earned under the old slug must count under the new one.

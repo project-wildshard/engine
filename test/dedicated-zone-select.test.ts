@@ -28,6 +28,9 @@ async function open(route: ReturnType<typeof zoneSelectRoute>, path = '/zone-sel
   return new URL(`http://127.0.0.1:${address.port}${path}`);
 }
 
+/** The placement file's `featured` (world data the API signs, OF31i2); engine keeps no list of its own (OF31i4). */
+const PLACED_FEATURED = ['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack', 'mossgate', 'brasscap-mesa', 'sunscar-dunes', 'far-reach'];
+
 test('the room door serves its own channel and counts only human arrivals for Popular', async () => {
   let serial = 5;
   const slugs = ['pine-hollow', 'driftwood-isle', 'new-shard', 'proof-town', 'test-name', '_future'];
@@ -44,7 +47,7 @@ test('the room door serves its own channel and counts only human arrivals for Po
     { slug: 'nine-dragon-stack', humans: 100, agents: 0, uniqueHumans: 100 },
   ]);
   const door = await open(zoneSelectRoute({
-    channel: 'staging', allowedOrigins: [staging], world: () => ({ serial, slugs }),
+    channel: 'staging', allowedOrigins: [staging], world: () => ({ serial, slugs, featured: PLACED_FEATURED }),
     uploads, totals, log: () => undefined,
   }));
   door.searchParams.set('channel', 'production');

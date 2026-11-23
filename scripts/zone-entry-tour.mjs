@@ -8,7 +8,7 @@ import { join, resolve } from 'node:path';
 import { acceptPhoneMemoryWarning, deployFrameProblem, PHONE } from './journey-proof.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
-import featured from '../src/server/game/zoneSelect/featured.json' with { type: 'json' };
+import { TOUR_FEATURED as featured } from './zone-entry-featured.mjs';
 
 /** @typedef {{instance:string, slug?:string, cell:readonly [number,number]}} Cell */
 /** @typedef {{from:Cell, to:Cell}} Leg */

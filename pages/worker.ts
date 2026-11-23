@@ -12,10 +12,10 @@
 // deploy would stay on phones and at the edge for a year. Any answer but a 2xx or a 304 is no-store; those keep theirs.
 // SA37: `/slug/<slug>` on every host is the page too, with its link-preview tags (og:title, og:description, og:image) from
 // the catalogue the page carries (slug-meta.ts); a slug that names no shard answers 404. SA49: unless the channel's placement
-// file gives it a cell and the API names it (placed-slug.ts), a new author's shard placed after the build.
+// file gives it a cell and the API names it (placed-slug.ts), a new author's shard placed after the build. TC-B12, OF31i4: a
+// retired slug the page doesn't name goes 302 to the slug that replaced it, from the same file's `aliases`.
 
-import { placedName } from './placed-slug.ts'
-import { apiSlugOf, publicNameOf } from './slug-names.ts'
+import { placedName, retiredName } from './placed-slug.ts'
 import { placedMeta, slugMeta, withSlugMeta } from './slug-meta.ts'
 
 interface Fetcher {
@@ -56,6 +56,20 @@ const OPENER = 'same-origin'
 const LEAVE_PATH = '/leave'
 const LEAVE_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex"><style>html,body{background:#050810}</style><script>(()=>{let to="/";try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}location.replace(to)})()</script></head><body></body></html>'
 const LEAVE_HEADERS = { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }
+
+/** Where a host's slug links live: Explore's at the root, every other host's under `/slug/`. */
+function slugAt(url: Readonly<URL>): string {
+  return url.hostname === EXPLORE_HOST ? '/' : '/slug/'
+}
+
+/** TC-B12, OF31i4: a slug the page doesn't name: 302 to the slug that replaced it (the name may still move), else a 404. */
+async function unnamedSlug(url: Readonly<URL>, slug: string, head: boolean): Promise<Response> {
+  const now = await retiredName(url.hostname, slug)
+  if (now !== undefined) {
+    return new Response(undefined, { status: FOUND, headers: { location: new URL(`${slugAt(url)}${now}${url.search}`, url).href, 'cache-control': 'no-store' } })
+  }
+  return new Response(head ? undefined : `No shard is named ${slug}.\n`, { status: NOT_FOUND, headers: PLAIN })
+}
 
 /** A 2xx or a 304 as the assets sent it; any other answer (a 404 above all) with `Cache-Control: no-store`. */
 function uncachedMiss(asset: Response): Response {
@@ -137,25 +151,19 @@ async function slugPage({ request, url, slug }: SlugRequest, env: Env): Promise<
   const meta = await pageMeta(html, slug, url)
   const head = request.method === 'HEAD'
   if (meta === undefined) {
-    return new Response(head ? undefined : `No shard is named ${slug}.\n`, { status: NOT_FOUND, headers: PLAIN })
+    return await unnamedSlug(url, slug, head)
   }
-  // TC-B12: og:url reads the public name
-  const shared = { ...meta, url: new URL(`${url.hostname === EXPLORE_HOST ? '/' : '/slug/'}${publicNameOf(slug)}`, url.origin).href }
+  const shared = { ...meta, url: new URL(`${slugAt(url)}${slug}`, url.origin).href }
   return new Response(head ? undefined : withSlugMeta(html, shared), { status: OK, headers: pageHeaders(asset) })
 }
 
 // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- the runtime's Request and bindings, only read
 async function namedSlug({ request, url, slug }: SlugRequest, env: Env): Promise<Response> {
-  // TC-B12: an old API slug's link goes to its public name (302: the name may still move), which serves the API slug's page
-  const name = publicNameOf(slug)
-  if (name !== slug) {
-    return Response.redirect(new URL(`/slug/${name}${url.search}`, url).href, FOUND)
-  }
-  return await slugPage({ request, url, slug: apiSlugOf(slug) }, env)
+  return await slugPage({ request, url, slug }, env)
 }
 
 function redirectToExplore(url: Readonly<URL>, slug: string): Response {
-  const destination = new URL(`/${publicNameOf(slug)}`, `https://${EXPLORE_HOST}`)
+  const destination = new URL(`/${slug}`, `https://${EXPLORE_HOST}`)
   for (const key of ['explore', 'cam', 'model']) {
     for (const value of url.searchParams.getAll(key)) {
       destination.searchParams.append(key, value)
@@ -171,7 +179,7 @@ function exploreRequest(request: Request, { url, slug }: SlugAddress, env: Env):
   }
   if (url.hostname === EXPLORE_HOST) {
     const name = EXPLORE_SLUG.exec(url.pathname)?.groups?.['slug']
-    return name === undefined ? undefined : slugPage({ request, url, slug: apiSlugOf(name) }, env)
+    return name === undefined ? undefined : slugPage({ request, url, slug: name }, env)
   }
   return slug !== undefined && url.searchParams.has('explore') && MMO_ORIGINS.has(url.origin)
     ? redirectToExplore(url, slug) : undefined

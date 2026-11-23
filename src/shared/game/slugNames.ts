@@ -1,13 +1,12 @@
-import named from './slugNames.json' with { type: 'json' };
-
-/** A retired shard slug and the slug that replaced it (`slugNames.json`). Brasscap Mesa was the API's old corpus slug
- *  blender-template (Jake, 2026-11-15: "I don't know why the fuck this slug is called Blender template"); since TC-SHIP-a
- *  the catalogue names it brasscap-mesa. The page reads it for links and saves (client/app/slugPath.ts), the profile ledger
- *  for achievements and entitlements (ledger.ts, TC-SHIP-g); pages/slug-names.ts keeps the same map for the page's Worker. */
-const names: Record<string, string | undefined> = { ...named.names };
+/** A retired shard slug and the slug that replaced it. World data, not engine data (ONE-FORMAT OF31i4): the API signs the
+ *  map into every channel's placement file (`aliases`, OF31i2), and the box (server/host/dedicated/placementFile.ts) and
+ *  the page (client/game/grid/placedCells.ts) lay it in here. The page reads it for links and saves (client/app/slugPath.ts),
+ *  the profile ledger for achievements and entitlements (ledger.ts, TC-SHIP-g); the page's Worker reads the same file
+ *  (pages/placed-slug.ts). A build with no placement file has none. */
+const names: Record<string, string | undefined> = {};
 export const SLUG_NAMES: Readonly<Record<string, string | undefined>> = names;
 
-/** OF31i: the placement file's aliases (world data) beat the built map; a believed file's are laid over it, never removed. */
+/** OF31i: a believed placement file's aliases are laid in, never removed. */
 export function adoptSlugAliases(aliases: Readonly<Record<string, string>> | undefined): void {
   if (aliases === undefined) return;
   for (const [old, now] of Object.entries(aliases)) if (old !== now) names[old] = now;
