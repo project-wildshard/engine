@@ -88,8 +88,11 @@ async function journey({ id, root, url, out, build, candidate }) {
       return { id, browser, pass: false, seconds: (Date.now() - started) / 1000, playedMs: 0, reason, log };
     }
   }
+  // QA 11-23-b row 21: on staging the gate crosses into Nalati (its second worker) and checks the walk back in holds; the
+  // local rig hosts only Driftwood, Pine and Sky Reach (`openQaRig` more), so a loopback leg crosses into Sky Reach as before
+  const nalati = url === STAGING, gateTarget = nalati ? 'nalati-grasslands' : 'far-reach';
   const args = gate
-    ? [join(import.meta.dirname, 'zone-gate-proof.mjs'), `--base=${url}`, `--out=${dir}`, '--engine=chromium', '--viewport=1280x800@1', '--target=nalati-grasslands', '--deploy', '--online', '--reenter']
+    ? [join(import.meta.dirname, 'zone-gate-proof.mjs'), `--base=${url}`, `--out=${dir}`, '--engine=chromium', '--viewport=1280x800@1', `--target=${gateTarget}`, '--deploy', '--online', ...(nalati ? ['--reenter'] : [])]
     : doctor ? ['--import', join(import.meta.dirname, 'bake-loader.mjs'), join(import.meta.dirname, 'e7-doctor-proof.mjs'), url, build, RELEASE_PUBLIC_KEY, '--engine=chromium',
       ...(candidate === undefined ? [] : [`--candidate-entry=${candidate.deploymentUrl}`, `--candidate-id=${candidate.deploymentId}`])]
     : [join(import.meta.dirname, 'journey-proof.mjs'), '--url', url, '--out', dir, '--browsers', browser, '--card', 'driftwood-isle', '--paths', 'mmo', '--runs', 'cold', '--deploy'];
@@ -106,7 +109,7 @@ async function journey({ id, root, url, out, build, candidate }) {
   } finally { closeSync(fd); }
   if (doctor) return { id, browser, pass: status === 0, seconds: (Date.now() - started) / 1000, playedMs: 0, log,
     ...(status === 0 ? {} : { reason: 'Doctor did not pass for this build' }) };
-  const report = readResult(join(dir, gate ? 'chromium-zone-gate.json' : 'report.json'));
+  const report = readResult(join(dir, gate ? (nalati ? 'chromium-zone-gate.json' : 'chromium-far-reach-zone-gate.json') : 'report.json'));
   const pass = status === 0 && report?.build === build &&
     (gate ? report?.fired?.ready === true : report?.report?.length === 1 && report?.report[0]?.ok === true);
   // the gate names the wait it gave up on and what the page showed then (zone-gate-proof.mjs `namedWait`)
