@@ -23,6 +23,7 @@ interface PinnedDocument {shards: DocumentRow[]}
 
 const {WILDSHARD_API: API = 'https://api.wildshard.io'} = process.env;
 const PINS = 'test/pins/shardfiles.json', CATALOGUE = 'test/pins/catalogue.json', SAVES = 'test/pins/saves';
+const PIANO_MANIFEST = 'public/assets/music/piano/music.json';
 const HASH = /^[a-f0-9]{64}$/u, SLUG = /^[a-z0-9-]+$/u, REVISION = /^[1-9][0-9]*$/u;
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
@@ -55,6 +56,58 @@ export function moveSavePin(save: SaveFixture, hash: string): Record<string, unk
     return made;
   }
   return {...save, pin: hash};
+}
+
+/** Meta SHARD-COMPAT NB10 (audit B16): engine's piano manifest names the recordings a pin publishes (Driftwood's
+ *  `island-*`, Pine's `pine-*`) by their bytes, so a re-pin whose encoder hashed them differently left it naming files
+ *  no pin mounts: engine main red, then a follow-up commit (Driftwood r5 `4a72bba51`, Pine r6 `57a386863`, Driftwood r8
+ *  `9166106aa`). The pin commit renames each manifest file to the one the new product mounts with the same stem
+ *  (`island-calm`), everywhere the manifest names it (slots, stings, provenance). Files the product does not mount stay. */
+const PIANO = '/assets/music/piano/', STEM = /^(.+)-[a-f0-9]{8}\.m4a$/u;
+export function movePianoStems(manifest: string, mounts: readonly string[]): {manifest: string; moved: string[]} {
+  const byStem = new Map<string, string>();
+  for (const url of mounts) {
+    if (!url.startsWith(PIANO)) continue;
+    const name = url.slice(PIANO.length), stem = STEM.exec(name)?.[1];
+    if (stem !== undefined && !name.includes('/')) byStem.set(stem, name);
+  }
+  const moved: string[] = [];
+  const text = manifest.replaceAll(/"([a-z0-9-]+-[a-f0-9]{8}\.m4a)"/gu, (whole, name: string) => {
+    const next = byStem.get(STEM.exec(name)?.[1] ?? '');
+    if (next === undefined || next === name) return whole;
+    if (!moved.includes(`${name} -> ${next}`)) moved.push(`${name} -> ${next}`);
+    return `"${next}"`;
+  });
+  return {manifest: text, moved};
+}
+
+/** The named entries of a ustar archive (a shard file tarball), with pax and GNU long names. Node built-ins only. */
+export function tarEntries(bytes: Uint8Array): Map<string, Uint8Array> {
+  const out = new Map<string, Uint8Array>(), text = (from: number, to: number): string => new TextDecoder().decode(bytes.subarray(from, to)).replace(/\0.*$/su, '');
+  let at = 0, longName: string | undefined;
+  while (at + 512 <= bytes.length) {
+    const header = bytes.subarray(at, at + 512);
+    if (header.every(byte => byte === 0)) break;
+    const sizeField = header.subarray(124, 136), size = (sizeField[0] ?? 0) & 0x80
+      ? sizeField.subarray(1).reduce((sum, byte) => sum * 256 + byte, 0)
+      : Number.parseInt(text(at + 124, at + 136).trim() || '0', 8);
+    const type = String.fromCodePoint(header[156] ?? 0), body = bytes.subarray(at + 512, at + 512 + size);
+    const prefix = text(at + 345, at + 500), name = longName ?? (prefix === '' ? text(at, at + 100) : `${prefix}/${text(at, at + 100)}`);
+    longName = undefined;
+    if (type === 'L') longName = new TextDecoder().decode(body).replace(/\0.*$/su, '');
+    else if (type === 'x') longName = /(?:^|\n)\d+ path=([^\n]*)\n/u.exec(new TextDecoder().decode(body))?.[1];
+    else if (type === '0' || type === '\0') out.set(name.replace(/^\.\//u, ''), body);
+    at += 512 + Math.ceil(size / 512) * 512;
+  }
+  return out;
+}
+
+/** The URLs a product's cook mounts, from its tarball's `cook.json`. */
+export function productMounts(tarball: Uint8Array): string[] {
+  const cook = tarEntries(tarball).get('cook.json');
+  if (cook === undefined) return [];
+  const rows = (JSON.parse(new TextDecoder().decode(cook)) as {mounts?: {url?: unknown}[]}).mounts ?? [];
+  return rows.flatMap(row => typeof row.url === 'string' ? [row.url] : []);
 }
 
 async function getJson(path: string): Promise<unknown> {
@@ -97,6 +150,13 @@ async function main(argv: readonly string[]): Promise<void> {
   writeFileSync(CATALOGUE, json(moved.document));
   const save = `${SAVES}/${slug}.json`;
   if (existsSync(save)) writeFileSync(save, json(moveSavePin(JSON.parse(readFileSync(save, 'utf8')) as Record<string, unknown>, hash)));
+  const tarball = await fetch(`${API}/api/shardfiles/${hash}`);
+  if (!tarball.ok) throw new Error(`GET /api/shardfiles/${hash.slice(0, 8)}: HTTP ${tarball.status}`);
+  const piano = movePianoStems(readFileSync(PIANO_MANIFEST, 'utf8'), productMounts(new Uint8Array(await tarball.arrayBuffer())));
+  if (piano.moved.length > 0) {
+    writeFileSync(PIANO_MANIFEST, piano.manifest);
+    console.log(`piano manifest follows the pin: ${piano.moved.join(', ')}`);
+  }
   await refreshStaging(API);
   console.log(`pinned ${slug} rev ${revision} ${hash.slice(0, 8)} (${bytes} bytes) from ${channel}${first ? ' (first pin)' : ''}`);
 }

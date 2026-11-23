@@ -131,8 +131,9 @@ jobs:
           published to $CHANNEL from Actions; shardfiles.json and the pinned
           document by pin-shard.ts, staging.json by refresh, Ring 1's slices by
           pins.ts slice and its CI digest by ring-step.ts, tarball on pins; the
-          released save fixture follows the pin (SHARD-COMPAT NB10)." \
-            -m 'Assisted-by: shard-pin:workflow' -- test/pins/shardfiles.json test/pins/catalogue.json test/pins/staging.json test/pins/slices.json test/pins/ring-digests.json \
+          released save fixture and the piano stems follow the pin (SHARD-COMPAT
+          NB10)." \
+            -m 'Assisted-by: shard-pin:workflow' -- test/pins/shardfiles.json test/pins/catalogue.json test/pins/staging.json test/pins/slices.json test/pins/ring-digests.json public/assets/music/piano/music.json \
             $(test -f "test/pins/saves/$SLUG.json" && echo "test/pins/saves/$SLUG.json")
           git push "https://x-access-token:${TOKEN}@github.com/project-wildshard/engine.git" "HEAD:refs/heads/$branch"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"

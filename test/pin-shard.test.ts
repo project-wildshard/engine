@@ -1,6 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import {expect, test} from 'vitest';
-import {movePin, moveSavePin} from '../scripts/pin-shard.ts';
+import {movePianoStems, movePin, moveSavePin, productMounts} from '../scripts/pin-shard.ts';
 
 const a = 'a'.repeat(64), b = 'b'.repeat(64);
 const pins = {api: 'x', shards: [{slug: 'dunes', revision: 1, hash: a, bytes: 10}, {slug: 'nine', revision: 1, hash: a, bytes: 20}]};
@@ -91,3 +93,29 @@ test('shard-pin commits its pin branch with no local hooks after ring-setup', ()
   expect(branch).toBeGreaterThan(unset);
   expect(commit).toBeGreaterThan(unset);
 });
+
+// Meta SHARD-COMPAT NB10 (audit B16): Driftwood r8 published from ubuntu hashed its island stems differently, so engine's
+// piano manifest named files no pin mounted (main red, 9166106aa). The pin commit now renames them to the new product's.
+test('a re-pin renames the piano stems the product mounts, everywhere the manifest names them', () => {
+  const manifest = JSON.stringify({slots: {island: {calm: 'island-calm-d256be45.m4a', tension: 'island-tension-aac7c988.m4a'}, title: {full: 'title-7ce82663.m4a'}},
+    provenance: [{file: 'island-calm-d256be45.m4a'}, {file: 'title-7ce82663.m4a'}]}, null, 2);
+  const mounts = ['/assets/music/piano/island-calm-d4e3ea34.m4a', '/assets/music/piano/island-tension-c8d2932e.m4a', '/assets/sfx/driftwood-isle/bed-1a2b3c4d.m4a'];
+  const moved = movePianoStems(manifest, mounts);
+  expect(moved.moved).toEqual(['island-calm-d256be45.m4a -> island-calm-d4e3ea34.m4a', 'island-tension-aac7c988.m4a -> island-tension-c8d2932e.m4a']);
+  const after = JSON.parse(moved.manifest) as {slots: {island: {calm: string}; title: {full: string}}; provenance: {file: string}[]};
+  expect(after.slots.island.calm).toBe('island-calm-d4e3ea34.m4a');
+  expect(after.provenance.map(row => row.file)).toEqual(['island-calm-d4e3ea34.m4a', 'title-7ce82663.m4a']);
+  expect(movePianoStems(moved.manifest, mounts)).toEqual({manifest: moved.manifest, moved: []});
+  expect(movePianoStems(manifest, [])).toEqual({manifest, moved: []});
+});
+
+const driftwood = (JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as {shards: {slug: string; hash: string}[]}).shards.find(row => row.slug === 'driftwood-isle')?.hash ?? '';
+const pinned = join(process.env['WILDSHARD_PIN_CACHE'] ?? join(homedir(), '.cache/wildshard/pins'), `${driftwood}.tar`);
+test.skipIf(!existsSync(pinned))('the pinned Driftwood product mounts exactly the island stems the piano manifest names', () => {
+  const mounts = productMounts(new Uint8Array(readFileSync(pinned)));
+  expect(mounts.filter(url => url.startsWith('/assets/music/piano/island-')).length).toBe(2);
+  const manifest = readFileSync('public/assets/music/piano/music.json', 'utf8');
+  expect(movePianoStems(manifest, mounts).moved).toEqual([]);
+  const stale = manifest.replaceAll(/island-calm-[a-f0-9]{8}/gu, 'island-calm-00000000');
+  expect(movePianoStems(stale, mounts).manifest).toBe(manifest);
+}, 60_000);
