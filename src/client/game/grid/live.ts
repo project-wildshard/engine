@@ -76,6 +76,10 @@ export interface LiveGridPorts {
      *  a pressure eviction), while the traveller is within this many metres of it (the page passes Infinity: the whole road),
      *  and is retired before any other cell's allocation. Absent: every cell expires. */
     readonly keepHome?: number;
+    /** QA 11-23-b row 17 (J500, Jake 2026-11-23: re-entering Signal Dunes from the road swapped its far placeholder for the zone at the
+     *  gate): any departed zone, home or not, stays resident and needed while the traveller is within this many metres of it (the
+     *  page passes one road cell). Past it, it retires. Absent: only the home is kept. */
+    readonly keepNear?: number;
     readonly schedule: (expire: () => void, delayMs: number) => () => void };
   /** G580 T2: told once before a resident's retirement or unload disposes its world, so its compiled programs can be kept
    *  for the next world; never refuses a retirement. Absent keeps nothing. */
@@ -394,7 +398,7 @@ export class LiveGridHost {
       } catch { return false; }
     }
     this.forgetLastCell();
-    const kept = policy.keepHome !== undefined && instance === this.ports.home.instance && this.distance(this.assembly.cell(instance)) <= policy.keepHome;
+    const kept = this.keptNear(instance, policy);
     const last = { instance, until: kept ? Number.POSITIVE_INFINITY : diagnosticNow() + policy.windowMs, pinned: kept, cancel: (): void => undefined };
     this.lastCell = last;
     if (kept) {
@@ -412,14 +416,20 @@ export class LiveGridHost {
     resident.lease.update({ needed: false, distance: this.distance(this.assembly.cell(instance)) });
     return this.lastCell === last;
   }
+  /** ZE21 and J500: whether a departed zone is kept (needed, no expiry) where the traveller stands now. */
+  private keptNear(instance: string, policy: NonNullable<LiveGridPorts['lastCell']>): boolean {
+    const away = this.distance(this.assembly.cell(instance));
+    return policy.keepHome !== undefined && instance === this.ports.home.instance && away <= policy.keepHome
+      || policy.keepNear !== undefined && away <= policy.keepNear;
+  }
   private distance(cell: GridCell, p = this.worldFeet()): number { return Math.hypot(Math.max(0, Math.abs(p.x - cell.origin.x) - CHUNK_HALF), Math.max(0, Math.abs(p.z - cell.origin.z) - CHUNK_HALF)); }
   /** Only the active/reserved world and one bounded departed world can remain.
    * A different actual entry retires the departure before any new allocation. */
   private retireInactiveRegions(destination?: string): boolean {
     const last = this.lastCell;
-    const keep = this.ports.lastCell?.keepHome;
+    const policy = this.ports.lastCell;
     if (last !== null && (diagnosticNow() >= last.until || !this.retainedFits(last.instance)
-      || keep !== undefined && last.instance === this.ports.home.instance && this.distance(this.assembly.cell(last.instance)) > keep
+      || last.pinned && policy !== undefined && !this.keptNear(last.instance, policy)
       || this.active !== null || destination !== undefined && destination !== last.instance)) this.forgetLastCell();
     let released = true;
     for (const [instance, resident] of this.residents) {

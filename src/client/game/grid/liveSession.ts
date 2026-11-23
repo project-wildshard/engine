@@ -356,7 +356,9 @@ export class LiveGridSession {
     const highwayBytes = (ports.initialStripBytes ?? ports.strips.reduce((sum, strip) => sum + strip.mesh.positions.byteLength + strip.mesh.indices.byteLength, 0))
       + assembly.cells.length * TRANSFER_WALL_BYTES;
     try { this.live = new LiveGridHost(assembly, {
-      lastCell: { windowMs: 30_000, playingBytes: ports.allocator.envelope(), keepHome: HOME_KEEP_METRES, schedule: (expire, ms) => {
+      lastCell: { windowMs: 30_000, playingBytes: ports.allocator.envelope(), keepHome: HOME_KEEP_METRES,
+        // QA 11-23-b row 17 (J500): any zone just left stays resident across the road band beside it
+        keepNear: assembly.pitch - CHUNK_HALF * 2, schedule: (expire, ms) => {
         const timer = scope.child('grid.last-cell-expiry');
         timer.timeout(ms, () => { timer.dispose(); scope.run(expire); });
         return () => { timer.dispose(); };

@@ -15,7 +15,7 @@ const level: SimLevel = { version: 3, id: 'platform', seed: 1, ground: { size: 5
   player: { at: { x: 0, y: 0, z: 0 }, yaw: 0, speed: 30 }, entities: [], quests: [],
   weapon: { id: 'none', shape: { kind: 'point', radius: 0 }, windup: 0, active: 0, recover: 0, cooldown: 0, range: 0, damage: 0, tags: [] } };
 
-async function fixture(options: { cap?: number; isolated?: boolean; keepHome?: number; beforeAdmit?: (instance: string, required: boolean) => Promise<void> } = {}) {
+async function fixture(options: { cap?: number; isolated?: boolean; keepHome?: number; keepNear?: number; beforeAdmit?: (instance: string, required: boolean) => Promise<void> } = {}) {
   const rapier = await loadRapier(Uint8Array.from(fixtureBytes(new URL('../node_modules/@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm', import.meta.url))));
   const assembly = new GridAssembly({ developer: false, devserver: false }), home = assembly.cell('driftwood-isle');
   const next = assembly.cells.find(cell => cell.instance !== home.instance);
@@ -28,7 +28,7 @@ async function fixture(options: { cap?: number; isolated?: boolean; keepHome?: n
   const live = new LiveGridHost(assembly, {
     home: { mode: 'owned', instance: home.instance, bytes: 50_000_000, residency: residency.admitHome(home.instance, 50_000_000) },
     player, allocator: residency.allocator,
-    lastCell: { windowMs: 30_000, playingBytes: options.cap ?? CONTENT_CAPS.playing, ...(options.keepHome === undefined ? {} : { keepHome: options.keepHome }), schedule: (run, delay) => {
+    lastCell: { windowMs: 30_000, playingBytes: options.cap ?? CONTENT_CAPS.playing, ...(options.keepHome === undefined ? {} : { keepHome: options.keepHome }), ...(options.keepNear === undefined ? {} : { keepNear: options.keepNear }), schedule: (run, delay) => {
       const expiry = { run, delay, cancelled: false }; expiries.push(expiry); return () => { expiry.cancelled = true; };
     } },
     bindFrame: () => undefined, gameplayReady: () => true, prefetchable: () => false,
@@ -298,5 +298,35 @@ test('ZE21: the owned home stays resident for the whole road, and allocator pres
     f.player.position.x -= 250 + 1500;
     await f.enter(f.home.instance);
     expect(f.created).toEqual([f.home.instance]); expect(f.objects.get(f.home.instance)).toBe(object);
+  } finally { f.close(); }
+});
+
+// QA 11-23-b row 17 (J500, Jake 2026-11-23 ~13:05 Cancún, left Signal Dunes and walked back in: its far placeholder filled the view,
+// then a void, then the zone). Any zone just left stays resident and needed while the traveller is on the road beside it, so the walk
+// back in reattaches the same world; past that band it retires as before.
+test('J500: a zone that is not the home stays resident on the road beside it, and retires past the band', async () => {
+  const f = await fixture({ keepNear: 150 });
+  try {
+    // world x of the traveller: the live host keeps the feet local to the cell it stands in
+    const at = (x: number): void => { f.player.position.x += x - f.live.worldFeet().x; f.player.position.z += f.next.origin.z - f.live.worldFeet().z; };
+    await f.enter(f.next.instance); const object = f.objects.get(f.next.instance);
+    at(f.next.origin.x);
+    expect(await f.leave()).toBe(true); await f.settle();
+    expect(f.expiries, 'no time expiry beside it').toEqual([]);
+    expect(f.live.state().retainedCell?.instance).toBe(f.next.instance);
+    // a step onto the road beside it: still kept, and allocator pressure never evicts it
+    at(f.next.origin.x + 250 + 100);
+    for (let tick = 0; tick < 3; tick++) await f.settle();
+    expect(f.live.state().retainedCell?.instance).toBe(f.next.instance); expect(f.disposed).not.toContain(f.next.instance);
+    // back in: the same world, never built again
+    at(f.next.origin.x);
+    await f.enter(f.next.instance);
+    expect(f.created.filter(id => id === f.next.instance)).toHaveLength(1); expect(f.objects.get(f.next.instance)).toBe(object);
+    // out again and past the band: it retires
+    at(f.next.origin.x);
+    expect(await f.leave()).toBe(true);
+    at(f.next.origin.x + 250 + 400);
+    for (let tick = 0; tick < 3; tick++) await f.settle();
+    expect(f.live.state().retainedCell?.instance).not.toBe(f.next.instance); expect(f.disposed).toContain(f.next.instance);
   } finally { f.close(); }
 });
