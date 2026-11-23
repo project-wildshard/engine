@@ -1,6 +1,6 @@
 // Client-only private presentation math. Pure CPU; shared by views and build
 // generators so their initial poses and instance matrices cannot drift.
-import { BufferAttribute, BufferGeometry, InstancedMesh, Material, Matrix4, Mesh, Object3D, Quaternion, Vector3 } from 'three';
+import { BufferAttribute, BufferGeometry, DynamicDrawUsage, InstancedMesh, Material, Matrix4, Mesh, Object3D, Quaternion, Vector3 } from 'three';
 import { compileTubeCurve, parseClientChannels, type ClientChannelProgram } from '@wildshard/format/clientChannels';
 import { createClientChannels, type ClientTubeFrame, type ClientConnectorFrame, type ClientChannelObservation } from '../../../shared/game/plugin/channels';
 
@@ -67,8 +67,13 @@ function bindTubeCurve(row: NonNullable<ClientChannelProgram['geometry']>, targe
   if(position===undefined&&Object.keys(attributes).length===0&&geometry.index===null)return ()=>undefined;
   const tube=compileTubeCurve({segments:row.segments,radial:row.radial,bend:row.bend,ripple:row.ripple,drop:row.drop,radius:row.radius});
   if(!(position instanceof BufferAttribute)||!(position.array instanceof Float32Array)||position.itemSize!==3||position.count!==tube.vertices)throw new Error('Tube mesh layout differs');
-  const positions=position.array;
-  return (frame,time)=>{tube.write(positions,frame,time);position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();};
+  // QA 11-23 row 13 (Dunes' whip): the tube is rewritten every frame, so it is dynamic. As a static attribute the Memory
+  // saver released its CPU copy once it had drawn unchanged and read it back from the GPU into a new array, while the
+  // writer kept filling the old one: the lash stayed a zero-size tube. Never release it, and write the live array.
+  position.setUsage(DynamicDrawUsage);
+  const normal=geometry.getAttribute('normal');if(normal instanceof BufferAttribute)normal.setUsage(DynamicDrawUsage);
+  return (frame,time)=>{const positions=position.array;if(!(positions instanceof Float32Array))throw new Error('Tube mesh layout differs');
+    tube.write(positions,frame,time);position.needsUpdate=true;geometry.computeVertexNormals();geometry.computeBoundingSphere();};
 }
 
 const CLIENT_SCALAR_TRANSFORMS = { x: ['position', 'x'], y: ['position', 'y'], z: ['position', 'z'],
