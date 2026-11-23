@@ -154,6 +154,22 @@ async function go(page, url, nav) {
   await settled(() => page.evaluate('setTimeout(() => { location.replace(arguments[0]); }, 0); return true;', [url]), 3);
 }
 
+/** QA 2026-11-23 row 1 (opus-qa1): the page's own word on how the last document in this tab ended (boot/lastEnd.ts: a
+ * reason the game wrote before it reloaded, index.html's self-reload claim, or a page that ended without a pagehide), with
+ * this document's navigation type and origin. A product reload leaves a reason; a WebContent the OS killed leaves none. */
+const LIFE = `const out = { timeOrigin: performance.timeOrigin, path: location.pathname + location.search,
+  nav: performance.getEntriesByType('navigation')[0]?.type ?? null, keys: {} };
+  for (const store of [localStorage, sessionStorage]) for (let i = 0; i < store.length; i++) {
+    const name = store.key(i); if (!name || !name.startsWith('wildshard.save')) continue;
+    try { const keys = JSON.parse(store.getItem(name) || '{}').keys || {};
+      for (const [k, v] of Object.entries(keys)) if (/^(life|boot)\\./.test(k)) out.keys[k] = v && typeof v === 'object' && 'data' in v ? v.data : v; } catch {}
+  }
+  return JSON.stringify(out);`;
+/** @param {Page} page @returns {Promise<unknown>} */
+async function life(page) {
+  try { return JSON.parse(String(await settled(() => page.evaluate(LIFE), 2))); } catch (error) { return { error: String(error) }; }
+}
+
 /** Open /slug/<zone>, wait for the new document, press ENTER ZONE and wait for control.
  * @param {Page} page @param {URL} base @param {string} zone @param {'replace' | 'load'} nav @param {string} [via] the address
  *   that leads there (`leave`: the leave page, which sends the page on) @returns {Promise<Boot>} */
@@ -166,6 +182,7 @@ async function boot(page, base, zone, nav, via = `/slug/${zone}`) {
     assert.ok(Date.now() < replacedBy, 'the page was not replaced');
     await pause(300);
   }
+  const firstOrigin = Number(await settled(() => page.evaluate('return performance.timeOrigin;')));
   const driver = /** @type {any} */ (page);
   const entryBy = Date.now() + 90_000;
   let button;
@@ -175,8 +192,9 @@ async function boot(page, base, zone, nav, via = `/slug/${zone}`) {
   await page.click(/** @type {{ el: { __wsElement: number } }} */ (button).el);
   const result = await waitForControl(driver, start, 180_000, () => undefined);
   // entering may move the page (the slug page to /), so the boot's document is the one at control
+  const atControl = await life(page);
   return { outcome: result.outcome, clickToControlMs: result.controlAt === null ? null : result.controlAt - start, error: result.state?.error ?? null,
-    controlAt: new Date().toISOString(), timeOrigin: Number(await page.evaluate('return performance.timeOrigin;')) };
+    controlAt: new Date().toISOString(), timeOrigin: Number(await page.evaluate('return performance.timeOrigin;')), firstOrigin, life: atControl };
 }
 
 /** Ask the warm page every second for `seconds`: a kill shows as no answer, or Safari's reload as another document.
@@ -255,7 +273,8 @@ async function main() {
       round.pidsWarm = webContentPids(join(dir, 'pids-warm.json')); save();
       if (round.warm.outcome === 'control') await hold(fresh, round.warm, Number(values.hold));
       round.pidsEnd = webContentPids(join(dir, 'pids-end.json'));
-    } catch (error) { round.error = String(error); console.error(`round ${String(index + 1)}:`, error); }
+      round.lifeEnd = await life(fresh);
+    } catch (error) { round.error = String(error); console.error(`round ${String(index + 1)}:`, error); if (page !== undefined) round.lifeAtError = await life(page); }
     finally {
       round.finishedAt = new Date().toISOString();
       await log.stop();
