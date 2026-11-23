@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "4ce89d0c9db427b6d7e75f25216e344f880faae7af22cdbc84305c8358e68611",
+  "catalogueHash": "6050eac0d354b91fe4c2a390c18e4c78f0bc892212c02404251e23a17b379b20",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -702,8 +702,8 @@
       {
         "slug": "mirror-salt",
         "name": "Mirror Salt",
-        "revision": 5,
-        "hash": "4265cae597ff5b2b508b243ed06ed946470c99d6aad8db4ab4d13efa2f616eb3"
+        "revision": 6,
+        "hash": "edb4a7b304cf56599565178ff75ee3da112944e1e9a34d38e4d223ad2ff47b9a"
       },
       {
         "slug": "mossgate",
@@ -714,8 +714,8 @@
       {
         "slug": "nalati-grasslands",
         "name": "Nalati Grasslands",
-        "revision": 5,
-        "hash": "7496916e63123254484b4d0020f14aed312119d008b82142c44b1fa0066deb76"
+        "revision": 6,
+        "hash": "4e99b83cde17151cacce01b6e8a755cc4442049ff73cabf769c21b3a6f9bbf6f"
       },
       {
         "slug": "nine-dragon-stack",
@@ -879,9 +879,9 @@
     },
     {
       "slug": "mirror-salt",
-      "revision": 5,
-      "hash": "4265cae597ff5b2b508b243ed06ed946470c99d6aad8db4ab4d13efa2f616eb3",
-      "bytes": 14881792
+      "revision": 6,
+      "hash": "edb4a7b304cf56599565178ff75ee3da112944e1e9a34d38e4d223ad2ff47b9a",
+      "bytes": 14883328
     },
     {
       "slug": "mossgate",
@@ -891,9 +891,9 @@
     },
     {
       "slug": "nalati-grasslands",
-      "revision": 5,
-      "hash": "7496916e63123254484b4d0020f14aed312119d008b82142c44b1fa0066deb76",
-      "bytes": 223362048
+      "revision": 6,
+      "hash": "4e99b83cde17151cacce01b6e8a755cc4442049ff73cabf769c21b3a6f9bbf6f",
+      "bytes": 223361024
     },
     {
       "slug": "nine-dragon-stack",
