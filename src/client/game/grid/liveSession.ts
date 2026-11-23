@@ -1170,7 +1170,10 @@ export class LiveGridSession {
    */
   private syncRoadDisplays(): void {
     const current = this.live.current(), entered = this.runtimePage.state();
-    const wanted = new Set(this.live.drawnFromRoad());
+    // only a zone the traveller has played draws whole from the road: one built ahead (rule 2) and never entered drew its
+    // pieces unplaced from the road (white shards above Nalati's wall); it keeps its near view until its gate, then enters
+    // with no build (row 17's local rig walk)
+    const wanted = new Set(this.live.drawnFromRoad().filter(instance => this.startedRuntimes.has(instance)));
     if (current !== null && this.roadDisplays.has(current) && !(entered.instance === current && entered.ready)) wanted.add(current);
     for (const [instance, shown] of this.roadDisplays) {
       if (wanted.has(instance) && this.runtimeRegions.get(instance) === shown.prepared) continue;

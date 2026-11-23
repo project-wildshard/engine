@@ -55,9 +55,9 @@ const portalRoutes = async (page, slug) => {
   const path = await page.evaluate(slug_ => {
     const bank = JSON.parse(document.getElementById('boot-module-files')?.textContent ?? '{}');
     const home = bank.spawnManifests?.home, baked = home?.shards?.includes(slug_), content = bank.contentBase;
-    const base = new URL(baked ? home.base : typeof content === 'string' && content.length > 0 ? content : document.baseURI);
+    const from = new URL(baked ? home.base : typeof content === 'string' && content.length > 0 ? content : document.baseURI);
     const loose = baked ? home.loose?.[slug_] : undefined;
-    const root = typeof loose === 'string' && /^loose\/[a-f0-9]{64}\/$/u.test(loose) ? new URL(loose, base) : base;
+    const root = typeof loose === 'string' && /^loose\/[a-f0-9]{64}\/$/u.test(loose) ? new URL(loose, from) : from;
     return new URL(`shardfiles/${encodeURIComponent(slug_)}/sections/world/edge.json`, root).href;
   }, slug);
   const response = await fetch(path, { signal: AbortSignal.timeout(10_000) }).catch(() => null);
@@ -119,9 +119,9 @@ try {
   const pitch = Number(first?.pitch ?? 562.5), road = (pitch - 2 * HALF) / 2;
   const [dx, dz] = SIDE;
   /** @type {any[]} */ const frames = /** @type {any} */ (report.frames);
-  let sampling = true, shot = 0, phase = 'start';
+  const sampling = { on: true }; let shot = 0, phase = 'start';
   const sampler = (async () => {
-    while (sampling) {
+    while (sampling.on) {
       const at = Date.now(), st = await gridState(page);
       // the video keeps every frame (a WebKit screenshot per sample stalled the sampler for 30 s on a busy page)
       frames.push({ at, phase, sample: shot++, ...st, cells: undefined });
@@ -130,16 +130,16 @@ try {
   })();
   /** hold forward toward `target` until within `within` m (or `landed`), side-stepping a post like the J451 smoke does
    * @param {Point} target @param {number} ms @param {number} [within] @param {(at: Point) => boolean} [landed] */
-  const walkTo = async (target, ms, within = 1.5, landed) => {
+  const walkTo = async (target, ms, within = 1.5, landed = (/** @type {Point} */ _at) => false) => {
     const end = Date.now() + ms;
     let last = /** @type {Point | null} */ (null), movedAt = Date.now(), stalls = 0, best = Infinity;
     await page.keyboard.down('ShiftLeft');
     try {
       for (;;) {
         const st = await gridState(page);
-        if (st?.feet != null) {
+        if (st !== null && st.feet !== null) {
           const distance = Math.hypot(st.feet.x - target.x, st.feet.z - target.z);
-          if (distance <= within || landed?.(st.feet) === true) return;
+          if (distance <= within || landed(st.feet)) return;
           if (distance < best - 3) { best = distance; stalls = 0; }
           await setYaw(page, yawTo(st.feet, target));
           if (last === null || Math.hypot(last.x - st.feet.x, last.z - st.feet.z) >= 0.5) { last = st.feet; movedAt = Date.now(); }
@@ -187,7 +187,7 @@ try {
   phase = 'road';
   await delay(4000);
   const look = async (/** @type {string} */ name, /** @type {Point} */ toward) => {
-    const st = await gridState(page); if (st?.feet == null) return;
+    const st = await gridState(page); if (st === null || st.feet === null) return;
     await setYaw(page, yawTo(st.feet, toward)); await delay(1500);
     await page.screenshot({ path: join(dir, `road-${name}.png`), scale: 'css' });
     /** @type {any[]} */ (report.shots).push({ name, ...(await gridState(page)), cells: undefined });
@@ -211,9 +211,10 @@ try {
   memories.back = await memory(page);
   phase = 'end';
   await delay(400);
-  sampling = false; await sampler;
+  sampling.on = false; await sampler;
   report.gaps = await page.evaluate(() => /** @type {any} */ (window).__roadGaps);
-  const roadFrames = frames.filter(row => row.phase === 'road' || row.phase.startsWith('walk-a') || row.phase === 'walk-back');
+  const roadPhases = new Set(['road', 'walk-ahead', 'walk-back']);
+  const roadFrames = frames.filter(row => roadPhases.has(row.phase));
   const shownAll = roadFrames.every(row => row.current !== null || row.drawn.includes(zone));
   const cardIn = frames.filter(row => row.phase === 'walk-in' && row.card === true).length;
   report.verdict = { leftZoneDrawnOnRoad: shownAll, roadFrames: roadFrames.length, loadingCardFramesWalkingIn: cardIn,
