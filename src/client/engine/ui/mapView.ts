@@ -6,11 +6,12 @@
  *
  * Pure numbers in the map's metres, so the tests read them without a canvas (map-view.test.ts). FullMap (Map.ts) reads
  * them when its extras carry a `grid` (the grid's full map, minimapBlend.ts); a one-shard map keeps its old fit.
- * QA 11-19 row 58 (Jake's A-1.4, 17:20): the chips are 0.25x, 0.5x, 1x and 2x; 1x is the opening view, 0.5x and 2x halve and
- * double it, 0.25x fits the whole 7 by 7 across the frame; a pinch settles on the nearest stop when the fingers lift.
+ * QA 11-19 row 58 (Jake's A-1.4, 17:20): 1x is the opening view, 0.5x and 2x halve and double it; a pinch settles on the nearest stop
+ * when the fingers lift. MAP-NEXT MN18 (J496): the chips read fit, 0.25x, 0.5x, 1x and 2x: 0.25x is a literal quarter of 1x
+ * (about 5 cells across), and fit lays the whole 7 by 7 across the frame.
  *
  *   const zoom = openZoom(grid)                         // about 5.7 for the 7 by 7: the 500 m zone fills 72% of the short side
- *   const stops = gridStops(grid)                       // [{ label: 0.25, zoom: 1 }, … { label: 2, zoom: 2 * openZoom(grid) }]
+ *   const stops = gridStops(grid)                       // fit (zoom 1), 0.25× (open / 4), 0.5×, 1× (open), 2×
  *   nearestStop(stops, zoom)                            // the stop a pinch settles on
  *   const ppm = gridPpm(grid, shortSidePx, zoom)        // px per metre: zoom 1 fits the 7 by 7 to the short side
  *   const { cx, cz } = clampView(grid, { cx, cz, halfX, halfZ })
@@ -23,8 +24,11 @@ export interface MapGrid { readonly x0: number; readonly z0: number; readonly pi
 
 /** QA 11-19 row 57: the share of the frame's short side your zone fills when the map opens (Jake's screen, 16:21) */
 export const OPEN_ZONE_FILL = 0.72;
-/** a zoom chip: its label (the "x" number the chip shows) and the map's zoom it sets (gridPpm's, or the chunk fit's) */
-export interface ZoomStop { readonly label: number; readonly zoom: number }
+/** a zoom chip: its label (the "x" number the chip shows, or `fit`: the whole grid) and the map's zoom it sets (gridPpm's,
+ *  or the chunk fit's) */
+export interface ZoomStop { readonly label: number | typeof FIT; readonly zoom: number }
+/** MN18: the stop that lays the whole grid across the frame (its chip reads engine string s_map_fit) */
+export const FIT = 'fit';
 /** a one-shard map's chips (a level off the grid, a practice room): 1x is the chunk fitted to the frame */
 export const SHARD_STOPS: readonly ZoomStop[] = [{ label: 1, zoom: 1 }, { label: 2, zoom: 2 }, { label: 4, zoom: 4 }];
 
@@ -34,11 +38,13 @@ export const gridSide = (grid: MapGrid): number => grid.cells * grid.pitch;
  *  (zoom 1 fits all `cells`) */
 export function openZoom(grid: MapGrid, zoneSide: number = CHUNK_SIZE): number { return gridSide(grid) / (zoneSide / OPEN_ZONE_FILL); }
 
-/** row 58 (A-1.4): the grid map's chips, widest first. 1x opens on you (openZoom), 0.5x and 2x halve and double it, and
- *  0.25x is zoom 1, the whole grid across the short side (Jake, 17:03: "0.25x shows the whole 7x7"), not 1x / 4. */
+/** the grid map's chips, widest first. 1x opens on you (openZoom), 0.5x and 2x halve and double it (row 58, A-1.4). MN18
+ *  (J496, replaces row 58's snapped 0.25x): 0.25x is a literal quarter of 1x, and `fit` is zoom 1, the whole grid across the
+ *  short side. A stop wider than fit (a small grid's 0.25x) is left out: fit already shows everything. */
 export function gridStops(grid: MapGrid, zoneSide: number = CHUNK_SIZE): readonly ZoomStop[] {
   const open = openZoom(grid, zoneSide);
-  return [{ label: 0.25, zoom: 1 }, { label: 0.5, zoom: open / 2 }, { label: 1, zoom: open }, { label: 2, zoom: 2 * open }];
+  const steps: readonly ZoomStop[] = [{ label: 0.25, zoom: open / 4 }, { label: 0.5, zoom: open / 2 }, { label: 1, zoom: open }, { label: 2, zoom: 2 * open }];
+  return [{ label: FIT, zoom: 1 }, ...steps.filter((stop) => stop.zoom > 1)];
 }
 
 /** the stop closest to `zoom` on a log scale (halfway between 1x and 2x is 1.41x): where a pinch settles */

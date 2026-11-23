@@ -17,7 +17,7 @@ import { engineString } from '../../../shared/engine/strings';
  * Around the chunk, `setExtras` lays out more ground as data (the grid: every cell's baked map at its cell, the road network
  * and each shard's name; SF66), and the view then spans all of it.
  * On the grid (the extras carry a `grid`, J455) the map opens centred on you with your zone filling 72% of the frame (QA 11-19
- * row 57), its chips are 0.25× (the whole 7 by 7) · 0.5× · 1× (that opening view) · 2× and a pinch settles on the nearest
+ * row 57), its chips are fit (the whole 7 by 7) · 0.25× · 0.5× · 1× (that opening view) · 2× (MN18) and a pinch settles on the nearest
  * of them (row 58, Jake's A-1.4), and the pan is clamped so a whole grid cell always stays in view (mapView.ts).
  * Drag to pan, pinch or wheel to zoom (1× = the chunk fitted to the frame, up to 6×). The world
  * keeps running underneath; the canvas swallows touch so the pads don't move you.
@@ -181,7 +181,7 @@ export class FullMap {
   /** a practice room's own map is up (the minimap's, E321): the MAP tab shows it — in the arena / a playground too */
   get hasRoom(): boolean { return this.minimap.room !== null; }
   get zoom(): number { return this._zoom; }
-  /** the zoom chips, widest first: on the grid 0.25× · 0.5× · 1× · 2× (row 58), else the chunk's 1× · 2× · 4× */
+  /** the zoom chips, widest first: on the grid fit · 0.25× · 0.5× · 1× · 2× (row 58, MN18), else the chunk's 1× · 2× · 4× */
   get stops(): readonly ZoomStop[] { const grid = this.grid(); return grid !== null ? gridStops(grid) : SHARD_STOPS; }
   /** the menu's zoom chips (a stop's `zoom`): on the grid about you, so 1× always brings back the opening view (MAP-NEXT
    *  MN7); a one-shard map zooms about the frame's centre */

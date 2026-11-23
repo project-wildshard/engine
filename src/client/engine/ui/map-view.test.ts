@@ -31,13 +31,19 @@ test('the map opens with the zone at 72% of the short side and a rim of road and
   expect(short / gridPpm(GRID, short, 1) / PITCH).toBeCloseTo(7);
 });
 
-test('row 58: 1x opens on you, 0.5x and 2x halve and double it, 0.25x is the whole 7 by 7', () => {
+test('MN18 (J496): fit is the whole 7 by 7, 0.25x a literal quarter of 1x (about 5 cells), 0.5x and 2x halve and double 1x', () => {
   const stops = gridStops(GRID), open = openZoom(GRID);
-  expect(stops.map(s => s.label)).toEqual([0.25, 0.5, 1, 2]);
-  expect(stops.map(s => s.zoom)).toEqual([1, open / 2, open, 2 * open]);
-  // 0.25x: the 7 by 7 exactly across the short side (zoom 1), not a quarter of 1x (which leaves a cell and a half out)
-  expect(1000 / gridPpm(GRID, 1000, stops[0]?.zoom ?? 0) / PITCH).toBeCloseTo(7);
-  expect(open / 4).toBeGreaterThan(1.3);
+  expect(stops.map(s => s.label)).toEqual(['fit', 0.25, 0.5, 1, 2]);
+  expect(stops.map(s => s.zoom)).toEqual([1, open / 4, open / 2, open, 2 * open]);
+  const cellsAcross = (zoom: number): number => 1000 / gridPpm(GRID, 1000, zoom) / PITCH;
+  // fit: the 7 by 7 exactly across the short side, all 49 cells
+  expect(cellsAcross(stops[0]?.zoom ?? 0)).toBeCloseTo(7);
+  expect(wholeCellsIn(GRID, { x0: GRID.x0, x1: GRID.x0 + 7 * PITCH, z0: GRID.z0, z1: GRID.z0 + 7 * PITCH })).toBe(49);
+  // 0.25x: a quarter of 1x, about 5 cells across, measured from the opening view like the others
+  expect(cellsAcross(stops[1]?.zoom ?? 0)).toBeGreaterThan(4.5); expect(cellsAcross(stops[1]?.zoom ?? 0)).toBeLessThan(5.5);
+  expect(cellsAcross(stops[1]?.zoom ?? 0) / cellsAcross(open)).toBeCloseTo(4);
+  // a grid too small for a 0.25x past fit keeps fit only
+  expect(gridStops({ ...GRID, cells: 3 }).map(s => s.label)).toEqual(['fit', 0.5, 1, 2]);
   expect(SHARD_STOPS.map(s => s.label)).toEqual([1, 2, 4]);
 });
 
@@ -50,7 +56,8 @@ test('MN8: a pinch settles on the nearest stop by log distance, either side of e
     expect(nearestStop(stops, mid * 0.99)).toBe(stop);
     expect(nearestStop(stops, mid * 1.01)).toBe(next);
   }
-  expect(nearestStop(stops, 0.5).label).toBe(0.25);
+  expect(nearestStop(stops, 0.5).label).toBe('fit');
+  expect(stops).toHaveLength(5);
   expect(nearestStop(stops, 100).label).toBe(2);
 });
 
@@ -214,11 +221,13 @@ test('MN7: a 386 x 540 pt frame at each stop, every chip zooming about you', () 
     const across = (): number => { const b = map.viewBox(); return b.x1 - b.x0; };
     const centred = (): void => { const b = map.viewBox(); expect((b.x0 + b.x1) / 2).toBeCloseTo(you.x); expect((b.z0 + b.z1) / 2).toBeCloseTo(you.z); };
     expect((map.viewBox().z1 - map.viewBox().z0) / across()).toBeCloseTo(540 / 386);
-    const [quarter, half, one, two] = map.stops;
-    if (quarter === undefined || half === undefined || one === undefined || two === undefined) throw new Error('four stops');
+    const [fit, quarter, half, one, two] = map.stops;
+    if (fit === undefined || quarter === undefined || half === undefined || one === undefined || two === undefined) throw new Error('five stops');
     map.setZoom(two.zoom); expect(ZONE / across()).toBeCloseTo(1.44); centred();
     map.setZoom(half.zoom); expect(across() / PITCH).toBeCloseTo(2.47, 1); centred();
-    map.setZoom(quarter.zoom); expect(wholeCellsIn(GRID, map.viewBox())).toBe(49);
+    // MN18: 0.25x about 5 cells across (about you, clamped inside the grid), fit all 49
+    map.setZoom(quarter.zoom); expect(across() / PITCH).toBeCloseTo(4.94, 1);
+    map.setZoom(fit.zoom); expect(wholeCellsIn(GRID, map.viewBox())).toBe(49);
     // pan far away: at 1x the clamp keeps a whole cell in view; at 2x the frame is narrower than a cell (347 m of 562.5),
     // so the clamp keeps the whole view inside the corner cell. The 1x chip brings back the opening view on you
     const canvas = map.root.querySelector('canvas');
@@ -238,9 +247,8 @@ test('MN7: a 386 x 540 pt frame at each stop, every chip zooming about you', () 
   } finally { scope.dispose(); }
 });
 
-test('MN13: the grid map names its places at 1x and 2x, and only marks them at 0.5x and 0.25x', () => {
-  const [quarter, half, one, two] = gridStops(GRID);
-  expect([quarter, half, one, two].map(stop => namesPlaces(GRID, stop?.zoom ?? 0))).toEqual([false, false, true, true]);
+test('MN13: the grid map names its places at 1x and 2x, and only marks them at 0.5x, 0.25x and fit', () => {
+  expect(gridStops(GRID).map(stop => namesPlaces(GRID, stop.zoom))).toEqual([false, false, false, true, true]);
   expect(namesPlaces(undefined, 1)).toBe(true); // a one-shard map always names them
   const { map, scope, frames, fillText } = fixture(gridExtras);
   try {
@@ -251,7 +259,7 @@ test('MN13: the grid map names its places at 1x and 2x, and only marks them at 0
     const named = (): string[] => { fillText.mockClear(); for (const frame of frames.splice(0)) frame(16); return fillText.mock.calls.map(([text]) => text).filter(text => text === 'THE PIER' || text === 'CASTAWAY'); };
     for (const stop of gridStops(GRID)) {
       map.setZoom(stop.zoom);
-      expect(named().sort(), `${String(stop.label)}x`).toEqual(stop.label >= 1 ? ['CASTAWAY', 'THE PIER'] : []);
+      expect(named().sort(), `${String(stop.label)}x`).toEqual(stop.label !== 'fit' && stop.label >= 1 ? ['CASTAWAY', 'THE PIER'] : []);
     }
   } finally { scope.dispose(); }
 });

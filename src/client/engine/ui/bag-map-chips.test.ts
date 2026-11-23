@@ -23,10 +23,10 @@ afterEach(() => { for (const owner of owners.splice(0)) owner.dispose(); vi.rest
 
 const GRID: MapGrid = { x0: -3.5 * 562.5, z0: -3.5 * 562.5, pitch: 562.5, cells: 7 };
 
-test('row 58: the grid map\'s chips read 0.25x 0.5x 1x 2x, open lit on 1x, and set their stop', () => {
+test('row 58, MN18: the grid map\'s chips read fit 0.25x 0.5x 1x 2x, open lit on 1x, and set their stop', () => {
   const owner = new Scope('bag-map-chips'); owners.push(owner);
   owner.onDispose(bindFlatTerrain());
-  const stops = gridStops(GRID), [, half, one] = stops;
+  const stops = gridStops(GRID), half = stops[2], one = stops[3];
   if (half === undefined || one === undefined) throw new Error('no stops');
   const state = { zoom: one.zoom };
   const setZoom = vi.fn((z: number) => { state.zoom = z; });
@@ -34,16 +34,16 @@ test('row 58: the grid map\'s chips read 0.25x 0.5x 1x 2x, open lit on 1x, and s
   const menu = withOwner(owner, () => new GameMenu({ fullMap: map, settings: () => ({ weapons: new Set(), melee: false, tracers: false, huntersEye: false }) }));
   menu.open('map');
   const chips = [...menu.root.querySelectorAll<HTMLButtonElement>('.ws-gmenu-zoom')];
-  expect(chips.map(c => c.textContent)).toEqual(['0.25×', '0.5×', '1×', '2×']);
-  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, true, false]);
+  expect(chips.map(c => c.textContent)).toEqual(['fit', '0.25×', '0.5×', '1×', '2×']);
+  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, false, true, false]);
   expect(menu.root.querySelector('.ws-gmenu-hint')?.textContent).toBe('');
-  chips[1]?.click();
+  chips[2]?.click();
   expect(setZoom.mock.calls).toEqual([[half.zoom]]);
-  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, true, false, false]);
+  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, true, false, false]);
   // MN8: while a pinch runs, the chip of the stop it will settle on is lit
   state.zoom = one.zoom * 1.3; map.onZoom?.(state.zoom);
-  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, true, false]);
+  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, false, true, false]);
   state.zoom = one.zoom * 1.5; map.onZoom?.(state.zoom);
-  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, false, true]);
+  expect(chips.map(c => c.classList.contains('active'))).toEqual([false, false, false, false, true]);
   menu.close();
 });

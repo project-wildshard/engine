@@ -87,7 +87,7 @@ export class GameMenu {
   private mapLegend: HTMLElement;
   private zoomChips: HTMLButtonElement[] = [];
   private zooms: HTMLElement;
-  /** the labels the chips show now ("0.25,0.5,1,2"): rebuilt when the map's stops change (the grid's, a one-shard map's) */
+  /** the labels the chips show now ("fit,0.25,0.5,1,2"): rebuilt when the map's stops change (the grid's, a one-shard map's) */
   private zoomKey = '';
   private zoomScope: Scope | null = null;
   private _tab: MenuTab = 'settings';
@@ -380,7 +380,8 @@ export class GameMenu {
       this.zoomScope?.dispose();
       const scope = this.zoomScope = this.scope.child('zooms');
       this.zoomChips = stops.map((stop) => {
-        const b = el('ws-gmenu-zoom', engineString('s_03a5f0ef36b4', [stop.label]), 'button') as HTMLButtonElement;
+        const text = stop.label === 'fit' ? engineString('s_map_fit') : engineString('s_03a5f0ef36b4', [stop.label]); // MN18: fit · 0.25× · …
+        const b = el('ws-gmenu-zoom', text, 'button') as HTMLButtonElement;
         b.type = 'button'; b.dataset['z'] = String(stop.label);
         listenTap(scope, b, () => { map.setZoom(stop.zoom); this.syncZoom(); });
         return b;

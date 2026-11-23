@@ -115,6 +115,7 @@ export const ENGINE_STRINGS = {
   "s_gfx_low": "Low · 1×",
   "s_gfx_high": "High · 2×",
   "s_gfx_low_start": "Low",
+  "s_map_fit": "fit",
   "s_gfx_high_start": "High",
   "s_gfx_shadows": "Sun shadows",
   "s_gfx_aa": "Anti-aliasing",
