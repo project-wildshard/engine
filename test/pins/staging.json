@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "3640f43e6ded0fe9fd7c063b15053f718b424797380d49429dcdd829b09fbd89",
+  "catalogueHash": "4af775409324e01c37f80f0c2751c9a6fa3e831037a3625fecd5e4930cdba5b1",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -684,8 +684,8 @@
       {
         "slug": "far-reach",
         "name": "Sky Reach",
-        "revision": 6,
-        "hash": "15008d514ec0f693630ef4e83cc31e9d2c3346891f2bcf4e94afdc8cae352d5f"
+        "revision": 7,
+        "hash": "a932beacbb73dbeef36f39dba36234a20d2a359dc14fc2a9f1a5cb1aecfa67e0"
       },
       {
         "slug": "glowfen",
@@ -834,8 +834,8 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 11,
-        "hash": "7848f16aee5645dff03a464b5d0f46a54c1335fae5d6578e83dd8fb6fe9c9499"
+        "revision": 12,
+        "hash": "df0a4a4786f772888373723cbb880d457ceb0514b4a94dba57266eba473e9292"
       },
       {
         "slug": "sunscar-dunes",
@@ -861,9 +861,9 @@
     },
     {
       "slug": "far-reach",
-      "revision": 6,
-      "hash": "15008d514ec0f693630ef4e83cc31e9d2c3346891f2bcf4e94afdc8cae352d5f",
-      "bytes": 52609024
+      "revision": 7,
+      "hash": "a932beacbb73dbeef36f39dba36234a20d2a359dc14fc2a9f1a5cb1aecfa67e0",
+      "bytes": 52611072
     },
     {
       "slug": "glowfen",
@@ -1011,9 +1011,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 11,
-      "hash": "7848f16aee5645dff03a464b5d0f46a54c1335fae5d6578e83dd8fb6fe9c9499",
-      "bytes": 322743296
+      "revision": 12,
+      "hash": "df0a4a4786f772888373723cbb880d457ceb0514b4a94dba57266eba473e9292",
+      "bytes": 322764800
     },
     {
       "slug": "sunscar-dunes",
