@@ -10,3 +10,8 @@
   42 to 4 links after control (none at draw: the four are the road warm-up's compiles in the first five seconds).
   `debug.bootRoadPrograms` moves those under the card. All three now default on at phone Low; a saved pick still wins,
   and other tiers keep them off.
+- The last four links after control were the outer far ring's first proxies (`sf23-far-pbr`, `-pbr-position`,
+  `-painterly`) and the haze band, prepared 4 to 5 s in because the ring starts once the background opens. The boot's
+  whole-inventory warm-up now links one stand-in of each far variant and a band under the card
+  (`GridSession.warmFarRingPrograms` through `Game.warmRootsNow`; the host's `prepareView` waits for drawn frames, so a
+  first try through it compiled the stand-ins after control). Route census: 0 links after control, 122 programs.

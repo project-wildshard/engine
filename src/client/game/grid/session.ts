@@ -29,7 +29,7 @@ import { LightPool } from '@wildshard/engine/fx/LightPool';
 import { platformInputs } from '../../../shared/game/grid/platformInputs';
 import { gridLevel as levelForGrid } from '../../../shared/game/grid/pageMode';
 import { cellClip } from './cellClip';
-import { BufferGeometry, Group, Mesh, Scene, Vector3, type DataTexture, type Material, type Object3D } from 'three';
+import { BufferGeometry, Float32BufferAttribute, Group, Mesh, Scene, Vector3, type DataTexture, type Material, type Object3D } from 'three';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import * as v from 'valibot';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
@@ -66,7 +66,7 @@ import type { PageResidency } from './pageResidency';
 import { PlatformRenderResidency } from './renderResidency';
 import { TileStreamer, levelPorts, type FarPlan, type LevelPrepared, type RingPorts, type RingTile, type RingWait } from '@wildshard/engine/world/tileStreamer';
 import { GhostWorlds, type GhostRegion } from '../../../shared/game/grid/ghosts';
-import { farRingPorts, type FarPreparationWait, type FarPrepared, type FarProxyView } from './farView';
+import { farRingPorts, installFarProxy, type FarPreparationWait, type FarPrepared, type FarProxyView } from './farView';
 import { FarBatches, farBatchOn, multiDraws } from './farBatch';
 import { decodeFarImpostor, farBandShare } from './farImpostorView';
 import { FarImpostorSchema, type FarImpostor } from '@wildshard/format/shardSections';
@@ -1086,6 +1086,36 @@ export class GridSession {
 
   /** DW3: the outer strips' colliders held until the player nears them (`debug.outerCollidersNear`), else null */
   private nearColliders: NearColliders | null = null;
+
+  /** meta DRIFTWOOD-FPS DF8 (mini-dwfps2, 2026-11-23): link the far ring's proxy and band programs under the loading card.
+   *  The outer ring starts once the background opens (outerPaced.ts), so its first proxies linked 4 to 5 s after control
+   *  (three `sf23-far` variants and the haze band on the Driftwood route; on the iPhone 13 a new source compiles in its
+   *  frame). A far proxy's program depends only on its family and positional mask (farView.ts `farProxyMaterial`; a
+   *  shardfile cell is `pbr` and positional, a baked cell one of three families and not) and every band shares one, so
+   *  stand-ins of each, prepared beside the cell roots and kept for the page, cover any neighbour without reading it.
+   *  `warm` links roots now, unpaced (`Game.warmRootsNow`: the host's `prepareView` waits for drawn frames, and none draw
+   *  under the card). Returns the stand-ins prepared (0: no neighbours). */
+  async warmFarRingPrograms(warm: (roots: readonly Object3D[], current: () => boolean) => Promise<void>, current: () => boolean): Promise<number> {
+    if (this.neighbours.length === 0) return 0;
+    const holder = new Group(); holder.name = 'far-ring:warm';
+    const geometry = new BufferGeometry().setAttribute('position', new Float32BufferAttribute([0, 0, 0, 1, 0, 0, 0, 1, 0], 3))
+      .setAttribute('normal', new Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0], 3)).setAttribute('color', new Float32BufferAttribute([1, 1, 1, 1, 1, 1, 1, 1, 1], 3))
+      .setAttribute('uv', new Float32BufferAttribute([0, 0, 1, 0, 0, 1], 2));
+    const haze = { colour: [1, 1, 1] as const };
+    const variants: readonly (readonly [FarLookRuntime['family'], boolean])[] = [['pbr', true], ['pbr', false], ['toon', false], ['painterly', false]];
+    const views = variants.map(([family, positional]) => installFarProxy(holder, geometry.clone(), { family, haze }, positional));
+    const unband = this.frame === null ? null : installHazeBand(holder, { colour: [1, 1, 1], height: 1, opacity: 0.5, own: 0 }, CHUNK_HALF);
+    this.host.scene.add(holder);
+    try {
+      await warm([holder], current);
+      if (current()) for (const view of views) this.host.keepViewPrograms?.(view.mesh);
+      const band = holder.getObjectByName('haze-band');
+      if (current() && band !== undefined) this.host.keepViewPrograms?.(band);
+    } finally {
+      holder.removeFromParent(); for (const view of views) view.dispose(); unband?.(); geometry.dispose();
+    }
+    return views.length + (unband === null ? 0 : 1);
+  }
 
   /** Complete deferred native seams before a distant entry or road recovery. One page promise, no second scheduler.
    *  `near` (the outer road's own start): with `debug.outerCollidersNear` on, each strip's collider waits for the player

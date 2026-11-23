@@ -309,6 +309,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     const wholeInventory = bootRoadPrograms();
     await precompileLevel(game, undefined, { sliceMs: BOOT_SHADER_SLICE_MS, ...wholeInventory ? {} : { drawnOnly: true }, turns: game.warmTurnYaws() });
     if (wholeInventory) await game.warmDeferredEntryRoots(() => !game.levelScope.disposed && !game.levelScope.disposing, undefined, true);
+    // DF8 (mini-dwfps2): and the far ring's proxy and band programs, which the outer ring would link in play
+    if (wholeInventory) await ctx.grid?.warmFarRingPrograms((roots, current) => game.warmRootsNow(roots, current), () => !game.levelScope.disposed && !game.levelScope.disposing);
     game.hiddenFrame();
     noteWorldFrame();
     bootMark('app:first-game-frame-submitted');
