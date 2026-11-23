@@ -1,0 +1,25 @@
+/** SHARD-COMPAT FE9a: what the cook records of the copy it vouches for, as the API records a migrated copy (CP2b, CP7a): the
+ * format the original was uploaded at, the migration chain engine's format runs on it, and the digest of what that chain makes
+ * (the original's own SHA-256 when no step applies). A host that knows the API's digest under the same chain refuses a copy
+ * whose digest differs, by slug: the two hosts ran the same code on the same bytes and must agree. */
+import {migrateShardfile} from '@wildshard/format/migrate';
+import {readTar, writeTar} from '@wildshard/format/tar';
+
+export interface CookProvenance {readonly formatIn: string; readonly chainId: string; readonly digest: string; readonly applied: readonly string[]}
+/** The API's record of the copy it serves for this original (`migrated_shardfiles`): its chain and digest. */
+export interface ExpectedCopy {readonly chainId: string; readonly digest: string}
+
+/** The chain's provenance for `tarball`, or undefined when the chain can't read it (the validator's refusal then stands). */
+export function cookProvenance(tarball: Uint8Array, hash: (bytes: Uint8Array) => string): CookProvenance | undefined {
+  try {
+    const chained = migrateShardfile(readTar(tarball), {hash});
+    const digest = chained.applied.length === 0 ? hash(tarball) : hash(writeTar(chained.files));
+    return {formatIn: chained.from, chainId: chained.chainId, digest, applied: chained.applied};
+  } catch { return undefined; }
+}
+
+/** Why the copy disagrees with the API's, or undefined when it agrees, the chains differ, or there is nothing to compare. */
+export function provenanceRefusal(slug: string, provenance: CookProvenance | undefined, expected: ExpectedCopy | undefined): string | undefined {
+  if (provenance === undefined || expected === undefined || expected.chainId !== provenance.chainId || expected.digest === provenance.digest) return undefined;
+  return `${slug}: the migrated copy's digest ${provenance.digest} differs from the API's ${expected.digest} under chain ${provenance.chainId}`;
+}

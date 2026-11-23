@@ -19,6 +19,7 @@ import {migrateShardfile, validateMigrated} from '@wildshard/format/migrate';
 import {readTar, writeTar} from '@wildshard/format/tar';
 import {cookShard, openShardfile, serverRows, type CookReport, type CookShardPhase, type OpenShardfile, type WireBytes} from './shardCook';
 import type {PartEncoder} from './spawnParts';
+import {cookProvenance, provenanceRefusal, type CookProvenance, type ExpectedCopy} from './cookProvenance';
 
 /** D31: the largest shardfile, stored or decoded: `api-server`'s cap, which Pine's head needs (J137). */
 export const MAX_SHARDFILE_BYTES = 450_000_000;
@@ -47,6 +48,8 @@ export interface CookJobPorts {
   readonly onPhase?: (phase: CookJobPhase, elapsedMs: number) => void;
   /** The renderer fingerprint the worker cooks for (J262); this process's own when unset. */
   readonly renderer?: string;
+  /** FE9a: the API's chain and digest for the copy it serves; a different digest under the same chain refuses by slug. */
+  readonly expected?: ExpectedCopy;
 }
 export interface ServerPackReport {readonly files: number; readonly bytes: number}
 export interface CookJobReport {
@@ -58,6 +61,8 @@ export interface CookJobReport {
   readonly header: string;
   readonly server: ServerPackReport;
   readonly seconds: number;
+  /** FE9a: the original's format, the chain and the copy's digest; absent when the chain can't read the original. */
+  readonly provenance?: CookProvenance;
   /** SA48: what a page's admission row needs of these bytes, from the receipt the validator just held (`cookReceipt`). */
   readonly receipt?: CookReceipt;
 }
@@ -157,6 +162,8 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
     throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
   }
+  const provenance = cookProvenance(tarball, sha256), refused = provenanceRefusal(product.index.identity.slug, provenance, ports.expected);
+  if (refused !== undefined) throw new ShardfileRefusedError(refused);
   phase('proof');
   const check = await checked(product, ports);
   const proof = check.proof === 'refused' ? 'unmeasured' : check.proof;
@@ -168,5 +175,5 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   const shard = openShardfile(cooked, renderer), header = `shardfiles/${shard.slug}/shard.json`, file = join(client, header);
   mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, shard.header);
   return {slug: product.index.identity.slug, hash: sha256(tarball), proof, check, cook, header, server: writeServerPack(shard, join(out, 'server')), seconds: (ports.now() - started) / 1000,
-    ...(receipt === undefined ? {} : {receipt})};
+    ...(receipt === undefined ? {} : {receipt}), ...(provenance === undefined ? {} : {provenance})};
 }
