@@ -7,3 +7,9 @@
   passed only because it is still pinned.
 - `adoptInlineMounts` already added the candidate's mount bytes (MG9); it now also reads the candidate's mounted
   `music.json` and `sfx.json` into the tables, provenance stripped as `gen.ts` does, the candidate's copy winning.
+
+# SI1: host/immutable is the format's (opus-compat-w9)
+
+- Engine's `host/immutable` (canonical JSON, SHA-256) and `host/shardfile` `parseShardfileField` now call
+  shard-format's own (9e0033b, in the pinned 0.70.0). Same import paths; `test/host-immutable-format.test.ts` proves
+  they agree.
