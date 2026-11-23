@@ -138,8 +138,10 @@ async function bench() {
         return [item.slice(0, at), JSON.parse(ab ? on : off)]; };
       const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, ...Object.fromEntries(values.ab.split(',').map(abValue)) };
       const temperature = tools === null ? null : await tools.cool();
-      const { webkitDriver, driver } = phone ? { webkitDriver: null, driver: await /** @type {NonNullable<typeof tools>} */ (tools).fresh() }
+      const opened = phone ? { webkitDriver: null, driver: await /** @type {NonNullable<typeof tools>} */ (tools).fresh() }
         : await (async () => { if (values.frames === true) process.env.WS_WEBKIT_GC_LOG = '1'; const { startWebKit } = await import('./webkit.mjs'); const started = await startWebKit({ gcLog: values.frames === true }); return { webkitDriver: started, driver: started }; })();
+      const { webkitDriver } = opened;
+      let { driver } = opened;
       const directory = join(out, `run-${String(run)}-cap${String(cap)}${ab === null ? '' : `-${String(ab)}`}`);
       mkdirSync(directory, { recursive: true });
       /** @type {Promise<void> | null} */
@@ -150,8 +152,21 @@ async function bench() {
         tools?.lockState(`run ${String(run)} cap ${String(cap)} before boot`);
         // --cache-off (DF8): Safari's resource cache off for the boot, a first load of a new build (link-bench's cold runs)
         // mini-phone-pairs: hold the seeds through the page's storage loss (lowGuard); High runs are left alone
-        if (phone && trialSlots.graphics !== 'high' && typeof Reflect.get(driver, 'bootstrap') === 'function') await /** @type {any} */ (driver).bootstrap(lowGuard(phoneSlots(trialSlots)));
-        const boot = await enterZone(/** @type {any} */ (driver), { base, slug: values.zone, slots: trialSlots, cacheOff: values['cache-off'] === true });
+        const bootOn = async (/** @type {any} */ page) => {
+          if (phone && trialSlots.graphics !== 'high' && typeof Reflect.get(page, 'bootstrap') === 'function') await page.bootstrap(lowGuard(phoneSlots(trialSlots)));
+          return enterZone(page, { base, slug: values.zone, slots: trialSlots, cacheOff: values['cache-off'] === true });
+        };
+        // DW3 (mini-dw3, 2026-11-23): the first page attached after the inspector proxy starts can leave its first evaluate
+        // unanswered for the whole 60 s (five jobs in a row: run 1's first arm failed, the next fresh Safari answered at
+        // once), and the runner then voids the job and plays it all again. One more fresh Safari, once, in the same run.
+        let boot;
+        try { boot = await bootOn(driver); } catch (error) {
+          if (!phone || !String(error).includes('Runtime.evaluate timed out')) throw error;
+          console.log(`run ${String(run)}: the page did not answer (${String(error).slice(0, 80)}); one more fresh Safari`);
+          try { await /** @type {any} */ (driver).close?.(); } catch { /* the stuck page */ }
+          driver = await /** @type {NonNullable<typeof tools>} */ (tools).fresh();
+          boot = await bootOn(driver);
+        }
         row.boot = { outcome: boot.outcome, controlS: boot.controlAt !== null && boot.startedAt !== null ? (boot.controlAt - boot.startedAt) / 1000 : null,
           build: boot.state?.build ?? null, version: boot.state?.version ?? null, error: boot.state?.error ?? null };
         tools?.lockState(`run ${String(run)} cap ${String(cap)} after boot`);
