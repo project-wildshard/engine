@@ -1211,5 +1211,9 @@ export function paintSpawnDownload(download: SpawnDownload, root: HTMLElement): 
       : `${mb(shown.done)} of ${mb(shown.total)} MB`;
     if (pct !== null) pct.textContent = percent === null ? '—' : String(percent);
     if (bar !== null) bar.style.width = `${percent ?? 0}%`;
+    // DL21c: before Loading adopts the card its foot was empty for the whole download (Nine cold on the Simulator: 3.5 s
+    // after the fresh-page swap with no named wait); it names the download as Loading's footer would ('Spawn download')
+    const foot = root.querySelector('[data-el="foot"]');
+    if (foot !== null) foot.textContent = row.complete ? '' : `Now waiting for: Spawn download · ${row.filesDone} / ${row.filesTotal} files`;
   });
 }

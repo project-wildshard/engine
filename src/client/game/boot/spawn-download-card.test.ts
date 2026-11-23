@@ -5,7 +5,7 @@ import {Loading} from '@wildshard/engine/ui/Loading';
 import {loadShellTemplate} from '@wildshard/engine/boot/shell';
 
 test('the existing card paints one fixed list and reserves 100 for actual completion', () => {
-  const root = document.createElement('div'); root.innerHTML = '<span data-el="dlFact"></span><span data-el="dlPct"></span><i data-el="dlBar"></i>';
+  const root = document.createElement('div'); root.innerHTML = '<span data-el="dlFact"></span><span data-el="dlPct"></span><i data-el="dlBar"></i><p data-el="foot"></p>';
   let row: SpawnDownloadSnapshot = {progressKnown: false, totalBytes: 7_000_000, completedBytes: 0, cachedBytes: 0, filesDone: 0, filesTotal: 2, complete: false, error: null};
   let update: (value: SpawnDownloadSnapshot) => void = () => undefined;
   const download: SpawnDownload = {ready: Promise.resolve(), snapshot: () => row, resolve: url => url, cancel: () => undefined,
@@ -14,12 +14,15 @@ test('the existing card paints one fixed list and reserves 100 for actual comple
   expect(root.querySelector('[data-el="dlFact"]')?.textContent).toBe('0.0 of 7.0 MB');
   expect(root.dataset['download']).toBe('');
   expect(root.querySelector('[data-el="dlPct"]')?.textContent).toBe('—');
+  // DL21c: the early card's foot names the download until it closes
+  expect(root.querySelector('[data-el="foot"]')?.textContent).toBe('Now waiting for: Spawn download · 0 / 2 files');
   row = {...row, progressKnown: true, completedBytes: 7_000_000, cachedBytes: 6_900_000, filesDone: 2}; update(row);
   expect(root.dataset['download']).toBe('99');
   row = {...row, complete: true}; update(row);
   expect(root.dataset['download']).toBe('100'); expect(root.dataset['readsClosed']).toBe('true');
   expect(root.querySelector('[data-el="dlFact"]')?.textContent).toBe('0.1 MB downloaded, 6.9 MB from cache');
   expect(root.querySelector<HTMLElement>('[data-el="dlBar"]')?.style.width).toBe('100%');
+  expect(root.querySelector('[data-el="foot"]')?.textContent).toBe('');
   stop(); update({...row, completedBytes: 1}); expect(root.dataset['readBytes']).toBe('7000000');
 });
 
