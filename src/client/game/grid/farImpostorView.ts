@@ -9,7 +9,7 @@
  */
 import { Box3, DataTexture, LinearFilter, Mesh, PlaneGeometry, RGBAFormat, ShaderMaterial, Sphere, UnsignedShort5551Type, Vector3, type Material, type Object3D } from 'three';
 import { gpuOnlyTexture } from '@wildshard/engine/core/gpuOnly';
-import { decoderIdleMs } from '@wildshard/engine/core/workerIdle';
+import { canvasWorkerRetires, decoderIdleMs } from '@wildshard/engine/core/workerIdle';
 import { pageScope } from '@wildshard/engine/app/resources';
 import type { Scope } from '@wildshard/engine/app/scope';
 import type { FarImpostor } from '@wildshard/format/shardSections';
@@ -28,11 +28,12 @@ export function farBandShare(distance: number): number {
 }
 
 /** The one decode worker, started on first use (null where workers are missing: the cell keeps its proxy). EM19: it
- *  retires once idle (2 s on the phone tier, `workerIdle.ts`) and the next decode starts it again. */
+ *  retires once idle on the phone tier (2 s, `workerIdle.ts`) and the next decode starts it again; elsewhere it lives with the
+ *  page, since ending a worker that drew on a canvas stalls the main thread (`canvasWorkerRetires`). */
 interface DecodePool { worker: Worker; next: number; pending: Map<number, (reply: FarImpostorDecodeReply) => void>; idle?: ReturnType<Scope['timeout']> | undefined }
 let decoder: DecodePool | null | undefined;
 function armIdle(pool: DecodePool): void {
-  if (pool.pending.size > 0) return;
+  if (pool.pending.size > 0 || !canvasWorkerRetires()) return;
   pageScope.cancelTimer(pool.idle);
   pool.idle = pageScope.timeout(decoderIdleMs(), () => {
     pool.idle = undefined;

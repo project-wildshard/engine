@@ -98,3 +98,13 @@
   on for desktop as well.
 - The beach frame at 35 s stays: 118 ms of `(program)` before the frame's callback (render start 113–120 ms into it),
   native work a CPU profile cannot name.
+
+## The beach frame at 35 s: a worker's GPU teardown (2026-11-23 09:10 Cancún)
+
+- A Chrome trace over 34 to 37 s (native, desktop High) names it: one 55 ms main-thread task,
+  `DidTerminateWorkerThread`, while the far impostor decode worker sat 44.7 ms in `CommandBufferHelper::Finish`.
+  EM19 retires an idle decode worker after 30 s off the phone; this one drew on an OffscreenCanvas, so its end
+  waits on the GPU channel, and the page waits with it.
+- Fix: `canvasWorkerRetires()` in `workerIdle.ts`; the impostor worker retires on the phone tier only (its jetsam
+  reason) and lives with the page elsewhere. Look-neutral (no pixel path changes).
+- Whole native route after: 0 frames over 50 ms (max 30.6, was 61), 204 fps, p50 4.7, p95 6.6.

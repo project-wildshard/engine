@@ -15,3 +15,11 @@ export function decoderIdleMs(): number { return TIER === 'phone' ? PHONE_DECODE
 
 /** A decode pool's worker count on this page's tier: one on the phone. */
 export function decodePoolSize(desktop: number): number { return TIER === 'phone' ? 1 : desktop; }
+
+/**
+ * Whether an idle worker that drew on an OffscreenCanvas retires at all (DRIFTWOOD-FPS DF14). Chromium ends such a
+ * worker by finishing its GPU command buffer, and the page's main thread waits in `DidTerminateWorkerThread` until it
+ * does: the far impostor decoder's 30 s retire was a 55 ms frame on the desktop route (a trace, 2026-11-23). The phone
+ * tier still retires it, for the jetsam budget above; elsewhere it lives with the page.
+ */
+export function canvasWorkerRetires(): boolean { return TIER === 'phone'; }
