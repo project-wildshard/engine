@@ -11,31 +11,31 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { generateKeyPairSync } from 'node:crypto';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, resolve as absolute } from 'node:path';
 import { chromium, devices } from './browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 
 // The rig's ports come from WS_RIG_PORTS when online-rig.mjs loads: this proof's own block, clear of other lanes' rigs.
 process.env.WS_RIG_PORTS ??= '19576';
 const { RELEASE_PORT, enterPage, intoWorld, openRig } = await import('./online-rig.mjs');
-const ROOT = resolve(import.meta.dirname, '..');
-const [workArg = ''] = process.argv.slice(2).filter(value => !value.startsWith('--'));
+const ROOT = absolute(import.meta.dirname, '..');
+const workArg = process.argv.slice(2).find(value => !value.startsWith('--')) ?? '';
 if (workArg === '') throw new Error('usage: seat-hold-proof.mjs <work dir> [--short]');
-const work = resolve(workArg), short = process.argv.includes('--short');
+const work = absolute(workArg), short = process.argv.includes('--short');
 const HELD_AT = short ? 20_000 : 240_000, GONE_BY = short ? 40_000 : 320_000, GONE_AFTER = short ? 0 : 295_000;
 const DUNES = 'sunscar-dunes', DRIFTWOOD = 'driftwood-isle';
 const steps = /** @type {{ step: string, ok: boolean }[]} */ ([]);
 /** @param {string} step @param {boolean} ok @param {unknown} [detail] */
 const note = (step, ok, detail) => { steps.push({ step, ok }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${step}${detail === undefined ? '' : ` ${JSON.stringify(detail).slice(0, 400)}`}`); };
 /** @param {number} ms */
-const sleep = ms => new Promise(done => { setTimeout(done, ms); });
+const sleep = ms => new Promise(resolve => { setTimeout(resolve, ms); });
 const at = () => new Date().toISOString().slice(11, 19);
 
 /** The level a page plays and where its player stands. @param {import('playwright').Page} page */
 const whereIs = page => page.evaluate(() => {
   const shard = /** @type {any} */ (window).__wildshard, world = shard?.world;
   // A grid page plays `platform.grid`; the cell it stands in is the grid's `inside` (as grid-gate-proof reads it).
-  return { level: String(shard?.shard?.grid?.state().inside ?? world?.game.level.id ?? ''), x: Number(world?.player.position.x ?? NaN), z: Number(world?.player.position.z ?? NaN) };
+  return { level: String(shard?.shard?.grid?.state().inside ?? world?.game.level.id ?? ''), x: Number(world?.player.position.x ?? Number.NaN), z: Number(world?.player.position.z ?? Number.NaN) };
 });
 /** The names a page sees in its world. @param {import('playwright').Page} page */
 const seen = page => page.evaluate(() => (/** @type {any} */ (window).__onlinePlayers?.() ?? []).map((/** @type {any} */ row) => String(row.name)));
@@ -76,7 +76,7 @@ const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS,
 const { defaultBrowserType: _engine, ...phone } = devices['iPhone 16 Pro'];
 let code = 1;
 try {
-  note('phone layout', phone.screen.width === 402 && phone.screen.height === 874 && phone.deviceScaleFactor === 3 && phone.hasTouch === true, phone.screen);
+  note('phone layout', phone.screen.width === 402 && phone.screen.height === 874 && phone.deviceScaleFactor === 3 && phone.hasTouch, phone.screen);
   const desk = await enterPage(browser, { viewport: { width: 1280, height: 800 } }, url(DRIFTWOOD), 'Desk');
   await intoWorld(desk.page);
   note('desktop plays Driftwood', (await whereIs(desk.page)).level.includes('driftwood'), await whereIs(desk.page));
