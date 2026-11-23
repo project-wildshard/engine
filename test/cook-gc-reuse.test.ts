@@ -18,10 +18,12 @@ import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {dirname, join} from 'node:path';
 const [tarball, out] = process.argv.slice(2), file = join(out, 'client', ${JSON.stringify(part)});
 mkdirSync(dirname(file), {recursive: true}); writeFileSync(file, 'part'); mkdirSync(join(out, 'server'), {recursive: true});
+// J450: a cook ends with its map, so the stand-in draws both sizes too.
+for (const size of ['', '-cell']) { const map = join(out, 'client', 'shardfiles', ${JSON.stringify(slug)}, 'cooked-map-v1' + size + '.png'); mkdirSync(dirname(map), {recursive: true}); writeFileSync(map, 'png'); }
 const hash = createHash('sha256').update(readFileSync(tarball)).digest('hex');
 // The job is a named stand-in; the worker still requires its successful full check.
 const check = {slug: ${JSON.stringify(slug)}, pass: true, proof: 'unmeasured', performance: {}, failures: []};
-console.log(JSON.stringify({slug: ${JSON.stringify(slug)}, hash, proof: 'unmeasured', check, cook: {manifests: []}, header: '', server: {}, seconds: 0}));
+console.log(JSON.stringify({slug: ${JSON.stringify(slug)}, hash, proof: 'unmeasured', check, cook: {manifests: [], map: {full: 1, cell: 1, drawn: 'plain'}}, header: '', server: {}, seconds: 0}));
 `;
 const TWO_HOURS_S = 7_200;
 const hashOf = (text: string): string => createHash('sha256').update(text).digest('hex');
@@ -58,5 +60,6 @@ test('GC during a cook keeps a part the cook reused', async () => {
 
   expect(row.state, row.detail).toBe('cooked');
   const index = JSON.parse(new TextDecoder().decode(await store.get(indexKey('new', hash)))) as CookIndex;
-  expect(await Promise.all(index.keys.map(key => store.has(key)))).toEqual([true]);
+  expect(index.keys.length, 'the shared part and the two map sizes').toBe(3);
+  expect((await Promise.all(index.keys.map(key => store.has(key)))).every(Boolean)).toBe(true);
 });

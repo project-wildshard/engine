@@ -22,9 +22,11 @@ const [tar,out,slug]=process.argv.slice(2),body=readFileSync(tar),hash=createHas
 const counter=join(resolve(out,'../../cache'),'launches');
 writeFileSync(counter,String((existsSync(counter)?Number(readFileSync(counter,'utf8')):0)+1));
 const header='shardfiles/'+slug+'/shard.json',part='assets/spawn/parts/'+hash+'.pack.br';
-for(const [file,value] of [[header,JSON.stringify({hash})],[part,'part '+hash]]){const path=join(out,'client',file);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,value);}
+// J450: a cook ends with its map, so the stand-in draws both sizes too.
+const maps=['','-cell'].map(size=>'shardfiles/'+slug+'/cooked-map-v1'+size+'.png');
+for(const [file,value] of [[header,JSON.stringify({hash})],[part,'part '+hash],...maps.map(map=>[map,'png'])]){const path=join(out,'client',file);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,value);}
 mkdirSync(join(out,'server'),{recursive:true});writeFileSync(join(out,'server/shard.json'),JSON.stringify({hash}));
-console.log(JSON.stringify({slug,hash,proof:'unmeasured',check:{pass:true},cook:{manifests:[]},header,server:{files:1,bytes:1},seconds:0}));`;
+console.log(JSON.stringify({slug,hash,proof:'unmeasured',check:{pass:true},cook:{manifests:[],map:{full:1,cell:1,drawn:'plain'}},header,server:{files:1,bytes:1},seconds:0}));`;
 
 describe('the recook rule (SP7)', () => {
   let scratch = '', store: PackStore | undefined;
