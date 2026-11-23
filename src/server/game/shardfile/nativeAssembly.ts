@@ -13,7 +13,8 @@ import { PopulationFieldSchema, type PopulationFieldRows } from '@wildshard/form
 import { parse } from 'valibot';
 import { NativePopulationField } from '../population/environment';
 import { need, readAssemblyInput, type AssemblyGround, type AssemblyPrepared, type NativeAssemblyContext, type NativeAssemblyPorts } from './nativeAssemblyInput';
-import { declaredWakeFight, prepareAssemblyFeature, prepareSectionMelee, prepareSectionRanged, type AssemblyRun } from './nativeAssemblyHosts';
+import { declaredWakeFight, HELD_HOSTS, prepareAssemblyFeature, prepareSectionMelee, prepareSectionRanged, SPRINT_SPEED, type AssemblyRun } from './nativeAssemblyHosts';
+import { parseHeldSlots } from '@wildshard/format/heldArms';
 import { parseChapterWake } from '@wildshard/format/chapterDirector';
 import { NativeBossBindingSchema } from '@wildshard/format/bossEncounter';
 import { declaredHarvest } from '../population/declaredNative';
@@ -202,6 +203,23 @@ function withSectionTaming(product: ShardFolder, features: readonly NativeAssemb
   const at = features.findIndex(row => row.host === 'riding.elites-ready');
   return at === -1 ? [...features, taming] : [...features.slice(0, at), taming, ...features.slice(at)];
 }
+/** ONE-FORMAT OF38d4a: where a plan names no held host, the arsenal its `held/slots.json` declares (a blade with its passes,
+ *  a bow and a polearm, Nalati's) stands as the `held.arms` host would, at the held hosts' place: before the patrol and the
+ *  open arena, else last. The step is the slots' own id, its four script inputs `<id>.attack`, `.swap`, `.aim` and `.pitch`
+ *  (a room reads its net commands instead), its motion the engine's sprint speed and its wind the weather owner's rows. */
+const HELD_SLOTS_FILE = 'held/slots.json';
+async function withSectionArms(product: ShardFolder, features: readonly NativeAssemblyFeature[]): Promise<readonly NativeAssemblyFeature[]> {
+  if (!product.hasFile(HELD_SLOTS_FILE) || features.some(row => HELD_HOSTS.has(row.host))) return features;
+  const slots = parseHeldSlots(await product.json(HELD_SLOTS_FILE)), kind = (name: string) => slots.slots.find(row => row.kind === name);
+  const blade = kind('blade');
+  if (blade?.kind !== 'blade' || blade.source.kind !== 'passes' || kind('bow') === undefined || kind('polearm') === undefined) return features;
+  const weather = features.find(row => row.host === 'weather.native');
+  if (weather?.host !== 'weather.native') throw new Error('A held arsenal reads its wind from a weather.native owner');
+  const id = slots.id, arms: NativeAssemblyFeature = { host: 'held.arms', step: id, slots: HELD_SLOTS_FILE, speed: SPRINT_SPEED, weather: weather.rows,
+    input: { attack: `${id}.attack`, swap: `${id}.swap`, aim: `${id}.aim`, pitch: `${id}.pitch` } };
+  const at = features.findIndex(row => row.host === 'encounter.patrol' || row.host === 'boss.open-arena');
+  return at === -1 ? [...features, arms] : [...features.slice(0, at), arms, ...features.slice(at)];
+}
 /** True when this product ships a native-assembly plan. */
 export function hasNativeAssembly(product: ShardFolder): boolean { return product.hasFile(NATIVE_ASSEMBLY_FILE); }
 /**
@@ -220,7 +238,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const declaredRoster = declaredBootSpawns(plan.features.some(row => row.host === 'riding.roster') ? boot : null, shard);
   const meadow = plan.field === undefined && plan.features.some(row => row.host === 'riding.roster') && product.hasFile(MEADOW_FILE);
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake, meadow), product, assets, ports, plan, bake, nav, boot, declaredRoster };
-  const features = withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, plan.features))));
+  const features = await withSectionArms(product, withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, plan.features)))));
   const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   const species = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
   // OF30: with no species programme an older pending carcass restores by the declared rows' harvest
@@ -244,8 +262,9 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const declaredLevel: SimLevel = { ...level, entities: declaredSpawnEntities(counted) };
   const world = sectionWorld(product, plan, meadow ? prepared.field : null);
   // OF22a3: with no collision host the bake lends its ground alone and the shard's prop solids stand beside it
-  const ownSolids = standsOwnSolids(plan.features.map(row => row.host)), melee = prepareSectionMelee<C>(product, plan.features.map(row => row.host));
-  const ranged = prepareSectionRanged<C>(product, plan.features.map(row => row.host));
+  const ownSolids = standsOwnSolids(plan.features.map(row => row.host)), melee = prepareSectionMelee<C>(product, features.map(row => row.host));
+  // OF38d4a: a held host the engine stood from the product's files counts as named
+  const ranged = prepareSectionRanged<C>(product, features.map(row => row.host));
   const ownGround = ownSolids && plan.bake !== undefined && plan.collision !== undefined ? { bake, resolution: plan.collision.resolution } : null;
   const hosts = features.map(row => row.host);
   if (meadow && !hosts.some(name => name.startsWith('water.'))) hosts.push('water.field');

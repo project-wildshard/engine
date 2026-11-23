@@ -110,9 +110,9 @@ export function prepareSectionMelee<C extends NativeAssemblyContext>(product: Sh
 }
 
 /** The held hosts whose families (format `primitiveOfHost`: `held.melee`, `held.ranged`) a section now stands. */
-const HELD_HOSTS: ReadonlySet<string> = new Set(['item.swept', 'held.arms', 'item.ranged', 'loadout', 'combat.motion', 'ammunition']);
+export const HELD_HOSTS: ReadonlySet<string> = new Set(['item.swept', 'held.arms', 'item.ranged', 'loadout', 'combat.motion', 'ammunition']);
 /** The engine's sprint speed (`walkingSpeed`), the motion a held ranged kit scales its spread and sway against. */
-const SPRINT_SPEED = 7.2;
+export const SPRINT_SPEED = 7.2;
 interface RangedRow { readonly id: string; readonly ranged?: unknown; readonly profile?: { readonly family: string; readonly action?: string } }
 /** A ranged weapon's install kind, from its admitted profile: a bow draws, a lever rifle cycles, any other firearm bolts. */
 export function rangedKind(row: RangedRow): 'bolt' | 'cycle' | 'bow' {
