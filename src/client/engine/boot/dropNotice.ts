@@ -132,6 +132,8 @@ export function describeDropError(error: unknown): { message: string; code: stri
 export class DropNotes {
   private readonly store: DropStore;
   private readonly now: () => number;
+  /** J501: this page recorded a drop itself; a step it marks after that (the world reaching Playing as it leaves) keeps it */
+  private recordedHere = false;
   constructor(store: DropStore, now: () => number = Date.now) { this.store = store; this.now = now; }
 
   /** where the world stands now, written before the step runs. Naming the world starts a new page: the page before it goes on
@@ -149,8 +151,9 @@ export class DropNotes {
     };
     this.write('step', 'stepOnce', { ...step, trail: [...step.trail] });
     if (fresh) this.store.clear('expect');
-    // the world is up: an older recorded drop is history, not this page's
-    if (at.step === PLAYING) { this.store.clear('pending'); this.store.clear('pendingOnce'); }
+    // the world is up: an older recorded drop is history, not this page's. J501 (WebKit proof, 11-23): a page whose world
+    // reached Playing just after it chose to end play wiped its own drop, and the title showed a codeless "Restarted".
+    if (at.step === PLAYING && !this.recordedHere) { this.store.clear('pending'); this.store.clear('pendingOnce'); }
   }
 
   /** the last error this page saw: it names the cause if the page dies next */
@@ -184,6 +187,7 @@ export class DropNotes {
       ...(at.room === undefined || at.room === '' ? {} : { room: at.room }),
     };
     this.write('pending', 'pendingOnce', { ...drop });
+    this.recordedHere = true;
     return drop;
   }
 

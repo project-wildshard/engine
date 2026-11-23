@@ -61,6 +61,15 @@ test('a forced load failure ends on the title with the modal and its reason', ()
   expect(again).toBeNull(); // shown once
 });
 
+test('J501: a drop the page records keeps its code when the world reaches Playing as the page leaves (WebKit proof)', () => {
+  const t = tab(), world = enterWorld(t);
+  world.notes.record({ reason: 'the world server seated you in forced-cell', code: 'SEAT-NOPAGE' });
+  world.notes.markStep({ step: 'Playing' });
+  world.life.markUnload('end play SEAT-NOPAGE: the world server seated you in forced-cell');
+  const { drop } = title(t, false);
+  expect(drop).toMatchObject({ kind: 'error', code: 'SEAT-NOPAGE', reason: 'the world server seated you in forced-cell' });
+});
+
 test('a forced server close during enter ends on the title with the close reason and code', () => {
   const t = tab(), world = enterWorld(t);
   const close = { code: 1006, reason: 'the server closed the connection', wasClean: false };
