@@ -247,13 +247,6 @@ jobs:
         timeout-minutes: 2
         run: node --test --test-timeout=10000 scripts/release-nightly.proof.ts
 
-      # TC26/J186: new outer-edge contracts soak for one week before blocking.
-      # Run after wall accounting: a non-blocking report must never spend a
-      # shard's blocking wall budget. Hooks and Vitest discovery stay unchanged.
-      - name: Soak actual host, door, format and outside-author contracts
-        if: steps.code.outputs.run == 'true'
-        continue-on-error: true
-        run: node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs
       # TC7: new complete journeys report for a week before becoming gates.
       - name: Soak full Dunes and real pin-grid journeys
         if: steps.code.outputs.run == 'true'

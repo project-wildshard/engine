@@ -16,6 +16,13 @@ check() {
   else echo "::endgroup::"; echo "::error title=static $name::red after $((SECONDS - started))s"; red=1; fi
 }
 proof() { local loader=$1; shift; node --import "./scripts/$loader" --experimental-transform-types --test "$@"; }
+# TC26 (J186, AD1): the fire drill soaked 414 clean ci-reports runs, 11-17 to 11-23. Static runs before `pnpm pins` and
+# gen, so it installs Nalati and publishes Rapier's binary itself.
+fire_drill() {
+  node scripts/pins.ts install nalati-grasslands &&
+    node --experimental-transform-types --input-type=module -e 'import {copyRapierWasm} from "./vite/rapier.ts"; copyRapierWasm();' &&
+    proof bake-loader.mjs test/ci/coverage-fire-drill.proof.mjs
+}
 
 mode=${1:-code}
 case "$mode" in code|docs) ;; *) echo 'usage: ci-static.sh [code|docs]' >&2; exit 2 ;; esac
@@ -37,6 +44,7 @@ if [ "$mode" = code ]; then
   check quest-seats proof sim-node-loader.mjs test/ci/quest-seats.proof.mjs
   check native-item-frame proof sim-node-loader.mjs test/ci/native-item-frame.proof.mjs
   check declared-input bash -c 'node scripts/pins.ts install nine-dragon-stack && node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs'
+  check fire-drill fire_drill
 fi
 check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then

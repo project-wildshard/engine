@@ -23,7 +23,7 @@ const faults=[
     plant:"      if (row.scene === 'template.door.toggle') return true; // TC26 dropped actual door script\n      if (decisions?.interact(id) === true) return true;",reason:/TC26_DOOR_OPEN/u},
   {id:'export',ring:3,owner:'engine:package.json',file:'package.json',find:'',plant:'',reason:/ERR_PACKAGE_PATH_NOT_EXPORTED/u},
   {id:'format',ring:1,owner:'shardfile:src/format/shardSchema.ts',file:'node_modules/@wildshard/format/src/format/shardSchema.ts',
-    find:'  version: v.literal(SHARDFILE_VERSION),',plant:'  version: v.literal(SHARDFILE_VERSION),\n  tc26Required: v.string(),',reason:/tc26Required/u},
+    find:'  version: v.picklist(SHARDFILE_VERSIONS),',plant:'  version: v.picklist(SHARDFILE_VERSIONS),\n  tc26Required: v.string(),',reason:/tc26Required/u},
   {id:'dropped-section',ring:1,owner:'shardfile:corpus/exports/brasscap-mesa',file:'',find:'',plant:'',reason:/ENOENT[\s\S]*sections\//u},
   {id:'broken-tar',ring:1,owner:'shardfile:src/format/tar.ts',file:'scripts/pin-format.ts',
     find:'const bytes = writeTar(files), hash =',plant:'const bytes = writeTar(files).subarray(0, 513), hash =',reason:/tar:/u},
