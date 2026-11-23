@@ -146,6 +146,11 @@ try {
                 modelVisible: board !== undefined && 'model' in board && typeof board.model === 'object' && board.model !== null && 'visible' in board.model ? board.model.visible : null,
                 inputAllowed: world.game.app.input.allowed('hover'), inputContext: world.game.app.input.top,
                 frame: world.game.frameCount, paused: world.game.app.clock.paused, linked: world.player.link !== null,
+                // FS30e: the seat and the predictor name a tap the server refused or never saw
+                appState: world.game.app.state, carried: world.player.carried,
+                seat: world.player.link === null ? null : {joined: Reflect.get(world.player.link, 'joined') as unknown,
+                  corrections: Reflect.get(Object(Reflect.get(world.player.link, 'predictor')), 'corrections') as unknown,
+                  full: Reflect.get(Object(Reflect.get(world.player.link, 'predictor')), 'full') as unknown},
                 recent: world.game.app.input.recent.filter(row => row.action === 'hover')};
             });
             const before = await observeHover();
@@ -217,6 +222,11 @@ try {
             return {mounted: true, unmounted: true, input: 'real touch', actualCap, expectedCap};
           });
         }, async context => {
+          // FS30e diagnostics only: emulate the slow hosted renderer (a nightly Chromium head ran at ~2.7 fps)
+          const throttle = Number(process.env['NIGHTLY_CPU_THROTTLE'] ?? '1');
+          if (browserName === 'chromium' && throttle > 1) context.on('page', page => {
+            void context.newCDPSession(page).then(session => session.send('Emulation.setCPUThrottlingRate', {rate: throttle}));
+          });
           for (const fixture of levelDownloadFixtures('packs')) await saveFixture(context, fixture);
           if (mode === 'arrival') await saveFixture(context, {scope: 'session', key: 'travel.handoff', data: {
             v: 1, from: null, to: route, mode: 'enter', arrive: null, carry: [], at: Date.now(),

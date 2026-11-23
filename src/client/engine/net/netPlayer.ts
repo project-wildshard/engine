@@ -161,6 +161,9 @@ export class NetPlayer implements PlayerLink {
    *  is near (under PREDICTION_SNAP). A rejoin or a crossing still holds still until its first frame. */
   private unseated = false;
   private unseatedSeq = 0;
+  /** FS30e: a HOVER tap played unseated is the player's, not a moment: the seat's first frame takes the server's board, so
+   *  the first seated step carries the toggle on (an odd count of unseated taps; a tap of that step's own cancels it). */
+  private unseatedBoard = false;
   /** OF10: play unseated until the first frame (a page that has heard one is seated, and this does nothing). */
   playUnseated(): void { if (this.seen === null) this.unseated = true; }
   /** OF10: unseated, and the ring is spent: movement holds until the seat. */
@@ -175,7 +178,9 @@ export class NetPlayer implements PlayerLink {
     if (this.respawnHeld || this.predictor.full) return false;
     if (this.seen === null) return this.unseated && this.deviceMode !== 'paused' && this.stepUnseated(typeof input === 'function' ? input() : input);
     if (!this.claimInputTick(0)) return false;
-    const armed = this.armed(typeof input === 'function' ? input() : input);
+    const sampled = typeof input === 'function' ? input() : input, board = this.unseatedBoard;
+    this.unseatedBoard = false;
+    const armed = this.armed(board ? { ...sampled, buttons: sampled.buttons ^ NET_BUTTONS.hover } : sampled);
     return this.sendCommand(armed, true, this.hooked(armed));
   }
   /** Bind current page activity and controls without consuming a device edge. */
@@ -206,6 +211,7 @@ export class NetPlayer implements PlayerLink {
   /** OF10: one step of the page's own, unsent, with a seq of its own; world actions wait for the link (the hold cards). */
   private stepUnseated(input: PlayerWireInput): boolean {
     const seq = this.unseatedSeq = (this.unseatedSeq % 0xffff) + 1;
+    if ((input.buttons & NET_BUTTONS.hover) !== 0) this.unseatedBoard = !this.unseatedBoard;
     this.world.poseFor(seq, false);
     return this.predictor.step(quantiseCommand({ ...input, seq, viewTick: 0 }));
   }
