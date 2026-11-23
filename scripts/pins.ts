@@ -223,7 +223,7 @@ async function preparationOf(files: ReadonlyMap<string, Uint8Array>, root: strin
   if (ownRenderer === undefined) { try { ownRenderer = rendererRevision(root); } catch { ownRenderer = null; } }
   if (cook.renderer === ownRenderer) return 'current';
   const {sidecarIn} = await import('../src/cook/game/cookSidecar.ts');
-  const sidecar = sidecarIn(process.env['WILDSHARD_COOK_SIDECARS'], pin.hash, ownRenderer);
+  const sidecar = sidecarIn(process.env.WILDSHARD_COOK_SIDECARS, pin.hash, ownRenderer);
   if (sidecar === undefined || ownRenderer === null) return 'stale';
   const {openShardfile} = await import('../src/cook/game/shardCook.ts');
   const shard = openShardfile(bytes, { renderer: ownRenderer, sidecar, warn: line => { console.warn(line); } });
