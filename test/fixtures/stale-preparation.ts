@@ -6,21 +6,31 @@ import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {readTar, writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
-import {outputIndexEnvelope} from '@wildshard/format/version';
+import {outputIndexEnvelope, writesPreparationMarker} from '@wildshard/format/version';
 import {folderTarball} from '../../src/cook/game/folderTarball';
 import {builtFolder} from './engine-lift/folder';
 
 export const digest = (bytes: Readonly<Uint8Array>): string => createHash('sha256').update(bytes).digest('hex');
 export const json = (bytes: Uint8Array | undefined): unknown => JSON.parse(new TextDecoder().decode(bytes));
+/** PR4: from format 0.1.0.3 the index records the preparation spec; older indexes say sdk 0.3 (prepared) or 0.2. */
+const marks = (held: {formatVersion?: unknown}): boolean => typeof held.formatVersion === 'string' && writesPreparationMarker(held.formatVersion);
+const draft = <T extends {sdk?: unknown; preparation?: unknown; formatVersion?: unknown}>(held: T): Omit<T, 'sdk' | 'preparation'> & {sdk?: '0.2'} => {
+  const {sdk: _sdk, preparation: _preparation, ...rest} = held;
+  return marks(held) ? rest : {...rest, sdk: '0.2'};
+};
+const spec3 = <T extends {sdk?: unknown; preparation?: unknown; formatVersion?: unknown}>(held: T): Omit<T, 'sdk' | 'preparation'> & ({sdk: '0.3'} | {preparation: 3}) => {
+  const {sdk: _sdk, preparation: _preparation, ...rest} = held;
+  return marks(held) ? {...rest, preparation: 3} : {...rest, sdk: '0.3'};
+};
 /** Remove the author's program mount and leave the other mounts in the legacy cook v1 format. */
 export function unprepared(tar: Uint8Array): Uint8Array {
   const files = new Map(readTar(tar)), held = parseOutputIndex(json(files.get('shard.json')));
-  if (held.sdk === '0.2') return tar;
+  if (held.sdk === '0.2' || (marks(held) && held.preparation === undefined)) return tar;
   const programs = `/programs/${held.identity.slug}.json`, data = readCookData(json(files.get('cook.json')));
   for (const row of data.mounts) if (row.url === programs) files.delete(row.path);
   const cook = validationSourceBytes({version: 1, mounts: data.mounts.filter(row => row.url !== programs)});
   files.set('cook.json', cook);
-  files.set('shard.json', validationSourceBytes({...held, sdk: '0.2', cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
+  files.set('shard.json', validationSourceBytes({...draft(held), cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
   return writeTar(files);
 }
 export const legacyBrasscap = (): Uint8Array => unprepared(folderTarball(builtFolder('brasscap-mesa')));
@@ -38,7 +48,7 @@ export function prepared(product: ReadonlyMap<string, Uint8Array>, renderer: str
   const mounts = [...oldMounts.filter(row => row.url !== `/programs/${slug}.json`),
     {url: `/programs/${slug}.json`, path: `mounts/programs/${slug}.json`, hash: digest(program), bytes: program.length},
     {url: '/assets/stale-proof.bin', path: 'mounts/assets/stale-proof.bin', hash: digest(asset), bytes: asset.length}];
-  const index = parseOutputIndex({...held, sdk: '0.3'});
+  const index = parseOutputIndex(spec3(held));
   const cook = validationSourceBytes({version: 3, renderer, mounts, packs: 'fence', fence: fenced ? [digest(asset)] : [], programs: json(program),
     inputHash: digest(cookPreparationBytes(index, mounts, renderer))});
   files.set('cook.json', cook);
