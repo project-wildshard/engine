@@ -3,7 +3,7 @@ import { generateKeyPairSync, sign } from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- the page's origin and the packs origin, as real HTTP
 import { createServer, type Server } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- the origin's port, as roomBench reads its own
-import type { AddressInfo } from 'node:net';
+import { createServer as createTcpServer, type AddressInfo, type Server as TcpServer } from 'node:net';
 import { afterEach, expect, test } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import { doctorReport, healthIsPrivate, healthUrl, runDoctor, type DoctorConfig, type DoctorRow } from '../src/client/host/online/doctor';
@@ -11,10 +11,12 @@ import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 
 // E7.5 prep: the Connection doctor against a real door on a real socket, and a real origin for the page, the release file and the packs.
 const SHARD = 'driftwood-isle', PART = '/assets/spawn/server/0123456789abcdef.pack.br';
-let bench: RoomBench | undefined, origin: Server | undefined;
+let bench: RoomBench | undefined, origin: Server | undefined, dead: TcpServer | undefined;
 const owner = new Scope('doctor test');
 afterEach(async () => {
   await bench?.close(); bench = undefined;
+  const door = dead; dead = undefined;
+  if (door !== undefined) await new Promise(resolve => { door.close(resolve); });
   const served = origin; origin = undefined;
   if (served !== undefined) { served.closeAllConnections(); await new Promise(resolve => { served.close(resolve); }); }
 });
@@ -22,6 +24,15 @@ afterEach(async () => {
 const key = generateKeyPairSync('ed25519'), otherKey = generateKeyPairSync('ed25519');
 const publicHex = (pair: typeof key): string => pair.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
 const signed = (body: unknown, by = key): string => { const text = JSON.stringify(body); return JSON.stringify({ body: text, signature: sign(null, Buffer.from(text), by.privateKey).toString('hex') }); };
+
+/** A door that is down: it holds its port and drops every connection, so no other test's server can take the port
+ * between a closed bench and the doctor's read (main red 45112581386 read 'pass' off a recycled port). */
+async function deadDoor(): Promise<string> {
+  const door = createTcpServer(socket => { socket.destroy(); });
+  await new Promise<void>(resolve => { door.listen(0, '127.0.0.1', resolve); });
+  dead = door;
+  return `ws://127.0.0.1:${String((door.address() as AddressInfo).port)}/`;
+}
 
 /** The page's origin, which also plays the packs origin: version.json, the release file, the server book and its one part. */
 async function serveOrigin(release: string, missingPart = false): Promise<string> {
@@ -67,9 +78,7 @@ test('a release file signed by another key fails on its signature and the rest w
 });
 
 test('a server that is down fails health and the socket, with the tunnel hint', { timeout: 30_000 }, async () => {
-  bench = await roomBench();
-  const socket = bench.url;
-  await bench.close(); bench = undefined;
+  const socket = await deadDoor();
   const rows = await run(config(await serveOrigin(signed(releaseFor(socket)))));
   expect(rows['release']?.state).toBe('pass');
   expect(rows['server']?.state).toBe('fail');
@@ -79,9 +88,7 @@ test('a server that is down fails health and the socket, with the tunnel hint', 
 });
 
 test('PZ12: on an isolated page a refused health read is private, not down', { timeout: 30_000 }, async () => {
-  bench = await roomBench();
-  const socket = bench.url;
-  await bench.close(); bench = undefined;
+  const socket = await deadDoor();
   // set directly: unstubbing every global would take the setup's localStorage with it
   Object.defineProperty(globalThis, 'crossOriginIsolated', { value: true, configurable: true });
   try {
