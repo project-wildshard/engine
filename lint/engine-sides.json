@@ -1264,6 +1264,7 @@
     "src/cook/game/brotliSizeCache.d.mts": "cook",
     "src/cook/game/brotliSizeCache.mjs": "cook",
     "src/cook/game/contentNamed.ts": "cook",
+    "src/cook/game/cookCanary.ts": "cook",
     "src/cook/game/cookJob.ts": "cook",
     "src/cook/game/cookProvenance.ts": "cook",
     "src/cook/game/cookSidecar.ts": "cook",
