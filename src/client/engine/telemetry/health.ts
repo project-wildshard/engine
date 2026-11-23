@@ -14,9 +14,12 @@ export class SessionHealth {
   private readonly tab;
   private readonly identity;
   private readonly reported;
+  private readonly bootedBuild;
   readonly install: string;
   private current: TaggedHeartbeat;
   private readonly send: (report: HealthReport) => void;
+  /** The build that last reached control here ('' when none did), then marks `build` as booted. */
+  swapBootedBuild(build: string): string { const previous = this.bootedBuild.read(); this.bootedBuild.write(build); return previous; }
   constructor(store: SaveStore, build: string, send: (report: HealthReport) => void, now: number = Date.now(),
     id: () => string = () => crypto.randomUUID(), actor?: ActorTags) {
     this.send = send;
@@ -25,6 +28,8 @@ export class SessionHealth {
     this.local = store.define({ ...compatible, scope: 'device' });
     this.tab = store.define({ ...compatible, scope: 'session' });
     this.identity = store.define({ key: 'telemetry.install', scope: 'device', version: 1, schema: v.string(), initial: () => '' });
+    // QA 2026-11-23 row 10: the last build that reached control on this device, so the next boot knows it is an update
+    this.bootedBuild = store.define({ key: 'telemetry.bootedBuild', scope: 'device', version: 1, schema: v.string(), initial: () => '' });
     this.reported = store.define({ key: 'telemetry.reported', scope: 'device', version: 1, schema: v.array(v.string()), initial: () => [] });
     this.install = this.identity.read() || id(); this.identity.write(this.install);
     const local = this.local.read(), tab = this.tab.read();

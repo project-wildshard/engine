@@ -14,7 +14,6 @@ import { pageActor } from './pageActor';
 import { SessionVitals, sessionDevice, type BootStep, type SessionSummary } from './sessionVitals';
 import { bootKind, bootStepTimes } from './bootSteps';
 import { bootTiming } from '../../../shared/engine/boot/timing';
-import * as v from 'valibot';
 
 declare const __BUILD_ID__: string;
 let vitals: SessionVitals | undefined;
@@ -31,13 +30,11 @@ export function noteWorldStep(step?: BootStep): void {
   if (vitals?.step(step) === true) health?.capture(vitals.reading());
 }
 export function noteWorldFrame(): void { vitals?.frame(diagnosticNow()); }
-/** QA 2026-11-23 row 10: the last build that reached control on this device, so the next boot knows it is an update. */
-const bootedBuild = saves.define({ key: 'telemetry.bootedBuild', scope: 'device', version: 1, schema: v.string(), initial: () => '' });
+/** QA 2026-11-23 row 10: this boot's kind and steps, on the session summary. */
 function noteBootSteps(): void {
   const build = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '';
-  if (vitals === undefined || build === '') return;
-  vitals.booted(bootKind(bootedBuild.read(), build), bootStepTimes(bootTiming()));
-  bootedBuild.write(build);
+  if (vitals === undefined || health === null || build === '') return;
+  vitals.booted(bootKind(health.swapBootedBuild(build), build), bootStepTimes(bootTiming()));
 }
 function noteWorldJoined(): void {
   if (vitals === undefined) return;
