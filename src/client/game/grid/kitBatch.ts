@@ -87,7 +87,7 @@ interface Member {
   readonly versions: number[]; readonly attributes: (Attribute | null)[];
   /** its channels' CPU copies went with the copy: it cannot draw itself again */
   readonly released: boolean; readonly mask: number; readonly drawn: number;
-  instance: number; geometryId: number; gone: boolean; at: Float64Array;
+  instance: number; geometryId: number; gone: boolean; at: Float64Array; spaceRevision: number;
   /** why it left (the census) */
   left?: string;
 }
@@ -104,6 +104,11 @@ export class KitBatch extends ChangedBatchedMesh {
   readonly members: Member[] = [];
   private hooks: (() => void)[] = [];
   private retired = false;
+  private space: THREE.Object3D | null = null;
+  private readonly spaceAt = new Float64Array(16);
+  private spaceRevision = 0;
+  private readonly worldToSpace = new THREE.Matrix4();
+  private readonly memberInSpace = new THREE.Matrix4();
   /**
    * DF8 (mini-df8c, `debug.programFold`): the cell patches its material ran when the batch was built. A cell's look patch
    * (`region.look`) leaves with the cell's scope, while the batch is the level's: as Driftwood
@@ -115,7 +120,7 @@ export class KitBatch extends ChangedBatchedMesh {
   private stale = false;
   /** a batch of `meshes` (one material, one keyed layout), each channel stored as `formats` has it (a custom channel a
    *  member lacks is filled with zeros) */
-  static of(meshes: readonly THREE.Mesh[], material: THREE.Material, formats: ReadonlyMap<string, Format>, cellPatches = false): KitBatch {
+  static of(meshes: readonly THREE.Mesh[], material: THREE.Material, formats: ReadonlyMap<string, Format>, cellPatches: boolean, space: THREE.Object3D): KitBatch {
     const geometries = meshes.map(mesh => mesh.geometry);
     const vertices = geometries.reduce((sum, g) => sum + g.getAttribute('position').count, 0);
     const indices = geometries.reduce((sum, g) => sum + (g.index?.count ?? g.getAttribute('position').count), 0);
@@ -123,6 +128,7 @@ export class KitBatch extends ChangedBatchedMesh {
     const batch = new KitBatch(meshes.length, vertices, indices, material);
     batch.name = `kit-batch:${material.name}`; batch.frustumCulled = false; batch.perObjectFrustumCulled = true; batch.sortObjects = false;
     batch.matrixAutoUpdate = false;
+    batch.space = space; batch.refreshSpace();
     const hooks = new Set<() => void>();
     for (const mesh of meshes) {
       const geometry = mesh.geometry, position = geometry.getAttribute('position');
@@ -142,7 +148,7 @@ export class KitBatch extends ChangedBatchedMesh {
       batch.getBoundingBoxAt(geometryId, new THREE.Box3()); batch.getBoundingSphereAt(geometryId, new THREE.Sphere());
       const instance = batch.addInstance(geometryId);
       mesh.updateWorldMatrix(true, false);
-      batch.setMatrixAt(instance, mesh.matrixWorld);
+      batch.placeMember(instance, mesh.matrixWorld);
       if (mesh.castShadow) batch.castShadow = true;
       if (mesh.receiveShadow) batch.receiveShadow = true;
       const hook = sharedHook(mesh);
@@ -150,7 +156,8 @@ export class KitBatch extends ChangedBatchedMesh {
       const attributes: (Attribute | null)[] = [...Object.values(geometry.attributes).map(a => a as Attribute), geometry.index];
       const released = attributes.some(a => a !== null && isGpuOnlyAttribute(a));
       batch.members.push({ mesh, geometry, material, attributes, versions: attributes.map(a => a?.version ?? 0), released, mask: mesh.layers.mask,
-        drawn: geometry.index?.count ?? position.count, instance, geometryId, gone: false, at: Float64Array.from(mesh.matrixWorld.elements) });
+        drawn: geometry.index?.count ?? position.count, instance, geometryId, gone: false, at: Float64Array.from(mesh.matrixWorld.elements),
+        spaceRevision: batch.spaceRevision });
       // a channel that gives its CPU copy up at upload goes now: the member never uploads, and the batch holds its copy
       for (const attribute of attributes) if (attribute !== null && isGpuOnlyAttribute(attribute)) attribute.onUploadCallback();
       mesh.layers.disableAll(); mesh.userData[BATCHED_VIEW] = true;
@@ -173,6 +180,21 @@ export class KitBatch extends ChangedBatchedMesh {
     for (const member of this.members) { Reflect.deleteProperty(member.mesh.userData, BATCHED_VIEW); if (!member.gone && !member.released) member.mesh.layers.mask = member.mask; }
     this.removeFromParent(); this.dispose();
   }
+  /** Batch matrices are relative to the cell that owns the draw. Recompute its inverse only when that frame moves. */
+  private refreshSpace(): void {
+    const matrix = this.space?.matrixWorld;
+    if (matrix === undefined) return;
+    for (let i = 0; i < 16; i++) {
+      if (matrix.elements[i] === this.spaceAt[i]) continue;
+      this.spaceAt.set(matrix.elements);
+      this.worldToSpace.copy(matrix).invert();
+      this.spaceRevision++;
+      return;
+    }
+  }
+  private placeMember(instance: number, world: THREE.Matrix4): void {
+    this.setMatrixAt(instance, this.memberInSpace.multiplyMatrices(this.worldToSpace, world));
+  }
   /** each copy's pose, visibility and range, as its member has them now; a changed member leaves */
   sync(): void {
     if (this.retired || this.stale) return;
@@ -182,6 +204,7 @@ export class KitBatch extends ChangedBatchedMesh {
       for (const member of this.members) if (!member.gone && this.getVisibleAt(member.instance)) this.setVisibleAt(member.instance, false);
       return;
     }
+    this.refreshSpace();
     const info: unknown = Reflect.get(this, '_geometryInfo');
     for (const member of this.members) {
       if (member.gone) continue;
@@ -204,9 +227,9 @@ export class KitBatch extends ChangedBatchedMesh {
       if (this.getVisibleAt(member.instance) !== visible) this.setVisibleAt(member.instance, visible);
       if (!visible) continue;
       const e = mesh.matrixWorld.elements;
-      let moved = false;
-      for (let i = 0; i < 16; i++) if (e[i] !== member.at[i]) { moved = true; break; }
-      if (moved) { member.at.set(e); this.setMatrixAt(member.instance, mesh.matrixWorld); }
+      let moved = member.spaceRevision !== this.spaceRevision;
+      for (let i = 0; !moved && i < 16; i++) if (e[i] !== member.at[i]) moved = true;
+      if (moved) { member.at.set(e); member.spaceRevision = this.spaceRevision; this.placeMember(member.instance, mesh.matrixWorld); }
       // a slab's range: the copy draws the same span of its own indices
       const row: unknown = Array.isArray(info) ? info[member.geometryId] : undefined;
       if (typeof row === 'object' && row !== null) {
@@ -234,7 +257,7 @@ export class KitBatch extends ChangedBatchedMesh {
 /** Gather `root`'s batchable meshes by material and layout; each set of two or more becomes a batch under `root`. */
 export function buildKitBatches(root: THREE.Object3D, cellPatches = false): KitBatch[] {
   const sets = new Map<string, { material: THREE.Material; keyed: string; meshes: THREE.Mesh[] }>();
-  root.updateMatrixWorld(true);
+  root.updateWorldMatrix(true, true);
   root.traverse((object) => {
     if (!batchableMesh(object)) return;
     const material = object.material as THREE.Material, geometry = object.geometry;
@@ -265,7 +288,7 @@ export function buildKitBatches(root: THREE.Object3D, cellPatches = false): KitB
     }
     const kept = members.filter(mesh => [...formats].every(([name, format]) => format.itemSize <= 3 || mesh.geometry.hasAttribute(name)));
     if (kept.length < 2) continue;
-    const batch = KitBatch.of(kept, material, formats, cellPatches);
+    const batch = KitBatch.of(kept, material, formats, cellPatches, root);
     batch.userData['layout'] = keyed;
     root.add(batch); batch.updateMatrixWorld(true);
     batches.push(batch);
@@ -276,7 +299,8 @@ export function buildKitBatches(root: THREE.Object3D, cellPatches = false): KitB
 /**
  * Batch `scene`'s kit now, once, while `scope` lives: when the slot is on at phone Low and the renderer multi-draws. The
  * boot calls it before the shaders step, while every channel's CPU copy is whole (the first frames upload and release
- * them), so the batched programs link and upload under the card. Returns the census the bench reads.
+ * them), so the batched programs link and upload under the card. A road admission calls it on its own view
+ * after the cell look is ready, before the final warm draw. Returns the census the bench reads.
  */
 export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: boolean, enabled: () => boolean = kitBatchOn, cellPatches: () => boolean = programFoldOn): { batches: number; members: number } {
   if (!multiDraw || !enabled() || scope.disposed || scope.disposing || scene.userData['kitBatch'] !== undefined) return { batches: 0, members: 0 };

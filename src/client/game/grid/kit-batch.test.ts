@@ -19,6 +19,37 @@ test('the slot is off unless set', () => {
   expect(kitBatch(false)).toBe(false);
 });
 
+test('a returning region owns its kit in cell coordinates', () => {
+  const scene = new THREE.Scene(), root = new THREE.Group();
+  root.position.set(420, 0, -220);
+  root.rotation.y = Math.PI / 2;
+  scene.add(root);
+  const material = new THREE.MeshLambertMaterial();
+  const a = new THREE.Mesh(box(false), material), b = new THREE.Mesh(box(false), material);
+  a.position.set(3, 1, 2);
+  root.add(a, b);
+  const [batch] = buildKitBatches(root);
+  if (batch === undefined) throw new Error('one batch');
+  expect(batch.parent).toBe(root);
+  const [member] = batch.members;
+  if (member === undefined) throw new Error('kit member');
+  const matrix = new THREE.Matrix4();
+  const rendered = (): number[] => {
+    batch.getMatrixAt(member.instance, matrix);
+    return new THREE.Vector3().setFromMatrixPosition(matrix.premultiply(batch.matrixWorld)).toArray();
+  };
+  const expected = (): number[] => a.getWorldPosition(new THREE.Vector3()).toArray();
+  expect(rendered()).toEqual(expected());
+  root.position.x += 10;
+  a.position.z = 7;
+  scene.updateMatrixWorld(true);
+  batch.sync();
+  expect(rendered()).toEqual(expected());
+  batch.retire();
+  expect(batch.parent).toBeNull();
+  expect([a.layers.mask, b.layers.mask]).toEqual([1, 1]);
+});
+
 test('meshes of one material share a batch that follows each member', () => {
   const scene = new THREE.Scene(), material = new THREE.MeshLambertMaterial(), other = new THREE.MeshLambertMaterial();
   const group = new THREE.Group(); scene.add(group);
