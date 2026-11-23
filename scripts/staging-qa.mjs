@@ -109,7 +109,8 @@ async function journey({ id, root, url, out, build, candidate }) {
   const report = readResult(join(dir, gate ? 'chromium-far-reach-zone-gate.json' : 'report.json'));
   const pass = status === 0 && report?.build === build &&
     (gate ? report?.fired?.ready === true : report?.report?.length === 1 && report?.report[0]?.ok === true);
-  const problem = gate ? report?.note : report?.report?.[0]?.problems?.[0]?.text;
+  // the gate names the wait it gave up on and what the page showed then (zone-gate-proof.mjs `namedWait`)
+  const problem = gate ? [report?.note, report?.stuck ? JSON.stringify(report.stuck) : ''].filter(Boolean).join(' ') : report?.report?.[0]?.problems?.[0]?.text;
   const reason = typeof problem === 'string' && problem !== '' ? problem : 'no passing exact-build result';
   return { id, browser, pass, seconds: (Date.now() - started) / 1000, playedMs: Number(report?.report?.[0]?.playedMs ?? 0), log,
     ...(pass ? {} : { reason }) };

@@ -97,7 +97,27 @@ async function bootCard(context, card, pose, errors) {
   return page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
 }
 const tag = `${engineName}${device === '' ? '' : '-phone'}${targetSlug === 'nalati-grasslands' ? '' : `-${targetSlug}`}`;
-const result = { base, engine: engineName, viewport: '', at: new Date().toISOString(), build: '', shots: /** @type {Record<string, unknown>[]} */ ([]), fired: /** @type {unknown} */ (null), errors: /** @type {string[]} */ ([]), note: '' };
+const result = { base, engine: engineName, viewport: '', at: new Date().toISOString(), build: '', shots: /** @type {Record<string, unknown>[]} */ ([]), fired: /** @type {unknown} */ (null), errors: /** @type {string[]} */ ([]), note: '', stage: '', stuck: /** @type {unknown} */ (null) };
+/** The page's grid and loading card as a wait gave up (v0.1.75's gate could not tell a Driftwood boot from an arrival).
+ * @param {import('playwright').Page} page @returns {Promise<unknown>} */
+async function stuckAt(page) {
+  try {
+    return await page.evaluate(() => {
+      const W = /** @type {any} */ (window), st = W.__wildshard?.shard?.grid?.state?.(), live = st?.live?.live;
+      return { home: live?.home ?? st?.home ?? null, current: live?.current ?? null, gameplayReady: live?.gameplayReady ?? null, cellStage: st?.cellStage ?? null,
+        step: document.querySelector('.ws-load [data-el="step"]')?.textContent ?? null,
+        error: document.querySelector('.ws-load-error, #wserr, .ws-fail')?.textContent?.slice(0, 300) ?? null };
+    });
+  } catch (error) { return String(error).slice(0, 200); }
+}
+/** A named wait: its failure says which wait it was (`stage`) and what the page showed (`stuck`).
+ * @template T @param {import('playwright').Page} page @param {string} name @param {Promise<T>} wait @returns {Promise<T>} */
+async function namedWait(page, name, wait) {
+  try { return await wait; } catch (error) {
+    result.stage = name; result.stuck = await stuckAt(page);
+    throw new Error(`${name}: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+}
 /** @type {import('./zone-entry-tour.mjs').Tour} */
 const tour = {expected:0, arrivals:[], pass:false, failure:{...FIRST_ZONE_PAIR, reason:'The runner did not reach the first crossing'}};
 const saveTour = () => writeFileSync(join(out, 'zone-entry.json'), `${JSON.stringify({build:result.build, engine:engineName, profile:'phone', ...tour}, null, 2)}\n`);
@@ -122,7 +142,7 @@ async function bootDriftwood(context, page) {
   if (index < 0) throw new Error('No Driftwood Isle card');
   await page.locator('.ws-menu-dots i').nth(index).click();
   await page.locator('.ws-menu-play').click();
-  await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: deploy ? 90_000 : 180_000, polling: 100 });
+  await namedWait(page, 'Driftwood control', page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.().live?.live?.gameplayReady === true, undefined, { timeout: deploy ? 90_000 : 180_000, polling: 100 }));
   await sleep(2000);
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
 }
@@ -198,11 +218,11 @@ try {
   if (deploy) {
     const from = await state();
     await walkTo(nalatiEdge + dir * 2);
-    await page.waitForFunction(slug => {
+    await namedWait(page, `${targetSlug} arrival`, page.waitForFunction(slug => {
       const st = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.();
       const live = st?.live?.live;
       return (live?.home ?? st?.home) === slug && live?.gameplayReady === true;
-    }, targetSlug, { timeout: 90_000, polling: 200 });
+    }, targetSlug, { timeout: 90_000, polling: 200 }));
     const dark = await deployFrameProblem(page);
     if (dark !== null) throw new Error(dark);
     if (await page.locator('#wserr:visible, .ws-fail:visible').count() > 0) throw new Error('an error card opened after crossing');
