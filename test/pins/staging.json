@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "9bc06c222a88ad03bb241b0160119222b92acb4c1070521d2241aa7a6ee66a7a",
+  "catalogueHash": "499afb079e9d893cdfe7177323f78ea71d9ec4d97ab23ce9ec6c8b6bb16ee5a4",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -784,14 +784,14 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 12,
-        "hash": "df0a4a4786f772888373723cbb880d457ceb0514b4a94dba57266eba473e9292"
+        "revision": 13,
+        "hash": "54aa3284a8347aadeeba82635faac6a63ee22f977a30ca5019a8db5152d61a9c"
       },
       {
         "slug": "sunscar-dunes",
         "name": "Signal Dunes",
-        "revision": 6,
-        "hash": "3fef58aebd2cf25a28293b57eaa060f5679526487c3a32cfa5479f4f75305149"
+        "revision": 7,
+        "hash": "1adcd6d4707fbdd39364811dacc6fbbdbbb391927365c0b156c225b5c3a69f4d"
       }
     ],
     "missing": []
@@ -949,15 +949,15 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 12,
-      "hash": "df0a4a4786f772888373723cbb880d457ceb0514b4a94dba57266eba473e9292",
-      "bytes": 322764800
+      "revision": 13,
+      "hash": "54aa3284a8347aadeeba82635faac6a63ee22f977a30ca5019a8db5152d61a9c",
+      "bytes": 310408704
     },
     {
       "slug": "sunscar-dunes",
-      "revision": 6,
-      "hash": "3fef58aebd2cf25a28293b57eaa060f5679526487c3a32cfa5479f4f75305149",
-      "bytes": 11424768
+      "revision": 7,
+      "hash": "1adcd6d4707fbdd39364811dacc6fbbdbbb391927365c0b156c225b5c3a69f4d",
+      "bytes": 11425280
     }
   ]
 }
