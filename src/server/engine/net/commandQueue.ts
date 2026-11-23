@@ -1,6 +1,7 @@
 import * as v from 'valibot';
 import { NetCommandSchema, type NetCommand } from '@wildshard/wire/netCommand';
 import { NET_PRESSES, seqAfter } from '../../../shared/engine/net/command';
+import { NET_BUTTONS } from '../../../shared/engine/input/netButtons';
 
 /** Steps a client may run ahead of the clock, so a burst or a late packet costs it nothing. */
 export const COMMAND_HEADROOM = 6;
@@ -9,7 +10,7 @@ export const STALL_TICKS = 15;
 /**
  * The most steps a client can have to spend. The clock pays it one a tick, a step costs one, and past STALL_TICKS the
  * no-input steps spend what an empty client earns: this is what stops a speed-hack by flooding (Unreal's MaxMoveDeltaTime
- * idea, §4.2). A command past it could only run late, so the oldest go.
+ * idea, §4.2). A command past it could only run late, so the oldest go, and their presses ride on (`trim`).
  */
 export const MAX_QUEUED_COMMANDS: number = COMMAND_HEADROOM + STALL_TICKS;
 /** Commands waiting past this are more than one client frame's burst (MAX_FIXED_STEPS): the player is behind. */
@@ -102,5 +103,24 @@ export class CommandQueue {
     this.budget--; this.held = null; // a stalled client has let go of everything
     return { command: null, extra: null, still: false };
   }
-  private trim(most: number): void { if (this.queue.length > most) this.queue.splice(0, this.queue.length - most); }
+  /**
+   * Drop the oldest past `most`. Their motion only runs late and goes, but their presses were already played by the page
+   * (FS30, TC22 nightly 45158091056: a stalled frame's HOVER tap, then the socket's queued frames' held commands past the
+   * cap; the tap went and the page's predicted board was corrected away). They ride on the oldest kept command instead:
+   * HOVER is a toggle, so pressed twice it cancels; JUMP, DODGE and LOCK land once.
+   */
+  private trim(most: number): void {
+    if (this.queue.length <= most) return;
+    const gone = this.queue.splice(0, this.queue.length - most), kept = this.queue[0];
+    if (kept === undefined) return;
+    let hover = 0, held = 0, hookTarget: number | undefined;
+    for (const command of gone) {
+      hover ^= command.buttons & NET_BUTTONS.hover;
+      held |= command.buttons & NET_PRESSES & ~NET_BUTTONS.hover;
+      if ((command.buttons & NET_BUTTONS.lock) !== 0 && command.hookTarget !== undefined) hookTarget = command.hookTarget;
+    }
+    if (hover === 0 && held === 0) return;
+    const buttons = (kept.buttons ^ hover) | held;
+    this.queue[0] = { ...kept, buttons, ...(kept.hookTarget === undefined && hookTarget !== undefined && (buttons & NET_BUTTONS.lock) !== 0 ? { hookTarget } : {}) };
+  }
 }

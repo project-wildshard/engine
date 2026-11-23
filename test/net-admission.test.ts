@@ -139,6 +139,31 @@ test('a flood gains no speed: steps never pass the ticks elapsed plus the headro
   expect(steps).toBeGreaterThanOrEqual(600);
 });
 
+test('a burst past the cap drops the oldest motion, never a press the page already played (FS30 TC22)', () => {
+  // Nightly 45158091056, Saltwind: after a stalled page frame sent its HOVER tap, the socket's queued frames each pulsed held
+  // commands, past MAX_QUEUED_COMMANDS. The tap was the oldest, so it went; the page's predicted toggle was corrected away.
+  const queue = new CommandQueue();
+  queue.admit([command(1, { buttons: NET_BUTTONS.hover | NET_BUTTONS.sprint }), command(2, { buttons: NET_BUTTONS.jump }), command(3, { buttons: NET_BUTTONS.lock, hookTarget: 4 }),
+    ...Array.from({ length: MAX_QUEUED_COMMANDS + 9 }, (_, index) => command(index + 4))]);
+  const first = queue.next().command;
+  expect(first?.seq).toBe(MAX_QUEUED_COMMANDS + 12 - COMMAND_HEADROOM); // the cap, then the first tick's budget
+  expect(first?.buttons).toBe(NET_BUTTONS.hover | NET_BUTTONS.jump | NET_BUTTONS.lock);
+  expect(first?.hookTarget).toBe(4);
+  // a toggle pressed twice in what was dropped cancels; a dropped dodge still lands
+  const twice = new CommandQueue();
+  twice.admit([command(1, { buttons: NET_BUTTONS.hover }), command(2, { buttons: NET_BUTTONS.hover | NET_BUTTONS.dodge }),
+    ...Array.from({ length: MAX_QUEUED_COMMANDS - 1 }, (_, index) => command(index + 3)), command(MAX_QUEUED_COMMANDS + 2, { buttons: NET_BUTTONS.dodge })]);
+  expect(twice.next().command?.buttons).toBe(NET_BUTTONS.dodge);
+  // a budget trim does the same: what a tick drops still lands on the next command it steps
+  const late = new CommandQueue();
+  for (let tick = 0; tick < COMMAND_HEADROOM; tick++) late.next();
+  late.admit([command(1), command(2)]); late.next(); late.next(); late.next();
+  late.admit([command(3, { buttons: NET_BUTTONS.hover }), ...Array.from({ length: MAX_QUEUED_COMMANDS - 1 }, (_, index) => command(index + 4))]);
+  const steps: NetCommand[] = [];
+  for (let tick = 0; tick < 40; tick++) { const { command: step, extra, still } = late.next(); if (!still && step !== null) steps.push(step); if (extra !== null) steps.push(extra); }
+  expect(steps.filter(step => (step.buttons & NET_BUTTONS.hover) !== 0)).toHaveLength(1);
+});
+
 test('a client silent for a long time banks no sprint', () => {
   const queue = new CommandQueue();
   for (let tick = 0; tick < 6000; tick++) queue.next();
