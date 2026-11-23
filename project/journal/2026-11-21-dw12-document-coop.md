@@ -34,3 +34,8 @@ first. Freeing things on teardown (Rapier from bytes) did not help.
   with no JetsamEvent report, only the kernel's memorystatus lines; a
   `hop` return showed a new visible pid and held 40 s. warm-return.mjs
   now counts the kernel's kills.
+
+2026-11-22 ~20:45 Cancún: the warm-return harness now leaves pages with `location.replace` (as the game's travel, reload-at-spot
+and exit do; a replace is never kept in WebKit's back-forward cache) and the preview server's game document says `no-store`
+like pages/worker.ts (over HTTPS WebKit keeps no back-forward copy of a no-store main document), so serve-local benches the
+same eligibility as staging. The 11-22 runs over serve-local may have returned into a process still holding the cold page.

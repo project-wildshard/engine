@@ -5,7 +5,8 @@
 // game's document to the game's document: one opener policy, so WebKit keeps the process). Each round starts a fresh Safari.
 //
 //   node scripts/memory/iphone/phone-queue.mjs submit --priority driftwood-fps -- scripts/memory/iphone/warm-return.mjs \
-//     --base https://staging.wildshard.io/ [--zone driftwood-isle] [--arms hop,hop,hop] [--hold 40] [--out <dir>]
+//     --base https://staging.wildshard.io/ [--zone driftwood-isle] [--arms hop,hop,hop] [--nav replace|load] [--hold 40] [--out <dir>]
+// `--nav replace` (default) leaves each page with `location.replace`, as the game leaves its own; `load` is a typed load.
 //
 // Per round it writes <out>/round-<n>/: the filtered device log (WebKit, RunningBoard, jetsam lines), the WebContent pids at
 // each stage (devicectl), and every JetsamEvent report the phone wrote in the round's window. RunningBoard's "visiblity is
@@ -25,7 +26,8 @@ import { startInspector } from './inspector.mjs';
 import { findButton, phoneSlots, watchPageErrors, waitForControl } from './safari.mjs';
 
 const UDID = '00008110-000A35C61E90401E';
-const WATCHED = /WebContent|jetsam|memorystatus/iu;
+// the kernel's and RunningBoard's WebContent lines, plus the UI process's word on which process a navigation got
+const WATCHED = /WebContent|jetsam|memorystatus|ProcessSwapping|WebProcessCache|SuspendedPage|BackForwardCache|Using WebProcess/iu;
 
 /** RunningBoard's visible WebContent pid at each moment: [local clock "HH:MM:SS.mmm", pid] in log order.
  * @param {string[]} lines @returns {[string, number][]} */
@@ -141,11 +143,18 @@ async function settled(call, tries = 6) {
 /** @typedef {{ outcome?: string, clickToControlMs?: number | null, error?: string | null, controlAt?: string, timeOrigin?: number,
  *   hold?: { seconds: number, answered: number, lost: { at: string, why: string } | null } }} Boot */
 
+/** Leave for `url` the way the game leaves its own page (`location.replace`: no back-forward entry), or as a typed load.
+ * @param {Page} page @param {string} url @param {'replace' | 'load'} nav */
+async function go(page, url, nav) {
+  if (nav === 'load') { await settled(() => page.navigate(url), 3); return; }
+  await settled(() => page.evaluate('setTimeout(() => { location.replace(arguments[0]); }, 0); return true;', [url]), 3);
+}
+
 /** Open /slug/<zone>, wait for the new document, press ENTER ZONE and wait for control.
- * @param {Page} page @param {URL} base @param {string} zone @returns {Promise<Boot>} */
-async function boot(page, base, zone) {
+ * @param {Page} page @param {URL} base @param {string} zone @param {'replace' | 'load'} nav @returns {Promise<Boot>} */
+async function boot(page, base, zone, nav) {
   const before = Number(await settled(() => page.evaluate('return performance.timeOrigin;')));
-  await settled(() => page.navigate(new URL(`/slug/${zone}`, base).href), 3);
+  await go(page, new URL(`/slug/${zone}`, base).href, nav);
   await pause(1500);
   for (const end = Date.now() + 30_000; Math.abs(Number(await settled(() => page.evaluate('return performance.timeOrigin;'))) - before) <= 5; await pause(300)) {
     assert(Date.now() < end, 'the page was not replaced');
@@ -176,17 +185,36 @@ async function hold(page, warm, seconds) {
   }
 }
 
+/** Load /version.json and clear the origin: saves, workers, caches and databases. @param {Page} page @param {URL} base */
+async function resetOrigin(page, base) {
+  await settled(() => page.navigate(new URL('/version.json', base).href), 3);
+  await pause(500);
+  await settled(() => page.evaluate(`window.__wsReset = { done: false }; (async () => { localStorage.clear(); sessionStorage.clear();
+    await Promise.all((await navigator.serviceWorker?.getRegistrations() ?? []).map(w => w.unregister()));
+    await Promise.all((await globalThis.caches?.keys() ?? []).map(k => caches.delete(k)));
+    await Promise.all(((await indexedDB.databases?.()) ?? []).filter(d => d.name).map(d => new Promise(r => { const q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r; })));
+    window.__wsReset.done = true; })().catch(e => { window.__wsReset = { done: true, error: String(e) }; }); return true;`), 3);
+  for (const end = Date.now() + 45_000; ; await pause(500)) {
+    const reset = /** @type {{ done: boolean, error?: string } | null} */ (await settled(() => page.evaluate('return window.__wsReset;'), 3));
+    if (reset?.done === true) { assert(reset.error === undefined, reset.error); return; }
+    assert(Date.now() < end, 'the origin reset did not finish');
+  }
+}
+
 async function main() {
   assert(process.env['WS_PHONE_JOB'], 'warm-return runs through the MD1 phone queue (phone-queue.mjs submit)');
   const { values } = parseArgs({ options: { base: { type: 'string' }, zone: { type: 'string', default: 'driftwood-isle' },
-    arms: { type: 'string', default: 'hop,hop,hop' }, hold: { type: 'string', default: '40' }, out: { type: 'string' } } });
+    arms: { type: 'string', default: 'hop,hop,hop' }, hold: { type: 'string', default: '40' }, out: { type: 'string' },
+    nav: { type: 'string', default: 'replace' } } });
   assert(values.base !== undefined, '--base <origin> is required');
   const base = new URL(values.base), zone = values.zone, arms = values.arms.split(',');
   assert(arms.every(arm => arm === 'hop' || arm === 'direct'), '--arms is a list of hop and direct');
+  const nav = /** @type {'replace' | 'load'} */ (values.nav);
+  assert(nav === 'replace' || nav === 'load', '--nav is replace or load');
   const out = resolve(values.out ?? `tmp/warm-return/${new Date().toISOString().replaceAll(/[:.]/gu, '-')}`);
   mkdirSync(out, { recursive: true });
   /** @type {Record<string, unknown> & { rounds: Record<string, unknown>[] }} */
-  const report = { job: process.env['WS_PHONE_JOB'], base: base.href, zone, startedAt: new Date().toISOString(), rounds: [] };
+  const report = { job: process.env['WS_PHONE_JOB'], base: base.href, zone, nav, startedAt: new Date().toISOString(), rounds: [] };
   const save = () => { writeFileSync(join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`); };
   report['phone'] = doctor({ udid: UDID, sharedPort: '4444' });
   for (const [index, arm] of arms.entries()) {
@@ -201,25 +229,19 @@ async function main() {
       page = await inspector.fresh();
       // a cold origin: no saves, workers, caches or databases, then the phone's slots (Low, phone tier, no first-play prompts)
       const fresh = page;
-      await fresh.navigate(new URL('/version.json', base).href);
-      await fresh.evaluate(`window.__wsReset = { done: false }; (async () => { localStorage.clear(); sessionStorage.clear();
-        await Promise.all((await navigator.serviceWorker?.getRegistrations() ?? []).map(w => w.unregister()));
-        await Promise.all((await globalThis.caches?.keys() ?? []).map(k => caches.delete(k)));
-        await Promise.all(((await indexedDB.databases?.()) ?? []).filter(d => d.name).map(d => new Promise(r => { const q = indexedDB.deleteDatabase(d.name); q.onsuccess = q.onerror = q.onblocked = r; })));
-        window.__wsReset.done = true; })().catch(e => { window.__wsReset = { done: true, error: String(e) }; }); return true;`);
-      for (const end = Date.now() + 45_000; ; await pause(500)) {
-        const reset = /** @type {{ done: boolean, error?: string } | null} */ (await fresh.evaluate('return window.__wsReset;'));
-        if (reset?.done === true) { assert(reset.error === undefined, reset.error); break; }
-        assert(Date.now() < end, 'the origin reset did not finish');
+      // a navigation still settling stops the page's context ("Context is stopped"): load version.json again and retry
+      for (let attempt = 1; ; attempt++) {
+        try { await resetOrigin(fresh, base); break; }
+        catch (error) { if (attempt >= 3) throw error; console.error(`round ${String(index + 1)}: origin reset try ${String(attempt)}:`, String(error)); await pause(2000); }
       }
       await fresh.evaluate(`const write = (${writeSaveFixture.toString()}); for (const f of arguments[0]) write(f); return true;`, [phoneSlots({ graphics: 'low' })]);
       round['pidsStart'] = webContentPids(join(dir, 'pids-start.json'));
-      round['cold'] = await boot(fresh, base, zone);
+      round['cold'] = await boot(fresh, base, zone, nav);
       round['pidsCold'] = webContentPids(join(dir, 'pids-cold.json')); save();
       if (round['cold'].outcome !== 'control') throw new Error(`cold boot: ${String(round['cold'].outcome)}`);
       await pause(5000);
-      if (arm === 'hop') { await settled(() => fresh.navigate(new URL('/robots.txt', base).href), 3); await pause(300); }
-      round['warm'] = await boot(fresh, base, zone);
+      if (arm === 'hop') { await go(fresh, new URL('/robots.txt', base).href, nav); await pause(1500); }
+      round['warm'] = await boot(fresh, base, zone, nav);
       round['pidsWarm'] = webContentPids(join(dir, 'pids-warm.json')); save();
       if (round['warm'].outcome === 'control') await hold(fresh, round['warm'], Number(values.hold));
       round['pidsEnd'] = webContentPids(join(dir, 'pids-end.json'));

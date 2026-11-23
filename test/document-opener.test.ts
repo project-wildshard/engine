@@ -56,7 +56,8 @@ test('the preview server (dev world, serve-local) sends COOP on the game documen
     const html = 'text/html,application/xhtml+xml';
     for (const path of ['/', '/index.html', '/slug/driftwood-isle']) {
       const page = await head(new URL(path, server.base), html);
-      expect([page.status, page.headers['content-type'], page.headers['cross-origin-opener-policy']], path).toEqual([200, 'text/html', 'same-origin']);
+      expect([page.status, page.headers['content-type'], page.headers['cross-origin-opener-policy'], page.headers['cache-control']], path)
+        .toEqual([200, 'text/html', 'same-origin', 'no-store']);
     }
     // the warm return's stop between boots: the SPA fallback answers it with the page's bytes, but not its policy
     const robots = await head(new URL('/robots.txt', server.base), html);

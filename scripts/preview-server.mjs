@@ -197,7 +197,8 @@ const server = createServer((req, res) => {
   const { file, stat } = found, etag = `W/"${stat.size}-${stat.mtime.getTime()}"`;
   res.setHeader('Content-Type', type(file)); res.setHeader('Last-Modified', stat.mtime.toUTCString()); res.setHeader('ETag', etag);
   // Meta IPHONE13-DRIFTWOOD DW12: the game's document says COOP, as pages/worker.ts does; the SPA fallback's other paths don't
-  if (type(file) === 'text/html' && isDocumentRoute(pathname)) res.setHeader('Cross-Origin-Opener-Policy', DOCUMENT_OPENER);
+  // and no-store as pages/worker.ts's page answers: over HTTPS (serve-local --public) WebKit then keeps no back-forward copy
+  if (type(file) === 'text/html' && isDocumentRoute(pathname)) { res.setHeader('Cross-Origin-Opener-Policy', DOCUMENT_OPENER); res.setHeader('Cache-Control', 'no-store'); }
   res.setHeader('Accept-Ranges', 'bytes');
   const compressible = COMPRESSIBLE.test(type(file)) && stat.size >= 1024;
   if (compressible) varyEncoding(res);
