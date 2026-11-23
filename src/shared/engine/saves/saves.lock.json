@@ -114,12 +114,13 @@
       "migrations": []
     },
     "device/telemetry.heartbeat": {
-      "version": 4,
-      "shape": "55403d02094826fd",
+      "version": 5,
+      "shape": "91232dfaa76184a6",
       "migrations": [
         1,
         2,
-        3
+        3,
+        4
       ]
     },
     "device/telemetry.install": {
@@ -289,12 +290,13 @@
       "migrations": []
     },
     "session/telemetry.heartbeat": {
-      "version": 4,
-      "shape": "55403d02094826fd",
+      "version": 5,
+      "shape": "91232dfaa76184a6",
       "migrations": [
         1,
         2,
-        3
+        3,
+        4
       ]
     },
     "session/titleArrival": {

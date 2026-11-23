@@ -20,7 +20,8 @@ export class SessionHealth {
   constructor(store: SaveStore, build: string, send: (report: HealthReport) => void, now: number = Date.now(),
     id: () => string = () => crypto.randomUUID(), actor?: ActorTags) {
     this.send = send;
-    const compatible = { key: 'telemetry.heartbeat', version: 4, schema: v.nullable(heartbeatSchema), initial: () => null, migrate: { 1: (old: unknown) => old, 2: (old: unknown) => old, 3: (old: unknown) => old } };
+    // v5 (QA 2026-11-23 row 10): the summary gained optional boot and bootSteps; a v4 heartbeat reads unchanged
+    const compatible = { key: 'telemetry.heartbeat', version: 5, schema: v.nullable(heartbeatSchema), initial: () => null, migrate: { 1: (old: unknown) => old, 2: (old: unknown) => old, 3: (old: unknown) => old, 4: (old: unknown) => old } };
     this.local = store.define({ ...compatible, scope: 'device' });
     this.tab = store.define({ ...compatible, scope: 'session' });
     this.identity = store.define({ key: 'telemetry.install', scope: 'device', version: 1, schema: v.string(), initial: () => '' });
