@@ -390,7 +390,25 @@ const CHECK_LANES = 8;
 function isQuota(failure: unknown): boolean { return typeof failure === 'object' && failure !== null && 'name' in failure && failure.name === 'QuotaExceededError'; }
 /** Exactly one list, one denominator and one completion per file. A complete
  * worker-cache response credits immediately without reading/checksumming it. */
-export function downloadSpawnManifest(address: SpawnManifestAddress, ports: SpawnDownloadPorts, base: string, packs: string = base): SpawnDownload {
+/** QA-FEEDBACK-2026-11-23-b row 23 (J501): the shard folder a loose file under `/shardfiles/<folder>/` sits in, when it is not `zone`'s */
+export function neighbourOf(url: string, zone: string | undefined): string | undefined {
+  if (zone === undefined || zone === '') return undefined;
+  const folder = /\/shardfiles\/([^/]+)\//u.exec(new URL(url, 'https://x.invalid').pathname)?.[1];
+  if (folder === undefined) return undefined;
+  return bareSlug(folder) === bareSlug(zone) ? undefined : folder;
+}
+/** row 23: a neighbour's bad file never blocks this zone's boot: it is skipped (its page read falls through to the network) and
+ *  reported to Sentry with its code, NEIGHBOUR-FILE (staging Driftwood stuck at `finish` on brasscap-mesa's discovery.json). */
+function reportNeighbourFile(zone: string, neighbour: string, url: string, failure: unknown): void {
+  console.warn(`[spawn] skipped ${neighbour}'s ${new URL(url, 'https://x.invalid').pathname} for ${zone}:`, failure);
+  const build: unknown = Reflect.get(globalThis, '__WS_BUILD_ID__');
+  void import('@wildshard/engine/telemetry/browserErrors').then(({ captureBrowserError }) => {
+    captureBrowserError(failure, { system: 'neighbour-file', build: typeof build === 'string' ? build : '', shard: zone, bootStage: 'download', fatal: false,
+      exit: { code: 'NEIGHBOUR-FILE', zone: neighbour, revision: '', room: '', step: 'download' } });
+    return undefined;
+  }).catch(() => undefined);
+}
+export function downloadSpawnManifest(address: SpawnManifestAddress, ports: SpawnDownloadPorts, base: string, packs: string = base, zone?: string): SpawnDownload {
   const controller = new AbortController(), listeners = new Set<(snapshot: SpawnDownloadSnapshot) => void>(), aliases = new Map<string, string>();
   let cacheWriteDenied = false, storageFull: number | null = null;
   const endStorageFull = (): void => { if (storageFull !== null) finishLoadingWait(storageFull); storageFull = null; };
@@ -639,6 +657,7 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
         for (let next = await nextLoose(); next !== undefined; next = await nextLoose()) {
           const {file} = next;
           try {
+          try {
             let received = 0, credited = 0;
             const {bytes: body, copy: cachedCopy} = await readSpawnFile(file.url, file.bytes, {
               ...ports, fetch: (url, signal, init) => {
@@ -662,6 +681,13 @@ export function downloadSpawnManifest(address: SpawnManifestAddress, ports: Spaw
             controller.signal.throwIfAborted();
             if (stored) serve(file); else if (cacheWriteDenied) members.set(file.url, Promise.resolve(Uint8Array.from(body)));
             settleFile(file.url, stored); landed(file.url); wireCompleted += file.wireBytes; filesDone++; publish();
+          } catch (failure) {
+            // row 23 (J501): a neighbour's file that fails (a size or hash that differs, a 404) is skipped, never this zone's boot
+            const neighbour = neighbourOf(file.url, zone);
+            if (neighbour === undefined || zone === undefined || controller.signal.aborted) throw failure;
+            reportNeighbourFile(zone, neighbour, file.url, failure);
+            settleFile(file.url, false); landed(file.url); wireCompleted += file.wireBytes; filesDone++; publish();
+          }
           } finally { landed(file.url); inFlight.delete(file.url); active--; if (demandedFlight.delete(file.url)) demandsActive--; nudge(); }
         }
       }));
@@ -1150,13 +1176,13 @@ function spawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'd
   // Runtime packs: this entry's whole-level manifest from the packs book. A missing, unreadable or entry-less book
   // fails the download (admission waits on it and refuses control with the reason); it never runs the default set and
   // reports it complete, which would break the whole-level rule (sp-x9's review of 40bc516d5c).
-  const download = !packsOn ? downloadSpawnManifest(selected.address, downloadPorts(selected.cacheName, false), document.baseURI, selected.base)
+  const download = !packsOn ? downloadSpawnManifest(selected.address, downloadPorts(selected.cacheName, false), document.baseURI, selected.base, bareSlug(slug))
     : lateDownload(async signal => {
       const address = packsSelection(await readPacksBook(), slug, flow, tier, mode);
       signal.throwIfAborted();
       if (address === null) throw new Error(`Packs book has no ${flow} entry for ${slug} (${tier}, ${mode})`);
       if (address.url === selected.address.url) throw new Error('Packs book names the default manifest');
-      return downloadSpawnManifest(address, downloadPorts(selected.cacheName, true), document.baseURI, selected.base);
+      return downloadSpawnManifest(address, downloadPorts(selected.cacheName, true), document.baseURI, selected.base, bareSlug(slug));
     });
   current?.download.cancel(); current = {key, download, foreground, again: () => spawnDownload(slug, flow, tier, mode, foreground)};
   trackOutcome(download, slug, packsOn);

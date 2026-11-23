@@ -208,3 +208,24 @@ test('LD2: a cancel ends the warm check span at once, even while a native cache 
     expect(spans.filter(row => row.operation === 'download:cache-check')).toEqual([{operation: 'download:cache-check', result: 'cancelled'}]);
   } finally { Reflect.deleteProperty(globalThis, '__bootTiming'); }
 });
+
+// QA-FEEDBACK-2026-11-23-b row 23 (J501): staging Driftwood's boot stuck at `finish` on "Spawn file size differs:
+// /shardfiles/brasscap-mesa/discovery.json". A neighbour's bad file is skipped (and reported); this zone's own bad file still refuses.
+test('a neighbour\'s file that differs never blocks the zone\'s boot; the zone\'s own still refuses', async () => {
+  const neighbour = {url: '/shardfiles/brasscap-mesa/discovery.json', bytes: 5, hash: 'c'.repeat(64)};
+  const own = {...manifest, files: [...files, neighbour], totalBytes: 12}, ownText = JSON.stringify(own);
+  const selected = {...address, bytes: ownText.length, totalBytes: 12, files: 3};
+  const body = (url: string): Uint8Array<ArrayBuffer> => new Uint8Array(url.includes('brasscap') ? 9 : url.endsWith('.js') ? 3 : 4);
+  const ports = {cached: () => Promise.resolve(undefined), fetch: (url: string) => Promise.resolve(new Response(url.endsWith('.json') && !url.includes('brasscap') ? ownText : body(url)))};
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  try {
+    const download = downloadSpawnManifest(selected, ports, base, base, 'example');
+    await download.ready;
+    expect(download.snapshot()).toMatchObject({filesDone: 3, complete: true, error: null});
+    expect(warn.mock.calls.some(([line]) => String(line).includes('skipped brasscap-mesa\'s /shardfiles/brasscap-mesa/discovery.json for example'))).toBe(true);
+    const ownBad = {...manifest, files: [{...files[0], url: '/shardfiles/example/discovery.json'}, files[1]]}, ownBadText = JSON.stringify(ownBad);
+    const refused = downloadSpawnManifest({...address, bytes: ownBadText.length}, {cached: () => Promise.resolve(undefined),
+      fetch: (url: string) => Promise.resolve(new Response(url.includes('spawn/') ? ownBadText : new Uint8Array(url.endsWith('.js') ? 3 : 9)))}, base, base, 'example');
+    await expect(refused.ready).rejects.toThrow('size differs');
+  } finally { warn.mockRestore(); }
+});

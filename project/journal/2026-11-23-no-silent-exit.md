@@ -9,3 +9,5 @@ the code to everyone with Retry where it can work, Sentry gets `exit_code`/`zone
 
 Row 23 rides beside it: a neighbour's bad spawn file (Brasscap's discovery.json) used to fail Driftwood's whole boot.
 Now it is skipped and reported as NEIGHBOUR-FILE; the zone's own bad file still refuses.
+
+Row 23 landed as its own commit: the neighbour test is `test/spawn-download.test.ts`'s last case (Brasscap's 9-byte discovery.json against its listed 5).
