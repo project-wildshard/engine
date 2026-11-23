@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// DF5: fit only the declared training segments, then test untouched segments.
+// DF5: fit only the declared training segments, then test untouched segments. --fenced fits gpuProbe.mjs's fenced frames.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -117,14 +117,79 @@ export function fitGpu(pairs, route, training, heldOut) {
       'At least one held-out prediction differs by more than 25%; do not use this ratio in the floor table.'};
 }
 
+/** @typedef {{build:string|null, css:number[], dpr:number|null, gpu?:string|null, legs:{name:string, frames:number, ms:number|null}[]}} FencedCapture */
+
+/** A phone route-bench run (route.json row) with --fenced-gpu, as a FencedCapture. Pure.
+ * @param {{boot?:{build?:string|null}, raster?:{css?:number[], dpr?:number}, legs?:{name:string, probe?:{frames?:number, tailMeanMs?:number|null}|null}[]}} row
+ * @returns {FencedCapture} */
+export function fencedFromRouteBench(row) {
+  return { build: row.boot?.build ?? null, css: row.raster?.css ?? [], dpr: row.raster?.dpr ?? null, gpu: null,
+    legs: (row.legs ?? []).map(leg => ({ name: leg.name, frames: leg.probe?.frames ?? 0, ms: leg.probe?.tailMeanMs ?? null })) };
+}
+
+/** A Mac measureFps cold capture with fencedEvery, as a FencedCapture. Pure.
+ * @param {{witness?:{build?:string|null, css?:number[], dpr?:number, gpu?:string|null}, legs?:{name:string, fencedGpu?:{frames?:number, tailMeanMs?:number|null}}[]}} cold
+ * @returns {FencedCapture} */
+export function fencedFromMeasure(cold) {
+  return { build: cold.witness?.build ?? null, css: cold.witness?.css ?? [], dpr: cold.witness?.dpr ?? null, gpu: cold.witness?.gpu ?? null,
+    legs: (cold.legs ?? []).map(leg => ({ name: leg.name, frames: leg.fencedGpu?.frames ?? 0, ms: leg.fencedGpu?.tailMeanMs ?? null })) };
+}
+
+/** DF5 with an observable the 30 fps cap cannot clamp: both sides fence the same frames (gpuProbe.mjs), so each
+ * segment's ratio is phone fenced GPU ms over Mac fenced GPU ms. Same rules as fitGpu: three matched runs, the ratio from
+ * training segments only, every held-out run predicted within 25%.
+ * @param {{phone:FencedCapture, mac:FencedCapture}[]} pairs @param {string[]} training @param {string[]} heldOut
+ * @param {number} [minFrames] fenced frames each leg needs */
+export function fitFencedGpu(pairs, training, heldOut, minFrames = 20) {
+  if (pairs.length < 3) throw new Error('DF5 needs at least three independent matched route pairs');
+  const assigned = [...training, ...heldOut];
+  if (training.length === 0 || heldOut.length < 2 || new Set(assigned).size !== assigned.length)
+    throw new Error('Declare disjoint training and at least two held-out segments');
+  const build = pairs[0].phone.build, css = JSON.stringify(pairs[0].phone.css);
+  for (const { phone, mac } of pairs) {
+    for (const side of [phone, mac]) {
+      if (side.build === null || side.build !== build) throw new Error('Matched captures need the same build');
+      if (side.dpr !== 1 || JSON.stringify(side.css) !== css) throw new Error('Matched captures need the same raster at DPR 1');
+    }
+    if (!/metal/iu.test(mac.gpu ?? '') || /software|swiftshader/iu.test(mac.gpu ?? '')) throw new Error('GPU fit requires hardware Metal measurements');
+  }
+  const segments = assigned.map(name => {
+    const measurements = pairs.map(({ phone, mac }, run) => {
+      const p = phone.legs.find(leg => leg.name === name), m = mac.legs.find(leg => leg.name === name);
+      if (p === undefined || m === undefined || p.frames < minFrames || m.frames < minFrames || !(Number(p.ms) > 0) || !(Number(m.ms) > 0))
+        throw new Error(`Missing fenced frames for ${name} in run ${String(run + 1)}`);
+      const phoneMs = /** @type {number} */ (p.ms), macMs = /** @type {number} */ (m.ms);
+      return { run: run + 1, phoneMs, macMs, phoneFrames: p.frames, macFrames: m.frames, ratio: phoneMs / macMs };
+    });
+    const ratios = measurements.map(row => row.ratio);
+    return { name, role: training.includes(name) ? 'training' : 'held-out', ratio: median(ratios),
+      spread: { min: Math.min(...ratios), max: Math.max(...ratios) }, measurements };
+  });
+  const byRun = pairs.map((_, run) => median(segments.filter(leg => leg.role === 'training').map(leg => leg.measurements[run].ratio)));
+  const ratio = median(byRun);
+  const validation = segments.filter(leg => leg.role === 'held-out').map(leg => ({ name: leg.name,
+    runs: leg.measurements.map(({ run, phoneMs, macMs }) => {
+      const predictedMs = macMs * ratio, errorMs = Math.abs(predictedMs - phoneMs);
+      return { run, measuredMs: phoneMs, predictedMs, errorFraction: errorMs / phoneMs, pass: errorMs <= phoneMs * 0.25 };
+    }) }));
+  const qualified = validation.every(leg => leg.runs.every(run => run.pass));
+  return { qualified, build, raster: { css: pairs[0].phone.css, dpr: 1 }, metric: 'fenced GPU tail, 10% trimmed mean (gpuProbe.mjs)',
+    training, heldOut, ratio, spread: { min: Math.min(...byRun), max: Math.max(...byRun) }, byRun, segments, validation,
+    reason: qualified ? 'All held-out predictions are within 25% in every matched run.' :
+      'At least one held-out prediction differs by more than 25%; do not use this ratio in the floor table.' };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const {values} = parseArgs({options:{manifest:{type:'string'},out:{type:'string'}}});
+  const {values} = parseArgs({options:{manifest:{type:'string'},out:{type:'string'},fenced:{type:'boolean'}}});
   if (!values.manifest || !values.out) throw new Error('Use --manifest <pairs.json> --out <fit.json>');
   const manifestPath = resolve(values.manifest), folder = resolve(manifestPath, '..');
   const read = (/** @type {string} */ file) => JSON.parse(readFileSync(resolve(folder,file),'utf8'));
   const manifest = read(manifestPath);
-  const pairs = manifest.pairs.map((/** @type {{phone:string,mac:string}} */ pair) => ({phone:read(pair.phone),mac:read(pair.mac)}));
-  const report = fitGpu(pairs, manifest.route, manifest.training, manifest.heldOut);
+  // --fenced: pairs are { phone: { file: route.json, run: index }, mac: { file: measureFps cold capture } }
+  const report = values.fenced === true
+    ? fitFencedGpu(manifest.pairs.map((/** @type {{phone:{file:string,run:number},mac:{file:string}}} */ pair) =>
+      ({ phone: fencedFromRouteBench(read(pair.phone.file)[pair.phone.run]), mac: fencedFromMeasure(read(pair.mac.file)) })), manifest.training, manifest.heldOut)
+    : fitGpu(manifest.pairs.map((/** @type {{phone:string,mac:string}} */ pair) => ({phone:read(pair.phone),mac:read(pair.mac)})), manifest.route, manifest.training, manifest.heldOut);
   writeFileSync(values.out,`${JSON.stringify(report,null,2)}\n`);
   console.log(report.reason);
   process.exitCode = report.qualified ? 0 : 2;

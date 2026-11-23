@@ -2,7 +2,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--route <name>] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--fenced-gpu <n>] [--out <dir>] [--dry-run]
 //
 // --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
 // --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
@@ -10,6 +10,7 @@
 // --frames logs every frame over 45 ms from the wake lock to the route's end with the links, uploads and scene adds in it,
 // and on the phone JavaScriptCore's collections (the inspector's Heap agent), then names each frame over 50 ms's cause. --gpu-fence adds WebGL2 fences and a full-collection
 // sentinel (gpuFence.mjs): whether each long frame waited on the GPU or ran a full collection.
+// --fenced-gpu <n> fences one frame in n with readPixels on each leg (fps/gpuProbe.mjs, DF5): the GPU time the 30 fps cap hides.
 // --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split). --legs n plays the first n segments only.
 //
 // Each run plays the route (route.mjs) once per cap, each from its own cold boot (fresh Safari on the phone, a fresh WebKit
@@ -24,6 +25,7 @@ import { parseArgs } from 'node:util';
 import { deviceSavePicks } from '../../debug-settings.mjs';
 import { enterZone, phoneSlots } from './safari.mjs';
 import { fenceFrames, fenceWaits, GPU_FENCE_READ, GPU_FENCE_START } from './gpuFence.mjs';
+import { observeFencedGpu } from '../../fps/gpuProbe.mjs';
 import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, otherKind, OWNER_CENSUS, VOICE_LOG_READ, VOICE_LOG_START, VOICE_WORKER_READ } from './census.mjs';
 import { askWake, holdWake, unlockAudio, playRoute, routeFor, routeTable, worstSegment } from './route.mjs';
 import { lockKind, underLock } from './locks.mjs';
@@ -32,7 +34,7 @@ const { values } = parseArgs({ options: {
   zone: { type: 'string', default: 'driftwood-isle' }, route: { type: 'string' }, runs: { type: 'string', default: '3' }, caps: { type: 'string', default: '30,60' },
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
   slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, 'cool-outside': { type: 'boolean' }, cooled: { type: 'boolean' }, out: { type: 'string' }, udid: { type: 'string' },
-  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'cache-off': { type: 'boolean' }, frames: { type: 'boolean' }, 'gpu-fence': { type: 'boolean' }, 'with-locks': { type: 'boolean' },
+  'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'cache-off': { type: 'boolean' }, frames: { type: 'boolean' }, 'gpu-fence': { type: 'boolean' }, 'fenced-gpu': { type: 'string' }, 'with-locks': { type: 'boolean' },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
 if (!Number.isSafeInteger(runs) || runs < 1 || caps.length === 0 || caps.some((cap) => cap !== 30 && cap !== 60)) throw new Error('--runs is a positive integer, --caps a list of 30 and 60');
@@ -180,7 +182,12 @@ async function bench() {
             })();
           }
           if ('quiet' in driver && typeof driver.quiet === 'function') await driver.quiet();
-          row.legs = await playRoute(driver, { slug: route, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+          // --fenced-gpu <n> (DF5, mini-dwfps): fence one frame in n per leg (fps/gpuProbe.mjs), a GPU time the cap cannot clamp
+          const every = values['fenced-gpu'] === undefined ? 0 : Number(values['fenced-gpu']);
+          const probe = every > 0 ? { start: `window.__wsFenced = (${observeFencedGpu.toString()})(window.__wildshard.world.game, ${String(every)}); return 'fencing';`,
+            stop: 'const stop = window.__wsFenced; window.__wsFenced = undefined; return stop === undefined ? null : stop();' } : undefined;
+          row.legs = await playRoute(driver, { slug: route, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), probe, log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+          if (probe !== undefined) for (const leg of row.legs) console.log(`  fenced ${leg.name}: ${JSON.stringify(leg.probe)}`);
           // DF9 (mini-df9b): what the far copies did on the route (farLod.ts `__wsFarLod`), when the slot is on
           row.farLod = await driver.evaluate(FAR_LOD_READ).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           if (row.farLod !== null) console.log(`  farLod: ${JSON.stringify(row.farLod).slice(0, 1500)}`);

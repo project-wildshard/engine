@@ -1,5 +1,6 @@
 import {expect, test} from 'vitest';
-import {fitGpu} from '../../scripts/fps/gpu-fit.mjs';
+import {fitGpu, fitFencedGpu, fencedFromRouteBench, fencedFromMeasure} from '../../scripts/fps/gpu-fit.mjs';
+import {observeFencedGpu} from '../../scripts/fps/gpuProbe.mjs';
 
 const route = ['dock','beach','village','fire','road'].map(name => ({name,seconds:1}));
 const training = ['dock','beach','village'], heldOut = ['fire','road'];
@@ -79,4 +80,43 @@ test('a cadence term can explain the fire residual without qualifying an unobser
   expect(changed.observation.validation[0].runs[2].pass).toBe(false);
   for (const pair of inputs) for (const leg of pair.phone.legs) leg.samples[0].gpuApproxMs.fill(0);
   expect(fitGpu(inputs,route,training,heldOut).observation).toBeNull();
+});
+
+// DF5 (mini-dwfps, 2026-11-23): the fenced fit reads gpuProbe.mjs's fenced frames from both benches
+test('the fenced fit trains on training legs only and qualifies when every held-out run is within 25%', () => {
+  const names = ['dock','beach','village','fire','road'];
+  const fenced = (run, macMs, scale, gpu) => ({ build: 'exact', css: [390, 664], dpr: 1, gpu,
+    legs: names.map((name, i) => ({ name, frames: 40, ms: macMs[i] * scale + run / 100 })) });
+  const mac = [2, 3, 4, 2.5, 3.5];
+  const inputs = [1, 2, 3].map(run => ({ phone: fenced(run, mac, 6, null), mac: fenced(0, mac, 1, 'ANGLE Metal Renderer: Apple M5 Pro') }));
+  const report = fitFencedGpu(inputs, ['dock','beach','village'], ['fire','road']);
+  expect(report.qualified).toBe(true);
+  expect(report.ratio).toBeGreaterThan(6);
+  expect(report.ratio).toBeLessThan(6.01);
+  inputs[1].phone.legs[4].ms = 40;
+  expect(fitFencedGpu(inputs, ['dock','beach','village'], ['fire','road']).qualified).toBe(false);
+  expect(fitFencedGpu(inputs, ['dock','beach','village'], ['fire','road']).ratio).toBe(report.ratio);
+  inputs[0].mac.gpu = 'SwiftShader';
+  expect(() => fitFencedGpu(inputs, ['dock','beach','village'], ['fire','road'])).toThrow('Metal');
+});
+
+test('route-bench and measureFps captures normalize to the same fenced shape', () => {
+  const phone = fencedFromRouteBench({ boot: { build: 'b' }, raster: { css: [390, 664], dpr: 1 }, legs: [{ name: 'dock', probe: { frames: 30, tailMeanMs: 9 } }] });
+  const mac = fencedFromMeasure({ witness: { build: 'b', css: [390, 664], dpr: 1, gpu: 'Metal' }, legs: [{ name: 'dock', fencedGpu: { frames: 31, tailMeanMs: 1.5 } }] });
+  expect(phone.legs[0]).toEqual({ name: 'dock', frames: 30, ms: 9 });
+  expect(mac.legs[0]).toEqual({ name: 'dock', frames: 31, ms: 1.5 });
+});
+
+test('the probe fences one frame in n with a readPixels before and after it, then restores the draw', () => {
+  const reads = [];
+  const gl = { IMPLEMENTATION_COLOR_READ_TYPE: 1, IMPLEMENTATION_COLOR_READ_FORMAT: 2, UNSIGNED_BYTE: 5121, NO_ERROR: 0, FLOAT: 5126, HALF_FLOAT: 5131, UNSIGNED_INT: 5125, INT: 5124,
+    getParameter: (key) => key === 1 ? 5121 : 6408, readPixels: (...args) => { reads.push(args[6].constructor.name); }, getError: () => 0 };
+  class Ranges { draw() { return 'drawn'; } }
+  const game = { frameDrawRanges: new Ranges(), renderer: { getContext: () => gl } };
+  const stop = observeFencedGpu(game, 3);
+  for (let i = 0; i < 9; i++) expect(game.frameDrawRanges.draw()).toBe('drawn');
+  const summary = stop();
+  expect(reads).toEqual(Array(6).fill('Uint8Array'));
+  expect(summary).toMatchObject({ every: 3, frames: 3, refused: 0 });
+  expect(Object.hasOwn(game.frameDrawRanges, 'draw')).toBe(false);
 });

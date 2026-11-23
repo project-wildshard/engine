@@ -30,3 +30,10 @@
   was programs compiled after control, which Chromium links fast at any CPU rate. The route script now counts each boot's
   links after control whose shader sources no earlier link used (`newProgramSourcesAfterControl`); WebKit keeps compiled
   programs by source, so those are the links that cost a phone frame.
+
+## A fenced GPU time for the DF5 ratio (2026-11-23)
+
+- The old DF5 fit divided the phone's capped frame residual by Mac timer queries; at a 30 fps cap the residual was the
+  34 − 1000/30 ms cadence floor in 14 of 15 segments, so no ratio could qualify. `scripts/fps/gpuProbe.mjs` fences one
+  frame in n with a 1-pixel readPixels before and after its draw; both benches (route-bench `--fenced-gpu`, measureFps
+  `fencedEvery`) record the same tail, and `gpu-fit.mjs --fenced` fits phone over Mac on it.

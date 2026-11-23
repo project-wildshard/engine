@@ -406,8 +406,9 @@ const recRead = `
 
 /** Play `slug`'s route on a driver at control, one leg at a time.
  * @param {{ evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<any> }} driver
- * @param {{ slug: string, cap: 30 | 60 | null, rec?: string[], legs?: number, log?: (line: string) => void }} options */
-export async function playRoute(driver, { slug, cap, rec = [], legs: count, log = () => undefined }) {
+ * @param {{ slug: string, cap: 30 | 60 | null, rec?: string[], legs?: number, log?: (line: string) => void,
+ *   probe?: { start: string, stop: string } }} options probe: page scripts run around each leg (route-bench --fenced-gpu); stop's value is the leg's `probe` */
+export async function playRoute(driver, { slug, cap, rec = [], legs: count, log = () => undefined, probe }) {
   const legs = [];
   // the grid's sky-down reveal (grid/reveal.ts: the camera comes down from ~400 m over the pier, 3 s) runs after control;
   // the route measures play, so it starts once the reveal has ended, and says how long the reveal took
@@ -423,13 +424,17 @@ export async function playRoute(driver, { slug, cap, rec = [], legs: count, log 
     const recording = rec.includes(leg.name) || (revealRec && legs.length === 0);
     const startRec = rec.includes(leg.name) && !(revealRec && legs.length === 0);
     if (startRec) log(`${leg.name}: REC ${String(await driver.evaluateAsync(recStart, [], 15_000))}`);
+    if (probe !== undefined) await driver.evaluateAsync(`const done = arguments[arguments.length - 1]; done((() => { ${probe.start} })());`, [], 15_000);
     const result = await driver.evaluateAsync(`
       const done = arguments[arguments.length - 1];
       (${routeLegOnPage.toString()})(arguments[0]).then(done, (error) => done({ error: String(error) }));
     `, [{ ...leg, cap }], (leg.seconds + 45) * 1000);
+    const probed = probe === undefined ? undefined : await driver.evaluateAsync(`const done = arguments[arguments.length - 1]; done((() => { ${probe.stop} })());`, [], 15_000)
+      .catch((/** @type {unknown} */ error) => ({ error: String(error) }));
     const summary = result?.samples?.length ? legSummary(result.samples) : null;
     const recText = recording ? await driver.evaluateAsync(recRead, [], 45_000).catch((/** @type {unknown} */ error) => `REC unread: ${String(error)}`) : null;
-    legs.push({ name: leg.name, kind: leg.kind, cap, error: result?.error ?? null, nav: result?.nav ?? null, summary, samples: result?.samples ?? [], rec: recText });
+    legs.push({ name: leg.name, kind: leg.kind, cap, error: result?.error ?? null, nav: result?.nav ?? null, summary, samples: result?.samples ?? [], rec: recText,
+      ...(probed === undefined ? {} : { probe: probed }) });
     log(`${leg.name}: ${summary === null ? `no frames (${String(result?.error)})` : `${String(summary.fps)} fps p95 ${String(summary.p95Ms)} ms >50 ${String(summary.over50)}`}${result?.nav?.stuck?.length ? ` stuck ${String(result.nav.stuck.length)}` : ''}`);
     if (result?.error) {
       // the coordinator, 2026-11-19: a broken leg brings back the page's console errors with their stacks and the error card
