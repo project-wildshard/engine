@@ -110,15 +110,26 @@ export function abilityRows(rows: Pick<ShardRows, 'species' | 'strikes'>): Reado
 }
 
 /**
- * Species rows or looks as a page registers them (TE-ENG7): each under its page kind (`speciesViewKinds`), and one that
- * moved also under its native kind with an id of its own, so a row from an older server, which names no species, still
- * draws as before rather than finding no kind.
+ * Species rows or looks as a page registers them (TE-ENG7): each under its page kind (`speciesViewKinds`), and the kind's
+ * first declared species (`owners`, see `nativeKindOwners`) also under its native kind with an id of its own, so a row from
+ * an older server, which names no species, still draws, and whatever asks by the bare kind (the Model Explorer's card)
+ * finds that species, not the last one declared on the kind (QA 11-23 #4: Pine's boar and elk cards drew their thralls).
  */
-export function pageSpecies<T extends { readonly id: string; readonly kind: string }>(entries: readonly T[], kinds: ReadonlyMap<string, string>, speciesOf: (entry: T) => string = (entry) => ('species' in entry && typeof entry.species === 'string' ? entry.species : entry.id)): T[] {
+export function pageSpecies<T extends { readonly id: string; readonly kind: string }>(entries: readonly T[], kinds: ReadonlyMap<string, string>,
+  speciesOf: (entry: T) => string = (entry) => ('species' in entry && typeof entry.species === 'string' ? entry.species : entry.id),
+  owners: ReadonlySet<string> = nativeKindOwners(entries.map((entry) => ({ id: speciesOf(entry), kind: entry.kind })))): T[] {
   return entries.flatMap((entry) => {
     const kind = kinds.get(speciesOf(entry)) ?? entry.kind;
-    return kind === entry.kind ? [entry] : [{ ...entry, kind }, { ...entry, id: `${entry.id}@${entry.kind}` }];
+    if (kind === entry.kind) return [entry];
+    return owners.has(speciesOf(entry)) ? [{ ...entry, kind }, { ...entry, id: `${entry.id}@${entry.kind}` }] : [{ ...entry, kind }];
   });
+}
+
+/** The species that answers for each native kind on a page: the first one declared on it (Pine's boar, not its thrall). */
+export function nativeKindOwners(species: readonly { readonly id: string; readonly kind: string }[]): ReadonlySet<string> {
+  const first = new Map<string, string>();
+  for (const row of species) if (!first.has(row.kind)) first.set(row.kind, row.id);
+  return new Set(first.values());
 }
 
 /** CC28c: a body's second look (format `swap`), drawn as a page kind of its own while channel `index` is at or above `at`. */

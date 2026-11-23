@@ -86,9 +86,11 @@ test('a page draws each species on a shared kind by its own look and name, and a
   const bandit = service.get(page.rowKind('mesa.bandit', 'bear')), wyrm = service.get(page.rowKind('mesa.wyrm', 'bear'));
   expect([bandit?.label, (bandit as { id?: string } | undefined)?.id]).toEqual(['Tin bandit', 'mesa.bandit']);
   expect([wyrm?.label, (wyrm as { id?: string } | undefined)?.id]).toEqual(['Dust Wyrm', 'mesa.wyrm']);
-  // An older server names no species: the row keeps the wire's kind, which still resolves, as it did before TE-ENG7.
+  // An older server names no species: the row keeps the wire's kind, which still resolves. The bare kind is the first
+  // species declared on it (QA 11-23 #4: Pine's Model Explorer asks for `boar` and drew its night thrall, declared last).
   expect(page.rowKind(undefined, 'bear')).toBe('bear');
-  expect(service.get('bear')?.label).toBe('Dust Wyrm');
+  expect(service.get('bear')?.label).toBe('Tin bandit');
+  expect(service.look('bear')?.id).toBe('look.bandit@bear');
   // A native body, or a species this page doesn't know, keeps the wire's kind too.
   expect(page.rowKind('', 'boar')).toBe('boar');
   expect(page.rowKind('mesa.target', 'greyBlob')).toBe('greyBlob');

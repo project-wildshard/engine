@@ -6,7 +6,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { ShardContext } from '../plugin/context';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { wirePage } from './wirePage';
-import { abilityRows, clientSpeciesLooks, pageSpecies, speciesSwaps, speciesViewKinds, type ClientRigLooks, type ShardViewRecipe } from './clientRecipes';
+import { abilityRows, clientSpeciesLooks, nativeKindOwners, pageSpecies, speciesSwaps, speciesViewKinds, type ClientRigLooks, type ShardViewRecipe } from './clientRecipes';
 import { loadClientRigLooks } from './clientRigLooks';
 import { clientNativeBook } from './clientNativeBook';
 import { loadStaticModels } from './itemModels';
@@ -73,11 +73,13 @@ export function declarePageCreatures(ctx: ShardContext, source: Shardfile, model
   wirePage.declareSpecies(kinds, ctx.scope);
   wirePage.declareAbilities(abilityRows(source.rows), ctx.scope);
   const pageRows = source.rows.species.map((row) => ({ ...row, harvest: row.harvest ?? [], variants: row.variants.map((variant) => ({ ...variant, scale: [variant.scale[0], variant.scale[1]] as [number, number] })) }));
-  ctx.rows.species(pageSpecies(pageRows, kinds));
+  // QA 11-23 #4: the bare native kind answers for its first declared species (rows and looks alike)
+  const owners = nativeKindOwners(source.rows.species);
+  ctx.rows.species(pageSpecies(pageRows, kinds, undefined, owners));
   // CC28c: a body's swap look registers under its own page kind, with a copy of its species row, never its species' kind
   const swaps = speciesSwaps(source.rows), swapped = new Map(swaps.map((swap) => [swap.look, swap]));
   const looks = withAttachments(clientSpeciesLooks(source.rows, models.recipes, models.materials, models.skins, models.rigLooks), source.rows, models.attachmentModels, models.materials, TIER === 'phone');
-  ctx.rows.speciesLook(pageSpecies(looks.filter((look) => !swapped.has(look.id)), kinds));
+  ctx.rows.speciesLook(pageSpecies(looks.filter((look) => !swapped.has(look.id)), kinds, undefined, owners));
   for (const swap of swaps) {
     const row = pageRows.find((entry) => entry.id === swap.species), look = looks.find((entry) => entry.id === swap.look);
     if (row === undefined || look === undefined) throw new Error(`Missing swap look ${swap.look}`);
