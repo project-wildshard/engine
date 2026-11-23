@@ -1,11 +1,11 @@
 import {describe, expect, it} from 'vitest';
 import {readTar} from '@wildshard/format/tar';
 import {admitPin} from '../scripts/pin-admit';
-import {hashOf, useCookHarness} from './fixtures/cookWorkerHarness';
+import {hashOf, legacyMigrationFixture, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** SHARD-COMPAT FE9b: `pins.ts install` admits a pin as the cook does, through the chain when this validator refuses it. */
 describe('a pin install admits through the chain', () => {
-  const h = useCookHarness();
+  const h = useCookHarness(legacyMigrationFixture.folder);
   const refuse = (): never => { throw new Error('refused as stored'); };
 
   it('installs a pin this validator admits as it is', () => {

@@ -5,11 +5,11 @@ import {migrateShardfile} from '@wildshard/format/migrate';
 import {readTar, writeTar} from '@wildshard/format/tar';
 import {cookProvenance, provenanceRefusal} from '../src/cook/game/cookProvenance';
 import {runCookJob, ShardfileRefusedError} from '../src/cook/game/cookJob';
-import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
+import {hashOf, legacyMigrationFixture, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** SHARD-COMPAT FE9a: the cook records the original's format, the chain id and the copy's digest, as the API does (CP7a). */
 describe('the cook provenance', () => {
-  const h = useCookHarness();
+  const h = useCookHarness(legacyMigrationFixture.folder), {slug} = legacyMigrationFixture;
 
   it('records the original format, the chain id the API stores and the migrated copy digest', () => {
     const chained = migrateShardfile(readTar(h.real), {hash: hashOf}), provenance = cookProvenance(h.real, hashOf);

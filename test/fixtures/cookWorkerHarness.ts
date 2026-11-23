@@ -17,6 +17,7 @@ import {compileCookWorker} from './compileCookWorker';
  * entry and owns a fresh scratch folder, so no file depends on another's store, cache or order. */
 export const root = process.cwd(), slug = 'sunscar-dunes';
 export const hashOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
+export const legacyMigrationFixture = { folder: join('test', 'fixtures', 'frozen-hall'), slug: 'blender-template' };
 
 /** A ustar with one entry `writeTar` would never write, its checksum right, so only a reader's rules refuse it. */
 export function rawTar(name: string, body: Uint8Array, type = '0'): Uint8Array {
@@ -40,7 +41,7 @@ export interface CookHarness {
 }
 
 /** Register the original suite setup in the calling `describe`. */
-export function useCookHarness(): CookHarness {
+export function useCookHarness(productFolder = join('out', slug)): CookHarness {
   let scratch: string | undefined, real: Uint8Array | undefined, files: Map<string, Uint8Array> | undefined, store: PackStore | undefined;
   let prepared: Awaited<ReturnType<typeof compileCookWorker>> | undefined, preparing: ReturnType<typeof compileCookWorker> | undefined;
   const preparationScope = new AbortController();
@@ -59,7 +60,7 @@ export function useCookHarness(): CookHarness {
   };
   beforeAll(async () => {
     scratch = mkdtempSync(join(tmpdir(), 'cook-worker-'));
-    real = folderTarball(join('out', slug)); files = new Map(readTar(real)); store = folderStore(join(scratch, 'store'));
+    real = folderTarball(productFolder); files = new Map(readTar(real)); store = folderStore(join(scratch, 'store'));
     preparing = compileCookWorker(preparationScope.signal); prepared = await preparing;
   });
   afterAll(async () => { preparationScope.abort(); await preparing?.catch(() => undefined); prepared?.dispose(); if (scratch !== undefined) rmSync(scratch, {recursive: true, force: true}); });

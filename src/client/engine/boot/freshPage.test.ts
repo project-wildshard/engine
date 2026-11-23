@@ -13,7 +13,13 @@ function leaveTo(href: string): string {
   const at = new URL(href);
   let went = '';
   const location = { origin: at.origin, search: at.search, replace: (to: string) => { went = to; } };
-  runInNewContext(script, { location, URL, URLSearchParams });
+  const frames: (() => void)[] = [];
+  runInNewContext(script, { location, URL, URLSearchParams,
+    requestAnimationFrame: (draw: () => void) => frames.push(draw), setTimeout: () => 0 });
+  expect(went).toBe('');
+  frames.shift()?.();
+  expect(went).toBe('');
+  frames.shift()?.();
   return went;
 }
 
