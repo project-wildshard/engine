@@ -9,6 +9,7 @@ import {pagePresentation} from '../app/view/presentation';
 import {PresentationLoop} from '../app/view/presentationLoop';
 import { SceneOwnership, sceneResourceOwner } from '../app/sceneOwnership';
 import { UploadOwnership } from '../render/uploadOwnership';
+import { desktopMedium } from './desktopPreset';
 import { composerAllocations, cachedResourceAllocations, type ResourceAllocation } from '../render/textureBytes';
 import { ViewmodelRoot } from '../render/viewmodel';
 import type { Phase } from '../app/systems';
@@ -755,11 +756,13 @@ export class Game {
     return composer;
   }
 
+  /** Whether the chain draws AO: the tier's or the level's knob, never on desktop Medium (J495, desktopPreset.ts). */
+  private aoWanted(knobs: ReturnType<Game['renderKnobs']>): boolean { return !desktopMedium() && (knobs.ao ?? TIER_CONFIG.ao); }
   /** n8ao's pass, fetched by prepareComposer only when this tier and level draw AO (J8: a phone entry loads no AO code) */
   private aoPass: typeof N8AOPostPass | null = null;
   /** Load what buildComposer will build from: the AO module when the tier and level have AO on (null: never fetched). */
   async prepareComposer(): Promise<void> {
-    if (this.lookStrategy?.mode === 'replace' || this.aoPass !== null || !(this.renderKnobs().ao ?? TIER_CONFIG.ao)) return;
+    if (this.lookStrategy?.mode === 'replace' || this.aoPass !== null || !this.aoWanted(this.renderKnobs())) return;
     this.aoPass = (await import('n8ao')).N8AOPostPass;
   }
 
@@ -780,7 +783,7 @@ export class Game {
 
     let aoPass: N8AOPostPass | null = null;
     // A level's tier data can keep its compositor below the transient boot peak.
-    if (knobs.ao ?? TIER_CONFIG.ao) {
+    if (this.aoWanted(knobs)) {
       const AoPass = this.aoPass;
       if (AoPass === null) throw new Error('Game.buildComposer with AO on before prepareComposer()');
       const ao = new AoPass(this.rootScene, this.camera, window.innerWidth, viewportHeight());

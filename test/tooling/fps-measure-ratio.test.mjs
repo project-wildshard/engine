@@ -18,7 +18,7 @@ test('each profile names the drawing buffer ratio it must witness', () => {
   expect(ratios).toEqual({
     'phone-lpm-low': [1], 'phone-high': [2], 'phone-low': [1],
     // 1496 × 717 on a 2× screen draws at 1.5; 1920 × 1080 on a 1× screen at 1
-    'desktop-high': [1.5, 1],
+    'desktop-medium': [1.5, 1],
     // desktop Low is the phone preset drawn uncapped at the raster it names
     'desktop-native': [1.5, 2, 1, 1],
   });

@@ -120,3 +120,19 @@
 - After: the 2× route profile has no frame over 50 ms (max 49.7, was 59–63), and the fetch layer is out of the top
   self-time list. What leads at 2× now is the scene walk: `updateMatrixWorld` 5.5% of samples, the render list and
   draw hooks, `aoTransparency` 1.9%, `roadCull` 1%.
+
+## Desktop Medium (J495, 2026-11-23)
+
+- Jake's call on the 2x half (J495): desktop Low and High keep their looks; a third desktop preset, Medium, carries the
+  half-speed CPU. Medium is the desktop tier with n8ao's pass never built and the staggered sun cascades redrawing one map a
+  frame (`core/desktopPreset.ts`, read once at boot from the device `graphics` slot as `'medium'`, which a phone reads as
+  High). Settings > Graphics on a desktop gets Low / Medium / High (Low is the phone tier at phone Low), applied on the
+  next load.
+- The bench's 2x profile is now `desktop-medium` (it was `desktop-high`; its caps key moved with J495, same 120 floor), so
+  a night stays 135 cells; `desktop-native` keeps holding Low and High to the floor at full speed.
+- Quick 2x route at 1496 x 717 (world2 on a loaded mini: the DF7 night and two other lanes on the GPU lock): High 105.3 fps,
+  p50 9.5, p95 11.5; Medium 120.3, 8.2, 10.3, max 43.9, 0 frames over 50 ms. Segments: dock 125.6 / p95 11.0, beach
+  119.6 / 9.8, village 116.9 / 9.9.
+- Also tried Medium without bloom: 121.0, 8.1, p95 10.8 (beach 10.3, village 11.0). No gain past run noise, so bloom stays.
+  What is left at Medium's p95 is the dock's settle and run-to-run noise on a busy mini; the nightly measures both sizes
+  three times a night.

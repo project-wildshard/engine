@@ -11,7 +11,7 @@
 //   --stalls: NB6's play-stall ratchet at each pose (exits 1 on a stall); with --capped, the desktop check Ring 1 can't run.
 //   --boot-profile <dir>: a CPU profile from the play click to 5 s after control, with the long animation frames after
 //   control (their page times; the profile's own clock starts at `profiledAt`), for a frame that only a boot shows
-//   --cpu <n>: CDP CPU throttling (2 = desktop-high's half-speed CPU)
+//   --cpu <n>: CDP CPU throttling (2 = desktop-medium's half-speed CPU)
 //   --ab-flags a,b: with --ab, only these Game boolean fields (live switches), each flipped
 //   --ab: at the last pose, each lever against the baseline, interleaved over 6 rounds so a busy machine's drift cancels
 //   (render scale 1 and 0.75, the shadow maps held, AO off, the post passes off, the viewmodel hidden).

@@ -3,7 +3,8 @@ import { engineString, type EngineStringKey } from '../../../shared/engine/strin
 import { listenTap } from '../input/dom';
 import { TIER, TIER_CONFIG, automaticTier, gfxPrefs, saveGfxPrefs } from '../core/tier';
 import { drawingBuffer, drawingPixelRatio } from '../core/devPixels';
-import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT } from '../core/graphicsMode';
+import { graphicsMode, lowPowerOn, lowPowerRefusal, PIXELS_EVENT, saveGraphicsMode } from '../core/graphicsMode';
+import { saveDesktopMedium, savedDesktopMedium, type DesktopPreset } from '../core/desktopPreset';
 import {
   applyPreset, DENSITIES, densityIn, flagOn, frameReadout, presetLabel, saveDensity, saveFlag, saveWorldToggle, shippedLook, worldToggleOn,
   type FlagKnob,
@@ -136,8 +137,21 @@ export function graphicsSettingsControls(): GraphicsControl[] {
     }
     scope.interval(1000, paint); paint(); r.append(box); return r;
   };
+  // J495 (DF14): a desktop's Low · Medium · High, each applied on the next load. Low is the phone tier at phone Low;
+  // Medium and High the desktop tier (core/desktopPreset.ts)
+  const deskNow = (): DesktopPreset => {
+    const saved = savedSetting('tier'), tier = saved === 'auto' ? automaticTier : saved;
+    return tier === 'phone' ? 'low' : savedDesktopMedium() ? 'medium' : 'high';
+  };
+  const deskSave = (v: string): void => {
+    if (v === 'low') { saveSetting('tier', 'phone'); saveGraphicsMode('low'); return; }
+    if (v !== 'medium' && v !== 'high') return;
+    saveSetting('tier', 'auto'); saveDesktopMedium(v === 'medium');
+  };
   return [
     { id: 'mode', section: 'main', order: 0, when: phone, build: row('modeCards') },
+    { id: 'deskPreset', section: 'main', order: 5, when: () => automaticTier === 'desktop', build: (scope) => pick(scope, s('s_gfx_desk_preset'),
+      [['low', s('s_st_low')], ['medium', s('s_st_medium')], ['high', s('s_st_high')]], deskNow, deskSave) },
     { id: 'gfxDensity', section: 'main', order: 10, when: phone, build: row('density') },
     // J458 (Jake, 2026-11-19, One Settings Menu A): the developer rows leave a phone's Graphics for DEV ▸ Graphics
     { id: 'gfxDrawing', section: 'dev', order: 0, when: phone, build: row('drawing') },

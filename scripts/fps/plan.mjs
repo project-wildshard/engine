@@ -4,7 +4,7 @@ import { routeFor } from '../memory/iphone/route.mjs';
 const PHONE = /** @type {const} */ ({ browser: 'chromium', tier: 'phone', width: 402, height: 812, dpr: 3 });
 const DESKTOP = /** @type {const} */ ({ browser: 'chromium', tier: 'desktop', cap: null });
 const displays = /** @type {const} */ ([{ width: 1496, height: 717, dpr: 2 }, { width: 1920, height: 1080, dpr: 1 }]);
-/** @param {(typeof displays)[number]} display @param {'low'|'high'} graphics @param {string|null} factor
+/** @param {(typeof displays)[number]} display @param {'low'|'medium'|'high'} graphics @param {string|null} factor
  * @returns {ProfileSpec} */
 function desktop(display, graphics, factor) {
   return { ...DESKTOP, ...display, graphics, factor, tier: graphics === 'low' ? 'phone' : 'desktop' };
@@ -14,7 +14,9 @@ const fullProfiles = {
   'phone-lpm-low': [{ ...PHONE, graphics: 'low', cap: 30, factor: 'phoneLpm' }],
   'phone-high': [{ ...PHONE, graphics: 'high', cap: 60, factor: 'phoneNormal' }],
   'phone-low': [{ ...PHONE, graphics: 'low', cap: 60, factor: 'phoneNormal' }],
-  'desktop-high': displays.map(display => desktop(display, 'high', 'desktopTypical')),
+  // J495 (Jake, 2026-11-23): desktop Low and High keep their looks; Medium (engine core/desktopPreset.ts) is the preset a
+  // half-speed desktop CPU plays at 120. desktop-native holds Low and High to the floor on a full-speed CPU.
+  'desktop-medium': displays.map(display => desktop(display, 'medium', 'desktopTypical')),
   'desktop-native': displays.flatMap(display => [desktop(display, 'high', null), desktop(display, 'low', null)]),
 };
 

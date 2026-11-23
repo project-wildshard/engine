@@ -173,12 +173,12 @@
    "decision": "J464",
    "why": "Driftwood drawn-frame minimum. DF7 qualifies the full route and its segments nightly."
   },
-  "fps/desktop-high/driftwood-isle": {
+  "fps/desktop-medium/driftwood-isle": {
    "hard": 120,
    "unit": "fps",
    "kind": "floor",
-   "decision": "J464",
-   "why": "Driftwood drawn-frame minimum. DF7 qualifies the full route and its segments nightly."
+   "decision": "J495",
+   "why": "Driftwood drawn-frame minimum (J464) for desktop Medium at half CPU speed; J495 gave the 2x case to Medium. DF7 qualifies it nightly."
   },
   "fps/desktop-native/driftwood-isle": {
    "hard": 120,

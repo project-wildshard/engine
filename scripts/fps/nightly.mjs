@@ -9,7 +9,7 @@ import { parseArgs } from 'node:util';
 import { readCaps } from '../budgets/files.mjs';
 
 const zone = 'driftwood-isle';
-const profiles = ['phone-low', 'phone-lpm-low', 'phone-high', 'desktop-high', 'desktop-native'];
+const profiles = ['phone-low', 'phone-lpm-low', 'phone-high', 'desktop-medium', 'desktop-native'];
 /** DF15: the profiles a night's verdict counts (all five). A profile left out still measures and prints, marked report
  *  only: its misses and absence do not stop the night qualifying, and the p95 comparison uses gated-green nights. */
 export const GATED_PROFILES = profiles;

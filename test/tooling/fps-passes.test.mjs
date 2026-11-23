@@ -59,10 +59,10 @@ test('installs the desktop pass probe before navigation and waits for control', 
 
 test('the table admits pass diagnostics only for short cold desktop runs', () => {
   const dock = { dockOnly: true, coldOnly: true };
-  expect(passBreakdownAllowed(['desktop-high', 'desktop-native'], dock)).toBe(true);
-  expect(passBreakdownAllowed(['desktop-high'], { ...dock, dockOnly: false })).toBe(false);
-  expect(passBreakdownAllowed(['desktop-high'], { ...dock, coldOnly: false })).toBe(false);
-  expect(passBreakdownAllowed(['desktop-high', 'phone-low'], dock)).toBe(false);
+  expect(passBreakdownAllowed(['desktop-medium', 'desktop-native'], dock)).toBe(true);
+  expect(passBreakdownAllowed(['desktop-medium'], { ...dock, dockOnly: false })).toBe(false);
+  expect(passBreakdownAllowed(['desktop-medium'], { ...dock, coldOnly: false })).toBe(false);
+  expect(passBreakdownAllowed(['desktop-medium', 'phone-low'], dock)).toBe(false);
   expect(() => requirePassBench(undefined)).toThrow('WS_BENCH=1');
   expect(() => requirePassBench('1')).not.toThrow();
 });

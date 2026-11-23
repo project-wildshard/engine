@@ -6,7 +6,7 @@ const build = 'exact-engine-build';
 const route = [{ name: 'Dock', seconds: 1 }];
 const specs = [
   ['phone-low', 60, 1], ['phone-lpm-low', 30, 1], ['phone-high', 30, 1],
-  ['desktop-high', 120, 2], ['desktop-native', 120, 4],
+  ['desktop-medium', 120, 2], ['desktop-native', 120, 4],
 ];
 
 function makeTable({ extraUpdateMs = 0, gpu = 'ANGLE Metal Renderer: Apple M4', calibrated = true } = {}) {
@@ -48,7 +48,7 @@ test('repeating a cold sample or omitting a variant cannot qualify the nightly',
   const duplicate = makeTable();
   duplicate.runs[0] = duplicate.runs[1];
   const sameVariant = makeTable();
-  const desktop = sameVariant.runs.filter(run => run.name === 'desktop-high');
+  const desktop = sameVariant.runs.filter(run => run.name === 'desktop-medium');
   for (const run of desktop.slice(3)) run.profile.width = desktop[0].profile.width;
   for (const table of [duplicate, sameVariant]) {
     const report = reviewNight(table, build);
@@ -77,7 +77,7 @@ test('the hosted job prints only a well-formed night from the mini, with the las
 });
 
 test('DF15: a profile left out of the gate still prints, marked report only, and cannot stop the night qualifying', () => {
-  const four = ['phone-low', 'phone-high', 'desktop-high', 'desktop-native'];
+  const four = ['phone-low', 'phone-high', 'desktop-medium', 'desktop-native'];
   const lpmMissing = makeTable();
   lpmMissing.runs = lpmMissing.runs.filter(run => run.name !== 'phone-lpm-low');
   expect(reviewNight(lpmMissing, build).qualifies).toBe(false);

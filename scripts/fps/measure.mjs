@@ -7,7 +7,7 @@ import { observePasses, requirePassBench } from './passes.mjs';
 import { observeProgramLinks, recordProgramSources } from './workload.mjs';
 import { observeFencedGpu } from './gpuProbe.mjs';
 
-/** @typedef {{browser:'webkit'|'chromium', cpu:number, graphics:'low'|'high', tier:'phone'|'desktop',
+/** @typedef {{browser:'webkit'|'chromium', cpu:number, graphics:'low'|'medium'|'high', tier:'phone'|'desktop',
  * width:number, height:number, dpr:1|2|3, cap:30|60|null, floor:number, device?:Record<string,boolean|number|string>}} Profile */
 /** @typedef {import('../memory/iphone/route.mjs').RouteLeg} RouteLeg */
 

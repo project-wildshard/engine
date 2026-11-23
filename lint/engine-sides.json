@@ -414,6 +414,7 @@
     "src/client/engine/render/ktx2Probe.ts": "client",
     "src/client/engine/render/layeredMaps.ts": "client",
     "src/client/engine/render/lighterTargets.ts": "client",
+    "src/client/engine/core/desktopPreset.ts": "client",
     "src/client/engine/core/devPixels.ts": "client",
     "src/client/engine/core/graphicsMode.ts": "client",
     "src/client/engine/core/graphicsQuality.ts": "client",

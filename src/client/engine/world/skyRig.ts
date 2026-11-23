@@ -1,6 +1,7 @@
 import { PLANET_DIST, SkyBackdropView, cloudLayer, paintedSkyEnvironment } from './skyBackdrop';
 import { cascadeRedraws, cascadeRedrawsOneMap } from './shadowCadence';
 import { jsonSlot } from '../saves/slots';
+import { desktopMedium } from '../core/desktopPreset';
 import { ownSceneResource } from '../app/sceneOwnership';
 import { BackdropLayer, applyLayers, layerKeyedSky, seedLayerTargets, type LayeredSkyBackdrop, type LayerEnvironmentOnly } from './backdropLayer';
 import { app } from '../app/runtime';
@@ -157,8 +158,9 @@ export class SkyRig {
     // (BA-3's A / B, shadowCadence.ts): near every frame, middle every 2nd, far every 4th. Desktop frames run at 60-120, so a
     // far moving caster steps at 15-30 Hz; the shadow pass was ~110 of Driftwood's ~320 draws a frame
     this.farEveryOther = (this.texelBias || TIER_CONFIG.cascadeStagger) && this.csm.lights.length > 1;
-    // DF14: desktop High's staggered cascades, one map a frame (shadowCadence.ts cascadeRedrawsOneMap); never the phone rig
-    this.oneMap = this.farEveryOther && !this.texelBias && jsonSlot('debug.shadowOneMap', 'device').read() === true;
+    // DF14: the staggered cascades, one map a frame (shadowCadence.ts cascadeRedrawsOneMap): desktop Medium's cadence (J495,
+    // desktopPreset.ts), or a set slot; never the phone rig
+    this.oneMap = this.farEveryOther && !this.texelBias && (desktopMedium() || jsonSlot('debug.shadowOneMap', 'device').read() === true);
     // E174: the phone rig's shadow maps are depth only at 16 bits (Jake's pick C; shadowVariants.ts): 40 MB, not three's 160
     if (shadows?.depth16 === 'phone' && rig.phone) {
       const maps = new ShadowMaps(this.renderer, this.csm, this.shadowFade?.ghosts ?? [], rig.size);
