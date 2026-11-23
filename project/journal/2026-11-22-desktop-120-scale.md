@@ -23,3 +23,10 @@
   (`getImageData`, 112 ms). Both wait on the GPU process from the page thread.
 - `debug.worldWatchDrawCheck` (the watch reads in a worker and stands in for DrawCheck on its canvas) is now on by default.
   Two ABBA pairs on the dock: frames over 50 ms off 2, 3 / on 1, 1. The one left is the frame control lands in.
+
+## A link-cost term for the phone stand-in (DF5, 2026-11-23)
+
+- At 2.2× CPU the stand-in ranked DF9's `farLod` worse like the iPhone 13, but not DF10's batches: the phone's loss there
+  was programs compiled after control, which Chromium links fast at any CPU rate. The route script now counts each boot's
+  links after control whose shader sources no earlier link used (`newProgramSourcesAfterControl`); WebKit keeps compiled
+  programs by source, so those are the links that cost a phone frame.

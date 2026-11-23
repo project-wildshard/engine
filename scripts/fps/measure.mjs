@@ -4,7 +4,7 @@ import { loadingCardIndex } from '../loading-benchmark/catalogue.mjs';
 import { legSummary, routeLegOnPage } from '../memory/iphone/route.mjs';
 import { fpsVerdict } from './verdict.mjs';
 import { observePasses, requirePassBench } from './passes.mjs';
-import { observeProgramLinks } from './workload.mjs';
+import { observeProgramLinks, recordProgramSources } from './workload.mjs';
 
 /** @typedef {{browser:'webkit'|'chromium', cpu:number, graphics:'low'|'high', tier:'phone'|'desktop',
  * width:number, height:number, dpr:1|2|3, cap:30|60|null, floor:number, device?:Record<string,boolean|number|string>}} Profile */
@@ -96,8 +96,10 @@ export function routeScript(route, profile, approach, passBreakdown) {
     const observeProgramLinks = (${observeProgramLinks.toString()});
     const observePasses = ${passBreakdown ? `(${observePasses.toString()})` : 'null'};
     const longFrames = (${observeLongFrames.toString()})();
+    const sources = (${recordProgramSources.toString()})([globalThis.WebGL2RenderingContext, globalThis.WebGLRenderingContext].filter(Boolean));
     document.addEventListener('ws:control-ready', () => {
       longFrames.start();
+      sources.control();
       window.__dfRoute = (async () => {
         const game = window.__wildshard.world.game, renderer = game.renderer;
         const gl = renderer.getContext();
@@ -119,7 +121,7 @@ export function routeScript(route, profile, approach, passBreakdown) {
           try { result = await runLeg({...leg, cap: ${JSON.stringify(cap)}}); }
           finally { measured = stop(); }
           legs.push({ name: leg.name, ...result, ...(observePasses === null ? { metal: measured } : { passBreakdown: measured }),
-            startPrograms, programLinksAfterControl: links.count() });
+            startPrograms, programLinksAfterControl: links.count(), newProgramSourcesAfterControl: sources.fresh() });
           if (result.error) break;
         }
         return { witness, legs, approach:approached, longFrames: longFrames.take() };
@@ -187,14 +189,15 @@ async function enterGrid(page, base, zone) {
 }
 
 /** @param {import('playwright').BrowserContext} context @param {Profile} profile
- * @param {{base:string, zone:string, route:RouteLeg[], approach?:RouteLeg[], passBreakdown?:boolean, signal:AbortSignal}} options */
-async function capture(context, profile, { base, zone, route, approach = [], passBreakdown = false, signal }) {
+ * @param {{base:string, zone:string, route:RouteLeg[], approach?:RouteLeg[], passBreakdown?:boolean, signal:AbortSignal, captureMs?:number}} options */
+async function capture(context, profile, { base, zone, route, approach = [], passBreakdown = false, signal, captureMs = 240_000 }) {
   const page = await context.newPage();
   /** @type {string[]} */
   const faults = [];
   page.on('pageerror', error => { if (faults.length < 8) faults.push(error.message.slice(0, 400)); });
   const stop = () => { void page.close().catch(() => undefined); };
-  const deadline = AbortSignal.any([signal, AbortSignal.timeout(240_000)]);
+  // one boot's whole route at a phone CPU rate (the DF5 stand-in) runs past the quick legs' 240 s
+  const deadline = AbortSignal.any([signal, AbortSignal.timeout(captureMs)]);
   deadline.addEventListener('abort', stop, { once: true });
   try {
     deadline.throwIfAborted();
@@ -230,7 +233,7 @@ async function capture(context, profile, { base, zone, route, approach = [], pas
 }
 
 /** One cold capture per fresh browser context. Its optional warm repeat keeps the actual HTTP and SW caches.
- * @param {Profile} profile @param {{base:string,zone:string,route:RouteLeg[],approach?:RouteLeg[],passBreakdown?:boolean,signal:AbortSignal,warm?:boolean}} options */
+ * @param {Profile} profile @param {{base:string,zone:string,route:RouteLeg[],approach?:RouteLeg[],passBreakdown?:boolean,signal:AbortSignal,warm?:boolean,captureMs?:number}} options */
 export async function measureFps(profile, options) {
   if (options.passBreakdown) requirePassBench(process.env.WS_BENCH);
   const browser = await openProfile(profile);
