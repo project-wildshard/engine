@@ -1,5 +1,5 @@
 import { installWorldRegistry } from '../../src/client/engine/world/registry';
-import { installKitSpecies } from '../../src/client/game/systems/species/install';
+import { installKitSpecies } from './kitSpecies';
 import { installAssetFixture, installCatalogueFixture } from './bootSetup';
 
 /** Exact shared creature owner and its real app tables, without unrelated world content. */

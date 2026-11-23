@@ -751,10 +751,10 @@ async function startSelected(): Promise<void> {
     const previousImages = selectedImages;
     selectedImages = imageOwner;
     previousImages?.dispose();
-    const [{ installKitSpecies }, { installKitIcons, BAG_ICONS }, { installPickupCatalogue, preparePickupCatalogue },
+    const [{ installKitCreatureSounds }, { installKitIcons, BAG_ICONS }, { installPickupCatalogue, preparePickupCatalogue },
       { default: PICKUP_CATALOGUE }, { installKitProps }, { STARTER_BAG_ITEMS }, { HOVERBOARD_TOOL }, { sharedCombatCues }] = await imports.ready();
     if (source !== null || dataPointer(manifest) !== undefined) document.documentElement.classList.remove('title-first');
-    installKitSpecies();
+    installKitCreatureSounds();
     installKitIcons();
     const [{browserContentHash},{publicBytes},{readContent}] = await Promise.all([import('@wildshard/engine/game/shardfile/folder'),import('@wildshard/engine/boot/tables'),import('@wildshard/engine/boot/contentRead')]);
     const pickupAssets=publicBytes(), pickupPath=/^\/assets\/baked\/common\/pickups\/([a-f0-9]{64})\.bin$/u;

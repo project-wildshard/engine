@@ -51,7 +51,7 @@ async function prepareWorld(): Promise<void> {
   const { installScore } = await import('../../src/client/engine/audio/score/score');
   const { WILDSHARD_SCORE } = await import('../../src/client/game/audio/theme');
   installScore(WILDSHARD_SCORE);
-  const { installKitSpecies } = await import('../../src/client/game/systems/species/install');
+  const { installKitSpecies } = await import('./kitSpecies');
   const { installKitIcons } = await import('../../src/client/game/icons');
   const { installPickupCatalogue, preparePickupCatalogue } = await import('../../src/client/game/models/specimenCatalogue');
   const { default: PICKUP_CATALOGUE } = await import('../../src/client/game/data/pickupCatalogue.json');

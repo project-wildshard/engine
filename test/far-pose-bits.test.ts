@@ -47,8 +47,8 @@ it('remembers a missing species per level until a registration or the scope chan
   expect(species.get('stormRoc')).toBeUndefined();
   const scope = level.child('row');
   species.registerRow({ id: 'row.stormRoc', kind: 'stormRoc' } as unknown as SpeciesRow, scope);
-  // a row with no look of its own resolves against the legacy registry, which this test does not seed
-  expect(() => species.get('stormRoc')).toThrow(/unknown animal kind/u);
+  // OF5b2b: a row with no look of its own draws nothing; the engine holds no creature to fall back on
+  expect(species.get('stormRoc')).toBeUndefined();
   scope.dispose();
   expect(species.get('stormRoc')).toBeUndefined();
 });

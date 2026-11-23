@@ -1,6 +1,6 @@
 import type * as THREE from 'three';
 import type { SpeciesRow } from '../../../../server/engine/ai/species';
-import { registeredSpecies, validateCreatureBones, type SpeciesDef, type VariantDef, type BoneDef, type FurStyle } from '../../../../shared/engine/entities/species/registry';
+import { validateCreatureBones, type SpeciesDef, type VariantDef, type BoneDef, type FurStyle } from '../../../../shared/engine/entities/species/registry';
 import type { SkyRig as Sky } from '../../world/skyRig';
 import type { AnimalMaterial } from '../AnimalFactory';
 import type { Scope } from '../../../../shared/engine/app/scope';
@@ -75,21 +75,12 @@ export class SpeciesService {
     const cached = this.cache.get(scope)?.get(kind); if (cached !== undefined) return cached ?? undefined;
     const row = this.rows.slice().reverse().find((entry) => entry.scope.belongsTo(scope) && entry.value.kind === kind)?.value;
     const look = this.looks.slice().reverse().find((entry) => entry.scope.belongsTo(scope) && entry.value.kind === kind)?.value;
-    if (row === undefined && look === undefined) {
+    // ONE-FORMAT OF5b2b: a kind draws from its declared row and look together; the engine holds no creature to fall back on
+    if (row === undefined || look === undefined) {
       const map = this.cache.get(scope) ?? new Map<string, SpeciesDef | null>(); map.set(kind, null); this.cache.set(scope, map);
       return undefined;
     }
-    let resolved: SpeciesDef;
-    if (row !== undefined && look !== undefined) resolved = speciesWithLook(row, look);
-    else {
-      const base = registeredSpecies(kind);
-      resolved = row !== undefined ? speciesWithLook(row, { ...base, id: `default.look.${kind}`, species: row.id,
-        variants: Object.fromEntries([...base.variants, ...(base.spawnOnly ?? [])].map((v) => [v.id, {
-          ...(v.tint === undefined ? {} : { tint: v.tint }), ...(v.fur === undefined ? {} : { fur: v.fur }),
-          ...(v.traits === undefined ? {} : { traits: v.traits }),
-        }])) })
-        : look !== undefined ? speciesWithLook({ ...base, id: kind }, look) : base;
-    }
+    const resolved = speciesWithLook(row, look);
     const map = this.cache.get(scope) ?? new Map<string, SpeciesDef | null>(); map.set(kind, resolved); this.cache.set(scope, map);
     return resolved;
   }

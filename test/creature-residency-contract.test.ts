@@ -1,4 +1,4 @@
-import { installKitSpecies } from '../src/client/game/systems/species/install';
+import { installKitSpecies } from './fixtures/kitSpecies';
 import { installWorldRegistry } from '@wildshard/engine/world/registry';
 import { afterEach, expect, test, vi } from 'vitest';
 import { Vector3 } from 'three';

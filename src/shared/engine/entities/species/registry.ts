@@ -324,7 +324,7 @@ const SPECIES = new Map<string, SpeciesDef>();
 let resolveSpecies: ((kind: string) => SpeciesDef | undefined) | undefined;
 /** The composition root supplies active, scoped rows; legacy tooling can keep its standalone catalog. */
 /** The calls a species with no `sounds` falls back on, by temperament: the composition root installs them (the kit's,
- *  installKitSpecies), so the engine names no creature sound (E405); none installed = silent */
+ *  installKitCreatureSounds), so the engine names no creature sound (E405); none installed = silent */
 export interface CreatureSoundDefaults { charger: { call: string; hurt: string }; grazer: { call: string; hurt: string } }
 let soundDefaults: CreatureSoundDefaults | null = null;
 export function setCreatureSoundDefaults(defaults: CreatureSoundDefaults | null): void { soundDefaults = defaults; }

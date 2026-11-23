@@ -140,7 +140,7 @@ const FACE_BEFORE_CHARGE = 0.6;
 /** the bearings `steerNav` tries round a blocked heading (rad, each side) */
 const NAV_FAN = [0.4, 0.8, 1.2, 1.6, 2.1, 2.6];
 
-/** a species with no `sounds`: the installed default call / hurt for its temperament (installKitSpecies); none installed: '' */
+/** a species with no `sounds`: the installed default call / hurt for its temperament (installKitCreatureSounds); none installed: '' */
 export const fallbackSound = (charger: boolean, which: 'call' | 'hurt'): string => creatureSoundDefaults()?.[charger ? 'charger' : 'grazer'][which] ?? '';
 
 /** One animal's hunting-brain memory. */

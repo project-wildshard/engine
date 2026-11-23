@@ -116,7 +116,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
   const noop = (): void => undefined, resolved = (): Promise<void> => Promise.resolve();
   const shard = {slug: 'example', name: 'Example'}, imageOwner = {dispose: () => {events.push('images:dispose');}};
   const page = {mode: 'shardfile', memory: {waitForWarning: noop, dispose: () => {events.push('memory:dispose');}}};
-  const kit = {installKitSpecies: () => {events.push('kit:species');},
+  const kit = {installKitCreatureSounds: () => {events.push('kit:species');},
     installKitIcons: () => {events.push('kit:icons');}, BAG_ICONS: {},
     preparePickupCatalogue: () => {events.push('kit:pickup:prepare'); return Promise.resolve([]);},
     installPickupCatalogue: () => {events.push('kit:pickup:install');},
