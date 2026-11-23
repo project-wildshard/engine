@@ -1,0 +1,41 @@
+# MAP-NEXT MN6 (meta docs/plans/MULTI-REPO-SAGA/MMO-SAGA/MAP-NEXT-PLAN.md; J450: "The map and the minimap should never be broken"):
+# the map never goes missing unseen. Nightly, and by hand after a recook, run MN4's audit (scripts/cooked-map-audit.mjs) against
+# staging and production. The job goes red naming each slug whose head lacks a map; the summary lists every head that is not ok.
+# The unit test runs first: its fixture index with one cooked-map key removed must go red, so a green audit is a real one.
+# Read only: it fetches version.json, the signed placement files, the API catalogue and the cook's indexes with the agent marker.
+name: cooked-map-audit
+
+on:
+  schedule:
+    - cron: '41 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cooked-map-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with: {version: 10.34.9}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with: {node-version: 24, cache: pnpm, cache-dependency-path: "pnpm-lock.yaml\npnpm-workspace.yaml"}
+      - uses: ./.github/actions/org-deps
+      - run: pnpm install --frozen-lockfile --config.ci=false
+      - name: A dropped map key goes red (fixture)
+        run: pnpm exec vitest run test/cooked-map-audit.test.ts
+      - name: Audit staging and production
+        run: |
+          set -o pipefail
+          node scripts/cooked-map-audit.mjs --channel staging --channel production 2>&1 | tee audit.txt
+      - name: Summary
+        if: always()
+        run: |
+          { echo '### Cooked map audit'; echo '```'; cat audit.txt 2>/dev/null || echo 'no audit output'; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
