@@ -12,13 +12,13 @@ export interface LegSummary { seconds: number | null; fps: number | null; p50Ms:
   trianglesP95: number | null; drawsP95: number | null; programsMax: number;
   texUploads: number; bufUploads: number; readBacks: number; texturesMin: number; texturesMax: number; mem: string | null;
   audioLiveMax: number; audioLiveEnd: number | null; audioStartsPerS: number | null }
-export interface LegResult { name: string; kind?: string; cap: number | null; error: string | null; nav: unknown; summary: LegSummary | null; samples?: LegSample[]; rec?: string | null }
+export interface LegResult { name: string; kind?: string; cap: number | null; error: string | null; nav: unknown; summary: LegSummary | null; samples?: LegSample[]; rec?: string | null; probe?: unknown }
 export const ROUTES: Readonly<Record<string, readonly RouteLeg[]>>;
 export function routeFor(slug: string): readonly RouteLeg[];
 export function routeLegOnPage(leg: RouteLeg & { cap: 0 | 30 | 60 | null }): Promise<unknown>;
 export function legSummary(samples: LegSample[]): LegSummary;
 export function playRoute(driver: { evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<unknown> },
-  options: { slug: string; cap: 30 | 60 | null; rec?: string[]; legs?: number; log?: (line: string) => void }): Promise<LegResult[]>;
+  options: { slug: string; cap: 30 | 60 | null; rec?: string[]; legs?: number; log?: (line: string) => void; probe?: { start: string; stop: string } }): Promise<LegResult[]>;
 export function routeTable(legs: LegResult[]): string;
 export function worstSegment(report: { legs: LegResult[] }[], cap: number): { name: string; p95Ms: number; over50Per30s: number; fps: number; runs: number }[];
 
