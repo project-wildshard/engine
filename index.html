@@ -56,6 +56,11 @@
         history.replaceState(history.state, '', location.pathname + location.search + (hash === '#' ? '' : hash));
       })();
     </script>
+    <script data-leave-door>
+      // Meta IPHONE13-DRIFTWOOD DW12: /leave is its own page on every host the game ships from (pages/worker.ts, the preview
+      // server, the service worker). A server that answers it with this page instead (an SPA fallback) still sends it on.
+      if (location.pathname === '/leave' && document.documentElement.dataset.secureDoor !== 'moving') (()=>{let to="/";try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}location.replace(to)})()
+    </script>
     <script data-boot-timing>
       // LS1: local, bounded, data-only history, installed before any module.
       (() => {

@@ -76,4 +76,7 @@ test('the page Worker and the service worker hold the leave page\'s bytes', () =
   const held = (file: string): string | undefined => /const LEAVE_PAGE = '(?<page>[^']+)'/u.exec(readFileSync(file, 'utf8'))?.groups?.['page'];
   expect(held('pages/worker.ts')).toBe(LEAVE_PAGE);
   expect(held('src/client/engine/pwa/sw.js')).toBe(LEAVE_PAGE);
+  // and the game page's leave door runs the same script, for a server that answers /leave with the game page
+  const script = /<script>(?<code>.*)<\/script>/u.exec(LEAVE_PAGE)?.groups?.['code'] ?? 'missing';
+  expect(readFileSync('index.html', 'utf8')).toContain(`if (location.pathname === '/leave' && document.documentElement.dataset.secureDoor !== 'moving') ${script}`);
 });
