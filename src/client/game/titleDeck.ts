@@ -319,6 +319,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   // a swipe's trailing click must not re-select the card under the finger; -Infinity, not 0: a page under 400 ms old (a fast
   // preview load, a proof's first click) took every card click for a swipe's
   let swipedAt = -Infinity;
+  const swipedJustNow = (): boolean => performance.now() - swipedAt <= 400;
   const fill = (): void => {
     cardScope.dispose(); cardScope = scope.child('title-deck-cards');
     // J313: a draft's card (Thin Ice, off the grid by J305) never loads, so only Developer sees it
@@ -427,8 +428,9 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   /** the tab's cards and dots, wired in the tab's own scope */
   const bind = (): void => {
     // a click that only follows the title's SHARD SELECT tap lands where that tap was, not on a card or dot (QC2)
-    cardEls.forEach((e, i) => { listenDom(cardScope, e, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev) && i !== index && performance.now() - swipedAt > 400) select(i); }); });
-    dots.forEach((d, i) => { listenDom(cardScope, d, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev)) select(i); }); });
+    cardEls.forEach((e, i) => { listenDom(cardScope, e, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev) && i !== index && !swipedJustNow()) select(i); }); });
+    // a swipe that starts on a mini hero steps the deck; its trailing click must not then select that mini hero
+    dots.forEach((d, i) => { listenDom(cardScope, d, 'click', (ev) => { ev.stopPropagation(); if (!followsTap(ev) && !swipedJustNow()) select(i); }); });
     dots.forEach((d, i) => { listenDom(cardScope, d, 'pointerdown', () => { warm(i); }); });
   };
   // the card is entered through its shardfile, whose download starts first
@@ -456,14 +458,20 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     return c?.shard && enter(c) ? c.shard : null;
   };
 
-  // swipe → the track follows the finger (rubber-banded at the ends), release = one page in the swipe direction
-  let drag: { id: number; x0: number; t0: number; dx: number } | null = null;
-  listenDom(scope, list, 'pointerdown', (e) => {
-    if (drag || listMode()) return;
-    drag = { id: e.pointerId, x0: e.clientX, t0: performance.now(), dx: 0 };
-    capturePointer(list, e.pointerId);
+  // swipe → the track follows the finger (rubber-banded at the ends), release = one page in the swipe direction.
+  // QA 11-23-b row 1 (Jake, ~11:15 Cancún: "nothing can be swiped lol on the new zone select", "I have to tab the carousel mini
+  // cards lol swipe should work"): J468's swipe look puts the zone's hero full-bleed and its name card in a thin band, so a swipe
+  // anywhere on the screen (the hero, the name, the mini heroes) steps the deck, not only one over the name band. A press on a
+  // control (BACK, a tab, ENTER ZONE) is the control's. The old carousel keeps its card row as the surface.
+  const surface = strip === undefined ? list : root;
+  let drag: { id: number; x0: number; y0: number; t0: number; dx: number } | null = null;
+  listenDom(scope, surface, 'pointerdown', (e) => {
+    if (drag || listMode() || e.button > 0) return;
+    if (surface === root && e.target instanceof Element && e.target.closest('button, a, input, .ws-menu-tabs') !== null) return;
+    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), dx: 0 };
+    capturePointer(surface, e.pointerId);
   });
-  listenDom(scope, list, 'pointermove', (e) => {
+  listenDom(scope, surface, 'pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag.dx = e.clientX - drag.x0;
     const atEnd = (drag.dx > 0 && index === 0) || (drag.dx < 0 && index === entries.length - 1);
@@ -476,7 +484,7 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
     if (Math.abs(dx) > 36 || (Math.abs(v) > 0.35 && Math.abs(dx) > 14)) { swipedAt = performance.now(); select(index + (dx < 0 ? 1 : -1)); }
     else place(index);
   };
-  listenDom(scope, list, 'pointerup', endDrag); listenDom(scope, list, 'pointercancel', endDrag);
+  listenDom(scope, surface, 'pointerup', endDrag); listenDom(scope, surface, 'pointercancel', endDrag);
   // a draft opens its tab in the tap's own turn (a popup blocker drops a late one); a gated entry enters the card tapped, even if the
   // deck moved while the gate asked, and ENTER WORLD stays busy meanwhile
   const playButton = required(root, '.ws-menu-play');
@@ -499,13 +507,16 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   // crossfade on release is usually instant (LOAD-PERF, first-launch transfer)
   const warmed = new Set<string>();
   function warm(i: number): void { const c = entries[i]; const u = c ? heroUrl(c) : ''; if (u && !warmed.has(u)) { warmed.add(u); new Image().src = u; } }
-  listenDom(scope, list, 'pointerdown', () => { warm(index - 1); warm(index + 1); });
+  listenDom(scope, surface, 'pointerdown', () => { warm(index - 1); warm(index + 1); });
 
   // ZS10 (J461): FEATURED, POPULAR, NEW (and Developer's ALL, J469); a press shows that tab's first card
   let tabBar: HTMLElement | null = null;
   const tabButtons: HTMLButtonElement[] = [];
   const markTab = (): void => {
     root.classList.toggle('ws-menu-list', listMode());
+    // QA 11-23-b row 1 (Jake: "the all section in zone select has no scrolling behavior no touch scrolling"): index.html cancels
+    // every touchmove outside [data-scroll] (no rubber-band page), so a list tab's rows scroll by touch only with the mark
+    if (listMode()) list.dataset['scroll'] = ''; else delete list.dataset['scroll'];
     root.dataset['tab'] = tab?.id ?? '';
     tabButtons.forEach((b) => { const on = b.dataset['tab'] === tab?.id; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
   };

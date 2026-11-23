@@ -184,6 +184,8 @@
    name and one line (with its feats) sit over the hero's foot and follow the finger; 4 mini heroes slide as a window; the stripe
    pager and "1 / 8"; one filled ice-cyan ENTER ZONE (J387's ENTER THE MMO). No card frame, no ribbon tape, no live badge. */
 .ws-menu.ws-menu-swipe .ws-menu-hero { filter: none; }
+/* QA 11-23-b row 1: the whole screen is the swipe surface (titleDeck.ts); the page never pans under it. A list tab's rows scroll natively */
+.ws-menu.ws-menu-swipe:not(.ws-menu-list) { touch-action: none; }
 .ws-menu.ws-menu-swipe::before { background: linear-gradient(180deg, rgba(6, 10, 18, 0.5) 0%, rgba(6, 10, 18, 0) 16%, rgba(6, 10, 18, 0) 40%, rgba(6, 10, 18, 0.62) 58%, rgba(6, 10, 18, 0.95) 100%); }
 .ws-menu.ws-menu-swipe .ws-menu-head { padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 0; }
 .ws-menu.ws-menu-swipe .ws-menu-bar { gap: 10px; flex: 1 1 100%; min-width: 0; }
