@@ -1,5 +1,5 @@
 // AUDIO AU19 (J299, J304): DOWNLOAD fetches exactly the audio a shard names. For each pinned shard, the `/assets/music/**`
-// and `/assets/sfx/**` rows of its cooked `client-phone` and `grid-phone` manifests are AU18's derived engine music, the
+// and `/assets/sfx/**` recordings in its cooked `client-phone` and `grid-phone` manifests are AU18's derived engine music, the
 // default boot effects (including authored sample overlays), and the shard's fence audio: nothing more, no row twice,
 // and no engine style but the one. A shard with no recorded music (Dunes, Far Reach) has no engine music row.
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the pinned products and own the cook's folder.
@@ -18,7 +18,8 @@ import { cookFilesOnly } from './filesOnlyCook';
 // (AU18's derived list: title, its base slot's calm and tension, its stings). Counts, not names: a re-encode renames.
 const SHARDS = [['driftwood-isle', 6], ['pine-hollow', 6], ['nalati-grasslands', 4], ['nine-dragon-stack', 1],
   ['open-plot-alien-plain', 1], ['sunscar-dunes', 0], ['far-reach', 0]] as const;
-const AUDIO = /^\/assets\/(?:music|sfx)\//u;
+const AUDIO = /^\/assets\/(?:music|sfx)\/[^?]+\.(?:m4a|mp3|ogg|opus|wav|webm|flac)$/u;
+const AUDIO_BANK = /^\/assets\/(music|sfx)\/([^/]+)\/\1\.json$/u;
 const path = (url: string): string => url.split('?')[0] ?? url;
 // The pinned products (`pnpm pins`, as CI's test jobs install them); the boot tables are baked here, never read stale.
 const have = SHARDS.every(([shard]) => existsSync(`out/${shard}/shard.json`));
@@ -39,8 +40,17 @@ function expected(shard: string, common: AssetTables): { want: string[]; engineM
   const engineMusic = data === undefined ? [] : withAssetTables(common, () => engineMusicFiles(data));
   const boot = data?.music === undefined || data.samples === undefined ? [] : withAssetTables(common, () => defaultBootAudio(data));
   // Every own audio mount ships: one the build lacks would drop from both sides and hide a missing row.
-  const own = half.mountRows('phone', 'entry').map(mount => path(mount.url)).filter(url => AUDIO.test(url));
+  const mounts = half.mountRows('phone', 'entry').map(mount => path(mount.url));
+  const own = mounts.filter(url => AUDIO.test(url));
   expect(own.filter(url => !shipped(url)), `${shard}: own audio mounts the build lacks`).toEqual([]);
+  // Prepared shards can mount the source JSON. LOAD uses the copy in the boot tables.
+  for (const url of mounts) {
+    const bank = AUDIO_BANK.exec(url);
+    const name = bank?.[2];
+    if (name === undefined) continue;
+    const manifests = bank?.[1] === 'music' ? common.music : common.sfx;
+    expect(Object.hasOwn(manifests, name), `${shard}: missing boot audio bank ${url}`).toBe(true);
+  }
   return { want: [...new Set([...boot, ...own])].sort(), engineMusic: engineMusic.sort() };
 }
 
