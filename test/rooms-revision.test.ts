@@ -74,8 +74,8 @@ test('today\'s staging: the signed file names no Driftwood, the rooms\' world wo
   const hints = tab();
   let reloads = 0;
   expect(pageRevision('driftwood-isle')).toBe(R8);
-  expect(heardRooms(word, 'driftwood-isle', hints, () => { reloads++; })).toBe('reload');
-  expect(heardRooms(word, 'pine-hollow', hints, () => { reloads++; })).toBe('same');
+  expect(heardRooms(word, 'driftwood-isle', () => { reloads++; }, hints)).toBe('reload');
+  expect(heardRooms(word, 'pine-hollow', () => { reloads++; }, hints)).toBe('same');
   expect(reloads).toBe(1);
   // the next boot: a placement file with no Driftwood row (api-server names only the cells the baked grid lacks)
   const none = JSON.stringify({ kind: 'placement', channel: 'staging', serial: 84, cells: [] });
@@ -83,18 +83,28 @@ test('today\'s staging: the signed file names no Driftwood, the rooms\' world wo
   const read = await learnPlacedCells(URL_AT, { keep: keep(), hints, fetch: serving(file), publicKey, content: (_slug, hash) => Promise.resolve(hash === R9 ? R9_COPY : undefined) });
   expect(read).toMatchObject({ followed: ['driftwood-isle'] });
   expect(pageRevision('driftwood-isle')).toBe(R9);
-  expect(heardRooms(word, 'driftwood-isle', hints, () => { reloads++; })).toBe('same');
+  expect(heardRooms(word, 'driftwood-isle', () => { reloads++; }, hints)).toBe('same');
   expect(reloads).toBe(1);
+});
+
+// QA 11-23-b rows 18 and 20 (Jake, staging, Signal Dunes r6 live at 16:28 UTC: ENTER THE MMO's Signal Dunes card dropped to the main
+// menu). The reload went out as a bare location.reload(), which lastEnd read as the player's own (QA 11-12 row 35: a quiet title). The
+// page now leaves through the shell's seat-elsewhere path, back into the same zone, and names it.
+test('the reload onto the rooms\' bytes goes back into the zone the page plays, by name', () => {
+  const word = { cells: 1, shards: ['sunscar-dunes', 'driftwood-isle'], revisions: { 'driftwood-isle': R9 } }, hints = tab();
+  const left: string[] = [];
+  expect(heardRooms(word, 'driftwood-isle', (zone, hash) => { left.push(`${zone} ${hash}`); }, hints)).toBe('reload');
+  expect(left).toEqual([`driftwood-isle ${R9}`]);
 });
 
 test('a page that still cannot draw the rooms\' bytes after its one reload never reloads again', () => {
   const word = { cells: 1, shards: ['driftwood-isle'], revisions: { 'driftwood-isle': R9 } }, hints = tab();
   let reloads = 0;
-  expect(heardRooms(word, 'driftwood-isle', hints, () => { reloads++; })).toBe('reload');
-  expect(heardRooms(word, 'driftwood-isle', hints, () => { reloads++; })).toBe('behind');
+  expect(heardRooms(word, 'driftwood-isle', () => { reloads++; }, hints)).toBe('reload');
+  expect(heardRooms(word, 'driftwood-isle', () => { reloads++; }, hints)).toBe('behind');
   expect(reloads).toBe(1);
   // an older door names no revisions: nothing changes
-  expect(heardRooms({ cells: 1, shards: ['driftwood-isle'] }, 'driftwood-isle', tab(), () => { reloads++; })).toBe('same');
+  expect(heardRooms({ cells: 1, shards: ['driftwood-isle'] }, 'driftwood-isle', () => { reloads++; }, tab())).toBe('same');
   expect(worldRevisions(['pine-hollow'], () => undefined)).toEqual({});
 });
 

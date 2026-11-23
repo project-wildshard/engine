@@ -68,8 +68,11 @@ export function sessionHints(build: unknown = Reflect.get(globalThis, '__WS_BUIL
  *  and `spawnDownload.ts` refuses entry with Reload). */
 export type RoomsHeard = 'same' | 'reload' | 'behind';
 /** On every world word: keep the rooms' revisions for this build, and reload once when the zone this page plays (`loaded`) runs other
- *  bytes than the rooms. A second word that still disagrees for the same hash never reloads again. */
-export function heardRooms(word: unknown, loaded: string | undefined, hints: RoomsHints = sessionHints(), reload: () => void = () => { location.reload(); }): RoomsHeard {
+ *  bytes than the rooms. A second word that still disagrees for the same hash never reloads again.
+ *  QA 11-23-b rows 18 and 20 (Jake, staging, Signal Dunes r6 live at 16:28 UTC: thrown to the main menu, and ENTER THE MMO's Signal
+ *  Dunes card dropping to the menu): `reload` leaves on purpose back into `zone` (the shell's seat-elsewhere path: a marked end and
+ *  the tab's arrival). A bare `location.reload()` read as the player's own, and the QA 11-12 row 35 rule sent it to a quiet title. */
+export function heardRooms(word: unknown, loaded: string | undefined, reload: (zone: string, hash: string) => void, hints: RoomsHints = sessionHints()): RoomsHeard {
   const revisions = roomsWord(word);
   if (revisions.size === 0) return 'same';
   const ahead = aheadOfPage(revisions), kept = hints.read();
@@ -79,6 +82,6 @@ export function heardRooms(word: unknown, loaded: string | undefined, hints: Roo
   if (zone === undefined || want === undefined) { hints.write(next); return 'same'; }
   if (kept.reloaded[zone] === want) { hints.write(next); return 'behind'; }
   hints.write({ ...next, reloaded: { ...next.reloaded, [zone]: want } });
-  reload();
+  reload(zone, want);
   return 'reload';
 }

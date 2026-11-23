@@ -187,7 +187,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       if (control === 'world') {
         if (worldReadsDevice(bytes)) sendDevice(transport, config.build); if (worldReadsSaves(bytes)) savesDoors.add(transport);
         // NB2 (J494): the page runs the rooms' revision of its zone, never its own; it reloads once onto it, or entry refuses
-        try { heardRooms(JSON.parse(decoder.decode(bytes)), gridCell === undefined ? config.loaded : cellSlug(gridCell)); } catch { /* a word that says no revisions changes nothing */ }
+        try { heardRooms(JSON.parse(decoder.decode(bytes)), gridCell === undefined ? config.loaded : cellSlug(gridCell), zone => { view.elsewhere(zone); }); } catch { /* a word that says no revisions changes nothing */ }
         return;
       }
       if (control === 'voice') {
