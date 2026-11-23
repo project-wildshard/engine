@@ -44,11 +44,29 @@ const {catalogue: reviewed} = read('test/pins/staging.json') as {catalogue: Stan
 const catalogueFile = join(dist, 'catalogue.json'), originalCatalogue = readFileSync(catalogueFile);
 const originalHTML = readFileSync(join(dist, 'index.html'), 'utf8');
 const work = mkdtempSync(join(out, '.heads-'));
+// TC22 (opus-nightly2): Chromium's own stderr names a GPU-process exit (its exit code, a watchdog hang, a lost context),
+// which the page only sees as wiped canvases. The workflow runs this under DEBUG=pw:browser, so Playwright relays each
+// browser stderr line through ours: keep the head's lines for its evidence, and leave page console lines out of the log.
+const browserLines: string[] = [], writeStderr = process.stderr.write.bind(process.stderr);
+process.stderr.write = (chunk: string | Uint8Array, ...rest: unknown[]): boolean => {
+  const text = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8');
+  if (!text.includes('pw:browser')) return Reflect.apply(writeStderr, process.stderr, [chunk, ...rest]) === true;
+  let shown = '';
+  for (const line of text.split('\n')) {
+    if (line.trim() === '') continue;
+    browserLines.push(line.slice(0, 500));
+    if (!line.includes(':CONSOLE')) shown += `${line}\n`;
+  }
+  if (browserLines.length > 4000) browserLines.splice(0, 2000);
+  return shown === '' ? true : writeStderr(shown);
+};
+const GPU_LINE = /gpu|watchdog|hang|crash|exited|exit_code|context_lost|lost context|metal|angle|out of memory|oom/iu;
 let preview: Awaited<ReturnType<typeof serve>> | undefined;
 try {
   preview = await serve(root, '', true, { errorReports: true });
   for (const head of selected.filter(row => only === undefined || row.slug === only)) {
     const result: HeadResult = {slug: head.slug, hash: head.hash, phases: []};
+    browserLines.length = 0;
     report.results.push(result); checkpoint();
     const phase = async (name: string, run: () => unknown): Promise<boolean> => {
       const started = Date.now();
@@ -269,6 +287,9 @@ try {
         const server = packs; server.closeAllConnections();
         await new Promise<void>((resolve, reject) => {server.close(error => {if (error === undefined) resolve(); else reject(error);});}).catch(retirementFailed);
       }
+      writeFileSync(join(evidence, 'browser-log.json'), JSON.stringify({relayed: process.env.DEBUG?.includes('pw:browser') === true,
+        gpu: browserLines.filter(line => !line.includes(':CONSOLE') && GPU_LINE.test(line)).slice(-200),
+        tail: browserLines.filter(line => !line.includes(':CONSOLE')).slice(-80)}, null, 2));
       if (result.phases.some(row => !row.ok)) cpSync(evidence, join(out, 'failures', `${browserName}-${groupText}-${head.slug}`),
         {recursive: true, filter: path => statSync(path).isDirectory() || path.endsWith('.json')});
       // Own generated outputs only. Reports are checkpointed separately from large packs/captures.

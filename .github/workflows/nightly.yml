@@ -234,6 +234,8 @@ jobs:
         env:
           BROWSER: ${{ matrix.browser }}
           GROUP: ${{ matrix.group }}
+          # TC22: Playwright relays the browser's stderr (a GPU-process exit) into each failed head's browser-log.json
+          DEBUG: pw:browser
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -325,6 +327,7 @@ jobs:
       - name: Exercise the production cold-pack and phone path
         env:
           NIGHTLY_GROUP: ${{ needs.plan.outputs.diagnostic_group }}
+          DEBUG: pw:browser
         run: |
           if [ "$NIGHTLY_DRILL" = true ]; then
             node scripts/nightly-head-drill.ts "$NIGHTLY_BROWSER" "$NIGHTLY_GROUP" tmp/nightly/reports "$NIGHTLY_HEAD"
