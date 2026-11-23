@@ -257,7 +257,8 @@ async function attach(socketUrl, { overrides = [] }) {
      *  full collection and holds the page for seconds, so a route takes it after a leg, never inside one. */
     async heapSnapshot() {
       await ready;
-      await send('Heap.enable', {}, 15_000);
+      // the collection log (--frames) may hold the Heap agent on already: WebKit refuses a second enable
+      await send('Heap.enable', {}, 15_000).catch((/** @type {unknown} */ error) => { if (!String(error).includes('already enabled')) throw error; });
       const result = await send('Heap.snapshot', {}, 180_000);
       return summarizeJscSnapshot(String(result?.snapshotData ?? '{}'));
     },
