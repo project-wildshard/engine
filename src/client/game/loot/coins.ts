@@ -1,6 +1,6 @@
 /**
- * What a kill is worth in doubloons (E314 L1, Jake's pick board 1 A): coins come only from kills, and only on a shard
- * whose ShardManifest says `loot: { coins: true }` (Driftwood today). First-guess values, tuned after a playthrough (a run
+ * What a kill is worth in coins (E314 L1, Jake's pick board 1 A): coins come only from kills, and only on a shard
+ * that declares its currency (`economy/loot`'s `currency`, OF31g4). First-guess values, tuned after a playthrough (a run
  * earns ~60–100; the trader's goods cost 15–50, project/archive/2026-09-30-driftwood-loot.md). No deer: Jake cut them from Driftwood
  * (their removal is a later pass), so they pay nothing meanwhile.
  *

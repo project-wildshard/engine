@@ -776,7 +776,7 @@
     {
       "id": "coin",
       "model": "shared/doubloon",
-      "name": "Doubloon",
+      "name": "Coin",
       "batch": "glow",
       "lift": 0.6,
       "parts": [
