@@ -20,3 +20,5 @@
   reached control on this device, `telemetry.bootedBuild`) and `bootSteps` (`page` splash, `control`, each loading
   stage's longest span) from `__bootTiming` at control. The summary schema strips unknown keys, so the client can ship
   before api-server stores them.
+- Row 10 read: `scripts/boot-steps.mjs` prints a day's newest N human boots per device class from api-server's
+  `?boots=N&day=D` (review password), times in Cancún.
