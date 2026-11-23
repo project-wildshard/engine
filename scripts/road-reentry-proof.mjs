@@ -60,25 +60,25 @@ const whatIsAhead = page => page.evaluate(() => {
       if (node.geometry.boundingBox === null) node.geometry.computeBoundingBox?.();
       const box = node.geometry.boundingBox?.clone().applyMatrix4(node.matrixWorld);
       if (box === undefined || !box.containsPoint(at)) return;
-      const path = []; for (let up = node; up !== null && path.length < 4; up = up.parent) path.push(up.name || up.type);
+      const path = []; for (let up = node; up !== null && path.length < 4; up = up.parent) path.push(up.name === '' ? up.type : up.name);
       names.add(path.join(' < '));
     });
     found[`${String(metres)}m`] = [...names].slice(0, 12);
   }
   return found;
-}).catch(error => String(error));
+}).catch(String);
 /** the page's attributed memory (the budget's model input) and the worlds held, at one moment @param {Page} page */
 const memory = page => page.evaluate(() => {
   const w = /** @type {any} */ (window), m = w.__wildshard.memory(), live = w.__wildshard.shard.grid.state().live;
   // the Developer memory chip's headline (budgetOverlay.ts memoryHeadline): the larger of the claims model and the measurement
   const chip = /** @type {HTMLElement | null} */ (document.querySelector('.ws-grid-budget'));
   // the ledger EM11 predicts the phone from (`__wildshardMemory.counters()`), summed per domain
-  const ledger = /** @type {Record<string, Record<string, number>> | undefined} */ (/** @type {any} */ (globalThis).__wildshardMemory?.counters?.());
-  const domains = ledger === undefined ? null : Object.fromEntries(Object.entries(ledger).map(([domain, rows]) => [domain, Math.round(Object.values(rows ?? {}).reduce((sum, bytes) => sum + (Number(bytes) || 0), 0))]));
-  const top = ledger === undefined ? null : Object.entries(ledger).flatMap(([domain, rows]) => Object.entries(rows ?? {}).map(([key, bytes]) => [`${domain}:${key}`, Math.round(Number(bytes) || 0)]))
-    .sort((a, b) => Number(b[1]) - Number(a[1])).slice(0, 14);
+  const ledger = /** @type {Record<string, Record<string, unknown>> | undefined} */ (/** @type {any} */ (globalThis).__wildshardMemory?.counters?.());
+  const domains = ledger === undefined ? null : Object.fromEntries(Object.entries(ledger).map(([domain, rows]) => [domain, Math.round(Object.values(rows).reduce((/** @type {number} */ sum, bytes) => sum + (typeof bytes === 'number' ? bytes : 0), 0))]));
+  const top = ledger === undefined ? null : Object.entries(ledger).flatMap(([domain, rows]) => Object.entries(rows).map(([key, bytes]) => /** @type {[string, number]} */ ([`${domain}:${key}`, Math.round(typeof bytes === 'number' ? bytes : 0)])))
+    .sort((a, b) => b[1] - a[1]).slice(0, 14);
   return { totals: m.totals, accountedBytes: m.accountedBytes, ledger: domains, top, residents: live?.live?.residents ?? [], drawn: live?.roadDisplays ?? [],
-    headline: chip === null ? null : { bytes: Number(chip.dataset['playingBytes']), peak: Number(chip.dataset['peakBytes']), source: chip.dataset['source'] ?? null } };
+    headline: chip === null ? null : { bytes: Number(chip.dataset.playingBytes), peak: Number(chip.dataset.peakBytes), source: chip.dataset.source ?? null } };
 }).catch(() => null);
 
 /** the zone's declared portal rows (sections/world/edge.json), read from the page's own content set like the J451 smoke
