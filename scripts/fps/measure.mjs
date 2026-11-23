@@ -66,15 +66,15 @@ export function observeLongFrames() {
   const round = (/** @type {number} */ v) => Math.round(v * 10) / 10;
   return {
     start() {
-      t0 = performance.now();
       try {
+        t0 = performance.now();
         observer = new PerformanceObserver(list => {
           for (const entry of /** @type {any[]} */ (list.getEntries())) {
             if (entry.startTime < t0 || frames.length >= 60) continue;
             frames.push({ at: round((entry.startTime - t0) / 1000), ms: Math.round(entry.duration),
               blockingMs: Math.round(entry.blockingDuration ?? 0), renderStartMs: Math.round((entry.renderStart ?? entry.startTime) - entry.startTime),
               scripts: (entry.scripts ?? []).filter((/** @type {any} */ x) => x.duration >= 5).slice(0, 6).map((/** @type {any} */ x) => ({ ms: Math.round(x.duration),
-                source: `${String(x.sourceFunctionName || '?')} ${String(x.sourceURL ?? '').split('/').pop()}:${String(x.sourceCharPosition ?? -1)}`,
+                source: `${String(x.sourceFunctionName ?? '') === '' ? '?' : String(x.sourceFunctionName)} ${String(x.sourceURL ?? '').split('/').pop()}:${String(x.sourceCharPosition ?? -1)}`,
                 invoker: String(x.invoker ?? '').slice(0, 80) })) });
           }
         });
