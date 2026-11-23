@@ -153,3 +153,21 @@ test('an index still on the CPU takes only a write\'s first `length` elements', 
   expect(Array.from(index.array)).toEqual([0, 2, 3, 0, 2, 3, 0, 0, 0]);
   geometry.dispose(); done();
 });
+
+// DW3 (mini-dw3): a turned index on the CPU has drawn, so a write marks only its runs for upload, not the whole index; an
+// index never turned keeps the whole upload (rotateTriangles refuses an index with update ranges)
+test('a turned index on the CPU uploads only the runs written', () => {
+  const { draw, done } = setup();
+  const geometry = quad(6), index = geometry.index;
+  if (index === null) throw new Error('Expected an index');
+  draw(geometry, true);
+  expect(writeIndexTriangles(index, [{ at: 6, triangles: Uint32Array.of(0, 1, 2) }, { at: 0, triangles: Uint32Array.of(0, 2, 3), length: 3 }], false)).toBe(true);
+  expect(index.updateRanges).toEqual([{ start: 6, count: 3 }, { start: 0, count: 3 }]);
+  expect(indexTurned(index)).toBe(true);
+  const plain = quad(0), plainIndex = plain.index;
+  if (plainIndex === null) throw new Error('Expected an index');
+  draw(plain, false);
+  expect(writeIndexTriangles(plainIndex, [{ at: 0, triangles: Uint32Array.of(0, 2, 3) }], false)).toBe(true);
+  expect(plainIndex.updateRanges).toEqual([]);
+  geometry.dispose(); plain.dispose(); done();
+});

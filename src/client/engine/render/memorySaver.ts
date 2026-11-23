@@ -189,6 +189,10 @@ export function writeIndexTriangles(index: THREE.BufferAttribute, writes: readon
   }
   const array = index.array as Uint16Array | Uint32Array;
   for (const { at, triangles, length = triangles.length } of writes) array.set(length === triangles.length ? triangles : triangles.subarray(0, length), at);
+  // DW3 (mini-dw3): a turned index has drawn (WebKit turns it at its first draw), so its buffer exists: send only the runs
+  // written, not the whole index (the phone's props.merged far swap re-sent 3.4 MB in a 38 ms draw on DW1's west path).
+  // An index not yet turned keeps the whole upload: `rotateTriangles` refuses an index with update ranges.
+  if (turned) for (const { at, triangles, length = triangles.length } of writes) index.addUpdateRange(at, length);
   index.needsUpdate = true;
   if (turned) keepRotated(index);
   return true;
