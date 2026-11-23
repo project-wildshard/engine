@@ -20,6 +20,18 @@ test('the phone Low default is on and an explicit boolean wins', () => {
   expect(kitBatch(false)).toBe(false);
 });
 
+test('a flat material batches members with and without normals together', () => {
+  const scene = new THREE.Scene(), material = new THREE.MeshStandardMaterial({ flatShading: true });
+  const withNormals = box(false), withoutNormals = box(false);
+  withoutNormals.deleteAttribute('normal');
+  scene.add(new THREE.Mesh(withNormals, material), new THREE.Mesh(withoutNormals, material));
+  const [batch] = buildKitBatches(scene);
+  expect(batch?.members).toHaveLength(2);
+  const normals = batch?.geometry.getAttribute('normal');
+  expect(normals?.getX(0)).toBe(withNormals.getAttribute('normal').getX(0));
+  expect(normals?.getX(withNormals.getAttribute('position').count)).toBe(0);
+});
+
 test('opaque baked tiles keep their lightmap UVs and changing draw ranges in a batch', () => {
   const root = new THREE.Scene(), material = new THREE.ShaderMaterial();
   const mesh = (): THREE.Mesh => {

@@ -13,7 +13,7 @@ import { copyBatchIndex } from '@wildshard/engine/render/memorySaver';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { programFoldOn } from '@wildshard/engine/render/programFold';
 import { hasShaderPatch } from '@wildshard/engine/render/shaderPatches';
-import { mergeableMaterial, sharedHook } from './staticViewMerge';
+import { mergeableMaterial, readsNoNormals, sharedHook } from './staticViewMerge';
 import { FarBatch } from './farBatch';
 
 /**
@@ -168,7 +168,11 @@ export class KitBatch extends ChangedBatchedMesh {
       const copy = new THREE.BufferGeometry();
       for (const [name, format] of formats) {
         const own = geometry.getAttribute(name) as Attribute | undefined;
-        copy.setAttribute(name, own === undefined ? new THREE.BufferAttribute(new format.Typed(position.count * format.itemSize), format.itemSize, format.normalized) : inFormat(own, format));
+        const data = own === undefined
+          ? new THREE.BufferAttribute(ownedArray(format.Typed, position.count * format.itemSize,
+            { owner: 'game/kit-batch', asset: `missing-${name}`, kind: 'geometry-cpu' }), format.itemSize, format.normalized)
+          : inFormat(own, format);
+        copy.setAttribute(name, data);
       }
       if (geometry.index !== null) copy.setIndex(geometry.index);
       else { const identity = ownedArray(Uint32Array, position.count, { owner: 'game/kit-batch', asset: 'identity-index', kind: 'geometry-cpu' }); for (let i = 0; i < identity.length; i++) identity[i] = i; copy.setIndex(new THREE.BufferAttribute(identity, 1)); }
@@ -299,8 +303,10 @@ export function buildKitBatches(root: THREE.Object3D, cellPatches = false, inclu
     if (includeBakedTiles && object.userData[BAKED_TILE_MEMBER] !== true) return;
     if (!batchableMesh(object, includeBakedTiles)) return;
     const material = object.material as THREE.Material, geometry = object.geometry;
-    // three's program keys on these channels' presence and size only: their storage may differ within a batch
-    const keyed = Object.entries(geometry.attributes).filter(([name]) => KEYED.has(name)).map(([name, a]) => `${name}:${String(a.itemSize)}`).sort().join('|');
+    // Flat kit props shade by derivatives. A missing normal doesn't split their layout; keep every normal a member has.
+    const flat = readsNoNormals(material);
+    const keyed = Object.entries(geometry.attributes).filter(([name]) => KEYED.has(name) && (name !== 'normal' || !flat))
+      .map(([name, a]) => `${name}:${String(a.itemSize)}`).sort().join('|');
     const key = `${material.uuid}|${keyed}`;
     let set = sets.get(key);
     if (set === undefined) { set = { material, keyed, meshes: [] }; sets.set(key, set); }

@@ -36,3 +36,9 @@ grid route measured 59 pooled draws and 394,793 pooled triangles at
 p95 on `518e4f35d`. The road used 60 draws and 397,637 triangles at
 p95. The independent J430 judge passed all 18 dock and road views.
 The four slots now default on at phone Low and accept explicit opt-outs.
+
+A fresh default boot reached 61 pooled draws, with the extra draws in
+the village and quest fire views. Its kit census split the same flat
+kit and still materials into four batches solely on whether a source
+mesh had a normal attribute. Those layouts now share their material's
+batch. The copies keep the normals the source provides.
