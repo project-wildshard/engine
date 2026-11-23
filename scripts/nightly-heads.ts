@@ -137,6 +137,10 @@ try {
             });
             if (actualCap !== expectedCap) throw new Error(`${head.slug}: admitted hover cap ${actualCap} differs from ${expectedCap}`);
             const observeHover = () => page.evaluate(() => {
+              const predictorField = (link: object, name: string): unknown => {
+                const predictor: unknown = Reflect.get(link, 'predictor');
+                return typeof predictor === 'object' && predictor !== null ? Reflect.get(predictor, name) : null;
+              };
               const world = window.__wildshard?.world;
               if (world === undefined) return null;
               const board = world.weapons.tools.find(tool => tool.id === 'tool.hoverboard');
@@ -149,8 +153,7 @@ try {
                 // FS30e: the seat and the predictor name a tap the server refused or never saw
                 appState: world.game.app.state, carried: world.player.carried,
                 seat: world.player.link === null ? null : {joined: Reflect.get(world.player.link, 'joined') as unknown,
-                  corrections: Reflect.get(Object(Reflect.get(world.player.link, 'predictor')), 'corrections') as unknown,
-                  full: Reflect.get(Object(Reflect.get(world.player.link, 'predictor')), 'full') as unknown},
+                  corrections: predictorField(world.player.link, 'corrections'), full: predictorField(world.player.link, 'full')},
                 recent: world.game.app.input.recent.filter(row => row.action === 'hover')};
             });
             const before = await observeHover();
@@ -197,7 +200,8 @@ try {
               if (world === undefined) return false;
               // FS30e: each change of the board, with the seat's corrections, for a mount that flicks on and drops
               const trace = (window as unknown as {__wsHoverTrace?: unknown[][]}).__wsHoverTrace ??= [];
-              const corrections = world.player.link === null ? null : Reflect.get(Object(Reflect.get(world.player.link, 'predictor')), 'corrections') as unknown;
+              const predictor: unknown = world.player.link === null ? null : Reflect.get(world.player.link, 'predictor');
+              const corrections: unknown = typeof predictor === 'object' && predictor !== null ? Reflect.get(predictor, 'corrections') : null;
               const last = trace.at(-1);
               if (trace.length < 40 && (last === undefined || last[1] !== world.player.hover || last[2] !== corrections)) trace.push([world.game.frameCount, world.player.hover, corrections]);
               if (world.game.frameCount - from > frames) throw new Error(`no mount within ${frames} frames of the tap`);
@@ -229,7 +233,7 @@ try {
           });
         }, async context => {
           // FS30e diagnostics only: emulate the slow hosted renderer (a nightly Chromium head ran at ~2.7 fps)
-          const throttle = Number(process.env['NIGHTLY_CPU_THROTTLE'] ?? '1');
+          const throttle = Number(process.env.NIGHTLY_CPU_THROTTLE ?? '1');
           if (browserName === 'chromium' && throttle > 1) context.on('page', page => {
             void context.newCDPSession(page).then(session => session.send('Emulation.setCPUThrottlingRate', {rate: throttle}));
           });
