@@ -103,6 +103,20 @@ async function openProfile(profile) {
     chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--use-angle=metal', '--ignore-gpu-blocklist', ...native] });
 }
 
+/** DF14 (mini-dwfps, 2026-11-22): the desktop tier's render scale (src/client/engine/render/tiers.ts `desktop.dpr`). A desktop
+ * player draws at min(screen, 1.5), and dynamic resolution (renderBudget.ts) only lowers it. Until now the bench forced the
+ * drawing buffer to the screen's 2× through a Developer pixel pick: 4.29 Mpx at 1496 × 717 against the 2.41 Mpx a player
+ * draws, which no player sees without picking Render scale 2 in Settings. The desktop profiles now draw at the tier's own
+ * ceiling, pinned (Settings ▸ Render scale 1.5) so dynamic resolution cannot move it under the bench. */
+export const DESKTOP_TIER_DPR = 1.5;
+
+/** The drawing buffer's pixel ratio a profile draws at: capped phones at their preset, desktop at the tier's ceiling,
+ * uncapped phone Low at the raster it names. @param {Profile} profile */
+export function drawingRatio(profile) {
+  if (profile.cap !== null) return profile.graphics === 'high' ? 2 : 1;
+  return profile.tier === 'desktop' ? Math.min(profile.dpr, DESKTOP_TIER_DPR) : profile.dpr;
+}
+
 /** @param {import('playwright').Browser} browser @param {Profile} profile */
 async function openContext(browser, profile) {
   const { devices } = await import('../browser-playwright.mjs');
@@ -111,8 +125,8 @@ async function openContext(browser, profile) {
     viewport: { width: profile.width, height: profile.height }, deviceScaleFactor: profile.dpr });
   await developerSettings(context, { tier: profile.tier, volume: 0, time: 'midday', weather: 'clear' });
   await saveFixture(context, { scope: 'device', key: 'graphics', data: profile.graphics });
-  if (profile.tier === 'desktop') await saveFixture(context, { scope: 'device', key: 'devPixels',
-    data: { screen: profile.dpr, density: 2 } });
+  // DF14: the tier's own render scale (DESKTOP_TIER_DPR), as a player draws it, never the Developer pixel pick's full screen
+  if (profile.tier === 'desktop') await saveFixture(context, { scope: 'global', key: 'gfx', data: { dpr: String(DESKTOP_TIER_DPR) }, merge: true });
   // Low is the engine's phone preset, drawn uncapped at the specified desktop raster.
   if (profile.tier === 'phone' && profile.cap === null) await saveFixture(context, {
     scope: 'device', key: 'gfx.knob.density', data: profile.dpr,
@@ -162,7 +176,7 @@ async function capture(context, profile, { base, zone, route, approach = [], pas
     const check = fpsVerdict(raw.legs, route, profile.floor);
     const costs = raw.legs.map((/** @type {{name:string,samples?:Parameters<typeof legSummary>[0]}} */ leg) =>
       ({ name: leg.name, ...legSummary(leg.samples ?? []) }));
-    const dpr = profile.cap === null ? profile.dpr : profile.graphics === 'high' ? 2 : 1;
+    const dpr = drawingRatio(profile);
     const error = raw.error ?? (raw.witness.phoneGraphics !== (profile.tier === 'phone') ? 'engine tier differs from profile' :
       raw.witness.dpr !== dpr ? 'drawing buffer DPR differs from profile' :
       raw.witness.build !== version.build ? 'game build differs from version.json' : null);
