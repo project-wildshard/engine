@@ -10,7 +10,8 @@ import { WorldRegistry } from '../src/client/engine/world/registry';
 import { shardContext, sourceManifest } from '../src/client/game/plugin/context';
 import { QuestViews } from '../src/client/game/plugin/ui';
 import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
-import { Owned } from '../src/shared/game/loot/Owned';
+import { keptItems, Owned } from '../src/shared/game/loot/Owned';
+import { DRIFTWOOD_KEPT } from './fixtures/keptRows';
 import { OWNED_ROW } from '../src/shared/game/loot/ownedRows';
 import { Purse, publishPurse, enteredPurse } from '../src/shared/game/loot/Purse';
 import { installQuestTrader, installQuestShop } from '../src/client/game/quest/trader';
@@ -25,14 +26,14 @@ const { shardfile: source } = await loadHeadlessFolder(builtFolder('driftwood-is
 const TEMPLATE = sourceManifest({ identity: source.identity, accent: source.accent, spawn: source.spawn, look: source.look });
 const coinRows = { name: 'Maren', reopen: false, shop: {
   place: 'Driftwood Isle', barter: false, lifetime: 'resident', modal: { restartOnClose: true, stow: true, resumeSwimming: true },
-  after: Object.fromEntries(declaredLootEconomy(source.rows.loot).goods.map(good => [good.id, [
+  after: Object.fromEntries(declaredLootEconomy(source.rows.loot, undefined, keptItems(source.items)).goods.map(good => [good.id, [
     { kind: 'chime', at: 'counter', gain: .8 }, { kind: 'offer' },
     { kind: 'toast', text: `Bought · ${good.name} — ${good.id === 'cape' ? 'wear it from GEAR' : good.does.toLowerCase()}` },
   ]])),
 } };
 
 function page(loot: unknown = source.rows.loot) {
-  const scope = new Scope('shop-entry'), host = new App(), events: string[] = [], owned = new Owned('shop-entry');
+  const scope = new Scope('shop-entry'), host = new App(), events: string[] = [], owned = new Owned('shop-entry', undefined, keptItems({ kept: DRIFTWOOD_KEPT }));
   for (const id of owned.all) owned.revoke(id);
   const product = createShardFolder({ slug: source.identity.slug, revision: source.identity.revision, shardfile: source,
     sections: new Map([['economy/loot', { rows: { loot } }]]), files: new Map(), read: () => Promise.reject(new Error('No shop file read')) });

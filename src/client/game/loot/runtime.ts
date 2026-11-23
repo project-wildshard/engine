@@ -13,7 +13,7 @@ import { coinsOn, type LootGate } from './coins';
 import type { LootFeed } from './feed';
 import { readOnlySave, wirePage } from '../shardfile/wirePage';
 import { purseSave } from '../../../shared/game/saves';
-import type { Owned, OwnedId } from '../../../shared/game/loot/Owned';
+import type { Owned } from '../../../shared/game/loot/Owned';
 import { declaredLootPresentation } from '../../../shared/game/shard/declaredRows';
 import { createFindsCatalogue } from '../../../shared/game/bag/findsCatalogue';
 import { boundQuestState } from '../../../shared/game/quest/boundState';
@@ -103,7 +103,7 @@ export function installLoot<A extends LootBody>(h: ScopedLootHost<A>): ScopedLoo
   const refresh = (): void => { if (h.menu.isOpen) h.menu.refresh(); };
   const offOwned = owned.onChange(() => { applyChart(); refresh(); });
   const offPurse = purse.onChange((n) => { chip?.set(n); if (shop?.isOpen === true) shop.render(); refresh(); });
-  ctx.debug.expose(view.debugName ?? `${h.manifest.slug}.loot`, { purse, owned, ...feed.debug, grant: (id: OwnedId) => owned.grant(id), coins: (n: number) => { purse.add(n); }, shop });
+  ctx.debug.expose(view.debugName ?? `${h.manifest.slug}.loot`, { purse, owned, ...feed.debug, grant: (id: string) => owned.grant(id), coins: (n: number) => { purse.add(n); }, shop });
   const dispose = (): void => {
     if (!live) return;
     live = false; flush(); offOwned(); offPurse(); releasePurse();

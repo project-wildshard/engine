@@ -9,7 +9,6 @@ import type { Database, Sql } from '../src/server/host/dedicated/saves/database'
 import type { SaveWrite } from '../src/server/host/dedicated/saves/saveStore';
 import type { SavedPlayer } from '../src/server/host/dedicated/world';
 import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
-import { isOwnedId } from '../src/shared/game/loot/Owned';
 import { Rng } from '@wildshard/format/seededRng';
 import { personalCoinTable, personalItemTable } from '../src/server/game/loot/personal';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
@@ -286,8 +285,8 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
   run(last, restored, 3);
   // What is restored from Postgres holds every item the ledger paid: gear it owns, and the pack in the counts it was paid.
   const bag = last.room.cell.owned.of(last.room.bodyOf('a')?.id ?? ''), items = receipts.filter(row => row.grant_kind === 'item'), packed = new Map<string, number>();
-  for (const row of items.filter(row => !isOwnedId(row.name))) packed.set(row.name, (packed.get(row.name) ?? 0) + Number(row.amount));
-  const gear = new Set(items.filter(row => isOwnedId(row.name)).map(row => row.name));
+  for (const row of items.filter(row => !bag.owned.kept.has(row.name))) packed.set(row.name, (packed.get(row.name) ?? 0) + Number(row.amount));
+  const gear = new Set(items.filter(row => bag.owned.kept.has(row.name)).map(row => row.name));
   expect(gear.size, 'kills paid gear').toBeGreaterThan(0);
   for (const item of gear) expect(bag.owned.has(item), `${item} is owned`).toBe(true);
   for (const [item, count] of packed) expect(bag.count(item), `${item} in the pack`).toBe(count);

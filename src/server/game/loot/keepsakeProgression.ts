@@ -8,7 +8,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { SimHost } from '@wildshard/engine/sim';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { progressionState } from '../../../shared/game/compendium/keepsakeProgression';
-import { keptItems, type Owned, type OwnedId } from '../../../shared/game/loot/Owned';
+import { keptItems, type Owned } from '../../../shared/game/loot/Owned';
 import { registerInstalled } from '../shardfile/installedSides';
 
 /**
@@ -24,7 +24,7 @@ export function installKeepsakeProgression(host: SimHost, source: Shardfile, sea
   if (rows === undefined || rows.flags.length === 0) return null;
   // the page's declaredLootEconomy refuses an unknown reward id; so does the room, at install
   const kept = keptItems(source.items), states = rows.states.map(state => state.earned.map(reward => { if (!kept.has(reward.id)) throw new Error(`Unknown progression reward ${reward.id}`); return reward.id; }));
-  const progression: { readonly flags: readonly string[]; readonly states: readonly (readonly OwnedId[])[] } = { flags: rows.flags, states };
+  const progression: { readonly flags: readonly string[]; readonly states: readonly (readonly string[])[] } = { flags: rows.flags, states };
   const books = questBooks(host), paid = new Map<string, number>();
   host.onStep('owned.keepsakes', () => {
     for (const [player, owned] of seated()) {

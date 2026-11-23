@@ -1,6 +1,6 @@
 // ONE-FORMAT OF31f2 (Q37): a shard's kept rows say what a player keeps; an old save keeps every item it holds today.
 import { expect, test } from 'vitest';
-import { keptItems, LEGACY_KEPT, Owned, type KeptRow } from './Owned';
+import { keptItems, Owned, type KeptRow } from './Owned';
 
 /** Every id a player could own before OF31f2: Driftwood's 13 and Pine's two guns, three worn looks among them. */
 const OLD_SAVE = {
@@ -8,8 +8,22 @@ const OLD_SAVE = {
     'bear-claw', 'boar-tusk', 'iron-sword', 'warden-longbow', 'lever-rifle'],
   worn: ['cape', 'captain-hat'],
 };
-/** Driftwood's kept rows as its items section declares them (OF31f3), Pine's as it will (OF31f4). */
-const DRIFTWOOD: readonly KeptRow[] = LEGACY_KEPT.filter(row => row.id !== 'warden-longbow' && row.id !== 'lever-rifle');
+/** Driftwood's kept rows as its items section declares them (r9, OF31f3), Pine's (r11, OF31f4). */
+const DRIFTWOOD: readonly KeptRow[] = [
+  { id: 'whetstone-1', kind: 'upgrade', label: 'Whetstone I', gauge: { name: 'sharpen', level: 1 } },
+  { id: 'whetstone-2', kind: 'upgrade', label: 'Whetstone II', gauge: { name: 'sharpen', level: 2 } },
+  { id: 'heart-1', kind: 'upgrade', label: 'Sturdy heart I', gauge: { name: 'hearts', level: 1 } },
+  { id: 'heart-2', kind: 'upgrade', label: 'Sturdy heart II', gauge: { name: 'hearts', level: 2 } },
+  { id: 'sea-chart', kind: 'upgrade', label: 'Sea chart' },
+  { id: 'cape', kind: 'cosmetic', label: 'Sailcloth cape' },
+  { id: 'captain-hat', kind: 'cosmetic', label: "Captain's hat" },
+  { id: 'charm-1', kind: 'charm', label: 'Sea glass charm I', gauge: { name: 'charms', level: 1 } },
+  { id: 'charm-2', kind: 'charm', label: 'Sea glass charm II', gauge: { name: 'charms', level: 2 } },
+  { id: 'charm-3', kind: 'charm', label: 'Sea glass charm III', gauge: { name: 'charms', level: 3 } },
+  { id: 'bear-claw', kind: 'trophy', label: 'Bear claw' },
+  { id: 'boar-tusk', kind: 'trophy', label: 'Boar tusk' },
+  { id: 'iron-sword', kind: 'gear', label: 'Iron sword' },
+];
 const PINE: readonly KeptRow[] = [{ id: 'warden-longbow', kind: 'gear', label: "The Warden's Longbow" }, { id: 'lever-rifle', kind: 'gear', label: 'Lever-action' }];
 const sorted = (ids: readonly string[] | undefined): string[] => [...(ids ?? [])].sort();
 
@@ -18,11 +32,12 @@ function slot(saved: unknown): { read: () => never; write: (value: { owned: stri
   return { read: () => structuredClone(saved) as never, write: (value) => { written.push(structuredClone(value)); return true; }, written };
 }
 
-test('the old table still keeps all 15 items and the worn looks of an old save', () => {
-  const owned = new Owned('driftwood-isle', slot(OLD_SAVE));
-  expect(sorted(owned.all)).toEqual(sorted(OLD_SAVE.owned));
-  expect(owned.worn('cape') && owned.worn('captain-hat')).toBe(true);
-  expect([owned.sharpen, owned.hearts, owned.charms]).toEqual([2, 2, 3]);
+test('OF31f5: a shard that declares no kept rows keeps nothing, and its save still holds every id', () => {
+  const save = slot(OLD_SAVE), owned = new Owned('old-shard', save, keptItems({ version: 1 }));
+  expect(owned.all).toEqual([]);
+  expect([owned.sharpen, owned.hearts, owned.charms]).toEqual([0, 0, 0]);
+  expect(() => owned.grant('whetstone-1')).toThrow(/Unknown owned identity/u);
+  expect(owned.kept.ids).toEqual([]);
 });
 
 test('declared kept rows read the same old save and write every item back, the ones they do not name included', () => {

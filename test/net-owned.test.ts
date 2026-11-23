@@ -15,6 +15,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { WirePage } from '../src/client/game/shardfile/wirePage';
 import { boardFromLines, boardLines } from '../src/shared/game/loot/ownedRows';
 import { PlayerOwned } from '../src/server/game/loot/playerOwned';
+import { DRIFTWOOD_KEPT } from './fixtures/keptRows';
 import { netBuys } from '../src/shared/host/standalone/netInput';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 
@@ -98,7 +99,7 @@ test('a purchase lands on the exchange that judges it, and a world with none cou
 });
 
 test('a filing lands in the player\'s purse and pack, and a purchase takes the price', () => {
-  const owned = new PlayerOwned('owned-test');
+  const owned = new PlayerOwned('owned-test', undefined, [], { kept: DRIFTWOOD_KEPT });
   owned.file({ grant: 'coins', name: 'coins', amount: 30 });
   owned.file({ grant: 'item', name: 'hide', amount: 2 });
   owned.file({ grant: 'item', name: 'whetstone-1', amount: 1 });

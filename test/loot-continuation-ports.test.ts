@@ -10,7 +10,8 @@ import { coinGeometry } from '../src/client/game/generators/pickups';
 import { CoinMotion } from '../src/client/game/loot/CoinMotion';
 import { CoinBurst } from '../src/client/game/loot/CoinBurst';
 import { Purse } from '../src/shared/game/loot/Purse';
-import { Owned } from '../src/shared/game/loot/Owned';
+import { keptItems, Owned } from '../src/shared/game/loot/Owned';
+import { DRIFTWOOD_KEPT } from './fixtures/keptRows';
 import { Bounty } from '../src/shared/game/loot/Bounty';
 import { ownedSave, bountySave } from '../src/shared/game/saves';
 
@@ -65,10 +66,10 @@ test('owned continuation storage preserves page filtering, writes and notificati
   const writes: string[] = [], events: string[] = [];
   try {
     ownedSave.write(structuredClone(durable), id);
-    const page = new Owned(id), native = new Owned(`chunk://local/${id}`, {
+    const page = new Owned(id, undefined, keptItems({ kept: DRIFTWOOD_KEPT })), native = new Owned(`chunk://local/${id}`, {
       read: slug => { expect(slug).toBe(id); return structuredClone(durable); },
       write: (value, slug) => { expect(slug).toBe(id); durable = structuredClone(value); writes.push(JSON.stringify(value)); return true; },
-    });
+    }, keptItems({ kept: DRIFTWOOD_KEPT }));
     page.onChange(() => { events.push('page'); }); native.onChange(() => { events.push('native'); });
     expect(native.all).toEqual(page.all); expect(native.worn('cape')).toBe(true);
     expect(native.grant('heart-1')).toBe(page.grant('heart-1'));

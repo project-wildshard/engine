@@ -160,19 +160,19 @@ for(const name of ["client/Inventory","client/grid/budgetPoints","shared/grid/ce
 
 test('game registries retain literal identities, readonly rows and live singletons',()=>{
  const consumer=resolve('src/test/game/t4-isolated-game-registry-declarations-consumer.ts');
- let source="import {PACK_SLOTS} from '../../client/game/Inventory';\nimport {ENTRY_ASPHALT,GAP_HALF} from '../../shared/game/grid/roadLayout';\nimport {pageGridCells,type GridCellEvents} from '../../shared/game/grid/cellEvents';\nimport {OWNED,type CosmeticId} from '../../shared/game/loot/Owned';\nimport {MOVER_FIELDS} from '../../shared/game/shardfile/movers';\nimport {BONES,LIMITS,TWISTS} from '../../client/game/systems/viewmodel/armRig';\nexport const slots:12=PACK_SLOTS;\nexport const asphalt:15=ENTRY_ASPHALT;\nexport const gap:number=GAP_HALF;\nexport const events:GridCellEvents=pageGridCells;\nexport const cosmetic:CosmeticId=\"cape\";\nexport const label:\"Sailcloth cape\"=OWNED.cape.label;\nexport const pitch:1=MOVER_FIELDS.pitch;\nexport const hand:\"R_hand\"=BONES.right[6];\nexport const twist:0.85=TWISTS[0].at;\nexport const low:-75=LIMITS.pronation[0];\n";
+ let source="import {PACK_SLOTS} from '../../client/game/Inventory';\nimport {ENTRY_ASPHALT,GAP_HALF} from '../../shared/game/grid/roadLayout';\nimport {pageGridCells,type GridCellEvents} from '../../shared/game/grid/cellEvents';\nimport {MOVER_FIELDS} from '../../shared/game/shardfile/movers';\nimport {BONES,LIMITS,TWISTS} from '../../client/game/systems/viewmodel/armRig';\nexport const slots:12=PACK_SLOTS;\nexport const asphalt:15=ENTRY_ASPHALT;\nexport const gap:number=GAP_HALF;\nexport const events:GridCellEvents=pageGridCells;\nexport const pitch:1=MOVER_FIELDS.pitch;\nexport const hand:\"R_hand\"=BONES.right[6];\nexport const twist:0.85=TWISTS[0].at;\nexport const low:-75=LIMITS.pronation[0];\n";
  const options:ts.CompilerOptions={strict:true,exactOptionalPropertyTypes:true,noUncheckedIndexedAccess:true,
   target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext,moduleResolution:ts.ModuleResolutionKind.Bundler,
   types:[],skipLibCheck:true,noEmit:true};
  const diagnostics=():readonly ts.Diagnostic[]=>consumerDiagnostics(consumer,source,options);
  expect(diagnostics()).toEqual([]);
- source+="export const wrongSlots:13=PACK_SLOTS;\nMOVER_FIELDS.pitch=1;\nBONES.right[0]=\"R_shoulder\";\nOWNED.cape.kind=\"cosmetic\";\nexport const missing=pageGridCells.undeclared;\n";
+ source+="export const wrongSlots:13=PACK_SLOTS;\nMOVER_FIELDS.pitch=1;\nBONES.right[0]=\"R_shoulder\";\nexport const missing=pageGridCells.undeclared;\n";
  const refused=diagnostics().map(diagnostic=>diagnostic.code);
- // ONE-FORMAT OF31f2: a cosmetic's id is the shard's own kept row now (`CosmeticId` is a string), so no literal id is refused.
+ // ONE-FORMAT OF31f5: kept items are the shard's own rows; the engine holds no kept table to declare.
  expect(refused.filter(code=>code===2322)).toHaveLength(1);
  expect(refused.filter(code=>code===2339)).toHaveLength(1);
- expect(refused.filter(code=>code===2540)).toHaveLength(3);
- expect(refused).toHaveLength(5);
+ expect(refused.filter(code=>code===2540)).toHaveLength(2);
+ expect(refused).toHaveLength(4);
 });
 });
 

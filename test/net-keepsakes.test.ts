@@ -11,7 +11,8 @@ import { questBooks } from '../src/shared/engine/quest/players';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { leadPlayer } from '../src/shared/engine/sim/leadPlayer';
 import { progressionState, takeKeepsake } from '../src/shared/game/compendium/keepsakeProgression';
-import { isCosmetic, isOwnedId, Owned } from '../src/shared/game/loot/Owned';
+import { keptItems, Owned } from '../src/shared/game/loot/Owned';
+import { DRIFTWOOD_KEPT } from './fixtures/keptRows';
 import { OWNED_ROW, WORN_LINE } from '../src/shared/game/loot/ownedRows';
 import { declaredLootEconomy } from '../src/shared/game/shard/declaredRows';
 import type { OwnedSlots } from '../src/server/game/loot/playerOwned';
@@ -36,7 +37,7 @@ async function driftwood(open: (player: string) => boolean = () => true) {
       if (!open(player)) throw new Error(`No seat for ${player}`);
       const held = stores.get(player) ?? memorySlots(); stores.set(player, held); return held;
     } });
-  const page = declaredLootEconomy(product.shardfile.rows.loot).progression, charms = [...new Set(page.states.flatMap(state => state.earned.map(reward => reward.id)))];
+  const page = declaredLootEconomy(product.shardfile.rows.loot, undefined, keptItems(product.shardfile.items)).progression, charms = [...new Set(page.states.flatMap(state => state.earned.map(reward => reward.id)))];
   return { world, page, stores,
     // the page's law over the same flags: what its keepsakes grant a player holding `n` glass
     earned: (n: number): readonly string[] => progressionState(page, flag => page.flags.indexOf(flag) < n).earned.map(reward => reward.id),
@@ -89,10 +90,10 @@ test('a seat is paid only once someone sits in it, from a save it imports, and a
 
 /** A fresh page's book (nothing saved on this device), mirrored from the server's lines as wirePage.mirrorOwned does. */
 function freshPage(lines: ReadonlyMap<string, number>): Owned {
-  const page = new Owned('driftwood-isle', { read: () => ({ owned: [], worn: [] }), write: () => true });
+  const page = new Owned('driftwood-isle', { read: () => ({ owned: [], worn: [] }), write: () => true }, keptItems({ kept: DRIFTWOOD_KEPT }));
   for (const [name, value] of lines) if (name.startsWith(OWNED_ROW.owned)) {
     const id = name.slice(OWNED_ROW.owned.length); page.grant(id);
-    if (isOwnedId(id) && isCosmetic(id) && page.worn(id) !== (value === WORN_LINE)) page.toggleWorn(id);
+    if (page.kept.cosmetic(id) && page.worn(id) !== (value === WORN_LINE)) page.toggleWorn(id);
   }
   return page;
 }

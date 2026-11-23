@@ -1,4 +1,4 @@
-// OF31f2b: a grid page's Owned takes its home cell's kept rows from the cell's shard file; the old table is the fallback.
+// OF31f2b: a grid page's Owned takes its home cell's kept rows from the cell's shard file; a cell with none keeps nothing (OF31f5).
 import { expect, test, vi } from 'vitest';
 import { emptyShardfile } from '@wildshard/engine/host/author';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
@@ -41,7 +41,7 @@ test('a grid cell\'s kept rows come from its index and combat/items alone, nothi
   expect(await readGridFolderKept(old.url, old.slug, old.options)).toBeNull();
 });
 
-test('the grid page\'s Owned keeps its home cell\'s rows; the old table stands for a cell with none or an unread one', async () => {
+test('the grid page\'s Owned keeps its home cell\'s rows; a cell with none or an unread one keeps nothing', async () => {
   const f = fixture('kept-home', KEPT);
   const kept = await gridHomeKept(f.slug, slug => readGridFolderKept(f.url, slug, f.options));
   expect(kept.ids).toEqual(KEPT.map(row => row.id));
@@ -49,14 +49,14 @@ test('the grid page\'s Owned keeps its home cell\'s rows; the old table stands f
   const writes: unknown[] = [];
   const owned = new Owned('kept-home', { read: () => saved, write: (value: unknown) => { writes.push(value); return true; } }, kept);
   expect(owned.has('warden-longbow')).toBe(true); expect(owned.worn('lantern-hat')).toBe(true);
-  expect(owned.has('cape')).toBe(false); // the old table's cape is not this cell's row: kept in the save, unread
+  expect(owned.has('cape')).toBe(false); // not this cell's row: kept in the save, unread
   expect(owned.grant('whetstone-1')).toBe(true); expect(owned.sharpen).toBe(1);
   expect(writes.at(-1)).toEqual({ owned: ['warden-longbow', 'lantern-hat', 'whetstone-1', 'cape'], worn: ['lantern-hat', 'cape'] });
 
   const old = fixture('old-home');
-  expect((await gridHomeKept(old.slug, slug => readGridFolderKept(old.url, slug, old.options))).has('cape')).toBe(true);
-  expect((await gridHomeKept('no-descriptor', () => null)).has('captain-hat')).toBe(true);
+  expect((await gridHomeKept(old.slug, slug => readGridFolderKept(old.url, slug, old.options))).ids).toEqual([]);
+  expect((await gridHomeKept('no-descriptor', () => null)).ids).toEqual([]);
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-  try { expect((await gridHomeKept('broken', () => Promise.reject(new Error('offline')))).has('iron-sword')).toBe(true); expect(warn).toHaveBeenCalledOnce(); }
+  try { expect((await gridHomeKept('broken', () => Promise.reject(new Error('offline')))).ids).toEqual([]); expect(warn).toHaveBeenCalledOnce(); }
   finally { warn.mockRestore(); }
 });

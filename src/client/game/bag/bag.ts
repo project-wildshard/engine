@@ -125,8 +125,8 @@ export function renderGear(p: HTMLElement, o: GearOpts): void {
 
   const doll = el('ws-gmenu-doll');
   const left = el('ws-gmenu-dollcol l'), right = el('ws-gmenu-dollcol r');
-  const wornHat = loot?.cosmetics?.some((c) => c.id === 'captain-hat' && c.worn) === true;
-  const wornCape = loot?.cosmetics?.some((c) => c.id === 'cape' && c.worn) === true;
+  const wornHat = loot?.cosmetics?.some((c) => c.icon === 'hat' && c.worn) === true;
+  const wornCape = loot?.cosmetics?.some((c) => c.icon === 'cape' && c.worn) === true;
   const fig = el('ws-gmenu-dollfig', figure(wornHat, wornCape));
   // the figure's head: max health over it (Driftwood)
   if (loot?.health) {
