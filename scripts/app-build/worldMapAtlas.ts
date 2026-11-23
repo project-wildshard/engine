@@ -81,10 +81,13 @@ export async function bakeWorldMapAtlas(products: readonly string[], read: (slug
  *  (QA-FEEDBACK 2026-11-13 row 44: open-plot-thin-ice had no tile). A placement this build didn't make, or a shard carded
  *  from the API after it (SA46), gets no tile: the page draws that cell's own map instead (minimapBlend.ts fullMapOverlay). */
 export async function writeWorldMapAtlas(root: string): Promise<void> {
-  const row = v.object({ slug: v.string() }), catalogue = v.parse(v.object({ placements: v.exactOptional(v.array(row)), grid: v.object({ cells: v.array(row) }) }),
+  const row = v.object({ slug: v.string() }), catalogue = v.parse(v.object({ placements: v.exactOptional(v.array(row)), shards: v.exactOptional(v.array(row)), grid: v.object({ cells: v.array(row) }) }),
     JSON.parse(readFileSync(Reflect.get(process.env, 'WILDSHARD_CATALOGUE') ?? resolve(root, 'test/pins/catalogue.json'), 'utf8')));
   const cells = catalogue.grid.cells.map(cell => cell.slug), builtHere = (slug: string): boolean => existsSync(resolve(root, 'out', slug, 'shard.json'));
-  const slugs = [...cells, ...(catalogue.placements ?? []).map(placement => placement.slug).filter(builtHere)];
+  // MAP-NEXT MN17 (v0.1.76): a pinned shard the grid's cells and placements lack (Mossgate, Mirror Salt: placed by the signed
+  // file, built here) gets its tile too. The page reads no cooked map for a slug the build has, so without one it drew a plot.
+  const pinned = (catalogue.shards ?? []).map(shard => shard.slug);
+  const slugs = [...cells, ...[...(catalogue.placements ?? []).map(placement => placement.slug), ...pinned].filter(builtHere)];
   // A filtered product build (build-shardfiles --shard) leaves only its own products, and the products copy
   // (outputFolders.mjs) publishes just those: the other cells draw the plot tile. A cold atlas, none built, still refuses.
   const built = new Set(slugs.filter(builtHere));
