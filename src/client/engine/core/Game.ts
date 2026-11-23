@@ -24,6 +24,7 @@ import {
 import type { N8AOPostPass } from 'n8ao';
 import { halfGodRaysMask, ldrOutputBuffer, quarterBloom } from '../render/lighterTargets';
 import { installAoTransparency } from '../render/aoTransparency';
+import { jsonSlot } from '../saves/slots';
 import { protectDisplayColour, protectDisplayColourAo } from '../render/displayColour';
 import { retried } from '../boot/retry';
 import { RegionCinematic } from '../render/regionCinematic';
@@ -792,7 +793,8 @@ export class Game {
       ao.configuration.color = new THREE.Color(0.05, 0.06, 0.05);
       // its transparency pre-passes: without opaque multi-material meshes or depth-free transparents (PH-P2), and not at all
       // when nothing would draw in them (SF69, bit-identical) — aoTransparency.ts
-      installAoTransparency(ao, this.rootScene, this.camera, { lean: () => this.aoLeanTransparency, skipEmpty: () => this.aoSkipEmptyTransparency });
+      installAoTransparency(ao, this.rootScene, this.camera, { lean: () => this.aoLeanTransparency, skipEmpty: () => this.aoSkipEmptyTransparency,
+        quietRestore: () => this.aoQuietRestore });
       protectDisplayColourAo(ao);
       composer.addPass(ao);
     }
@@ -1045,6 +1047,9 @@ export class Game {
   aoLeanTransparency = true;
   /** skip both n8ao transparency pre-passes when nothing would draw in them (aoTransparency.ts; SF69) — a live switch for A/B captures */
   aoSkipEmptyTransparency = true;
+  /** the pre-passes' hidden objects come back as the pass's own restore, not a reveal (passVisibility.ts; DRIFTWOOD-FPS DF14) — a live
+   *  switch for A/B captures, off with the device slot `debug.aoQuietRestore: false` */
+  aoQuietRestore: boolean = jsonSlot('debug.aoQuietRestore', 'device').read() !== false;
   /**
    * A cinematic chain's shafts, fringe and grain for a page that runs another chain (`regionCinematic.ts`; the grid's frame);
    * where this page's own chain leaves its god rays out (its tier's `godRays: false`), god rays built as the chain builds its

@@ -9,6 +9,7 @@ import { skinEnvelope, uploadedSkinBounds } from './skinEnvelope';
 import { guardObjectDraw, type DrawGuard } from '@wildshard/engine/render/drawGuards';
 import { ownLightUniforms } from '@wildshard/engine/render/lightUniforms';
 import { instanceEnvelope } from '@wildshard/engine/render/instancedGeometry';
+import { restoringPassVisibility } from '@wildshard/engine/render/passVisibility';
 
 
 /** `material.clone()` with its `userData` shallow-copied by reference (G639: three's Material.copy deep-copies userData through
@@ -562,7 +563,8 @@ export function cellClip(root: Object3D, half: number, scope: Scope, options: Ce
     };
     manual(); undo.push(() => { manualStop(); });
     undo.push(onCellField(node, 'matrixAutoUpdate', () => { manual(); moved(); }));
-    undo.push(onCellField(node, 'visible', () => { if (!checking && node.visible) mark(node, true, true); }));
+    // DF14: a pass restoring what it hid for one render (n8ao's pre-passes) is no reveal: nothing moved meanwhile
+    undo.push(onCellField(node, 'visible', () => { if (!checking && node.visible && !restoringPassVisibility()) mark(node, true, true); }));
     undo.push(scope.listenEmitter(node, 'childadded', (event: { child: Object3D }): void => { watch(event.child); }));
     undo.push(scope.listenEmitter(node, 'childremoved', (event: { child: Object3D }): void => { unwatch(event.child); }));
     if (isDraw(node)) {

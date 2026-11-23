@@ -41,3 +41,17 @@
   dock/beach/village gives phone/Mac 3.25 (runs 3.22 to 3.54); quest fire and road crossing are predicted within 0.8 to
   12.5% in every run, so `fps-calibration.json` records the GPU ratio as qualified. Two phone runs whose road crossing
   stuck on a waypoint were refused by the fitter (incomplete legs) and replaced.
+
+## The AO pre-passes re-gated the whole cell every frame (2026-11-23)
+
+- A CPU profile of desktop High at the Driftwood dock (1496×717 at 2, render scale 1.5) put about 9% of the frame in the
+  grid's cellClip: n8ao's transparency pre-passes hide every visible opaque renderable for one render and show it again,
+  and cellClip took each restore for a reveal, so the next frame re-gated and re-checked every draw in the cell.
+  `render/passVisibility.ts` lets the pass mark its restore; cellClip skips its reveal work then (nothing moved between the
+  hide and the restore). Live switch `game.aoQuietRestore`, device slot `debug.aoQuietRestore: false` turns it off.
+- Same build, after: cellClip's self time 9.4% → 1.5% of the frame. Cold boots at 2× CPU, ABBA (loaded mini, load
+  average 8 to 12): render p50 10.2 / 10.5 ms off, 7.9 / 8.4 on; frame p50 15.2 / 14.8 off, 11.3 / 11.4 on.
+- The 52 to 81 ms frame about 3.5 s after control in 2× boots is not the world watch's copy: a warm page shows no cost
+  for either the copy or a bitmap, a GPU blit read did not remove it (ABBA 1 / 2 / 0 / 1 frames over 50 ms), and a boot
+  profile (`deskbench --boot-profile --cpu 2`) shows that window busy with content arriving: the placement culler,
+  precompile's material clones, tile content's static matrices. The watch change was dropped.

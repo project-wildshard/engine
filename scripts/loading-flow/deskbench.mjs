@@ -7,26 +7,31 @@
 // the drawing buffer (pixel ratio, megapixels).
 //   scripts/browser-lane.sh node scripts/loading-flow/deskbench.mjs --base <url> [--shards Nine,Nalati,Driftwood]
 //     [--frames 240] [--poses 6] [--width 1496 --height 717 --scale 2] [--gfx-dpr 1|1.5|2|native] [--json <out.json>]
-//     [--shots <dir>] [--profile <dir>] [--census] [--ab] [--capped] [--stalls]
+//     [--shots <dir>] [--profile <dir>] [--census] [--owners] [--probe <file>] [--ab] [--capped] [--stalls]
 //   --stalls: NB6's play-stall ratchet at each pose (exits 1 on a stall); with --capped, the desktop check Ring 1 can't run.
+//   --boot-profile <dir>: a CPU profile from the play click to 5 s after control, with the long animation frames after
+//   control (their page times; the profile's own clock starts at `profiledAt`), for a frame that only a boot shows
+//   --cpu <n>: CDP CPU throttling (2 = desktop-high's half-speed CPU)
+//   --ab-flags a,b: with --ab, only these Game boolean fields (live switches), each flipped
 //   --ab: at the last pose, each lever against the baseline, interleaved over 6 rounds so a busy machine's drift cancels
 //   (render scale 1 and 0.75, the shadow maps held, AO off, the post passes off, the viewmodel hidden).
 //   --hide <regex>: at each pose a second shot with every object whose name matches and everything under it drawn on no layer (what is behind it).
 //   --census: one frame's renderer.render calls (target, draws, CPU ms) and the scene graph's size.
 //   --profile: a Chromium CPU profile of each pose's sample. GPU timer queries are left out: ANGLE Metal's TIME_ELAPSED
 //   read 17-24 ms for frames drawn every 7-10 ms (2026-11-14), so a cost here is a drawn interval or a subtraction.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { chromium } from "../browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from '../chromium-keychain.mjs';
 import { finishPlayProfile, startStallProfile } from './stalls.mjs';
+import { OWNER_CENSUS } from '../memory/iphone/census.mjs';
 import { NAME_ASKED, developerSettings, saveFixture, levelDownloadFixtures, hideDeveloperOverlays, harnessPins } from '../debug-settings.mjs';
 
 const { values } = parseArgs({ options: { base: { type: 'string' }, shards: { type: 'string', default: 'Nine,Nalati,Driftwood' },
   frames: { type: 'string', default: '240' }, poses: { type: 'string', default: '6' }, width: { type: 'string', default: '1496' },
   height: { type: 'string', default: '717' }, scale: { type: 'string', default: '2' }, json: { type: 'string' }, shots: { type: 'string' },
-  'gfx-dpr': { type: 'string' }, extra: { type: 'string' }, walk: { type: 'string', default: '0' }, ab: { type: 'boolean', default: false }, capped: { type: 'boolean', default: false }, stalls: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, hide: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
+  'gfx-dpr': { type: 'string' }, extra: { type: 'string' }, walk: { type: 'string', default: '0' }, ab: { type: 'boolean', default: false }, owners: { type: 'boolean', default: false }, 'ab-flags': { type: 'string' }, 'boot-profile': { type: 'string' }, cpu: { type: 'string', default: '1' }, probe: { type: 'string' }, capped: { type: 'boolean', default: false }, stalls: { type: 'boolean', default: false }, census: { type: 'boolean', default: false }, profile: { type: 'string' }, hide: { type: 'string' }, settle: { type: 'string', default: '2500' } } });
 if (values.base === undefined) { console.error('usage: deskbench.mjs --base <url> [--shards Nine,Nalati,Driftwood] [--frames 240] [--poses 6] [--json <file>] [--shots <dir>] [--profile <dir>] [--census] [--ab]'); process.exit(2); }
 // --stalls reads busy time: an uncapped frame loop keeps the main thread busy by design and would fault every pose
 if (values.stalls && !values.capped) { console.error('deskbench: --stalls needs --capped (an uncapped frame loop is busy by design)'); process.exit(2); }
@@ -120,7 +125,7 @@ function walkHitches(/** @type {number} */ seconds) {
 }
 
 /** Browser side: each variant against the baseline, interleaved (A B A B …) so a busy machine's drift cancels. */
-async function abCosts(/** @type {any} */ sampler) {
+async function abCosts(/** @type {any} */ sampler, /** @type {string[]} */ flags = []) {
   const g = /** @type {any} */ (window).__wildshard.world.game, r = g.renderer, ratio = r.getPixelRatio();
   const wait = (/** @type {number} */ ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
   const setRatio = (/** @type {number} */ v) => { r.setPixelRatio(v); g.resize(); };
@@ -138,6 +143,8 @@ async function abCosts(/** @type {any} */ sampler) {
     ['post passes off', () => { for (const p of held = passes()) p.enabled = false; }, () => { for (const p of held) p.enabled = true; }],
     ['viewmodel hidden', () => { g.camera.children.forEach((/** @type {any} */ c) => { if (c.visible) { hidden.push(c); c.visible = false; } }); }, () => { for (const c of hidden.splice(0)) c.visible = true; }],
   ];
+  // --ab-flags a,b: only these Game boolean fields (live switches), each flipped against the baseline
+  if (flags.length > 0) variants.splice(0, variants.length, ...flags.map((f) => /** @type {[string, () => void, () => void]} */ ([`${f} flipped`, () => { g[f] = !g[f]; }, () => { g[f] = !g[f]; }])));
   /** @type {Map<string, any[]>} */
   const rows = new Map([['baseline', []], ...variants.map(([name]) => /** @type {[string, any[]]} */ ([name, []]))]);
   for (let round = 0; round < 6; round++) {
@@ -172,6 +179,12 @@ try {
     await harnessPins(context, { seed: 357, capture: null }); // frame-floor's pins: the probe's pose control
     const page = await context.newPage();
     page.setDefaultTimeout(240_000);
+    const bootCdp = values['boot-profile'] !== undefined || values.cpu !== '1' ? await context.newCDPSession(page) : null;
+    if (bootCdp !== null && values.cpu !== '1') await bootCdp.send('Emulation.setCPUThrottlingRate', { rate: Number(values.cpu) });
+    if (values['boot-profile'] !== undefined) await context.addInitScript(() => {
+      const w = /** @type {any} */ (window); w.__loaf = [];
+      try { new PerformanceObserver((list) => { for (const e of /** @type {any[]} */ (list.getEntries())) if (e.duration >= 40) w.__loaf.push({ start: Math.round(e.startTime), ms: Math.round(e.duration), renderStart: Math.round(e.renderStart - e.startTime), styleStart: Math.round(e.styleAndLayoutStart - e.startTime), scripts: (e.scripts ?? []).map((/** @type {any} */ x) => `${Math.round(x.duration)}ms ${x.invoker} ${x.sourceFunctionName} ${String(x.sourceURL).split('/').pop()}:${x.sourceCharPosition}`) }); }).observe({ type: 'long-animation-frame', buffered: true }); } catch { /* no LoAF */ }
+    });
     /** @type {string[]} */
     const errors = [];
     page.on('pageerror', e => { errors.push(String(e).slice(0, 200)); });
@@ -190,13 +203,29 @@ try {
     if (!await until(`document.querySelector('.ws-menu-card.selected')?.dataset.i === '${target}' && !document.querySelector('.ws-menu-play')?.disabled`, 15_000)) throw new Error(`${titles[target]} never selectable`);
     await sleep(800);
     const t0 = Date.now();
+    /** @type {number} */
+    let profiledAt = 0;
+    if (bootCdp !== null && values['boot-profile'] !== undefined) {
+      await bootCdp.send('Profiler.enable'); await bootCdp.send('Profiler.setSamplingInterval', { interval: 250 }); await bootCdp.send('Profiler.start');
+      profiledAt = Number(await page.evaluate('performance.now()'));
+    }
     await page.evaluate(`setTimeout(() => document.querySelector('.ws-menu-play').click(), 0)`);
     const control = `(() => { const w = window.__wildshard?.world, l = document.querySelector('.ws-load');
       const shown = !!l && l.isConnected && l.getClientRects().length > 0 && getComputedStyle(l).display !== 'none' && Number(getComputedStyle(l).opacity) > .05;
       try { return !!w?.hud.entered && !w.hud.paused && w.game.frameGate() && !shown; } catch { return false; } })()`;
     if (!await until(control, 300_000)) throw new Error(`${titles[target]} never reached control`);
     const controlS = (Date.now() - t0) / 1000;
+    const controlAt = Number(await page.evaluate('performance.now()'));
     await sleep(5000);
+    if (bootCdp !== null && values['boot-profile'] !== undefined) {
+      const { profile } = await bootCdp.send('Profiler.stop'), dir = values['boot-profile'];
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${shardName}-boot.cpuprofile`), JSON.stringify(profile));
+      const loaf = /** @type {any[]} */ (await page.evaluate('window.__loaf'));
+      const after = loaf.filter((f) => f.start >= controlAt - 500).map((f) => ({ ...f, afterControlMs: f.start - controlAt, profileMs: f.start - profiledAt }));
+      writeFileSync(join(dir, `${shardName}-boot-frames.json`), JSON.stringify({ profiledAt, controlAt, frames: after }, null, 1));
+      for (const f of after) console.log(`  boot frame ${f.ms} ms at control${f.afterControlMs >= 0 ? '+' : ''}${(f.afterControlMs / 1000).toFixed(2)} s (profile ${f.profileMs} ms): render start ${f.renderStart}, style ${f.styleStart}; ${f.scripts.join(' | ')}`);
+    }
     const meta = await page.evaluate(`(() => { const w = window.__wildshard.world, g = w.game, gl = g.renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
       return { level: g.level.id, renderer: ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '', dpr: devicePixelRatio, viewport: [innerWidth, innerHeight],
         spawn: { name: 'spawn', x: w.player.position.x, y: w.player.position.y, z: w.player.position.z, yaw: w.player.yaw, pitch: w.player.pitch },
@@ -250,6 +279,18 @@ try {
       console.log(`  census: ${c.objects} objects (${c.autoUpdate} auto-update), ${c.meshes} meshes (${c.visibleMeshes} visible), ${c.lights} lights, ${c.skinned} skinned, ${c.programs} programs, ${c.perFrame} renderer.render calls a frame`);
       for (const k of c.calls.slice(0, Math.ceil(c.perFrame))) console.log(`    ${k.scene} / ${k.camera} to ${k.target}: ${k.draws} draws, ${k.ms} ms`);
     }
+    if (values.owners) {
+      // DF14 (mini-dwfps): which owners draw the frame, main pass and shadow maps apart (census.mjs's phone census, here)
+      const o = await page.evaluate(`new Promise(done => { (function () { ${OWNER_CENSUS} }).apply(null, [30, done]); })`);
+      const rows = [...(o.owners ?? [])].sort((x, y) => y[1] - x[1]);
+      console.log(`  owners (draws a frame over ${String(o.frames)} frames, shadow auto ${String(o.shadowAuto)}): ${rows.reduce((n, r) => n + r[1], 0).toFixed(1)} draws in the top 40`);
+      for (const [owner, draws, tris] of rows) console.log(`    ${String(draws).padStart(6)} ${String(tris).padStart(9)}  ${String(owner)}`);
+    }
+    if (values.probe !== undefined) {
+      // --probe <file>: an async page-function body (a file), its value printed as JSON (one-off questions about the frame)
+      const out = await page.evaluate(`(async () => { ${readFileSync(values.probe, 'utf8')} })()`);
+      console.log(`  probe: ${JSON.stringify(out, null, 1)}`);
+    }
     /** @type {any} */
     let walk = null;
     if (walkSeconds > 0) {
@@ -264,7 +305,7 @@ try {
     /** @type {any} */
     let ab = null;
     if (values.ab) {
-      ab = await page.evaluate(`(${abCosts.toString()})(${sampleFrames.toString()})`);
+      ab = await page.evaluate(`(${abCosts.toString()})(${sampleFrames.toString()}, ${JSON.stringify((values['ab-flags'] ?? '').split(',').filter(Boolean))})`);
       console.log('  interleaved A/B at the last pose (median of 6 rounds, 60 frames each; saved ms = baseline minus variant):');
       for (const v of ab) console.log(`    ${v.variant.padEnd(34)} p50 ${v.p50} (saves ${v.saves}) · work ${v.work} · render ${v.render} · ${v.calls} draws`);
     }

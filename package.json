@@ -570,6 +570,7 @@
     "./render/hoverboardGeometry": "./src/client/engine/render/hoverboardGeometry.ts",
     "./render/graph/colourFunction": "./src/client/engine/render/graph/colourFunction.ts",
     "./render/instancedGeometry": "./src/client/engine/render/instancedGeometry.ts",
+    "./render/passVisibility": "./src/client/engine/render/passVisibility.ts",
     "./render/dataLook": "./src/client/engine/render/dataLook.ts",
     "./render/look": "./src/client/engine/render/look.ts",
     "./render/lookLight": "./src/client/engine/render/lookLight.ts",

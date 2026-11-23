@@ -44,6 +44,7 @@ import * as THREE from 'three';
 import type { N8AOPostPass } from 'n8ao';
 import type { Renderer } from './renderer';
 import { ViewmodelRoot } from './viewmodel';
+import { restorePassVisibility } from './passVisibility';
 
 /** live switches (Game.ts fields, for same-instant A/B captures) */
 export interface AoTransparencySwitches {
@@ -51,6 +52,8 @@ export interface AoTransparencySwitches {
   lean: () => boolean;
   /** cut 2: skip both pre-passes when nothing would draw in either (SF69) */
   skipEmpty: () => boolean;
+  /** DF14: the objects a pre-pass hid are shown again as the pass's own restore (passVisibility.ts), not as a reveal */
+  quietRestore?: () => boolean;
 }
 
 /** n8ao's depth-buffer kinds (its `DepthType`): 3 = reversed */
@@ -143,12 +146,13 @@ export function installAoTransparency(ao: N8AOPostPass, scene: THREE.Scene, came
 
   // ── cut 1: n8ao's two renders, touching only this frame's visible renderables ──
   const showOnly = (pass: number): void => { for (let i = 0; i < objects.length; i++) { const o = objects[i]; if (o !== undefined) o.visible = ((bits[i] ?? 0) & pass) !== 0; } };
+  const showAll = (): void => { for (const o of objects) o.visible = true; }; // every one was visible (collect walks only visible ones)
   const prepass = (renderer: Renderer): void => {
     if (skipped === (PASS_FREE | PASS_WRITE)) { hooks(renderer, blankOff); hooks(renderer, blankOn); return; } // cut 2: only the scene hooks
     const off = ao.transparencyRenderTargetDWFalse, on = ao.transparencyRenderTargetDWTrue, copy = ao.depthCopyPass;
     if (!(off instanceof THREE.WebGLRenderTarget) || !(on instanceof THREE.WebGLRenderTarget) || copy === null || copy === undefined) return;
     const background = scene.background, alpha = renderer.getClearAlpha(), autoClearDepth = renderer.autoClearDepth;
-    const autoShadows = renderer.shadowMap.autoUpdate;
+    const autoShadows = renderer.shadowMap.autoUpdate, quiet = switches.quietRestore?.() ?? false;
     renderer.getClearColor(clearColour);
     scene.background = null;
     renderer.autoClearDepth = false;
@@ -166,7 +170,8 @@ export function installAoTransparency(ao: N8AOPostPass, scene: THREE.Scene, came
       for (const pass of PASSES) {
         if (skipped & pass) { hooks(renderer, pass === PASS_FREE ? blankOff : blankOn); continue; } // cut 3
         renderer.setRenderTarget(pass === PASS_FREE ? off : on);
-        showOnly(pass);
+        // the second pass shows what the first hid: a restore of the visibility this pass borrowed, too
+        if (quiet) restorePassVisibility(() => { showOnly(pass); }); else showOnly(pass);
         for (const v of viewmodels) v.syncClearer(); // cut 4: what the skipped matrix walk did
         renderer.clear(true, true, true);
         copy.render(renderer);
@@ -174,7 +179,7 @@ export function installAoTransparency(ao: N8AOPostPass, scene: THREE.Scene, came
       }
     } finally {
       scene.matrixWorldAutoUpdate = autoMatrices;
-      for (const o of objects) o.visible = true; // every one was visible (collect walks only visible ones)
+      if (quiet) restorePassVisibility(showAll); else showAll();
       renderer.shadowMap.autoUpdate = autoShadows;
       renderer.setClearColor(clearColour, alpha);
       scene.background = background;
