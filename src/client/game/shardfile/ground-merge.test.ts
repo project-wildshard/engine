@@ -39,6 +39,8 @@ test('coarse props share a draw without dropping partially covered fragments', a
   const a = new Scope('tile a'), b = new Scope('tile b'), material = new THREE.MeshStandardMaterial();
   const attach = (x: number, scope: Scope): ((excluded: ReadonlySet<number>) => void) => {
     const root = new THREE.Group(), prop = new THREE.Mesh(tile(x * 125 - 250, -250).geometry, material);
+    prop.geometry.setAttribute('normal', new THREE.Float32BufferAttribute([1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0], 3));
+    if (x === 1) prop.rotation.z = Math.PI / 2;
     root.add(prop);
     const mask = mergeCoarseProps(parent, root, root, [prop], { x, z: 0 }, scope);
     expect(prop.visible).toBe(false);
@@ -52,6 +54,7 @@ test('coarse props share a draw without dropping partially covered fragments', a
   const first = drawn();
   expect(first?.geometry.index?.count).toBe(12);
   expect(Array.from(first?.geometry.getAttribute('wsCoarseTile').array ?? [])).toEqual([0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]);
+  expect(first?.geometry.getAttribute('normal').getY(6)).toBeCloseTo(1);
   hide(new Set([0]));
   await settle();
   expect(drawn()).toBe(first);

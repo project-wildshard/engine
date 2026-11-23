@@ -32,9 +32,9 @@ import { FarBatch } from './farBatch';
  * the shared kind (it reads nothing of its mesh), run once per batch draw.
  */
 export const KIT_BATCH_SLOT = 'debug.kitBatch';
-export const BAKED_TILE_MEMBER = 'bakedTileBatchMember';
+const BAKED_TILE_MEMBER = 'bakedTileBatchMember';
 const bakedTileSlot = jsonSlot('debug.bakedTileBatch', 'device');
-function bakedTileBatchOn(): boolean {
+export function bakedTileBatchOn(): boolean {
   try { return bakedTileSlot.read() === true; } catch { return false; }
 }
 const kitBatchSlot = jsonSlot(KIT_BATCH_SLOT, 'device');
@@ -60,7 +60,11 @@ export const MAX_BATCH_VERTICES = 1_048_576;
 
 type Attribute = THREE.BufferAttribute;
 /** a batch channel's storage: the members' own where they agree, else 32-bit floats (three reads every one as floats) */
-interface Format { readonly itemSize: number; readonly normalized: boolean; readonly Typed: new (length: number) => THREE.TypedArray }
+interface Format {
+  readonly itemSize: number;
+  readonly normalized: boolean;
+  readonly Typed: { new (length: number): THREE.TypedArray; readonly BYTES_PER_ELEMENT: number };
+}
 const formatOf = (a: Attribute): Format => ({ itemSize: a.itemSize, normalized: a.normalized, Typed: a.array.constructor as Format['Typed'] });
 const sameFormat = (a: Format, b: Format): boolean => a.itemSize === b.itemSize && a.normalized === b.normalized && a.Typed === b.Typed;
 /** `a` in `format`: itself, or its values (denormalized) as floats */
@@ -69,6 +73,21 @@ function inFormat(a: Attribute, format: Format): Attribute {
   const out = new THREE.BufferAttribute(new format.Typed(a.count * a.itemSize), a.itemSize, format.normalized);
   for (let i = 0; i < a.count; i++) for (let c = 0; c < a.itemSize; c++) out.setComponent(i, c, a.getComponent(i, c));
   return out;
+}
+
+/** The baked GLB pads quantized positions to a four-component stride. Copy just the channels the batch reads. */
+export function prepareBakedTileBatch(mesh: THREE.Mesh): void {
+  for (const [name, attribute] of Object.entries(mesh.geometry.attributes)) {
+    if (!(attribute instanceof THREE.InterleavedBufferAttribute)) continue;
+    const { array, stride } = attribute.data, { count, itemSize, normalized, offset } = attribute;
+    const Typed = array.constructor as Format['Typed'];
+    const values = ownedArray(Typed, count * itemSize, { owner: 'game/kit-batch', asset: 'baked-tile-channel', kind: 'geometry-cpu' });
+    for (let row = 0; row < count; row++) {
+      for (let i = 0; i < itemSize; i++) values[row * itemSize + i] = array[row * stride + offset + i] ?? 0;
+    }
+    mesh.geometry.setAttribute(name, new THREE.BufferAttribute(values, itemSize, normalized).setUsage(attribute.data.usage));
+  }
+  mesh.userData[BAKED_TILE_MEMBER] = true;
 }
 
 /** Whether `object` is a plain mesh the batch may draw, with every channel's CPU copy still whole. */

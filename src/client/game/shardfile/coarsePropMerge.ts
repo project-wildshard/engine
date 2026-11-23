@@ -59,7 +59,7 @@ ${shader.fragmentShader}`.replace('#include <clipping_planes_fragment>', `
   }, { scope: owner, key: prior => `${prior}|df10-coarse-props` });
   const merge = new GroundMerge(parent, material, 'coarse-props.merged', drawn => {
     drawn.receiveShadow = receive; drawn.renderOrder = order;
-  }, 'cell');
+  }, 'region');
   const batch = { owner, merge, corners, hidden, used: new Set<number>() };
   const map = batches;
   batches.set(key, batch);

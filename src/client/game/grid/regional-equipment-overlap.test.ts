@@ -16,7 +16,8 @@ function deferred() {
 async function flush(): Promise<void> {for (let i = 0; i < 5; i++) await Promise.resolve();}
 async function settle(promise: Promise<void>): Promise<unknown> {try {await promise; return null;} catch (error) {return error;}}
 
-function fixture(options: {models?: boolean; prepare?: (root: Object3D) => Promise<void>; enabled?: boolean; worldOnly?: boolean; boot?: boolean} = {}) {
+function fixture(options: {models?: boolean; prepare?: (root: Object3D) => Promise<void>; enabled?: boolean; worldOnly?: boolean; boot?: boolean; roadKit?: boolean} = {}) {
+  const calls: string[] = [];
   const source = readFileSync(new URL('regionalRuntime.ts', import.meta.url), 'utf8');
   const declarationsStart = source.indexOf('          let enteredWarm:');
   const declarationsEnd = source.indexOf('          return { ...installation, context,', declarationsStart);
@@ -30,12 +31,12 @@ function fixture(options: {models?: boolean; prepare?: (root: Object3D) => Promi
     return {start: () => hooks.afterWorld(null), kit: () => {if (typeof equipmentReady === 'function') equipmentReady();},
       content: () => {contentReady(); forgetContent();}, result: () => enteredWarm};
   })`), {Promise,timeClientPreparation:(_slug:string,_step:string,work:()=>unknown)=>Promise.resolve(work()),
-    // DF10's road-kit prime (kitBatch.ts) is off outside phone Low, as it is here
-    kitBatchOn:(): boolean => false,primeKitBatches:(): never => {throw new Error('kit prime while off');},multiDraws:(): boolean => false});
+    kitBatchOn:(): boolean => options.roadKit === true,multiDraws:(): boolean => true,
+    primeKitBatches:(): void => {expect(options.roadKit).toBe(true); calls.push('kit-prime');}});
   if (typeof factory !== 'function') throw new Error('Regional hook factory missing');
   const owner = new Scope('equipment-overlap'), root = new Group(), models = new Group();
   root.visible = false; models.visible = false; models.name = 'staged-equipment';
-  const calls: string[] = [], worldReady = deferred(), finalStarted = deferred(), kitCensus = deferred();
+  const worldReady = deferred(), finalStarted = deferred(), kitCensus = deferred();
   let framePass = 0;
   // the arrival point (D188) is the runtime's own closure: a fixture with no crossing entry has none
   const ports = {owner, view: {root}, preparedModels: options.models === false ? null : models, preparing: options.enabled !== false, world: {}, arrivalAt: (): undefined => undefined,
@@ -78,6 +79,16 @@ test('the complete inventory waits for all content without speculative compilati
     expect(f.root.visible).toBe(false); expect(f.models.visible).toBe(false);
     f.content(); await result;
     expect(f.calls).toEqual(['before-final', 'final']);
+  } finally {f.kit(); f.content(); f.owner.dispose(); await observed;}
+});
+
+test('the phone Low road kit primes only after the completed inventory and final look', async () => {
+  const f = fixture({roadKit: true});
+  await f.start(); const result = f.result(), observed = settle(result);
+  try {
+    f.kit(); await flush(); expect(f.calls).toEqual([]);
+    f.content(); await result;
+    expect(f.calls).toEqual(['before-final', 'kit-prime', 'final']);
   } finally {f.kit(); f.content(); f.owner.dispose(); await observed;}
 });
 

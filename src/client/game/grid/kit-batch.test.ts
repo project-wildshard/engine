@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
 import { patchShader } from '@wildshard/engine/render/shaderPatches';
-import { BAKED_TILE_MEMBER, batchableMesh, buildKitBatches, kitBatch } from './kitBatch';
+import { batchableMesh, buildKitBatches, kitBatch, prepareBakedTileBatch } from './kitBatch';
 
 // DF10 (mini-df10e): the level's plain meshes of one material draw as one batch; each member stays the source of its pose,
 // visibility and draw range, and a member that changes leaves for good and draws itself again.
@@ -23,10 +23,11 @@ test('opaque baked tiles keep their lightmap UVs and changing draw ranges in a b
   const root = new THREE.Scene(), material = new THREE.ShaderMaterial();
   const mesh = (): THREE.Mesh => {
     const geometry = box(false);
-    const uv = new Float32Array(geometry.getAttribute('position').count * 2).fill(0.25);
-    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    const uv = new Uint16Array(geometry.getAttribute('position').count * 4).fill(16384);
+    const channel = new THREE.InterleavedBufferAttribute(new THREE.InterleavedBuffer(uv, 4), 2, 1, true);
+    geometry.setAttribute('uv', channel);
     const tile = new THREE.Mesh(geometry, material);
-    tile.userData[BAKED_TILE_MEMBER] = true;
+    prepareBakedTileBatch(tile);
     root.add(tile);
     return tile;
   };
@@ -36,7 +37,9 @@ test('opaque baked tiles keep their lightmap UVs and changing draw ranges in a b
   const [batch] = buildKitBatches(root, false, true);
   if (batch === undefined) throw new Error('one baked tile batch');
   expect(batch.material).toBe(material);
-  expect(batch.geometry.getAttribute('uv').getX(0)).toBe(0.25);
+  const uv = batch.geometry.getAttribute('uv');
+  expect(uv.array[0]).toBe(16384);
+  expect(uv.getX(0)).toBeCloseTo(0.25);
   const member = batch.members.find(row => row.mesh === a);
   if (member === undefined) throw new Error('baked tile member missing');
   a.geometry.setDrawRange(0, 3);
