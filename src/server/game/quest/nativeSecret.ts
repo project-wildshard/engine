@@ -18,6 +18,7 @@ import { chapterDecide } from '../../../shared/game/quest/chapterDecision';
 import { commitSeatEffects } from '../../../shared/game/quest/effects';
 import { questObservation } from '../../../shared/game/quest/questObservation';
 import type { QuestStepEffect } from '../../../shared/game/quest/steps';
+import { hasServerPlan, serverPlan } from '../shardfile/serverPlan';
 
 /** The page's own story file (`pageComposition.ts`). */
 const STORY = 'quests/story.json';
@@ -37,8 +38,8 @@ export interface NativeQuestSecret {
 /** The page's quest-view secret, from the rows the page reads: the `quest.views` file's `secret`, its quest composition's chapter
  *  program and the story's decision. Undefined when a shard's quest views declare none. */
 export async function readNativeQuestSecret(product: ShardFolder): Promise<NativeQuestSecret | undefined> {
-  if (!product.has('client/plan')) return undefined;
-  const features = product.section('client/plan').features, views = features.find(row => row.kind === 'quest.views');
+  if (!hasServerPlan(product)) return undefined;
+  const features = serverPlan(product).features, views = features.find(row => row.kind === 'quest.views');
   if (views === undefined) return undefined;
   const rows = v.parse(ViewRows, await product.json<unknown>(views.file)), secret = rows.secret;
   if (secret === undefined) return undefined;

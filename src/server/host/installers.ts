@@ -7,6 +7,7 @@
 import { CLIENT_FEATURE_SIDES, WORLD_ASSEMBLY_STAGE_SIDES, type SideEntry } from '@wildshard/format/featureSides';
 import type { ServerInstallerKey } from '@wildshard/engine/game/shardfile/installedSides';
 import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
+import { hasServerPlan, serverPlanFeatures } from '@wildshard/engine/game/shardfile/serverPlan';
 
 /** Every SS2 server key, and the engine owner(s) that register it. A key SS2 adds without an entry here fails
  *  `test/side-installers.test.ts`. */
@@ -42,14 +43,14 @@ const serverKey = (entry: SideEntry | undefined): string | null => entry === und
 
 /** Every `both` or `server` kind a product's `client/plan` declares, once each. A product with no plan has none. */
 export function serverSides(product: Pick<ShardFolder, 'has' | 'section'>): readonly ServerSide[] {
-  if (!product.has('client/plan')) return [];
+  if (!hasServerPlan(product)) return [];
   const out = new Map<string, ServerSide>(), add = (where: ServerSide['where'], kind: string, entry: SideEntry | undefined): void => {
     // admission (SS2) refuses an unsided kind, so a kind with no entry never reaches a room
     if (entry === undefined) throw new Error(`Unsided ${where} kind ${kind}`);
     const key = serverKey(entry);
     if (key !== null) out.set(`${where} ${kind}`, { where, kind, key });
   };
-  for (const feature of product.section('client/plan').features) {
+  for (const feature of serverPlanFeatures(product)) {
     add('client/plan', feature.kind, CLIENT_FEATURE_SIDES[feature.kind]);
     if (feature.kind === 'world.assembly') for (const stage of feature.rows.stages) add('world.assembly', stage.kind, WORLD_ASSEMBLY_STAGE_SIDES[stage.kind]);
   }

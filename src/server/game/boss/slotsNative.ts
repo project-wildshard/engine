@@ -28,6 +28,7 @@ import type { EncounterIntake } from '../population/encounterIntake';
 import { nativePopulationOf } from '../riding/nativePopulation';
 import { heldArmsOf } from '../weapons/nativeHeld';
 import { SlotHeights } from './slotHeights';
+import { serverPlan } from '../shardfile/serverPlan';
 
 const Saved = v.strictObject({ version: v.literal(1), law: v.unknown(), sites: v.array(v.boolean()), poses: v.pipe(v.array(v.tuple([v.string(), v.string()])), v.maxLength(16)), heights: v.exactOptional(v.unknown()) });
 const Held = v.object({ slot: v.string(), enabled: v.optional(v.boolean(), true) });
@@ -71,7 +72,7 @@ export interface SlotPlan {
 export async function prepareSlots(product: Pick<ShardFolder, 'json' | 'section' | 'file'> & Partial<Pick<ShardFolder, 'shardfile'>>, files: SlotFiles): Promise<SlotPlan | null> {
   const timing = v.parse(TimedEncountersSchema, await product.json<unknown>(files.rows)), declared = timing.slots.actors;
   if (declared === undefined) return null;
-  const plan = parseClientPlan(product.section('client/plan')), timed = plan.features.find(row => row.kind === 'timed.encounters'), view = plan.features.find(row => row.kind === 'view.program' && row.id === 'creature-views');
+  const plan = parseClientPlan(serverPlan(product)), timed = plan.features.find(row => row.kind === 'timed.encounters'), view = plan.features.find(row => row.kind === 'view.program' && row.id === 'creature-views');
   if (timed?.kind !== 'timed.encounters' || view?.kind !== 'view.program') throw new Error('Slots require their timed encounter and creature view');
   const scenes = v.parse(v.object({ dressing: v.object({ phone: v.string() }) }), product.section('world/scenes'));
   const [poses, actors, dressing, module] = await Promise.all([readEncounterPoses(product, [declared.kind], files),

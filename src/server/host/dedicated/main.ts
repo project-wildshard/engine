@@ -43,6 +43,7 @@ import { WHOLE_GRID, catalogueCell, cellShard, homeCell, keepPlacedCells, placeC
 import { PlacementWatch, fetchPlacementFile } from './placementFile';
 import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
 import { DEV_CONTROL_PATH, devRoute } from './devControl';
+import { rawServerPlan } from '@wildshard/engine/game/shardfile/serverPlan';
 
 declare const __BUILD_ID__: string;
 /** scripts/build-server.mjs: true only for `--dev`, the local dev server (MEMORY-STRUCTURE STR4). */
@@ -281,7 +282,7 @@ if (activationToken !== undefined) {
     read: () => fetchPlacementFile(placementAt, placementKey),
     preload: async (slug, hash) => {
       const input = await readPackFolder(slug, build, await rapier(), {origin, cache}, reads, hash, catalogue, true);
-      return {clientPlan: input.sections?.get('client/plan') ?? (input.product?.has('client/plan') === true ? input.product.section('client/plan') : undefined)};
+      return {clientPlan: rawServerPlan(input.sections, input.product)};
     },
     place: (row, file) => {placeCell(row, file);}, open: instances => world.activateCells(instances),
     opened: instance => Object.hasOwn(world.health().table, instance), catalogue: catalogueCell,

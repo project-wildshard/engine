@@ -6,15 +6,16 @@ import { RopeChain } from '@wildshard/engine/physics/ropeChain';
 import { tagOf } from '@wildshard/engine/physics/surface';
 import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 import { registerInstalled } from '@wildshard/engine/game/shardfile/installedSides';
+import { hasServerPlan, serverPlanFeatures } from '@wildshard/engine/game/shardfile/serverPlan';
 
 type RopeDeckStage = Extract<WorldAssemblyStage, { kind: 'rope-deck' }>;
 type RopeChainStage = Extract<WorldAssemblyStage, { kind: 'rope-chain' }>;
 
 /** Each admitted rope chain with the deck rows and baked span facts it is built from. */
 export function ropeChainStages(product: ShardFolder | undefined): { readonly stage: RopeChainStage; readonly deck: RopeDeckStage; readonly facts: RopeDeckStage['site']['spans'][number] }[] {
-  if (product?.has('client/plan') !== true) return [];
+  if (!hasServerPlan(product)) return [];
   const decks = new Map<string, RopeDeckStage>(), out: ReturnType<typeof ropeChainStages> = [];
-  for (const feature of product.section('client/plan').features) {
+  for (const feature of serverPlanFeatures(product)) {
     if (feature.kind !== 'world.assembly') continue;
     for (const stage of feature.rows.stages) {
       if (stage.kind === 'rope-deck') {

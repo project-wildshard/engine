@@ -32,6 +32,7 @@ import { applyWeatherCover, type WeatherReactions } from '../weather/reactions';
 import { prepareChapterRecords, type ChapterRecords } from '../quest/chapterRecords';
 import { heldArmsOf, type HeldArrowTargets, type HeldCommand } from '../weapons/nativeHeld';
 import { bindHeldArrowTarget, heldArrowTargets } from '../weapons/nativeHeldTargets';
+import { serverPlan } from '../shardfile/serverPlan';
 
 /** The original tape adapter uses the same registered encounter target. */
 export const openArenaArrows: HeldArrowTargets = heldArrowTargets;
@@ -68,7 +69,7 @@ export interface OpenArenaRuntime {
 /** Read the arena's rows now, then bind each install to its own host. */
 export async function prepareOpenArenaHost(product: Pick<ShardFolder, 'json' | 'section' | 'file' | 'shardfile'>, row: OpenArenaRow): Promise<(host: SimHost) => OpenArenaRuntime> {
   const data = await readArenaScriptData(product, { fight: row.fight, geometry: row.geometry });
-  const plan = parseClientPlan(product.section('client/plan')), view = plan.features.find(entry => entry.kind === 'view.program' && entry.id === row.view);
+  const plan = parseClientPlan(serverPlan(product)), view = plan.features.find(entry => entry.kind === 'view.program' && entry.id === row.view);
   if (view?.kind !== 'view.program') throw new Error('Open arena requires its admitted pose view');
   const [prefix] = row.id.split('.');
   const module = await product.file(view.module), installRecords = await prepareChapterRecords(product, { step: `${prefix ?? row.id}.chapter-records`, elites: `${prefix ?? row.id}.elites` });

@@ -46,6 +46,7 @@ import { FallFloor, shardFallFloor, shardPlayArea } from './fallFloor';
 import { stepResident } from '../../../shared/host/standalone/netInput';
 import { NET_BUTTONS } from '@wildshard/engine/input/netButtons';
 import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';
+import { hasServerPlan, serverPlanFeatures } from '@wildshard/engine/game/shardfile/serverPlan';
 
 /** The host's own player: the seat its systems are bound to. */
 export const LEAD_SEAT = 'actor.player';
@@ -117,7 +118,7 @@ async function openDataCell(input: HeadlessRuntimeInput, snapshot: string | SimS
   // encounter runs no decision and the boss falls back to its native phase chase.
   const sections = input.sections ?? (input.product === undefined ? undefined : folderHeadlessSections(input.product));
   // OF41b: a plain upload's portal rides from its `client/plan` `portal.ride` rows, as the page does.
-  const portalRide = input.product?.has('client/plan') === true ? planPortalRide(input.product.section('client/plan').features) : null;
+  const portalRide = hasServerPlan(input.product) ? planPortalRide(serverPlanFeatures(input.product)) : null;
   const ports: ShardfileSimPorts = { rapier, ...(sections === undefined ? {} : { sections }), portalRide,
     quest: { fact: (name, actorId) => { effects.push({ kind: 'fact', name, actorId }); }, coins: (amount, actorId) => { effects.push({ kind: 'coins', amount, actorId }); } } };
   // SR11: the kit items install with the simulation, so a restore finds their seats where the save put them.

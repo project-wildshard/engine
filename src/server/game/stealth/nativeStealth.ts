@@ -13,6 +13,7 @@ import { playerSeats, type PlayerSeat, type PlayerSeats } from '../plugin/player
 import { mountedPlayerOf } from '../riding/native';
 import { nativeTamingControls, nativeTamingOf } from '../riding/nativeTaming';
 import type { NativeGroupCollection } from '../shardfile/groupRuntime';
+import { serverPlan } from '../shardfile/serverPlan';
 
 const finite = v.pipe(v.number(), v.finite()), truth = v.boolean();
 const Threat = v.strictObject({ x: finite, z: finite, awareness: finite, alert: finite, hunting: finite });
@@ -40,7 +41,7 @@ export function nativeStealthOf(host: SimHost): PlayerSeats<StealthSeat> | undef
 
 /** Read the page's own stealth rows now, when its client plan enters stealth; the returned step installs them on one room host. */
 export function prepareNativeStealth(product: Pick<ShardFolder, 'section'>): ((host: SimHost, context: { readonly tick: StealthTick; readonly groups: NativeGroupCollection | undefined }) => void) | null {
-  if (!v.parse(ClientPlanSchema, product.section('client/plan')).features.some(row => row.kind === 'stealth.entry')) return null;
+  if (!v.parse(ClientPlanSchema, serverPlan(product)).features.some(row => row.kind === 'stealth.entry')) return null;
   const rows = v.parse(StealthRowsSchema, product.section('player/stealth')), sources = rows.observations;
   if (sources === undefined) throw new Error('Native stealth requires its admitted observation sources');
   return (host, { tick, groups }) => {

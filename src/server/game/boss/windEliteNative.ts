@@ -20,6 +20,7 @@ import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import type { EncounterIntake } from '../population/encounterIntake';
 import { readEncounterIntake } from '../population/encounterBook';
 import { nativePopulationOf } from '../riding/nativePopulation';
+import { hasServerPlan, serverPlan } from '../shardfile/serverPlan';
 
 const finite = v.pipe(v.number(), v.finite()), pair = v.tuple([finite, finite]);
 const Profile = v.object({ id: v.string(), value: v.object({ def: EliteFeatureSchema.entries.fights.pipe[0].item.entries.def, pattern: v.string(), kind: v.string(), yaw: finite, offset: pair, spec: v.unknown() }) });
@@ -37,8 +38,8 @@ export interface NativeWindElite {
 type Core = EliteCore<EliteCoreScript<AnimalSim>>;
 
 function planRows(product: Pick<ShardFolder, 'section' | 'has'>) {
-  if (!product.has('client/plan')) return null;
-  const { features } = v.parse(Plan, product.section('client/plan'));
+  if (!hasServerPlan(product)) return null;
+  const { features } = v.parse(Plan, serverPlan(product));
   const rows = features.find(row => row.kind === 'elite.construct'), rock = features.find(row => row.kind === 'elite.entry');
   if (rows === undefined || rock === undefined) return null;
   const { profiles, strikes } = v.parse(Construct, rows).rows, profile = profiles.find(row => row.value.pattern === 'wind')?.value;

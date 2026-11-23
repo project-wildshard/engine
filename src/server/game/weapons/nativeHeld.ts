@@ -42,6 +42,7 @@ import { nativeTamingOf } from '../riding/nativeTaming';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { nativeStealthOf } from '../stealth/nativeStealth';
 import { heldArrowTargets, heldContacts } from './nativeHeldTargets';
+import { serverPlan } from '../shardfile/serverPlan';
 
 const finite=v.pipe(v.number(),v.finite()),count=v.pipe(finite,v.integer(),v.minValue(0)),vector=v.tuple([finite,finite,finite]);
 const SwingSaved=v.strictObject({move:v.nullable(count),swingT:finite,comboIdx:count,lastSwingEnd:finite,cooldown:finite,
@@ -86,7 +87,7 @@ export function heldArmsOf(host: SimHost): PlayerSeats<HeldSeat> | undefined { r
 export async function prepareHeldArms(product: Pick<ShardFolder, 'json' | 'section' | 'shardfile'>, arms: HeldArmsRow): Promise<(host: SimHost, context: HeldArmsContext) => void> {
   const slots=parseHeldSlots(await product.json(arms.slots));
   // OF38c: a product without the old `combat.targets` list aims by its creatures' own `attackable.unless` shields
-  const listed=v.parse(ClientPlanSchema,product.section('client/plan')).features.find(row=>row.kind==='combat.targets')?.rows.aim;
+  const listed=v.parse(ClientPlanSchema,serverPlan(product)).features.find(row=>row.kind==='combat.targets')?.rows.aim;
   const aimRows=listed??{exclude:declaredAimExclusions(product.shardfile.rows.species),append:[]};
   const bowSlot=slots.slots.find(row=>row.kind==='bow'),bladeSlot=slots.slots.find(row=>row.kind==='blade'),spearSlot=slots.slots.find(row=>row.kind==='polearm');
   if(bowSlot?.kind!=='bow'||bladeSlot?.kind!=='blade'||spearSlot?.kind!=='polearm'||bladeSlot.source.kind!=='passes')throw new Error('Missing admitted native weapon slots');
