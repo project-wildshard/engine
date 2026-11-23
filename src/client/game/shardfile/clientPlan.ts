@@ -21,7 +21,7 @@ import { clientNativeBook } from './clientNativeBook';
 import type { PlatformSectionName } from '@wildshard/format/sections';
 import { constructionCheckpoint } from './constructionCheckpoint';
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { ClientFeatureKind, ClientFeatureRow } from '@wildshard/format/clientPlan';
+import type { ClientFeatureRow } from '@wildshard/format/clientPlan';
 import { ownedCombatTargets } from '../../../shared/game/shardfile/aimTargetFilter';
 import { readClientPlan } from './cookedDocument';
 import { clientOwnershipRules } from '@wildshard/format/clientOwnership';
@@ -32,23 +32,27 @@ import { clientSceneHandles, publishClientSceneHandles } from './clientSceneHand
 import { installEnteredRuntimeService, retainsRuntimeServices } from '../shard/retainedHooks';
 
 export type ClientPhase = 'world' | 'world-bindings' | 'kit' | 'prepare-play' | 'play';
+/** ONE-FORMAT OF29e8: the kind of the engine's own page population row (`PageHomesRow`). */
+export const PAGE_HOMES = 'engine.page-homes';
 interface ClientFeature {
   readonly phase: ClientPhase;
-  readonly phaseFor?: (row: ClientFeatureRow) => ClientPhase;
+  readonly phaseFor?: (row: AdmittedFeatureRow) => ClientPhase;
   readonly rank: number;
-  readonly rankFor?: (row: ClientFeatureRow) => number;
+  readonly rankFor?: (row: AdmittedFeatureRow) => number;
   readonly lifetime: 'resident' | 'entered';
   readonly sections: readonly PlatformSectionName[];
   /** Native metadata can precede the original visual constructor without loading its looks. */
   readonly needsWorldLooks?: false;
-  readonly install: (ctx: ShardContext, row: ClientFeatureRow, resident: Scope) => Promise<void> | void;
+  readonly install: (ctx: ShardContext, row: AdmittedFeatureRow, resident: Scope) => Promise<void> | void;
   readonly play?: { readonly rank: number; readonly install: ClientFeature['install'] };
-  readonly world?: { readonly rank: number; readonly when: (row: ClientFeatureRow) => boolean; readonly install: ClientFeature['install'] };
-  readonly preparePlay?: { readonly rank: number; readonly install: ClientFeature['install']; readonly when?: (row: ClientFeatureRow) => boolean };
+  readonly world?: { readonly rank: number; readonly when: (row: AdmittedFeatureRow) => boolean; readonly install: ClientFeature['install'] };
+  readonly preparePlay?: { readonly rank: number; readonly install: ClientFeature['install']; readonly when?: (row: AdmittedFeatureRow) => boolean };
+  /** OF29e8: the engine's page population a quest page binds (`PageHomesRow`), rooted in that page's entry. */
+  readonly pageHomes?: (ctx: ShardContext, row: PageHomesRow, resident: Scope) => Promise<void> | void;
 }
 /** Keep optional feature graphs cold until their original ordered phase.
  * The module can finish loading after eviction; refuse before invoking it. */
-function loadFeature(load: () => Promise<ClientFeature['install']>): ClientFeature['install'] {
+function loadFeature<R>(load: () => Promise<(ctx: ShardContext, row: R, resident: Scope) => Promise<void> | void>): (ctx: ShardContext, row: R, resident: Scope) => Promise<void> | void {
   return async (ctx, row, resident) => {
     const scope = ctx.scope, product = ctx.product, install = await load();
     if (ctx.scope !== scope || ctx.product !== product || scope.disposed || scope.disposing || resident.disposed || resident.disposing) throw new Error('Client feature owner is disposed');
@@ -56,7 +60,7 @@ function loadFeature(load: () => Promise<ClientFeature['install']>): ClientFeatu
   };
 }
 /** Compiled-in client-only registry. Adding a kind requires its strict format schema and a reviewed platform host. */
-export const CLIENT_FEATURES: Readonly<Record<ClientFeatureKind, ClientFeature>> = {
+export const CLIENT_FEATURES: Readonly<Record<AdmittedFeatureRow['kind'], ClientFeature>> = {
   'content.catalogue': { phase: 'kit', rank: 15, lifetime: 'entered',
     // Item/quest/journal envelopes are root data; finishes are streamed separately.
     sections: ['held/finishes'], install: loadFeature(async () => (await import('./clientCatalogue')).installClientCatalogue) },
@@ -330,9 +334,9 @@ export const CLIENT_FEATURES: Readonly<Record<ClientFeatureKind, ClientFeature>>
   'species.program': { phase: 'kit', rank: 20, rankFor: row => row.kind === 'species.program' && row.catalogue !== undefined ? -40 : 20, lifetime: 'entered', needsWorldLooks: false, sections: ['actors/species-programs', 'sim/scripts', 'sim/runtime-plan'], install: loadFeature(async () => (await import('./clientSpeciesProgram')).installClientSpeciesProgram),
     world: { rank: 10, when: row => row.kind === 'species.program' && row.catalogue !== undefined, install: loadFeature(async () => (await import('./clientSpeciesProgram')).prepareClientSpeciesCatalogue) } },
   'quest.page': { phase: 'play', rank: 10, lifetime: 'entered', sections: ['world/scenes', 'world/targets', 'look/painted'], install: loadFeature(async () => (await import('./clientQuestPage')).installClientQuestPage),
-    play: { rank: 80, install: loadFeature(async () => (await import('./clientQuestPage')).finishClientQuestPage) } },
+    play: { rank: 80, install: loadFeature(async () => (await import('./clientQuestPage')).finishClientQuestPage) },
+    pageHomes: loadFeature<PageHomesRow>(async () => (await import('./clientPopulation')).installClientPopulation) },
   'boss.spawned': { phase: 'play', rank: 50, lifetime: 'entered', sections: ['sim/runtime-plan'], install: loadFeature(async () => (await import('./clientBossFight')).installClientBossFight) },
-  'population.homes': { phase: 'play', rank: 60, lifetime: 'entered', sections: ['sim/runtime-plan', 'sim/scripts'], install: loadFeature(async () => (await import('./clientPopulation')).installClientPopulation) },
   'boss.held': { phase: 'play', rank: 70, lifetime: 'entered', sections: ['sim/runtime-plan'], install: loadFeature(async () => (await import('./clientBossFight')).installClientBossFight) },
   'boss.telegraph': { phase: 'play', rank: 75, lifetime: 'entered', sections: ['sim/runtime-plan', 'actors/strikes'], install: loadFeature(async () => (await import('./clientBossTelegraph')).installClientBossTelegraph) },
   'weather.fields': { phase: 'play', rank: 40, lifetime: 'entered', sections: [],
@@ -373,7 +377,23 @@ export const CLIENT_FEATURES: Readonly<Record<ClientFeatureKind, ClientFeature>>
     } else ctx.debug.expose(row.name, ctx.game.runtime);
   } },
 };
-export interface AdmittedClientPlan { readonly features: readonly ClientFeatureRow[] }
+/** ONE-FORMAT OF29e8: the engine's own page population row. A quest page always binds its population from the declared
+ *  files under the engine's system; an older pin's format `population.homes` row (Far Reach r4, Dunes r5) becomes this row
+ *  with its own system, held bodies, holds and groups, so the format can retire the kind once no pin names one. */
+export interface PageHomesRow {
+  readonly kind: typeof PAGE_HOMES;
+  readonly system: string;
+  readonly held?: { readonly order: readonly string[]; readonly settle: string; readonly placements: readonly { readonly id: string; readonly fromY: number; readonly y: number }[] };
+  readonly holds?: { readonly system: string; readonly rows: readonly { readonly home: number; readonly field: string; readonly until: string }[] };
+  readonly groups: Readonly<Record<string, readonly string[]>>;
+}
+type FormatHomesRow = Extract<ClientFeatureRow, { kind: 'population.homes' }>;
+/** An admitted format row: every kind but the page population, which is the plan's `pageHomes`. */
+export type AdmittedFeatureRow = Exclude<ClientFeatureRow, FormatHomesRow>;
+export interface AdmittedClientPlan { readonly features: readonly AdmittedFeatureRow[]; readonly pageHomes?: PageHomesRow }
+/** The page population's place among the play rows (after the boss it may keep, before the held boss) and its sections. */
+const PAGE_HOMES_STEP = { phase: 'play', rank: 60, lifetime: 'entered', sections: ['sim/runtime-plan', 'sim/scripts'] } as const;
+
 function stageCpuMicros(product: ShardFolder): number {
   const source = product.shardfile;
   return (source.runtime === null ? budgetTierLimits(source.budgets) : runtimeTierLimits(source)).cpuMicrosPerFrame;
@@ -385,7 +405,7 @@ export const WILDLIFE_FRAME = 'engine.population.wildlife';
 /** ONE-FORMAT OF29e: a plan that names no `population.wildlife` row stands it from the product's declared wildlife files
  *  (published as `wildlife`, steering on the nav grid, before the creatures), as OF29e1 stands the server's population
  *  family. A plan naming the row keeps its own (J486). */
-function withDeclaredWildlife<P extends AdmittedClientPlan>(product: ShardFolder, plan: P): P {
+function withDeclaredWildlife<P extends { readonly features: readonly ClientFeatureRow[] }>(product: ShardFolder, plan: P): P {
   if (plan.features.some(row => row.kind === 'population.wildlife')) return plan;
   if (![WILDLIFE_FILES.file, WILDLIFE_FILES.crowd.json, WILDLIFE_FILES.crowd.binary].every(file => product.hasFile(file))) return plan;
   const row = { kind: 'population.wildlife', file: WILDLIFE_FILES.file, crowd: { ...WILDLIFE_FILES.crowd }, navSteer: true, publish: 'wildlife',
@@ -394,19 +414,25 @@ function withDeclaredWildlife<P extends AdmittedClientPlan>(product: ShardFolder
 }
 /** The engine's own system for a page population no plan row names. */
 export const HOMES_SYSTEM = 'engine.population.homes';
-/** ONE-FORMAT OF29e4: a quest page whose plan names no `population.homes` row binds its population from the declared files
- *  (`sim/runtime-plan`'s homes and the product's declared spawns), as OF29e1 stands the server's family. The row's own facts
- *  were only names: its system (the engine's here), its witness (read by nothing) and its groups (none, where a page draws
- *  no trail). A plan naming the row keeps its own (J486). */
-function withDeclaredHomes<P extends AdmittedClientPlan>(product: ShardFolder, plan: P): P {
-  if (!plan.features.some(row => row.kind === 'quest.page') || plan.features.some(row => row.kind === 'population.homes')) return plan;
-  const row = { kind: 'population.homes', system: HOMES_SYSTEM, witness: { kinds: [] } };
-  return { ...plan, features: [...plan.features, ...readClientPlan(product.shardfile, { version: 1, features: [row] }).features] };
+/** An older pin's format row as the engine's: its witness (read by nothing) and body homes (passed to nothing) drop. */
+function pageHomesRow(row: FormatHomesRow): PageHomesRow {
+  return { kind: PAGE_HOMES, system: row.system, groups: row.groups,
+    ...(row.held === undefined ? {} : { held: row.held }), ...(row.holds === undefined ? {} : { holds: row.holds }) };
+}
+/** ONE-FORMAT OF29e4/OF29e8: a quest page binds its population from the declared files (`sim/runtime-plan`'s homes and the
+ *  product's declared spawns) under the engine's system, as OF29e1 stands the server's family; a plan naming the format row
+ *  keeps its own facts (J486) in the engine's row. */
+export function pageHomes(features: readonly ClientFeatureRow[]): AdmittedClientPlan {
+  const rows: AdmittedFeatureRow[] = [];
+  let homes: PageHomesRow | undefined;
+  for (const row of features) if (row.kind === 'population.homes') homes = pageHomesRow(row); else rows.push(row);
+  if (homes === undefined && features.some(row => row.kind === 'quest.page')) homes = { kind: PAGE_HOMES, system: HOMES_SYSTEM, groups: {} };
+  return homes === undefined ? { features: rows } : { features: rows, pageHomes: homes };
 }
 /** Validate the whole plan and all required sections before the first feature can mutate the page. */
 export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedClientPlan {
   try {
-    const plan = withDeclaredHomes(product, withDeclaredWildlife(product, readClientPlan(product.shardfile, input)));
+    const read = withDeclaredWildlife(product, readClientPlan(product.shardfile, input)), plan = pageHomes(read.features);
     const limit = stageCpuMicros(product);
     // A row is the smallest host installer we can pace between drawn frames.
     for (const row of plan.features) {
@@ -456,7 +482,7 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
     const sections = new Map(outputDescriptor(product.shardfile)?.sections);
     for (const name of ['world/scenes', 'actors/species-programs', 'sim/runtime-plan', 'sim/scripts', 'look/painted'] as const)
       if (product.has(name)) sections.set(name, product.section(name));
-    sections.set('client/plan', plan);
+    sections.set('client/plan', read); // the format's rules read its own rows
     const errors = clientOwnershipRules(product.shardfile, sections); if (errors.length > 0) throw new Error(errors.join('; '));
     if (plan.features.some(row => row.kind === 'light.emitters') && !plan.features.some(row => row.kind === 'world.scenes')) throw new Error('Emitters require the scene feature');
     if (plan.features.some(row => row.kind === 'motion.channels') && !plan.features.some(row => row.kind === 'world.scenes')) throw new Error('Motion requires the scene feature');
@@ -524,15 +550,19 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
         product.section(name); // A listed stream section is not an admitted boot dependency.
       }
     }
-    checkClientPlanModules(plan);
+    if (plan.pageHomes !== undefined) for (const name of PAGE_HOMES_STEP.sections) {
+      if (!product.has(name)) throw new Error(`Missing feature section ${name}`);
+      product.section(name);
+    }
+    checkClientPlanModules(read);
     // ONE-FORMAT OF38c: held arms with no `combat.targets` list aim by their owners' and creatures' own declarations
     const listless = plan.features.some(row => row.kind === 'held.claims.install') && !plan.features.some(row => row.kind === 'combat.targets');
     const owners = plan.features.map(row => ({ kind: row.kind, owner: 'owner' in row && typeof row.owner === 'string' ? row.owner : undefined,
       equipment: 'equipment' in row && typeof row.equipment === 'string' ? row.equipment : undefined }));
     const owned = listless ? ownedCombatTargets(owners, product.shardfile.rows.species) : null;
-    if (owned === null) return { features: plan.features };
+    if (owned === null) return plan;
     const targets = readClientPlan(product.shardfile, { version: 1, features: [{ kind: 'combat.targets', rows: owned.rows, bindings: owned.bindings }] }).features;
-    return { features: [...plan.features, ...targets] };
+    return { ...plan, features: [...plan.features, ...pageHomes(targets).features] };
   } catch (error) { throw new FolderError(product.slug, 'client/plan', 'schema', error instanceof Error ? error.message : 'Invalid client plan'); }
 }
 const folderPlans = new WeakMap<ShardFolder, AdmittedClientPlan>();
@@ -546,26 +576,35 @@ export function admittedFolderClientPlan(product: ShardFolder): AdmittedClientPl
   folderPlans.set(product, admitted);
   return admitted;
 }
+/** One install step of a phase: a format row's or the engine's page population (OF29e8). */
+interface Step { readonly row: AdmittedFeatureRow | PageHomesRow; readonly rank: number; readonly looks: boolean; readonly run: () => Promise<void> | void }
 // Open arenas bind before rooms, independent of the product's feature order.
-const phaseKey=(row:ClientFeatureRow):string=>row.kind==='debug.expose'?row.name:row.kind==='arena-room.entry'?`${row.kind}:${row.equipment===undefined?1:0}:${row.owner}`:row.kind;
+const phaseKey=(row:AdmittedFeatureRow|PageHomesRow):string=>row.kind==='debug.expose'?row.name:row.kind==='arena-room.entry'?`${row.kind}:${row.equipment===undefined?1:0}:${row.owner}`:row.kind;
 /** Run a platform-ordered phase with bounded frame-budget pauses. Resident scene construction is cached by its host. */
 export async function installClientPhase(ctx: ShardContext, plan: AdmittedClientPlan, phase: ClientPhase, resident: Scope, lifetime?: 'resident' | 'entered'): Promise<void> {
   if(lifetime!=='resident'&&(phase==='world'||phase==='kit'))await prepareClientReturnModules(ctx);
-  const rows = plan.features.flatMap(row => {
+  const step = (row: AdmittedFeatureRow, rank: number, install: ClientFeature['install']): Step =>
+    ({ row, rank, looks: CLIENT_FEATURES[row.kind].needsWorldLooks !== false, run: () => install(ctx, row, resident) });
+  const rows: Step[] = plan.features.flatMap(row => {
     const feature = CLIENT_FEATURES[row.kind];
     if (lifetime !== undefined && feature.lifetime !== lifetime) return [];
-    return [...((feature.phaseFor?.(row) ?? feature.phase) === phase ? [{ row, rank: feature.rankFor?.(row) ?? feature.rank, install: feature.install }] : []),
-      ...(phase === 'world' && feature.world?.when(row) === true ? [{ row, ...feature.world }] : []),
-      ...(phase === 'play' && feature.play !== undefined ? [{ row, ...feature.play }] : []),
-      ...(phase === 'prepare-play' && feature.preparePlay !== undefined && (feature.preparePlay.when?.(row) ?? true) ? [{ row, ...feature.preparePlay }] : [])];
-  }).sort((a, b) => a.rank - b.rank || phaseKey(a.row).localeCompare(phaseKey(b.row)));
+    return [...((feature.phaseFor?.(row) ?? feature.phase) === phase ? [step(row, feature.rankFor?.(row) ?? feature.rank, feature.install)] : []),
+      ...(phase === 'world' && feature.world?.when(row) === true ? [step(row, feature.world.rank, feature.world.install)] : []),
+      ...(phase === 'play' && feature.play !== undefined ? [step(row, feature.play.rank, feature.play.install)] : []),
+      ...(phase === 'prepare-play' && feature.preparePlay !== undefined && (feature.preparePlay.when?.(row) ?? true) ? [step(row, feature.preparePlay.rank, feature.preparePlay.install)] : [])];
+  });
+  // OF29e8: the engine's page population row runs at its own place among the play rows
+  const homes = plan.pageHomes, installHomes = CLIENT_FEATURES['quest.page'].pageHomes;
+  if (homes !== undefined && installHomes !== undefined && phase === PAGE_HOMES_STEP.phase && (lifetime === undefined || lifetime === PAGE_HOMES_STEP.lifetime))
+    rows.push({ row: homes, rank: PAGE_HOMES_STEP.rank, looks: true, run: () => installHomes(ctx, homes, resident) });
+  rows.sort((a, b) => a.rank - b.rank || phaseKey(a.row).localeCompare(phaseKey(b.row)));
   const live = (): void => {
     if (ctx.scope.disposed || ctx.scope.disposing || resident.disposed || resident.disposing) throw new Error('Client feature owner is disposed');
   };
   // The platform's look phase precedes every entered world step, including
   // native runtimes whose data client intentionally skips presentation. A
   // metadata-only phase leaves look construction to its original native owner.
-  if (phase === 'world' && lifetime !== 'resident' && rows.some(({ row }) => CLIENT_FEATURES[row.kind].needsWorldLooks !== false)) {
+  if (phase === 'world' && lifetime !== 'resident' && rows.some(row => row.looks)) {
     live();
     const missing = Object.keys(ctx.product.shardfile.look.materials).filter(id => !hasLentLook(id));
     if (missing.length > 0) await timeClientPreparation(ctx.product.slug, 'world.looks', async () => {
@@ -574,9 +613,9 @@ export async function installClientPhase(ctx: ShardContext, plan: AdmittedClient
   }
   if (rows.length === 0) return;
   const stageBudgetMs = stageCpuMicros(ctx.product) / 1_000;
-  for (const { row, install } of rows) {
+  for (const { row, run } of rows) {
     live();
-    await timeClientPreparation(ctx.product.slug, `${phase}.${row.kind}`, () => install(ctx, row, resident));
+    await timeClientPreparation(ctx.product.slug, `${phase}.${row.kind}`, run);
     // A completed install may already have yielded through reads/decodes.
     // Pause at the owner’s tier within the shared frame budget.
     const pause = constructionCheckpoint(ctx.scope, stageBudgetMs);

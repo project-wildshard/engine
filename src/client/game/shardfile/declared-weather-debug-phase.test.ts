@@ -2,7 +2,7 @@
 import {expect,test,vi} from 'vitest';
 import {Scope} from '@wildshard/engine/app/scope';
 import {parseClientPlan} from '@wildshard/format/clientPlan';
-import {CLIENT_FEATURES,installClientPhase} from './clientPlan';
+import {CLIENT_FEATURES,installClientPhase,pageHomes} from './clientPlan';
 import {publishEntryOwner} from '../../../shared/game/shardfile/entryOwners';
 import type {ShardContext} from '../plugin/context';
 import type {ForestWeatherRig} from '../weather/forest';
@@ -13,7 +13,7 @@ test('weather diagnostics wait for the original play-phase weather publication',
  const ctx=legacyDouble<ShardContext>({scope,game:legacyDouble<ShardContext['game']>({runtime:legacyDouble<NonNullable<ShardContext['game']['runtime']>>({})}),
   // installClientPhase paces rows at the product's tier (f1daaa0c), so the product carries a shardfile.
   product:legacyDouble<ShardContext['product']>({slug:'orchard',shardfile:legacyDouble<ShardContext['product']['shardfile']>({runtime:null,budgets:legacyDouble<ShardContext['product']['shardfile']['budgets']>({tier:'small'})})}),debug:{expose}});
- const plan=parseClientPlan({version:1,features:[{kind:'debug.expose',name:'weather',source:{kind:'world-weather',owner:'orchard.weather'}}]});
+ const plan=pageHomes(parseClientPlan({version:1,features:[{kind:'debug.expose',name:'weather',source:{kind:'world-weather',owner:'orchard.weather'}}]}).features);
  try{
   // World bindings run before weather.forest constructs and publishes at play/40.
   await installClientPhase(ctx,plan,'world-bindings',scope);

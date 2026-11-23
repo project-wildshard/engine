@@ -1,6 +1,4 @@
-import { parse } from 'valibot';
 import { buildYield } from '@wildshard/engine/core/workSlice';
-import { ClientPopulationSchema } from '@wildshard/format/clientNative';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import type { ShardContext } from '../plugin/context';
 import type { RuntimeHomePorts } from '../../../shared/game/plugin/runtimeRows';
@@ -10,11 +8,12 @@ import { folderPainterLight } from '../looks/paintedLook';
 import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import { wirePage } from './wirePage';
 import { clientNativeBook } from './clientNativeBook';
+import type { PageHomesRow } from './clientPlan';
 
-/** Compiled population.homes feature keeps the original native bodies,
+/** The engine's page population row (OF29e8, `PageHomesRow`) keeps the original native bodies,
  * allocation order, refill identities and late floor-placement phase. */
-export async function installClientPopulation(ctx: ShardContext, input: unknown): Promise<void> {
-  const row = parse(ClientPopulationSchema, input), book = clientNativeBook(ctx);
+export async function installClientPopulation(ctx: ShardContext, row: PageHomesRow): Promise<void> {
+  const book = clientNativeBook(ctx);
   if (book.population !== null || !book.species || book.quest === null)
     throw new Error('Population requires its actual catalogue and saved page');
   const declared = pagePopulationRows(ctx.product.section('sim/runtime-plan'));

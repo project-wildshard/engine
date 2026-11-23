@@ -3,7 +3,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
-import { installClientPhase, admitClientPlan } from '../src/client/game/shardfile/clientPlan';
+import { installClientPhase, admitClientPlan, pageHomes } from '../src/client/game/shardfile/clientPlan';
 import * as places from '../src/client/game/shardfile/clientPlaceSets';
 import * as continuation from '../src/client/game/quest/continuation';
 import { emptyShardfile } from '../src/shared/host/author';
@@ -54,7 +54,7 @@ test('unordered declared play waits for the actual binding before continuation',
   });
   const effects = vi.spyOn(continuation, 'installQuestContinuationFile').mockImplementation(() => { order.push('continue'); return Promise.resolve(); });
   try {
-    const plan = parseClientPlan({ version: 1, features: [{ kind: 'quest.continuation', file: 'continuation.json' }, binding] });
+    const plan = pageHomes(parseClientPlan({ version: 1, features: [{ kind: 'quest.continuation', file: 'continuation.json' }, binding] }).features);
     const running = installClientPhase(f.ctx, plan, 'play', f.scope, 'entered');
     await reached; expect(order).toEqual(['bind:start']);
     if (finish === undefined) throw new Error('Missing binding completion'); finish();
