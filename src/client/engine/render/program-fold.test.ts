@@ -80,3 +80,11 @@ test('an exempt scene draws with no environment whatever the height', () => {
   unfold();
   undo();
 });
+
+test('DF14 (mini-dwfps): unset on desktop, fold and reuse are on; a saved pick still wins; phone Low keeps its own', () => {
+  expect(programFold(null, false, true)).toBe(true);
+  expect(programFold(false, false, true)).toBe(false);
+  expect(programReuse(null, false, true)).toBe(true);
+  expect(programReuse('off', false, true)).toBe(false);
+  expect(programReuse(null, false, false)).toBe(false);
+});

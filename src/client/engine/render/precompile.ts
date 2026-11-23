@@ -41,7 +41,7 @@ import { isDev } from '../core/devMode';
 // 1.2 s (DRIFTWOOD-FPS DF1): the dock's spikes over 50 ms. With the device slot on, the boot's world-frame stage links them
 // all before the reveal; the load is longer by their link time, play starts with none left.
 
-/** The device slot (true or false); with none, BOOT_ROAD_PROGRAMS_PHONE_LOW at phone Low, else BOOT_ROAD_PROGRAMS_DEFAULT. */
+/** The device slot (true or false); with none, BOOT_ROAD_PROGRAMS_PHONE_LOW at phone Low, BOOT_ROAD_PROGRAMS_DESKTOP on desktop, else BOOT_ROAD_PROGRAMS_DEFAULT. */
 export const BOOT_ROAD_PROGRAMS_SLOT = 'debug.bootRoadPrograms';
 /** Off until the iPhone 13 pairs decide (load time against the dock's spikes). */
 export const BOOT_ROAD_PROGRAMS_DEFAULT = false;
@@ -49,6 +49,9 @@ export const BOOT_ROAD_PROGRAMS_DEFAULT = false;
  *  bootRoadPrograms on, the calibrated stand-in (headless Chromium, phone Low, cap 30, CPU 2.0x, the driftwood-fps route)
  *  links no program after control and holds fewer programs (meta project/evidence/driftwood-fps/df8-phone-low-defaults-2026-11-23.md). */
 export const BOOT_ROAD_PROGRAMS_PHONE_LOW = true;
+/** Unset on desktop: on (meta DRIFTWOOD-FPS DF14, mini-dwfps, 2026-11-23). With the three DF8 program slots on, desktop High's
+ *  driftwood-fps quick route linked 2 programs after control, not 73, and lost its village long frames (97 and 71 ms). */
+export const BOOT_ROAD_PROGRAMS_DESKTOP = true;
 
 let picked: boolean | undefined;
 /** Whether this page links its road variants and undrawn programs at boot; read once per page. */
@@ -57,7 +60,7 @@ export function bootRoadPrograms(): boolean {
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(BOOT_ROAD_PROGRAMS_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
   try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
-  picked = typeof saved === 'boolean' ? saved : phoneLow ? BOOT_ROAD_PROGRAMS_PHONE_LOW : BOOT_ROAD_PROGRAMS_DEFAULT;
+  picked = typeof saved === 'boolean' ? saved : phoneLow ? BOOT_ROAD_PROGRAMS_PHONE_LOW : TIER === 'desktop' ? BOOT_ROAD_PROGRAMS_DESKTOP : BOOT_ROAD_PROGRAMS_DEFAULT;
   return picked;
 }
 /** Tests only: read the slot again. */

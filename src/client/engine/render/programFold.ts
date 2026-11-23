@@ -16,7 +16,7 @@
  *   program.
  * - The far ring's batch programs warm before their batch replaces its proxies (game/grid/farBatch.ts). A creature's
  *   card shot keeps one plain material (entities/AnimalHerdView.ts) on every tier whose cards draw, fold or not.
- * Off by default; on at phone Low (DF8, mini-dwfps2).
+ * Off by default; on at phone Low (DF8, mini-dwfps2) and on desktop (DF14, mini-dwfps).
  */
 import * as THREE from 'three';
 import { jsonSlot } from '../saves/slots';
@@ -30,13 +30,16 @@ export const PROGRAM_FOLD_DEFAULT = false;
  *  bootRoadPrograms on, the calibrated stand-in (headless Chromium, phone Low, cap 30, CPU 2.0x, the driftwood-fps route)
  *  links no program after control and holds fewer programs (meta project/evidence/driftwood-fps/df8-phone-low-defaults-2026-11-23.md). */
 export const PROGRAM_FOLD_PHONE_LOW = true;
+/** Unset on desktop: on (meta DRIFTWOOD-FPS DF14, mini-dwfps, 2026-11-23). With the three DF8 program slots on, desktop High's
+ *  driftwood-fps quick route linked 2 programs after control, not 73, and lost its village long frames (97 and 71 ms). */
+export const PROGRAM_FOLD_DESKTOP = true;
 
-/** The slot's value: a boolean (or a capture's `true`/`on`/1) wins; unset, PROGRAM_FOLD_PHONE_LOW at phone Low, else PROGRAM_FOLD_DEFAULT. */
-export function programFold(saved: unknown, phoneLow = false): boolean {
+/** The slot's value: a boolean (or a capture's `true`/`on`/1) wins; unset, PROGRAM_FOLD_PHONE_LOW at phone Low, PROGRAM_FOLD_DESKTOP on desktop, else PROGRAM_FOLD_DEFAULT. */
+export function programFold(saved: unknown, phoneLow = false, desktop = false): boolean {
   if (typeof saved === 'boolean') return saved;
   if (saved === 'true' || saved === 'on' || saved === 1) return true;
   if (saved === 'false' || saved === 'off' || saved === 0) return false;
-  return phoneLow ? PROGRAM_FOLD_PHONE_LOW : PROGRAM_FOLD_DEFAULT;
+  return phoneLow ? PROGRAM_FOLD_PHONE_LOW : desktop ? PROGRAM_FOLD_DESKTOP : PROGRAM_FOLD_DEFAULT;
 }
 
 let picked: boolean | undefined;
@@ -46,7 +49,7 @@ export function programFoldOn(): boolean {
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(PROGRAM_FOLD_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
   try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
-  picked = programFold(saved, phoneLow);
+  picked = programFold(saved, phoneLow, TIER === 'desktop');
   return picked;
 }
 /** Tests only: read the slot again. */

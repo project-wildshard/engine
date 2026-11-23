@@ -19,13 +19,16 @@ export const PROGRAM_REUSE_DEFAULT = false;
  *  bootRoadPrograms on, the calibrated stand-in (headless Chromium, phone Low, cap 30, CPU 2.0x, the driftwood-fps route)
  *  links no program after control and holds fewer programs (meta project/evidence/driftwood-fps/df8-phone-low-defaults-2026-11-23.md). */
 export const PROGRAM_REUSE_PHONE_LOW = true;
+/** Unset on desktop: on (meta DRIFTWOOD-FPS DF14, mini-dwfps, 2026-11-23). With the three DF8 program slots on, desktop High's
+ *  driftwood-fps quick route linked 2 programs after control, not 73, and lost its village long frames (97 and 71 ms). */
+export const PROGRAM_REUSE_DESKTOP = true;
 
-/** The slot's value: a boolean (or a capture's `true`/`on`/1) wins; unset, PROGRAM_REUSE_PHONE_LOW at phone Low, else PROGRAM_REUSE_DEFAULT. */
-export function programReuse(saved: unknown, phoneLow = false): boolean {
+/** The slot's value: a boolean (or a capture's `true`/`on`/1) wins; unset, PROGRAM_REUSE_PHONE_LOW at phone Low, PROGRAM_REUSE_DESKTOP on desktop, else PROGRAM_REUSE_DEFAULT. */
+export function programReuse(saved: unknown, phoneLow = false, desktop = false): boolean {
   if (typeof saved === 'boolean') return saved;
   if (saved === 'true' || saved === 'on' || saved === 1) return true;
   if (saved === 'false' || saved === 'off' || saved === 0) return false;
-  return phoneLow ? PROGRAM_REUSE_PHONE_LOW : PROGRAM_REUSE_DEFAULT;
+  return phoneLow ? PROGRAM_REUSE_PHONE_LOW : desktop ? PROGRAM_REUSE_DESKTOP : PROGRAM_REUSE_DEFAULT;
 }
 
 let picked: boolean | undefined;
@@ -35,6 +38,6 @@ export function programReuseOn(): boolean {
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(PROGRAM_REUSE_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
   try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
-  picked = programReuse(saved, phoneLow);
+  picked = programReuse(saved, phoneLow, TIER === 'desktop');
   return picked;
 }

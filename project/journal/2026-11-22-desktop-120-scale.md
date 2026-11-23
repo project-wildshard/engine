@@ -84,3 +84,17 @@
   frame of a 1.2 rad/s pan and a walk, the frame as drawn against the same instant with every cascade fresh (both at
   dt 0; a repeat control differs by 0 px): the stagger on main errs on p90 0.002% of pixels, worst 0.18%; one map a
   frame p90 0.008%, worst 2.8% (a one-frame shadow pop). `debug.shadowOneMap` stays off; water AO is on.
+
+## The route's long frames on desktop native, and DF8's program slots (2026-11-23, 09:00)
+
+- The quick desktop table (dock, beach, village; engine 9f506700c): desktop-high 106 fps, p50 9.3, p95 11.9, worst at the
+  dock; desktop-native 199 fps, p95 7.9, missing only on frames over 50 ms (beach 35 s: 120 ms; village 67 s: 97, 71 ms).
+- A route CPU profile (`tmp/mini-dwfps/routeprof.mjs`: measure.mjs's own capture with the profiler on its page and a marker
+  at control) named the 67 s frames: 41 ms of `getProgramParameter` under `renderBufferDirect`, the first draw of two
+  `family:pbr` programs (full maps, one flat-shaded) for the grid cell's `props.merged` meshes, built after the boot's
+  warm-up. 71 more programs link in the dock's first seconds.
+- DF8's three program slots (`debug.programReuse`, `debug.programFold`, `debug.bootRoadPrograms`, on at phone Low) on
+  desktop: links after control 73 → 2, the village frames gone, spikes 3 → 1, fps and p95 within noise. They now default
+  on for desktop as well.
+- The beach frame at 35 s stays: 118 ms of `(program)` before the frame's callback (render start 113–120 ms into it),
+  native work a CPU profile cannot name.
