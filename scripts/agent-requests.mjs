@@ -16,8 +16,9 @@ function gameAddress(input) {
 /** @param {HeadersInit | undefined} source */
 function markedHeaders(source) {
   const headers = new Headers(source);
+  const base = headers.get('user-agent') ?? 'node';
   for (const [key, value] of Object.entries(agentHeaders())) headers.set(key, value);
-  headers.set('user-agent', agentUserAgent(headers.get('user-agent') ?? 'node'));
+  headers.set('user-agent', agentUserAgent(base));
   return headers;
 }
 

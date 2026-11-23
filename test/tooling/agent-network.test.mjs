@@ -21,6 +21,12 @@ test('passes third-party reads through and marks only the game request', async (
   assert.equal(options.headers.get('user-agent'), agentUserAgent('node'));
 });
 
+test('a hand-rolled fetch with agentHeaders() carries the marked UA the hourly audit reads', () => {
+  const headers = agentHeaders();
+  assert.equal(headers['user-agent'], agentUserAgent('node'));
+  assert.match(headers['user-agent'], /^node WildshardAgent\/1\b/u);
+});
+
 test('preloaded fetch and WebSocket preserve the handshake and mark an owned endpoint', async () => {
   const server = createServer((request, response) => response.end(JSON.stringify(request.headers)));
   server.listen(0, '127.0.0.1');

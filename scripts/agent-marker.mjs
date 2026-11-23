@@ -17,9 +17,11 @@ export function agentUserAgent(base) {
   return `${base.trim()} ${marker}`.trim();
 }
 
-/** @returns {Readonly<Record<string, string>>} */
+/** The marker header plus a marked Node UA: the hourly audit reads only the UA, so a bare
+ * `fetch(url, {headers: agentHeaders()})` must carry both (METRICS MT16). Browsers never take these.
+ * @returns {Readonly<Record<string, string>>} */
 export function agentHeaders() {
-  return { [AGENT_HEADER]: name() };
+  return { [AGENT_HEADER]: name(), 'user-agent': agentUserAgent('node') };
 }
 
 /** Open a marked URL in a driver that has no UA or header port.
