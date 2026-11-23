@@ -6,6 +6,7 @@
 import { expect, test } from 'vitest';
 import { speciesHealth, variantMods } from '@wildshard/engine/entities/species/registry';
 import type { SpeciesData } from '@wildshard/format/speciesPrograms';
+import { readSpeciesPrograms } from '@wildshard/format/speciesPrograms';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { declaredBossProgram, declaredHarvest, declaredRosterPopulation } from '../src/server/game/population/declaredNative';
 import { builtFolder } from '../src/test/game/builtFolder';
@@ -22,7 +23,7 @@ function filled(row: SpeciesData): unknown {
 test('Pine\'s native species rebuilt from its declared rows match its species programme', async () => {
   const product = await loadHeadlessFolder(builtFolder('pine-hollow')), shard = product.shardfile;
   if (!product.has('actors/species-programs')) return; // Pine has moved: nothing left to compare against
-  const programme = product.section('actors/species-programs'), hunt = programme.hunt;
+  const programme = readSpeciesPrograms(product.section('actors/species-programs')), hunt = programme.hunt;
   if (hunt === undefined) throw new Error('Pine\'s programme has its hunt');
   const species = [{ id: 'pine.creature.deer' }, { id: 'pine.creature.elk', spawnOnly: ['pine.elk.thrall'] },
     { id: 'pine.creature.boar', spawnOnly: ['pine.boar.thrall'] }, { id: 'pine.creature.bear' }, { id: 'pine.creature.king' }];
@@ -41,7 +42,7 @@ test('Pine\'s native species rebuilt from its declared rows match its species pr
 test('Pine\'s boss programme rebuilt from a binding keeps its decision, body and strikes', async () => {
   const product = await loadHeadlessFolder(builtFolder('pine-hollow')), shard = product.shardfile;
   if (!product.has('actors/species-programs')) return;
-  const programme = product.section('actors/species-programs').program, king = programme?.species.find(row => row.kind === 'antler-king');
+  const programme = readSpeciesPrograms(product.section('actors/species-programs')).program, king = programme?.species.find(row => row.kind === 'antler-king');
   if (programme === undefined || king?.brain?.archetype !== 'decision' || king.body === undefined) throw new Error('Pine\'s King has his programme');
   const rebuilt = declaredBossProgram(shard.rows, 'antler-king', { decision: king.brain.data, body: king.body }, programme.strikes);
   expect(rebuilt.species[0]?.brain).toEqual(king.brain);

@@ -948,7 +948,6 @@
     "src/client/game/population/pageAir.ts": "client",
     "src/client/game/population/pageLife.ts": "client",
     "src/client/game/population/pageReturns.ts": "client",
-    "src/client/game/population/folderCreatures.ts": "client",
     "src/client/game/population/projection.ts": "client",
     "src/client/game/population/rowSpecies.ts": "client",
     "src/client/game/population/speciesViewSlots.ts": "client",

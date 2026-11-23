@@ -53,10 +53,8 @@ async function resolveExplorerRoster(product: ShardFolder, native: readonly Rost
   const preparedSpecimens=new Map<string,ReturnType<typeof defineSpecimenCatalogue<Record<string,object>>>>();
   for (const row of rows.entries) {
     if (row.kind === 'species') {
-      const programs = product.has('actors/species-programs') ? product.section('actors/species-programs') : undefined;
-      const declared = programs?.program?.species.find(entry => entry.kind === row.species)
-        ?? programs?.native.find(entry => entry.kind === row.species) ?? programs?.page.find(entry => entry.kind === row.species);
-      const species = declared ?? product.shardfile.rows.species.find(entry => entry.kind === row.species)
+      // OF30: a species card reads its declared row (no species programme)
+      const species = product.shardfile.rows.species.find(entry => entry.kind === row.species)
         ?? speciesDef(row.species);
       if (row.id === undefined || row.file === undefined) throw refusal(product, row, 'Species card requires its original id and file');
       entries.push(present(defineModel({ ...creature(row.species, { species, ...(row.name === undefined ? {} : { name: row.name }),

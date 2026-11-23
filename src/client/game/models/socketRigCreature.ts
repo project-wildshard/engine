@@ -4,14 +4,14 @@
  * tint, traits) and the product file whose socket rig rows dress it (`format/roamingCombat` projection, read by
  * `SocketRigCard`). The card is the engine's `creature(kind)` read from that coat, dressed by the fight's own socket rig on
  * the live copy and on the specimen alike. `prepareHullBookKit` is the page kit such a product needs before play: the hull
- * book's derived species, the species programs page, the hull looks, the declared spawn tables, the held equipment and
- * each card's socket rows.
+ * book's derived species, the declared species rows its looks name (ONE-FORMAT OF30: no species programme), the hull
+ * looks, the held equipment and each card's socket rows.
  */
 import * as v from 'valibot';
 import { creature, type CreatureParams } from '@wildshard/engine/models/creature';
 import { defineModel, type ModelDef } from '@wildshard/engine/models/model';
-import { declaredSpawnTables } from '@wildshard/engine/ai/encounters';
 import type { VariantDef } from '@wildshard/engine/entities/species/registry';
+import type { SpeciesRow } from '@wildshard/engine/ai/species';
 import { SocketRigCreatureSchema } from '@wildshard/format/socketRigCreature';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { SocketRigCard } from '../boss/socketRig';
@@ -37,9 +37,16 @@ export class SocketRigCreature {
 export async function prepareHullBookKit(ctx: ShardContext, cards: readonly SocketRigCreature[]): Promise<void> {
   const live = (): void => { if (ctx.scope.disposed || ctx.scope.disposing) throw new Error('Hull book kit owner left'); };
   live();
-  const book = folderHullBook(ctx.product), programs = ctx.product.section('actors/species-programs');
-  book.install(ctx.rows, programs.page, programs.program?.species);
-  ctx.rows.spawnTable(declaredSpawnTables(programs.spawns));
+  // OF30: the page's species are the declared rows the hull book draws, in the book's order (a spawn-only row, the thralls,
+  // lends its variants to the server's roster and draws on its kind's look)
+  const book = folderHullBook(ctx.product), declared = ctx.product.shardfile.rows.species;
+  const page: SpeciesRow[] = [];
+  for (const look of ctx.product.section('look/hull-book').rows) for (const row of declared) if (row.id === look.species && row.kind === look.kind) {
+    const variants: SpeciesRow['variants'] = [];
+    for (const variant of row.variants) variants.push({ ...variant, scale: [variant.scale[0], variant.scale[1]] });
+    page.push({ ...row, harvest: row.harvest ?? [], variants });
+  }
+  book.install(ctx.rows, page);
   const held = await HeldEquipment.prepare(ctx.product); live();
   for (const card of cards) { await card.card.preload(); live(); }
   held.install(ctx);

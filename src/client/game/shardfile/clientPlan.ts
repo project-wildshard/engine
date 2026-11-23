@@ -212,14 +212,13 @@ export const CLIENT_FEATURES: Readonly<Record<AdmittedFeatureRow['kind'], Client
     const { prepareHeldClaimsEntry } = await import('./heldClaimsEntry');
     await prepareHeldClaimsEntry(ctx, row.id, row.source);
   } },
-  'population.hull-book': { phase: 'kit', rank: -25, lifetime: 'entered', sections: ['actors/species-programs', 'explore/catalogue'], install: async ctx => {
+  'population.hull-book': { phase: 'kit', rank: -25, lifetime: 'entered', sections: ['look/hull-book', 'explore/catalogue'], install: async ctx => {
     const { prepareDeclaredHullBookKit } = await import('../models/socketRigCreature');
     await prepareDeclaredHullBookKit(ctx);
   } },
-  'population.product-creatures': { phase: 'kit', rank: -20, lifetime: 'entered', sections: ['actors/species-programs'], install: async ctx => {
-    const { installFolderCreatures } = await import('../population/folderCreatures');
-    if (ctx.scope.disposed || ctx.scope.disposing) throw new Error('Client feature owner is disposed');
-    await installFolderCreatures(ctx);
+  // ONE-FORMAT OF30: retired; admitClientPlan refuses it. The name leaves with the format's retire release.
+  'population.product-creatures': { phase: 'kit', rank: -20, lifetime: 'entered', sections: [], install: () => {
+    throw new Error('population.product-creatures is retired (OF30): declare species rows and looks');
   } },
   'held.claims.install': { phase: 'kit', rank: -10, lifetime: 'entered', sections: [], install: async (ctx, row) => {
     if (row.kind !== 'held.claims.install') throw new Error('Invalid claims installation feature');
@@ -449,8 +448,8 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
         if (!product.shardfile.items.rows.some(item => item.id === row.grapple.item && item.kind === 'tool')) throw new Error('Held play entry requires its declared tool');
       }
     }
+    if (plan.features.some(row => row.kind === 'population.product-creatures')) throw new Error('population.product-creatures is retired (OF30): declare species rows and looks');
     if (plan.features.some(row => row.kind === 'population.hull-book')) {
-      if (plan.features.some(row => row.kind === 'population.product-creatures')) throw new Error('Hull book kit cannot duplicate product creatures');
       // These existing admitted services retain their wire during entry migration.
       for (const name of ['look/hull-book', 'held/equipment'] as const) {
         if (!product.has(name)) throw new Error('Hull book kit requires its admitted legacy owners');
@@ -467,14 +466,6 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
     } else if((prepare!==undefined||install!==undefined)&&(prepare===undefined||install===undefined||prepare.id!==install.claims))throw new Error('Held claims require one matching preparation and installation');
     if(install!==undefined&&install.preparation!=='world')product.section('held/arms');
     if(prepare?.source!==undefined&&(install?.preparation!=='world'||!product.hasFile(prepare.source.slots)||!product.hasFile(prepare.source.library)))throw new Error('Held slot preparation requires its declared world sources');
-    if (plan.features.some(row => row.kind === 'population.product-creatures')) {
-      if (!product.hasFile('actors/creature-install.json')) throw new Error('Product creatures require their admitted install rows');
-      // Compatibility owners already live in the admitted product; they are not new client feature schemas.
-      for (const name of ['economy/loot', 'look/hull-book'] as const) {
-        if (!product.has(name)) throw new Error('Product creatures require their admitted legacy owners');
-        product.section(name);
-      }
-    }
     for (const row of plan.features) if (row.kind === 'world.bind-sets') {
       if (!plan.features.some(feature => feature.kind === 'world.sets')) throw new Error('Named-place binding requires its declared sets');
       if (row.quest !== undefined && !plan.features.some(feature => feature.kind === 'quest.composition' && feature.id === row.quest)) throw new Error('Named-place binding requires its declared quest');

@@ -878,7 +878,6 @@
     "./game/ui/dataPanels": "./src/client/game/ui/dataPanels.ts",
     "./game/models/mountedSpecimen": "./src/client/game/models/mountedSpecimen.ts",
     "./game/population/perchBody": "./src/server/game/population/perchBody.ts",
-    "./game/population/folderCreatures": "./src/client/game/population/folderCreatures.ts",
     "./game/quest/ledger": "./src/shared/game/quest/ledger.ts",
     "./game/ledger": "./src/shared/game/ledger.ts",
     "./game/slugNames": "./src/shared/game/slugNames.ts",
