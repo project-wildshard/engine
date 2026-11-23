@@ -1,13 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
-import { rapierAlias } from './vite/rapier';
-import { assertVitestLane, vitestMaxWorkers, vitestNodeExecArgv } from './scripts/vitest-lane';
+import { rapierAlias } from './vite/rapier.ts';
+import { assertVitestLane, vitestMaxWorkers, vitestNodeExecArgv } from './scripts/vitest-lane.ts';
 import { viteTmpRoot } from './scripts/vite-tmp.mjs';
-import { vitestModuleCache } from './scripts/vitest-module-cache';
+import { vitestModuleCache } from './scripts/vitest-module-cache.ts';
 import { setPriority } from 'node:os';
 import { resolve } from 'node:path';
 import { activeQuarantineFiles } from './scripts/test-quarantine.mjs';
-import { withTestEnvironments } from './scripts/vitest-environments';
+import { withTestEnvironments } from './scripts/vitest-environments.ts';
 import { NIGHTLY_SERIAL_TESTS } from './scripts/vitest-ci-files.ts';
 import { WORKTREE_GLOB, worktreeWatchIgnored } from './scripts/worktree-ignore.mjs';
 import { ensureBootStamps } from './scripts/boot-stamps.mjs';
