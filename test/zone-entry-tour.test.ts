@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { approachBudget, featuredZoneEntry, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../scripts/zone-entry-tour.mjs';
+import { approachBudget, featuredZoneEntry, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../scripts/zone-entry-tour.mjs';
 import { zoneEntryGap } from '../scripts/page-release/flow.mjs';
 import { TOUR_FEATURED as curated } from '../scripts/zone-entry-featured.mjs';
 
@@ -53,7 +53,14 @@ test('a retry carries passed pairs forward and only redoes failed indexed pairs 
   expect(retrySmokeEntries(route, {...report,scope:'loopback'}, build, 476, 'loopback').pending).toEqual([1,7,14]);
   expect(() => retrySmokeEntries(route, {...report,arrivals:[...arrivals, ...arrivals.slice(0, 1)]}, build, 476)).toThrow(/pair/u);
   const {failure: _failure, ...held} = report;
-  const complete = {...held,pass:true,arrivals:all,failures:[]};
+  // QA 11-23-b row 20: the first crossing into each zone but Driftwood also goes to the main menu and back, then crosses back
+  const rejoin = new Set(rejoinLegs(route));
+  expect(rejoin.size).toBe(7);
+  expect([...rejoin].map(index => route[index]?.to.instance)).not.toContain('driftwood-isle');
+  expect(new Set([...rejoin].map(index => route[index]?.to.instance)).size).toBe(7);
+  const crossedOnly = {...held,pass:true,arrivals:all,failures:[]};
+  expect(zoneEntryGap(crossedOnly, build)).toMatch(/no menu-and-back for /u);
+  const complete = {...crossedOnly,arrivals:all.map(row => rejoin.has(row.index) ? {...row,rejoinMs:9000,returnMs:30_000} : row)};
   const loopback = {...complete,scope:'loopback'};
   expect(zoneEntryGap(complete, build)).toBeUndefined();
   expect(zoneEntryGap(loopback, build)).toMatch(/16 seeded crossings/u);

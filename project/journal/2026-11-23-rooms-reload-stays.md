@@ -33,3 +33,16 @@ the 6 kB cap), so the size check failed the whole Driftwood download. A
 new upload with other discovery bytes would fail the same way. A manifest
 now reads only its own slug's loose files from the upload; a neighbour's
 stay the build's copy, which is what the manifest lists.
+
+## The smoke goes to the main menu and back
+
+Jake, ~11:36 Cancún: fold the check into the J451 zone-entry smoke, not a
+new test. After the first seeded crossing into each zone but Driftwood
+(seven of the sixteen), the staging smoke now pauses, exits to the main
+menu, taps ENTER THE MMO, and must be back in that zone through one
+loading screen, never by way of Driftwood, then walks the return crossing.
+The arrival keeps `rejoinMs` and `returnMs`; the release gate
+(`smokeGap`) holds a verdict that lacks either for any of the seven, and
+each failure names its step (pause, exit, main menu, ENTER THE MMO, the
+loading screen, play, the return crossing). Nalati is already one of the
+eight featured zones, with two crossings in every draw.

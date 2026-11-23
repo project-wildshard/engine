@@ -17,7 +17,7 @@ import { TOUR_FEATURED as featured } from './zone-entry-featured.mjs';
 /** @typedef {{from:string,to:string,ms:number}} Arrival */
 /** @typedef {Pair & {reason:string}} CrossingFailure */
 /** @typedef {{expected:number, arrivals:Arrival[], failure?:CrossingFailure, retries?:CrossingFailure[], resumedFrom?:number, pass:boolean}} Tour */
-/** @typedef {Arrival & {index:number}} SmokeArrival */
+/** @typedef {Arrival & {index:number, rejoinMs?:number, returnMs?:number}} SmokeArrival */
 /** @typedef {CrossingFailure & {index:number}} SmokeFailure */
 /** @typedef {{mode:'smoke', scope?:'loopback', batch?:number, build:string, engine:'webkit', profile:'phone', seed:number, cells: Cell[], expected:number,
  * arrivals:SmokeArrival[], failures:SmokeFailure[], failure?:CrossingFailure, pass:boolean, wallMs:number}} SmokeReport */
@@ -112,9 +112,31 @@ export function smokeGap(report) {
   try {
     const route = featuredZoneEntry(proof.cells, proof.seed);
     smokeEntries(route, proof);
-    if (proof.scope === undefined && proof.pass && proof.failures.length === 0 && proof.arrivals.length === 16) return undefined;
+    if (proof.scope === undefined && proof.pass && proof.failures.length === 0 && proof.arrivals.length === 16) {
+      const rejoined = new Map(proof.arrivals.map(row => [row.index, row]));
+      const missing = rejoinLegs(route).find(index => {
+        const row = rejoined.get(index);
+        return !(Number.isFinite(row?.rejoinMs) && Number.isFinite(row?.returnMs));
+      });
+      if (missing === undefined) return undefined;
+      return `J451 zone-entry smoke has no menu-and-back for ${route[missing]?.to.instance ?? 'a zone'}`;
+    }
   } catch { /* Only a complete, matching smoke qualifies a release. */ }
   return 'J476 zone-entry smoke did not pass all 16 seeded crossings';
+}
+
+/** QA 11-23-b row 20 (Jake, 2026-11-23: "Entity MMO is completely broken ... I was in the signal dunes loading screen and then it
+ *  pops you out the main menu"): after the first seeded crossing into each zone but Driftwood, the guest leaves to the main menu,
+ *  taps ENTER THE MMO, must be back in that zone through one loading screen (never by way of Driftwood), then crosses back.
+ * @param {readonly Leg[]} route @returns {number[]} the route indexes that rejoin */
+export function rejoinLegs(route) {
+  const seen = new Set(), out = [];
+  for (const [index, leg] of route.entries()) {
+    if (leg.to.instance === DRIFTWOOD || seen.has(leg.to.instance)) continue;
+    seen.add(leg.to.instance);
+    out.push(index);
+  }
+  return out;
 }
 
 /** Walk each shared side in both directions. Every leg starts where the previous one ended.
@@ -522,6 +544,60 @@ async function crossZoneEntry(page, leg, center, pitch, previous, fresh = false)
   return Date.now()-started;
 }
 
+/** One state read for the menu-and-back watch: the title's button, the loading card's zone, the grid's home.
+ * @param {Page} page */
+const rejoinState = page => page.evaluate(() => {
+  const w = /** @type {any} */ (window), st = w.__wildshard?.shard?.grid?.state?.();
+  const mmo = document.querySelector('.ws-main-mmo'), load = document.querySelector('.ws-load:not(.hide)');
+  const card = load !== null && getComputedStyle(load).display !== 'none' && load.getBoundingClientRect().height > 0;
+  return {title: mmo !== null && mmo.getBoundingClientRect().height > 0, card,
+    zone: card ? (load?.querySelector('[data-el="slug"]')?.textContent ?? '').trim().toLowerCase() : '',
+    home: typeof st?.home === 'string' ? st.home : null};
+}).catch(() => null);
+
+/** QA 11-23-b row 20: pause, exit to the main menu, ENTER THE MMO, back in `zone` through one loading screen. Each throw names its
+ *  step. @param {Page} page @param {Cell} zone @param {Point} center @returns {Promise<number>} ms from the tap to play */
+async function rejoinFromMenu(page, zone, center) {
+  /** @template T @param {string} name @param {() => Promise<T>} work @returns {Promise<T>} */
+  const step = async (name, work) => {
+    try { return await work(); } catch (error) {
+      throw new Error(`menu and back, ${name}: ${(error instanceof Error ? error.message : String(error)).split('\n')[0]}`, {cause:error});
+    }
+  };
+  await step('pause', () => page.locator('.ws-touch-pause').tap({timeout:10_000}));
+  await step('exit to the main menu', () => page.locator('.ws-gmenu.show .ws-gmenu-exit').tap({timeout:10_000}));
+  await step('main menu', () => page.locator('.ws-main-mmo').waitFor({state:'visible', timeout:45_000}));
+  const started = Date.now(), end = started+ENTRY_MS, name = (zone.slug ?? zone.instance).replace(/-/gu, ' ');
+  let navigated = false;
+  const nav = (/** @type {import('playwright').Frame} */ frame) => { if (frame === page.mainFrame()) navigated = true; };
+  page.on('framenavigated', nav);
+  try {
+    await step('ENTER THE MMO', () => page.locator('.ws-main-mmo').tap({timeout:10_000}));
+    let screens = 0, lastCard = 0, seenCard = false;
+    for (;;) {
+      if (Date.now() > end) throw new Error(`menu and back, ${zone.instance}: not in play within ${ENTRY_MS/1000} s of the tap`);
+      const now = Date.now(), at = await rejoinState(page);
+      if (at !== null) {
+        if (at.card) {
+          if (now-lastCard > 1500) screens++;
+          lastCard = now; seenCard = true;
+          if (at.zone !== '' && at.zone !== name) throw new Error(`menu and back, loading screen: it names ${at.zone}, not ${name}`);
+        }
+        if (at.home !== null && at.home !== zone.instance) throw new Error(`menu and back, ${zone.instance}: it went by way of ${at.home}`);
+        if (at.title && navigated && seenCard && !at.card) throw new Error(`menu and back, ${zone.instance}: the loading screen dropped to the main menu`);
+        if (at.home === zone.instance && !at.card) break;
+      }
+      await acceptPhoneMemoryWarning(page).catch(() => undefined);
+      await delay(200);
+    }
+    if (screens !== 1) throw new Error(`menu and back, ${zone.instance}: ${screens} loading screens, not one`);
+    await step(`play in ${zone.instance}`, () => arrived(page, zone.instance, center, end));
+  } finally {
+    page.off('framenavigated', nav);
+  }
+  return Date.now()-started;
+}
+
 /** @param {Page} page @param {Point} origin @param {Tour} result @param {() => void} save
  * @param {{restart:()=>Promise<Page>, resume?:{proof:unknown, build:string, from:number}}} options */
 export async function walkZoneEntryTour(page, origin, result, save, {restart, resume}) {
@@ -696,6 +772,8 @@ async function runSmoke({build, out, seed, prior, loopback}) {
     const route = batchId === undefined ? draw : smokeBatches(draw)[batchId];
     if (route === undefined) throw new Error('Unknown loopback batch');
     const fullRoute = zoneEntryTour(cells);
+    // QA 11-23-b row 20: the staging smoke's menu-and-back legs (a loopback batch is a slice of the route and has no title world)
+    const rejoins = new Set(scope === undefined ? rejoinLegs(route) : []);
     const {arrivals,pending} = prior === undefined
       ? {arrivals:[],pending:route.map((_,index) => index)}
       : retrySmokeEntries(route,prior,build,seed,scope,batchId);
@@ -744,7 +822,19 @@ async function runSmoke({build, out, seed, prior, loopback}) {
           }
           const {center,pitch} = await smokePose(page,leg);
           const ms = await crossZoneEntry(page,leg,center,pitch,stagingLeg?.from,stagingLeg === undefined);
-          arrivals.push({...pair,ms});
+          if (!rejoins.has(index)) arrivals.push({...pair,ms});
+          else {
+            const back = {from:leg.to,to:leg.from};
+            const rejoinMs = await rejoinFromMenu(page,leg.to,(await smokePose(page,back)).center);
+            console.log(`REJOIN ${index+1}/${route.length} ${pair.to} from the main menu (${rejoinMs} ms)`);
+            const home = await smokePose(page,back);
+            // the room's kept place is by the gate; a guest it seats inland walks out as a fresh one does
+            const at = await feet(page), inland = at !== null && Math.max(Math.abs(at.x-home.center.x),Math.abs(at.z-home.center.z)) < HALF-30;
+            const returnMs = await crossZoneEntry(page,back,home.center,home.pitch,inland ? undefined : leg.from,inland).catch((/** @type {unknown} */ error) => {
+              throw new Error(`return crossing ${pair.to} -> ${pair.from}: ${(error instanceof Error ? error.message : String(error)).split('\n')[0]}`, {cause:error});
+            });
+            arrivals.push({...pair,ms,rejoinMs,returnMs});
+          }
           failed.delete(index);
           console.log(`PASS ${index+1}/${route.length} ${pair.from} -> ${pair.to} (${ms} ms)`);
         } catch (error) {
