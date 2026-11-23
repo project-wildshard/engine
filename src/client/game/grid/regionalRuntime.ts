@@ -145,6 +145,9 @@ export interface PreparedRegionalRuntime {
   /** J500 (QA 11-23-b row 17): draw this resident from the road while `owner` lives (a zone just left, or one built ahead
    *  of its gate). Its road variants link first (RP4's exterior warm-up), so the first frame that shows it compiles nothing. */
   readonly display?: (owner: Scope) => void;
+  /** J500: the zone's world draws its whole cell's ground (`cellGround: 'world'`), so it can draw from the road before it is
+   *  ever entered; a zone whose ground is its tiles (Pine) drew floating pieces there, its tiles streamed only on entry. */
+  readonly ownsGround?: boolean;
   /** Actual actor-object provenance in the retained region; repeated IDs in parked neighbours grant no permission. */
   readonly combatActors: () => ReadonlyMap<ReturnType<RowBodiesView['animals'][number]['combatActor']>, Readonly<{ x: number; y: number; z: number }>>;
 }
@@ -525,6 +528,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
           };
         } };
       let parked = false, roadWarm: Promise<void> | undefined;
+      const ownsGround = request.manifest.cellGround === 'world'; // J500: see PreparedRegionalRuntime.ownsGround
       return { resident, get warmPreparation() {
         const trace = request.page.world.game.entryPreparation;
         return !scope.disposed && trace?.root === view.root.uuid ? trace : null;
@@ -534,6 +538,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
         animals: () => localPlay?.animals ?? null,
         interactables: () => localRuntime?.interactables ?? [],
         park: () => { if (!parked) { parked = true; freezeParkedMatrices(view.root); } },
+        ownsGround,
         display: owner => {
           const warm = async (): Promise<void> => {
             try { await request.page.world.game.warmExteriorRoots(scope, [...view.root.children], () => !scope.disposed && !scope.disposing); }

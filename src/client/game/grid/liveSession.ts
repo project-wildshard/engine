@@ -541,6 +541,9 @@ export class LiveGridSession {
 
   /** MMO-PLAN MP5.2b: on the road, the home region's creature manager and the home's origin in the world's frame, where the road's rows
    *  of the home's creatures near its edge are drawn (in the home's own metres); null in a cell or with no home world. */
+  /** J500 rule 3: whether a zone is drawn whole from the road, so its far proxy may go within reach. */
+  groundFromRoad(instance: string): boolean { return this.roadDisplays.has(instance); }
+
   roadAnimals(): { readonly animals: NonNullable<ReturnType<PreparedRegionalRuntime['animals']>>; readonly origin: { readonly x: number; readonly z: number } } | null {
     if (this.live.current() !== null) return null;
     const animals = this.runtimeRegions.get(this.ports.home.instance)?.animals() ?? null;
@@ -1170,10 +1173,9 @@ export class LiveGridSession {
    */
   private syncRoadDisplays(): void {
     const current = this.live.current(), entered = this.runtimePage.state();
-    // only a zone the traveller has played draws whole from the road: one built ahead (rule 2) and never entered drew its
-    // pieces unplaced from the road (white shards above Nalati's wall); it keeps its near view until its gate, then enters
-    // with no build (row 17's local rig walk)
-    const wanted = new Set(this.live.drawnFromRoad().filter(instance => this.startedRuntimes.has(instance)));
+    // a zone draws whole from the road once played (its tiles are up) or when its world draws its own ground (Nalati); one
+    // built ahead whose ground is its tiles (Pine) drew floating pieces there, so it keeps its far proxy until its gate
+    const wanted = new Set(this.live.drawnFromRoad().filter(instance => this.startedRuntimes.has(instance) || this.runtimeRegions.get(instance)?.ownsGround === true));
     if (current !== null && this.roadDisplays.has(current) && !(entered.instance === current && entered.ready)) wanted.add(current);
     for (const [instance, shown] of this.roadDisplays) {
       if (wanted.has(instance) && this.runtimeRegions.get(instance) === shown.prepared) continue;

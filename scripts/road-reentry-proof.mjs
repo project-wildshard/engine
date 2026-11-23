@@ -7,6 +7,7 @@
 // when the walk back in shows no loading card and the zone just left was drawn from the road the whole time it stood there.
 //   node scripts/road-reentry-proof.mjs --base=<preview or staging url> --out=<dir> [--zone=sunscar-dunes] [--side=e|w|n|s]
 //     [--entry=select|mmo] [--card=<Shard Select card text>]   (select: a preview build's in-page grid; mmo: a world build)
+//     [--board=1]   (the J500 board: shots on the road beside each neighbour once it is drawn, then stop)
 // Writes <out>/<zone>/{road-*.png, walk.json, video/*.webm}. Never production.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -24,6 +25,8 @@ if (/play\.wildshard\.io|^https?:\/\/(?:www\.)?wildshard\.io/u.test(base)) throw
 const SIDE = /** @type {Record<string, readonly [number, number]>} */ ({ e: [1, 0], w: [-1, 0], n: [0, 1], s: [0, -1] })[flag('side', 'e')];
 if (SIDE === undefined) throw new Error('--side is e, w, n or s');
 const HALF = 256, dir = join(out, zone);
+/** --board ends the walk after its shots (the board needs no re-entry) */
+const BOARD_DONE = new Error('board shots taken');
 mkdirSync(join(dir, 'video'), { recursive: true });
 
 /** @typedef {{x:number,z:number}} Point */
@@ -185,6 +188,36 @@ try {
     await walkTo(p(HALF + road), 120_000);
   }
   phase = 'road';
+  if (flag('board', '') !== '') {
+    // the J500 rule 3 board's cameras (meta qa-2026-11-23-look/board/j500-rule3-road.jpg): on the road beside each
+    // neighbour, looking at it once it is built (rule 2), and the crossing, each after the zone ahead is drawn
+    const R = HALF + road;
+    /** @param {string} name @param {Point} at @param {Point} toward @param {string | null} wait */
+    const stop = async (name, at, toward, wait) => {
+      phase = `board-${name}`;
+      await walkTo(at, 180_000, 3);
+      const until = Date.now() + 90_000;
+      if (wait !== null) for (;;) {
+        if (Date.now() >= until || ((await gridState(page))?.drawn ?? []).includes(wait)) break;
+        await delay(500);
+      }
+      const st = await gridState(page); if (st === null || st.feet === null) return;
+      await setYaw(page, yawTo(st.feet, toward)); await delay(2500);
+      await page.screenshot({ path: join(dir, `board-${name}.png`), scale: 'css' });
+      /** @type {any[]} */ (report.shots).push({ name, wait, ...(await gridState(page)), cells: undefined, memory: await memory(page) });
+    };
+    const c = (/** @type {number} */ x, /** @type {number} */ z) => ({ x: center.x + x, z: center.z + z });
+    const zoneAt = (/** @type {number} */ x, /** @type {number} */ z) => /** @type {any[]} */ (report.cells ?? []).find(row => row.cell[0] === x && row.cell[1] === z)?.instance ?? null;
+    await stop('road-e', c(R, 0), c(pitch, 0), zoneAt(1, 0));
+    await stop('left', c(R, 0), c(0, 0), zone);
+    await stop('crossing', c(R, R), c(pitch, pitch), zoneAt(1, 1));
+    await stop('road-n', c(0, R), c(0, pitch), zoneAt(0, 1));
+    await walkTo(c(-R, R), 180_000, 3); await walkTo(c(-R, -R), 180_000, 3);
+    await stop('road-s', c(0, -R), c(0, -pitch), zoneAt(0, -1));
+    sampling.on = false; await sampler;
+    code = 0; await context.close();
+    throw BOARD_DONE;
+  }
   await delay(4000);
   const look = async (/** @type {string} */ name, /** @type {Point} */ toward) => {
     const st = await gridState(page); if (st === null || st.feet === null) return;
@@ -223,7 +256,7 @@ try {
   code = shownAll && cardIn === 0 ? 0 : 1;
   await context.close();
 } catch (error) {
-  report.error = error instanceof Error ? error.message : String(error);
+  if (error !== BOARD_DONE) report.error = error instanceof Error ? error.message : String(error);
   report.gaps ??= await browser.contexts()[0]?.pages()[0]?.evaluate(() => /** @type {any} */ (window).__roadGaps).catch(() => null);
 } finally {
   await browser.close();

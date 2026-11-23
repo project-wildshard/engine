@@ -927,8 +927,9 @@ export class GridSession {
       for (const [id, entry] of drawnFar) {
         const root = roots.get(id), view = entry.view; if (root === undefined) continue;
         const distance = Math.hypot(Math.max(0, Math.abs(eye.x - root.position.x) - CHUNK_HALF), Math.max(0, Math.abs(eye.z - root.position.z) - CHUNK_HALF));
-        // J500 rule 3: within one road cell of its zone the far proxy never draws (its near view or the zone itself does)
-        const shown = !farNearReach || farDrawnAt(distance, this.assembly.pitch);
+        // J500 rule 3: within one road cell of its zone the far proxy goes once the zone itself draws there with its own ground
+        // (alone it left empty sky; a ring-tile zone such as Pine keeps it under its pieces)
+        const shown = !farNearReach || farDrawnAt(distance, this.assembly.pitch) || this.live?.groundFromRoad(id) !== true;
         if (shown !== entry.far) { entry.far = shown; view.mesh.visible = shown && !near.shows(id) && entry.excluded.size < 16; }
         view.band?.(farBandShare(distance));
       }

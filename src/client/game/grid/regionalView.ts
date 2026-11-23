@@ -211,6 +211,8 @@ export function createRegionalView(request: RegionalViewRequest): RegionalView {
   };
   const display = (owner: Scope): void => {
     if (scope.disposed || owner.disposed) throw new Error('Regional display requires a live view and owner');
+    // a zone built ahead and never entered never ran its pieces' poses: place them before its first drawn frame
+    root.updateMatrixWorld(true); sync();
     displays++; relight();
     const uncover = cellCoverOf(request.scene)?.cover(cell.instance, request.ownGround === true) ?? ((): void => undefined);
     containment.update();
