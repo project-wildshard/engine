@@ -110,14 +110,146 @@
           "note": "Both fitted inside the ±15% band; the two runs picked 2.2 and 1.8, within ±0.5. The calibrate page's JS and math prices were not run on the phone (no phone runner for that page)."
         },
         "phoneLpm": {
-          "device": "iPhone 17 Pro",
-          "qualified": false,
-          "reference": {
-            "version": "0.1.50",
+          "device": "iPhone 13",
+          "factor": 3.7,
+          "qualified": true,
+          "decision": "J489",
+          "build": "a0258ecd8",
+          "lowPowerMode": true,
+          "capFps": 30,
+          "phone": {
             "updateP50Ms": 5,
-            "renderP50Ms": 6
+            "renderP50Ms": 7,
+            "runs": [
+              [
+                5,
+                7
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                5,
+                7
+              ]
+            ],
+            "frameP95Ms": 43,
+            "trianglesP95": 365000,
+            "drawsP95": 65,
+            "programsMax": 110,
+            "switch": "Jake's Shortcuts 'Set Low Power Mode On' / 'Set Low Power Mode Off' launched by devicectl inside the phone-queue job; the status bar's yellow battery confirmed it, and Off restored it",
+            "normalPowerSameBuild": {
+              "updateP50Ms": 3,
+              "renderP50Ms": 4,
+              "note": "two cooled runs at normal power on the same build, matching phoneNormal's 3 / 4 ms"
+            }
           },
-          "reason": "J485: no iPhone 17 Pro session is coming, and the iPhone 13 references are normal power (Low Power Mode off, Jake 2026-11-22), so nothing calibrates this factor."
+          "bench": {
+            "zone": "driftwood-isle",
+            "mode": "serve-local single shard, phone Low, cap 30, rotating dock, cold",
+            "sweeps": [
+              {
+                "run": "a",
+                "fit": 4.1,
+                "dock": [
+                  {
+                    "throttle": 2,
+                    "updateP50Ms": 2.3,
+                    "renderP50Ms": 3.5
+                  },
+                  {
+                    "throttle": 3,
+                    "updateP50Ms": 3.8,
+                    "renderP50Ms": 5.8
+                  },
+                  {
+                    "throttle": 4,
+                    "updateP50Ms": 4.4,
+                    "renderP50Ms": 7
+                  },
+                  {
+                    "throttle": 5,
+                    "updateP50Ms": 5.9,
+                    "renderP50Ms": 9.7
+                  },
+                  {
+                    "throttle": 6,
+                    "updateP50Ms": 6.9,
+                    "renderP50Ms": 10.8
+                  }
+                ]
+              },
+              {
+                "run": "b",
+                "fit": 3.4,
+                "dock": [
+                  {
+                    "throttle": 2,
+                    "updateP50Ms": 2.5,
+                    "renderP50Ms": 3.4
+                  },
+                  {
+                    "throttle": 3,
+                    "updateP50Ms": 3.7,
+                    "renderP50Ms": 5.6
+                  },
+                  {
+                    "throttle": 4,
+                    "updateP50Ms": 6.4,
+                    "renderP50Ms": 10.5
+                  },
+                  {
+                    "throttle": 5,
+                    "updateP50Ms": 5.9,
+                    "renderP50Ms": 11.7
+                  },
+                  {
+                    "throttle": 6,
+                    "updateP50Ms": 10,
+                    "renderP50Ms": 17.3
+                  }
+                ]
+              },
+              {
+                "run": "c",
+                "fit": 3.8,
+                "dock": [
+                  {
+                    "throttle": 2,
+                    "updateP50Ms": 2.5,
+                    "renderP50Ms": 3.6
+                  },
+                  {
+                    "throttle": 3,
+                    "updateP50Ms": 3.2,
+                    "renderP50Ms": 5.5
+                  },
+                  {
+                    "throttle": 4,
+                    "updateP50Ms": 4.3,
+                    "renderP50Ms": 7.2
+                  },
+                  {
+                    "throttle": 5,
+                    "updateP50Ms": 5.4,
+                    "renderP50Ms": 9.1
+                  },
+                  {
+                    "throttle": 6,
+                    "updateP50Ms": 9.8,
+                    "renderP50Ms": 15.6
+                  }
+                ]
+              }
+            ],
+            "atFactor": {
+              "updateP50Ms": 4.76,
+              "renderP50Ms": 7.47
+            },
+            "method": "median of the three runs at each rate, a least-squares line for update and for render, each solved for the phone's p50, the mean of the two (meta project/evidence/driftwood-fps/df3-df5-mini-dwfps/fit-cpu.mjs)"
+          },
+          "note": "The three sweeps picked 4.1, 3.4 and 3.8 (A and C within ±0.3; B ran noisy at 4 and 6), and the line through the three runs' medians sits inside the ±15% band at 3.7×. Low Power Mode on the iPhone 13 costs the dock about 1.7× its normal-power update and render (5 / 7 against 3 / 4 ms), and Safari still draws past 30 (44.5 fps at cap 60, 57.7 at normal power)."
         }
       },
       "cpuDiagnostics": {
