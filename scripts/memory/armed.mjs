@@ -1,8 +1,9 @@
-// J424/J426. The shipped format list is the sole source of arming. Engine
-// baselines are measurements, including for zones that still report only.
+// J424/J426. The format list is the sole source of arming. A release
+// measures the products in its reviewed engine pin set.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { capFor } from '../budgets/files.mjs';
+import { pinnedSlugs } from '../pins-catalogue.ts';
 import { judgeReads } from './ledgerVerdict.mjs';
 import { zoneOverRuns } from './phoneModel.mjs';
 
@@ -33,7 +34,10 @@ export function parseArmedMemory(value) {
 }
 
 export function armedMemory() {
-  return parseArmedMemory(JSON.parse(readFileSync(require.resolve(LIST), 'utf8')));
+  const policy = parseArmedMemory(JSON.parse(readFileSync(require.resolve(LIST), 'utf8')));
+  const manifest = new URL('../../test/pins/shardfiles.json', import.meta.url);
+  const shipped = new Set(pinnedSlugs(JSON.parse(readFileSync(manifest, 'utf8'))));
+  return { ...policy, zones: new Set([...policy.zones].filter(zone => shipped.has(zone))) };
 }
 
 /** A pinned zone outside the online grid has its supported standalone

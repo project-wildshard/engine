@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Check workflow wiring without starting CI.
 import { readFileSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
-import { comparePhoneFootprint, footprintBootFor, footprintLines, guardZone, judgeFootprint, ledgerZones, parseArmedMemory, phoneFootprint } from '../scripts/memory/armed.mjs';
+import { armedMemory, comparePhoneFootprint, footprintBootFor, footprintLines, guardZone, judgeFootprint, ledgerZones, parseArmedMemory, phoneFootprint } from '../scripts/memory/armed.mjs';
 import { readCaps } from '../scripts/budgets/files.mjs';
 import { checkReads, ledgerFailure } from '../scripts/memory/ledgerVerdict.mjs';
 import { loadPhoneModel } from '../scripts/memory/phoneModel.mjs';
@@ -19,6 +19,13 @@ test('arming comes from zone presence and refuses invalid policy data', () => {
   expect(() => parseArmedMemory({ zones: {} })).toThrow('Invalid armed memory list');
   expect(() => parseArmedMemory({ lines, zones: { 'driftwood-isle': { ...arm, loadingBytes: 0 } } }))
     .toThrow('Invalid armed memory entry');
+});
+
+test('release memory gates measure all shipped armed products and retain historical readings', () => {
+  const pins = JSON.parse(readFileSync('test/pins/shardfiles.json', 'utf8')) as {shards: {slug: string}[]};
+  const shipped = new Set(pins.shards.map(pin => pin.slug));
+  const release = armedMemory();
+  expect(release.zones).toEqual(new Set([...release.readings.keys()].filter(zone => shipped.has(zone))));
 });
 
 test('a partial recording always includes every named zone assigned to its ledger host', () => {
