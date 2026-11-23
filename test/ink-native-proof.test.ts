@@ -13,7 +13,7 @@ for (const mode of ['boot', 'headless', 'replay', 'ledger'] as const) test(`Ink 
 });
 
 for (const kind of ['section', 'asset'] as const) for (const damage of ['truncated', 'changed'] as const) test(`Ink native intake refuses a ${damage} ${kind} before proof execution`, () => {
-  const folder = readBuiltShardfile(resolve('.'), 'ink-cel-valley');
+  const folder = readBuiltShardfile(resolve('.'), 'ink-cel-valley', { testFixture: true });
   const index = parseOutputIndex(JSON.parse(readFileSync(resolve(folder, 'shard.json'), 'utf8')));
   const target = kind === 'section' ? index.sections[0] : index.files[0];
   if (target === undefined) throw new Error(`Missing original Ink ${kind} control`);

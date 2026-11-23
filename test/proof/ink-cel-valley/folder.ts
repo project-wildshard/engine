@@ -15,7 +15,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 /** Read only an exact-SHA/current-input prepared product. Never invokes its
  * renderer-bearing producer, builds bytes, or falls back to loose assets. */
 export function inkProofFolder(): { readonly source: Shardfile; readonly assets: ReadonlyMap<string, Uint8Array> } {
-  const root = fileURLToPath(new URL('../../../', import.meta.url)), folder = readBuiltShardfile(root, 'ink-cel-valley');
+  const root = fileURLToPath(new URL('../../../', import.meta.url)), folder = readBuiltShardfile(root, 'ink-cel-valley', { testFixture: true });
   return readInkProofFolder(path => readFileSync(resolve(folder, path)));
 }
 

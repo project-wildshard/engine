@@ -105,7 +105,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
   let copy=null;
   if(pregated===null&&why!==null&&sha!==null){
     console.error(`  - gate in a clean copy of ${sha.slice(0,10)}: ${why}`);
-    copy=makeGateCopy(root,sha,{env});
+    copy=makeGateCopy(root,sha,{env,testPins:true});
   }
   const gateRoot=copy?.path??pkgDir;
   let code=1;

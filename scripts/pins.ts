@@ -6,6 +6,7 @@
 //                                           release pair or a set E7_*_SHARDS names a slug GET /api/catalogue no longer
 //                                           lists (DEL9); `--drop <slug>` lets refresh drop a deleted pin
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
+//   node scripts/pins.ts install --for-tests  also install frozen retired grid products for test suites
 //   node scripts/pins.ts install --staging  install the reviewed staging snapshot for a public dev build
 //   node scripts/pins.ts install --ring 1   Ring 1: pinned Brasscap Mesa and Dunes (J434), and server slices
 //   node scripts/pins.ts install --ring-slices 1  add Ring 1 server slices beside installed full pins
@@ -246,7 +247,7 @@ function pruneStale(root: string): void {
 
 /** One install of this tree at a time, full or reused: out/.pins.lock (pins-reuse.mjs). */
 type LocalProduct = Awaited<ReturnType<typeof localProduct>>;
-async function install(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' | 'staging' = 'pins', localPath?: string): Promise<readonly Pin[]> {
+async function install(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' | 'staging' | 'tests' = 'pins', localPath?: string): Promise<readonly Pin[]> {
   const release = lockPins(process.cwd());
   try {
     const local = localPath === undefined ? undefined : await (await import('./pin-local.ts')).localProduct(localPath, process.cwd());
@@ -254,15 +255,17 @@ async function install(only: readonly string[], source: 'pins' | 'format' | 'rin
   } finally { release?.(); }
 }
 
-async function installLocked(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' | 'staging', local?: LocalProduct): Promise<readonly Pin[]> {
+async function installLocked(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' | 'staging' | 'tests', local?: LocalProduct): Promise<readonly Pin[]> {
   // DS12: a full install whose pins match this tree's last one, or another worktree's, clones and verifies (pins-reuse.mjs).
   const full = only.length === 0 && source === 'pins', root = process.cwd();
   const revision = shardfileValidationRevision(root), inputs = full ? pinsCompatibilityKey(root, revision) : '';
   const key = full ? pinsKey(root, revision, inputs) : '';
   const canReuse = full && process.env.WILDSHARD_PINS_REUSE !== '0';
   const overlay = source === 'format' || source === 'local';
+  const testFixtures = source === 'tests';
+  const output = testFixtures ? 'out/.test-products' : 'out';
   const trackedPins = source === 'staging' ? (await import('./pins-staging.ts')).readStaging().shards
-    : overlay ? [] : (readJson(PINS) as PinFile).shards;
+    : overlay ? [] : (readJson(testFixtures ? 'test/fixtures/retired-grid-products.json' : PINS) as Pick<PinFile, 'shards'>).shards;
   let retained: Awaited<ReturnType<typeof reuseUnchangedPins>>;
   if (canReuse) {
     const reused = await reusePins(root, key, { log: line => { console.log(line); } });
@@ -279,7 +282,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     }
     retained = await reuseUnchangedPins(root, inputs, trackedPins);
   }
-  dropManifest(root);
+  if (!testFixtures) dropManifest(root);
   const folderHashes = new Map(Object.entries(retained?.products ?? {})), mountHashes = new Map(Object.entries(retained?.mounts ?? {}));
   const owners = new Map<string, PinOwner>(Object.entries(retained?.owners ?? {}));
   // The validator hashes most members already; the manifest reuses those digests rather than hashing twice.
@@ -309,7 +312,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   // install replaces the whole set.
   const replaced = dependency === undefined || !overlay ? new Set<string>() : mountsOf(resolve('out', local?.folder ?? dependency.pin.slug));
   for (const path of local?.preservedMounts ?? []) replaced.delete(path);
-  const before = existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : [];
+  const before = !testFixtures && existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : [];
   const shared = trackedPublic(), publicUrls = new Set(publicAssets.map(asset => asset.url));
   const published = new Set([...mountHashes.keys()].filter(path => !shared.has(path)));
   // Mark before writing: a failed local install must still prevent publication.
@@ -371,11 +374,11 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       if (folder === undefined) { failed++; console.error(`refused ${pin.slug}: no discovery document`); continue; }
       if (!folderName(folder)) { failed++; console.error(`refused ${pin.slug}: product folder ${folder}`); continue; }
       if (folderHashes.has(folder)) throw new Error(`Two pins publish out/${folder}`);
-      insideTree(root, 'out', true);
-      const target = resolve('out', folder);
+      insideTree(root, output, true);
+      const target = resolve(output, folder);
       rmSync(target, { recursive: true, force: true });
       const written = new Map<string, string>(), mounts = new Set<string>();
-      const publishMount = (url: string, body: Uint8Array): void => { publish(url, body); mounts.add(url); };
+      const publishMount = (url: string, body: Uint8Array): void => { if (!testFixtures) { publish(url, body); mounts.add(url); } };
       const beforeMounts = published.size;
       for (const [path, body] of files) {
         if (path.endsWith('/') || path === 'validation.json') continue;
@@ -405,16 +408,18 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${published.size - beforeMounts} mounts published${preparation === 'none' ? '' : `, ${preparation} preparation`}`);
       if (preparation === 'stale') console.warn(`stale preparation: ${pin.slug}`);
     }
-    for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
+    if (!testFixtures) for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   } finally {
     // The install lock has created out/. Keep cleanup information even if publication stopped midway.
     const kept = overlay ? before.filter(path => !replaced.has(path) && existsSync(path)) : [];
     paths = [...new Set([...kept, ...published])].sort((a, b) => a.localeCompare(b));
-    writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
-    excludePublished(paths);
+    if (!testFixtures) {
+      writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
+      excludePublished(paths);
+    }
   }
   if (failed > 0) process.exitCode = 1;
-  if (remoteSlugs.length > 0) await installSaves(remoteSlugs);
+  if (!testFixtures && remoteSlugs.length > 0) await installSaves(remoteSlugs);
   if (full) pruneStale(root);
   if (source === 'staging') pruneStalePinProducts(root, pins.map(pin => pin.hash));
   // The manifest certifies these bytes only for the inputs the install read: a pin or source edited meanwhile changes the key.
@@ -558,6 +563,10 @@ if (command === 'refresh') {
   }
 }
 else if (command === 'install' && rest.length === 1 && rest[0] === '--staging') await install([], 'staging');
+else if (command === 'install' && rest.length === 1 && rest[0] === '--for-tests') {
+  await install([]);
+  if (process.exitCode !== 1) await install([], 'tests');
+}
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1', rest.slice(2));
 else if (command === 'install' && rest.length === 2 && rest[0] === '--ring-slices') await installRingSlices(ringOf(rest[1] ?? '1').slices);
 else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), 'format');
@@ -571,4 +580,4 @@ else if (command === 'verify-slices') await slice(true);
 else if (command === 'install-saves') await installSaves(rest);
 else if (command === 'keep') await keep(rest[0] ?? 'tmp/pins-release');
 else if (command === 'status') status();
-else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --staging | install --ring 1 [extra slug...] | install --ring-slices 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');
+else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --for-tests | install --staging | install --ring 1 [extra slug...] | install --ring-slices 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');

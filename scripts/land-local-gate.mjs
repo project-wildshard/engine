@@ -60,7 +60,7 @@ if(pinnedPnpm!==undefined){
 }
 if(process.platform==='linux')Reflect.set(env,'PLAYWRIGHT_BROWSERS_PATH',join(process.env.XDG_CACHE_HOME??join(homedir(),'.cache'),'ms-playwright'));
 Reflect.deleteProperty(env,'WS_PUSH_REFS');
-const copy=makeGateCopy(root,expected,{env,directory,installIsolated:true});
+const copy=makeGateCopy(root,expected,{env,directory,installIsolated:true,testPins:true});
 try{
  verify(copy.path);
  // npr's default machine cache can itself be a global pnpm install. Seal the
