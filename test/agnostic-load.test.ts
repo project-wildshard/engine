@@ -1,10 +1,11 @@
 // SHARD-COMPAT PR7 (J487): preparation is engine agnostic. A product prepared on an earlier engine loads on this one:
 // the client admits it, the cook takes it with the rooms' own admission check, and nothing rewrites the original.
-// The default product is the format corpus's Brasscap Mesa export (prepared on an earlier engine). WS_AGNOSTIC_PRODUCT
-// names another prepared product (a folder or a .shardfile), such as one prepared on the last release's engine:
+// Products: the format corpus's Brasscap Mesa export (prepared on an earlier engine); on a release candidate
+// (release/* in CI) also pinned products from out/ (`pnpm pins`), each prepared on the engine of its own publish (PR7b).
+// WS_AGNOSTIC_PRODUCT names one more prepared product (a folder or a .shardfile); WS_AGNOSTIC_PINS lists pinned slugs.
 //   WS_AGNOSTIC_PRODUCT=<dir|file> pnpm vitest run test/agnostic-load.test.ts
 // oxlint-disable-next-line import/no-nodejs-modules -- The native cook owns its output.
-import {mkdtempSync,readFileSync,rmSync,statSync} from 'node:fs';
+import {existsSync,mkdtempSync,readFileSync,rmSync,statSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch stays below the lane's folder.
 import {join,resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Vitest redirects its temp root into owned repository scratch.
@@ -18,10 +19,18 @@ import {checkShardfile} from '../src/server/host/checkShardfile';
 import {admitFolder,type FolderOptions} from '../src/client/game/shardfile/folder';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 
-const product=resolve(process.env['WS_AGNOSTIC_PRODUCT']??'node_modules/@wildshard/format/corpus/exports/brasscap-mesa');
+// PR7b: a release candidate loads pinned products the last releases prepared; the CI tests unit installs the pins first.
+const release=(process.env['GITHUB_REF']??'').startsWith('refs/heads/release/');
+const pins=(process.env['WS_AGNOSTIC_PINS']??(release?'brasscap-mesa,mirror-salt':'')).split(',').filter(Boolean);
+const products=[
+ resolve('node_modules/@wildshard/format/corpus/exports/brasscap-mesa'),
+ ...pins.map(slug=>resolve('out',slug)),
+ ...(process.env['WS_AGNOSTIC_PRODUCT']===undefined?[]:[resolve(process.env['WS_AGNOSTIC_PRODUCT'])]),
+];
 const base='https://example.test/shardfiles/agnostic/';
 
-test(`a product prepared on an earlier engine loads here unchanged (${product.split('/').slice(-2).join('/')})`,async()=>{
+test.each(products.map(product=>({product,name:product.split('/').slice(-2).join('/')})))('a product prepared on an earlier engine loads here unchanged ($name)',async({product})=>{
+ if(!existsSync(join(product,'shard.json'))&&!statSync(product,{throwIfNoEntry:false})?.isFile())throw new Error(`No prepared product at ${product} (pnpm pins installs the pinned ones)`);
  const tar=statSync(product).isDirectory()?folderTarball(product):new Uint8Array(readFileSync(product));
  const files=readTar(tar),header=files.get('shard.json');
  if(header===undefined)throw new Error('Missing product header');
