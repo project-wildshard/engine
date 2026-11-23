@@ -30,6 +30,8 @@ export const SECTION_HOSTS = Object.freeze({
   'look/colour-functions': ['src/client/engine/render/graph/colourFunction.ts#materialColourGraph'],
   'look/toon': ['src/client/game/looks/toonLook.ts#toonLook'],
   'client/plan': [CLIENT_PLAN_ROOT],
+  // SHARD-COMPAT HS6 (format 0.71.0): the server's own plan, read by the one server seam before client/plan.
+  'server/plan': ['src/server/game/shardfile/serverPlan.ts#serverPlan'],
   'world/tiles': ['src/client/game/shardfile/clientViews.ts#clientTileViews'],
   'world/terrain': ['src/shared/game/shardfile/clientGround.ts#clientGround'],
   'world/edge': ['src/shared/game/shardfile/portalTraversal.ts#createPortalTraversal'],
