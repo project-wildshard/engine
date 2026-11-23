@@ -30,7 +30,7 @@ import {shardSlugOf} from '@wildshard/format/standaloneCatalogue';
 import {ShardfileHashSchema, ShardSlugSchema, RevisionNumberSchema} from '@wildshard/format/uploadWire';
 import {MAX_SHARDFILE_BYTES, type CookJobReport} from './cookJob';
 import {stalePreparationLine, type PreparationState} from './shardCook';
-import {cookPreparedLine} from './cookSidecar';
+import {cookPreparedLine, sidecarPath} from './cookSidecar';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {installedRuntimeReads} from './installedRuntimeReads';
 import {cookIndexPath, readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
@@ -150,12 +150,6 @@ export interface JobLauncher {
   readonly sidecars?: string;
 }
 
-/** The sidecar file for `hash` on the launcher's renderer, when the host holds one. */
-function sidecarFile(launcher: JobLauncher, hash: string): string | undefined {
-  if (launcher.sidecars === undefined || launcher.renderer === undefined) return undefined;
-  const file = join(launcher.sidecars, hash, `${launcher.renderer}.tar`);
-  return existsSync(file) ? file : undefined;
-}
 /** The cook row's word on its preparation. */
 function preparationWords(slug: string, preparation: PreparationState): string {
   if (preparation === 'stale') return stalePreparationLine(slug);
@@ -450,7 +444,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     writeFileSync(file, tarball);
     const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug), phases => {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: phases ${phases}`);
-    }, sidecarFile(launcher, head.hash));
+    }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer));
     if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason, ...(outcome.check === undefined ? {} : {check: outcome.check})};
     if (outcome.kind === 'killed') return {...head, state: 'failed', detail: outcome.reason};
     if (!outcome.report.check?.pass) return {...head, state: 'failed', detail: 'The job supplied no successful full check'};

@@ -212,15 +212,22 @@ function cookMounts(files: ReadonlyMap<string, Uint8Array>): readonly CookMount[
 
 /** J262: `current` when the author preparation names this engine's renderer fingerprint, `stale` for another (or when this
  *  tree can't compute its own), `none` without one. The same verdict `openShardfile` reaches; validation already
- *  refused a preparation that doesn't match its own inputs. */
+ *  refused a preparation that doesn't match its own inputs. SP1b4: a stale one with a sidecar in `WILDSHARD_COOK_SIDECARS`
+ *  for this pin on this renderer opens as the cook would: `cook` on a hit, `stale` (and the line why) otherwise. */
 let ownRenderer: string | null | undefined;
-function preparationOf(files: ReadonlyMap<string, Uint8Array>, root: string): 'current' | 'stale' | 'none' {
+async function preparationOf(files: ReadonlyMap<string, Uint8Array>, root: string, pin: Pin, bytes: Uint8Array): Promise<'current' | 'stale' | 'cook' | 'none'> {
   const body = files.get('cook.json');
   if (body === undefined) return 'none';
   const cook = JSON.parse(decoder.decode(body)) as { readonly version?: number; readonly renderer?: string };
   if (cook.version !== 3) return 'none';
   if (ownRenderer === undefined) { try { ownRenderer = rendererRevision(root); } catch { ownRenderer = null; } }
-  return cook.renderer === ownRenderer ? 'current' : 'stale';
+  if (cook.renderer === ownRenderer) return 'current';
+  const {sidecarIn} = await import('../src/cook/game/cookSidecar.ts');
+  const sidecar = sidecarIn(process.env['WILDSHARD_COOK_SIDECARS'], pin.hash, ownRenderer);
+  if (sidecar === undefined || ownRenderer === null) return 'stale';
+  const {openShardfile} = await import('../src/cook/game/shardCook.ts');
+  const shard = openShardfile(bytes, { renderer: ownRenderer, sidecar, warn: line => { console.warn(line); } });
+  return shard.preparation === 'cook' ? 'cook' : 'stale';
 }
 
 
@@ -404,9 +411,10 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       folderHashes.set(folder, Object.fromEntries(written));
       owners.set(pin.slug, {folder, descriptor: pinDescriptor(pin), mounts: [...mounts].sort()});
       // J262 (SP1a): a preparation from another renderer installs and cooks as it is; say so, as the cook does.
-      const preparation = preparationOf(files, root);
+      const preparation = await preparationOf(files, root, pin, bytes);
       console.log(`${pin.slug}: admitted in ${((performance.now() - started) / 1000).toFixed(1)}s, ${files.size} files, ${published.size - beforeMounts} mounts published${preparation === 'none' ? '' : `, ${preparation} preparation`}`);
       if (preparation === 'stale') console.warn(`stale preparation: ${pin.slug}`);
+      if (preparation === 'cook') console.warn(`prepared by cook: ${pin.slug}`);
     }
     if (!testFixtures) for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   } finally {

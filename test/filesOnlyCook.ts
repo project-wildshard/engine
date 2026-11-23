@@ -15,7 +15,7 @@ import { GPU_FILES } from '../src/client/engine/boot/ktx2.generated';
 export interface FilesOnlyCook { readonly root: string; readonly output: string; readonly book: SpawnManifestBook; readonly common: AssetTables }
 
 /** Cook `shards` (folders under out/) in a new folder under tmp/<scratch>; the caller removes `root`. */
-export async function cookFilesOnly(shards: readonly string[], scratch: string): Promise<FilesOnlyCook> {
+export async function cookFilesOnly(shards: readonly string[], scratch: string, options: { readonly from?: string; readonly build?: Partial<BuildHalf> } = {}): Promise<FilesOnlyCook> {
   mkdirSync(`tmp/${scratch}`, { recursive: true });
   const root = mkdtempSync(resolve(`tmp/${scratch}/cook-`));
   const baked = spawnSync(process.execPath, ['--import', './scripts/bake-loader.mjs', 'scripts/serialize-asset-tables.mjs'],
@@ -23,7 +23,7 @@ export async function cookFilesOnly(shards: readonly string[], scratch: string):
   if (baked.status !== 0) throw new Error(`boot tables did not bake (${String(baked.status)})`);
   mkdirSync(resolve(root, 'out/.app'), { recursive: true });
   writeFileSync(resolve(root, ASSET_TABLES), baked.stdout);
-  for (const shard of shards) symlinkSync(resolve('out', shard), resolve(root, 'out', shard));
+  for (const shard of shards) symlinkSync(resolve(options.from ?? 'out', shard), resolve(root, 'out', shard));
   symlinkSync(resolve('public'), resolve(root, 'public'));
   // A shard's recorded fence (src/shards/<slug>/fence-reads.json) is the cook's other way to list audio.
   if (existsSync('src/shards')) { mkdirSync(resolve(root, 'src'), { recursive: true }); symlinkSync(resolve('src/shards'), resolve(root, 'src/shards')); }
@@ -32,7 +32,7 @@ export async function cookFilesOnly(shards: readonly string[], scratch: string):
   mkdirSync(resolve(output, 'assets'), { recursive: true });
   writeAssetTables(output, root);
   const build: BuildHalf = { cacheName: scratch, gpuFiles: GPU_FILES, filesOnly: true, tables: readAssetTables,
-    tableAddresses: at => assetTableAddresses(readAssetTables(at)), seams: () => { throw new Error('no grid seams in this root'); } };
+    tableAddresses: at => assetTableAddresses(readAssetTables(at)), seams: () => { throw new Error('no grid seams in this root'); }, ...options.build };
   const input = { common: [], client: [], grid: [], optional: { files: [], groups: {} }, extras: {},
     products: Object.fromEntries(shards.map(shard => [`/shardfiles/${shard}/`, [0, 0]])) };
   const book = await writeSpawnManifests(output, input, { '000': {} }, root, build);

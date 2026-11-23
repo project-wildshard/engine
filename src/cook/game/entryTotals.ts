@@ -11,6 +11,7 @@ import {createHash} from 'node:crypto';
 import {readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnManifestAddress} from '../../shared/game/shardfile/spawnManifest';
 import {assetIdentities, audioTableRefs, bundlerSources as manifestSources, identityFiles, joinRefs, standInRefs, packMembers, readFenceReads, resolveFenceReads, sectionRefs, type PackPart} from './fenceReads';
 import {createPartEncoder, writeSpawnManifestFiles, writeSpawnParts, type CookedMember, type SpawnPartEncoding} from './spawnParts';
+import {cookPreparedLine, sidecarIn} from './cookSidecar';
 import {cookParts, cookShardServerPack, openShardfile, preparedShardHalf, servedAsIs, stalePreparationLine, type CookTiers, type PreparationState, type ShardHalf} from './shardCook';
 import type {ServerPack} from '../../shared/game/shardfile/serverPack';
 import {contentNamed} from './contentNamed';
@@ -62,6 +63,8 @@ export interface BuildHalf {
    *  minutes the parts' q11 encode takes over every product. Tests only: a build never sets it. */
   readonly filesOnly?: boolean;
   readonly rendererRevision?: string;
+  /** SHARD-COMPAT SP1b4: a host's cook preparation sidecars (`<hash>/<renderer>.tar`), for products installed from a pin. */
+  readonly sidecars?: string;
   readonly cacheName: string;
   readonly gpuFiles: Parameters<typeof standInRefs>[0];
   /** S12d: the cook's per-tier textures (`defaultCookTiers`), as the box's cook makes them. None: every tier reads the
@@ -97,6 +100,10 @@ export function phoneOverlay(discovery: Uint8Array | undefined): Readonly<Record
 /** S12d: where a build keeps each shard's discovery document as its cook serves it, inside that build's own output, until
  *  `copyOutputFolders` lays it over the product's (and removes the folder); the catalogue hashes it there. */
 export const SERVED_DISCOVERY = '.discovery';
+/** The pinned shardfile's hash an installed product records in its `validation.json`, when it came from a pin. */
+function pinnedHash(product: string): string | undefined {
+  try { return (JSON.parse(readFileSync(join(product, 'validation.json'), 'utf8')) as {pin?: {hash?: string}}).pin?.hash; } catch { return undefined; }
+}
 export function servedDiscoveryPath(outDir: string, directory: string): string { return join(outDir, SERVED_DISCOVERY, directory, 'discovery.json'); }
 /** DL5: a shard's packs set, `src/shards/<slug>/packs-set.json` (`{"version": 1, "set": "fence"}`): 'fence' packs the
  *  default set (what the boot reads before control), absent packs the whole level. Anything else fails the build. */
@@ -218,8 +225,9 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     const directory = prefix.split('/')[2]; if (directory === undefined || !/^[a-z0-9_-]+$/u.test(directory)) throw new Error('Invalid spawn shard');
     const product = join(root, 'out', directory), index = parseOutputIndex(JSON.parse(readFileSync(join(product, 'shard.json'), 'utf8')));
     if (index.runtime !== null && (!('kind' in index.runtime) || index.runtime.kind !== 'client-plan')) continue;
+    const sidecar = sidecarIn(build.sidecars, pinnedHash(product), build.rendererRevision);
     const reopen = (): Promise<ShardHalf> => preparedShardHalf(openShardfile(folderTarball(product), {preparationOnly: build.preparationOnly === true,
-      ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision})}), wireBytes, undefined, directory, tiers);
+      ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision}), ...(sidecar === undefined ? {} : {sidecar, warn: line => { console.warn(line); }})}), wireBytes, undefined, directory, tiers);
     const half = await reopen();
     open.set(directory, reopen);
     // What no part answers serves at its URL: the tiered discovery document (beside its product) and the phone's own files.
@@ -247,6 +255,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     // J262 (SP1a): a preparation from another renderer cooks as it is, and the build says which shards took that path.
     (preparations[half.shard.preparation] ??= []).push(directory);
     if (half.shard.preparation === 'stale') console.warn(stalePreparationLine(directory));
+    if (half.shard.preparation === 'cook') console.warn(cookPreparedLine(directory));
     const shardRows = {phone: {entry: half.folderRows('phone', 'entry'), whole: half.folderRows('phone', 'whole')},
       desktop: {entry: half.folderRows('desktop', 'entry'), whole: half.folderRows('desktop', 'whole')}};
     if (build.filesOnly !== true) {

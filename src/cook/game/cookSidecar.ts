@@ -4,6 +4,10 @@
  * signed and unchanged. A cook that finds a sidecar for its renderer and the same inputs cooks by it (`prepared by cook`);
  * one for another renderer or other inputs is a miss, and one whose bytes don't hold is corrupt. Either way the cook
  * falls back to the author's stale lists, as before (SP1a). */
+// oxlint-disable-next-line import/no-nodejs-modules -- The cook reads a host's sidecar folder (J28).
+import {existsSync, readFileSync} from 'node:fs';
+// oxlint-disable-next-line import/no-nodejs-modules -- The cook reads a host's sidecar folder (J28).
+import {join} from 'node:path';
 import {readCookData, type CookData} from '@wildshard/format/cookData';
 import {requireCookPreparation} from '@wildshard/format/cookPreparation';
 import type {OutputIndex} from '@wildshard/format/outputIndex';
@@ -60,4 +64,17 @@ export function readSidecarTar(tar: Uint8Array): CookSidecar {
     const files = readTar(tar);
     return {cook: files.get('cook.json') ?? new Uint8Array(), mounts: new Map([...files].filter(([path]) => path.startsWith('mounts/')))};
   } catch { return {cook: new Uint8Array(), mounts: new Map()}; }
+}
+
+/** SP1b4: the file a host's sidecar folder keeps for the shardfile `hash` on `renderer`: `<folder>/<hash>/<renderer>.tar`. */
+export function sidecarPath(folder: string | undefined, hash: string | undefined, renderer: string | null | undefined): string | undefined {
+  if (folder === undefined || folder === '' || hash === undefined || renderer === undefined || renderer === null) return undefined;
+  if (!/^[0-9a-f]{64}$/u.test(hash) || !/^[0-9a-f]+$/u.test(renderer)) return undefined;
+  const file = join(folder, hash, `${renderer}.tar`);
+  return existsSync(file) ? file : undefined;
+}
+/** The sidecar a host's folder keeps for `hash` on `renderer`, when it keeps one. */
+export function sidecarIn(folder: string | undefined, hash: string | undefined, renderer: string | null | undefined): CookSidecar | undefined {
+  const file = sidecarPath(folder, hash, renderer);
+  return file === undefined ? undefined : readSidecarTar(readFileSync(file));
 }
