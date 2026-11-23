@@ -37,3 +37,7 @@
   34 − 1000/30 ms cadence floor in 14 of 15 segments, so no ratio could qualify. `scripts/fps/gpuProbe.mjs` fences one
   frame in n with a 1-pixel readPixels before and after its draw; both benches (route-bench `--fenced-gpu`, measureFps
   `fencedEvery`) record the same tail, and `gpu-fit.mjs --fenced` fits phone over Mac on it.
+- Fit (same day): build aaeec2602, phone Low 390×658 at DPR 1, cap 30, route `driftwood-fps`, three matched runs. Training
+  dock/beach/village gives phone/Mac 3.25 (runs 3.22 to 3.54); quest fire and road crossing are predicted within 0.8 to
+  12.5% in every run, so `fps-calibration.json` records the GPU ratio as qualified. Two phone runs whose road crossing
+  stuck on a waypoint were refused by the fitter (incomplete legs) and replaced.

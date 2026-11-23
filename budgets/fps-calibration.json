@@ -232,9 +232,11 @@
         ]
       },
       "gpu": {
-        "qualified": false,
-        "build": "39542d31dacaddbe56dc7988170699db78d1fbe3",
-        "rendererRevision": "c516b683948a3dfabff368383a6f4a801d852278522c72722d58ed0922575dcf",
+        "qualified": true,
+        "decision": "J489",
+        "device": "iPhone 13",
+        "lowPowerMode": false,
+        "build": "aaeec2602",
         "raster": {
           "css": [
             390,
@@ -242,7 +244,9 @@
           ],
           "dpr": 1
         },
-        "metric": "p95",
+        "capFps": 30,
+        "route": "driftwood-fps",
+        "metric": "fenced GPU tail: one frame in 10 is drained by a 1-pixel readPixels, drawn, then waited on by a second readPixels; the 10% trimmed mean of that wait per segment (engine scripts/fps/gpuProbe.mjs; route-bench --fenced-gpu 10 on the phone, measureFps fencedEvery 10 in headless Chromium on ANGLE Metal)",
         "training": [
           "dock spawn",
           "beach",
@@ -252,366 +256,140 @@
           "quest fire",
           "road crossing"
         ],
-        "ratio": 0.07930476458493925,
+        "ratio": 3.249,
         "spread": {
-          "min": 0.07926921933181483,
-          "max": 0.09819164652802753
+          "min": 3.22,
+          "max": 3.535
         },
         "byRun": [
-          0.09819164652802753,
-          0.07930476458493925,
-          0.07926921933181483
+          3.535,
+          3.22,
+          3.249
         ],
         "segments": [
           {
             "name": "dock spawn",
             "role": "training",
-            "ratio": 0.07930476458493925,
-            "spread": {
-              "min": 0.07926921933181483,
-              "max": 0.7897955584726911
-            },
-            "measurements": [
-              {
-                "run": 1,
-                "phoneMs": 6.7,
-                "macMs": 8.483208,
-                "ratio": 0.7897955584726911
-              },
-              {
-                "run": 2,
-                "phoneMs": 0.7,
-                "macMs": 8.826708,
-                "ratio": 0.07930476458493925
-              },
-              {
-                "run": 3,
-                "phoneMs": 0.7,
-                "macMs": 8.830666,
-                "ratio": 0.07926921933181483
-              }
+            "ratio": 3.878,
+            "runs": [
+              [
+                8.827,
+                2.276
+              ],
+              [
+                9.311,
+                2.446
+              ],
+              [
+                9.16,
+                2.26
+              ]
             ]
           },
           {
             "name": "beach",
             "role": "training",
-            "ratio": 0.07016869958754837,
-            "spread": {
-              "min": 0.0673589693230895,
-              "max": 0.07212343658284102
-            },
-            "measurements": [
-              {
-                "run": 1,
-                "phoneMs": 0.7,
-                "macMs": 9.975958,
-                "ratio": 0.07016869958754837
-              },
-              {
-                "run": 2,
-                "phoneMs": 0.7,
-                "macMs": 9.705583,
-                "ratio": 0.07212343658284102
-              },
-              {
-                "run": 3,
-                "phoneMs": 0.7,
-                "macMs": 10.392083,
-                "ratio": 0.0673589693230895
-              }
+            "ratio": 3.249,
+            "runs": [
+              [
+                11.357,
+                3.325
+              ],
+              [
+                10.837,
+                3.366
+              ],
+              [
+                11.071,
+                3.408
+              ]
             ]
           },
           {
             "name": "village",
             "role": "training",
-            "ratio": 0.09819164652802753,
-            "spread": {
-              "min": 0.09765682220794263,
-              "max": 0.10448282048687203
-            },
-            "measurements": [
-              {
-                "run": 1,
-                "phoneMs": 0.7,
-                "macMs": 7.128916,
-                "ratio": 0.09819164652802753
-              },
-              {
-                "run": 2,
-                "phoneMs": 0.7,
-                "macMs": 7.167958,
-                "ratio": 0.09765682220794263
-              },
-              {
-                "run": 3,
-                "phoneMs": 0.7,
-                "macMs": 6.699666,
-                "ratio": 0.10448282048687203
-              }
+            "ratio": 3.225,
+            "runs": [
+              [
+                10.779,
+                3.049
+              ],
+              [
+                9.71,
+                3.094
+              ],
+              [
+                9.993,
+                3.099
+              ]
             ]
           },
           {
             "name": "quest fire",
             "role": "held-out",
-            "ratio": 0.10487087773179272,
-            "spread": {
-              "min": 0.10070615153456032,
-              "max": 0.10654084699973365
-            },
-            "measurements": [
-              {
-                "run": 1,
-                "phoneMs": 0.7,
-                "macMs": 6.674875,
-                "ratio": 0.10487087773179272
-              },
-              {
-                "run": 2,
-                "phoneMs": 0.7,
-                "macMs": 6.950916,
-                "ratio": 0.10070615153456032
-              },
-              {
-                "run": 3,
-                "phoneMs": 0.7,
-                "macMs": 6.57025,
-                "ratio": 0.10654084699973365
-              }
+            "ratio": 3.559,
+            "runs": [
+              [
+                12.189,
+                3.425
+              ],
+              [
+                12.027,
+                3.239
+              ],
+              [
+                10.797,
+                3.296
+              ]
             ]
           },
           {
             "name": "road crossing",
             "role": "held-out",
-            "ratio": 0.08521041738740479,
-            "spread": {
-              "min": 0.0763674575135105,
-              "max": 0.08851702745153281
-            },
-            "measurements": [
-              {
-                "run": 1,
-                "phoneMs": 0.7,
-                "macMs": 9.166208,
-                "ratio": 0.0763674575135105
-              },
-              {
-                "run": 2,
-                "phoneMs": 0.7,
-                "macMs": 8.214958,
-                "ratio": 0.08521041738740479
-              },
-              {
-                "run": 3,
-                "phoneMs": 0.7,
-                "macMs": 7.908083,
-                "ratio": 0.08851702745153281
-              }
+            "ratio": 3.011,
+            "runs": [
+              [
+                5.524,
+                1.838
+              ],
+              [
+                5.6,
+                1.86
+              ],
+              [
+                5.448,
+                1.74
+              ]
             ]
           }
         ],
         "validation": [
           {
             "name": "quest fire",
-            "runs": [
-              {
-                "run": 1,
-                "measuredMs": 0.7,
-                "predictedMs": 0.5293493905088964,
-                "errorFraction": 0.2437865849872908,
-                "pass": true
-              },
-              {
-                "run": 2,
-                "measuredMs": 0.7,
-                "predictedMs": 0.5512407570296877,
-                "errorFraction": 0.21251320424330328,
-                "pass": true
-              },
-              {
-                "run": 3,
-                "measuredMs": 0.7,
-                "predictedMs": 0.5210521295141971,
-                "errorFraction": 0.2556398149797184,
-                "pass": false
-              }
+            "errors": [
+              0.087,
+              0.125,
+              0.008
             ]
           },
           {
             "name": "road crossing",
-            "runs": [
-              {
-                "run": 1,
-                "measuredMs": 0.7,
-                "predictedMs": 0.7269239675765867,
-                "errorFraction": 0.03846281082369539,
-                "pass": true
-              },
-              {
-                "run": 2,
-                "measuredMs": 0.7,
-                "predictedMs": 0.6514853102651633,
-                "errorFraction": 0.06930669962119519,
-                "pass": true
-              },
-              {
-                "run": 3,
-                "measuredMs": 0.7,
-                "predictedMs": 0.6271486606331602,
-                "errorFraction": 0.10407334195262821,
-                "pass": true
-              }
+            "errors": [
+              0.081,
+              0.079,
+              0.038
             ]
           }
         ],
-        "reason": "Phone observations are dominated by cadence; these capped frames cannot qualify a GPU ratio.",
-        "basis": "Phone gpu~ is a capped frame-interval residual. Fourteen of fifteen segment p95s round the 34 - 1000/30 ms cadence floor to 0.7 ms. A cadence term explains the held-out discrepancy but cannot identify sub-cap GPU cost or a fire-specific term.",
-        "captured": "2026-11-21",
-        "routeMethodSha256": "efe80d0630dd07d7cfb1fe7a4fc12ba0801d2bafbcd33c5c294245d0828be187",
-        "phoneCaptures": [
-          "phone-qual-30",
-          "phone-qual-31",
-          "phone-qual-34"
-        ],
-        "metalCaptures": [
-          "mac-7",
-          "mac-8",
-          "mac-9"
-        ],
-        "evidence": "project-wildshard-meta:project/evidence/driftwood-fps/df5/cadence-model-2026-11-21/gpu-fit.json",
-        "observation": {
-          "kind": "capped-frame-residual",
-          "floorMs": 0.6666666666666643,
-          "training": [
-            {
-              "run": 1,
-              "name": "dock spawn",
-              "frames": 895,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 6.666666666666664
-            },
-            {
-              "run": 1,
-              "name": "beach",
-              "frames": 1201,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 0.6666666666666643
-            },
-            {
-              "run": 1,
-              "name": "village",
-              "frames": 1801,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 0.6666666666666643
-            },
-            {
-              "run": 2,
-              "name": "dock spawn",
-              "frames": 896,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 0.6666666666666643
-            },
-            {
-              "run": 2,
-              "name": "beach",
-              "frames": 1200,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 0.6666666666666643
-            },
-            {
-              "run": 2,
-              "name": "village",
-              "frames": 1799,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 0.6666666666666643
-            },
-            {
-              "run": 3,
-              "name": "dock spawn",
-              "frames": 895,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 0.6666666666666643
-            },
-            {
-              "run": 3,
-              "name": "beach",
-              "frames": 1201,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 0.6666666666666643
-            },
-            {
-              "run": 3,
-              "name": "village",
-              "frames": 1800,
-              "floorMs": 0.6666666666666643,
-              "integerClock": true,
-              "p95": 0.6666666666666643
-            }
-          ],
-          "gpuRatioIdentifiable": false,
-          "reason": "Most training observations equal the integer-clock cadence floor; sub-cap GPU cost is unobserved.",
-          "validation": [
-            {
-              "name": "quest fire",
-              "runs": [
-                {
-                  "run": 1,
-                  "measuredMs": 0.7,
-                  "predictedMs": 0.6666666666666643,
-                  "errorFraction": 0.04761904761905094,
-                  "pass": true
-                },
-                {
-                  "run": 2,
-                  "measuredMs": 0.7,
-                  "predictedMs": 0.6666666666666643,
-                  "errorFraction": 0.04761904761905094,
-                  "pass": true
-                },
-                {
-                  "run": 3,
-                  "measuredMs": 0.7,
-                  "predictedMs": 0.6666666666666643,
-                  "errorFraction": 0.04761904761905094,
-                  "pass": true
-                }
-              ]
-            },
-            {
-              "name": "road crossing",
-              "runs": [
-                {
-                  "run": 1,
-                  "measuredMs": 0.7,
-                  "predictedMs": 0.7269239675765867,
-                  "errorFraction": 0.03846281082369539,
-                  "pass": true
-                },
-                {
-                  "run": 2,
-                  "measuredMs": 0.7,
-                  "predictedMs": 0.6666666666666643,
-                  "errorFraction": 0.04761904761905094,
-                  "pass": true
-                },
-                {
-                  "run": 3,
-                  "measuredMs": 0.7,
-                  "predictedMs": 0.6666666666666643,
-                  "errorFraction": 0.04761904761905094,
-                  "pass": true
-                }
-              ]
-            }
-          ],
-          "ratio": 0.07930476458493925
+        "phoneRuns": "route-bench runs 1, 4 and 5 (runs 2 and 3 stuck on a road crossing waypoint and are refused as incomplete; their held-out tails, quest fire 11.55 and 10.51 ms, road crossing 5.95 and 6.31 ms, sit within 7% of the fitted predictions)",
+        "macRuns": "three cold headless Chromium boots, one per desktop-gpu.lock hold, 390x658 CSS at DPR 1, phone Low, cap 30",
+        "reading": "Phone GPU work left after the CPU submit is about 3.25x the M5 Pro Metal stand-in's at the same raster. It is the fenced wait, not a timer query: the Mac's timer-query p50 on the same route is 1.2x to 1.6x its fenced tail, because part of the GPU work overlaps the submit.",
+        "evidence": "project-wildshard-meta:project/evidence/driftwood-fps/df3-df5-mini-dwfps/fenced/",
+        "captured": "2026-11-23",
+        "supersedes": {
+          "kind": "capped-frame residual over Mac timer queries, unqualified (cadence censoring)",
+          "build": "39542d31dacaddbe56dc7988170699db78d1fbe3",
+          "evidence": "project-wildshard-meta:project/evidence/driftwood-fps/df5/cadence-model-2026-11-21/gpu-fit.json"
         }
       }
     }

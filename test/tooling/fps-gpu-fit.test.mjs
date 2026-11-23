@@ -96,6 +96,9 @@ test('the fenced fit trains on training legs only and qualifies when every held-
   inputs[1].phone.legs[4].ms = 40;
   expect(fitFencedGpu(inputs, ['dock','beach','village'], ['fire','road']).qualified).toBe(false);
   expect(fitFencedGpu(inputs, ['dock','beach','village'], ['fire','road']).ratio).toBe(report.ratio);
+  inputs[2].phone.legs[3].error = 'incomplete waypoint, dwell or road return';
+  expect(() => fitFencedGpu(inputs, ['dock','beach','village'], ['fire','road'])).toThrow('complete route');
+  inputs[2].phone.legs[3].error = null;
   inputs[0].mac.gpu = 'SwiftShader';
   expect(() => fitFencedGpu(inputs, ['dock','beach','village'], ['fire','road'])).toThrow('Metal');
 });
@@ -103,8 +106,8 @@ test('the fenced fit trains on training legs only and qualifies when every held-
 test('route-bench and measureFps captures normalize to the same fenced shape', () => {
   const phone = fencedFromRouteBench({ boot: { build: 'b' }, raster: { css: [390, 664], dpr: 1 }, legs: [{ name: 'dock', probe: { frames: 30, tailMeanMs: 9 } }] });
   const mac = fencedFromMeasure({ witness: { build: 'b', css: [390, 664], dpr: 1, gpu: 'Metal' }, legs: [{ name: 'dock', fencedGpu: { frames: 31, tailMeanMs: 1.5 } }] });
-  expect(phone.legs[0]).toEqual({ name: 'dock', frames: 30, ms: 9 });
-  expect(mac.legs[0]).toEqual({ name: 'dock', frames: 31, ms: 1.5 });
+  expect(phone.legs[0]).toEqual({ name: 'dock', frames: 30, ms: 9, error: null });
+  expect(mac.legs[0]).toEqual({ name: 'dock', frames: 31, ms: 1.5, error: null });
 });
 
 test('the probe fences one frame in n with a readPixels before and after it, then restores the draw', () => {

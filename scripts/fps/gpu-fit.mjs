@@ -117,22 +117,22 @@ export function fitGpu(pairs, route, training, heldOut) {
       'At least one held-out prediction differs by more than 25%; do not use this ratio in the floor table.'};
 }
 
-/** @typedef {{build:string|null, css:number[], dpr:number|null, gpu?:string|null, legs:{name:string, frames:number, ms:number|null}[]}} FencedCapture */
+/** @typedef {{build:string|null, css:number[], dpr:number|null, gpu?:string|null, legs:{name:string, frames:number, ms:number|null, error?:string|null}[]}} FencedCapture */
 
 /** A phone route-bench run (route.json row) with --fenced-gpu, as a FencedCapture. Pure.
- * @param {{boot?:{build?:string|null}, raster?:{css?:number[], dpr?:number}, legs?:{name:string, probe?:{frames?:number, tailMeanMs?:number|null}|null}[]}} row
+ * @param {{boot?:{build?:string|null}, raster?:{css?:number[], dpr?:number}, legs?:{name:string, error?:string|null, probe?:{frames?:number, tailMeanMs?:number|null}|null}[]}} row
  * @returns {FencedCapture} */
 export function fencedFromRouteBench(row) {
   return { build: row.boot?.build ?? null, css: row.raster?.css ?? [], dpr: row.raster?.dpr ?? null, gpu: null,
-    legs: (row.legs ?? []).map(leg => ({ name: leg.name, frames: leg.probe?.frames ?? 0, ms: leg.probe?.tailMeanMs ?? null })) };
+    legs: (row.legs ?? []).map(leg => ({ name: leg.name, frames: leg.probe?.frames ?? 0, ms: leg.probe?.tailMeanMs ?? null, error: leg.error ?? null })) };
 }
 
 /** A Mac measureFps cold capture with fencedEvery, as a FencedCapture. Pure.
- * @param {{witness?:{build?:string|null, css?:number[], dpr?:number, gpu?:string|null}, legs?:{name:string, fencedGpu?:{frames?:number, tailMeanMs?:number|null}}[]}} cold
+ * @param {{witness?:{build?:string|null, css?:number[], dpr?:number, gpu?:string|null}, legs?:{name:string, error?:string|null, fencedGpu?:{frames?:number, tailMeanMs?:number|null}}[]}} cold
  * @returns {FencedCapture} */
 export function fencedFromMeasure(cold) {
   return { build: cold.witness?.build ?? null, css: cold.witness?.css ?? [], dpr: cold.witness?.dpr ?? null, gpu: cold.witness?.gpu ?? null,
-    legs: (cold.legs ?? []).map(leg => ({ name: leg.name, frames: leg.fencedGpu?.frames ?? 0, ms: leg.fencedGpu?.tailMeanMs ?? null })) };
+    legs: (cold.legs ?? []).map(leg => ({ name: leg.name, frames: leg.fencedGpu?.frames ?? 0, ms: leg.fencedGpu?.tailMeanMs ?? null, error: leg.error ?? null })) };
 }
 
 /** DF5 with an observable the 30 fps cap cannot clamp: both sides fence the same frames (gpuProbe.mjs), so each
@@ -158,6 +158,7 @@ export function fitFencedGpu(pairs, training, heldOut, minFrames = 20) {
       const p = phone.legs.find(leg => leg.name === name), m = mac.legs.find(leg => leg.name === name);
       if (p === undefined || m === undefined || p.frames < minFrames || m.frames < minFrames || !(Number(p.ms) > 0) || !(Number(m.ms) > 0))
         throw new Error(`Missing fenced frames for ${name} in run ${String(run + 1)}`);
+      if ((p.error ?? null) !== null || (m.error ?? null) !== null) throw new Error(`A complete route is required: ${name} in run ${String(run + 1)} did not finish`);
       const phoneMs = /** @type {number} */ (p.ms), macMs = /** @type {number} */ (m.ms);
       return { run: run + 1, phoneMs, macMs, phoneFrames: p.frames, macFrames: m.frames, ratio: phoneMs / macMs };
     });
