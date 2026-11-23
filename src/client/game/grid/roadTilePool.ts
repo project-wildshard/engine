@@ -6,7 +6,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import type { RingTile, RingView } from '@wildshard/engine/world/tileStreamer';
 import { finishRoadSteps, gpuOnlyRoad, publishRoadPlan, type CullPlan, type RoadCuller } from './roadCull';
-import type { RoadTileArena, RoadTileGeometry } from './roadTileGeometry';
+import { RoadTileArena, type RoadTileGeometry } from './roadTileGeometry';
 import type { RoadTileReference } from './roadTileArchive';
 
 /** Includes live decoded storage, replacement CPU/GPU buffers and the retiring
@@ -111,7 +111,10 @@ export class RoadTilePool {
   private readonly masks = new Map<Map<CullPlan['bins'][number], { visible: boolean }>, { readonly revision: number; readonly apply: () => void }>();
   private revision = 0;
   private built = 0;
-  private job: { readonly revision: number; readonly steps: Generator<void, { geometry: BufferGeometry; plan: CullPlan }>; readonly entries: ReadonlySet<object> } | null = null;
+  private job: { readonly revision: number; readonly steps: Generator<void, { geometry: BufferGeometry; plan: CullPlan }>; readonly entries: ReadonlySet<object>; readonly side: number } | null = null;
+  /** DW3 (mini-dw3, `debug.roadPoolArena`): two arenas; a merge fills the one the drawn mesh (`side`) does not hold */
+  private arenas: readonly [RoadTileArena, RoadTileArena] | null = null;
+  private side = 0;
   constructor(private readonly owner: Scope, private readonly material: Material, private readonly culler: RoadCuller, private readonly name: string, private readonly receiveShadow = true, private readonly renderOrder = 0) {
     if (!Number.isFinite(renderOrder)) throw new Error('Invalid road render order');
     if (owner.disposed || owner.disposing) throw new Error('Road tile pool owner retired');
@@ -193,6 +196,16 @@ export class RoadTilePool {
    *  merges in `settle`'s slices while the old draw stands, and a parent's mask waits for the merge that holds the tiles
    *  it covers (or uncovers), so the drawn road never shows a hole or a double. */
   slice(): void { this.deferred = true; this.sliced = true; }
+  /** DW3 (mini-dw3, `debug.roadPoolArena`): merge into two reused arenas, alternately, instead of new arrays a merge.
+   *  The drawn mesh's merged index (the culler's source) stays in the arena it was merged into; its attributes went
+   *  GPU-only at their upload, so the next merge but one may overwrite them. The culler's draw index stays its own:
+   *  gpuOnly copies an index that views a larger buffer (MG10), so an arena view would be copied anyway. */
+  arena(): void { this.arenas ??= [new RoadTileArena(), new RoadTileArena()]; }
+  /** The arena a new merge fills (not the drawn mesh's), and its side; none without `arena()`. */
+  private nextArena(): { arena: RoadTileArena | undefined; side: number } {
+    const side = 1 - this.side;
+    return { arena: this.arenas?.[side], side };
+  }
   /** Advance the deferred merge for up to `ms` (at least one slice); true once the draw holds every resident tile, and
    *  the pool then merges each publish at once again, as it does undeferred. A tile published or retired meanwhile
    *  restarts the merge from the current tiles. */
@@ -205,7 +218,8 @@ export class RoadTilePool {
     if (this.job === null) {
       const entries = [...this.resident.values()];
       const flags = new Map(entries.flatMap(entry => [...entry.flags]));
-      this.job = { revision: this.revision, steps: mergeRoadTileSteps(entries.map(entry => entry.data), flags), entries: new Set(entries) };
+      const { arena, side } = this.nextArena();
+      this.job = { revision: this.revision, steps: mergeRoadTileSteps(entries.map(entry => entry.data), flags, arena), entries: new Set(entries), side };
     }
     const job = this.job, started = now();
     for (;;) {
@@ -214,7 +228,7 @@ export class RoadTilePool {
       catch (error) { this.job = null; this.owner.dispose(); throw error; }
       if (next.done === true) {
         this.job = null;
-        try { this.install(next.value); }
+        try { this.install(next.value, job.side); }
         catch (error) { this.owner.dispose(); throw error; }
         this.built = job.revision;
         this.showMasks(job.revision);
@@ -233,16 +247,17 @@ export class RoadTilePool {
   private rebuild(): void {
     const entries = [...this.resident.values()];
     const flags = new Map(entries.flatMap(entry => [...entry.flags]));
-    this.install(finishRoadSteps(mergeRoadTileSteps(entries.map(entry => entry.data), flags)));
+    const { arena, side } = this.nextArena();
+    this.install(finishRoadSteps(mergeRoadTileSteps(entries.map(entry => entry.data), flags, arena)), side);
   }
-  private install(next: { geometry: BufferGeometry; plan: CullPlan }): void {
+  private install(next: { geometry: BufferGeometry; plan: CullPlan }, side: number): void {
     const mesh = this.makeMesh(next.geometry);
     try { publishRoadPlan(this.culler, mesh, next.plan); gpuOnlyRoad(mesh, []); }
     catch (error) { this.culler.plans.delete(mesh); next.geometry.dispose(); throw error; }
     // Publish only after all fallible preparation. Neither a plan-map entry nor
     // an old view hook retains the retired native geometry after the swap.
     const previous = this.current;
-    this.root.add(mesh); this.current = mesh; previous.removeFromParent();
+    this.root.add(mesh); this.current = mesh; this.side = side; previous.removeFromParent();
     this.culler.plans.delete(previous);
     previous.onBeforeRender = () => { /* Drop the retired plan closure. */ };
     try { previous.geometry.dispose(); }

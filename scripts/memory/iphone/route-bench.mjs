@@ -130,7 +130,7 @@ async function bench() {
     for (const { run, cap, ab } of trials) {
       // DF10 (mini-dfload): `--ab a,b` turns several slots off and on together (farBatch and kitBatch are one trial)
       // DW3 (mini-dw3): `--ab key=on/off` trials a valued slot (`debug.coverReachLow=0.8/1`); a bare key is a boolean
-      const abValue = (item) => { const at = item.indexOf('='); if (at < 0) return [item, ab];
+      const abValue = (/** @type {string} */ item) => { const at = item.indexOf('='); if (at < 0) return [item, ab];
         const [on, off] = item.slice(at + 1).split('/'); if (off === undefined) throw new Error(`--ab ${item}: write key=on/off`);
         return [item.slice(0, at), JSON.parse(ab ? on : off)]; };
       const trialSlots = ab === null || values.ab === undefined ? slots : { ...slots, ...Object.fromEntries(values.ab.split(',').map(abValue)) };

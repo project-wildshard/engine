@@ -188,3 +188,26 @@ test('a sliced merge lands through a publish, and a mask waits for the merge tha
   expect(pool.mesh().geometry.getAttribute('position').count).toBe(9);
   owner.dispose(); material.dispose();
 });
+
+// DW3: with arenas, a pool merges into the arena the drawn mesh does not hold, so the merge two back's arrays come back
+test('an arena pool reuses the arrays of the merge two back and keeps the drawn mesh intact', () => {
+  const owner = new Scope('road pool arena'), material = new MeshBasicMaterial(), culler: RoadCuller = { pitch: 562.5, tileSize: 62.5, plans: new Map() };
+  const pool = new RoadTilePool(owner, material, culler, 'road');
+  pool.arena();
+  const views = [0, 1, 2].map(i => pool.publish(descriptor(`t${String(i)}`), fixture(i * 10), owner.child(`t${String(i)}`)));
+  const merged = (): { buffer: ArrayBufferLike; xs: number[]; index: ArrayBufferLike } => {
+    const mesh = pool.mesh(), position = mesh.geometry.getAttribute('position'), plan = culler.plans.get(mesh);
+    if (plan === undefined) throw new Error('no plan');
+    return { buffer: position.array.buffer, xs: Array.from({ length: position.count }, (_, i) => position.getX(i)), index: plan.source.buffer };
+  };
+  const three = merged();
+  expect(three.xs).toEqual([0, 1, 0, 10, 11, 10, 20, 21, 20]);
+  views[2]?.dispose(); const two = merged();
+  expect(two.xs).toEqual([0, 1, 0, 10, 11, 10]);
+  expect(two.buffer).not.toBe(three.buffer); // the drawn mesh's arena is never written
+  views[1]?.dispose(); const one = merged();
+  expect(one.xs).toEqual([0, 1, 0]);
+  expect(one.buffer).toBe(three.buffer); expect(one.index).toBe(three.index);
+  expect(Array.from(culler.plans.get(pool.mesh())?.source ?? [])).toEqual([0, 1, 2]);
+  owner.dispose(); material.dispose();
+});

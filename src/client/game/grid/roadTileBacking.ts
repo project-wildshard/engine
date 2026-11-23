@@ -15,6 +15,7 @@ import { persistRoadTile, ROAD_TILE_ARCHIVE_BYTES, ROAD_TILE_HEADER_BYTES, type 
 import { RoadTilePool } from './roadTilePool';
 import { roadHandoffPacedOn } from './roadHandoffPaced';
 import { roadPoolSlicedOn } from './roadPoolSliced';
+import { roadPoolArenaOn } from './roadPoolArena';
 import { roadCellKey, roadTileStream, type PreparedRoadTile, type RoadTileSource } from './roadTileStream';
 import { captureJobBytes, roadCaptureLeanOn, RoadTileCaptureWorker } from './roadTileCaptureWorker';
 import { captureJobTiles } from './roadTileCaptureJob';
@@ -112,6 +113,8 @@ export class RoadTileBacking {
   handoffPaced: () => boolean = roadHandoffPacedOn;
   /** DW3 (mini-dw3): whether the pools merge in slices after the handoff too (`debug.roadPoolSliced`); tests pass their own */
   poolSliced: () => boolean = roadPoolSlicedOn;
+  /** DW3 (mini-dw3): whether the pools merge into two reused arenas (`debug.roadPoolArena`); tests pass their own */
+  poolArena: () => boolean = roadPoolArenaOn;
   constructor(private readonly scope: Scope, private readonly store: RoadTileStore, private readonly culler: RoadCuller, private readonly origin?: string) {
     if (scope.disposed || scope.disposing) throw new Error('Road backing owner retired');
     this.captureWorker = origin === undefined ? null : new RoadTileCaptureWorker(scope.child('capture-worker'));
@@ -298,6 +301,7 @@ export class RoadTileBacking {
       // DF8 (mini-driftwood13n): paced, the hidden pools merge once, in slices, at the handoff (RoadTilePool.settle)
       if (this.poolSliced()) pool.slice();
       else if (this.handoffPaced()) pool.defer();
+      if (this.poolArena()) pool.arena();
       sources.push({ pool, references: source.references, coarseReferences: source.coarseReferences });
     }
     this.stream = roadTileStream(this.scope, sources, origin, layout, budget, this.store, id);

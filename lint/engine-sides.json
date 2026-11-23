@@ -815,6 +815,7 @@
     "src/client/game/grid/roadTileBacking.ts": "client",
     "src/client/game/grid/roadHandoffPaced.ts": "client",
     "src/client/game/grid/roadPoolSliced.ts": "client",
+    "src/client/game/grid/roadPoolArena.ts": "client",
     "src/client/game/grid/roadTileCapture.worker.ts": "client",
     "src/client/game/grid/roadTileCaptureJob.ts": "client",
     "src/client/game/grid/roadTileCaptureWorker.ts": "client",
