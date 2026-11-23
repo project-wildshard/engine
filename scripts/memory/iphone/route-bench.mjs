@@ -217,7 +217,7 @@ async function bench() {
           }
           // DF18 (mini-dw3): --heap-at <leg> sums JavaScriptCore's live heap by class after that leg (what a full collection marks)
           for (const leg of row.legs) if (leg.heap !== undefined) console.log(`  heap after ${leg.name}: ${JSON.stringify(leg.heap).slice(0, 2400)}`);
-          if (legVsync) for (const leg of row.legs) console.log(`  leg vsync ${leg.name}: ${JSON.stringify(leg.probe?.vsync ?? null)} (game clock p95 ${String(leg.summary?.p95Ms ?? '?')})`);
+          if (legVsync) for (const leg of row.legs) console.log(`  leg vsync ${leg.name}: ${JSON.stringify({ ...leg.probe?.vsync, at: undefined, ends: undefined })} (game clock p95 ${String(leg.summary?.p95Ms ?? '?')})`);
           if (legAlloc) for (const leg of row.legs) {
             const a = leg.probe?.alloc;
             console.log(`  leg alloc ${leg.name}: ${String(a?.mb ?? '?')} MB in ${String(a?.count ?? '?')} buffers over ${String(a?.seconds ?? '?')} s (${String(a?.mbPerSecond ?? '?')} MB/s) ${JSON.stringify(a?.byKind ?? {})}`);

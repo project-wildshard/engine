@@ -76,15 +76,18 @@ return 'leg census';
 export const LEG_VSYNC_START = `
 const g = window.__wildshard?.world?.game;
 if (g === undefined) return 'no game';
-const own = window.requestAnimationFrame, drawn = [], late = [];
+const own = window.requestAnimationFrame, drawn = [], late = [], ends = [];
 window.requestAnimationFrame = function (cb) { return own.call(window, (now) => {
   const start = performance.now(), before = g.frameCount;
-  try { return cb(now); } finally { if (g.frameCount !== before && drawn.length < 20000) { drawn.push(now); late.push(start - now); } } }); };
+  try { return cb(now); } finally { if (g.frameCount !== before && drawn.length < 20000) { drawn.push(now); late.push(start - now); ends.push(performance.now()); } } }); };
 window.__wsLegVsync = () => { window.requestAnimationFrame = own;
   const gaps = []; for (let i = 1; i < drawn.length; i++) gaps.push(drawn[i] - drawn[i - 1]);
   const q = (list, p) => { if (list.length === 0) return null; const s = [...list].sort((a, b) => a - b); return Math.round(s[Math.min(s.length - 1, Math.floor(p * s.length))] * 10) / 10; };
   return { frames: drawn.length, vsyncP50: q(gaps, 0.5), vsyncP95: q(gaps, 0.95), vsyncOver34: gaps.filter((x) => x > 34).length, vsyncOver50: gaps.filter((x) => x > 50.5).length,
-    lateP50: q(late, 0.5), lateP95: q(late, 0.95), lateOver8: late.filter((x) => x > 8).length }; };
+    lateP50: q(late, 0.5), lateP95: q(late, 0.95), lateOver8: late.filter((x) => x > 8).length,
+    // DW3: each drawn frame's page-clock start and the end of its game callback (ms, 0.1), so a route's --profile samples
+    // between one frame's end and the next frame's start name the tasks that held the frame back
+    at: drawn.map((x) => Math.round(x * 10) / 10), ends: ends.map((x) => Math.round(x * 10) / 10) }; };
 return 'leg vsync';
 `;
 export const LEG_VSYNC_STOP = `
