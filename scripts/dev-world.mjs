@@ -68,7 +68,8 @@ const stopChild = (child, graceMs = 15_000) => new Promise(resolve => {
  * checkout's pins installed (`built-folder.mjs` `readBuiltShardfile`).
  * `publicOrigin` and `publicSocket` name the page and the world's socket as another device reaches them through an HTTPS
  * proxy in front of the loopback ports (`serve-local.mjs`); `socketPort` fixes the world
- * socket's loopback port for that proxy. Staging mode serves the full snapshot and builds the server without dev controls.
+ * socket's loopback port for that proxy. Staging mode serves the full snapshot; only a public world builds the server without
+ * dev controls.
  * @param {{ dist: string, work: string, shard?: string, product?: string, port?: number, saves?: 'disk' | 'memory', gridRoot?: string,
  *   publicOrigin?: string, publicSocket?: string, socketPort?: number, staging?: readonly { slug: string, revision: number }[], log?: (line: string) => void }} options */
 export async function openDevWorld({ dist, work: requestedWork, shard = 'brasscap-mesa', product, port = DEV_PORT, saves = 'disk', gridRoot = ROOT, publicOrigin, publicSocket, socketPort = 0, staging, log = line => { console.log(line); } }) {
@@ -112,7 +113,9 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     const serverFor = (id, built) => {
       run(['scripts/server-origin.mjs', origin, id, `--grid=${absolute(gridRoot)}`, ...books], 'the server book');
       run(['scripts/build-server.mjs', '--build', id, '--out', server,
-        ...staging === undefined ? ['--dev'] : ['--catalogue', join(built, 'catalogue.json')]], 'the server build');
+        // a world only this Mac reaches keeps the dev control channel, staging snapshot or not (meta QA 2026-11-22: J490's local
+        // proofs raise flags on the staging grid); a public one (`serve-local.mjs`) never has it
+        ...publicOrigin === undefined ? ['--dev'] : [], ...staging === undefined ? [] : ['--catalogue', join(built, 'catalogue.json')]], 'the server build');
     };
     /** @param {string} id */
     const publish = id => {
