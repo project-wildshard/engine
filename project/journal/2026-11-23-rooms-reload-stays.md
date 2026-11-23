@@ -46,17 +46,3 @@ The arrival keeps `rejoinMs` and `returnMs`; the release gate
 each failure names its step (pause, exit, main menu, ENTER THE MMO, the
 loading screen, play, the return crossing). Nalati is already one of the
 eight featured zones, with two crossings in every draw.
-
-## A neighbour's file stays the build's own
-
-While proving the smoke, every fresh WebKit boot of staging's Driftwood
-stopped at "Download paused · the connection dropped" (16:50 UTC, the
-placement file at serial 90 and 91). Copy diagnostics named
-`/shardfiles/brasscap-mesa/discovery.json`: Driftwood's grid manifest
-lists Brasscap's discovery at the bytes the build baked, but the rooms had
-moved Brasscap to an upload, so SA48's `placedLoose` sent the read to that
-upload's folder. The folder had no such file yet (a 27 kB 404 page, over
-the 6 kB cap), so the size check failed the whole Driftwood download. A
-new upload with other discovery bytes would fail the same way. A manifest
-now reads only its own slug's loose files from the upload; a neighbour's
-stay the build's copy, which is what the manifest lists.
