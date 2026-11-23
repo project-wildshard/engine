@@ -53,6 +53,7 @@ export const KEY_EXEMPT=Object.freeze({
  'scripts/pins-catalogue.ts':'refresh check only (DEL9): refuses before the pins are written; no byte under out/',
  'scripts/pins-staging.ts':'refresh/export only; selection materializes shardfiles.json already hashed in the key',
  'scripts/server-release/served-slug.mjs':'refresh check only (DEL9): names a slug\'s served folder for the catalogue compare',
+ 'scripts/pin-test-names.ts':'drop check only (SHARD-COMPAT NB10): refuses a --drop while tests name the slug; no byte under out/',
 });
 
 /** @typedef {{slug:string,hash:string,revision:number,bytes:number}} Pin */
