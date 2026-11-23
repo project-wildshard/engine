@@ -8,3 +8,7 @@ the best double jump hurt. The threshold is now derived from the jump law: the h
 (`MAX_JUMP_APEX`), landing on ground as far below the take-off as that (`SAFE_FALL`, about 6 m), plus one 30 fps
 step of gravity, about 17 m/s. A jump on flat ground or off a ledge no higher than a jump deals nothing at 30 and 60
 fps; a 12 m fall still hurts. Client and headless host share the rule (`hardLanding`).
+
+Trace re-record (same day): the wet, dry, driver and walking host traces in `seven-traces.json` record fewer `env.fall`
+hits under the new threshold. With `HARD_LANDING_SPEED` back at 9 m/s all four match their old chains, so the re-record
+(`MOTION_TRACE_RECORD=1`) carries the fall rule only.
