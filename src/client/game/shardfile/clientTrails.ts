@@ -3,9 +3,15 @@ import { parse } from 'valibot';
 import { SlashTrail } from '@wildshard/engine/combat/view/slashTrail';
 import { ClientTrailsSchema } from '@wildshard/format/clientTrails';
 import type { ShardContext } from '../plugin/context';
-import { clientPopulationBodies, type ClientPopulationBody } from './clientPopulation';
+import { clientMemberBodies, clientPopulationBodies, type ClientPopulationBody } from './clientPopulation';
 import { sceneModelSource } from './sceneSources';
 
+/** A trail's bodies: the declared spawns it names (`members`, ONE-FORMAT OF29e7a) or its page population group's. */
+export function trailBodies(ctx: ShardContext, row: Readonly<{ group?: string; members?: readonly string[] }>): readonly ClientPopulationBody[] {
+  if (row.members !== undefined) return clientMemberBodies(ctx, row.members);
+  if (row.group === undefined) throw new Error('A trail names its group or its members');
+  return clientPopulationBodies(ctx, row.group);
+}
 /** Client-only point trails on the actual population: the keeper's bodies, or on a server's page its rows' (C12). A row's body
  * arrives late and may be replaced, so each frame asks for it, and a new body starts a fresh wake. The look owns materials; the
  * entered scope owns geometry. */
@@ -16,7 +22,7 @@ export function installClientTrails(ctx: ShardContext, input: unknown): void {
   for (const row of rows.rows) {
     const material = sceneModelSource(ctx.product, row.library).look(row.look);
     if (material === undefined) throw new Error(`Missing trail look: ${row.look}`);
-    const trails = clientPopulationBodies(ctx, row.group).map(body => {
+    const trails = trailBodies(ctx, row).map(body => {
       const positions = new Float32Array(row.points * 6), fade = new Float32Array(row.points * 2), sides = new Float32Array(row.points * 2), indices: number[] = [];
       for (let i = 0; i < row.points - 1; i++) { const a = i * 2; indices.push(a, a + 1, a + 3, a, a + 3, a + 2); }
       for (let i = 0; i < row.points; i++) { const f = 1 - i / (row.points - 1); fade[i * 2] = f; fade[i * 2 + 1] = f; sides[i * 2] = 1; sides[i * 2 + 1] = -1; }

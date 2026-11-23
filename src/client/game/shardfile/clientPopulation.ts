@@ -47,5 +47,10 @@ export function clientPopulationBodies(ctx: ShardContext, group: string): readon
   const population = ctx.product.section('client/plan').features.find(row => row.kind === 'population.homes');
   const ids = population?.kind === 'population.homes' ? population.groups[group] : undefined;
   if (ids === undefined || clientNativeBook(ctx).population === null) throw new Error(`Missing entered native population group: ${group}`);
+  return clientMemberBodies(ctx, ids);
+}
+/** ONE-FORMAT OF29e7b: the bodies of the declared spawns a row names itself (a trail's `members`), by address, as a group's. */
+export function clientMemberBodies(ctx: ShardContext, ids: readonly string[]): readonly ClientPopulationBody[] {
+  if (clientNativeBook(ctx).population === null) throw new Error('Missing entered native population');
   return ids.map(id => () => clientPopulationActor(ctx, id) ?? wirePage.namedBody(id));
 }
