@@ -22,6 +22,8 @@ export interface BrowserErrorTags {
   readonly diagnostic?: Record<string, unknown>;
   /** SENTRY-TRIAGE S13: the error screen this report opened. Set only by the call that opens it, so each screen is one event. */
   readonly screen?: ErrorScreen;
+  /** J501: why play ended (src/client/engine/boot/endPlay.ts): `exit_code`, `zone`, `revision`, `room`, `step` tags; '' is left out */
+  readonly exit?: { readonly code: string; readonly zone: string; readonly revision: string; readonly room: string; readonly step: string };
 }
 
 /**
@@ -196,7 +198,9 @@ function loadSdk(): Promise<BrowserSdk | null> {
 }
 
 function tagsOf(tags: BrowserErrorTags): Record<string, string> {
-  return { system: tags.system, build: tags.build, shard: tags.shard, boot_stage: tags.bootStage, ...(tags.screen === undefined ? {} : { screen: tags.screen }) };
+  const exit = tags.exit === undefined ? {} : Object.fromEntries(Object.entries({ exit_code: tags.exit.code, zone: tags.exit.zone, revision: tags.exit.revision,
+    room: tags.exit.room, step: tags.exit.step }).filter(([, value]) => value !== '').map(([key, value]) => [key, value.slice(0, 200)]));
+  return { system: tags.system, build: tags.build, shard: tags.shard, boot_stage: tags.bootStage, ...(tags.screen === undefined ? {} : { screen: tags.screen }), ...exit };
 }
 
 async function send(error: unknown, tags: BrowserErrorTags): Promise<void> {

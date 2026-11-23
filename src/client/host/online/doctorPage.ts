@@ -23,4 +23,4 @@ function handoff(): { readonly earlier: string | null; readonly back: string } {
 const { earlier, back } = handoff();
 document.querySelector('[data-doctor-shell]')?.remove();
 openDoctor({ build: stamps.__WS_BUILD_ID__ ?? '', origin: location.origin, ...stamps.__WS_WORLD__ === undefined ? {} : { world: stamps.__WS_WORLD__ }, ...chunk === null ? {} : { cell: chunk } },
-  { label: back === '/' ? 'Open the game' : 'Back to game', go: () => { location.assign(back); } }, earlier);
+  { label: back === '/' ? 'Open the game' : 'Back to game', go: () => { location.assign(back); } }, earlier); // exit: player (the doctor page runs no world)

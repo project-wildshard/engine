@@ -152,3 +152,26 @@ test('STAGING-BUGBASH SB30: the forced update of a too-old client (J383) reloads
   expect(end.kind).toBe('intentional');
   expect(next.notes.take(end)).toBeNull();
 });
+
+// J501 (QA-FEEDBACK-2026-11-23-b rows 20 and 22): Signal Dunes r6. The room ran a newer revision than the page's book, and
+// roomsRevision.ts reloaded with a bare location.reload(): the next page read the player's reload and landed on a quiet title.
+test('an unmarked engine reload reads as the player\'s and goes quiet; reloadPlay\'s mark keeps the drop and its code (J501)', () => {
+  const silent = tab(), dunes = loadNalati(silent);
+  window.dispatchEvent(new Event('pagehide'));
+  const quiet = silent.page('reload'), quietEnd = quiet.life.lastEnd();
+  expect(quietEnd.player, 'the old bare reload: the player\'s reload, so the quiet title').toBe(true);
+  expect(quiet.notes.take(quietEnd)).toBeNull();
+  void dunes;
+
+  const t = tab(), world = loadNalati(t);
+  // what reloadPlay does: the drop first (with its code and context), then the mark, then the reload
+  world.notes.record({ reason: 'The world runs a newer version of this zone.', code: 'REV-RELOAD', retry: true, context: { zone: 'sunscar-dunes', revision: '3fef58aebd2c' } });
+  world.life.markReload('engine reload REV-RELOAD: the world runs a newer version of this zone', 'background');
+  window.dispatchEvent(new Event('pagehide'));
+  const next = t.page('reload'), end = next.life.lastEnd();
+  expect(end).toMatchObject({ kind: 'intentional' });
+  expect(end.player).toBeUndefined();
+  expect(toTitle(end), 'an engine reload resumes the world').toBe(false);
+  // and if it ends on the title anyway, the title says why, with the code
+  expect(next.notes.take(end)).toMatchObject({ kind: 'error', code: 'REV-RELOAD', retry: true, zone: 'sunscar-dunes', revision: '3fef58aebd2c' });
+});

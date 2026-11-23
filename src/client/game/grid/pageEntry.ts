@@ -1,4 +1,4 @@
-import { recordDrop } from '@wildshard/engine/boot/dropNotice';
+import { endPlay } from '@wildshard/engine/boot/endPlay';
 import { beginNavigationShell } from '@wildshard/engine/boot/shell';
 import { pageScope } from '@wildshard/engine/app/resources';
 import { registerBeforeReload, type LastEnd } from '@wildshard/engine/boot/lastEnd';
@@ -86,10 +86,12 @@ export function reenterGrid(instance: string): void {
   const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
   // A cell this build has no page for, or a seat that keeps moving: the title, never a loop of entries.
   if (cell === undefined || target === undefined || !reentryAllowed(Date.now())) {
-    // the drop modal on that title says why (Jake, 11-12: Blender Template "go straight to main menu" with no word)
-    recordDrop({ reason: cell === undefined || target === undefined ? `The world server seated you in ${cell?.slug ?? instance}, a place this build can't open, so the game went back to the title.`
-      : 'The world server kept moving your seat, so the game stopped re-entering and went back to the title.', code: instance });
-    location.replace(new URL(location.pathname, location.origin)); return;
+    // the drop modal on that title says why (Jake, 11-12: Blender Template "go straight to main menu" with no word), with its code (J501)
+    const unopened = cell === undefined || target === undefined;
+    endPlay({ code: unopened ? 'SEAT-NOPAGE' : 'SEAT-LOOP', zone: cell?.slug ?? instance, room: instance, retry: !unopened,
+      why: unopened ? `The world server seated you in ${cell?.slug ?? instance}, a place this build can't open, so the game went back to the title.`
+        : 'The world server kept moving your seat, so the game stopped re-entering and went back to the title.' }, new URL(location.pathname, location.origin));
+    return;
   }
   pageGridIntents().set({ instance: cell.instance, slug: target.slug });
   travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
@@ -115,8 +117,9 @@ export function reenterGridInPage(instance: string, handOver: () => void): boole
 export function reenterShard(instance: string): void {
   const cell = new GridAssembly(gridMode(DEVSERVER)).cells.find(row => row.instance === instance), target = cell === undefined ? undefined : findTitleManifest(cell.slug);
   if (cell === undefined || target === undefined) {
-    recordDrop({ reason: `The world hosts one place, and this build can't open ${cell?.slug ?? instance} on its own, so the game went back to the title.`, code: instance });
-    location.replace(new URL(location.pathname, location.origin)); return;
+    endPlay({ code: 'ONE-CELL', zone: cell?.slug ?? instance, room: instance,
+      why: `The world hosts one place, and this build can't open ${cell?.slug ?? instance} on its own, so the game went back to the title.` }, new URL(location.pathname, location.origin));
+    return;
   }
   travel({ to: target.slug, mode: 'enter', shown: gridDestination({ slug: target.slug }, target) });
 }

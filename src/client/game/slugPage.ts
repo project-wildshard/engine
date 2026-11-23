@@ -68,7 +68,7 @@ export function buildSlugPage(opts: SlugPageOptions): TitleDeckView {
   title.textContent = GAME_STRINGS.mainMenu.zoneSelect;
   bar.append(back, title);
   deck.root.querySelector('.ws-menu-head')?.prepend(bar);
-  deck.onTap(back, () => { location.assign('/'); });
+  deck.onTap(back, () => { location.assign('/'); }); // exit: player (BACK on a zone's page; no world runs here)
   const root = document.createElement('div');
   root.className = 'ws-title-stack';
   root.dataset['screen'] = 'slug';

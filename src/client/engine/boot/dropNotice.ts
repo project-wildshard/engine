@@ -58,12 +58,27 @@ export interface Drop {
   readonly routeStack: string;
   readonly at: number;
   readonly build: string;
+  /** J501: the modal offers Retry (endPlay's `retry`); absent: no Retry */
+  readonly retry?: boolean;
+  /** J501: where play ended, for the modal's details and Sentry's tags ('' or absent: unknown) */
+  readonly zone?: string;
+  readonly revision?: string;
+  readonly room?: string;
+}
+/** J501: where play ended (src/client/engine/boot/endPlay.ts): Sentry's `zone`, `revision`, `room` and `step` tags */
+export interface EndContext {
+  readonly zone?: string;
+  readonly revision?: string;
+  readonly room?: string;
+  readonly step?: string;
 }
 export interface DropInput {
   readonly what?: string;
   readonly reason: string;
   readonly error?: unknown;
   readonly code?: string | number;
+  readonly retry?: boolean;
+  readonly context?: EndContext;
 }
 /** the store a DropNotes reads and writes: real save slots on a page, a Map in a test */
 export interface DropStore {
@@ -156,12 +171,17 @@ export class DropNotes {
 
   /** the game leaves for the title by itself: say why, first */
   record(input: DropInput): Drop {
-    const step = this.step(false), d = describeDropError(input.error), name = first(step?.name, step?.world);
+    const step = this.step(false), d = describeDropError(input.error), at = input.context ?? {};
+    const name = first(step?.name, step?.world, at.zone);
     const drop: Drop = {
       kind: 'error', what: input.what ?? (name === '' ? 'Back at the title' : `Couldn't enter ${name}`), reason: input.reason,
-      step: step?.step ?? '', world: step?.world ?? '', name, message: first(d.message, step?.error),
+      step: first(at.step, step?.step), world: first(step?.world, at.zone), name, message: first(d.message, step?.error),
       code: input.code === undefined ? d.code : String(input.code), stack: first(d.stack, step?.errorStack), end: '',
       trail: (step?.trail ?? []).join(' → '), routeStack: step?.routeStack ?? '', at: this.now(), build: build(),
+      ...(input.retry === true ? { retry: true } : {}),
+      ...(first(at.zone, step?.world) === '' ? {} : { zone: first(at.zone, step?.world) }),
+      ...(at.revision === undefined || at.revision === '' ? {} : { revision: at.revision }),
+      ...(at.room === undefined || at.room === '' ? {} : { room: at.room }),
     };
     this.write('pending', 'pendingOnce', { ...drop });
     return drop;
@@ -197,7 +217,11 @@ export class DropNotes {
     if (pending !== null && time(pending, 'at') >= time(expected, 't')) {
       return this.once({ kind: 'error', what: text(pending, 'what'), reason: text(pending, 'reason'), step: text(pending, 'step'), world: text(pending, 'world'),
         name: text(pending, 'name'), message: text(pending, 'message'), code: text(pending, 'code'), stack: text(pending, 'stack'), end: said,
-        trail: text(pending, 'trail'), routeStack: text(pending, 'routeStack'), at: time(pending, 'at'), build: text(pending, 'build') });
+        trail: text(pending, 'trail'), routeStack: text(pending, 'routeStack'), at: time(pending, 'at'), build: text(pending, 'build'),
+        ...(field(pending, 'retry') === true ? { retry: true } : {}),
+        ...(text(pending, 'zone') === '' ? {} : { zone: text(pending, 'zone') }),
+        ...(text(pending, 'revision') === '' ? {} : { revision: text(pending, 'revision') }),
+        ...(text(pending, 'room') === '' ? {} : { room: text(pending, 'room') }) });
     }
     // the first boot of a visit, and a title after a title: no world page came before it in this tab
     if (step === null) return null;

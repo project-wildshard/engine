@@ -43,7 +43,8 @@ import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { bootRoute, exploreBootParams, onlineTitleFirst } from './bootRoute';
 import { arrivalTier, consumeTitleArrival, pendingTitleArrival, setTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { lastEnd, markUnload, settleLastEnd } from '@wildshard/engine/boot/lastEnd';
-import { installDropNotes, markDropStep, recordDrop, takeDrop } from '@wildshard/engine/boot/dropNotice';
+import { installDropNotes, markDropStep, takeDrop, type Drop } from '@wildshard/engine/boot/dropNotice';
+import { showEnd } from '@wildshard/engine/boot/endPlay';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
 import { currentSlug, exploreSlugOfPath, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
@@ -181,6 +182,7 @@ async function enterPage(): Promise<unknown> {
   if (requested !== null && document.getElementById('ws-shardfile') === null && findTitleManifest(requested) === undefined) {
     if (exploreChannel()) return showExploreIndex(UNLISTED);
     document.documentElement.classList.add('title-first');
+    showEnd({ code: 'UNLISTED', zone: requested, what: 'World not listed', why: UNLISTED }); // J501: the title's modal says it, with its code
     return showPageTitle(UNLISTED);
   }
   await waitFor('Startup stylesheets', waitForLoadingStyles(entryScope), 'file');
@@ -215,7 +217,10 @@ async function enterPage(): Promise<unknown> {
     document.documentElement.classList.add('title-first');
     const { dropGridEntry, notInWorldLine } = await import('@wildshard/engine/game/grid/oneWayIn');
     dropGridEntry(slug);
-    return showPageTitle(notInWorldLine(findTitleManifest(slug)?.name ?? slug));
+    const line = notInWorldLine(findTitleManifest(slug)?.name ?? slug);
+    // J501: a seat hop or a link the world doesn't open ends on the title's modal, with its code and Retry (Enter MMO again)
+    showEnd({ code: 'NOT-IN-WORLD', zone: slug, why: line, retry: true });
+    return showPageTitle(line);
   };
   if (requested !== null && await notInWorld()) return notInWorldTitle(requested);
   const tapped = requested !== null && (pendingTitleArrival(requested) !== null || pendingGridEntry(requested));
@@ -369,7 +374,15 @@ async function showPageTitle(refusal = ''): Promise<void> {
   });
   // DL10 (Debug 'Early shader compile', default off): after the title's first frames, one trivial shader link starts the
   // GPU process's compiler, so a cold entry's first program does not pay its 1-1.4 s start-up
-  showDropOnTitle();
+  // J501: the drop modal's Retry enters again the way the title does: Enter MMO on a world build (its gate first), else the zone
+  showDropOnTitle((drop) => {
+    if (world !== undefined) {
+      if (gate === undefined) grid.onGrid();
+      else void gate(grid.onGrid);
+      return;
+    }
+    if (drop.world !== '') travel({ to: drop.world, mode: 'enter' });
+  });
   startTitleLowPowerProbe(); // Jake (11-10): the shown title, once idle, reads Low Power Mode for the tab (boot/lowPower.ts)
   void startTitleWarmup(import('@wildshard/engine/boot/earlyPrograms'), entryScope, window);
 }
@@ -413,15 +426,22 @@ async function showSlugPage(slug: string): Promise<void> {
  * The drop modal (Jake, 2026-11-12): a title the player did not ask for says why, once. Plain words for everyone, the real error
  * with Developer on; every drop also goes to Sentry where the page reports there (src/client/engine/boot/dropNotice.ts).
  */
-function showDropOnTitle(): void { showDrop(takeDrop(lastEnd())); }
-function showDrop(drop: ReturnType<typeof takeDrop>): void {
+function showDropOnTitle(retry?: (drop: Drop) => void): void { showDrop(takeDrop(lastEnd()), retry); }
+function showDrop(drop: ReturnType<typeof takeDrop>, retry?: (drop: Drop) => void): void {
   if (drop === null) return;
   void (async () => {
-    const [{ showDropModal }, { isDev }] = await Promise.all([import('./dropModal'), import('@wildshard/engine/core/devMode')]);
-    const abrupt = previousBootLine();
-    // Jake (17:52): every title nobody asked for is an error, so the modal's open reports it (SENTRY-TRIAGE S13, `screen:title-drop`)
-    showDropModal(drop, entryScope, { dev: isDev(), ...(abrupt === '' ? {} : { extra: [abrupt] }) });
-  })().catch(() => undefined);
+    try {
+      const [{ showDropModal }, { isDev }] = await Promise.all([import('./dropModal'), import('@wildshard/engine/core/devMode')]);
+      const abrupt = previousBootLine();
+      // Jake (17:52): every title nobody asked for is an error, so the modal's open reports it (SENTRY-TRIAGE S13, `screen:title-drop`)
+      showDropModal(drop, entryScope, { dev: isDev(), ...(abrupt === '' ? {} : { extra: [abrupt] }), ...(retry === undefined ? {} : { retry }) });
+    } catch (error) {
+      // J501: the drop modal's own code failed to load (a stale chunk, the network): the fatal modal says it instead, never silence
+      console.error('[drop] the drop modal did not open', error);
+      try { (await import('@wildshard/engine/ui/ErrorModal')).showError(`${drop.what}: ${drop.reason}${drop.code === '' ? '' : ` (code ${drop.code})`}`); }
+      catch { /* both modals' code is gone: the console line above is all this page can do */ }
+    }
+  })();
 }
 
 // QA 11-19 row 19: the Web Analytics beacon loads a second after the title or a world is first interactive, never on the
@@ -496,7 +516,7 @@ async function startPage(): Promise<void> {
       return;
     }
     clearGridRecovery();
-    recordDrop({ reason: 'The world could not be restored after the last session ended, so the game went back to the title.', error });
+    showEnd({ code: 'RESTORE-FAIL', why: 'The world could not be restored after the last session ended, so the game went back to the title.', error, retry: true });
     history.replaceState(history.state, '', new URL('/', location.origin));
     document.documentElement.classList.add('title-first');
     await showPageTitle();

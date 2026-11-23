@@ -46,7 +46,7 @@ export class ClientUpdater {
     })();
     try { await Promise.race([Promise.all([clear, visible]), deadline]); }
     catch { document.documentElement.dataset['forceUpdateIncomplete'] = 'true'; await visible; }
-    finally { owner.dispose(); location.reload(); }
+    finally { owner.dispose(); location.reload(); } // exit: marked (markReload(FORCE_UPDATE_RELOAD) at the reset's start)
   })();
   return this.resetting;
 }

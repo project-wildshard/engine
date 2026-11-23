@@ -19,7 +19,7 @@ import { saveStorage } from '../saves/slots';
 import { ErrorReporter, safeUrl, sendReport } from '../core/errorReport';
 import { countReload, recentReloads } from '../core/reloadGuard';
 import { markReload } from './lastEnd';
-import { recordDrop } from './dropNotice';
+import { showEnd } from './endPlay';
 import { pageScope } from '../../../shared/engine/app/resources';
 
 
@@ -96,7 +96,7 @@ function settle(error: unknown): void {
   if (recentReloads().length === 0 && !retriedThisSession()) {
     // the common case (a build the host no longer serves): one automatic recovery, no tap and no card (RL4). The reload
     // lands on the title: the drop modal there says why (Jake, 11-12: "where's my error modal at?")
-    recordDrop({ reason: 'The game hit an error while starting, so it reloaded to recover.', error });
+    showEnd({ code: 'BOOT-FAIL', why: 'The game hit an error while starting, so it reloaded to recover.', error, retry: true });
     void recover();
     return;
   }

@@ -20,6 +20,7 @@ import { askNameOnce, nameAskDue } from '@wildshard/engine/ui/namePrompt';
 import { openSignIn, saveFile, takeLinkOutcome, titleLogin, titleSignedIn, type AccountPorts } from '@wildshard/engine/ui/signInCard';
 import { engineString } from '@wildshard/engine/strings';
 import { lastEnd, type LastEnd } from '@wildshard/engine/boot/lastEnd';
+import { endPlay } from '@wildshard/engine/boot/endPlay';
 import { setDev } from '@wildshard/engine/core/devMode';
 import { buildTitleDeck, titleCards, type DeckTab, type TitleDeck, type TitleDeckOptions } from './titleDeck';
 import { menuMode, gridMode } from './grid/menu';
@@ -271,10 +272,16 @@ export function buildTitleMenu(opts: TitleMenuOptions): TitleMenu {
     entering = true;
     // QA 11-23 row 8: the gate asks the world (its code and a read, seconds on a phone); the tapped button sweeps meanwhile
     mmoCard.setAttribute('aria-busy', 'true');
-    mmoIdle = Promise.resolve(deckOpts.gate(go)).catch(() => undefined).finally(() => {
-      entering = false;
-      if (!leavingTitle) mmoCard.removeAttribute('aria-busy');
-    });
+    // J501: a gate that throws never eats the tap: the title comes back with the modal, its code and Retry
+    const gate = deckOpts.gate;
+    mmoIdle = (async (): Promise<void> => {
+      try { await gate(go); }
+      catch (error) { endPlay({ code: 'ENTRY-GATE', what: 'Couldn\'t enter the MMO', why: 'Enter MMO couldn\'t ask the world whether it is up.', error, retry: true }); }
+      finally {
+        entering = false;
+        if (!leavingTitle) mmoCard.removeAttribute('aria-busy');
+      }
+    })();
   }); };
   // SB49 (staging, "Navigation shell requires a live owner"): the late catalogue's refresh disposed this menu while the world gate
   // held ENTER ZONE, so the gate's go reached a dead deck. Idle is no name prompt, no held tap and no entry under way, all at once

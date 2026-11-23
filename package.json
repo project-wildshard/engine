@@ -377,6 +377,7 @@
     "./core/updateLean": "./src/client/engine/core/updateLean.ts",
     "./core/taskStamp": "./src/client/engine/core/taskStamp.ts",
     "./boot/dropNotice": "./src/client/engine/boot/dropNotice.ts",
+    "./boot/endPlay": "./src/client/engine/boot/endPlay.ts",
     "./boot/freshPage": "./src/client/engine/boot/freshPage.ts",
     "./boot/lastEnd": "./src/client/engine/boot/lastEnd.ts",
     "./boot/loadingPacks": "./src/client/engine/boot/loadingPacks.ts",

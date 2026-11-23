@@ -244,3 +244,31 @@ test("a drop from a page that ended hours ago never greets a new session", () =>
   expect(drop).toBeNull();
   expect(modal()).toBeNull();
 });
+
+test('an endPlay drop shows its code to everyone, offers Retry, and tags Sentry with the exit (J501)', () => {
+  const t = tab(), world = enterWorld(t);
+  world.notes.record({ reason: 'The world server kept moving your seat.', code: 'SEAT-LOOP', retry: true, context: { zone: 'sunscar-dunes', room: '-1,0', revision: '3fef58aebd2c' } });
+  world.life.markUnload('end play SEAT-LOOP: the world server kept moving your seat');
+  const next = t.page(), end = next.life.lastEnd(), drop = next.notes.take(end);
+  expect(drop).toMatchObject({ kind: 'error', code: 'SEAT-LOOP', retry: true, zone: 'sunscar-dunes', room: '-1,0', revision: '3fef58aebd2c' });
+  if (drop === null) return;
+  const sent: unknown[] = [], retried: string[] = [];
+  showDropModal(drop, scope(), { dev: false, parent: document.body, report: (_error, tags) => { sent.push(tags); }, retry: (d) => { retried.push(d.code); } });
+  expect(modal()?.querySelector('.code')?.textContent, 'the code shows without Developer').toBe('Code SEAT-LOOP');
+  expect(sent).toMatchObject([{ screen: 'title-drop', exit: { code: 'SEAT-LOOP', zone: 'sunscar-dunes', room: '-1,0', revision: '3fef58aebd2c', step: 'Joining the world' } }]);
+  expect(dropDetails(drop)).toContain('Zone: sunscar-dunes · Revision: 3fef58aebd2c · Room: -1,0');
+  modal()?.querySelector<HTMLButtonElement>('button.retry')?.click();
+  expect(retried).toEqual(['SEAT-LOOP']);
+  expect(modal(), 'Retry closes the modal').toBeNull();
+});
+
+test('no Retry when the drop says retry cannot work, or the title has no way back in', () => {
+  const t = tab(), world = enterWorld(t);
+  world.notes.record({ reason: 'This build can\'t open that zone.', code: 'SEAT-NOPAGE' });
+  world.life.markUnload('end play SEAT-NOPAGE');
+  const next = t.page(), drop = next.notes.take(next.life.lastEnd());
+  if (drop === null) throw new Error('no drop');
+  showDropModal(drop, scope(), { dev: false, parent: document.body, report: () => undefined, retry: () => undefined });
+  expect(modal()?.querySelector('button.retry')).toBeNull();
+  expect(modal()?.querySelector('.code')?.textContent).toBe('Code SEAT-NOPAGE');
+});

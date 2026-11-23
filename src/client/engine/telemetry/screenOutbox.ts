@@ -27,9 +27,11 @@ export class ScreenOutbox {
       if (typeof tags !== 'object' || tags === null || Array.isArray(tags)) continue;
       const screen = ERROR_SCREENS.find((name) => name === tags['screen']);
       if (screen === undefined || typeof tags['system'] !== 'string' || typeof tags['bootStage'] !== 'string') continue;
-      // every tag is a string or the fatal flag; the diagnostic is a plain object
+      // every tag is a string or the fatal flag; the diagnostic is a plain object; J501's exit is an object of strings
       const sound = Object.entries(tags).every(([key, value]) => key === 'diagnostic'
-        ? typeof value === 'object' && value !== null && !Array.isArray(value) : typeof value === 'string' || typeof value === 'boolean');
+        ? typeof value === 'object' && value !== null && !Array.isArray(value)
+        : key === 'exit' ? typeof value === 'object' && value !== null && !Array.isArray(value) && Object.values(value).every((part) => typeof part === 'string')
+          : typeof value === 'string' || typeof value === 'boolean');
       if (sound) owed.push({ id, at, message, stack, tags: { ...(tags as unknown as BrowserErrorTags), screen } });
     }
     return owed.slice(-OUTBOX_MAX);

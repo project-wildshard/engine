@@ -14,6 +14,8 @@ export function reportDrop(drop: Drop, report: typeof captureBrowserError = capt
     const error = new Error(`${drop.what}: ${drop.reason}`);
     if (drop.stack !== '') error.stack = drop.stack;
     report(error, { system: 'title-drop', build: drop.build, shard: drop.world, bootStage: drop.step, fatal: drop.kind !== 'background', screen: 'title-drop',
+      // J501: the exit's code and where play ended, as tags (`screen:title-drop exit_code:REV-RELOAD`)
+      exit: { code: drop.code, zone: drop.zone ?? drop.world, revision: drop.revision ?? '', room: drop.room ?? '', step: drop.step },
       diagnostic: { kind: drop.kind, message: drop.message, code: drop.code, end: drop.end, trail: drop.trail, route: drop.routeStack.slice(0, 1500) } });
   } catch { /* telemetry never stops the modal */ }
 }
@@ -25,6 +27,7 @@ const STYLE = `
   #wsdrop .tag::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 10px 1px 0; background: #ffb86b; box-shadow: 0 0 8px #ffb86b; vertical-align: middle; }
   #wsdrop h1 { margin: 0 0 10px; font: 700 21px/1.2 Rajdhani, "JetBrains Mono", sans-serif; letter-spacing: 0.08em; text-transform: uppercase; color: #fff; overflow-wrap: anywhere; }
   #wsdrop .reason { margin: 0 0 14px; font-size: 13px; line-height: 1.5; color: #ffb86b; overflow-wrap: anywhere; }
+  #wsdrop .code { display: inline-block; margin: 0 0 14px; padding: 3px 8px; border: 1px solid rgba(255, 184, 107, 0.5); color: #ffb86b; letter-spacing: 0.14em; text-transform: uppercase; -webkit-user-select: text; user-select: text; }
   #wsdrop[data-kind="background"] .reason { color: #cfe9f3; }
   #wsdrop[data-kind="background"] .tag::before { background: #8fe3ff; box-shadow: 0 0 8px #8fe3ff; }
   #wsdrop .dev { margin: 0 0 14px; padding: 10px; border: 1px solid rgba(255, 184, 107, 0.35); background: rgba(4, 9, 14, 0.7); }
@@ -45,6 +48,8 @@ export function dropDetails(drop: Drop, extra: readonly string[] = []): string {
     drop.step === '' ? '' : `Step: ${drop.step}`,
     drop.message === '' ? '' : `Error: ${drop.message}`,
     drop.code === '' ? '' : `Code: ${drop.code}`,
+    [drop.zone === undefined ? '' : `Zone: ${drop.zone}`, drop.revision === undefined ? '' : `Revision: ${drop.revision}`, drop.room === undefined ? '' : `Room: ${drop.room}`]
+      .filter((line) => line !== '').join(' · '),
     drop.end === '' ? '' : `Previous page: ${drop.end}`,
     drop.trail === '' ? '' : `Route: ${drop.trail}`,
     `World: ${drop.name || drop.world || 'none'} · build ${drop.build || 'unknown'} · ${drop.at > 0 ? new Date(drop.at).toISOString() : 'time unknown'}`,
@@ -61,9 +66,10 @@ function make<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, 
   return el;
 }
 
-/** Show the drop over the title and report it (S13). `dev`: the real error too. `report`: a test's own. Returns the close. */
+/** Show the drop over the title and report it (S13). `dev`: the real error too. `report`: a test's own. `retry` (J501): the title's
+ *  way back in, offered when the drop says retry can work. Returns the close. */
 export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev: boolean; readonly extra?: readonly string[]; readonly parent?: HTMLElement;
-  readonly report?: typeof captureBrowserError }): () => void {
+  readonly report?: typeof captureBrowserError; readonly retry?: (drop: Drop) => void }): () => void {
   reportDrop(drop, options.report);
   if (document.getElementById('wsdrop-style') === null) {
     const style = make('style', ''); style.id = 'wsdrop-style'; style.textContent = STYLE; document.head.append(style);
@@ -74,6 +80,8 @@ export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev:
   root.dataset['kind'] = drop.kind;
   const box = make('div', 'box');
   box.append(make('p', 'tag', drop.kind === 'background' ? 'Welcome back' : drop.kind === 'restart' ? 'Restarted' : 'Back at the title'), make('h1', '', drop.what), make('p', 'reason', drop.reason));
+  // J501: the code, for everyone (the player can read it out; Sentry's exit_code tag matches it)
+  if (drop.code !== '') box.append(make('p', 'code', `Code ${drop.code}`));
   if (options.dev) {
     const dev = make('div', 'dev'); dev.append(make('b', '', 'Developer details'));
     const list = make('dl', '');
@@ -94,8 +102,13 @@ export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev:
   const row = make('div', 'row');
   const copy = make('button', 'copy', 'Copy details'); copy.type = 'button';
   const dismiss = make('button', 'go dismiss', 'Dismiss'); dismiss.type = 'button';
-  row.append(copy, dismiss); box.append(row); root.append(box);
+  row.append(copy, dismiss);
+  const retry = drop.retry === true ? options.retry : undefined;
+  if (retry !== undefined) { dismiss.className = 'dismiss'; row.append(make('button', 'go retry', 'Retry')); }
+  box.append(row); root.append(box);
   const close = (): void => { root.remove(); };
+  const again = root.querySelector<HTMLButtonElement>('button.retry');
+  if (again !== null && retry !== undefined) { again.type = 'button'; scope.listen(again, 'click', () => { close(); retry(drop); }); }
   const clip: { clipboard?: Clipboard | undefined } = navigator;
   scope.listen(copy, 'click', () => {
     const text = dropDetails(drop, options.extra);
@@ -109,6 +122,6 @@ export function showDropModal(drop: Drop, scope: Scope, options: { readonly dev:
   // over the whole page, never inside the title's HUD band: the title's own cards would sit on top of it
   const doc: { body: HTMLElement | null } = document;
   mountUi(root, scope, options.parent ?? doc.body ?? document.documentElement);
-  dismiss.focus({ preventScroll: true });
+  (again ?? dismiss).focus({ preventScroll: true });
   return close;
 }
