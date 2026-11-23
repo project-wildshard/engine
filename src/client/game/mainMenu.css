@@ -53,7 +53,7 @@
    keeps them moving while the main thread works. Reduced motion pulses; it never stops. */
 .ws-main .ws-main-mmo[aria-busy="true"] { overflow: hidden; }
 .ws-main .ws-main-mmo[aria-busy="true"]::after, .ws-main-leaving::after { content: ''; position: absolute; left: 0; bottom: 0; width: 30%; height: 3px; background: linear-gradient(90deg, transparent, rgba(7, 20, 32, 0.75), transparent); transform: translateX(-100%); will-change: transform; animation: ws-main-sweep 1.2s linear infinite; }
-.ws-main-leaving { position: fixed; left: 0; right: 0; top: env(safe-area-inset-top, 0px); height: 3px; z-index: 2147483000; overflow: hidden; pointer-events: none; background: rgba(143, 227, 255, 0.12); }
+.ws-main-leaving { position: fixed; left: 0; right: 0; top: env(safe-area-inset-top, 0px); height: 3px; z-index: calc(var(--ws-layer-hud) + 4); overflow: hidden; pointer-events: none; background: rgba(143, 227, 255, 0.12); }
 .ws-main-leaving::after { background: linear-gradient(90deg, transparent, rgba(143, 227, 255, 0.9), transparent); }
 @keyframes ws-main-sweep { from { transform: translateX(-100%); } to { transform: translateX(334%); } }
 @keyframes ws-main-pulse { from { opacity: 0.15; } to { opacity: 0.8; } }
