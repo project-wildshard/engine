@@ -6,6 +6,7 @@ import * as v from 'valibot';
 import { BoxGeometry, MeshBasicMaterial, Vector3 } from 'three';
 import type { NetCommand } from '@wildshard/wire/netCommand';
 import { app } from '../src/client/engine/app/runtime';
+import { pageSpecies, speciesViewKinds } from '../src/client/game/shardfile/clientRecipes';
 import { BowWeaponProfileSchema, MeleeWeaponProfileSchema, parseNativeFirearmProfile } from '@wildshard/format/weaponProfiles';
 import { NetClient } from '../src/client/engine/net/client';
 import { CombatWire, type CombatEvent } from '../src/server/engine/net/combatWire';
@@ -40,7 +41,7 @@ import { tickCommands, type HeadlessCommand } from '../src/shared/host/tickProto
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
-import { parseShardfileField } from '@wildshard/format/shardSchema';
+import { parseShardfileField, type Shardfile } from '@wildshard/format/shardSchema';
 import originalNativeItems from './fixtures/native-explicit-combat-items.json' with {type: 'json'};
 const nativeSwordItems = parseShardfileField('items', originalNativeItems.items);
 
@@ -51,6 +52,13 @@ const nativeSwordItems = parseShardfileField('items', originalNativeItems.items)
 type StandCommand = Extract<HeadlessCommand, { kind: 'player' }>;
 let restore = (): void => undefined;
 afterEach(() => { restore(); restore = () => undefined; });
+
+/** The native page's declared species rows supply row IDs to its hit effects. */
+function registerContactSpecies(source: Shardfile, scope: Scope): void {
+  const rows = source.rows.species.map(row => ({ ...row, harvest: row.harvest ?? [],
+    variants: row.variants.map(variant => ({ ...variant, scale: [variant.scale[0], variant.scale[1]] as [number, number] })) }));
+  for (const row of pageSpecies(rows, speciesViewKinds(source.rows))) app.species.registerRow(row, scope);
+}
 
 // VITEST-BENCH VB16: a shard's shipped bytes, product and Rapier are immutable, so each loads once per file;
 // every resident is still created fresh in each case.
@@ -207,11 +215,10 @@ test('native local and confirmed debris resolve the admitted row for a declared 
   const previous = app.levelScope, scope = new Scope('native-contact-row');
   app.levelScope = scope;
   try {
-    const species = product.section('actors/species-programs');
-    for (const row of [...(species.program?.species ?? []), ...species.page]) app.species.registerRow(row, scope);
+    registerContactSpecies(product.shardfile, scope);
     const crab = nearest(live, 'crab'), rowId = app.species.rowId(crab.kind);
     if (rowId === undefined) throw new Error('Missing admitted native contact row');
-    // Driftwood rev 7 (OF22e2) declares its crabs: the wire names the species row
+    // The wire names the species row on the declared crab.
     expect(crab.species).toBe('creature.crab'); hold(live); tick(live, 2); facing(live, crab, 1.4);
     crab.hp = crab.maxHp = 10000;
     const page = pageWorld(live, chest(crab)), row = v.parse(MeleeWeaponProfileSchema, weaponRow(product.shardfile, 'weapon.driftwood-isle.wood').profile);
@@ -519,8 +526,7 @@ test('candidate native swords preserve original local and confirmed effects and 
     const {product, resident} = await shipped('driftwood-isle'), live = await resident();
     const previous = app.levelScope, scope = new Scope('original-native-effects'); app.levelScope = scope;
     try {
-      const metadata = product.section('actors/species-programs');
-      for (const row of [...metadata.program?.species ?? [], ...metadata.page]) app.species.registerRow(row, scope);
+      registerContactSpecies(product.shardfile, scope);
       const target = nearest(live, kind);hold(live);tick(live, 2);facing(live, target, 1.4);target.hp = target.maxHp = 10000;
       const authored = nativeSwordItems.rows.find(row => row.id === `weapon.driftwood-isle.${blade}`);
       if (authored?.kind !== 'weapon' || authored.profile?.family !== 'melee') throw new Error('Missing original declared sword');
@@ -542,7 +548,7 @@ test('candidate native swords preserve original local and confirmed effects and 
         burst.mockClear();sword.serverHit({kind, species: '', at: chest(target), head: false, killed: false, amount: 1, seq: 2});
         expect(burst).toHaveBeenCalledWith(surface, expect.any(Vector3), expect.any(Vector3), Math.round(count * 1.6));
         if (blade === 'iron') expect(burst).toHaveBeenCalledWith('sparks', expect.any(Vector3), expect.any(Vector3), 16);
-        expect(target.species).toBe(`creature.${kind}`); // rev 7 declares its bodies (OF22e2)
+        expect(target.species).toBe(`creature.${kind}`);
       } finally {burst.mockRestore();}
     } finally {scope.dispose();app.levelScope = previous;live.dispose();restore();restore = () => undefined;}
   }
