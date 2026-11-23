@@ -25,6 +25,7 @@ import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { bindSceneSourceLooks } from './sceneSources';
 import { bindPaintedMaterialMaps } from '../looks/paintedLook';
 import { installCompletion } from '../complete/declared';
+import { defaultCompletionRows } from '../complete/defaultCard';
 import { retainsRuntimeServices } from '../shard/retainedHooks';
 import { installPageItemContexts } from './pageItems';
 import { ktx2TranscodeSupport } from '@wildshard/engine/core/ktx2';
@@ -814,7 +815,8 @@ export class ShardfileClient {
         try { installQuests(quests, views(held), ui); return true; } catch (cause) { console.error('[devScene] quest views', cause); return false; }
       });
     } else installQuests(source.quests, ctx, presentation);
-    if (ctx.product.has('ui/completion') && ctx.product.section('ui/completion').trigger === 'quest') installCompletion(ctx, flags, play.progress);
+    if (ctx.product.has('ui/completion')) { if (ctx.product.section('ui/completion').trigger === 'quest') installCompletion(ctx, flags, play.progress); }
+    else { const rows = defaultCompletionRows(source.identity.slug, source.identity.name, source.quests.quests); if (rows !== undefined) installCompletion(ctx, flags, play.progress, undefined, undefined, rows); }
     runtime.hooks.questFlags = () => flags.all; runtime.hooks.adventureFlags = () => flags.all;
     // An admitted scene installs its own declared profiles once in the play phase.
     if (this.bindings.audioOwner !== 'runtime' && !this.plan?.features.some(row => row.kind === 'audio.scene')) installDeclaredAudio(source.audio, { audio: play.audio, cues: play.cues, voices: this.bindings.voices(play.audio), music: play.music, scope: ctx.scope, profiles: this.bindings.audioProfiles?.(play, { source: source.audio, read: this.assets.audioRead() }) ?? pageScoreProfiles(source.audio, play, source.quests.races) });

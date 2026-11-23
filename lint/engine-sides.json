@@ -665,6 +665,7 @@
     "src/client/game/compendium/keepsakes.ts": "client",
     "src/client/game/compendium/keepsakesView.ts": "client",
     "src/client/game/complete/declared.ts": "client",
+    "src/client/game/complete/defaultCard.ts": "client",
     "src/client/game/complete/ShardComplete.ts": "client",
     "src/client/game/cosmetics/bodyShadow.ts": "client",
     "src/client/game/cosmetics/cosmetics.ts": "client",
