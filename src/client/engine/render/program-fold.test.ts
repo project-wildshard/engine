@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import * as THREE from 'three';
 import { FOLD_EXEMPT, foldScene, installEnvironmentFold, isFoldEnvironment, programFold, PROGRAM_FOLD_DEFAULT } from './programFold';
+import { programReuse } from './programReuse';
 
 // DF8 (mini-df8b): a scene with no environment draws and compiles with a black one of the page's cube height, so its lit
 // programs are the environment variant (one program for the road and the cell); restored as each call returns
@@ -23,6 +24,14 @@ test('the slot is off unless set', () => {
   expect(programFold(true)).toBe(true);
   expect(programFold('on')).toBe(true);
   expect(programFold(false)).toBe(false);
+});
+
+test('DF8 (mini-dwfps2): unset at phone Low, fold and reuse are on; a saved pick still wins', () => {
+  expect(programFold(null, true)).toBe(true);
+  expect(programFold(false, true)).toBe(false);
+  expect(programReuse(null, true)).toBe(true);
+  expect(programReuse(null)).toBe(false);
+  expect(programReuse('off', true)).toBe(false);
 });
 
 test('a scene with no environment draws with a black one of the latest height, and gets none back', async () => {

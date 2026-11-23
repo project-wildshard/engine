@@ -16,30 +16,37 @@
  *   program.
  * - The far ring's batch programs warm before their batch replaces its proxies (game/grid/farBatch.ts), and a creature's
  *   card shot keeps one plain material (entities/AnimalHerdView.ts), so its program is not freed and linked again.
- * Off by default.
+ * Off by default; on at phone Low (DF8, mini-dwfps2).
  */
 import * as THREE from 'three';
 import { jsonSlot } from '../saves/slots';
+import { TIER } from '../core/tier';
+import { graphicsMode } from '../core/graphicsMode';
 import { latestEnvironmentHeight } from './drawnEnvironment';
 
 export const PROGRAM_FOLD_SLOT = 'debug.programFold';
 export const PROGRAM_FOLD_DEFAULT = false;
+/** Unset at phone Low: on (meta DRIFTWOOD-FPS DF8, mini-dwfps2, 2026-11-23). With programReuse, programFold and
+ *  bootRoadPrograms on, the calibrated stand-in (headless Chromium, phone Low, cap 30, CPU 2.0x, the driftwood-fps route)
+ *  links no program after control and holds fewer programs (meta project/evidence/driftwood-fps/df8-phone-low-defaults-2026-11-23.md). */
+export const PROGRAM_FOLD_PHONE_LOW = true;
 
-/** The slot's value: a boolean (or a capture's `true`/`on`/1) wins; unset, PROGRAM_FOLD_DEFAULT. */
-export function programFold(saved: unknown): boolean {
+/** The slot's value: a boolean (or a capture's `true`/`on`/1) wins; unset, PROGRAM_FOLD_PHONE_LOW at phone Low, else PROGRAM_FOLD_DEFAULT. */
+export function programFold(saved: unknown, phoneLow = false): boolean {
   if (typeof saved === 'boolean') return saved;
   if (saved === 'true' || saved === 'on' || saved === 1) return true;
   if (saved === 'false' || saved === 'off' || saved === 0) return false;
-  return PROGRAM_FOLD_DEFAULT;
+  return phoneLow ? PROGRAM_FOLD_PHONE_LOW : PROGRAM_FOLD_DEFAULT;
 }
 
 let picked: boolean | undefined;
 /** Whether this page folds program variants; read once per page. */
 export function programFoldOn(): boolean {
   if (picked !== undefined) return picked;
-  let saved: unknown = null;
+  let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(PROGRAM_FOLD_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  picked = programFold(saved);
+  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  picked = programFold(saved, phoneLow);
   return picked;
 }
 /** Tests only: read the slot again. */

@@ -30,6 +30,8 @@ import { BATCHED_VIEW, MERGED_PROGRAM, MERGED_VIEW, SHADOW_LAYER } from '../core
 import { buildHeld, buildUrgent, heldBudget, nativeBudgetSpent, presenting } from '../../../shared/engine/core/framePacing';
 import { countedWait, waitFor } from '../../../shared/engine/boot/waits';
 import { jsonSlot } from '../saves/slots';
+import { TIER } from '../core/tier';
+import { graphicsMode } from '../core/graphicsMode';
 import { isDev } from '../core/devMode';
 
 // meta IPHONE13-DRIFTWOOD DW3 / DRIFTWOOD-FPS DF8 (mini-driftwood13, 2026-11-19): link the zone's whole program inventory
@@ -39,18 +41,23 @@ import { isDev } from '../core/devMode';
 // 1.2 s (DRIFTWOOD-FPS DF1): the dock's spikes over 50 ms. With the device slot on, the boot's world-frame stage links them
 // all before the reveal; the load is longer by their link time, play starts with none left.
 
-/** The device slot (true or false); with none, BOOT_ROAD_PROGRAMS_DEFAULT. */
+/** The device slot (true or false); with none, BOOT_ROAD_PROGRAMS_PHONE_LOW at phone Low, else BOOT_ROAD_PROGRAMS_DEFAULT. */
 export const BOOT_ROAD_PROGRAMS_SLOT = 'debug.bootRoadPrograms';
 /** Off until the iPhone 13 pairs decide (load time against the dock's spikes). */
 export const BOOT_ROAD_PROGRAMS_DEFAULT = false;
+/** Unset at phone Low: on (meta DRIFTWOOD-FPS DF8, mini-dwfps2, 2026-11-23). With programReuse, programFold and
+ *  bootRoadPrograms on, the calibrated stand-in (headless Chromium, phone Low, cap 30, CPU 2.0x, the driftwood-fps route)
+ *  links no program after control and holds fewer programs (meta project/evidence/driftwood-fps/df8-phone-low-defaults-2026-11-23.md). */
+export const BOOT_ROAD_PROGRAMS_PHONE_LOW = true;
 
 let picked: boolean | undefined;
 /** Whether this page links its road variants and undrawn programs at boot; read once per page. */
 export function bootRoadPrograms(): boolean {
   if (picked !== undefined) return picked;
-  let saved: unknown = null;
+  let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(BOOT_ROAD_PROGRAMS_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  picked = typeof saved === 'boolean' ? saved : BOOT_ROAD_PROGRAMS_DEFAULT;
+  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  picked = typeof saved === 'boolean' ? saved : phoneLow ? BOOT_ROAD_PROGRAMS_PHONE_LOW : BOOT_ROAD_PROGRAMS_DEFAULT;
   return picked;
 }
 /** Tests only: read the slot again. */
