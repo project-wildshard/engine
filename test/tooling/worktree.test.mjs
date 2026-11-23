@@ -397,7 +397,7 @@ describe('a full cap makes room', () => {
     // Fresh worktrees are not idle: the cap still refuses, naming the parked one.
     const refused = worktree(canonical, ['new', 'next', '--no-install'], env);
     expect(refused.status).toBe(1);
-    expect(refused.stderr).toMatch(/cap 6\).*a full cap reaps one idle 30 min with no process inside/u);
+    expect(refused.stderr).toMatch(new RegExp(`cap ${String(MAX_WORKTREES)}\\).*a full cap reaps one idle 30 min with no process inside`, 'u'));
     const ENV_FULL = {...ENV, ...env};
     expect(reapForCap(canonical, ENV_FULL)).toEqual([]);
     // 31 min on: full-0 is dirty and stays; full-1 is the oldest clean one and goes, after its copy.

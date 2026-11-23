@@ -90,7 +90,7 @@ export function withStoreUse(env,what,fn){
 }
 
 /** Meta REPO-DISK DK9 (DEV-SPEED Q41): at most this many live plan worktrees per repo. */
-export const MAX_WORKTREES=6;
+export const MAX_WORKTREES=10;
 /** Build-max C4: how long a landed, clean worktree sits untouched before a full cap takes it. */
 export const CAP_REAP_IDLE_MS=30*60_000;
 /** Meta REPO-DISK DK9: refuse a new worktree when the repo's volume has less free than this, in GiB. */
