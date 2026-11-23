@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { PHONE_NEAR_CELLS, farDrawnAt, nearReach, planNearPlaceholders } from './nearPlaceholderPlan';
+import { PHONE_NEAR_CELLS, farDrawnAt, farNearReachOn, nearReach, planNearPlaceholders } from './nearPlaceholderPlan';
 
 const pitch = 555, cells = [-2, -1, 0, 1, 2].flatMap(x => [-2, -1, 0, 1, 2].map(z => ({ instance: `c${x}${z}`, slug: 'content', cell: [x, z] as [number, number], origin: { x: x * pitch, y: 0, z: z * pitch } })));
 
@@ -28,4 +28,10 @@ test('J500 rule 3: a cell within one road cell of the eye stays near past the ph
   expect(farDrawnAt(pitch - 512, pitch)).toBe(false);
   expect(farDrawnAt(reach + 1, pitch)).toBe(true);
   expect(farDrawnAt(pitch, pitch)).toBe(true);
+});
+
+test('J500 rule 3 waits behind debug.farNearReach: off unless the slot is true', () => {
+  expect(farNearReachOn(null)).toBe(false);
+  expect(farNearReachOn(false)).toBe(false);
+  expect(farNearReachOn(true)).toBe(true);
 });

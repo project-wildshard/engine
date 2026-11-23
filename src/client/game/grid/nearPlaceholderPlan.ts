@@ -27,6 +27,12 @@ export interface NearPlanOptions {
  * across the road.
  */
 export function nearReach(pitch: number): number { return (pitch - CHUNK_HALF * 2) * Math.SQRT2; }
+/**
+ * J500 rule 3 is off until rule 2 (the early full load, opus-finish) draws the real zone in that slot: alone, hiding the far
+ * proxy left empty sky where the neighbour stands (coordinator, 2026-11-23). On with the device slot `debug.farNearReach: true`;
+ * rule 2's commit turns the default on.
+ */
+export function farNearReachOn(saved: unknown): boolean { return saved === true; }
 /** Whether a cell's far proxy (and its haze band) may draw with the eye `distance` metres from its content square. */
 export function farDrawnAt(distance: number, pitch: number): boolean { return distance > nearReach(pitch); }
 

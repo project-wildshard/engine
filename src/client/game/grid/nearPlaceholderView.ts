@@ -32,6 +32,8 @@ export interface NearPlaceholderHost {
   readonly pitch: number;
   /** at most this many cells near, the nearest (absent: every cell; the phone tier's `PHONE_NEAR_CELLS`) */
   readonly limit?: number;
+  /** J500 rule 3 (`debug.farNearReach`): a cell within one road cell stays near past `limit` */
+  readonly reach?: boolean;
   /** Optional startup dependency: richer views must not enter the shared decode
    * queue before the visible coarse fallback is ready. Existing views stay owned. */
   readonly readyToRefine?: () => boolean;
@@ -79,7 +81,7 @@ export class NearPlaceholders {
     const skip = new Set(this.missing);
     for (const cell of this.host.cells) if (this.host.root(cell.instance) === undefined) skip.add(cell.instance);
     const plan = planNearPlaceholders(this.host.cells, this.host.pitch, eye, entered, { held: new Set(this.slots.keys()), skip,
-      ...(this.host.limit === undefined ? {} : { limit: this.host.limit, reach: nearReach(this.host.pitch) }) });
+      ...(this.host.limit === undefined ? {} : { limit: this.host.limit, ...(this.host.reach === true ? { reach: nearReach(this.host.pitch) } : {}) }) });
     this.eye = { x: Math.round(eye.x * 10) / 10, z: Math.round(eye.z * 10) / 10 };
     const wanted = new Map(plan.cells.map(c => [c.instance, c.distance]));
     // QA 2026-11-13 (Jake, Driftwood from the road): a cell turns live a few metres before its runtime draws it (the entry
