@@ -99,7 +99,8 @@ class PreviewTests(unittest.TestCase):
         shutil.copyfile(source, self.root / 'scripts/serve-build.sh')
         shutil.copyfile(HELPER, self.root / 'scripts/serve-port-lease.py')
         shutil.copyfile(os.environ.get('X15_TEST_SHARED', ROOT / 'scripts/serve-shared-preview.py'), self.root / 'scripts/serve-shared-preview.py')
-        for name in ('preview-server.mjs', 'preview-encoded-cache.mjs', 'preview-telemetry.mjs'):
+        for name in ('preview-server.mjs', 'preview-encoded-cache.mjs', 'preview-telemetry.mjs', 'app-build/isolation.mjs'):
+            (self.root / 'scripts' / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / 'scripts' / name, self.root / 'scripts' / name)
         subprocess.run(['git', 'init', '-q', str(self.root)], check=True)
         (self.root / 'source').write_text('pinned fixture')

@@ -26,7 +26,10 @@ const settle = async (): Promise<void> => { for (let at = 0; at < 6; at++) await
 function slice(file: string, from: string, to: string, name: string, ports: object, prefix = ''): (...args: readonly unknown[]) => unknown {
   const source = readFileSync(file, 'utf8'), start = source.indexOf(from), end = to === '' ? source.length : source.indexOf(to, start);
   if (start === -1 || end < start) throw new Error(`Missing ${from} in ${file}`);
-  const made: unknown = runInNewContext(stripTypeScriptTypes(`${prefix}${source.slice(start, end).replace('export function', 'function')}\n${name}`), { URL, leaveSaved, ...ports });
+  // DW12: a fresh page goes through the leave page (boot/freshPage.ts); here it lands on the address it asks for
+  const at = (ports as { readonly location?: { readonly href?: string; readonly replace?: (url: string) => void } }).location;
+  const replaceFresh = (url: string | URL): void => { at?.replace?.(new URL(String(url), at.href ?? 'https://example.test/').href); };
+  const made: unknown = runInNewContext(stripTypeScriptTypes(`${prefix}${source.slice(start, end).replace('export function', 'function')}\n${name}`), { URL, leaveSaved, replaceFresh, ...ports });
   if (typeof made !== 'function') throw new Error(`${name} is not callable`);
   return (...args) => Reflect.apply(made, undefined, args) as unknown;
 }

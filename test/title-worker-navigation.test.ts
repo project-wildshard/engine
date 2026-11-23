@@ -16,6 +16,8 @@ function fixture(active: boolean, tier: 'phone' | 'desktop' = 'phone') {
   const destinations: string[] = [], arrivals: unknown[] = [], unloads: unknown[] = [];
   const ports = { running: active ? {} : null, window: { __ws_sw: { ready } }, URL, arrivalTier: { current: tier },
     location: { href: 'https://example.test/?v=old', replace: (url: string) => { destinations.push(url); } },
+    // DW12: a fresh page goes through the leave page (boot/freshPage.ts); the address it asks for is the destination
+    replaceFresh: (url: string | URL) => { destinations.push(new URL(String(url), 'https://example.test/?v=old').href); },
     setTitleArrival: (arrival: unknown) => { arrivals.push(arrival); }, findTitleManifest: () => ({ name: 'Fixture' }),
     markUnload: (reason: unknown) => { unloads.push(reason); }, leaveSaved: (go: () => void) => { go(); },
   };
