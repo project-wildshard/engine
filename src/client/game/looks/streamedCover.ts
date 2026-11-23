@@ -8,6 +8,7 @@ import { createCoverAppearance, type CoverAppearance } from './coverAppearance';
 import { terrainHeight } from '@wildshard/engine/world/terrainHeight';
 import { parseStreamedCover, type StreamedCoverRow } from '@wildshard/format/streamedCover';
 import type { SceneHandles } from '../shardfile/sceneHandles';
+import { coverLowOn } from './coverLow';
 import { CellWindow, instanceTier, type InstanceArrays, type InstanceTier } from '@wildshard/engine/render/streamedInstances';
 
 
@@ -144,7 +145,8 @@ class StreamedCover {
 
   /** Builds every kind's meshes in its lent graphs (one program for all of them) into `group`. */
   build(): this {
-    const row = this.row, K = forTier(row.reachK), capK = forTier(row.capK), sr = row.slopeReach;
+    // DW3 (mini-dw3): at phone Low, `debug.coverReachLow` scales the reach and `debug.coverKeepLow` thins the far models
+    const low = coverLowOn(), row = this.row, K = forTier(row.reachK) * low.reach, capK = forTier(row.capK), sr = row.slopeReach;
     const material = (id: string, reach: THREE.Vector3, far: THREE.Vector3, mode: number, keep = 1): THREE.Material => {
       const mat = this.appearance.material(id);
       setLentParam(id, row.params.reach, reach.toArray()); setLentParam(id, row.params.lodReach, far.toArray()); setLentParam(id, row.params.mode, mode); setLentParam(id, row.params.keep, keep);
@@ -162,10 +164,10 @@ class StreamedCover {
       let farTier: FarTier | null = null;
       const farSpan = new THREE.Vector3(0, 0, 1);
       if (k.far !== undefined) {
-        const f = k.far, [fn, ff] = f.reach, fcap = Math.round(f.cap * f.keep * capK);
+        const f = k.far, [fn, ff] = f.reach, keep = Math.min(f.keep, low.keep), fcap = Math.round(f.cap * keep * capK);
         farSpan.set(fn * K, ff * K, (ff - fn) * K * row.growShare);
         this.rFar = Math.max(this.rFar, farSpan.y * sr.up + row.farSlack + row.eyeSlack);
-        farTier = { set: instanceTier(this.group, `${row.meshPrefix}${k.name}-far`, geometry(f.geometry, `${row.look}-${k.name}-far`), material(`${row.look}-${k.name}-far`, reach, farSpan, MODE_FAR), fcap, ATTRS, options), cap: fcap, reach: farSpan, keep: f.keep };
+        farTier = { set: instanceTier(this.group, `${row.meshPrefix}${k.name}-far`, geometry(f.geometry, `${row.look}-${k.name}-far`), material(`${row.look}-${k.name}-far`, reach, farSpan, MODE_FAR), fcap, ATTRS, options), cap: fcap, reach: farSpan, keep };
       }
       const set = instanceTier(this.group, `${row.meshPrefix}${k.name}`, geometry(k.geometry, `${row.look}-${k.name}`), material(`${row.look}-${k.name}`, reach, farSpan, farTier ? MODE_HANDOVER : MODE_NEAR, farTier ? farTier.keep : 1), cap, ATTRS, options);
       this.kinds.push({ set, cap, far: farTier, reach, scale: k.scale });

@@ -582,6 +582,16 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/COVER_KEEP_LOW_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
+    "json:device/COVER_REACH_LOW_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/DENSITY_LOD_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

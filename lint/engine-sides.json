@@ -871,6 +871,7 @@
     "src/client/game/looks/speciesBook.ts": "client",
     "src/client/game/looks/staticCapture.ts": "client",
     "src/client/game/looks/streamedCover.ts": "client",
+    "src/client/game/looks/coverLow.ts": "client",
     "src/client/game/looks/toonLighting.ts": "client",
     "src/client/game/looks/toonLook.ts": "client",
     "src/client/game/looks/toonSky.ts": "client",
