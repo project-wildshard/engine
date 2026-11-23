@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { once } from 'node:events';
 import { afterEach, expect, test } from 'vitest';
 import { ServerReports } from '../src/server/host/dedicated/serverReports';
-import { FLUSH_MS, sendSentryTest, serverSentry, serverSentryRelease } from '../src/server/host/dedicated/serverSentry';
+import { FLUSH_MS, KIND_QUIET_MS, SENDS_PER_HOUR, sendSentryTest, serverSentry, serverSentryRelease } from '../src/server/host/dedicated/serverSentry';
 
 // SENTRY-TRIAGE S8: the server's errors reach Sentry with the client's release name and the channel as environment, carry
 // no request or host, and a Sentry that is away or slow never holds the server past FLUSH_MS.
@@ -67,15 +67,28 @@ test('a Sentry that refuses or hangs costs a capture nothing and an ending proce
   expect(performance.now() - started, 'one deadline for the whole flush').toBeLessThan(FLUSH_MS + 500);
 }, 10_000);
 
-test('a capture only queues: the SDK and the send run on a later turn, and a flood past the queue is dropped', async () => {
+test('a capture only queues: the SDK and the send run on a later turn, and a flood stops at SENDS_PER_HOUR (SZ3)', async () => {
   const sentry = await ingest();
   let sends = 0;
   const counted: typeof fetch = async (input, init) => { sends += 1; return fetch(input, init); };
   const client = serverSentry({ dsn: sentry.dsn, version: '0.1.7', build: 'b1', channel: 'staging', fetch: counted });
-  for (let index = 0; index < 40; index += 1) client?.capture(new Error(`flood ${String(index)}`), { system: 'server', fatal: true });
+  for (let index = 0; index < 40; index += 1) client?.capture(new Error('flood'), { system: `s${'x'.repeat(index)}`, fatal: true });
   expect(sends, 'nothing ran in the caller\'s turn').toBe(0);
   await client?.flush();
-  expect(sentry.envelopes).toHaveLength(32);
+  expect(sentry.envelopes).toHaveLength(SENDS_PER_HOUR);
+});
+
+test('SZ3: one event per kind an hour; ids and numbers fold into one kind', async () => {
+  const sentry = await ingest();
+  let clock = 0;
+  const client = serverSentry({ dsn: sentry.dsn, version: '0.1.7', build: 'b1', channel: 'production', now: () => clock });
+  for (let index = 0; index < 5; index += 1) client?.capture(new Error(`save contract failure: player ${String(index)}`), { system: 'save-contract', fatal: false });
+  await client?.flush();
+  expect(sentry.envelopes).toHaveLength(1);
+  clock = KIND_QUIET_MS;
+  client?.capture(new Error('save contract failure: player 9'), { system: 'save-contract', fatal: false });
+  await client?.flush();
+  expect(sentry.envelopes).toHaveLength(2);
 });
 
 test('a thrown plain object keeps its fields out of the event', async () => {

@@ -25,6 +25,33 @@ export interface ServerSentryOptions {
   readonly channel: string;
   /** For tests: the transport's fetch. */
   readonly fetch?: typeof fetch;
+  /** For tests: the send gate's clock, in milliseconds. */
+  readonly now?: () => number;
+}
+
+/**
+ * SENTRY-ZERO SZ3 (Jake, 2026-11-23: "Everything in sentry MUST be a bug, and it must be fixed and it must be low frequency"):
+ * one event per kind an hour (the system and the message with its ids and numbers folded), at most SENDS_PER_HOUR in all, and
+ * never a warning or info level. A crash loop or a bad save read on every join is one event an hour, not one a player.
+ */
+export const KIND_QUIET_MS = 3_600_000;
+export const SENDS_PER_HOUR = 20;
+export function serverErrorKind(error: unknown, system: string): string {
+  const message = (error instanceof Error ? error.message : String(error)).replaceAll(/[0-9a-f-]{8,}/giu, '#').replaceAll(/\d+/gu, '#').slice(0, 160);
+  return `${system}|${message}`;
+}
+/** Whether this kind may send at `at`; records the send when it may. */
+export function serverSendGate(): (kind: string, at: number) => boolean {
+  const last = new Map<string, number>();
+  let sent: number[] = [];
+  return (kind, at) => {
+    const before = last.get(kind);
+    if (before !== undefined && at - before < KIND_QUIET_MS) return false;
+    sent = sent.filter(time => at - time < KIND_QUIET_MS);
+    if (sent.length >= SENDS_PER_HOUR) return false;
+    sent.push(at); last.set(kind, at);
+    return true;
+  };
 }
 
 export interface ServerSentry {
@@ -74,14 +101,17 @@ export function serverSentry(options: ServerSentryOptions): ServerSentry | undef
     integrations: [linkedErrorsIntegration()], stackParser: createStackParser(nodeStackLineParser()),
     transport: fetchTransport(options.fetch ?? fetch), traceLifecycle: 'static',
     sendClientReports: false, sendDefaultPii: false, maxBreadcrumbs: 0,
-    beforeSend: event => scrubServerEvent(event),
+    // SZ3: a warning or info event is never sent
+    beforeSend: event => (event.level === 'warning' || event.level === 'info' || event.level === 'log' || event.level === 'debug' ? null : scrubServerEvent(event)),
   });
   client.init();
   // The SDK builds the event and starts its send synchronously, so a capture only queues and the SDK runs on a later turn.
   const queued = new Set<Promise<void>>(), scope = new Scope('dedicated.sentry');
+  const admit = serverSendGate(), now = options.now ?? Date.now;
   return {
     capture: (error, tags) => {
       if (queued.size >= MAX_QUEUED) return;
+      if (!admit(serverErrorKind(error, String(tags['system'] ?? '')), now())) return;
       const turn = new Promise<void>(resolve => { scope.timeout(0, () => {
         try {
           const event = new SentryScope();

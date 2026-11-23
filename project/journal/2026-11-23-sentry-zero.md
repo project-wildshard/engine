@@ -8,3 +8,4 @@ Meta plan: `docs/plans/SENTRY-ZERO-PLAN.md`. Jake: the 5000-event Sentry quota r
   `map-tile-missing` warning screen that S21's automation cap exempted.
 - SZ2b: the loading card's 20 s `boot.slow` note is a warning (trail only); wrapped network failures are noise; a page reports its
   first missing KTX2 stand-in only (WILDSHARD-GAME-BV sent 180 in 7 min, one per model).
+- SZ3: the rooms server sends one event per kind an hour, at most 20 an hour, never warning or info.
