@@ -69,20 +69,36 @@ export function packFormat(name: string, data: Float32Array, size: number): Pack
   return null;
 }
 
-/** One staging array the packed uploads share (GL copies it at once), let go when the task's uploads end. */
+/** The phone Low far ring keeps packing on streamed draws. Hold at most one small pair between tasks. */
+const KEEP_PACKED_BYTES = 4 * 1024 * 1024;
+const KEEP_WORD_COUNT = KEEP_PACKED_BYTES / Int32Array.BYTES_PER_ELEMENT;
+function stageCapacity(request: number, previous: number, kept: number): number {
+  return Math.max(request, Math.min(kept, previous * 2));
+}
+
+/** One staging array the packed uploads share (GL copies it at once). */
 let staging: Uint8Array | null = null;
+let largeStaging: Uint8Array | null = null;
 function stagingBytes(bytes: number): Uint8Array {
-  if (staging === null || staging.byteLength < bytes) staging = ownedArray(Uint8Array, Math.max(bytes, 2 * (staging?.byteLength ?? 0)), PACKED);
-  const out = staging.subarray(0, bytes); out.fill(0); return out;
+  if (bytes > KEEP_PACKED_BYTES) {
+    if (largeStaging === null || largeStaging.byteLength < bytes) largeStaging = ownedArray(Uint8Array, bytes, PACKED);
+    return largeStaging.subarray(0, bytes);
+  }
+  if (staging === null || staging.byteLength < bytes) staging = ownedArray(Uint8Array, stageCapacity(bytes, staging?.byteLength ?? 0, KEEP_PACKED_BYTES), PACKED);
+  return staging.subarray(0, bytes);
 }
 /** `count` zeroed Int32 words, from one array shared like the staging bytes. */
 let wordStaging: Int32Array | null = null;
+let largeWordStaging: Int32Array | null = null;
 function stagingWords(count: number): Int32Array {
-  if (wordStaging === null || wordStaging.length < count) wordStaging = ownedArray(Int32Array, Math.max(count, 2 * (wordStaging?.length ?? 0)), PACKED);
+  if (count > KEEP_WORD_COUNT) {
+    if (largeWordStaging === null || largeWordStaging.length < count) largeWordStaging = ownedArray(Int32Array, count, PACKED);
+    const out = largeWordStaging.subarray(0, count); out.fill(0); return out;
+  }
+  if (wordStaging === null || wordStaging.length < count) wordStaging = ownedArray(Int32Array, stageCapacity(count, wordStaging?.length ?? 0, KEEP_WORD_COUNT), PACKED);
   const out = wordStaging.subarray(0, count); out.fill(0); return out;
 }
-/** The shared staging goes (the end of a task's uploads). */
-export function releasePackStaging(): void { staging = null; wordStaging = null; }
+export function releasePackStaging(): void { staging = null; wordStaging = null; largeStaging = null; largeWordStaging = null; }
 
 /** Vertices `[from, to)` in `f`'s layout, in the shared staging array: upload it before the next `encode`. Element `e`
  * (vertex `e / f.size`, component `e % f.size`) is read from `source[e + shift]`; a missing or non-finite one writes 0 and
@@ -152,7 +168,8 @@ export const vertexPackStats: VertexPackStats = { buffers: 0, floatBytes: 0, pac
 if (typeof window !== "undefined") Reflect.set(window, "__vertexPackStats", vertexPackStats);
 
 /** Wrap `gl` so static Float32 vertex channels go up packed. `enabled` is read at each upload. False: not installed. */
-export function installVertexPack(gl: VertexPackContext, enabled: () => boolean, schedule: (flush: () => void) => void = queueMicrotask): boolean {
+export function installVertexPack(gl: VertexPackContext, enabled: () => boolean, schedule: (flush: () => void) => void = queueMicrotask,
+  keepStaging: () => boolean = () => false): boolean {
   const call = (name: keyof VertexPackContext): ((...args: readonly unknown[]) => unknown) => { const f: unknown = gl[name]; return (...args) => Reflect.apply(f as (...a: unknown[]) => unknown, gl, args); };
   const wrap = (name: keyof VertexPackContext, value: (...args: readonly unknown[]) => unknown): void => { Object.defineProperty(gl, name, { value, writable: true, configurable: true }); };
   const bindBuffer = call('bindBuffer'), deleteBuffer = call('deleteBuffer'), bufferData = call('bufferData'), bufferSubData = call('bufferSubData');
@@ -173,8 +190,13 @@ export function installVertexPack(gl: VertexPackContext, enabled: () => boolean,
     if (previous !== buffer) bindBuffer(ARRAY_BUFFER, previous);
     vertexPackStats.unpacked++;
   };
-  const flushAll = (): void => { scheduled = false; for (const [buffer, entry] of pending) flushOne(buffer, entry); releasePackStaging(); };
-  /** the end of this task flushes what is still waiting and lets the staging go */
+  const flushAll = (): void => {
+    scheduled = false;
+    for (const [buffer, entry] of pending) flushOne(buffer, entry);
+    if (!keepStaging() || !enabled()) releasePackStaging();
+    largeStaging = null; largeWordStaging = null;
+  };
+  /** The end of this task flushes uploads that no draw used. */
   const later = (): void => { if (!scheduled) { scheduled = true; schedule(flushAll); } };
   const nameOf = (index: number): string | undefined => {
     if (!live(program)) return undefined;

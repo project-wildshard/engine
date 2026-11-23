@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { decode, encode, installVertexPack, packFormat, vertexPackStats, vertexPackWanted } from './vertexPack';
+import { decode, encode, installVertexPack, packFormat, releasePackStaging, vertexPackStats, vertexPackWanted } from './vertexPack';
 
 const ARRAY_BUFFER = 0x8892, STATIC = 0x88e4, DYNAMIC = 0x88e8;
 const BYTE = 0x1400, UNSIGNED_BYTE = 0x1401, SHORT = 0x1402, UNSIGNED_SHORT = 0x1403, FLOAT = 0x1406;
@@ -116,6 +116,36 @@ test('a later write packs in range and turns the buffer back to Float32 out of i
   expect(wide.length).toBe(colours.length);
   expect([wide[0], wide[1], wide[3], wide[4]]).toEqual([2, 0.5, 1, 0]);
   expect(pointers.at(-1)).toBe(`vao 0 3x${String(FLOAT)} stride 12 at 0`);
+});
+
+test('phone Low can reuse upload storage across tasks while preserving each packed channel', () => {
+  const { gl, store } = fakeContext(['normal']);
+  const original = gl.bufferData, flushes: (() => void)[] = [], backs: ArrayBufferLike[] = [];
+  gl.bufferData = (target, data, usage) => {
+    if (data instanceof Uint8Array) backs.push(data.buffer);
+    original(target, data, usage);
+  };
+  let keep = true;
+  installVertexPack(gl, () => true, flush => { flushes.push(flush); }, () => keep);
+  gl.useProgram({});
+  function upload(normal: readonly number[]): Uint8Array | undefined {
+    const buffer = {};
+    gl.bindBuffer(ARRAY_BUFFER, buffer);
+    gl.bufferData(ARRAY_BUFFER, floats(normal), STATIC);
+    gl.vertexAttribPointer(0, 3, FLOAT, false, 0, 0);
+    flushes.shift()?.();
+    return store.get(buffer);
+  }
+  try {
+    const first = upload([0, 1, 0]), second = upload([0, 0, 1]);
+    expect(first?.slice(0, 4)).toEqual(Uint8Array.of(0, 127, 0, 0));
+    expect(second?.slice(0, 4)).toEqual(Uint8Array.of(0, 0, 127, 0));
+    expect(backs[1]).toBe(backs[0]);
+    keep = false;
+    upload([1, 0, 0]);
+    upload([0, 1, 0]);
+    expect(backs[3]).not.toBe(backs[2]);
+  } finally { releasePackStaging(); }
 });
 
 test('dynamic, small, off or interleaved channels pass straight through', () => {

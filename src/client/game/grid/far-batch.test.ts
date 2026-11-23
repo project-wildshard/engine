@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { expect, test } from 'vitest';
-import { FarBatches, farBatch } from './farBatch';
+import { farBatch } from '@wildshard/engine/core/graphicsMode';
+import { FarBatches } from './farBatch';
 import { installFarProxy } from './farView';
 import type { FarLookRuntime } from '../../../shared/game/grid/farProxy';
 
@@ -35,11 +36,32 @@ test('proxies of one program share a batch that follows each proxy', () => {
   toon.sync();
   expect([toon.getVisibleAt(0), toon.getVisibleAt(1)]).toEqual([true, false]);
   b.dispose();
-  const after = batches.batches().find(batch => batch.material !== c.mesh.material && batch.instanceCount === 1 && batch !== toon);
   expect(batches.batches().length).toBe(2);
-  expect(after).toBeDefined();
+  expect(batches.batches()).toContain(toon);
+  expect(toon.instanceCount).toBe(1);
   batches.dispose();
   expect(scene.children.filter(child => child.name === 'far-batch')).toEqual([]);
+});
+
+test('a proxy fits in compacted space without replacing live geometry or changing the surviving draw', () => {
+  const scene = new THREE.Scene(), batches = new FarBatches(scene);
+  const shade = look('toon');
+  const a = installFarProxy(scene, new THREE.PlaneGeometry(4, 4, 2, 2), shade);
+  const b = installFarProxy(scene, new THREE.PlaneGeometry(6, 6, 2, 2), shade);
+  const c = installFarProxy(scene, new THREE.PlaneGeometry(8, 8, 3, 2), shade);
+  for (const proxy of [a, b]) batches.adopt(proxy, shade, false);
+  const batch = batches.batches()[0];
+  if (batch === undefined || batch.geometry.index === null) throw new Error('indexed far batch');
+  const positions = batch.geometry.getAttribute('position').array, indices = batch.geometry.index.array;
+  a.dispose();
+  batches.adopt(c, shade, false);
+  expect(batches.batches()[0]).toBe(batch);
+  expect(batch.instanceCount).toBe(2);
+  expect(batch.geometry.getAttribute('position').array).toBe(positions);
+  expect(batch.geometry.index?.array).toBe(indices);
+  expect(Array.from(positions.slice(0, 27))).toEqual(Array.from(b.mesh.geometry.getAttribute('position').array));
+  expect(Array.from(indices.slice(0, 24))).toEqual(Array.from(b.mesh.geometry.index?.array ?? []));
+  batches.dispose();
 });
 
 test('DF8 (debug.programReuse): a group keeps one material across rebuilds, so its program is never freed', () => {
@@ -67,6 +89,8 @@ test('DF8 (debug.programFold): a stand-in draws with the group material it will 
   const stand = batches.stand(view, look('toon'), false);
   if (stand === null) throw new Error('a stand-in');
   const material = stand.material;
+  expect(stand.geometry.getAttribute('position').count).toBe(3);
+  expect(stand.geometry.index?.count).toBe(3);
   let disposed = 0;
   if (material instanceof THREE.Material) material.addEventListener('dispose', () => { disposed++; });
   expect(stand.parent).toBe(null); // the caller places it, never in the drawn scene

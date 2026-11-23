@@ -22,13 +22,14 @@ import { installShadowMaterialOwnership } from './shadowMaterialOwnership';
 import { installCookedSkinUvBinding, installProvokingVertex } from './drawHooks';
 import { installPassSplit, passSplitLimit, PASS_SPLIT_VERTICES } from './passSplit';
 import { installByteTriples } from './byteTriples';
-import { installVertexPack, VERTEX_PACK_SLOT, vertexPackWanted } from './vertexPack';
+import { installVertexPack, releasePackStaging, VERTEX_PACK_SLOT, vertexPackWanted } from './vertexPack';
 import { programTwinsOn } from './programTwins';
 import { programReuseOn } from './programReuse';
 import { installEnvironmentFold, programFoldOn } from './programFold';
 import { skipEmptyBatches } from './drawGuards';
 import { jsonSlot } from '../saves/slots';
 import { TIER } from '../core/tier';
+import { farBatchAtLow } from '../core/graphicsMode';
 import { gltfOpaqueSort } from './gltfMaterialOrder';
 import { installRenderListSort } from './renderListSort';
 import type { AssetService } from '../app/assets';
@@ -79,10 +80,10 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   installByteTriples(context);
   // STR16: the phone's static Float32 vertex channels go up packed (vertexPack.ts); outside byteTriples, inside the Memory saver
   const packSlot = jsonSlot(VERTEX_PACK_SLOT, 'device').read();
-  installVertexPack(context, () => vertexPackWanted(TIER === 'phone', packSlot));
+  installVertexPack(context, () => vertexPackWanted(TIER === 'phone', packSlot), queueMicrotask, () => TIER === 'phone' && farBatchAtLow());
   const stopLabels = installDeveloperLabels(renderer);
   const dispose = renderer.dispose.bind(renderer);
-  renderer.dispose = () => { try { dispose(); } finally { stopLabels(); stopJournal(); stopCounters(); } };
+  renderer.dispose = () => { try { dispose(); } finally { releasePackStaging(); stopLabels(); stopJournal(); stopCounters(); } };
   installFrameCounter(renderer); // SF59: the engine counts its own renders (frameCounter.ts)
   installTextureUploadEvents(renderer);
   installCompressedTextureRetirement(renderer);

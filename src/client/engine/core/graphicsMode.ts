@@ -65,3 +65,13 @@ export function saveGraphicsMode(mode: GraphicsMode): boolean {
 
 /** The mode in force on a phone: Low while Low Power Mode looks on, else the saved pick. */
 export function graphicsMode(): GraphicsMode { return lowPowerOn() ? 'low' : savedGraphicsMode(); }
+
+export const FAR_BATCH_SLOT = 'debug.farBatch';
+const farBatchSlot = jsonSlot(FAR_BATCH_SLOT, 'device');
+/** DF10 defaults far batching on at phone Low. A saved boolean wins. */
+export function farBatch(saved: unknown): boolean { return saved !== false; }
+export function farBatchAtLow(): boolean {
+  let saved: unknown = null;
+  try { saved = farBatchSlot.read(); } catch { /* storage blocked: the default */ }
+  return graphicsMode() === 'low' && farBatch(saved);
+}

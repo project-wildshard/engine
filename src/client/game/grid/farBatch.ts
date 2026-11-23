@@ -2,8 +2,7 @@ import * as THREE from 'three';
 import { ChangedBatchedMesh } from '@wildshard/engine/render/changedTextureUploads';
 import { patchShader } from '@wildshard/engine/render/shaderPatches';
 import { TIER } from '@wildshard/engine/core/tier';
-import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
-import { jsonSlot } from '@wildshard/engine/saves/slots';
+import { farBatchAtLow } from '@wildshard/engine/core/graphicsMode';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { skipEmptyBatches } from '@wildshard/engine/render/drawGuards';
 import type { FarLookRuntime } from '../../../shared/game/grid/farProxy';
@@ -15,21 +14,11 @@ import { farProxyMaterial, type FarProxyView } from './farView';
  * cell in view: 7 of the beach's 55. Its proxies share one program per family and mask kind, so each group becomes a
  * three BatchedMesh whose copies read their flags and share from a small data texture by draw id. A proxy's own mesh
  * stays the source of truth (its parent's and its own visibility, its masks and band, its matrix): it no longer draws
- * (no layer), and the batch reads it every frame. A group is rebuilt only when a proxy joins or leaves (the ring moves).
+ * (no layer), and the batch reads it every frame. The batch keeps its geometry buffers as proxies enter and leave.
  * A proxy with light or colour layers keeps them (they are its children and still draw).
  */
-export const FAR_BATCH_SLOT = 'debug.farBatch';
-const farBatchSlot = jsonSlot(FAR_BATCH_SLOT, 'device');
-/** DF10 defaults the far ring's batches on for phone Low. A saved boolean wins. */
-export function farBatch(saved: unknown): boolean { return saved !== false; }
 /** The far ring batches only at phone Low. */
-export function farBatchOn(): boolean {
-  let saved: unknown = null;
-  try { saved = farBatchSlot.read(); } catch { /* storage blocked: the default */ }
-  let low = false;
-  try { low = graphicsMode() === 'low'; } catch { /* no settings: not Low */ }
-  return TIER === 'phone' && low && farBatch(saved);
-}
+export function farBatchOn(): boolean { return TIER === 'phone' && farBatchAtLow(); }
 
 /** whether a renderer multi-draws (`WEBGL_multi_draw`); none (a test host): no */
 export function multiDraws(renderer: unknown): boolean {
@@ -46,6 +35,20 @@ const MASKS = 16;
 const EMPTY = ownedArray(Uint8Array, 0, { owner: 'grid/far-batch', asset: 'far-flags', kind: 'scratch' });
 
 interface Member { readonly view: FarProxyView; readonly material: THREE.Material; readonly geometry: THREE.BufferGeometry; instance: number }
+interface VacantGeometry { readonly id: number; readonly vertices: number; readonly indices: number }
+
+/** Shader warm-up needs the same attribute layout, with no need for the proxy's full draw geometry. */
+function standGeometry(source: THREE.BufferGeometry): THREE.BufferGeometry {
+  if (source.getAttribute('position').count < 3) return source;
+  const attributes = Object.entries(source.attributes);
+  const stand = new THREE.BufferGeometry();
+  for (const [name, attribute] of attributes) {
+    if (!(attribute instanceof THREE.BufferAttribute)) return source;
+    stand.setAttribute(name, new THREE.BufferAttribute(attribute.array.subarray(0, 3 * attribute.itemSize), attribute.itemSize, attribute.normalized));
+  }
+  if (source.index !== null) stand.setIndex([0, 1, 2]);
+  return stand;
+}
 
 /** a proxy material's flags and band, as `farProxyMaterial` records them */
 function farState(material: THREE.Material): { mask: Float32Array; band: number } | null {
@@ -81,32 +84,72 @@ float farMaskAt(float id, int r) { return texelFetch(farBatchData, ivec2(r / 4, 
   return material;
 }
 
-/** one program's proxies as one batch: rebuilt when a proxy joins or leaves, synced from the proxies every frame */
+/** One program's proxies as one batch, synced from the proxies every frame. */
 export class FarBatch extends ChangedBatchedMesh {
   readonly members: Member[] = [];
   /** the copies' flags and band (absent on a copy three's clone made: it draws what it was copied with) */
   private flags: { readonly data: THREE.DataTexture; readonly bytes: Uint8Array } | null = null;
   private retired = false;
+  private readonly vacant: VacantGeometry[] = [];
   /** DF8 (`debug.programReuse`): the material is its group's, kept across rebuilds; the group disposes it */
   private sharedMaterial = false;
   /** a batch of `members`, its flags and band in `data` (whose pixels are `bytes`); `shared`: the material outlives it */
-  static of(members: readonly Member[], data: THREE.DataTexture, bytes: Uint8Array, material: THREE.Material, shared = false): FarBatch {
+  static of(members: readonly Member[], data: THREE.DataTexture, bytes: Uint8Array, material: THREE.Material, shared = false, instances: number = members.length): FarBatch {
     const vertices = members.reduce((sum, member) => sum + member.geometry.getAttribute('position').count, 0);
     const indices = members.reduce((sum, member) => sum + (member.geometry.index?.count ?? 0), 0);
+    const reserve = instances > members.length ? 1.5 : 1;
     // three's constructor signature, so its clone (`new this.constructor(...)`) still makes a batch
-    const batch = new FarBatch(members.length, vertices, Math.max(1, indices), material);
+    const batch = new FarBatch(instances, Math.ceil(vertices * reserve), Math.max(1, Math.ceil(indices * reserve)), material);
     batch.name = 'far-batch'; batch.frustumCulled = false; batch.perObjectFrustumCulled = true; batch.sortObjects = false;
     batch.castShadow = false; batch.receiveShadow = false; batch.matrixAutoUpdate = false;
     batch.flags = { data, bytes }; batch.sharedMaterial = shared;
-    for (const member of members) {
-      const geometry = batch.addGeometry(member.geometry);
-      member.instance = batch.addInstance(geometry);
-      member.view.mesh.updateWorldMatrix(true, false);
-      batch.setMatrixAt(member.instance, member.view.mesh.matrixWorld);
-      batch.members.push(member);
+    for (const member of members) batch.append(member);
+    // The first GL upload copies the entire buffer. Future appends should upload only their changed spans.
+    batch.geometry.index?.clearUpdateRanges();
+    for (const attribute of Object.values(batch.geometry.attributes)) {
+      if (attribute instanceof THREE.BufferAttribute) attribute.clearUpdateRanges();
     }
     batch.sync();
     return batch;
+  }
+  private append(member: Member, geometry = this.addGeometry(member.geometry)): void {
+    member.instance = this.addInstance(geometry);
+    member.view.mesh.updateWorldMatrix(true, false);
+    this.setMatrixAt(member.instance, member.view.mesh.matrixWorld);
+    this.members.push(member);
+    this.boundingBox = null; this.boundingSphere = null;
+  }
+  /** Fill a vacant range, append, or compact when empty ranges are large enough together. */
+  tryAppend(member: Member): boolean {
+    if (this.retired || this.instanceCount === this.maxInstanceCount) return false;
+    const vertices = member.geometry.getAttribute('position').count, indices = member.geometry.index?.count ?? 0;
+    const hole = this.vacant.findIndex(entry => vertices <= entry.vertices && indices <= entry.indices);
+    const fitting = this.vacant[hole];
+    if (fitting !== undefined) {
+      this.setGeometryAt(fitting.id, member.geometry);
+      this.vacant.splice(hole, 1);
+      this.append(member, fitting.id);
+      return true;
+    }
+    if (vertices > this.unusedVertexCount || indices > this.unusedIndexCount) {
+      if (vertices > this.vacant.reduce((total, entry) => total + entry.vertices, this.unusedVertexCount)
+        || indices > this.vacant.reduce((total, entry) => total + entry.indices, this.unusedIndexCount)) return false;
+      for (const entry of this.vacant) this.deleteGeometry(entry.id);
+      this.vacant.length = 0;
+      this.optimize();
+    }
+    this.append(member);
+    return true;
+  }
+  removeMember(member: Member): void {
+    const at = this.members.indexOf(member);
+    if (at === -1) return;
+    const id = this.getGeometryIdAt(member.instance), range = this.getGeometryRangeAt(id);
+    if (range === null) throw new Error('Missing far batch geometry range');
+    this.vacant.push({ id, vertices: range.reservedVertexCount, indices: Math.max(0, range.reservedIndexCount) });
+    this.deleteInstance(member.instance);
+    this.members.splice(at, 1);
+    this.boundingBox = null; this.boundingSphere = null;
   }
   /** once: three's dispose empties its textures, and a scene owner may dispose the batch before the ring does */
   retire(): void {
@@ -201,7 +244,7 @@ export class FarBatches {
     group.material ??= batchMaterial(group.look, group.positionalMask, group.holder);
     const bytes = ownedArray(Uint8Array, TEXELS * 8 * 4, { owner: 'grid/far-batch', asset: 'far-flags', kind: 'scratch' });
     const scratch = new THREE.DataTexture(bytes, TEXELS, 8, THREE.RGBAFormat, THREE.UnsignedByteType);
-    const batch = FarBatch.of([{ view, material, geometry: view.mesh.geometry, instance: -1 }], scratch, bytes, group.material, true);
+    const batch = FarBatch.of([{ view, material, geometry: standGeometry(view.mesh.geometry), instance: -1 }], scratch, bytes, group.material, true);
     batch.name = 'far-batch:stand-in';
     const retire = batch.retire.bind(batch);
     batch.retire = (): void => { retire(); scratch.dispose(); };
@@ -218,22 +261,26 @@ export class FarBatches {
     const member: Member = { view, material, geometry, instance: -1 };
     group.members.push(member);
     view.mesh.layers.disableAll();
-    const dispose = view.dispose, owner = group;
+    const dispose = view.dispose;
     view.dispose = () => {
-      const at = owner.members.indexOf(member);
-      if (at !== -1) { owner.members.splice(at, 1); this.rebuild(key); }
+      const at = group.members.indexOf(member);
+      if (at !== -1 && this.groups.get(key) === group) {
+        group.members.splice(at, 1);
+        if (group.members.length === 0) {
+          group.batch?.retire(); group.data?.dispose(); group.material?.dispose();
+          this.groups.delete(key);
+        } else group.batch?.removeMember(member);
+      }
       dispose();
     };
-    this.rebuild(key);
+    if (group.batch?.tryAppend(member) !== true) this.grow(group);
     return true;
   }
 
-  private rebuild(key: string): void {
-    const group = this.groups.get(key);
-    if (group === undefined) return;
-    if (group.batch !== null) { group.batch.retire(); group.batch = null; }
-    if (group.members.length === 0) { group.data?.dispose(); group.data = null; group.material?.dispose(); group.material = null; this.groups.delete(key); return; }
-    const data = this.ensureData(group, group.members.length);
+  private grow(group: Group): void {
+    const instances = Math.max(8, group.members.length * 2);
+    group.batch?.retire();
+    const data = this.ensureData(group, instances);
     let material: THREE.Material;
     if (this.keepMaterials) {
       group.holder ??= { value: data };
@@ -241,7 +288,7 @@ export class FarBatches {
       group.material ??= batchMaterial(group.look, group.positionalMask, group.holder);
       material = group.material;
     } else material = batchMaterial(group.look, group.positionalMask, { value: data });
-    const batch = FarBatch.of(group.members, data, group.bytes, material, this.keepMaterials);
+    const batch = FarBatch.of(group.members, data, group.bytes, material, this.keepMaterials, instances);
     this.parent.add(batch); batch.updateMatrixWorld(true);
     group.batch = batch;
   }
