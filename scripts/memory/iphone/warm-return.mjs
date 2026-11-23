@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // meta IPHONE13-DRIFTWOOD DW12 / DW11 (mini-dw12e, 2026-11-22): a zone's cold boot, then its warm return in the same tab, on
 // the iPhone 13, with the kernel's word on whether WebContent was jetsammed. The warm return is IP9's: the page leaves for
-// /robots.txt, waits 300 ms and opens /slug/<zone> again (`hop`); `direct` opens /slug/<zone> from the game page itself (the
-// game's document to the game's document: one opener policy, so WebKit keeps the process). Each round starts a fresh Safari.
+// /robots.txt, waits 1.5 s and opens /slug/<zone> again (`hop`); `direct` opens /slug/<zone> from the game page itself (the
+// game's document to the game's document: one opener policy, so WebKit keeps the process); `leave` goes the way the game's own
+// navigations go since DW12 (boot/freshPage.ts: `/leave?to=/slug/<zone>`, a COOP-less page that sends itself on at once).
+// Each round starts a fresh Safari.
 //
 //   node scripts/memory/iphone/phone-queue.mjs submit --priority driftwood-fps -- scripts/memory/iphone/warm-return.mjs \
 //     --base https://staging.wildshard.io/ [--zone driftwood-isle] [--arms hop,hop,hop] [--nav replace|load] [--hold 40] [--out <dir>]
@@ -48,6 +50,8 @@ export function kernelKills(lines) {
   for (const line of lines) {
     const match = /^\w+ +\d+ (?<at>\d\d:\d\d:\d\d\.\d{3})\d* kernel.*memorystatus: (?<what>killing\w*(?: process| pid)+ (?<pid>\d+) \[com\.apple\.WebKit\.WebContent\][^-]*)/u.exec(line);
     if (match?.groups?.['at'] === undefined || match.groups['pid'] === undefined) continue;
+    // an idle WebContent the kernel reclaims (a spare, a few MB) is not a page kill
+    if (/killing_idle_process/u.test(line)) continue;
     const kb = /(?<n>\d+)KB/u.exec(line)?.groups?.['n'];
     out.push([match.groups['at'], Number(match.groups['pid']), kb === undefined ? null : Number(kb), (match.groups['what'] ?? '').trim()]);
   }
@@ -151,10 +155,11 @@ async function go(page, url, nav) {
 }
 
 /** Open /slug/<zone>, wait for the new document, press ENTER ZONE and wait for control.
- * @param {Page} page @param {URL} base @param {string} zone @param {'replace' | 'load'} nav @returns {Promise<Boot>} */
-async function boot(page, base, zone, nav) {
+ * @param {Page} page @param {URL} base @param {string} zone @param {'replace' | 'load'} nav @param {string} [via] the address
+ *   that leads there (`leave`: the leave page, which sends the page on) @returns {Promise<Boot>} */
+async function boot(page, base, zone, nav, via = `/slug/${zone}`) {
   const before = Number(await settled(() => page.evaluate('return performance.timeOrigin;')));
-  await go(page, new URL(`/slug/${zone}`, base).href, nav);
+  await go(page, new URL(via, base).href, nav);
   await pause(1500);
   for (const end = Date.now() + 30_000; Math.abs(Number(await settled(() => page.evaluate('return performance.timeOrigin;'))) - before) <= 5; await pause(300)) {
     assert(Date.now() < end, 'the page was not replaced');
@@ -208,7 +213,7 @@ async function main() {
     nav: { type: 'string', default: 'replace' } } });
   assert(values.base !== undefined, '--base <origin> is required');
   const base = new URL(values.base), zone = values.zone, arms = values.arms.split(',');
-  assert(arms.every(arm => arm === 'hop' || arm === 'direct'), '--arms is a list of hop and direct');
+  assert(arms.every(arm => arm === 'hop' || arm === 'direct' || arm === 'leave'), '--arms is a list of hop, direct and leave');
   const nav = /** @type {'replace' | 'load'} */ (values.nav);
   assert(nav === 'replace' || nav === 'load', '--nav is replace or load');
   const out = resolve(values.out ?? `tmp/warm-return/${new Date().toISOString().replaceAll(/[:.]/gu, '-')}`);
@@ -241,7 +246,8 @@ async function main() {
       if (round['cold'].outcome !== 'control') throw new Error(`cold boot: ${String(round['cold'].outcome)}`);
       await pause(5000);
       if (arm === 'hop') { await go(fresh, new URL('/robots.txt', base).href, nav); await pause(1500); }
-      round['warm'] = await boot(fresh, base, zone, nav);
+      round['warm'] = arm === 'leave' ? await boot(fresh, base, zone, nav, `/leave?to=${encodeURIComponent(`/slug/${zone}`)}`)
+        : await boot(fresh, base, zone, nav);
       round['pidsWarm'] = webContentPids(join(dir, 'pids-warm.json')); save();
       if (round['warm'].outcome === 'control') await hold(fresh, round['warm'], Number(values.hold));
       round['pidsEnd'] = webContentPids(join(dir, 'pids-end.json'));
