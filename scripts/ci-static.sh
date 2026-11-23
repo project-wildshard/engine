@@ -45,6 +45,8 @@ if [ "$mode" = code ]; then
   check native-item-frame proof sim-node-loader.mjs test/ci/native-item-frame.proof.mjs
   check declared-input bash -c 'node scripts/pins.ts install nine-dragon-stack && node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs'
   check fire-drill fire_drill
+  # TC22 (J186, AD2): the release gate's nightly reader soaked 414 clean ci-reports runs, 11-17 to 11-23.
+  check release-nightly node --test --test-timeout=10000 scripts/release-nightly.proof.ts
 fi
 check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then

@@ -1,4 +1,4 @@
-// TC22 report-only soak: explicit local/hosted invocation, outside hook discovery.
+// TC22: blocking in ci-static (promoted after its J186 week); explicit invocation, outside hook discovery.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';

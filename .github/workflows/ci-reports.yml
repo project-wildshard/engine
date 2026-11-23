@@ -239,13 +239,6 @@ jobs:
         env:
           TC39_INSTALLED_FORMAT: '1'
         run: node --test --test-timeout=10000 scripts/api-health.proof.ts
-      # TC22/J186: report-only, outside the blocking share's wall budget.
-      # Admission review no earlier than 2026-11-23 after a green week.
-      - name: Observe nightly release refusal and planted failure
-        if: steps.code.outputs.run == 'true'
-        continue-on-error: true
-        timeout-minutes: 2
-        run: node --test --test-timeout=10000 scripts/release-nightly.proof.ts
 
       # TC7: new complete journeys report for a week before becoming gates.
       - name: Soak full Dunes and real pin-grid journeys
