@@ -1269,6 +1269,7 @@
     "src/cook/game/cookProvenance.ts": "cook",
     "src/cook/game/cookSidecar.ts": "cook",
     "src/cook/game/cookWorker.ts": "cook",
+    "src/cook/game/recordSidecars.ts": "cook",
     "src/cook/game/cookedMap.ts": "cook",
     "src/cook/game/installedRuntimeReads.ts": "cook",
     "src/cook/game/encodedBytes.ts": "cook",
