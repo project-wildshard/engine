@@ -109,7 +109,12 @@ const EXTENSION_FRAME = /^(?:chrome-extension|moz-extension|safari-extension|saf
  * SZ2: the network, not the game: a read the game itself names as the connection's (`· connection unavailable`, `· the download
  * stopped`), and the browsers' bare fetch and module-load failures. The player's card and the /api/errors inbox keep them.
  */
-const NETWORK_MESSAGE = /· connection unavailable$|· the download stopped$|^(?:TypeError: )?(?:Failed to fetch|Load failed|NetworkError when attempting to fetch resource\.)$|^Importing a module script failed\.$|FetchEvent\.respondWith received an error: TypeError: Load failed$/u;
+const NETWORK_MESSAGE = /· connection unavailable(?:$|\))|· the download stopped(?:$|\))|^(?:TypeError: )?(?:Failed to fetch|Load failed|NetworkError when attempting to fetch resource\.)$|^Importing a module script failed\.$|FetchEvent\.respondWith received an error: TypeError: Load failed/u;
+/**
+ * SZ2: systems whose reports are early warnings, never bugs: `boot.slow` is the loading card's 20 s "Loading slow" note
+ * (app/entry.ts); the 60 s stuck-step report that may follow it is the bug report (WILDSHARD-GAME-AJ, -AE, -BR, -AG).
+ */
+const QUIET_SYSTEMS: ReadonlySet<string> = new Set(['boot.slow']);
 
 /**
  * Why an event is noise and must not reach Sentry, or null to keep it (SENTRY-TRIAGE S6). Pure, so each case is tested:
@@ -289,7 +294,7 @@ export function engineScreenTags(screen: ErrorScreen, system: string, bootStage:
 
 export function captureBrowserError(error: unknown, tags: BrowserErrorTags): void {
   // SZ2: a warning is never an event (it rides the next real one), so it loads no SDK and writes no outbox
-  if (browserErrorLevel(error, tags.fatal, tags.screen) === 'warning') { noteWarning(error, tags); return; }
+  if (QUIET_SYSTEMS.has(tags.system) || browserErrorLevel(error, tags.fatal, tags.screen) === 'warning') { noteWarning(error, tags); return; }
   if (!dsn || !productionPage()) return;
   if (tags.screen !== undefined) { reportScreen(error, tags); return; }
   void send(error, tags);

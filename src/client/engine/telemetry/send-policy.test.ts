@@ -72,6 +72,8 @@ test.each([
   ['a bare fetch failure (WILDSHARD-GAME-88)', thrown('Failed to fetch'), 'network'],
   ['Safari\'s module load failure (WILDSHARD-GAME-BT)', thrown('Importing a module script failed.'), 'network'],
   ['the service worker\'s load failure (WILDSHARD-GAME-AF)', thrown('FetchEvent.respondWith received an error: TypeError: Load failed'), 'network'],
+  ['a failed start wrapping the service worker\'s load failure (WILDSHARD-GAME-AC)', thrown('The game failed to start at step "modules" (TypeError: FetchEvent.respondWith received an error: TypeError: Load failed)'), 'network'],
+  ['a wrapped connection read', thrown('The game stopped loading (Read failed: /x.json · connection unavailable)'), 'network'],
 ] as const)('SZ2 drops %s', (_name, event, reason) => {
   expect(browserErrorNoise(event, page)).toBe(reason);
 });

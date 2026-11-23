@@ -151,6 +151,16 @@ test('SZ2: a warning screen never sends; it rides the next real event as context
   expect(sdk.sent[0]?.contexts['warnings']).toMatchObject({ recent: expect.arrayContaining(['map-tile-missing: Missing world map tile: mossgate']) });
 });
 
+test('SZ2: the loading card\'s 20 s "Loading slow" note is never an event (the 60 s stuck step is)', async () => {
+  page({ automated: false });
+  const faults = await install();
+  const { recentWarnings } = await import('../src/client/engine/telemetry/browserErrors');
+  faults.emitFault({ system: 'boot.slow', error: new Error('Loading slow at step "home" (no progress for 20 s)'), verdict: 'retry' });
+  await settle();
+  expect(sdk.sent).toEqual([]);
+  expect(recentWarnings()).toContain('boot.slow: Loading slow at step "home" (no progress for 20 s)');
+});
+
 test('a player on the same page reports the same faults under the plain environment', async () => {
   page({ automated: false });
   nalati(await install());

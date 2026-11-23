@@ -6,3 +6,5 @@ Meta plan: `docs/plans/SENTRY-ZERO-PLAN.md`. Jake: the 5000-event Sentry quota r
   Warnings never send; production and staging only; agent sessions on a 1% sample; one event per fingerprint per tab session
   (sessionStorage ledger), at most 10 a session. The month's spend was 81% warnings and 78% agent sessions, mostly the
   `map-tile-missing` warning screen that S21's automation cap exempted.
+- SZ2b: the loading card's 20 s `boot.slow` note is a warning (trail only); wrapped network failures are noise; a page reports its
+  first missing KTX2 stand-in only (WILDSHARD-GAME-BV sent 180 in 7 min, one per model).

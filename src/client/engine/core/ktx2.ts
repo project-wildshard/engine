@@ -58,6 +58,8 @@ export const BASIS_PATH: Parameters<KTX2Loader['setTranscoderPath']>[0] = `/basi
 
 let loader: KTX2Loader | null = null;
 let gameRenderer: Renderer | null = null;
+/** SENTRY-ZERO: a page reports its first missing KTX2 stand-in only */
+let standInFaultSent = false;
 
 function createLoader(): KTX2Loader {
   const made = new KTX2Loader().setTranscoderPath(BASIS_PATH);
@@ -271,7 +273,12 @@ export function installGltfKtx2(type: typeof GLTFLoader): void {
           if (retired === undefined) { void heldModelRetry(url, failure, again, fail); return; }
           if (retired === 'new') {
             console.warn(`[ktx2] stand-in ${String(missing)} answered 404; loading ${url} instead`);
-            emitFault({ system: 'assets.gpu', error: new Error(`KTX2 stand-in not served: ${String(missing)} (for ${url})`), verdict: 'retry' });
+            // SENTRY-ZERO (WILDSHARD-GAME-BV: 180 events in 7 min, one per model of a shard whose stand-ins were never served):
+            // one fault a page names the first; the rest are the same gap and stay in the console
+            if (!standInFaultSent) {
+              standInFaultSent = true;
+              emitFault({ system: 'assets.gpu', error: new Error(`KTX2 stand-in not served: ${String(missing)} (for ${url})`), verdict: 'retry' });
+            }
           }
           again();
         }]);
