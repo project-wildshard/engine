@@ -2,6 +2,8 @@
 export const JUMP_SPEED = 7.2;
 /** m/s the second jump on foot adds (E120: 6.8 → 8.6, ~1.7 m on top of the first: wading beside the pier you clear its deck by ~0.2 m). */
 export const DOUBLE_JUMP = 8.6;
+/** The share of a rising speed the double jump keeps. */
+export const DOUBLE_JUMP_KEEP = 0.3;
 /** The ground grace window (ms) a level gets unless it authors its own (Player.coyoteMs). */
 export const COYOTE_MS = 100;
 
@@ -25,6 +27,6 @@ export function jumpSpeed(wadeT: number): number { return JUMP_SPEED * (1 - 0.35
  */
 export function jump(state: JumpState, grounded: boolean, vy: number, coyoteMs: number, blocked: boolean, launch: number): number | null {
   if ((grounded || state.ago <= coyoteMs) && !blocked) { state.ago = Infinity; return launch; }
-  if (!grounded && state.left > 0) { state.left--; return Math.max(vy, 0) * 0.3 + DOUBLE_JUMP; }
+  if (!grounded && state.left > 0) { state.left--; return Math.max(vy, 0) * DOUBLE_JUMP_KEEP + DOUBLE_JUMP; }
   return null;
 }
