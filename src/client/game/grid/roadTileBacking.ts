@@ -14,6 +14,7 @@ import { compactRoadTileSteps, type RoadTileGeometry } from './roadTileGeometry'
 import { persistRoadTile, ROAD_TILE_ARCHIVE_BYTES, ROAD_TILE_HEADER_BYTES, type RoadTileReference, type RoadTileStore } from './roadTileArchive';
 import { RoadTilePool } from './roadTilePool';
 import { roadHandoffPacedOn } from './roadHandoffPaced';
+import { roadPoolSlicedOn } from './roadPoolSliced';
 import { roadCellKey, roadTileStream, type PreparedRoadTile, type RoadTileSource } from './roadTileStream';
 import { captureJobBytes, roadCaptureLeanOn, RoadTileCaptureWorker } from './roadTileCaptureWorker';
 import { captureJobTiles } from './roadTileCaptureJob';
@@ -109,6 +110,8 @@ export class RoadTileBacking {
   /** `origin` (the archive's URL origin) moves each source's capture to a worker; without it the page captures. */
   /** DF8 (mini-driftwood13m): whether the handoff takes one material a step (`debug.roadHandoffPaced`); tests pass their own */
   handoffPaced: () => boolean = roadHandoffPacedOn;
+  /** DW3 (mini-dw3): whether the pools merge in slices after the handoff too (`debug.roadPoolSliced`); tests pass their own */
+  poolSliced: () => boolean = roadPoolSlicedOn;
   constructor(private readonly scope: Scope, private readonly store: RoadTileStore, private readonly culler: RoadCuller, private readonly origin?: string) {
     if (scope.disposed || scope.disposing) throw new Error('Road backing owner retired');
     this.captureWorker = origin === undefined ? null : new RoadTileCaptureWorker(scope.child('capture-worker'));
@@ -293,7 +296,8 @@ export class RoadTileBacking {
       const pool = new RoadTilePool(this.scope.child(`material:${String(sources.length)}`), source.mesh.material, this.culler, source.mesh.name, source.mesh.receiveShadow, source.mesh.renderOrder);
       pool.root.visible = false; source.mesh.add(pool.root); source.pool = pool;
       // DF8 (mini-driftwood13n): paced, the hidden pools merge once, in slices, at the handoff (RoadTilePool.settle)
-      if (this.handoffPaced()) pool.defer();
+      if (this.poolSliced()) pool.slice();
+      else if (this.handoffPaced()) pool.defer();
       sources.push({ pool, references: source.references, coarseReferences: source.coarseReferences });
     }
     this.stream = roadTileStream(this.scope, sources, origin, layout, budget, this.store, id);
@@ -324,7 +328,7 @@ export class RoadTileBacking {
     if (!this.committed && (this.handingOff || (this.primed && stream.ready()))) {
       // DF8: `debug.roadHandoffPaced` (roadHandoffPaced.ts) hands one material over a step, once the ring was ready and
       // that material's pool has merged (in ROAD_MERGE_SLICE_MS slices)
-      const paced = this.handoffPaced();
+      const paced = this.handoffPaced() || this.poolSliced();
       this.handingOff = true;
       for (const source of this.sources.values()) {
         if (this.handedOff.has(source)) continue;
@@ -340,6 +344,16 @@ export class RoadTileBacking {
       if (this.handedOff.size === this.sources.size) {
         this.committed = true; this.handingOff = false;
         for (const pin of this.initialPins) pin.release(); this.initialPins = [];
+      }
+    }
+    // DW3 (mini-dw3, `debug.roadPoolSliced`): handed over, the pools' publishes and retirements merge here, one shared
+    // ROAD_MERGE_SLICE_MS budget a step (a pool with nothing pending returns at once)
+    else if (this.committed && this.poolSliced()) {
+      const until = diagnosticNow() + ROAD_MERGE_SLICE_MS;
+      for (const source of this.sources.values()) {
+        const left = until - diagnosticNow();
+        if (left <= 0) break;
+        source.pool?.settle(left, diagnosticNow);
       }
     }
     if (handoffAt !== undefined) frameCost.sectionOther('grid.road handoff', diagnosticNow() - handoffAt);

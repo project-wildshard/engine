@@ -113,3 +113,45 @@ test('a deferred pool with no tiles settles at once', () => {
   pool.defer(); expect(pool.settle(4, () => 0)).toBe(true);
   owner.dispose(); material.dispose();
 });
+
+// DW3 (mini-dw3, `debug.roadPoolSliced`): sliced, the pool stays deferred after settle: a publish or retirement keeps the old
+// draw until the slices finish, and a parent's mask meanwhile waits for the merge that holds its children
+test('a sliced pool merges every change in slices and holds a parent mask until the merge', () => {
+  const owner = new Scope('road pool sliced'), material = new MeshBasicMaterial(), culler: RoadCuller = { pitch: 562.5, tileSize: 62.5, plans: new Map() };
+  const pool = new RoadTilePool(owner, material, culler, 'road');
+  const coarse = fixture(0), child = fixture(1);
+  // a coarse parent at road cell (0, 0) with a patch in each of two quadrants
+  const parentData: RoadTileGeometry = { ...coarse, identity: { x: 0, z: 0 },
+    plan: { ...coarse.plan, bins: [{ sphere: new Sphere(undefined, 1), start: 0, count: 3, levels: [], tile: { x: 0, z: 0 } },
+      { sphere: new Sphere(undefined, 1), start: 0, count: 0, levels: [], tile: { x: 1, z: 0 } }] } };
+  pool.slice();
+  const parent = pool.publish({ key: 'p:l1:0,0', instance: 'p', level: 'l1', x: 0, z: 0, type: 'road' }, parentData, owner.child('p'));
+  let clock = 0; const tick = (): number => clock++;
+  while (!pool.settle(0, tick)) { /* slices */ }
+  const merged = pool.mesh(), bins = culler.plans.get(merged)?.bins ?? [];
+  expect(merged.geometry.getAttribute('position').count).toBe(3);
+  expect(bins.map(bin => bin.visibility?.visible)).toEqual([true, true]);
+  // the child arrives: the old draw stands, and the parent's mask of quadrant 1 waits
+  const view = pool.publish(descriptor('c'), child, owner.child('c'));
+  parent.mask(new Set([1]));
+  expect(pool.mesh()).toBe(merged);
+  expect(bins.map(bin => bin.visibility?.visible)).toEqual([true, true]);
+  expect(pool.settle(0, tick)).toBe(false);
+  while (!pool.settle(0, tick)) { /* slices */ }
+  expect(pool.mesh()).not.toBe(merged);
+  expect(pool.mesh().geometry.getAttribute('position').count).toBe(6);
+  expect(culler.plans.get(pool.mesh())?.bins.map(bin => bin.visibility?.visible)).toEqual([true, false, true]);
+  // the child retires: the parent's quadrant shows again only with the merge that drops it
+  const withChild = pool.mesh();
+  view.dispose(); parent.mask(new Set());
+  expect(pool.mesh()).toBe(withChild);
+  expect(culler.plans.get(withChild)?.bins.map(bin => bin.visibility?.visible)).toEqual([true, false, true]);
+  while (!pool.settle(0, tick)) { /* slices */ }
+  expect(pool.mesh().geometry.getAttribute('position').count).toBe(3);
+  expect(culler.plans.get(pool.mesh())?.bins.map(bin => bin.visibility?.visible)).toEqual([true, true]);
+  // nothing pending: a mask shows at once, and settle stays true
+  parent.mask(new Set([0]));
+  expect(culler.plans.get(pool.mesh())?.bins.map(bin => bin.visibility?.visible)).toEqual([false, true]);
+  expect(pool.settle(0, tick)).toBe(true);
+  owner.dispose(); expect(culler.plans.size).toBe(0); material.dispose();
+});

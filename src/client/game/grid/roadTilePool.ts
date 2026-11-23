@@ -106,6 +106,9 @@ export class RoadTilePool {
   private readonly resident = new Map<string, { data: RoadTileGeometry; scope: Scope; flags: Map<CullPlan['bins'][number], { visible: boolean }> }>();
   /** DF8 (mini-driftwood13n): while deferred, a publish or a tile's retirement only bumps `revision`; `settle` merges */
   private deferred = false;
+  /** DW3 (mini-dw3, `debug.roadPoolSliced`): stays deferred after `settle`; masks wait in `masks` for the merge */
+  private sliced = false;
+  private readonly masks = new Map<Map<CullPlan['bins'][number], { visible: boolean }>, () => void>();
   private revision = 0;
   private built = 0;
   private job: { readonly revision: number; readonly steps: Generator<void, { geometry: BufferGeometry; plan: CullPlan }> } | null = null;
@@ -115,7 +118,7 @@ export class RoadTilePool {
     this.current = this.makeMesh(new BufferGeometry()); this.root.name = name; this.root.matrixAutoUpdate = false; this.root.updateMatrix(); this.root.add(this.current);
     owner.onDispose(() => {
       if (this.job !== null) abandon(this.job.steps); this.job = null;
-      this.resident.clear(); this.culler.plans.delete(this.current);
+      this.resident.clear(); this.masks.clear(); this.culler.plans.delete(this.current);
       this.current.onBeforeRender = () => { /* Drop the retired plan closure. */ };
       this.root.removeFromParent(); this.root.clear(); this.current.geometry.dispose();
     });
@@ -151,12 +154,20 @@ export class RoadTilePool {
       if (tile.level === 'l0' && excluded.size > 0) throw new Error('Fine road tiles cannot mask children');
       for (const value of excluded) if (!Number.isInteger(value) || value < 0 || value > 3) throw new Error('Invalid road quadrant mask');
       const parent = data.identity;
-      for (const [bin, flag] of flags) {
-        if (parent === undefined || bin.tile === undefined) { flag.visible = true; continue; }
+      for (const bin of flags.keys()) {
+        if (parent === undefined || bin.tile === undefined || tile.level !== 'l1') continue;
         const x = bin.tile.x - parent.x * 2, z = bin.tile.z - parent.z * 2;
-        if (tile.level === 'l1' && (x < 0 || x > 1 || z < 0 || z > 1)) throw new Error('Road patch outside its parent');
-        flag.visible = tile.level === 'l0' || !excluded.has(x + 2 * z);
+        if (x < 0 || x > 1 || z < 0 || z > 1) throw new Error('Road patch outside its parent');
       }
+      const apply = (): void => {
+        for (const [bin, flag] of flags) {
+          if (parent === undefined || bin.tile === undefined) { flag.visible = true; continue; }
+          flag.visible = tile.level === 'l0' || !excluded.has(bin.tile.x - parent.x * 2 + 2 * (bin.tile.z - parent.z * 2));
+        }
+      };
+      // DW3 (sliced): a merge in flight holds the old draw; the parent's mask shows with the merge that holds its children
+      if (this.sliced && (this.job !== null || this.built !== this.revision)) this.masks.set(flags, apply);
+      else { this.masks.delete(flags); apply(); }
     },
       shadow: () => { /* Road geometry retains its original no-caster contract. */ }, dispose: () => { scope.dispose(); } };
   }
@@ -176,13 +187,17 @@ export class RoadTilePool {
    * records its tile, and `settle` merges the pool once, in slices, before the handoff shows it.
    */
   defer(): void { this.deferred = true; }
+  /** DW3 (mini-dw3, `debug.roadPoolSliced`): defer for good. Every publish and retirement, before and after the handoff,
+   *  merges in `settle`'s slices while the old draw stands, and a parent's mask waits for the merge that holds the tiles
+   *  it covers (or uncovers), so the drawn road never shows a hole or a double. */
+  slice(): void { this.deferred = true; this.sliced = true; }
   /** Advance the deferred merge for up to `ms` (at least one slice); true once the draw holds every resident tile, and
    *  the pool then merges each publish at once again, as it does undeferred. A tile published or retired meanwhile
    *  restarts the merge from the current tiles. */
   settle(ms: number, now: () => number): boolean {
     if (!this.deferred) return true;
     if (this.owner.disposed || this.owner.disposing) throw new Error('Road tile pool owner retired');
-    if (this.job === null && this.built === this.revision) { this.deferred = false; return true; }
+    if (this.job === null && this.built === this.revision) { this.showMasks(); if (!this.sliced) this.deferred = false; return true; }
     if (this.job !== null && this.job.revision !== this.revision) { abandon(this.job.steps); this.job = null; }
     if (this.job === null) {
       const entries = [...this.resident.values()];
@@ -200,10 +215,18 @@ export class RoadTilePool {
         catch (error) { this.owner.dispose(); throw error; }
         this.built = job.revision;
         if (this.built !== this.revision) return false;
-        this.deferred = false; return true;
+        this.showMasks();
+        if (!this.sliced) this.deferred = false;
+        return true;
       }
       if (now() - started >= ms) return false;
     }
+  }
+  /** DW3: the masks that waited for this merge show with it. */
+  private showMasks(): void {
+    if (this.masks.size === 0) return;
+    const waiting = [...this.masks.values()]; this.masks.clear();
+    for (const apply of waiting) apply();
   }
   private rebuild(): void {
     const entries = [...this.resident.values()];
