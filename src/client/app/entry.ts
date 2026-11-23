@@ -37,6 +37,7 @@ import { progressOfCard, reportCardOf, stuckContext, stuckMessage, watchStuckSte
 import { startShellClock, waitForLoadingStyles } from '@wildshard/engine/boot/shell';
 import { inspectPreviousBoot, previousBootLine, previousBootLevel } from '@wildshard/engine/boot/bootTrace';
 import { Scope } from '@wildshard/engine/app/scope';
+import { titleGate } from './titleGate';
 import { harnessPins } from '@wildshard/engine/app/identity';
 import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { bootRoute, exploreBootParams, onlineTitleFirst } from './bootRoute';
@@ -326,14 +327,7 @@ async function showPageTitle(refusal = ''): Promise<void> {
   // FM4 9b/10b: on a world build, Enter world asks the world first and may hold on a card until it is back (no title weight: the
   // gate's code loads on the tap)
   const world = (globalThis as { __WS_WORLD__?: unknown }).__WS_WORLD__;
-  let asking: Promise<void> | null = null;
-  const gate = world === undefined ? undefined : (go: () => void): Promise<void> => {
-    // one tap at a time: a second tap while the first is asked or held enters nothing
-    asking ??= import('@wildshard/engine/game/grid/oneWayIn')
-      .then(({ titleEntryGate }) => { const held = titleEntryGate(world); if (held === undefined) { go(); return undefined; } return held(go); }, () => { go(); })
-      .finally(() => { asking = null; });
-    return asking;
-  };
+  const gate = world === undefined ? undefined : titleGate(world, () => import('@wildshard/engine/game/grid/oneWayIn'));
   const selectSource = zoneSelectSource(document, world);
   let servedZones = selectSource.initial();
   let menu: ReturnType<typeof buildTitleMenu> | undefined;

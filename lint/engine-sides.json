@@ -760,6 +760,7 @@
     "src/client/game/grid/edgeCreatures.ts": "client",
     "src/client/game/grid/neighbourRows.ts": "client",
     "src/client/game/grid/oneWayIn.ts": "client",
+    "src/client/game/grid/worldRestart.ts": "client",
     "src/client/game/grid/placedCells.ts": "client",
     "src/client/game/grid/roomsRevision.ts": "client",
     "src/client/game/grid/placedContent.ts": "client",

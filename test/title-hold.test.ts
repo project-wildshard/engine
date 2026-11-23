@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { clearRestart, holdTitleEntry, noteRestart, type WorldHeard } from '../src/client/host/online/titleHold';
+import { holdTitleEntry, type WorldHeard } from '../src/client/host/online/titleHold';
+import { clearRestart, noteRestart } from '../src/client/game/grid/worldRestart';
 
 // FM4 (meta MMO-FAILURE-MODES-PLAN, 9b and 10b): Enter world on the title while the world is restarting or about to move holds the
 // tap on a card that joins by itself; Cancel stays on the title. Only what the page observed: a restart this tab heard and a world

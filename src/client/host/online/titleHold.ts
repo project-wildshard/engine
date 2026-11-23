@@ -5,6 +5,7 @@
 // (`moving`, J174). Then the tap holds on a card that joins by itself when the world is back; Cancel stays on the title. Anything else
 // enters at once and the in-world screens say why, with no guessed cause.
 import { Scope } from '@wildshard/engine/app/scope';
+import { restartRecent } from '@wildshard/engine/game/grid/worldRestart';
 import { buttons, card, linkStyle, make, ring } from './linkScreens';
 
 /** What a title's own socket heard: the world's first word (and a move due in so many seconds), or nothing in time. */
@@ -15,25 +16,6 @@ export interface TitleWorld { readonly release: string; readonly key: string }
 const DEPLOY_HOLD_S = 15;
 /** How often a held entry asks the world again: each ask is a socket, and the door takes 10 a minute from one address. */
 const AGAIN_MS = 8000;
-/** A restart heard this long ago no longer explains a quiet world. */
-const RESTART_RECENT_MS = 180_000;
-const RESTART_KEY = 'ws:world-restart';
-
-/** The shell heard the world close `restart` (mode 9). Kept for this tab, across the title's navigation. */
-export function noteRestart(now: number = Date.now()): void {
-  // oxlint-disable-next-line wildshard/no-raw-save -- one tab-scoped mark the title reads; online.js has no save store (OF4)
-  try { sessionStorage.setItem(RESTART_KEY, String(now)); } catch { /* a page that keeps nothing guesses nothing */ }
-}
-/** Seated again: the restart is over. */
-export function clearRestart(): void {
-  // oxlint-disable-next-line wildshard/no-raw-save -- the same tab-scoped mark
-  try { sessionStorage.removeItem(RESTART_KEY); } catch { /* nothing kept */ }
-}
-function restartRecent(now: number): boolean {
-  // oxlint-disable-next-line wildshard/no-raw-save -- the same tab-scoped mark
-  try { const at = Number(sessionStorage.getItem(RESTART_KEY)); return at > 0 && now - at >= 0 && now - at < RESTART_RECENT_MS; } catch { return false; }
-}
-
 type Hold = 'restart' | 'deploy' | null;
 const holdFor = (heard: WorldHeard, now: number): Hold => heard.heard
   ? heard.movingInS !== null && heard.movingInS <= DEPLOY_HOLD_S ? 'deploy' : null
