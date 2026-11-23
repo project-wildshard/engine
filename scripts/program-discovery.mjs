@@ -3,8 +3,7 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import * as v from 'valibot';
 import { readBuiltShardfile } from './built-folder.mjs';
-import { discoveryFormat, outputFormat } from './node-format.mjs';
-import { encodeCanonicalJson } from '@wildshard/engine/host/immutable';
+import { discoveryFormat, immutableFormat, outputFormat } from './node-format.mjs';
 
 /** @param {unknown} value @returns {value is Record<string, unknown>} */
 const plain = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -37,6 +36,6 @@ export function readProgramDiscovery(root, name, options = {}) {
     JSON.parse(read('validation.json', 2 * 1024 * 1024).toString('utf8')));
   if (index.identity.slug !== name || receipt.indexHash !== createHash('sha256').update(envelope).digest('hex')) throw new Error(`${name}: discovery index receipt differs`);
   const values = discoveryFormat.parseDiscoveryValues(receipt.discovery.values);
-  if (receipt.discovery.hash !== createHash('sha256').update(encodeCanonicalJson(values)).digest('hex')) throw new Error(`${name}: discovery values receipt differs`);
+  if (receipt.discovery.hash !== createHash('sha256').update(immutableFormat.encodeCanonicalJson(values)).digest('hex')) throw new Error(`${name}: discovery values receipt differs`);
   return values;
 }
