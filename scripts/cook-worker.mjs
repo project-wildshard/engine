@@ -4,6 +4,8 @@
 //     polls it every COOK_POLL_SECONDS (45; 30 to 60) and cooks each new upload (SHARD-COMPAT SP6, J175)
 //     (production, preview and staging heads: MS2.4, a new author's `upload --channel staging` is a staging head only)
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs recook    every live and preview head, then exit; a deploy's step
+//     (SHARD-COMPAT SP1b-T: the record pass first, when the host keeps sidecars and names a recorder)
+//   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs record    the record pass alone, then exit
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs bake <dist> <origin>   the live heads this build cooked, onto its built client
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs gc <build>...   keep those builds and every build a channel's
 //     live deploy-chunks.json names (PAGE-SIZE PZ5: 5 a channel), delete the rest, print usage
@@ -11,7 +13,9 @@
 // Environment: WILDSHARD_API_URL, WILDSHARD_BUILD; R2_ACCOUNT_ID, R2_BUCKET_PACKS, R2_PACKS_ACCESS_KEY_ID,
 // R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_NOTIFY_TOKEN; COOK_PORT (8792; 8790 and 8791 are the game's), COOK_HOST (127.0.0.1);
 // COOK_SERVER_PACKS, COOK_SCRATCH; COOK_SECONDS, COOK_MEMORY_MB, COOK_HEAP_MB, COOK_MAX_SHARDFILE_BYTES; COOK_JOB_WRAP, a JSON array the host puts
-// before each job to take its network away (see the wildshard-cook unit in scripts/vps/rebuild.sh).
+// before each job to take its network away (see the wildshard-cook unit in scripts/vps/rebuild.sh). SP1b-T: COOK_SIDECARS, the
+// folder of cook preparation sidecars every job reads; COOK_RECORDER (the `wildshard` command, a JSON array),
+// COOK_PREPARATION_CLIENT, COOK_RECORD_CANARY, COOK_RECORD_WRAP, COOK_RECORD_SECONDS, COOK_RECORD_ACCEPTED for the record pass.
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
@@ -21,6 +25,7 @@ import { fileURLToPath } from 'node:url';
 const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, pollCatalogue, PACK_BUDGET_BYTES, POLL_EVERY_MS, storeUsage, uncookedLiveRefusal } = await import('../src/cook/game/cookWorker.ts');
 const {activationDelivery, gameActivationClient, cookApi, pendingSource, uploadDelivery, VerdictOutbox} = await import('../src/cook/game/uploadTransport.ts');
 const { MAX_SHARDFILE_BYTES } = await import('../src/cook/game/cookJob.ts');
+const { cookSidecars, recordPass } = await import('../src/cook/game/recordPass.ts');
 const { addStoredShards } = await import('./app-build/catalogue.ts');
 const { refreshServiceWorker } = await import('./app-build/serviceWorker.ts');
 const { folderStore, r2Store } = await import('../src/cook/game/packStore.ts');
@@ -51,13 +56,16 @@ const publicSource = apiSource(env.WILDSHARD_API_URL ?? 'https://api.wildshard.i
 const privateSource = uploadApi === undefined ? undefined : pendingSource(uploadApi, publicSource);
 const uploadSource = privateSource ?? publicSource;
 const [command, ...rest] = process.argv.slice(2);
+const sidecars = cookSidecars(env), scratch = resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch');
+/** SP1b-T: record a sidecar for every stale head before a recook cooks it, so a render change ends `prepared by cook`. */
+const record = () => recordPass(env, renderer, scratch, uploadSource, line => { console.log(line); });
 const worker = () => createCookWorker({
   build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); },
-  serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch: resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch'),
+  serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch,
   ...(validator === undefined ? {} : { validator }), ...(cookRevisionId === undefined ? {} : { cook: cookRevisionId }),
   launcher: {
     root, execPath: process.execPath, loader: fileURLToPath(new URL('bake-loader.mjs', import.meta.url)), script: fileURLToPath(new URL('cook-job.mjs', import.meta.url)),
-    wrap: JSON.parse(env.COOK_JOB_WRAP ?? '[]'), ...(renderer === undefined ? {} : { renderer }),
+    wrap: JSON.parse(env.COOK_JOB_WRAP ?? '[]'), ...(renderer === undefined ? {} : { renderer }), ...(sidecars === undefined ? {} : { sidecars }),
     limits: { seconds: Number(env.COOK_SECONDS ?? DEFAULT_LIMITS.seconds), memoryMB: Number(env.COOK_MEMORY_MB ?? DEFAULT_LIMITS.memoryMB), heapMB: Number(env.COOK_HEAP_MB ?? DEFAULT_LIMITS.heapMB), maxBytes,
       // The service's AllowedCPUs already constrains the cook. Pass that grant so its encoders reserve one core for coordination.
       ...(command === 'serve' ? {cpuSlots: availableParallelism()} : {}) },
@@ -88,7 +96,10 @@ if (command === 'serve') {
     const activations = activationDelivery(uploadApi, gameActivationClient(receivers, need('WILDSHARD_BUILD')), line => {console.log(line);});
     pollCatalogue({sweep: async () => {await activations.sweep(); return [];}}, {everyMs, log: line => {console.log(line);}});
   }
+} else if (command === 'record') {
+  console.log(JSON.stringify(await record()));
 } else if (command === 'recook') {
+  await record();
   const cook = worker(), rows = await cook.recook(['live']), preview = await cook.recook(['preview', 'staging']);
   console.log(JSON.stringify([...rows, ...preview]));
   // J29: a build takes no traffic with a live shard it couldn't cook. A refused head is already live, so it stops a deploy
@@ -117,5 +128,5 @@ if (command === 'serve') {
 } else if (command === 'report') {
   console.log(JSON.stringify(await storeUsage(store, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES))));
 } else {
-  throw new Error('usage: cook-worker serve | recook | bake <dist> <origin> | gc <build>... | report');
+  throw new Error('usage: cook-worker serve | recook | record | bake <dist> <origin> | gc <build>... | report');
 }

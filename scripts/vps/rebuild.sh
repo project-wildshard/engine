@@ -568,6 +568,9 @@ Environment=COOK_HOST=127.0.0.1
 Environment=COOK_SCRATCH=$COOK_HOME/scratch
 Environment=COOK_SERVER_PACKS=$COOK_HOME/server
 Environment=COOK_OUTBOX=$COOK_HOME/verdicts
+# SHARD-COMPAT SP1b-T: every job reads its shard's cook preparation sidecar from here; the record pass writes them once
+# cook.env names a recorder (COOK_RECORDER, COOK_PREPARATION_CLIENT, COOK_RECORD_CANARY).
+Environment=COOK_SIDECARS=$COOK_HOME/sidecars
 Environment=COOK_STAGING_ACTIVATION_URL=http://127.0.0.1:8791
 # Each job's prefix: a user and network namespace of its own, so nothing that reads a shardfile has a route out. The single
 # quotes keep the JSON's double quotes, which systemd would otherwise strip.
