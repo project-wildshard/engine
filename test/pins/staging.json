@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "4af775409324e01c37f80f0c2751c9a6fa3e831037a3625fecd5e4930cdba5b1",
+  "catalogueHash": "b4325afd55e0f5b119f907856b1f9a6c70d35f9daf49ba0bf9eb3424cd46b025",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -99,7 +99,7 @@
         "status": "experimental"
       },
       {
-        "instance": "blender-template-solo",
+        "instance": "brasscap-mesa-solo",
         "slug": "brasscap-mesa",
         "cell": [
           -1,
@@ -111,7 +111,7 @@
           500
         ],
         "order": 8,
-        "status": "hidden"
+        "status": "earlyAccess"
       },
       {
         "instance": "pastel-plain-solo",
@@ -142,21 +142,6 @@
         ],
         "order": 10,
         "status": "hidden"
-      },
-      {
-        "instance": "open-plot-thin-ice-solo",
-        "slug": "open-plot-thin-ice",
-        "cell": [
-          -6,
-          8
-        ],
-        "size": [
-          500,
-          500,
-          500
-        ],
-        "order": 11,
-        "status": "earlyAccess"
       },
       {
         "instance": "open-plot-frostline-peaks-solo",
@@ -292,21 +277,6 @@
         ],
         "order": 11,
         "status": "earlyAccess"
-      },
-      {
-        "instance": "open-plot-desert-ruin-solo",
-        "slug": "open-plot-desert-ruin",
-        "cell": [
-          4,
-          8
-        ],
-        "size": [
-          500,
-          500,
-          500
-        ],
-        "order": 11,
-        "status": "hidden"
       },
       {
         "instance": "open-plot-night-market-solo",
@@ -447,13 +417,13 @@
           "instance": "pastel-plain",
           "slug": "pastel-plain",
           "cell": [
-            -1,
-            1
+            0,
+            3
           ],
           "speedClass": "road"
         },
         {
-          "instance": "blender-template",
+          "instance": "brasscap-mesa",
           "slug": "brasscap-mesa",
           "cell": [
             -1,
@@ -584,8 +554,8 @@
           "instance": "ink-cel-valley",
           "slug": "ink-cel-valley",
           "cell": [
-            -1,
-            2
+            1,
+            3
           ],
           "speedClass": "road"
         },
@@ -617,35 +587,27 @@
           "speedClass": "road"
         },
         {
-          "instance": "open-plot-thin-ice",
-          "slug": "open-plot-thin-ice",
-          "cell": [
-            0,
-            3
-          ]
-        },
-        {
           "instance": "mossgate",
           "slug": "mossgate",
           "cell": [
-            2,
-            3
+            1,
+            1
           ]
         },
         {
           "instance": "mirror-salt",
           "slug": "mirror-salt",
           "cell": [
-            3,
-            3
+            -1,
+            2
           ]
         },
         {
           "instance": "glowfen",
           "slug": "glowfen",
           "cell": [
-            3,
-            2
+            -1,
+            1
           ]
         }
       ],
@@ -672,8 +634,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 13,
-        "hash": "c0a5acd3fb815e910557931ab3554fbd20eec1a5828718a4f96880fea9468233"
+        "revision": 14,
+        "hash": "027f8b78379d50414e3cd112b49c4b3007882a7ba02597927c034ceadb8f4c0a"
       },
       {
         "slug": "driftwood-isle",
@@ -720,8 +682,8 @@
       {
         "slug": "nine-dragon-stack",
         "name": "Nine Dragon Stack",
-        "revision": 6,
-        "hash": "c112cac1b42dd7f689374b7baf92b77c4e13f9f7a988bb7e18ca13438bbbb975"
+        "revision": 7,
+        "hash": "9cf0e39315150c415e54de4797c3d84e748be7faec86ffd79e094d34fa7bba3e"
       },
       {
         "slug": "open-plot-alien-plain",
@@ -740,12 +702,6 @@
         "name": "Open Plot · Coral Drift",
         "revision": 3,
         "hash": "351ec764be010d0bd091c8681aa4ebbb9a2546126c4d0aa16f8a2422a34a6d00"
-      },
-      {
-        "slug": "open-plot-desert-ruin",
-        "name": "Open Plot · Desert Ruin",
-        "revision": 2,
-        "hash": "cc8fb5c1c4f0a6f5e5b67b70834e90212fb63d917b5f5436197d98205ac17f4a"
       },
       {
         "slug": "open-plot-ember-forge",
@@ -820,12 +776,6 @@
         "hash": "1cc2a9a9efdb7861627746c577ef6285b8d0ac7e8105046dc1655fe19fbed123"
       },
       {
-        "slug": "open-plot-thin-ice",
-        "name": "Open Plot · Thin Ice",
-        "revision": 2,
-        "hash": "367f3d682186738571ed5598d8aee7f5e4172490564db505b7e0c556dcd23894"
-      },
-      {
         "slug": "pastel-plain",
         "name": "Pastel Plain",
         "revision": 1,
@@ -840,8 +790,8 @@
       {
         "slug": "sunscar-dunes",
         "name": "Signal Dunes",
-        "revision": 5,
-        "hash": "8d9f9754aea8230a3aa7809010a89a3c9538f1eb2f8c47383c8da6501b78801d"
+        "revision": 6,
+        "hash": "3fef58aebd2cf25a28293b57eaa060f5679526487c3a32cfa5479f4f75305149"
       }
     ],
     "missing": []
@@ -849,9 +799,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 13,
-      "hash": "c0a5acd3fb815e910557931ab3554fbd20eec1a5828718a4f96880fea9468233",
-      "bytes": 22462464
+      "revision": 14,
+      "hash": "027f8b78379d50414e3cd112b49c4b3007882a7ba02597927c034ceadb8f4c0a",
+      "bytes": 22499840
     },
     {
       "slug": "driftwood-isle",
@@ -897,9 +847,9 @@
     },
     {
       "slug": "nine-dragon-stack",
-      "revision": 6,
-      "hash": "c112cac1b42dd7f689374b7baf92b77c4e13f9f7a988bb7e18ca13438bbbb975",
-      "bytes": 118880256
+      "revision": 7,
+      "hash": "9cf0e39315150c415e54de4797c3d84e748be7faec86ffd79e094d34fa7bba3e",
+      "bytes": 118896640
     },
     {
       "slug": "open-plot-alien-plain",
@@ -918,12 +868,6 @@
       "revision": 3,
       "hash": "351ec764be010d0bd091c8681aa4ebbb9a2546126c4d0aa16f8a2422a34a6d00",
       "bytes": 14665216
-    },
-    {
-      "slug": "open-plot-desert-ruin",
-      "revision": 2,
-      "hash": "cc8fb5c1c4f0a6f5e5b67b70834e90212fb63d917b5f5436197d98205ac17f4a",
-      "bytes": 14199808
     },
     {
       "slug": "open-plot-ember-forge",
@@ -998,12 +942,6 @@
       "bytes": 11383808
     },
     {
-      "slug": "open-plot-thin-ice",
-      "revision": 2,
-      "hash": "367f3d682186738571ed5598d8aee7f5e4172490564db505b7e0c556dcd23894",
-      "bytes": 6237184
-    },
-    {
       "slug": "pastel-plain",
       "revision": 1,
       "hash": "e42e2f5f57937695bae0eb0e17fdfbd5f238897d05b167cd38aa2b7ecebb0481",
@@ -1017,9 +955,9 @@
     },
     {
       "slug": "sunscar-dunes",
-      "revision": 5,
-      "hash": "8d9f9754aea8230a3aa7809010a89a3c9538f1eb2f8c47383c8da6501b78801d",
-      "bytes": 11474944
+      "revision": 6,
+      "hash": "3fef58aebd2cf25a28293b57eaa060f5679526487c3a32cfa5479f4f75305149",
+      "bytes": 11424768
     }
   ]
 }
