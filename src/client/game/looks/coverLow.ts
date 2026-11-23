@@ -14,9 +14,12 @@ import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 
 export const COVER_REACH_LOW_SLOT = 'debug.coverReachLow';
 export const COVER_KEEP_LOW_SLOT = 'debug.coverKeepLow';
-/** Unset at phone Low: the authored reach and keep, until cooled iPhone 13 pairs and a J430 board decide (DW3). */
-export const COVER_REACH_PHONE_LOW = 1;
-export const COVER_KEEP_PHONE_LOW = 1;
+/** Unset at phone Low: reach 0.8 and keep 0.6 (DW3). The J430 board on the route's leg ends passed (2026-11-23, clock and
+ *  sky pinned: the cover the same in all 8 views). iPhone 13, two ABBA jobs plus a census trial: the west side's
+ *  triangles fall 26 to 31%, its fenced GPU p95 from 18-22 to 15-18 ms, and its frame p95 from 40-46 to 35-43 at the same
+ *  heat. Save 1 and 1 for the authored cover. */
+export const COVER_REACH_PHONE_LOW = 0.8;
+export const COVER_KEEP_PHONE_LOW = 0.6;
 
 const clamp = (saved: unknown, lo: number, fallback: number): number => {
   // a number, or its text (the look loop's `--save` writes text)
