@@ -282,6 +282,7 @@
     "../vite/rapier.ts",
     "../vite/valibotStandard.ts",
     "../vite/threeHeldShaderStages.ts",
+    "../vite/threeSideBlindPrograms.ts",
     "../scripts/app-build/controlChunks.ts",
     "../scripts/pin-packs.ts",
     "../scripts/pin-assets.ts",

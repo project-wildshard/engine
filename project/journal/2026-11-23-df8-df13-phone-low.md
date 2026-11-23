@@ -15,3 +15,9 @@
   whole-inventory warm-up now links one stand-in of each far variant and a band under the card
   (`GridSession.warmFarRingPrograms` through `Game.warmRootsNow`; the host's `prepareView` waits for drawn frames, so a
   first try through it compiled the stand-ins after control). Route census: 0 links after control, 122 programs.
+- The 40% cut: `debug.programTwins` (on at phone Low) leaves out programs the grid page built but never drew. The page's
+  creature warm rigs sit outside every region (no look) while every row on the grid draws in a region; family stand-ins
+  were linked for creature materials only rigs draw and for unplaced default surfaces that carry no region look; and the
+  shadow map's one depth material (and unlit basics) keyed by side and normals their shaders never read (a three build
+  transform, `vite/threeSideBlindPrograms.ts`, now keys those without them). Route census: 122 → 101 programs (173 with
+  every DF8 slot off: −41.6%), still 0 links after control.

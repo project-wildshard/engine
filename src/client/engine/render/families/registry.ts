@@ -20,6 +20,7 @@ import type { SwingUniforms } from '../../world/swings';
 import { applySceneEmissive, applySceneSurface } from './sceneSurface';
 import { updateGround } from './ground';
 import { compileToon, type ToonLook } from './toon';
+import { programTwinsOn } from '../programTwins';
 
 /** What a compiler may read besides the material's own parameters. */
 export interface FamilyContext {
@@ -125,18 +126,39 @@ function variantKey(m: THREE.Material): string {
 }
 
 /**
+ * DF8 (`debug.programTwins`, mini-dwfps2): the family materials a plain (unskinned) mesh on `scene`'s page draws. A stand-in
+ * for any other live family material links a program no draw uses: a creature's materials draw only on its skinned rig
+ * (whose clone the scene jobs warm), and an unplaced one (a shard's default family surface) carries no region look, so a
+ * region draw of it later keys another program anyway. On Driftwood's grid page that was nine programs, one per family in
+ * each of three lightings, none drawn on the route.
+ */
+function plainlyDrawn(scene: THREE.Object3D): Set<THREE.Material> {
+  let page = scene;
+  while (page.parent !== null) page = page.parent;
+  const drawn = new Set<THREE.Material>();
+  page.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || object instanceof THREE.SkinnedMesh) return;
+    const material: THREE.Material | THREE.Material[] = object.material;
+    for (const m of Array.isArray(material) ? material : [material]) if (live.has(m)) drawn.add(m);
+  });
+  return drawn;
+}
+
+/**
  * Shader-step jobs for every live family program not yet compiled: one plain stand-in mesh per distinct program variant
  * (instanced and skinned variants already in the scene are the scene jobs' clones), drawn with `target`'s fog and lights into `rt`. Programs the scene
  * already holds are cache hits. Empty when no family material is live.
  * Optional exclusions remove known region-only materials from exterior variants. Unplaced families stay prepared,
  * as do materials shared with surviving content: later spawns and separate view passes need those programs too.
  */
-export function familyCompileJobs(target: THREE.Scene | null, rt: THREE.WebGLRenderTarget | null, per = 6, excludedMaterials?: ReadonlySet<THREE.Material>): CompileJob[] {
+export function familyCompileJobs(target: THREE.Scene | null, rt: THREE.WebGLRenderTarget | null, per = 6, excludedMaterials?: ReadonlySet<THREE.Material>,
+  twins: boolean = programTwinsOn()): CompileJob[] {
   const seen = new Set<string>();
   const meshes: THREE.Mesh[] = [];
   const geometry = standIn();
+  const drawn = twins && target !== null ? plainlyDrawn(target) : undefined;
   for (const m of live.keys()) {
-    if (excludedMaterials?.has(m) === true) continue;
+    if (excludedMaterials?.has(m) === true || drawn?.has(m) === false) continue;
     const key = variantKey(m);
     if (seen.has(key)) continue;
     seen.add(key);

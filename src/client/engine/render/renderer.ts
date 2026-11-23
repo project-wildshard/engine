@@ -23,6 +23,7 @@ import { installCookedSkinUvBinding, installProvokingVertex } from './drawHooks'
 import { installPassSplit, passSplitLimit, PASS_SPLIT_VERTICES } from './passSplit';
 import { installByteTriples } from './byteTriples';
 import { installVertexPack, VERTEX_PACK_SLOT, vertexPackWanted } from './vertexPack';
+import { programTwinsOn } from './programTwins';
 import { programReuseOn } from './programReuse';
 import { installEnvironmentFold, programFoldOn } from './programFold';
 import { skipEmptyBatches } from './drawGuards';
@@ -59,6 +60,9 @@ export function createRenderer(canvas: HTMLCanvasElement, context: WebGL2Renderi
   // DF8: a live custom program holds its shader stages (`debug.programReuse`, off; vite/threeHeldShaderStages.ts), so a
   // revisited cell's graph materials reuse the programs the grid keeper pinned rather than linking identical twins
   Reflect.set(renderer, 'wsHeldShaderStages', programReuseOn());
+  // DF8 (mini-dwfps2): depth and unlit programs key without the side and normals they never read (`debug.programTwins`;
+  // vite/threeSideBlindPrograms.ts)
+  Reflect.set(renderer, 'wsSideBlindPrograms', programTwinsOn());
   // DF8 (mini-df8b): variants that draw the same pixels share one program (`debug.programFold`, off; programFold.ts)
   if (programFoldOn()) { installEnvironmentFold(renderer); skipEmptyBatches(true); }
   renderer.setOpaqueSort(gltfOpaqueSort);

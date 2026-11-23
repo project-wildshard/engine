@@ -28,6 +28,7 @@ import { installWorldWatch } from '@wildshard/engine/core/worldWatch';
 import { webglRendererName } from '@wildshard/engine/core/slowGpuPacing';
 import { TIER } from '@wildshard/engine/core/tier';
 import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
+import { programTwinsOn } from '@wildshard/engine/render/programTwins';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { bootRoadPrograms, liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
 import { textureBytes } from '@wildshard/engine/render/textureBytes';
@@ -147,8 +148,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   // and takes the pinned time; on the grid each entered cell registers its own (runtime shard.ts)
   if (ctx.grid === null) enterSkyClock(app, [game.levelScope], game.levelScope);
   if (!eagerGridComposer) { await game.prepareComposer(); game.buildComposer(); }
-  // DL24 (J198): every body a row can bring, parked hidden after the compose, so the first frame builds its programs
-  animals.stageWarmRigs();
+  // DL24 (J198): every body a row can bring, parked hidden after the compose, so the first frame builds its programs.
+  // DF8 (`debug.programTwins`): not on a grid page, where every row draws in a region whose own rigs carry its look
+  if (ctx.grid === null || !programTwinsOn()) animals.stageWarmRigs();
   // The first live late/render phases would otherwise publish the home PMREM and install its grade only after
   // shaders/firstFrame, invalidating every warmed world key. Settle the same presentation owners without a tick.
   ctx.grid?.prepareFrame();
