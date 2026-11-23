@@ -29,7 +29,9 @@ function fixture(options: {models?: boolean; prepare?: (root: Object3D) => Promi
     const hooks = {${source.slice(hookStart, hookEnd)}};
     return {start: () => hooks.afterWorld(null), kit: () => {if (typeof equipmentReady === 'function') equipmentReady();},
       content: () => {contentReady(); forgetContent();}, result: () => enteredWarm};
-  })`), {Promise,timeClientPreparation:(_slug:string,_step:string,work:()=>unknown)=>Promise.resolve(work())});
+  })`), {Promise,timeClientPreparation:(_slug:string,_step:string,work:()=>unknown)=>Promise.resolve(work()),
+    // DF10's road-kit prime (kitBatch.ts) is off outside phone Low, as it is here
+    kitBatchOn:(): boolean => false,primeKitBatches:(): never => {throw new Error('kit prime while off');},multiDraws:(): boolean => false});
   if (typeof factory !== 'function') throw new Error('Regional hook factory missing');
   const owner = new Scope('equipment-overlap'), root = new Group(), models = new Group();
   root.visible = false; models.visible = false; models.name = 'staged-equipment';
