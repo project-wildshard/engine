@@ -3,6 +3,8 @@ export declare const OWNER_CENSUS: string;
 /** DW3: route probe bodies (census.mjs): the owners of each leg's heaviest sampled frames. */
 export declare const LEG_CENSUS_START: string;
 export declare const LEG_CENSUS_STOP: string;
+export declare const LEG_ALLOC_START: string;
+export declare const LEG_ALLOC_STOP: string;
 /** In-page bodies (census.mjs): time every procedural voice render, then read the log. */
 export declare const VOICE_LOG_START: string;
 export declare const VOICE_LOG_READ: string;

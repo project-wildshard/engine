@@ -65,6 +65,43 @@ window.__wsLegCensus = () => { r.renderBufferDirect = draw; r.shadowMap.render =
 return 'leg census';
 `;
 
+/** A route probe body: the leg's new typed-array and ArrayBuffer storage, by constructor and, for each allocation of
+ * 64 KB or more, by the first three calling frames. DRIFTWOOD-FPS DW3 (mini-dw3): JSC counts a buffer's bytes toward its
+ * next full collection, and on the iPhone 13 every full (75 to 176 ms) is a frame over 50 ms. A view on an existing
+ * buffer is not counted. Must not close over anything outside itself. */
+export const LEG_ALLOC_START = `
+const names = ['ArrayBuffer', 'Float32Array', 'Float64Array', 'Uint8Array', 'Uint8ClampedArray', 'Uint16Array', 'Uint32Array', 'Int8Array', 'Int16Array', 'Int32Array'];
+const kept = {}, byKind = {}, sites = new Map(), t0 = performance.now();
+let total = 0, count = 0;
+for (const name of names) {
+  const own = window[name]; if (typeof own !== 'function') continue;
+  kept[name] = own;
+  window[name] = new Proxy(own, { construct(target, args, newTarget) {
+    const made = Reflect.construct(target, args, newTarget === window[name] ? target : newTarget);
+    const a0 = args[0];
+    if (!(a0 instanceof kept.ArrayBuffer || (typeof SharedArrayBuffer === 'function' && a0 instanceof SharedArrayBuffer))) {
+      const bytes = made.byteLength; total += bytes; count++;
+      const k = byKind[name] ?? (byKind[name] = [0, 0]); k[0]++; k[1] += bytes;
+      if (bytes >= 65536 && sites.size < 400) {
+        const at = String(new Error().stack ?? '').split('\\n').slice(1, 5).map((l) => l.replace(/https?:\\/\\/[^/]+/, '').trim()).filter((l) => !l.includes('construct')).slice(0, 3).join(' < ');
+        const key = name + ' ' + at, o = sites.get(key) ?? [0, 0]; o[0]++; o[1] += bytes; sites.set(key, o);
+      }
+    }
+    return made;
+  } });
+}
+window.__wsLegAlloc = () => { for (const name of Object.keys(kept)) window[name] = kept[name];
+  const seconds = (performance.now() - t0) / 1000;
+  return { seconds: Math.round(seconds), mbPerSecond: Math.round(total / 1048576 / Math.max(seconds, 0.001) * 100) / 100, count, mb: Math.round(total / 1048576 * 10) / 10,
+    byKind: Object.fromEntries(Object.entries(byKind).map(([n, [c, b]]) => [n, [c, Math.round(b / 1048576 * 10) / 10]])),
+    sites: [...sites].map(([k, [c, b]]) => [k, c, Math.round(b / 1048576 * 10) / 10]).sort((a, b) => b[2] - a[2]).slice(0, 15) }; };
+return 'leg alloc';
+`;
+export const LEG_ALLOC_STOP = `
+const stop = window.__wsLegAlloc; window.__wsLegAlloc = undefined;
+return stop === undefined ? null : stop();
+`;
+
 /** The probe's stop body: the owners over the leg's heaviest tenth of sampled frames (by triangles), the view the leg's
  * p95 frame draws, and the mean over all sampled frames. */
 export const LEG_CENSUS_STOP = `
