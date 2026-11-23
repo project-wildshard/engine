@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "d817a6a30b7b9705f343c15ac7b07a7c344593e2deba7737a591e8f402a3ac29",
+  "catalogueHash": "9bc06c222a88ad03bb241b0160119222b92acb4c1070521d2241aa7a6ee66a7a",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -99,7 +99,7 @@
         "status": "experimental"
       },
       {
-        "instance": "brasscap-mesa-solo",
+        "instance": "blender-template-solo",
         "slug": "brasscap-mesa",
         "cell": [
           -1,
@@ -423,7 +423,7 @@
           "speedClass": "road"
         },
         {
-          "instance": "brasscap-mesa",
+          "instance": "blender-template",
           "slug": "brasscap-mesa",
           "cell": [
             -1,
@@ -634,8 +634,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 14,
-        "hash": "027f8b78379d50414e3cd112b49c4b3007882a7ba02597927c034ceadb8f4c0a"
+        "revision": 13,
+        "hash": "c0a5acd3fb815e910557931ab3554fbd20eec1a5828718a4f96880fea9468233"
       },
       {
         "slug": "driftwood-isle",
@@ -664,8 +664,8 @@
       {
         "slug": "mirror-salt",
         "name": "Mirror Salt",
-        "revision": 6,
-        "hash": "edb4a7b304cf56599565178ff75ee3da112944e1e9a34d38e4d223ad2ff47b9a"
+        "revision": 7,
+        "hash": "8729462ab98c723a355c11d0ce1520bf75b1c65ea889188f597b4dab751df3c3"
       },
       {
         "slug": "mossgate",
@@ -799,9 +799,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 14,
-      "hash": "027f8b78379d50414e3cd112b49c4b3007882a7ba02597927c034ceadb8f4c0a",
-      "bytes": 22499840
+      "revision": 13,
+      "hash": "c0a5acd3fb815e910557931ab3554fbd20eec1a5828718a4f96880fea9468233",
+      "bytes": 22462464
     },
     {
       "slug": "driftwood-isle",
@@ -829,9 +829,9 @@
     },
     {
       "slug": "mirror-salt",
-      "revision": 6,
-      "hash": "edb4a7b304cf56599565178ff75ee3da112944e1e9a34d38e4d223ad2ff47b9a",
-      "bytes": 14883328
+      "revision": 7,
+      "hash": "8729462ab98c723a355c11d0ce1520bf75b1c65ea889188f597b4dab751df3c3",
+      "bytes": 14879232
     },
     {
       "slug": "mossgate",

@@ -153,9 +153,9 @@
     },
     {
       "slug": "mirror-salt",
-      "revision": 6,
-      "hash": "edb4a7b304cf56599565178ff75ee3da112944e1e9a34d38e4d223ad2ff47b9a",
-      "bytes": 14883328
+      "revision": 7,
+      "hash": "8729462ab98c723a355c11d0ce1520bf75b1c65ea889188f597b4dab751df3c3",
+      "bytes": 14879232
     }
   ]
 }
