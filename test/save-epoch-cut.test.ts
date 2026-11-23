@@ -52,9 +52,9 @@ test('a real epoch 1 -> 2 boot keeps identity, session, settings and device pref
   expect(JSON.parse(saves.exportAll())).toHaveProperty('saveEpoch', EPOCH);
 });
 
-test('every client older than the cut is forced over once, and no build forces itself', () => {
+test('the epoch cut enforces its floor until the next scheduled client floor', () => {
   for (const version of ['0.1.31', '0.1.34', '0.1.35']) expect(olderClient(version, clientFloor(CUT))).toBe(true);
-  for (const version of [CUT, '0.1.40', '0.2.0']) {
+  for (const version of [CUT, '0.1.40', '0.1.72']) {
     expect(clientFloor(version)).toBe(CUT);
     expect(olderClient(version, clientFloor(version))).toBe(false);
   }
