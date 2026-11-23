@@ -69,6 +69,29 @@ return 'leg census';
  * 64 KB or more, by the first three calling frames. DRIFTWOOD-FPS DW3 (mini-dw3): JSC counts a buffer's bytes toward its
  * next full collection, and on the iPhone 13 every full (75 to 176 ms) is a frame over 50 ms. A view on an existing
  * buffer is not counted. Must not close over anything outside itself. */
+/** A route probe body: each drawn frame's vsync timestamp (the animation frame's \`now\`) and how late its callback ran.
+ * DRIFTWOOD-FPS DW3 (mini-dw3): the bench's frame time is the game clock's delta, read when the callback runs, so a
+ * callback a task held 10 ms reads as a 43 ms frame and the next as a 23 ms one, whatever the display showed. The
+ * vsync-to-vsync interval between drawn frames is the cadence the display had. Must not close over anything outside itself. */
+export const LEG_VSYNC_START = `
+const g = window.__wildshard?.world?.game;
+if (g === undefined) return 'no game';
+const own = window.requestAnimationFrame, drawn = [], late = [];
+window.requestAnimationFrame = function (cb) { return own.call(window, (now) => {
+  const start = performance.now(), before = g.frameCount;
+  try { return cb(now); } finally { if (g.frameCount !== before && drawn.length < 20000) { drawn.push(now); late.push(start - now); } } }); };
+window.__wsLegVsync = () => { window.requestAnimationFrame = own;
+  const gaps = []; for (let i = 1; i < drawn.length; i++) gaps.push(drawn[i] - drawn[i - 1]);
+  const q = (list, p) => { if (list.length === 0) return null; const s = [...list].sort((a, b) => a - b); return Math.round(s[Math.min(s.length - 1, Math.floor(p * s.length))] * 10) / 10; };
+  return { frames: drawn.length, vsyncP50: q(gaps, 0.5), vsyncP95: q(gaps, 0.95), vsyncOver34: gaps.filter((x) => x > 34).length, vsyncOver50: gaps.filter((x) => x > 50.5).length,
+    lateP50: q(late, 0.5), lateP95: q(late, 0.95), lateOver8: late.filter((x) => x > 8).length }; };
+return 'leg vsync';
+`;
+export const LEG_VSYNC_STOP = `
+const stop = window.__wsLegVsync; window.__wsLegVsync = undefined;
+return stop === undefined ? null : stop();
+`;
+
 export const LEG_ALLOC_START = `
 const names = ['ArrayBuffer', 'Float32Array', 'Float64Array', 'Uint8Array', 'Uint8ClampedArray', 'Uint16Array', 'Uint32Array', 'Int8Array', 'Int16Array', 'Int32Array'];
 const kept = {}, byKind = {}, sites = new Map(), t0 = performance.now();
