@@ -25,7 +25,7 @@ test('the observer uses the staging agent marker on its socket upgrade', () => {
     new StagingSocket(url, []);
     assert.deepEqual(dial.mock.lastCall, [url, [], {
       origin: 'https://staging.wildshard.io',
-      headers: { 'x-wildshard-agent': 'observer-test' },
+      headers: { 'x-wildshard-agent': 'observer-test', 'user-agent': 'node WildshardAgent/1 (observer-test)' },
     }]);
   } finally {
     vi.unstubAllEnvs();
