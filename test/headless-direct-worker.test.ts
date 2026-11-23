@@ -15,7 +15,7 @@ import { expect, test } from 'vitest';
 // QA-FEEDBACK 2026-11-22 row 12: a case takes 3 to 10 s of CPU, and at load 25 to 48 the fixed 20 s kill failed land
 // gates (opus-pine2 03:38, opus-compat-w4 03:56 UTC) that pass alone. The deadline is 20 s on an idle machine, stretched
 // by how oversubscribed the cores are at the start (capped at 3 minutes), and the test's own timeout sits above it.
-const DEADLINE_MS = Math.min(180_000, Math.round(20_000 * Math.max(1, loadavg()[0] / availableParallelism())));
+const DEADLINE_MS = Math.min(180_000, Math.round(20_000 * Math.max(1, (loadavg()[0] ?? 0) / availableParallelism())));
 
 test.each([
   ['trusted-run', '"nativeActors":1'],
