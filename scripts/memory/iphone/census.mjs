@@ -168,7 +168,8 @@ if (typeof g.captureFrame === 'function') { const cap = g.captureFrame; g.captur
   log.reads.push([Math.round(t), 'game.captureFrame ask', 0]); return cap.apply(this, args); }; }
 const timer = (name) => { const own = window[name]; window[name] = function (fn, ...rest) {
   if (typeof fn !== 'function') return own.call(window, fn, ...rest);
-  const label = name + ':' + (fn.name || String(fn).slice(0, 60).replace(/\\s+/g, ' '));
+  // DW3 (mini-dw3): a minified name (\`n\`) names nothing; a short name carries the body's start too
+  const label = name + ':' + (fn.name.length > 2 ? fn.name : (fn.name + ' ' + String(fn).slice(0, 90)).replace(/\\s+/g, ' '));
   return own.call(window, function (...a) { const t = performance.now();
     try { return fn.apply(this, a); } finally { const ms = performance.now() - t; if (ms >= 8 && log.tasks.length < 2000) log.tasks.push([Math.round(t), label, Math.round(ms)]); } }, ...rest); }; };
 timer('setTimeout'); timer('setInterval');
