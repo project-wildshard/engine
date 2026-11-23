@@ -146,7 +146,7 @@ export class GameMenu {
     mountUi(this.root, this.scope, document.body);
 
     // ── MAP: the FullMap canvas lives inside this panel (Map.ts embedded mode) ──
-    // row 58 (Jake's A-1.4): the map is the panel's full width and 1.4 times as tall, the zoom row and the key under it and
+    // row 58 (Jake's A-1.4, J499's 1.3): the map is the panel's full width and 1.3 times as tall, the zoom row and the key under it and
     // nothing below. The map has no name line of its own: the header's subtitle names the zone, or a practice room (MN10)
     this.mapQuest = el('ws-gmenu-mapquest');
     const frame = el('ws-gmenu-mapframe');

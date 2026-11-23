@@ -76,18 +76,18 @@
 .ws-gmenu .ws-gmenu-empty { padding: 20px 0; text-align: center; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ws-text-dim); }
 .ws-gmenu svg { width: 100%; height: 100%; display: block; }
 
-/* MAP: label row, a frame the FullMap canvas fills (1.4 times as tall as wide, row 58), zoom chips + legend. The panel is a
-   size container, so the frame's height reads the panel's width (386 x 540 inside a 402 pt phone's 1 px sheet border) */
+/* MAP: label row, a frame the FullMap canvas fills (1.3 times as tall as wide, J499; row 58's 1.4 left no room), zoom chips +
+   legend. The panel is a size container, so the frame's height reads the panel's width (388 x 504 on a 402 pt phone) */
 .ws-gmenu .ws-gmenu-panel.map { touch-action: none; padding: 8px 7px; container-type: size; }
 /* the quest card (E51): the chapter title, the full objective and its sub-steps — the HUD carries only the short chip */
-.ws-gmenu .ws-gmenu-mapquest { flex: none; margin-bottom: 10px; padding: 8px 10px 8px 12px; border: 1px solid rgba(143, 227, 255, 0.22); border-left: 2px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.05); }
+.ws-gmenu .ws-gmenu-mapquest { flex: none; margin-bottom: 16px; padding: 8px 10px 8px 12px; border: 1px solid rgba(143, 227, 255, 0.22); border-left: 2px solid var(--ws-cyan); background: rgba(143, 227, 255, 0.05); }
 .ws-gmenu .ws-gmenu-mapquest[hidden] { display: none; }
 .ws-gmenu .ws-gmenu-mapquest-title { font-size: 8.5px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--ws-cyan); }
 .ws-gmenu .ws-gmenu-mapquest-obj { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-family: var(--ws-display); font-weight: 600; font-size: 15px; letter-spacing: 0.03em; color: var(--ws-text); }
 .ws-gmenu .ws-gmenu-mapquest-obj i { flex: none; width: 7px; height: 7px; transform: rotate(45deg); background: var(--ws-cyan); box-shadow: 0 0 8px rgba(143, 227, 255, 0.8); }
 .ws-gmenu .ws-gmenu-mapquest-hint { margin-top: 3px; padding-left: 15px; font-size: 9.5px; letter-spacing: 0.06em; color: var(--ws-text-dim); }
-.ws-gmenu .ws-gmenu-mapframe { position: relative; flex: 0 1 auto; width: 100%; height: calc(100cqw * 1.4); min-height: 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(4, 7, 12, 0.9); overflow: hidden; }
-.ws-gmenu .ws-gmenu-mapfoot { flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.ws-gmenu .ws-gmenu-mapframe { position: relative; flex: 0 1 auto; width: 100%; height: calc(100cqw * 1.3); min-height: 0; border: 1px solid rgba(143, 227, 255, 0.22); background: rgba(4, 7, 12, 0.9); overflow: hidden; }
+.ws-gmenu .ws-gmenu-mapfoot { flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
 .ws-gmenu .ws-gmenu-zooms { display: flex; gap: 6px; }
 .ws-gmenu .ws-gmenu-zoom { min-width: 42px; min-height: 36px; padding: 6px 8px; appearance: none; -webkit-appearance: none; background: rgba(143, 227, 255, 0.05); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text-dim); font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.04em; cursor: pointer; }
 .ws-gmenu .ws-gmenu-zoom.active { border-color: var(--ws-cyan); color: #fff; background: rgba(143, 227, 255, 0.16); }
@@ -99,20 +99,29 @@
 .ws-gmenu .ws-gmenu-legend[hidden] { display: none; }
 /* QA 11-19 row 58, Jake's A-1.4 (17:20, board 9TGmo1PWB5zAEd4GaPSdHL): the BAG (`.play`, MN15: never PAUSE, never the
    title's Settings, which shares this sheet) gets a shorter CLOSE · BAG
-   header, the map at the sheet's full width and 1.4 times as tall, the zoom row (0.25x 0.5x 1x 2x) and the key under it,
+   header, the map at the sheet's full width and 1.3 times as tall (J499), the zoom row (0.25x 0.5x 1x 2x) and the key under it,
    and nothing below: no hint line (the web app's bottom bar sits there). The 44 px tap height stays, past the button. */
 .ws-gmenu.play .ws-gmenu-bar { padding: 2px 10px; }
 .ws-gmenu.play .ws-gmenu-bar .ws-gmenu-close { position: relative; min-height: 32px; padding: 4px 14px; font-size: 12px; letter-spacing: 0.2em; }
 .ws-gmenu.play .ws-gmenu-bar .ws-gmenu-close::before { content: ''; position: absolute; inset: -6px -4px; }
 /* MAP-NEXT MN11: with the icon tabs' padding (the BAG rule below) the header and the tab row are 88 pt or less together */
 /* MN12: in a home-screen app iOS reports no bottom inset (E58); --ws-home stands in, so the sheet ends above the home bar */
-.ws-gmenu.play { padding-bottom: calc(10px + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px))); }
-/* MN10: on a wider screen the frame keeps its 1.4, capped by the height the sheet leaves it */
-@media (min-width: 561px) { .ws-gmenu .ws-gmenu-mapframe { width: auto; max-width: 100%; aspect-ratio: 5 / 7; align-self: center; } }
+/* (J499: the BAG's sheet pads it below, now the BAG is the whole screen) */
+/* MN10: on a wider screen the frame keeps its 1.3 (J499), capped by the height the sheet leaves it */
+@media (min-width: 561px) { .ws-gmenu .ws-gmenu-mapframe { width: auto; max-width: 100%; aspect-ratio: 10 / 13; align-self: center; } }
 .ws-gmenu.play .ws-gmenu-bar .ws-gmenu-title { font-size: 17px; letter-spacing: 0.3em; }
 .ws-gmenu.play .ws-gmenu-bar .ws-gmenu-sub { margin-top: 2px; font-size: 8.5px; letter-spacing: 0.24em; }
 .ws-gmenu .ws-gmenu-hint:empty { display: none; }
 @media (max-width: 560px) { .ws-gmenu.play { padding-left: 0; padding-right: 0; } } /* the sheet at the phone's full width */
+/* J499 (Jake 2026-11-23 ~12:55 Cancun, QA-FEEDBACK-2026-11-23-b row 16: "the settings shouldn't be having this border ... width
+   to width, height to height ... full page. Can I get rid of this weird curved thing"): the BAG is the whole screen, edge to
+   edge, with no curved frame, hairline, shadow or corner bracket of its own, and opaque (a whole-screen page, so the HUD under it
+   never shows through). The content keeps the safe areas: the sheet pads
+   the top inset (and the pill) and the home bar, which .ws-gmenu pads for every other sheet. PAUSE and the title's Settings
+   keep their sheet. */
+.ws-gmenu.play { padding: 0; }
+.ws-gmenu.play .ws-gmenu-sheet { max-width: none; border: 0; border-radius: 0; box-shadow: none; background: rgb(8, 12, 20); padding: calc(var(--ws-top) + 4px + var(--ws-pill, 0px)) 0 calc(10px + max(env(safe-area-inset-bottom, 0px), var(--ws-home, 0px))); }
+.ws-gmenu.play .ws-gmenu-sheet::before, .ws-gmenu.play .ws-gmenu-sheet::after { display: none; }
 
 /* INVENTORY: equipped weapon cards + the 3-column pack grid */
 .ws-gmenu .ws-gmenu-weapon { flex: none; display: flex; align-items: center; gap: 14px; width: 100%; margin-bottom: 8px; padding: 10px 12px; appearance: none; -webkit-appearance: none; text-align: left; background: rgba(143, 227, 255, 0.04); border: 1px solid rgba(143, 227, 255, 0.22); color: var(--ws-text); font-family: var(--ws-mono); cursor: pointer; }
