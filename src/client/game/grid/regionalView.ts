@@ -12,7 +12,8 @@
  *   its moving pieces and its player floors (the region's `PlayerFrameQueries.platforms`);
  * - `enter(entry)`: while an entered runtime scope lives, the root is visible and the page registry verbs (`ctx.piece`,
  *   `place`, `activeRegistry()`) resolve to this registry, exactly as the frame's physics replaces the page's on a
- *   crossing. Prepared geometry may park across exits, but it is hidden on leave: an inactive neighbour displays only
+ *   crossing. Prepared geometry may park across exits, but it is hidden on leave unless the road shows it (`display`,
+ *   J500: a ready zone beside the road draws whole, its own lights out); an inactive neighbour displays only
  *   its shardfile / frozen declared content; while entered, the cell's coarse cover (its far proxy and ring tiles) is
  *   hidden through the scene's `cellCover.ts` port, so the region's own ground is what draws inside its cell (G223);
  * - disposal in dependency order: every piece's colliders and bodies leave the destination world, every object leaves
@@ -88,6 +89,10 @@ export interface RegionalView {
   prepare: (owner: Scope) => void;
   /** Show the parked root and route the page registry verbs here while `entry` (an entered runtime scope) lives. */
   enter: (entry: Scope) => void;
+  /** J500 (QA 11-23-b row 17): show the parked root from outside its cell while `owner` lives, the cell's coarse cover handed
+   *  over as on entry, its own lights out (the road keeps the page sun and fill, the keys its exterior warm-up made). No
+   *  registry binding and no entered service: the zone is drawn, not played. */
+  display: (owner: Scope) => void;
   /** Pose moving pieces (also run from `fixedPre` when supplied). */
   sync: () => void;
   census: () => RegionalViewCensus;
@@ -113,7 +118,15 @@ export function createRegionalView(request: RegionalViewRequest): RegionalView {
   registry.scope = scope; // SF57: an ambient registration belongs to this view, never to the page
   const movers = new Set<() => void>(), platforms: Floor[] = [];
   const objects = new Map<Object3D, { scope: Scope; refs: number }>();
-  let bindings = 0, visibleBindings = 0, held = false;
+  let bindings = 0, visibleBindings = 0, displays = 0, held = false;
+  // J500: a root drawn from the road draws under the road's lights: its own lights stay out while no entry shows it
+  const dimmed: Object3D[] = [];
+  const relight = (): void => {
+    root.visible = visibleBindings + displays > 0;
+    const dim = displays > 0 && visibleBindings === 0;
+    if (dim && dimmed.length === 0) root.traverse(node => { if ((node as Object3D & { isLight?: boolean }).isLight === true && node.visible) { node.visible = false; dimmed.push(node); } });
+    else if (!dim && dimmed.length > 0) { for (const light of dimmed) light.visible = true; dimmed.length = 0; }
+  };
   // Unwinds last (LIFO): the scene node, then the claim hold, after every piece scope below has released its handles.
   scope.onDispose(() => {
     registry.retire(); // SF57: what `place` recorded and the cullers it started for this region go with it
@@ -181,7 +194,7 @@ export function createRegionalView(request: RegionalViewRequest): RegionalView {
     const prior = slot.registryValue;
     if (prior === registry) { unhold(); throw new Error('Regional registry is already entered'); }
     slot.registryValue = registry; bindings++; if (present) visibleBindings++;
-    root.visible = visibleBindings > 0;
+    relight();
     // G223: the cell's coarse cover (far proxy, ring tiles) hands over to this root while the entry lives
     const uncover = present ? cellCoverOf(request.scene)?.cover(cell.instance, request.ownGround === true) ?? ((): void => undefined) : (): void => undefined;
     let restored = false;
@@ -189,15 +202,28 @@ export function createRegionalView(request: RegionalViewRequest): RegionalView {
     const restore = (): void => {
       if (restored) return; restored = true; forgetEntry(); forgetView(); bindings--; unhold(); uncover(); held = bindings > 0;
       if (present) visibleBindings--;
-      root.visible = visibleBindings > 0;
+      relight();
       if (slot.registryValue === registry) slot.registryValue = prior;
     };
     forgetEntry = owner.capture('disposers', restore);
     // A view disposed before its entry still hands the page its previous registry back.
     forgetView = scope.capture('disposers', restore);
   };
+  const display = (owner: Scope): void => {
+    if (scope.disposed || owner.disposed) throw new Error('Regional display requires a live view and owner');
+    displays++; relight();
+    const uncover = cellCoverOf(request.scene)?.cover(cell.instance, request.ownGround === true) ?? ((): void => undefined);
+    containment.update();
+    let restored = false;
+    let forgetOwner = (): void => undefined, forgetView = (): void => undefined;
+    const restore = (): void => {
+      if (restored) return; restored = true; forgetOwner(); forgetView(); displays--; uncover(); relight();
+    };
+    forgetOwner = owner.capture('disposers', restore);
+    forgetView = scope.capture('disposers', restore);
+  };
   return {
-    scope, root, registry, queries, enter: owner => { bind(owner, true); containment.update(); }, prepare: owner => { bind(owner, false); }, sync,
+    scope, root, registry, queries, enter: owner => { bind(owner, true); containment.update(); }, prepare: owner => { bind(owner, false); }, display, sync,
     census: () => {
       const native = physics.scopedCensus(scope);
       return { bodies: native.bodies, colliders: native.colliders, pieces: registry.pieces.length, objects: root.children.length,

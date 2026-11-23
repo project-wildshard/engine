@@ -28,11 +28,11 @@ export interface NearPlanOptions {
  */
 export function nearReach(pitch: number): number { return (pitch - CHUNK_HALF * 2) * Math.SQRT2; }
 /**
- * J500 rule 3 is off until rule 2 (the early full load, opus-finish) draws the real zone in that slot: alone, hiding the far
- * proxy left empty sky where the neighbour stands (coordinator, 2026-11-23). On with the device slot `debug.farNearReach: true`;
- * rule 2's commit turns the default on.
+ * J500 rule 3 is on: rule 2 (the zone ahead built before its gate) and rule 1 (the zone just left kept) draw the real zone in
+ * that slot from the road (`LiveGridHost.drawnFromRoad`). Alone, hiding the far proxy left empty sky where the neighbour
+ * stands (coordinator, 2026-11-23). The device slot `debug.farNearReach: false` turns it off.
  */
-export function farNearReachOn(saved: unknown): boolean { return saved === true; }
+export function farNearReachOn(saved: unknown): boolean { return saved !== false; }
 /** Whether a cell's far proxy (and its haze band) may draw with the eye `distance` metres from its content square. */
 export function farDrawnAt(distance: number, pitch: number): boolean { return distance > nearReach(pitch); }
 

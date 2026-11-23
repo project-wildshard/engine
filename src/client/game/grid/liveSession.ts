@@ -203,6 +203,8 @@ export interface LiveGridSessionState {
   /** G580 T2: the distinct compiled programs kept across retired cells (null: the Developer row is off) */
   readonly keptPrograms: number | null;
   readonly live: LiveGridState; readonly crossing: GridCrossingState; readonly stowed: boolean; readonly renderOrigin: { x: number; z: number };
+  /** J500: the resident worlds drawn from the road now (`syncRoadDisplays`) */
+  readonly roadDisplays?: readonly string[];
   /** Entered hook intervals in the same performance clock as browser long tasks. */
   readonly runtimeTiming: ReturnType<RuntimePageSession['timings']>;
   /** Committed synchronous transitions; approach preparation wall intervals remain separate. */
@@ -225,6 +227,13 @@ export interface LiveGridSpawn { readonly x: number; readonly y: number | undefi
  *  model's fixed shares, which now yield to it (`keepHome`). */
 const HOME_KEEP_METRES = Number.POSITIVE_INFINITY;
 const LINK: ReadinessLink = { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: 0.25, maxStallSeconds: 10 };
+/** J500 rule 2: the zone ahead builds once its readiness estimate at the traveller's speed (a sprint at least), with a quarter
+ *  more, plus 8 m, covers the walk to its square. */
+const ROAD_AHEAD = { minSpeed: 8, margin: 1.25, leadMetres: 8 } as const;
+/** J500 rule 1 (QA 11-23-b row 17): the zone just left stays whole beside the road up to the J410 memory refusal line (engine
+ *  budgets `memory/loading/*`, 1.5 GB), not the 1.0 GB playing envelope (J445's may-crash target): on a phone Driftwood alone
+ *  plays 1.18 GB, so the envelope retired it the moment its gate was crossed and walking back in rebuilt it at the gate. */
+const DEPARTED_PLAYING_BYTES = 1_500_000_000;
 
 /** G598: a preparation that fails (or a road approach abandoned for another crossing, T7) frees its half-built region as a
  *  crossing's retirement does (O20):
@@ -301,6 +310,8 @@ export class LiveGridSession {
   private readonly plotBanks = new Map<string, ReturnType<PlotAudioPorts['bank']>>();
   private readonly runtimeScope: Scope;
   private readonly runtimeRegions = new Map<string, PreparedRegionalRuntime>();
+  /** J500 rules 1 and 2: the resident worlds drawn from the road now, each with the scope that shows it */
+  private readonly roadDisplays = new Map<string, { readonly prepared: PreparedRegionalRuntime; readonly owner: Scope }>();
   /** GC9: worlds pre-warmed from inside an entered runtime (GC5), whose entry preparation waits for the source to be left:
    *  the runtime session prepares an entry only from the neutral road, so preparing it inside the source threw away the
    *  whole world just built ("Entry preparation requires the neutral road") and closed the cell until a retry. */
@@ -357,7 +368,7 @@ export class LiveGridSession {
     const highwayBytes = (ports.initialStripBytes ?? ports.strips.reduce((sum, strip) => sum + strip.mesh.positions.byteLength + strip.mesh.indices.byteLength, 0))
       + assembly.cells.length * TRANSFER_WALL_BYTES;
     try { this.live = new LiveGridHost(assembly, {
-      lastCell: { windowMs: 30_000, playingBytes: ports.allocator.envelope(), keepHome: HOME_KEEP_METRES,
+      lastCell: { windowMs: 30_000, playingBytes: DEPARTED_PLAYING_BYTES, keepHome: HOME_KEEP_METRES,
         // QA 11-23-b row 17 (J500): any zone just left stays resident across the road band beside it
         keepNear: assembly.pitch - CHUNK_HALF * 2, schedule: (expire, ms) => {
         const timer = scope.child('grid.last-cell-expiry');
@@ -365,6 +376,8 @@ export class LiveGridSession {
         return () => { timer.dispose(); };
       } },
       keepPrograms: instance => { this.keepPrograms(instance); },
+      // J500 rule 2: the zone ahead starts its whole build from the road, led by speed (a sprint at least)
+      ahead: ROAD_AHEAD,
       home: { mode: 'owned', instance: home.instance, bytes: ports.residency.bytes, residency: ports.residency },
       player, allocator: ports.allocator,
       highway: { bytes: highwayBytes, create: () => {
@@ -415,6 +428,7 @@ export class LiveGridSession {
     page.onFixedPre(() => {
       if (scope.disposed) return;
       this.live.beforeFixed(); this.crossing.step(this.live.worldFeet());
+      this.syncRoadDisplays();
       const walls = this.transferWalls.get(this.live.current());
       if (walls === undefined) throw new Error('Active transfer fence is missing');
       walls.sync();
@@ -1149,6 +1163,28 @@ export class LiveGridSession {
   }
 
   /** The fixed-boundary rebind: the page's stepped world, the player's motor and the render origin. */
+  /**
+   * J500 rules 1 and 2 (QA 11-23-b row 17): on the road, every ready resident runtime world (the zone just left, the one
+   * built ahead) is drawn from outside its cell in place of its far and near placeholders. Inside a cell none is; the entered
+   * one keeps its road display until its entry is ready, so the walk in never shows a frame without it.
+   */
+  private syncRoadDisplays(): void {
+    const current = this.live.current(), entered = this.runtimePage.state();
+    const wanted = new Set(this.live.drawnFromRoad());
+    if (current !== null && this.roadDisplays.has(current) && !(entered.instance === current && entered.ready)) wanted.add(current);
+    for (const [instance, shown] of this.roadDisplays) {
+      if (wanted.has(instance) && this.runtimeRegions.get(instance) === shown.prepared) continue;
+      this.roadDisplays.delete(instance); shown.owner.dispose();
+    }
+    for (const instance of wanted) {
+      const prepared = this.runtimeRegions.get(instance);
+      if (prepared?.display === undefined || this.roadDisplays.has(instance) || !this.live.ready(instance)) continue;
+      const owner = this.ports.scope.child(`grid.road-display.${instance}`);
+      this.roadDisplays.set(instance, { prepared, owner });
+      prepared.display(owner);
+    }
+  }
+
   private bind(frame: LiveGridFrame): void {
     this.framePhysics = frame.physics;
     const runtime = frame.instance === null ? undefined : this.runtimeRegions.get(frame.instance);
@@ -1243,6 +1279,6 @@ export class LiveGridSession {
   state(): LiveGridSessionState {
     const cap = this.page.traveller.hoverSpeedLimit?.();
     return { keptPrograms: this.keeper?.size ?? 0, live: this.live.state(), crossing: this.crossing.crossing.state(), stowed: this.page.equipment.stowed, renderOrigin: { x: this.offset.x, z: this.offset.z }, runtimeTiming: this.runtimePage.timings(), crossingTiming: this.crossing.crossing.timings(), leaveTiming: this.leaveTiming.map(row => ({ ...row })), crossingLoading: this.crossing.crossing.timings().map(crossingLoadingRows),
-      hoverCap: cap === undefined ? null : Math.round(cap * 100) / 100 };
+      hoverCap: cap === undefined ? null : Math.round(cap * 100) / 100, roadDisplays: [...this.roadDisplays.keys()].sort() };
   }
 }

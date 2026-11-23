@@ -81,6 +81,11 @@ export interface LiveGridPorts {
      *  page passes one road cell). Past it, it retires. Absent: only the home is kept. */
     readonly keepNear?: number;
     readonly schedule: (expire: () => void, delayMs: number) => () => void };
+  /** J500 rule 2 (QA 11-23-b row 17, Jake 2026-11-23: a zone you approach is drawn at full detail before you reach its gate):
+   *  on the road, the zone the traveller heads into starts its whole world build once its readiness estimate at the
+   *  traveller's speed (at least `minSpeed`, the estimate times `margin`, plus `leadMetres`) covers the distance to its
+   *  square. One zone at a time, beside the zone just left. Absent: a zone builds only at its gate (T7). */
+  ahead?: { readonly minSpeed: number; readonly margin: number; readonly leadMetres: number };
   /** G580 T2: told once before a resident's retirement or unload disposes its world, so its compiled programs can be kept
    *  for the next world; never refuses a retirement. Absent keeps nothing. */
   keepPrograms?: (instance: string) => void;
@@ -273,6 +278,9 @@ export class LiveGridHost {
   /** GC5 / GC36: the cell whose world the road is building or built ahead of its line (`buildAhead`), kept until the
    *  traveller enters a cell or heads into another's mouth. */
   private ahead: string | null = null;
+  /** J500 rule 2: the feet at the last fixed step (the heading and speed), and how many builds ahead began */
+  private aheadFeet: GridPoint | null = null;
+  private aheadBuilds = 0;
   private transportApproach: { instance: string; controller: AbortController; work: Promise<void> } | null = null;
   private retiredTransport: Promise<void> = Promise.resolve();
   private stopApproachTransport(): void {
@@ -367,7 +375,9 @@ export class LiveGridHost {
   }
   private retainedFits(instance: string): boolean {
     const policy = this.ports.lastCell;
-    return policy !== undefined && this.ports.allocator.ownerCost(instance).playing <= Math.min(this.ports.allocator.envelope(), policy.playingBytes);
+    // J500 rule 1: a world just played is kept up to the policy's own line, not the envelope: the traveller already played it
+    // there (Driftwood plays 1.18 GB against the 1.0 GB envelope on a phone), and its bound eviction still yields it to an entry
+    return policy !== undefined && this.ports.allocator.ownerCost(instance).playing <= policy.playingBytes;
   }
   /** Call only after entered leave hooks finish. Keep the same ready world,
    * without a second claim, snapshot, physics host or shader preparation. */
@@ -461,10 +471,53 @@ export class LiveGridHost {
     this.beforeFixedWithWork();
   }
   private beforeFixedWithWork():void{
-    // J353: the road and placeholders remain, but a page never reads, prepares or admits a second cell.
+    // J353: one crossing implementation. J500 rule 2: on the road, the zone ahead builds before its gate (`buildAhead`).
     this.retireInactiveRegions();
+    this.buildAhead();
     const walls = this.active === null ? this.highway.walls : this.region(this.active)?.walls;
     walls?.sync(this.readiness);
+  }
+  /** J500 rule 2: the speed-led lead (m) at which `instance`'s whole world starts building from the road. */
+  private aheadLead(instance: string, speed: number): number {
+    const policy = this.ports.ahead; if (policy === undefined) return -1;
+    const estimate = readinessModel(this.ports.readiness.bundle(this.assembly.cell(instance)), this.ports.readiness.link);
+    return policy.leadMetres + Math.max(speed, policy.minSpeed) * estimate.seconds * policy.margin;
+  }
+  /**
+   * J500 rule 2 (QA 11-23-b row 17): on the road, the nearest zone whose square the feet close on, within its speed-led
+   * lead, builds its whole world now through the ordinary entry path (`ensure`), so the crossing finds it resident and the
+   * road draws it (`drawnFromRoad`). The zone just left stays as rule 1 keeps it. A zone being built ahead stays the one
+   * ahead while the feet stay within its lead (a stop or a jump keeps it); past it the next one may take its place, and
+   * the old one retires as any unneeded world does. A refused build (the shared budget) waits for the gate, as before.
+   */
+  private buildAhead(): void {
+    if (this.ports.ahead === undefined) return;
+    const feet = this.worldFeet(), previous = this.aheadFeet; this.aheadFeet = feet;
+    if (this.active !== null) { this.ahead = null; return; }
+    const speed = previous === null ? 0 : Math.hypot(feet.x - previous.x, feet.z - previous.z) * 60;
+    const held = this.ahead;
+    if (held !== null && (this.issues.has(held) || this.distance(this.assembly.cell(held), feet) > this.aheadLead(held, speed))) this.ahead = null;
+    if (this.ahead !== null || previous === null || this.requests.size > 0) return;
+    let best: GridCell | undefined, bestDistance = Infinity;
+    for (const cell of this.assembly.cells) {
+      const id = cell.instance;
+      if (this.residents.has(id) || this.issues.has(id) || this.constructing.has(id) || this.retiring.has(id)) continue;
+      // heading in: closing on its centre (along the road, the middle of its edge, where its gate stands), within a pitch
+      const distance = this.distance(cell, feet), centre = (p: GridPoint): number => Math.hypot(p.x - cell.origin.x, p.z - cell.origin.z);
+      if (distance >= bestDistance || distance >= this.assembly.pitch || centre(feet) >= centre(previous) - 0.000001) continue;
+      if (distance > this.aheadLead(id, speed)) continue;
+      best = cell; bestDistance = distance;
+    }
+    if (best === undefined) return;
+    const id = best.instance;
+    this.ahead = id; this.aheadBuilds++;
+    void this.ensure(id).catch(() => { if (this.ahead === id) this.ahead = null; });
+  }
+  /** J500 rules 1 and 2: on the road, the ready resident worlds the page draws from outside their cells (the zone just left,
+   *  the zone built ahead); none inside a cell. */
+  drawnFromRoad(): string[] {
+    if (this.disposed || this.active !== null) return [];
+    return [...this.residents.keys()].filter(id => this.ready(id)).sort();
   }
   /** The server runs these worlds now (J130): a region's own law stands still, and its views draw what the wire says. */
   followServer(): void { this.followingServer = true; }
@@ -596,10 +649,13 @@ export class LiveGridHost {
     if (from === null && to !== null) {
       // Drain any superseded requested entry, then release every unentered world
       // before the requested destination allocates. Refused disposal stays charged.
-      await this.sequence;
+      // J500: a ready destination (the zone just left, or the one built ahead) allocates nothing, so it waits on no other
+      // world's build (a zone built ahead that the traveller turned away from retires once it is done).
+      const resident = this.ready(to);
+      if (!resident) await this.sequence;
       current();
       if (!this.retireInactiveRegions(to)) throw new Error('Exclusive runtime awaits successful disposal');
-      await this.sequence;
+      if (!resident) await this.sequence;
       current();
       if (this.current() !== from) throw new Error('Stale live frame preparation');
     }
@@ -632,10 +688,10 @@ export class LiveGridHost {
   private retainedState(): Exclude<LiveGridState['retainedCell'], undefined> {
     const last = this.lastCell, policy = this.ports.lastCell;
     return last === null || policy === undefined ? null : { instance: last.instance, remainingMs: Math.max(0, last.until - diagnosticNow()),
-      playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: Math.min(this.ports.allocator.envelope(), policy.playingBytes) };
+      playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: policy.playingBytes };
   }
   /** Read-only crossing evidence and failures for the real grid physics harness. */
-  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.folderRequests.keys()])].sort(), pendingWork: [
+  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.aheadBuilds }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.folderRequests.keys()])].sort(), pendingWork: [
     ...[...this.requests.keys()].sort().map(instance => ({ instance, kind: 'world' as const, trigger: 'entry' as const })),
     ...[...this.folderRequests].sort(([a], [b]) => a.localeCompare(b)).map(([instance, request]) => ({ instance, kind: request.required ? 'required-metadata' as const : 'optional-metadata' as const, trigger: request.trigger })),
   ], issues: Object.fromEntries(this.issues), gameplayReady: this.active === null || this.ports.gameplayReady(this.active), ...(this.ports.lastCell === undefined ? {} : { retainedCell: this.retainedState() }), retirements: this.retirements.map(row => ({ ...row })), retiring: [...this.retiring.keys()], ghosts: { count: this.ghosts.count(), regions: this.ghosts.regions() } }; }

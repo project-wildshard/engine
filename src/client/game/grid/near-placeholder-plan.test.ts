@@ -30,8 +30,8 @@ test('J500 rule 3: a cell within one road cell of the eye stays near past the ph
   expect(farDrawnAt(pitch, pitch)).toBe(true);
 });
 
-test('J500 rule 3 waits behind debug.farNearReach: off unless the slot is true', () => {
-  expect(farNearReachOn(null)).toBe(false);
+test('J500 rule 3 is on with rule 2: off only when debug.farNearReach is false', () => {
+  expect(farNearReachOn(null)).toBe(true);
   expect(farNearReachOn(false)).toBe(false);
   expect(farNearReachOn(true)).toBe(true);
 });

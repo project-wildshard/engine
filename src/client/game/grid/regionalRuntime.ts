@@ -142,6 +142,9 @@ export interface PreparedRegionalRuntime {
   /** A destination built on the road stays parked (invisible) until its crossing commits: stop its subtree's
    *  per-frame matrix updates while it is hidden (they resume whenever it shows; sp-o5's freezeParkedMatrices). Once. */
   readonly park?: () => void;
+  /** J500 (QA 11-23-b row 17): draw this resident from the road while `owner` lives (a zone just left, or one built ahead
+   *  of its gate). Its road variants link first (RP4's exterior warm-up), so the first frame that shows it compiles nothing. */
+  readonly display?: (owner: Scope) => void;
   /** Actual actor-object provenance in the retained region; repeated IDs in parked neighbours grant no permission. */
   readonly combatActors: () => ReadonlyMap<ReturnType<RowBodiesView['animals'][number]['combatActor']>, Readonly<{ x: number; y: number; z: number }>>;
 }
@@ -521,7 +524,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
             },
           };
         } };
-      let parked = false;
+      let parked = false, roadWarm: Promise<void> | undefined;
       return { resident, get warmPreparation() {
         const trace = request.page.world.game.entryPreparation;
         return !scope.disposed && trace?.root === view.root.uuid ? trace : null;
@@ -531,6 +534,18 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
         animals: () => localPlay?.animals ?? null,
         interactables: () => localRuntime?.interactables ?? [],
         park: () => { if (!parked) { parked = true; freezeParkedMatrices(view.root); } },
+        display: owner => {
+          const warm = async (): Promise<void> => {
+            try { await request.page.world.game.warmExteriorRoots(scope, [...view.root.children], () => !scope.disposed && !scope.disposing); }
+            catch (error) { if (!scope.disposed && !scope.disposing) console.warn('[grid] road display warm-up stopped', error); }
+          };
+          roadWarm ??= warm();
+          const show = async (): Promise<void> => {
+            await roadWarm;
+            if (!owner.disposed && !owner.disposing && !scope.disposed && !scope.disposing) view.display(owner);
+          };
+          void show();
+        },
         combatActors: () => new Map((localPlay?.animals.animals ?? []).map(animal => [animal.combatActor(), animal.position])),
         loadout: { checkpoint, stow: () => {
           stowed = true;

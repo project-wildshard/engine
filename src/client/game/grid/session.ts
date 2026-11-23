@@ -880,7 +880,7 @@ export class GridSession {
     const drawnFar = new Map<string, { view: FarProxyView; excluded: ReadonlySet<number>; far: boolean }>();
     // G607 (Jake's round-36 D): every neighbour draws its near view, whatever its distance; round 39: the phone tier only
     // its nearest PHONE_NEAR_CELLS (the rest on their far proxies, still unhazed)
-    // J500 rule 3, off until rule 2 lands (`debug.farNearReach`)
+    // J500 rule 3, on with rule 2 (`debug.farNearReach: false` turns it off)
     const farNearReach = farNearReachOn(jsonSlot('debug.farNearReach', 'device').read());
     const near = new NearPlaceholders({
       allocator: this.allocator, cells: this.assembly.cells, pitch: this.assembly.pitch, root: (id) => roots.get(id),

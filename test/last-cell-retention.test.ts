@@ -15,7 +15,7 @@ const level: SimLevel = { version: 3, id: 'platform', seed: 1, ground: { size: 5
   player: { at: { x: 0, y: 0, z: 0 }, yaw: 0, speed: 30 }, entities: [], quests: [],
   weapon: { id: 'none', shape: { kind: 'point', radius: 0 }, windup: 0, active: 0, recover: 0, cooldown: 0, range: 0, damage: 0, tags: [] } };
 
-async function fixture(options: { cap?: number; isolated?: boolean; keepHome?: number; keepNear?: number; beforeAdmit?: (instance: string, required: boolean) => Promise<void> } = {}) {
+async function fixture(options: { cap?: number; isolated?: boolean; keepHome?: number; keepNear?: number; ahead?: boolean; beforeAdmit?: (instance: string, required: boolean) => Promise<void> } = {}) {
   const rapier = await loadRapier(Uint8Array.from(fixtureBytes(new URL('../node_modules/@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm', import.meta.url))));
   const assembly = new GridAssembly({ developer: false, devserver: false }), home = assembly.cell('driftwood-isle');
   const next = assembly.cells.find(cell => cell.instance !== home.instance);
@@ -31,6 +31,7 @@ async function fixture(options: { cap?: number; isolated?: boolean; keepHome?: n
     lastCell: { windowMs: 30_000, playingBytes: options.cap ?? CONTENT_CAPS.playing, ...(options.keepHome === undefined ? {} : { keepHome: options.keepHome }), ...(options.keepNear === undefined ? {} : { keepNear: options.keepNear }), schedule: (run, delay) => {
       const expiry = { run, delay, cancelled: false }; expiries.push(expiry); return () => { expiry.cancelled = true; };
     } },
+    ...(options.ahead === true ? { ahead: { minSpeed: 8, margin: 1.25, leadMetres: 8 } } : {}),
     bindFrame: () => undefined, gameplayReady: () => true, prefetchable: () => false,
     highway: { bytes: 1000, create: () => ({ physics: page.physics, dispose: () => undefined }) },
     readiness: { link: { speed: 30, linkBitsPerSecond: 5_000_000, requestLatencySeconds: .25, maxStallSeconds: 3 },
@@ -329,4 +330,71 @@ test('J500: a zone that is not the home stays resident on the road beside it, an
     for (let tick = 0; tick < 3; tick++) await f.settle();
     expect(f.live.state().retainedCell?.instance).not.toBe(f.next.instance); expect(f.disposed).toContain(f.next.instance);
   } finally { f.close(); }
+});
+
+// J500 rule 2 (QA 11-23-b row 17, Jake 2026-11-23: a zone you approach is drawn at full detail before you reach its gate). On the road
+// the zone the traveller heads into builds its whole world once its readiness estimate at the traveller's speed covers the walk, so
+// the crossing reattaches it with no build, and the road draws it (with the zone just left) from outside.
+async function roadWalk(options: Parameters<typeof fixture>[0] = {}) {
+  const f = await fixture({ keepNear: 150, ahead: true, ...options });
+  const dx = f.next.origin.x - f.home.origin.x, dz = f.next.origin.z - f.home.origin.z, length = Math.hypot(dx, dz);
+  // a point `metres` from the home's centre toward the next zone's centre (world metres)
+  const along = (metres: number): { x: number; z: number } => ({ x: f.home.origin.x + dx / length * metres, z: f.home.origin.z + dz / length * metres });
+  const at = (metres: number): void => { const p = along(metres), feet = f.live.worldFeet(); f.player.position.x += p.x - feet.x; f.player.position.z += p.z - feet.z; };
+  /** one fixed step per half metre (30 m/s), as the page's fixed step runs */
+  const walk = async (from: number, to: number): Promise<void> => {
+    const step = to > from ? 0.5 : -0.5;
+    for (let metres = from; step > 0 ? metres <= to : metres >= to; metres += step) { at(metres); await f.settle(); }
+  };
+  // the next zone's square edge on the line between the two centres
+  const edge = length - 256 / Math.max(Math.abs(dx), Math.abs(dz)) * length;
+  return { ...f, at, walk, edge, length };
+}
+
+test('J500 rule 2: heading along the road into a zone builds its world before the gate; the crossing builds nothing', async () => {
+  const f = await roadWalk();
+  try {
+    f.at(0); await f.enter(f.home.instance); f.at(f.edge - 140); expect(await f.leave()).toBe(true);
+    await f.walk(f.edge - 140, f.edge - 1);
+    await f.live.prefetch([]); for (let tick = 0; tick < 3; tick++) await f.settle();
+    expect(f.created.filter(id => id === f.next.instance), 'built on the road, ahead of its gate').toHaveLength(1);
+    expect(f.live.ready(f.next.instance)).toBe(true);
+    expect(f.live.state().ahead?.instance).toBe(f.next.instance);
+    expect(f.live.drawnFromRoad(), 'the road draws the zone ahead and the zone just left').toEqual([f.home.instance, f.next.instance].sort());
+    const object = f.objects.get(f.next.instance);
+    f.at(f.edge + 8); await f.enter(f.next.instance);
+    expect(f.created.filter(id => id === f.next.instance), 'the crossing reattaches it').toHaveLength(1);
+    expect(f.objects.get(f.next.instance)).toBe(object);
+    expect(f.live.drawnFromRoad(), 'nothing is drawn from outside while inside a zone').toEqual([]);
+  } finally { f.close(); }
+});
+
+test('J500 rule 2: standing or turning away builds nothing ahead', async () => {
+  const f = await roadWalk();
+  try {
+    f.at(0); await f.enter(f.home.instance); f.at(f.edge - 20); expect(await f.leave()).toBe(true);
+    for (let tick = 0; tick < 30; tick++) await f.settle();
+    expect(f.created, 'standing still is no heading').toEqual([f.home.instance]);
+    await f.walk(f.edge - 20, f.edge - 40);
+    expect(f.created, 'walking away from it').toEqual([f.home.instance]);
+    expect(f.live.state().ahead?.instance ?? null).toBeNull();
+  } finally { f.close(); }
+});
+
+test('J500: a ready return waits on no other zone built ahead', async () => {
+  let release = (): void => undefined;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const f = await roadWalk({ beforeAdmit: async (instance) => { if (instance !== 'driftwood-isle') await gate; } });
+  try {
+    f.at(0); await f.enter(f.home.instance); f.at(f.edge - 100); expect(await f.leave()).toBe(true);
+    await f.walk(f.edge - 100, f.edge - 60);
+    expect(f.live.state().ahead?.instance).toBe(f.next.instance);
+    expect(f.live.ready(f.next.instance)).toBe(false);
+    // back into the zone just left while the one ahead still builds: no wait on it
+    f.at(f.edge - 290); await f.enter(f.home.instance);
+    expect(f.live.current()).toBe(f.home.instance);
+    release(); await f.live.prefetch([]); for (let tick = 0; tick < 3; tick++) await f.settle();
+    await new Promise(resolve => setTimeout(resolve, 0)); for (let tick = 0; tick < 3; tick++) await f.settle();
+    expect(f.live.state().residents, 'the zone built ahead retires once done').toEqual([f.home.instance]);
+  } finally { release(); f.close(); }
 });
