@@ -60,7 +60,37 @@ export function tickDistance(at: { readonly x: number; readonly y: number; reado
 
 /** The first band covering `distance` (undefined only for a rate that `checkTickRate` refuses). */
 export function bandAt(rate: TickRate, distance: number): TickBand | undefined {
-  return rate.bands.find((entry) => distance < entry.upTo);
+  for (const entry of rate.bands) if (distance < entry.upTo) return entry;
+  return undefined;
+}
+
+/** Two points a band distance runs between: `tickDistance(at, player)`, measured only as exactly as a band edge needs. */
+export interface BandSpan { readonly at: { readonly x: number; readonly y: number; readonly z: number }; readonly player: { readonly x: number; readonly y: number; readonly z: number } }
+
+/** The edge margin, relative to a squared edge: far wider than the few ulps the squared sum and the portable hypot err by. */
+const EDGE_MARGIN = 1e-9;
+
+/**
+ * `bandAt(rate, tickDistance(span.at, span.player))`, the same band bit for bit, without the portable hypot (QA 2026-11-23
+ * row 2b, opus-perf1: Pine's story asked ~6M of them). The squared sum decides an edge it clears by more than
+ * `EDGE_MARGIN`; a sum that close to an edge, an edge outside the safe square range, or a non-finite sum asks the exact
+ * distance. Both read the same three differences, and the sum of squares and the hypot each stay within a few ulps of the
+ * true length, so outside the margin they fall on the same side of every edge.
+ */
+export function bandBetween(rate: TickRate, span: BandSpan): TickBand | undefined {
+  const { at, player } = span, dx = at.x - player.x, dy = at.y - player.y, dz = at.z - player.z;
+  const squared = dx * dx + dy * dy + dz * dz;
+  if (squared < Infinity) {
+    for (const entry of rate.bands) {
+      const edge = entry.upTo;
+      if (edge === Infinity) return entry;
+      const edgeSquared = edge * edge;
+      if (!(edge > 0 && edgeSquared > 1e-280 && edgeSquared < 1e300)) break;
+      if (squared < edgeSquared * (1 - EDGE_MARGIN)) return entry;
+      if (!(squared > edgeSquared * (1 + EDGE_MARGIN))) break;
+    }
+  }
+  return bandAt(rate, tickDistance(at, player));
 }
 
 /**
@@ -110,6 +140,16 @@ export function keepsCreatureBody(has: boolean, live: boolean, driven: boolean, 
   return has ? !(!live || distance > CREATURE_BODY_FAR || driven) : live && distance < CREATURE_BODY_NEAR && !driven;
 }
 
+/** `keepsCreatureBody(has, true, false, creatureBodyDistance(at, player))` for a live, undriven body, the same answer bit for
+ *  bit, without the portable hypot unless the squared distance lies within `EDGE_MARGIN` of its edge (as `bandBetween`). */
+export function keepsLiveCreatureBody(has: boolean, at: { readonly x: number; readonly z: number }, player: { readonly x: number; readonly z: number }): boolean {
+  const dx = at.x - player.x, dz = at.z - player.z, squared = dx * dx + dz * dz;
+  const edge = has ? CREATURE_BODY_FAR : CREATURE_BODY_NEAR, edgeSquared = edge * edge;
+  if (squared < edgeSquared * (1 - EDGE_MARGIN)) return true;
+  if (squared > edgeSquared * (1 + EDGE_MARGIN)) return false;
+  return keepsCreatureBody(has, true, false, creatureBodyDistance(at, player));
+}
+
 /** The page's creature body capsule for a body of these dimensions and scale (CreatureBodies' motor recipe). */
 export function creatureBodyShape(dims: { readonly bodyRadius: number; readonly bodyHalfLen: number; readonly bodyY: number }, scale: number): { radius: number; height: number; step: number; maxClimbDeg: number; snap: number } {
   const radius = Math.max(0.12, Math.min(0.9, Math.min(dims.bodyRadius, dims.bodyHalfLen) * scale));
@@ -144,13 +184,16 @@ export class BodyBandClocks {
   // QA 2026-11-23 row 2 (opus-qa1): every body and brain asks this each tick, so it makes no object or closure (Pine's
   // story asked it ~500k times)
   private row(id: string, rate: string): BandRow {
-    if (!this.rates.has(rate)) throw new Error(`Unknown tick rate: ${rate}`);
     let row = this.rows.get(id);
-    if (row?.rate !== rate) { row = { rate, brain: freshClock(this.time, this.frameDt), body: freshClock(this.time, this.frameDt) }; this.rows.set(id, row); }
+    // A held row's rate is always a known one (every row is made or restored on a known rate), so only a new row asks.
+    if (row?.rate === rate) return row;
+    if (!this.rates.has(rate)) throw new Error(`Unknown tick rate: ${rate}`);
+    row = { rate, brain: freshClock(this.time, this.frameDt), body: freshClock(this.time, this.frameDt) }; this.rows.set(id, row);
     return row;
   }
-  private band(rate: string, distance: number): TickBand {
-    const table = this.rates.get(rate), band = table === undefined ? undefined : bandAt(table, distance);
+  private band(rate: string, distance: number | BandSpan): TickBand {
+    const table = this.rates.get(rate);
+    const band = table === undefined ? undefined : typeof distance === 'number' ? bandAt(table, distance) : bandBetween(table, distance);
     if (band === undefined) throw new Error(`Uncovered tick distance: ${rate}`);
     return band;
   }
@@ -160,8 +203,14 @@ export class BodyBandClocks {
     if (row?.rate !== rate || row.body.frame !== this.frame || (active && row.body.dt === 0)) return undefined;
     return active ? Math.min(row.body.dt, this.frameDt) : row.body.dt;
   }
-  /** This frame's body step for `id` at `distance` (m) on `rate`; 0 = paused or the off frame of 'half'. */
-  bodyDt(id: string, rate: string, distance: number, active = false): number {
+  /** `settledBodyDt`, else `bodyDt`, on one row lookup (QA 2026-11-23 row 2b, opus-perf1: a host asks every body ~3 times a tick). */
+  settledOrBodyDt(id: string, rate: string, distance: number | BandSpan, active: boolean): number {
+    const row = this.rows.get(id);
+    if (row?.rate !== rate || row.body.frame !== this.frame || (active && row.body.dt === 0)) return this.bodyDt(id, rate, distance, active);
+    return active ? Math.min(row.body.dt, this.frameDt) : row.body.dt;
+  }
+  /** This frame's body step for `id` at `distance` (m, or the span it runs) on `rate`; 0 = paused or the off frame of 'half'. */
+  bodyDt(id: string, rate: string, distance: number | BandSpan, active = false): number {
     const row = this.row(id, rate);
     const dt = tickClock(row.body, active ? activeBodyBand : this.band(rate, distance), true, this.time, this.frame,
       active && row.body.frame === this.frame && row.body.dt === 0, id);
@@ -169,7 +218,7 @@ export class BodyBandClocks {
     return active ? Math.min(dt, this.frameDt) : dt;
   }
   /** This frame's decision step for `id`; `urgent` (a hit, a lost sight line) wakes it now. The step is taken (consumed). */
-  takeBrainDt(id: string, rate: string, distance: number, urgent: boolean, maximumHz?: number, damage?: number): number {
+  takeBrainDt(id: string, rate: string, distance: number | BandSpan, urgent: boolean, maximumHz?: number, damage?: number): number {
     if (maximumHz !== undefined && !(maximumHz > 0)) throw new RangeError('Invalid authored decision frequency');
     if (damage !== undefined && !Number.isFinite(damage)) throw new RangeError('Invalid decision damage wake');
     const row = this.row(id, rate);

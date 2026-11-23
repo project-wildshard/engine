@@ -21,7 +21,7 @@ import { CharacterMotor, PLAYER_BODY, PLAYER_CAPSULE, type MotorOptions } from '
 import { PlayerSim, simCommandOf } from './sim/playerSim';
 import { publishDay } from '../../shared/engine/sim/shardRows';
 import { actRoutes } from '../../shared/engine/sim/actRoutes';
-import { BodyBandClocks, creatureBodyDistance, creatureBodyShape, keepsCreatureBody, tickDistance, type BandsState } from '../../shared/engine/sim/bands';
+import { BodyBandClocks, creatureBodyShape, keepsLiveCreatureBody, type BandSpan, type BandsState } from '../../shared/engine/sim/bands';
 import type { TickRate } from '../../shared/engine/app/scheduler';
 import { modeCollides } from '../../shared/engine/player/modes';
 import type { Rapier } from '../../shared/engine/physics/rapier';
@@ -190,6 +190,14 @@ function liveVector(read: () => Vector3): Vector3 {
 const DEAD_PLAYER_PENALTY = 1e12;
 
 /** A session-local 60 Hz host using the same creature motion, damage, strikes, events and physics as the client. */
+/** A band span whose player end is the host's nearest player to `at`, looked up when read. */
+class NearestSpan implements BandSpan {
+  at: Vector3 = new Vector3();
+  private readonly host: SimHost;
+  constructor(host: SimHost) { this.host = host; }
+  get player(): Vector3 { return this.host.nearestPlayer(this.at).position; }
+}
+
 export class SimHost {
   readonly level: SimLevel;
   readonly scope: Scope;
@@ -547,15 +555,21 @@ export class SimHost {
   bodyDt(id: string): number {
     const entity = this.entities.get(id);
     if (entity === undefined) throw new RangeError(`Unknown simulation body ${id}`);
+    return this.entityBodyDt(id, entity);
+  }
+  /** `bodyDt` for a body the caller already holds (a host step visits every body). */
+  private entityBodyDt(id: string, entity: AnimalSim): number {
     const bands = this.bands;
     if (bands === undefined) return FIXED_STEP;
     if (bands.present?.(entity) === false || entity.harnessHold) { bands.clocks.forget(id); return 0; }
     const active = bands.fixedSteps && (entity.attackPhase >= 0 || entity.hasImpulse || entity.driven || this.strikes.get(id)?.busy === true);
-    const rate = bands.rate(entity);
-    const dt = bands.clocks.settledBodyDt(id, rate, active)
-      ?? bands.clocks.bodyDt(id, rate, active ? 0 : tickDistance(entity.position, this.nearestPlayer(entity.position).position), active);
+    const dt = bands.clocks.settledOrBodyDt(id, bands.rate(entity), active ? 0 : this.spanTo(entity.position), active);
     return bands.fixedSteps ? Math.round(dt * 60) / 60 : dt;
   }
+  /** The band span from `at` to its nearest player, in one reused object (a band asks it per body per tick); the player is
+   *  found only when a band is chosen, never for a settled ask. */
+  private spanTo(at: Vector3): BandSpan { this.bandSpan.at = at; return this.bandSpan; }
+  private readonly bandSpan = new NearestSpan(this);
   /** Take this tick's decision step for body `id` on its band (the page scheduler's takeBrainDt): 0 until its rate's
    * period has passed, the time since its last decision when due; `urgent` (a hit, a lost sight line) wakes it now.
    * The authored divisor caps this same clock; without bands it retains its modulo and fixed-step multiple. */
@@ -568,7 +582,7 @@ export class SimHost {
     if (bands === undefined) return this.state.tick % divisor === 0 ? divisor / 60 : urgent ? FIXED_STEP : 0;
     if (bands.present?.(entity) === false) { bands.clocks.forget(id); return 0; }
     const damage = bands.fixedSteps && Number.isFinite(entity.lastHitT) ? entity.lastHitT : undefined;
-    const dt = bands.clocks.takeBrainDt(id, bands.rate(entity), tickDistance(entity.position, this.nearestPlayer(entity.position).position), urgent, 60 / divisor, damage);
+    const dt = bands.clocks.takeBrainDt(id, bands.rate(entity), this.spanTo(entity.position), urgent, 60 / divisor, damage);
     // Authored native recipes historically receive exact fixed-step multiples, not accumulated float drift.
     return divisor === 1 && !bands.fixedSteps ? dt : Math.round(dt * 60) / 60;
   }
@@ -592,8 +606,9 @@ export class SimHost {
   /** CreatureBodies.sync's physics body LOD, before the tick's decisions as on the page. */
   private syncBodies(): void {
     for (const entity of this.entities.values()) {
-      const keep = this.bands?.present?.(entity) !== false && entity.hitVolumes?.motorless !== true
-        && keepsCreatureBody(entity.motor !== null, entity.alive, entity.driven, creatureBodyDistance(entity.position, this.nearestPlayer(entity.position).position));
+      // A dead or driven body keeps no motor at any distance, so only a live, undriven one measures it.
+      const keep = this.bands?.present?.(entity) !== false && entity.hitVolumes?.motorless !== true && entity.alive && !entity.driven
+        && keepsLiveCreatureBody(entity.motor !== null, entity.position, this.nearestPlayer(entity.position).position);
       if (entity.motor === null && keep) {
         const motor = new CharacterMotor(this.physics, this.creatureMotorOptions(entity));
         motor.resetAt(entity.position); // at the animal, not the world origin (G222 playtest #7)
@@ -770,7 +785,7 @@ export class SimHost {
   private readonly visitBody = (entity: AnimalSim, id: string): void => {
     if (entity.harnessHold) return;
     this.focusOn(entity.position);
-    const dt = this.visitingBodyBands ? this.bodyDt(id) : FIXED_STEP, hooks = this.visitingBodyHooks;
+    const dt = this.visitingBodyBands ? this.entityBodyDt(id, entity) : FIXED_STEP, hooks = this.visitingBodyHooks;
     if (dt <= 0) return;
     hooks?.before?.(id, entity, dt);
     entity.step(dt);

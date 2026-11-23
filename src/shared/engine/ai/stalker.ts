@@ -206,6 +206,14 @@ function validatePack(spec: CirclingPackSpec): CirclingPackSpec {
   return { ...spec, hearing: [...spec.hearing] };
 }
 
+// QA 2026-11-23 row 2b (opus-perf1): every roster's noise step measures the same player move each tick (Pine's ~160 layer
+// hunts each asked the portable hypot for it), so the last answer is kept: the same two differences, the same length.
+let movedX = Number.NaN, movedZ = Number.NaN, movedLength = Number.NaN;
+function rosterMoved(dx: number, dz: number): number {
+  if (dx !== movedX || dz !== movedZ) { movedX = dx; movedZ = dz; movedLength = Math.hypot(dx, dz); }
+  return movedLength;
+}
+
 /** Circling melee, pack-leader howl or ledge pounce; native encounter and body authority remain explicit ports. */
 export type StalkerProfile<A extends AnimalSim> =
   | { pattern: 'hunt'; config: HuntConfig; ports: HuntPorts<A>; player: Vector3; sampleTerrain: (actor: A) => void }
@@ -323,7 +331,7 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
       observe: dt => {
         if (!Number.isFinite(dt) || dt <= 0) throw new RangeError('Invalid hunt noise step');
         if (!noise.seen) { noise.prev.copy(player); noise.seen = true; }
-        const moved = Math.hypot(player.x - noise.prev.x, player.z - noise.prev.z);
+        const moved = rosterMoved(player.x - noise.prev.x, player.z - noise.prev.z);
         noise.prev.copy(player);
         // oxlint-disable-next-line prefer-exponentiation-operator -- `**` never reaches the portable Math (test/portable-math.test.ts).
         if (dt !== decayDt) { decayDt = dt; decay = 1 - Math.pow(0.5, dt * 10); }

@@ -39,6 +39,8 @@ function hypot(a?: number, b?: number, c?: number, d?: number): number {
   const count = arguments.length;
   // oxlint-disable-next-line prefer-rest-params -- forwarding `arguments` makes no array; a rest parameter is the cost
   if (count > 4) return Reflect.apply(hypotList, undefined, arguments) as number;
+  if (count === 2) return hypot2(a as number, b as number);
+  if (count === 3) return hypot3(a as number, b as number, c as number);
   let max = 0, nan = false;
   for (let i = 0; i < count; i++) {
     const size = Math.abs((i === 0 ? a : i === 1 ? b : i === 2 ? c : d) as number);
@@ -55,6 +57,34 @@ function hypot(a?: number, b?: number, c?: number, d?: number): number {
     sum = preliminary;
   }
   return Math.sqrt(sum) * max;
+}
+
+// QA 2026-11-23 row 2b (opus-perf1): the sim's two- and three-term lengths (a band distance, a body's step, a motor's move)
+// are most of its hypot calls; these are `hypot`'s two passes written out for that many terms, the same operations in the
+// same order (each Math.abs taken again in the second pass, as there), so the same bits.
+function hypot2(a: number, b: number): number {
+  let max = 0, nan = false;
+  const sa = Math.abs(a); if (Number.isNaN(sa)) nan = true; else if (sa > max) max = sa;
+  const sb = Math.abs(b); if (Number.isNaN(sb)) nan = true; else if (sb > max) max = sb;
+  if (max === Infinity) return Infinity;
+  if (nan) return Number.NaN;
+  if (max === 0) return 0;
+  // The first term starts the sum exactly (its compensation is 0, and a square is never -0), so the second adds plainly.
+  const na = Math.abs(a) / max, nb = Math.abs(b) / max;
+  return Math.sqrt(na * na + nb * nb) * max;
+}
+function hypot3(a: number, b: number, c: number): number {
+  let max = 0, nan = false;
+  const sa = Math.abs(a); if (Number.isNaN(sa)) nan = true; else if (sa > max) max = sa;
+  const sb = Math.abs(b); if (Number.isNaN(sb)) nan = true; else if (sb > max) max = sb;
+  const sc = Math.abs(c); if (Number.isNaN(sc)) nan = true; else if (sc > max) max = sc;
+  if (max === Infinity) return Infinity;
+  if (nan) return Number.NaN;
+  if (max === 0) return 0;
+  const na = Math.abs(a) / max, p0 = na * na;
+  const nb = Math.abs(b) / max, s1 = nb * nb, p1 = p0 + s1, c1 = (p1 - p0) - s1;
+  const nc = Math.abs(c) / max, s2 = nc * nc - c1;
+  return Math.sqrt(p1 + s2) * max;
 }
 
 // captured before any install, so a special value can defer to the native function
