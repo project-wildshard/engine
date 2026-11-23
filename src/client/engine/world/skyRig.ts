@@ -1,5 +1,6 @@
 import { PLANET_DIST, SkyBackdropView, cloudLayer, paintedSkyEnvironment } from './skyBackdrop';
-import { cascadeRedraws } from './shadowCadence';
+import { cascadeRedraws, cascadeRedrawsOneMap } from './shadowCadence';
+import { jsonSlot } from '../saves/slots';
 import { ownSceneResource } from '../app/sceneOwnership';
 import { BackdropLayer, applyLayers, layerKeyedSky, seedLayerTargets, type LayeredSkyBackdrop, type LayerEnvironmentOnly } from './backdropLayer';
 import { app } from '../app/runtime';
@@ -156,6 +157,8 @@ export class SkyRig {
     // (BA-3's A / B, shadowCadence.ts): near every frame, middle every 2nd, far every 4th. Desktop frames run at 60-120, so a
     // far moving caster steps at 15-30 Hz; the shadow pass was ~110 of Driftwood's ~320 draws a frame
     this.farEveryOther = (this.texelBias || TIER_CONFIG.cascadeStagger) && this.csm.lights.length > 1;
+    // DF14: desktop High's staggered cascades, one map a frame (shadowCadence.ts cascadeRedrawsOneMap); never the phone rig
+    this.oneMap = this.farEveryOther && !this.texelBias && jsonSlot('debug.shadowOneMap', 'device').read() === true;
     // E174: the phone rig's shadow maps are depth only at 16 bits (Jake's pick C; shadowVariants.ts): 40 MB, not three's 160
     if (shadows?.depth16 === 'phone' && rig.phone) {
       const maps = new ShadowMaps(this.renderer, this.csm, this.shadowFade?.ghosts ?? [], rig.size);
@@ -419,6 +422,8 @@ export class SkyRig {
    * two-sided sheets). A cascade's square follows the camera's aspect (a resize, a rotation), so it is read each frame.
    */
   private texelBias = false;
+  /** DF14: one cascade a drawn frame (device slot `debug.shadowOneMap`) */
+  private oneMap = false;
   /**
    * E189 (Jake, iPhone 17 Pro: the warm phone must hold a locked 30 in the grass, "keep the look"; his pick of what may
    * give: "far shadows softer" — redrawn less often): on the phone's low-poly rig the far cascade (22–80 m) is redrawn on
@@ -476,7 +481,7 @@ export class SkyRig {
     this.shadowFade?.update(dt); // after the CSM and its bias: each ghost copies its cascade's square
     if (this.farEveryOther) {
       this.farTick = (this.farTick + 1) % 8;
-      const redraw = cascadeRedraws(this.farTick, this.csm.lights.length);
+      const redraw = (this.oneMap ? cascadeRedrawsOneMap : cascadeRedraws)(this.farTick, this.csm.lights.length);
       this.csm.lights.forEach((light, i) => { light.shadow.autoUpdate = redraw[i] ?? true; });
       // DW: a running fade's ghosts redraw on the ticks no far or middle cascade does (2 and 6 of the 8, 7.5 Hz at the
       // phone's 30); on the fade's first frame they take their cascades' maps (ShadowFade.adopt) and draw only if that

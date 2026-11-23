@@ -55,3 +55,15 @@
   for either the copy or a bitmap, a GPU blit read did not remove it (ABBA 1 / 2 / 0 / 1 frames over 50 ms), and a boot
   profile (`deskbench --boot-profile --cpu 2`) shows that window busy with content arriving: the placement culler,
   precompile's material clones, tile content's static matrices. The watch change was dropped.
+
+## What else desktop High at 2× spends (2026-11-23, later)
+
+- A live A/B at the dock, 2× CPU, 5 rounds of 150 frames (one boot, loaded mini): AO off saves ~1.3 ms mean and ~2.8 ms
+  p95, all shadow maps held ~1.4 / ~2.5, the DOM HUD hidden ~0.5 / ~1.7 (it barely mutates; compositing, not layout).
+- Two look-neutral AO tries were bit-identical (same-instant pixel diff: performance.now frozen, loop parked, 0 of
+  2.4 M pixels differ) but no faster than the quiet restore already on main: rendering the pre-pass from a stand-in
+  scene of its three renderables (ocean and two pools) and the lights. Dropped.
+- `debug.shadowOneMap` (`shadowCadence.ts` `cascadeRedrawsOneMap`): one cascade a frame on desktop High (near every 2nd
+  frame, middle and far every 4th) instead of the stagger's 1.75. Live A/B: render −0.34 ms mean, interval −0.4; cold
+  ABBA could not resolve it (off 96.8 / 104.6 fps, on 92.2 / 102). Landed off; a moving caster's shadow near the camera
+  would step at 60 Hz, which a still board cannot judge.
