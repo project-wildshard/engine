@@ -10,7 +10,7 @@ import { autoPlaced, installCatalogue } from '../src/shared/game/grid/catalogueS
 import { GAP_HALF, gridRail, roadLayout, RAIL_OFFSET } from '../src/shared/game/grid/roadLayout';
 import { voidFloorBoxes } from '../src/shared/game/grid/voidFloor';
 import { openRoad } from '../src/server/host/standalone/roadWorld';
-import catalogue from '../src/shared/game/grid/singleplayer.json' with { type: 'json' };
+import catalogue from '../test/pins/catalogue.json' with { type: 'json' };
 
 const p = CONTENT_CAPS.pitch, disposers: (() => void)[] = [];
 afterAll(() => { for (const dispose of disposers.reverse()) dispose(); });

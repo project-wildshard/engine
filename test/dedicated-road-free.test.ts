@@ -19,7 +19,7 @@ import { GridAssembly } from '../src/shared/game/grid/assembly';
 import type { GridCollisionStrip } from '../src/shared/game/grid/gridCollision';
 import { GAP_HALF, RING_ISLAND, RING_OUTER, ROAD_HALF, roadLayout, SEGMENT_HALF, TURN_IN_HALF } from '../src/shared/game/grid/roadLayout';
 import { openRoad } from '../src/server/host/standalone/roadWorld';
-import catalogue from '../src/shared/game/grid/singleplayer.json' with { type: 'json' };
+import catalogue from '../test/pins/catalogue.json' with { type: 'json' };
 import { bakedGridCollision } from './fixtures/gridCollision';
 
 const j305 = new GridAssembly({ developer: false, devserver: false }, catalogue.grid), layout = roadLayout(j305, slug => slug);

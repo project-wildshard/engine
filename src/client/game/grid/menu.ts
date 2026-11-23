@@ -12,7 +12,7 @@ declare const __PREPARATION_ONLY__: boolean;
  *   | developer | every shard, as today (Jake, G58: Select a shard is the existing flow) | shown: the same 25 cells as shipped |
  *   | DEVSERVER | every shard                                  | + the `devserver` cell           |
  *
- * The grid's shard lists come from the grid catalogue (`singleplayer.json`), never from a shard name here.
+ * The grid's shard lists come from the grid catalogue (`test/pins/catalogue.json`, the API's), never from a shard name here.
  */
 
 /** SF22's crossroads gates: when they pass, Infinite Wildshard shows to everyone, still labelled EXPERIMENTAL (G61 E1) */

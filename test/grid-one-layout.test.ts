@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import catalogue from '../src/shared/game/grid/singleplayer.json' with { type: 'json' };
+import catalogue from '../test/pins/catalogue.json' with { type: 'json' };
 import { Scope } from '../src/shared/engine/app/scope';
 import { CHUNK_HALF } from '../src/shared/engine/core/config';
 import { GridAssembly } from '../src/shared/game/grid/assembly';

@@ -7,7 +7,7 @@ import { GRID_CELL_COUNT, GRID_RADIUS } from '@wildshard/format/contentBounds';
 import { CONTENT_CAPS } from '../src/shared/engine/core/config';
 import { DRAWN_GRID_RADIUS, parseGridCatalogue } from '../src/shared/game/grid/catalogue';
 import { FAR_RING, GRID_SIGHTLINE } from '../src/shared/game/grid/farProxy';
-import catalogue from '../src/shared/game/grid/singleplayer.json' with { type: 'json' };
+import catalogue from '../test/pins/catalogue.json' with { type: 'json' };
 
 const pinned = (JSON.parse(readFileSync('test/pins/catalogue.json', 'utf8')) as { grid: unknown }).grid;
 type Grid = { cells: { instance: string; slug: string; cell: [number, number] }[] };

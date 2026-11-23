@@ -120,7 +120,7 @@ function slugOf(path) {
 /** The level's dependency set: every same-origin request that names no other level. In the grid the level is the home
  *  cell (filled in at control from the grid's state); the other cells and the road between them are its neighbours. */
 const levelSlugs = new Set(flow === 'grid' ? [] : [flow]);
-const GRID_SLUGS = new Set(JSON.parse(readFileSync(resolve('src/shared/game/grid/singleplayer.json'), 'utf8')).grid.cells.map(cell => cell.slug));
+const GRID_SLUGS = new Set(JSON.parse(readFileSync(resolve('test/pins/catalogue.json'), 'utf8')).grid.cells.map(cell => cell.slug));
 const origin = new URL(base).origin;
 /** A same-origin http path that is not version.json or SHARD SELECT card art (a level's thumb, portrait and landscape
  *  cards are menu art, never drawn in the level); null otherwise. blob: and data: URLs are in-memory reads, not downloads. */

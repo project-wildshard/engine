@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import catalogue from '../src/shared/game/grid/singleplayer.json' with { type: 'json' };
+import catalogue from '../test/pins/catalogue.json' with { type: 'json' };
 
 // J305 (Jake, 2026-11-12): the centre 3x3 holds the six main shards, the two new templates and one of Ink & Cel Valley or
 // Pastel Plain; the outer ring holds the other one, then unique open plots, then copies of the two new templates. The

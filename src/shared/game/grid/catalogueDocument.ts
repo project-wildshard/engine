@@ -1,6 +1,7 @@
-import baked from './singleplayer.json' with { type: 'json' };
+import baked from '../../../../test/pins/catalogue.json' with { type: 'json' };
 import { installedCatalogue, type CatalogueDocument } from './catalogueSlot';
 
-/** Each reader asks here, at call time, never at import. The JSON beside this file is what a Node tool, a test or a page
- * with no bake reads: the built-in's grid until `api-server` production owns it. */
+/** Each reader asks here, at call time, never at import. ONE-FORMAT OF31i3 (R3): with none installed, a Node tool, a test or a
+ * page with no bake reads the pinned channel catalogue (`test/pins/catalogue.json`, api-server's `/api/catalogue.json` as the pins
+ * hold it); no grid lives in `src/`. */
 export function catalogueDocument(): CatalogueDocument { return installedCatalogue() ?? baked; }

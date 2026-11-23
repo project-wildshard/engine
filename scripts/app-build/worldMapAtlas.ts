@@ -82,7 +82,7 @@ export async function bakeWorldMapAtlas(products: readonly string[], read: (slug
  *  from the API after it (SA46), gets no tile: the page draws that cell's own map instead (minimapBlend.ts fullMapOverlay). */
 export async function writeWorldMapAtlas(root: string): Promise<void> {
   const row = v.object({ slug: v.string() }), catalogue = v.parse(v.object({ placements: v.exactOptional(v.array(row)), grid: v.object({ cells: v.array(row) }) }),
-    JSON.parse(readFileSync(Reflect.get(process.env, 'WILDSHARD_CATALOGUE') ?? resolve(root, 'src/shared/game/grid/singleplayer.json'), 'utf8')));
+    JSON.parse(readFileSync(Reflect.get(process.env, 'WILDSHARD_CATALOGUE') ?? resolve(root, 'test/pins/catalogue.json'), 'utf8')));
   const cells = catalogue.grid.cells.map(cell => cell.slug), builtHere = (slug: string): boolean => existsSync(resolve(root, 'out', slug, 'shard.json'));
   const slugs = [...cells, ...(catalogue.placements ?? []).map(placement => placement.slug).filter(builtHere)];
   // A filtered product build (build-shardfiles --shard) leaves only its own products, and the products copy

@@ -42,8 +42,13 @@ const sleep = (/** @type {number} */ ms) => new Promise(resolve => { setTimeout(
 // the grid at the build the base serves (its version.json), not this checkout's
 const build = await fetch(`${base}/version.json`, { signal: AbortSignal.timeout(15_000) }).then(async found => String((await found.json()).build).split('-')[0] ?? '').catch(() => '');
 const catalogueText = (() => {
-  try { return execFileSync('git', ['show', `${build}:src/shared/game/grid/singleplayer.json`], { cwd: join(import.meta.dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
-  catch { console.log(`build ${build} is not in this checkout: reading the working catalogue`); return readFileSync(join(import.meta.dirname, '../src/shared/game/grid/singleplayer.json'), 'utf8'); }
+  // OF31i3: the pinned channel catalogue; a build from before it kept the grid in src
+  for (const path of ['test/pins/catalogue.json', 'src/shared/game/grid/singleplayer.json']) {
+    try { return execFileSync('git', ['show', `${build}:${path}`], { cwd: join(import.meta.dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
+    catch { /* the next path */ }
+  }
+  try { throw new Error('no catalogue at that build'); }
+  catch { console.log(`build ${build} is not in this checkout: reading the working catalogue`); return readFileSync(join(import.meta.dirname, '../test/pins/catalogue.json'), 'utf8'); }
 })();
 /** @type {{ instance: string, slug: string, cell: [number, number] }[]} */
 const cells = JSON.parse(catalogueText).grid.cells;

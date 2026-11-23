@@ -16,7 +16,7 @@ import {GridAssembly} from '../src/shared/game/grid/assembly';
 import {catalogueDocument} from '../src/shared/game/grid/catalogueDocument';
 import {installCatalogue, installInlineCatalogue, installedCatalogue} from '../src/shared/game/grid/catalogueSlot';
 import {catalogueInstance} from '../src/shared/game/grid/instances';
-import shipped from '../src/shared/game/grid/singleplayer.json' with {type: 'json'};
+import shipped from '../test/pins/catalogue.json' with {type: 'json'};
 import {instanceSaveIdentity} from '../src/shared/game/instanceSaves';
 import {admittedShardInstance, assertShardSlug} from '../src/shared/game/shardfile/identity';
 

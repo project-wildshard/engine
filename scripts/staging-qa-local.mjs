@@ -45,7 +45,7 @@ async function tourFixture(checkout, seed) {
   /** @type {ReturnType<typeof import('./zone-entry-tour.mjs').featuredZoneEntry>} */
   const route = featuredZoneEntry(cells, seed);
   const selected = new Set(route.flatMap(({from,to}) => [from.slug ?? from.instance,to.slug ?? to.instance]));
-  const base = /** @type {import('./zone-entry-tour.mjs').Cell[]} */ (home('src/shared/game/grid/singleplayer.json').grid.cells);
+  const base = /** @type {import('./zone-entry-tour.mjs').Cell[]} */ (home('test/pins/catalogue.json').grid.cells);
   const builtIn = new Set(base.map(cell => cell.instance));
   const extras = cells.filter(cell => !builtIn.has(cell.instance) && selected.has(cell.slug ?? cell.instance));
   return {catalogue, extras, more: [...selected].filter(slug => slug !== 'driftwood-isle')};

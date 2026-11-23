@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare complete serialized region continuations.
 import { createHash } from 'node:crypto';
 import { TEMPLATE_SOURCE as template, templateAssets as readTemplateAssets } from '../../fixtures/templateSource.ts';
-import catalogue from '../../../src/shared/game/grid/singleplayer.json' with { type: 'json' };
+import catalogue from '../../../test/pins/catalogue.json' with { type: 'json' };
 import { createShardfileSim } from '../../../src/server/game/plugin/simulation.ts';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier.ts';
 import { snapshotSimHost } from '../../../src/shared/engine/sim/snapshot.ts';

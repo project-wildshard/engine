@@ -11,7 +11,7 @@ export const DECK_SHARDS = Object.freeze([
 ]);
 /** Open Plots have no deck card (the open-plots audit): a player reaches them by a deep link with Developer on, or a resume. */
 export const OPEN_PLOTS = Object.freeze(['open-plot-thin-ice', 'open-plot-night-market', 'open-plot-mosslight-ruins']);
-/** OF3, OF5b: whether the grid catalogue (`src/shared/game/grid/singleplayer.json`, its `grid.cells`) places a shard, so a world
+/** OF3, OF5b: whether the grid catalogue (`test/pins/catalogue.json`, its `grid.cells`) places a shard, so a world
  *  build may enter it. Thin Ice is a draft with no cell: a world build answers "Not in this world yet" for it.
  * @param {string} slug @param {{ grid?: { cells?: readonly { slug?: unknown }[] } }} catalogue */
 export const gridPlaces = (slug, catalogue) => (catalogue.grid?.cells ?? []).some(cell => cell.slug === slug);

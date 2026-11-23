@@ -1261,7 +1261,7 @@
     "./game/audio/theme": "./src/client/game/audio/theme.ts",
     "./game/identity": "./src/client/game/identity.ts",
     "./game/shardfile/wholeGeometryPieces": "./src/client/game/shardfile/wholeGeometryPieces.ts",
-    "./game/grid/singleplayer.json": "./src/shared/game/grid/singleplayer.json",
+    "./game/grid/singleplayer.json": "./test/pins/catalogue.json",
     "./game/shardCook": "./src/cook/game/shardCook.ts",
     "./game/shard/load": "./src/client/game/shard/load.ts",
     "./game/grid/runtimeCost": "./src/client/game/grid/runtimeCost.ts",
@@ -1450,6 +1450,7 @@
     "tsconfig*.json",
     "kit/tsconfig.json",
     "test/tsconfig.json",
+    "test/pins/catalogue.json",
     "index.html"
   ]
 }

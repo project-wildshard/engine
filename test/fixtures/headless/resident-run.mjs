@@ -12,7 +12,7 @@ import { createShardFolder } from '../../../src/shared/game/shardfile/shardFolde
 import { emptyShardfile } from '../../../src/shared/host/author.ts';
 import { loadRapier } from '../../../src/shared/engine/physics/rapier.ts';
 import { serializeSimSnapshot, snapshotSimHost } from '../../../src/shared/engine/sim/snapshot.ts';
-import catalogue from '../../../src/shared/game/grid/singleplayer.json' with { type: 'json' };
+import catalogue from '../../../test/pins/catalogue.json' with { type: 'json' };
 import { GridAssembly } from '../../../src/shared/game/grid/assembly.ts';
 import { GridSimulation } from '../../../src/server/game/grid/simulation.ts';
 import { ResidencyAllocator } from '../../../src/shared/game/grid/allocator.ts';

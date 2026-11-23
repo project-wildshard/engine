@@ -93,7 +93,7 @@ mkdirSync(out, { recursive: true });
 const STAGING = CHANNELS.staging;
 /** The grid catalogue: a world build enters only the shards it places (OF3). It is this checkout's, so it matches a build of this
  *  tree (the default, or a `--base` served from it), not a build of another commit. */
-const CATALOGUE = JSON.parse(readFileSync(join(ROOT, 'src/shared/game/grid/singleplayer.json'), 'utf8'));
+const CATALOGUE = JSON.parse(readFileSync(join(ROOT, 'test/pins/catalogue.json'), 'utf8'));
 /** The stand-in door's world word: every proof shard on staging's grid. */
 /** OF5b: `--cells=1` makes the stand-in door say production's one-cell word, so every page takes the one-shard `client` route. */
 const WORD_CELLS = Number(option('cells') ?? 20);

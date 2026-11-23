@@ -106,7 +106,7 @@ interface Listed {readonly slug: string; readonly order?: number; readonly statu
 
 /** The in-tree grid with this build's heads: a product's slug, name and tarball hash, at revision 1. */
 export function inTreeCatalogue(root: string, products: string, listed: readonly Listed[]): StandaloneCatalogue {
-  const grid = JSON.parse(readFileSync(join(root, 'src/shared/game/grid/singleplayer.json'), 'utf8')) as Pick<StandaloneCatalogue, 'version' | 'placements' | 'grid'>;
+  const grid = JSON.parse(readFileSync(join(root, 'test/pins/catalogue.json'), 'utf8')) as Pick<StandaloneCatalogue, 'version' | 'placements' | 'grid'>;
   const rows = new Map(listed.map(row => [row.slug, row]));
   const placements = grid.placements.map(row => {
     const shard = rows.get(row.slug);

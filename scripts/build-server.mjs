@@ -28,7 +28,7 @@ const rapier = { name: 'rapier', resolveId: source => {
 } };
 // The local staging world and both of its worker entries read exactly the grid baked into the page.
 const catalogue = values.catalogue === undefined ? undefined : readFileSync(resolve(ROOT, values.catalogue), 'utf8');
-const bakedCatalogue = join(ROOT, 'src/shared/game/grid/singleplayer.json');
+const bakedCatalogue = join(ROOT, 'test/pins/catalogue.json');
 /** @type {import('rolldown').Plugin} */
 const gridInput = { name: 'server-grid-catalogue', load: id => id === bakedCatalogue ? catalogue : undefined };
 // Rolldown supplies the Node CommonJS require bridge for ws and pg.

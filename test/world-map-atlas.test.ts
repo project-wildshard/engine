@@ -28,10 +28,10 @@ test('the app build writes one atlas and its define, verifies source hashes, and
   const root = mkdtempSync(resolve('tmp', 'world-atlas-build-'));
   const digest = (value: Uint8Array | string): string => createHash('sha256').update(value).digest('hex');
   try {
-    mkdirSync(resolve(root, 'src/shared/game/grid'), { recursive: true });
+    mkdirSync(resolve(root, 'test/pins'), { recursive: true });
     // QA-FEEDBACK 2026-11-13 row 44: a built placement the grid's cells lack (a cell the placement file adds) gets its tile too;
     // an unbuilt one gets none, so the page draws that cell's own map rather than a plot tile for good
-    writeFileSync(resolve(root, 'src/shared/game/grid/singleplayer.json'), JSON.stringify({ placements: [{ slug: 'placed' }, { slug: 'base' }, { slug: 'unbuilt' }],
+    writeFileSync(resolve(root, 'test/pins/catalogue.json'), JSON.stringify({ placements: [{ slug: 'placed' }, { slug: 'base' }, { slug: 'unbuilt' }],
       grid: { cells: [{ slug: 'base' }, { slug: 'plain' }, { slug: 'override' }] } }));
     const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: '#123456' } }).webp().toBuffer();
     for (const slug of ['base', 'override', 'placed', 'plain']) {
@@ -63,8 +63,8 @@ test('the atlas precedes the app build, and a cold atlas refuses an unbuilt prod
   expect(prepareCall).toBeLessThan(script.indexOf('const build = spawnSync('));
   const root = mkdtempSync(resolve('tmp', 'world-atlas-cold-'));
   try {
-    mkdirSync(resolve(root, 'src/shared/game/grid'), { recursive: true });
-    writeFileSync(resolve(root, 'src/shared/game/grid/singleplayer.json'), JSON.stringify({ grid: {
+    mkdirSync(resolve(root, 'test/pins'), { recursive: true });
+    writeFileSync(resolve(root, 'test/pins/catalogue.json'), JSON.stringify({ grid: {
       cells: [{ slug: 'brasscap-mesa' }, { slug: 'plain' }],
     } }));
     await expect(writeWorldMapAtlas(root)).rejects.toThrow(/ENOENT.*brasscap-mesa/u);
@@ -77,8 +77,8 @@ test('a mostly transparent author map yields to a world map that draws the missi
   try {
     const folder = resolve(root, 'out', 'sparse');
     mkdirSync(folder, {recursive: true});
-    mkdirSync(resolve(root, 'src/shared/game/grid'), {recursive: true});
-    writeFileSync(resolve(root, 'src/shared/game/grid/singleplayer.json'), JSON.stringify({grid: {cells: [{slug:'sparse'}]}}));
+    mkdirSync(resolve(root, 'test/pins'), {recursive: true});
+    writeFileSync(resolve(root, 'test/pins/catalogue.json'), JSON.stringify({grid: {cells: [{slug:'sparse'}]}}));
     const pixels = Buffer.alloc(8 * 8 * 4);
     pixels.set([255, 255, 255, 255], 0);
     const image = await sharp(pixels, {raw: {width: 8, height: 8, channels: 4}}).png().toBuffer();

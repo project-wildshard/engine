@@ -20,6 +20,7 @@
   ],
   "include": [
     "scripts/memory/phone-model.json",
+    "test/pins/catalogue.json",
     "src/client/game",
     "src/shared/game",
     "src/server/game",

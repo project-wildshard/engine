@@ -3,7 +3,7 @@ import { expect, test } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
 import { GridAssembly } from '../../../shared/game/grid/assembly';
 import { parseGridCatalogue } from '../../../shared/game/grid/catalogue';
-import catalogue from '../../../shared/game/grid/singleplayer.json' with { type: 'json' };
+import catalogue from '../../../../test/pins/catalogue.json' with { type: 'json' };
 import { neighbourEdges } from '../../../shared/game/grid/readinessEdges';
 import { MEET_METRES, edgeDistance, installSoftWallLook } from './softWallLook';
 

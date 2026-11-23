@@ -34,14 +34,19 @@ const devRetry = !process.argv.includes('--no-dev'), only = flag('cells', '').sp
 const shots = join(out, 'shots');
 mkdirSync(shots, { recursive: true });
 
-/** The 25 cells (src/shared/game/grid/singleplayer.json) and the deck card that names each, where the deck has one. */
+/** The 25 cells (test/pins/catalogue.json; src/shared/game/grid/singleplayer.json before OF31i3) and the deck card that names each, where the deck has one. */
 // staging's own grid: the catalogue at the build staging runs (`/health`), not this checkout's, which other lanes edit; a preview's
 // is the build its `version.json` names
 const stagingBuild = STAGING ? await fetch(HEALTH, { signal: AbortSignal.timeout(15_000) }).then(async found => String((await found.json()).build)).catch(() => '')
   : await fetch(`${BASE}/version.json`, { signal: AbortSignal.timeout(15_000) }).then(async found => String((await found.json()).build).split('-')[0] ?? '').catch(() => '');
 const catalogueText = (() => {
-  try { return execFileSync('git', ['show', `${stagingBuild}:src/shared/game/grid/singleplayer.json`], { cwd: join(import.meta.dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
-  catch { console.log(`staging build ${stagingBuild} is not in this checkout: reading the working catalogue`); return readFileSync(join(import.meta.dirname, '../src/shared/game/grid/singleplayer.json'), 'utf8'); }
+  // OF31i3: the pinned channel catalogue; a build from before it kept the grid in src
+  for (const path of ['test/pins/catalogue.json', 'src/shared/game/grid/singleplayer.json']) {
+    try { return execFileSync('git', ['show', `${stagingBuild}:${path}`], { cwd: join(import.meta.dirname, '..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }); }
+    catch { /* the next path */ }
+  }
+  try { throw new Error('no catalogue at that build'); }
+  catch { console.log(`staging build ${stagingBuild} is not in this checkout: reading the working catalogue`); return readFileSync(join(import.meta.dirname, '../test/pins/catalogue.json'), 'utf8'); }
 })();
 const catalogue = /** @type {{ grid: { cells: { instance: string, slug: string, cell: [number, number] }[] } }} */ (JSON.parse(catalogueText));
 const CARD = /** @type {Record<string, string>} */ ({ 'driftwood-isle': 'Driftwood Isle', 'pine-hollow': 'Pine Hollow', 'nalati-grasslands': 'Nalati Grasslands', 'nine-dragon-stack': 'Nine Dragon Stack',

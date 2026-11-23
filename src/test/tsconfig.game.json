@@ -23,6 +23,7 @@
   ],
   "include": [
     "../*/game/**/*.test.ts",
+    "../../test/pins/catalogue.json",
     "game/**/*.ts",
     "engine/**/*.ts",
     "../*/game/**/*.d.ts"
