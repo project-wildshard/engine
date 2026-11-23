@@ -45,6 +45,9 @@ export const ROUTES = Object.freeze({
   ]),
 });
 
+/** The start of a leg's error when the player died mid-leg (`routeLegOnPage`); table.mjs restarts the world on it. */
+export const ROUTE_DIED = 'the player died during the route';
+
 /** The route for a zone, or a refusal naming the zones that have one. @param {string} slug */
 export function routeFor(slug) {
   const route = ROUTES[slug];
@@ -202,6 +205,12 @@ export function routeLegOnPage(leg) {
     const now = performance.now(), elapsed = now - last, dt = Math.min(0.1, elapsed / 1000), s = (now - t0) / 1000;
     last = now;
     if (w !== /** @type {any} */ (window).__wildshard?.world || document.visibilityState !== 'visible') { end('the page lost the controlled world during the leg'); return; }
+    // DF15 (mini-df15, 2026-11-23): a creature can kill the bench player (a night's dev world runs for hours, and Driftwood's
+    // black bear came to stand at the quest fire): name the death, so the table restarts the world instead of grading a respawn
+    if (document.documentElement?.dataset.wsState === 'dead') {
+      const cause = document.querySelector('.ws-combat-death-cause')?.textContent?.trim() ?? '';
+      end(`the player died during the route: ${cause === '' ? 'cause not shown' : cause}`); return;
+    }
     const x = p.position.x - originX, z = p.position.z - originZ;
     const movedSinceFrame = Math.hypot(p.position.x - prevX, p.position.z - prevZ);
     if (leg.fixed && movedSinceFrame > 18) { end('position jumped during the route'); return; }

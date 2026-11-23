@@ -3,6 +3,7 @@
 // Default: one cold three-leg route per profile. --qualify: full nightly / DF15 sampling.
 // node scripts/fps/table.mjs --zone driftwood-isle [--qualify] [--profiles NAME,...] [--base ORIGIN]
 // --device key=value,... saves device slots for every profile (an A/B arm; true/false/numbers parsed).
+// --stop-on-death: a cell whose player died ends the run with exit 4 (batch.mjs PLAYER_DIED), for a caller that restarts the world.
 // --dock-only --cold-only is a short diagnostic. With WS_BENCH=1, add --pass-breakdown for CPU submit by pass.
 // The full matrix includes both desktop sizes and a warm repeat.
 // --qualify --profiles NAME --windows 1 proves reduced sampling; its subset scope never qualifies nightly.
@@ -20,7 +21,7 @@ import { capFor, readCaps } from '../budgets/files.mjs';
 import { fpsPlan } from './plan.mjs';
 import { passBreakdownAllowed, requirePassBench } from './passes.mjs';
 import { workloadCounts } from './workload.mjs';
-import { retryColdBoot, runBatch } from './batch.mjs';
+import { PLAYER_DIED, cellError, playerDied, retryColdBoot, runBatch } from './batch.mjs';
 import { lockfArgs, lockRoot } from '../memory/iphone/locks.mjs';
 
 /** @typedef {import('./plan.mjs').ProfileSpec} ProfileSpec */
@@ -33,7 +34,7 @@ const keys = Object.keys(fpsPlan().profiles);
 const choices = parseArgs({ options: {
   zone: { type:'string', default:'driftwood-isle' }, profiles:{ type:'string', default:keys.join(',') },
   runs:{ type:'string' }, windows:{ type:'string' }, qualify:{ type:'boolean' }, base:{ type:'string', default:'https://staging.wildshard.io/' }, out:{ type:'string' },
-  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' }, 'worker-batch':{ type:'string' }, device:{ type:'string' },
+  'cpu-rates':{ type:'string' }, 'dock-only':{ type:'boolean' }, 'pass-breakdown':{ type:'boolean' }, 'cold-only':{ type:'boolean' }, 'dry-run':{ type:'boolean' }, 'worker':{ type:'string' }, 'worker-batch':{ type:'string' }, device:{ type:'string' }, 'stop-on-death':{ type:'boolean' },
 } }).values;
 const sampling = fpsPlan({qualify:choices.qualify,runs:choices.runs,dockOnly:choices['dock-only'],coldOnly:choices['cold-only'],windows:choices.windows});
 const {profiles,route,count} = sampling;
@@ -88,8 +89,8 @@ async function worker(job) {
     if (stop.signal.aborted) return 3;
     atomicJson(job.output, {fingerprint:job.fingerprint, id:job.id, report});
     if (readCell(job.output, job.fingerprint, job.build, { ...job, floor:job.profile.floor }) !== null) return 0;
-    console.error(report.cold.error ?? report.warm?.error ?? 'cell did not produce complete evidence for this build');
-    return 3;
+    console.error(cellError(report));
+    return playerDied(report) ? PLAYER_DIED : 3;
   } finally { clearInterval(playing); process.removeListener('SIGINT',interrupt); process.removeListener('SIGTERM',interrupt); }
 }
 
@@ -181,7 +182,7 @@ async function main() {
     return { id, interval, route:sampling.mode === 'quick' ? route : undefined, approach, profile:run.profile, floor:run.profile.floor, warm:run.warm, passBreakdown,
       output:cellPath(out,id), build, base, zone, fingerprint };
   }));
-  let resumedCells = 0;
+  let resumedCells = 0, died = /** @type {string|null} */ (null);
   /** @type {{id:string, failedAttempt:string}[]} */
   const coldBootRetries = [];
   try {
@@ -207,12 +208,14 @@ async function main() {
       });
       if (retry.length > 0) await measureCell(retry,stop.signal);
     } else {
-      for (let rep=0; rep<count; rep++) {
-        for (let i=rep; i<groups.length; i+=count) for (const job of groups[i]) {
+      for (let rep=0; rep<count && died === null; rep++) {
+        for (let i=rep; i<groups.length && died === null; i+=count) for (const job of groups[i]) {
           stop.signal.throwIfAborted();
           if (readCell(job.output,fingerprint,build,job) !== null) { resumedCells++; continue; }
           const status = await measureCell(job,stop.signal);
-          console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : 'incomplete'}`);
+          console.error(`${job.id} ${job.interval.name}: ${status === 0 ? 'recorded' : status === PLAYER_DIED ? 'the player died' : 'incomplete'}`);
+          // DF15: the world, not the build, ended this cell; the caller restarts the world and resumes from it
+          if (status === PLAYER_DIED && choices['stop-on-death']) { died = job.id; break; }
         }
       }
     }
@@ -240,6 +243,7 @@ async function main() {
   atomicJson(join(out,'table.json'),{schema:1,mode:sampling.mode,host,base,zone,scope:sampling.scope,
     seconds:(Date.now()-started)/1000,fresh:resumedCells===0,resumedCells,coldBootRetries,progress,runs:measured});
   console.log(markdown);
+  if (died !== null) { console.error(`${died}: the player died; stopping for a fresh world (--stop-on-death)`); return PLAYER_DIED; }
   if (stop.signal.aborted || measured.some(run=>run.cold.verdict==='incomplete'||run.warm?.verdict==='incomplete')) return 3;
   if (measured.some(run=>run.cold.verdict==='miss')) return 2;
   return measured.every(run=>run.profile.calibrated) ? 0 : 3;

@@ -14,6 +14,8 @@ export interface LegSummary { seconds: number | null; fps: number | null; p50Ms:
   audioLiveMax: number; audioLiveEnd: number | null; audioStartsPerS: number | null }
 export interface LegResult { name: string; kind?: string; cap: number | null; error: string | null; nav: unknown; summary: LegSummary | null; samples?: LegSample[]; rec?: string | null; probe?: unknown; heap?: unknown }
 export const ROUTES: Readonly<Record<string, readonly RouteLeg[]>>;
+/** The start of a leg's error when the player died mid-leg (DF15). */
+export const ROUTE_DIED: 'the player died during the route';
 export function routeFor(slug: string): readonly RouteLeg[];
 export function routeLegOnPage(leg: RouteLeg & { cap: 0 | 30 | 60 | null }): Promise<unknown>;
 export function legSummary(samples: LegSample[]): LegSummary;

@@ -15,13 +15,15 @@
 // `gh workflow run driftwood-fps.yml` with the night and the table. One receipt line goes to lane-receipts.log.
 // A full night is 135 cells (nine variants, three repeats, five legs), each a fresh boot that queues for the GPU lock
 // beside the lanes: about 3 to 5 minutes a cell (the 11-23 smoke), so --hours defaults to 10 and a night still cut
-// short is dispatched as it stands, graded incomplete.
+// short is dispatched as it stands, graded incomplete. A cell whose player died (a creature of the hours-old world) restarts
+// the world on the same port and resumes (DF15).
 // The launchd job copies this file from origin/main before it runs, so a stale canonical checkout runs today's runner.
 // It imports nothing from the repo for the same reason.
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -46,7 +48,21 @@ const step = (cmd, args, cwd) => spawnSync(cmd, args, { cwd, stdio: 'inherit' })
 /** The canonical checkout: the one whose .git the worktrees share. @param {string} from */
 const canonicalOf = (from) => dirname(git(from, 'rev-parse', '--path-format=absolute', '--git-common-dir'));
 const nightRoot = (/** @type {string} */ canonical) => join(canonical, 'tmp/df7-nightly');
-const exitedFlag = { dev: false };
+// DF15: table.mjs's exit when a cell's player died (scripts/fps/batch.mjs PLAYER_DIED; this file imports nothing from the repo)
+const PLAYER_DIED = 4;
+const MAX_WORLD_RESTARTS = 20;
+
+/** A port free right now, for the night's dev world. @returns {Promise<number>} */
+async function freePort() {
+  const server = createServer();
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const address = server.address();
+  server.close();
+  await once(server, 'close');
+  if (address === null || typeof address === 'string') throw new Error('no free port');
+  return address.port;
+}
 
 /** Check main's tip out at the nightly checkout and run its own copy of this script. @param {string} canonical
  * @param {string[]} pass */
@@ -104,31 +120,75 @@ async function measure(build, hours, dispatch, extra) {
   mkdirSync(out, { recursive: true });
   const short = build.slice(0, 10);
   const logFd = openSync(join(out, 'dev.log'), 'a');
-  // DF15: a dropped player's body stands 5 minutes (cellProtocol.ts HOLD_MS), so back-to-back boots measured the dock with the
-  // last boots' bodies in view; a 1 s hold lets each cell boot alone
-  const dev = spawn(process.execPath, ['scripts/dev.mjs', '--staging', '--shard', 'driftwood-isle', '--port', '0', '--saves', 'memory',
-    '--no-watch', '--work', join(out, 'world')], { cwd: root, detached: true, stdio: ['ignore', logFd, logFd], env: { ...process.env, WS_BUILD_ID: build, HOLD_MS: '1000' } });
-  const stopDev = () => { try { if (dev.pid !== undefined) process.kill(-dev.pid, 'SIGTERM'); } catch { /* already gone */ } };
-  exitedFlag.dev = false;
-  dev.once('exit', () => { exitedFlag.dev = true; });
-  try {
+  // DF15 (mini-df15, 2026-11-23): one port for the night, so a restarted world keeps the table's base (and its resume fingerprint)
+  const port = await freePort();
+  /** @type {import('node:child_process').ChildProcess | null} */
+  let dev = null;
+  const stopDev = async () => {
+    const running = dev;
+    dev = null;
+    if (running === null || running.exitCode !== null || running.signalCode !== null) return;
+    const group = running.pid;
+    if (group === undefined) return;
+    try { process.kill(-group, 'SIGTERM'); } catch { return; }
+    // the whole group (dev.mjs, its preview server, the world server) leaves, so the port is free for the next world
+    for (let n = 0; n < 60; n++) {
+      try { process.kill(-group, 0); } catch { return; }
+      await sleep(500);
+    }
+  };
+  /** Start a fresh dev world on the night's port; its origin, or null if it never came up. */
+  const startDev = async () => {
+    const from = readFileSync(join(out, 'dev.log'), 'utf8').length;
+    // DF15: a dropped player's body stands 5 minutes (cellProtocol.ts HOLD_MS), so back-to-back boots measured the dock with the
+    // last boots' bodies in view; a 1 s hold lets each cell boot alone
+    const world = spawn(process.execPath, ['scripts/dev.mjs', '--staging', '--shard', 'driftwood-isle', '--port', String(port), '--saves', 'memory',
+      '--no-watch', '--work', join(out, 'world')], { cwd: root, detached: true, stdio: ['ignore', logFd, logFd], env: { ...process.env, WS_BUILD_ID: build, HOLD_MS: '1000' } });
+    dev = world;
     let base = /** @type {string|null} */ (null);
-    for (let n = 0; n < 900 && base === null && !exitedFlag.dev; n++) {
-      base = /^engine dev on (\S+)/mu.exec(readFileSync(join(out, 'dev.log'), 'utf8'))?.[1] ?? null;
+    for (let n = 0; n < 900 && base === null && world.exitCode === null && world.signalCode === null; n++) {
+      base = /^engine dev on (\S+)/mu.exec(readFileSync(join(out, 'dev.log'), 'utf8').slice(from))?.[1] ?? null;
       if (base === null) await sleep(2000);
     }
+    return base;
+  };
+  // A SIGTERM (launchd, a watchdog) would end this process past its finally and orphan the world: stop it first
+  /** @type {import('node:child_process').ChildProcess | null} */
+  let table = null;
+  const terminate = () => { table?.kill('SIGTERM'); void stopDev().finally(() => process.exit(143)); };
+  process.once('SIGTERM', terminate);
+  try {
+    const base = await startDev();
     if (base === null) {
       receipt(`FAILED ${short}: the dev world never came up (${join(out, 'dev.log')})`);
       return 1;
     }
     console.error(`df7-nightly: ${short} on ${base}`);
-    const table = spawn(process.execPath, ['scripts/fps/table.mjs', '--qualify', '--base', base, '--out', join(out, 'table'), ...extra],
-      { cwd: root, stdio: 'inherit' });
-    // Past the night's budget the table stops at its next cell and writes what it has, graded incomplete.
-    const deadline = setTimeout(() => { table.kill('SIGTERM'); }, hours * 3_600_000);
-    const [status] = await once(table, 'exit');
-    clearTimeout(deadline);
-    if (![0, 2, 3].includes(status) || !existsSync(join(out, 'table/table.json'))) {
+    // DF15: a night's world runs for hours and its creatures roam; on 11-23 Driftwood's black bear came to stand at the quest
+    // fire and killed 15 cells' players. A death stops the table (--stop-on-death, exit 4): restart the world and resume.
+    const ends = Date.now() + hours * 3_600_000;
+    let status = /** @type {number|null} */ (null), restarts = 0;
+    for (;;) {
+      table = spawn(process.execPath, ['scripts/fps/table.mjs', '--qualify', '--stop-on-death', '--base', base, '--out', join(out, 'table'), ...extra],
+        { cwd: root, stdio: 'inherit' });
+      // Past the night's budget the table stops at its next cell and writes what it has, graded incomplete.
+      const running = table;
+      const deadline = setTimeout(() => { running.kill('SIGTERM'); }, Math.max(1, ends - Date.now()));
+      [status] = await once(running, 'exit');
+      table = null;
+      clearTimeout(deadline);
+      if (status !== PLAYER_DIED || restarts >= MAX_WORLD_RESTARTS || Date.now() >= ends) break;
+      restarts++;
+      await stopDev();
+      const again = await startDev();
+      if (again !== base) {
+        receipt(`FAILED ${short}: the dev world did not come back on ${base} after a death (${join(out, 'dev.log')})`);
+        return 1;
+      }
+      console.error(`df7-nightly: the player died; world restarted (${String(restarts)} of ${String(MAX_WORLD_RESTARTS)})`);
+    }
+    if (status === PLAYER_DIED) status = 3;
+    if (![0, 2, 3].includes(status ?? -1) || !existsSync(join(out, 'table/table.json'))) {
       receipt(`FAILED ${short}: table.mjs exited ${String(status)} (${out})`);
       return 1;
     }
@@ -160,7 +220,7 @@ async function measure(build, hours, dispatch, extra) {
     }
     receipt(`NIGHT ${short}: ${verdict}; qualifies ${String(graded.qualifies)}; dispatched ${WORKFLOW} (gh run list -R ${REPO} --workflow ${WORKFLOW})`);
     return 0;
-  } finally { stopDev(); }
+  } finally { process.removeListener('SIGTERM', terminate); await stopDev(); }
 }
 
 const domain = () => `gui/${String(process.getuid?.() ?? 501)}`;
