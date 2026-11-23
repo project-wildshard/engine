@@ -190,7 +190,7 @@ jobs:
             assert.deepEqual(proof.smoke.ran, ['K1', 'K2', 'K3', 'K4', 'K5']);
           }
           const read = async url => {
-            const response = await fetch(url, {cache: 'no-store', signal: AbortSignal.timeout(15_000)});
+            const response = await fetch(url, {cache: 'no-store', headers: {'user-agent': 'node WildshardAgent/1 (ci-npm-publish)'}, signal: AbortSignal.timeout(15_000)});
             assert.equal(response.status, 200);
             return response.text();
           };
@@ -224,7 +224,7 @@ jobs:
           assert.equal(manifest.name, '@wildshard/engine');
           assert.equal(`v${manifest.version}`, process.env.RELEASE_TAG);
           const read = async url => {
-            const response = await fetch(url, {cache: 'no-store', signal: AbortSignal.timeout(15_000)});
+            const response = await fetch(url, {cache: 'no-store', headers: {'user-agent': 'node WildshardAgent/1 (ci-npm-publish)'}, signal: AbortSignal.timeout(15_000)});
             assert.equal(response.status, 200);
             return response.text();
           };

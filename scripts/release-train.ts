@@ -1,4 +1,6 @@
 // FS28 and J475. The repo-kit still owns the release branch and page-release owns staging.
+// oxlint-disable-next-line import/no-unassigned-import -- Mark the staging and production readbacks (METRICS MT16).
+import './agent-fetch.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { appendFileSync, closeSync, createReadStream, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
