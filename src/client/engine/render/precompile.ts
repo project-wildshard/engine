@@ -1051,6 +1051,12 @@ const LIVE_LINK_POLL_MAX_MS = 1000;
 /** the wait before asking an unfinished link again: LIVE_LINK_POLL_MS in play, none while loading */
 const linkPollMs = (): number => (presenting() ? LIVE_LINK_POLL_MS : 0);
 
+/**
+ * DL21b: how many programs a boot warm-up issues before it waits for their links. WebKit's GPU process reports no link of
+ * a batch done until the whole batch is: Nine Dragon's 61 entry programs held the card 3.6 s on 'Link 61 shader programs'
+ * on the iPhone Simulator (11-23), then all landed at once. A chunk lands as one, so the card moves every chunk.
+ */
+export const BOOT_LINK_CHUNK = 8;
 /** How long a parallel link is waited on before its caller links it synchronously (ms; `boundedLinkWait`). */
 export const LINK_WAIT_MS = 10_000;
 /**
@@ -1286,6 +1292,10 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
   // query, and the bar sat still while its total grew by 75 programs. Under a loading screen each job's new programs are
   // resolved inside its own slice, so the slice clock counts the link and the painted pause follows it.
   const linkPerJob = serialLoading(renderer, isolateImageUploads), settledPause = gpuSettled(renderer, pause, current);
+  // DL21b: under a loading card, parallel links are waited on in chunks as they are issued (BOOT_LINK_CHUNK)
+  const chunkLinks = parallel && !isolateImageUploads && onProgress !== undefined && !presenting();
+  let linkChunk: ProgramLike[] = [], chunkLinked = 0;
+  const chunked = new Set<ProgramLike>();
   const before = snapshotPrograms(renderer);
   const created: ProgramLike[] = [];
   // op-hitch31: the programs the jobs' materials compiled to, including ones issued before `before` (a captured
@@ -1456,6 +1466,21 @@ async function runPrecompileWork(renderer: Renderer, camera: THREE.Camera, jobs:
     if (linkPerJob && issuedPrograms.size > 0) {
       for (const program of snapshotPrograms(renderer)) if (issuedPrograms.has(program) && needsPreparation(program)) await resolveProgram(program, tFrame);
       checkCurrent();
+    }
+    if (chunkLinks) {
+      for (const program of snapshotPrograms(renderer)) {
+        if (issuedPrograms.has(program) && needsPreparation(program) && !chunked.has(program)) { chunked.add(program); linkChunk.push(program); }
+      }
+      if (linkChunk.length >= BOOT_LINK_CHUNK || i === jobs.length - 1 && linkChunk.length > 0) {
+        const chunk = linkChunk; linkChunk = [];
+        onProgress?.(i + 1, total(), `${materials} materials · ${i + 1} / ${jobs.length} batches · linking ${chunk.length} · ${mode}`);
+        // past the bound, Phase A below and the resolve take what is left. The wait names its programs' range, so the
+        // card's foot moves as each chunk lands (the bar's share for links is the tail of this step)
+        await waitFor(`Link shader programs ${chunkLinked + 1}–${chunkLinked + chunk.length}`, boundedLinkWait(() => { checkCurrent(); return chunk.every(p => nativeRetired(p) || p.isReady()); },
+          async () => { await pause(); checkCurrent(); }), 'shader');
+        chunkLinked += chunk.length;
+        tFrame = performance.now(); programsAtFrame = programCount(renderer); nativeInSlice = false;
+      }
     }
     onProgress?.(i + 1, total(), `${materials} materials · ${i + 1} / ${jobs.length} batches · ${mode}`);
     // op-hitch37: a live WebKit warm-up also yields once a slice has issued LIVE_PROGRAMS_PER_FRAME programs: WebKit
