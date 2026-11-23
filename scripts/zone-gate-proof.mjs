@@ -127,10 +127,11 @@ async function bootDriftwood(context, page) {
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
 }
 
-/** @type {import('playwright').Browser|undefined} */ let browser;
+/** @type {import('playwright').Browser|undefined} */ let runningBrowser;
 let code = 1;
 try {
-  browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
+  const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
+  runningBrowser = browser;
   result.build = await servedBuild().catch(() => '');
   if (liveTour && result.build !== expectedBuild) throw new Error('Staging serves a different build from the zone-entry request');
   const phone = device === '' ? undefined : devices[device];
@@ -373,7 +374,7 @@ finally {
     writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
     keepReleaseProof(out, proof, [`${tag}-zone-gate.json`, 'zone-entry.json']);
   } finally {
-    try { await browser?.close(); }
+    try { await runningBrowser?.close(); }
     finally { scratch.close(); }
   }
 }
