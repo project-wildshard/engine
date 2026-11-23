@@ -76,6 +76,8 @@ import { heightAt } from '@wildshard/engine/world/Heightfield';
 import { loadBakedTerrain } from '@wildshard/engine/world/BakedTerrain';
 import { bakedTerrainSource } from '@wildshard/engine/world/bakedTerrainField';
 import { TIER, TIER_CONFIG } from '@wildshard/engine/core/tier';
+import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
+import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { prepareManifestScalarBlocks,type ShardManifest } from '../shard/manifest';
 import { prepareShardAssets } from '../shard/load';
 import { toLevelSpec } from '../shard/spec';
@@ -105,6 +107,13 @@ import { findShard } from '../shard/registry';
 import { tileRing } from '../shardfile/tileDriver';
 import { primeStaticMerges } from './staticViewMerge';
 import { programFoldOn } from '@wildshard/engine/render/programFold';
+
+const roadWarmCardSlot = jsonSlot('debug.roadWarmCards', 'device');
+
+function quickRoadCardWarm(): boolean {
+  try { return TIER === 'phone' && graphicsMode() === 'low' && roadWarmCardSlot.read() === true; }
+  catch { return false; }
+}
 
 /** Page-root ports; every default is the standalone behaviour, the live session supplies the cell's own installs. */
 export interface RegionalWorldPorts {
@@ -558,7 +567,7 @@ export function createRegionalWorldFoundation(ports: RegionalWorldPorts): (reque
           // warm-up builds the programs its creatures draw with: the region's look patch and its own factory's bodies. The
           // page's warm rigs sit outside the region (no `|look:`, another factory's hulls): Driftwood's glowing creature
           // linked 149 to 198 ms on the first walk back in from the road, Pine's wildlife three programs
-          frame.run(app, () => { animals.stageWarmRigs(); });
+          frame.run(app, () => { animals.stageWarmRigs(game.frameCount > 0 && quickRoadCardWarm()); });
           return { animals, wearSkin: (equipment: EquipmentService, skin: SkinDef): void => {
             const model = equipment.get(skin.weapon).model;
             if (model instanceof Group) applySkin(model, skin, sky);

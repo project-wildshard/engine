@@ -47,7 +47,7 @@ export interface RowBodiesDraw {
   endDraw: (animals: readonly Animal[], count: number, dt: number) => void;
   bloodBurst: (at: Vector3, dir: Vector3, strength: number) => void;
   /** DL24: hidden rigs of these models, parked for the level's life, for the boot's first-frame warm draws */
-  stageWarmRigs?: (models: readonly AnimalModel[]) => void;
+  stageWarmRigs?: (models: readonly AnimalModel[], quickCards?: boolean) => void;
 }
 /** What the bodies read of the running app, live at each call: a region's frame swaps these under them. */
 export type RowBodiesHost = Pick<App, 'combat' | 'events' | 'equipmentHost' | 'levelScope' | 'physics' | 'rng'>;
@@ -144,9 +144,9 @@ export class RowBodies {
   /** DL24 (J198): park one hidden rig of every model a row can ask for, so the boot's first frame builds its programs.
    *  Call after the composer is built: a look's compose patches the scene's materials once (Far Reach's haze), and the
    *  rows' rigs, which all arrive after it, carry no such patch, so a rig parked before it keys a different program. */
-  stageWarmRigs(): void {
+  stageWarmRigs(quickCards = false): void {
     const kinds = [...activeLevel().spawns.map(row => row.kind), ...app.species.kinds()];
-    this.draw.stageWarmRigs?.(this.draw.factory.everyModel(kinds));
+    this.draw.stageWarmRigs?.(this.draw.factory.everyModel(kinds), quickCards);
   }
 
   retire(a: Animal): void {
