@@ -34,7 +34,9 @@ test('the npm artifact carries the native dev server and frozen format', () => {
   for (const stamp of BOOT_STAMPS) { mkdirSync(dirname(join(staged, stamp)), { recursive: true }); cpSync(stamp, join(staged, stamp)); }
   if (existsSync('patches')) cpSync('patches', join(staged, 'patches'), { recursive: true });
   const installedFormat = realpathSync('node_modules/@wildshard/format');
-  for (const name of ['@wildshard/format', 'meshoptimizer', 'valibot']) {
+  // npm-artifact bundles the format with its own dependencies, read from its manifest (0.71.0 adds @valibot/to-json-schema).
+  const formatDependencies: Record<string, string> = JSON.parse(readFileSync(join(installedFormat, 'package.json'), 'utf8')).dependencies ?? {};
+  for (const name of ['@wildshard/format', ...Object.keys(formatDependencies)]) {
     const link = join(staged, 'node_modules', name);
     mkdirSync(dirname(link), { recursive: true });
     symlinkSync(realpathSync(join('node_modules', name)), link, 'dir');

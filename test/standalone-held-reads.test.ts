@@ -38,11 +38,12 @@ test('a product the page holds moves nothing over the network', async () => {
   expect(network).not.toHaveBeenCalled();
 });
 
+// The verdict hashes the index as written (format 0.71.0 parses identity.revision as saveRevision), as the worker does.
 test('a worker told its build\'s verdict reads that build\'s product unchecked, and any other product checked', async () => {
-  const directory = builtFolder('sunscar-dunes'), root = 'https://held.test/shardfiles/sunscar-dunes/', index = parseOutputIndex(JSON.parse(readFileSync(`${directory}/shard.json`, 'utf8')));
+  const directory = builtFolder('sunscar-dunes'), root = 'https://held.test/shardfiles/sunscar-dunes/', written: unknown = JSON.parse(readFileSync(`${directory}/shard.json`, 'utf8')), index = parseOutputIndex(written);
   const page = { location: Reflect.get(globalThis, 'location'), fetch: globalThis.fetch }, rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
   const held = (url: string): Promise<ArrayBuffer> => Promise.resolve(Uint8Array.from(readFileSync(`${directory}/${url.slice(root.length)}`)).buffer);
-  const verdict = { revision: 'a build', sourceHash: index.build.sourceHash, indexHash: await contentHash(validationSourceBytes(index)), worst: { playing: 0, loading: 0, accounted: 0, location: [0, 0] } };
+  const verdict = { revision: 'a build', sourceHash: index.build.sourceHash, indexHash: await contentHash(validationSourceBytes(written)), worst: { playing: 0, loading: 0, accounted: 0, location: [0, 0] } };
   Reflect.set(globalThis, 'location', { href: 'https://held.test/b/test/standalone/serverWorker.js' }); Reflect.set(globalThis, 'fetch', () => Promise.reject(new Error('the network was read')));
   try {
     const checked = await fetchServerFolder(root, rapier, held);
