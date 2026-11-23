@@ -157,7 +157,8 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
-      - run: pnpm pins && pnpm gen:inputs
+      # net-fuzz reads the retired products frozen for tests (Pastel Plain), as the tests job does.
+      - run: node scripts/pins.ts install --for-tests && pnpm gen:inputs
       - name: Choose a bounded replayable network fuzz seed
         run: echo "NET_FUZZ_SEEDS=$(node scripts/nightly-seed.ts "$GITHUB_RUN_ID")" >> "$GITHUB_ENV"
       - run: node scripts/scratch-dir.mjs ci-native-contention 'Serial native CPU-admission rehearsals'

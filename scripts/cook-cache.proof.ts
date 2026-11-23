@@ -93,11 +93,13 @@ import {brotliCompressSync} from 'node:zlib';
 const [tar,out]=process.argv.slice(2),body=readFileSync(tar),revision=body.toString();
 const cache=resolve(out,'../../cache'),counter=join(cache,'launches');
 mkdirSync(cache,{recursive:true});writeFileSync(counter,String((existsSync(counter)?Number(readFileSync(counter,'utf8')):0)+1));
-for(const [file,value] of [[${JSON.stringify(header)},JSON.stringify({revision})],[${JSON.stringify(part)},brotliCompressSync(Buffer.from('shared-part'))]]){
+// J450: a cook ends with its map, so the double draws both sizes too.
+const maps=['','-cell'].map(size=>[${JSON.stringify(`shardfiles/${slug}/cooked-map-v1`)}+size+'.png','png']);
+for(const [file,value] of [[${JSON.stringify(header)},JSON.stringify({revision})],[${JSON.stringify(part)},brotliCompressSync(Buffer.from('shared-part'))],...maps]){
  const path=join(out,'client',file);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,value);
 }
 mkdirSync(join(out,'server'),{recursive:true});writeFileSync(join(out,'server/shard.json'),JSON.stringify({revision}));
-console.log(JSON.stringify({slug:${JSON.stringify(slug)},hash:createHash('sha256').update(body).digest('hex'),proof:'unmeasured',check:{pass:true},cook:{manifests:[]},header:${JSON.stringify(header)},server:{files:1,bytes:1},seconds:0}));`;
+console.log(JSON.stringify({slug:${JSON.stringify(slug)},hash:createHash('sha256').update(body).digest('hex'),proof:'unmeasured',check:{pass:true},cook:{manifests:[],map:{full:1,cell:1,drawn:'plain'}},header:${JSON.stringify(header)},server:{files:1,bytes:1},seconds:0}));`;
 
 function harness(root: string): {store: PackStore; worker: (build?: string, store?: PackStore) => ReturnType<typeof createCookWorker>;
   launches: () => number; downloads: () => number; counter: string} {
