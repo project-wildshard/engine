@@ -6,8 +6,10 @@ import { expect, test } from 'vitest';
 
 const workflow = readFileSync('.github/workflows/npm-publish.yml', 'utf8');
 const step = workflow.slice(workflow.indexOf('      - name: Admit the exact staging release for npm next'));
+const nodeStart = "          node --input-type=module <<'JS'\n";
 const command = step.slice(step.indexOf('        run: |\n') + '        run: |\n'.length,
-  step.indexOf("          node --input-type=module <<'JS'"));
+  step.indexOf(nodeStart));
+const readback = step.slice(step.indexOf(nodeStart) + nodeStart.length, step.indexOf('\n          JS\n'));
 const build = 'a'.repeat(40);
 const { version } = JSON.parse(readFileSync('package.json', 'utf8')) as { version: string };
 test('the release tag installs without package build lifecycle hooks', () => {
@@ -63,6 +65,18 @@ test('J475 uses the recorded green run even when the Actions list omits it', () 
   expect(outcome.stderr).toContain(`exact run ${run}`);
   expect(outcome.stderr).not.toContain('index consulted');
   expect(outcome.status).toBe(0);
+});
+
+test('J475 admits a green release before any staging readback exists', () => {
+  const outcome = spawnSync(process.execPath, ['--input-type=module', '-e',
+    `globalThis.fetch = () => { throw new Error('staging is still deploying'); };\n${readback}`], {
+    encoding: 'utf8',
+    env: { ...process.env, RELEASE_BUILD: build, RELEASE_CI_RUN: String(run), QUEUE_ATTEMPT: '',
+      STAGING_QUALIFICATION: JSON.stringify(proof) },
+  });
+  expect(outcome.stderr).toBe('');
+  expect(outcome.status).toBe(0);
+  expect(outcome.stdout).toContain('Exact release CI admitted for npm next');
 });
 
 test('J475 never substitutes a list entry for a malformed run id', () => {

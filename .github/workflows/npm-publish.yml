@@ -20,7 +20,7 @@ on:
         type: string
         default: 0.0.1
       staging_build:
-        description: Full SHA of the qualified staging release to publish on npm next
+        description: Full SHA of the release build to publish on npm next
         type: string
         default: ''
       staging_qualification:
@@ -144,10 +144,11 @@ jobs:
           const proof = JSON.parse(process.env.STAGING_QUALIFICATION);
           assert.equal(proof.build, process.env.RELEASE_BUILD);
           if (proof.j475 !== undefined) {
-            // J475: green release CI can publish to next while J451 runs.
-            // The exact CI and signed staging readback still apply to this dispatch.
+            // J475 and J490: the exact green release CI above admits npm next independently of staging.
             assert.equal(process.env.QUEUE_ATTEMPT, '');
             assert.equal(proof.j475.releaseCi, Number(process.env.RELEASE_CI_RUN));
+            console.log('Exact release CI admitted for npm next', packageInfo.version, proof.j475.releaseCi);
+            process.exit(0);
           } else if (proof.preAliasSmokeV1 !== undefined) {
             const smoke = proof.preAliasSmokeV1;
             const scenarios = ['K1', 'K2', 'K3', 'K4', 'K5', 'K6'];
