@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // E7.3d: a folder laid out as `PACK_ORIGIN` is: this build's server book and its parts, from built products.
-//   node scripts/server-origin.mjs <out> <build> <slug>=<product folder> ...
+//   node scripts/server-origin.mjs <out> <build> <slug>=<product folder> ... [--grid=<root>] [--fast-encode]
+// --fast-encode writes q1 parts with no shared cache, for a proof of what reads the packs (not of their wire size).
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
