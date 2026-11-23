@@ -21,6 +21,7 @@ import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { saveFixture } from './debug-settings.mjs';
+import { agentUserAgent } from './agent-marker.mjs';
 import { watchFaults } from './proof-faults.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 import { deployFrameProblem, PHONE } from './journey-proof.mjs';
@@ -30,7 +31,7 @@ import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
 const base = flag('base', '').replace(/\/$/u, ''), proof = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire');
-const deploy = process.argv.includes('--deploy');
+const deploy = process.argv.includes('--deploy'), reenter = process.argv.includes('--reenter');
 const liveTour = process.argv.includes('--walk-all'), expectedBuild = flag('expected-build', '');
 const resumeFile = flag('resume', ''), fromFlag = flag('from', '');
 if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || proof === absolute('')) throw new Error('usage: zone-gate-proof.mjs --base=<staging, preview or loopback url> --out=<dir>');
@@ -154,10 +155,12 @@ try {
   runningBrowser = browser;
   result.build = await servedBuild().catch(() => '');
   if (liveTour && result.build !== expectedBuild) throw new Error('Staging serves a different build from the zone-entry request');
-  const phone = device === '' ? undefined : devices[device];
+  // METRICS MT2: a phone context carries the agent marker in its user agent (staging counts it as automation)
+  const catalogued = device === '' ? undefined : devices[device];
+  const phone = catalogued === undefined ? undefined : { ...catalogued, userAgent: agentUserAgent(catalogued.userAgent) };
   if (device !== '' && phone === undefined) throw new Error(`No Playwright device ${device}`);
   result.viewport = liveTour ? 'iPhone 17 Pro 402x874@3' : phone === undefined ? `${String(desk[0])}x${String(desk[1])}@${String(desk[2])}` : `${device} ${String(phone.viewport.width)}x${String(phone.viewport.height)}@${String(phone.deviceScaleFactor)}`;
-  const context = await browser.newContext(liveTour ? {...PHONE, isMobile:true} : phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 }), page = await context.newPage();
+  const context = await browser.newContext(liveTour ? {...PHONE, userAgent: agentUserAgent(PHONE.userAgent), isMobile:true} : phone ?? { viewport: { width: desk[0] ?? 2992, height: desk[1] ?? 1434 }, deviceScaleFactor: desk[2] ?? 2 }), page = await context.newPage();
   // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
   const faults = await watchFaults(page, result.errors);
   if (staging) await context.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
@@ -176,7 +179,7 @@ try {
     const restart = async () => {
       await active.close();
       if (await servedBuild() !== expectedBuild) throw new Error('The staging build changed before the crossing could restart');
-      active = await browser.newContext({...PHONE,isMobile:true});
+      active = await browser.newContext({...PHONE,userAgent:agentUserAgent(PHONE.userAgent),isMobile:true});
       await active.addInitScript(guardStagingSockets, 'wss://rooms-staging.wildshard.io');
       const next = await active.newPage();
       await watchFaults(next, result.errors);
@@ -227,6 +230,19 @@ try {
     if (dark !== null) throw new Error(dark);
     if (await page.locator('#wserr:visible, .ws-fail:visible').count() > 0) throw new Error('an error card opened after crossing');
     result.fired = { ready: true, crossedFrom: from.cur, target: targetSlug };
+    // QA 11-23-b row 21 (`--reenter`): Jake's Nalati clip bounced him back onto the road. Stand 6 s in the arrival, step 3 m out onto
+    // the road and straight back 12 m in, stand 6 s: the page must hold the zone as its own (feet and live grid) every sample
+    if (reenter) {
+      const homeAt = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
+      const outside = async (/** @type {number} */ ms) => { let missed = 0; for (const ends = Date.now() + ms; Date.now() < ends; await sleep(250)) { const now = await state(); if (now.inside !== targetSlug || now.cur !== targetSlug) missed++; } return missed; };
+      const arrival = await outside(6000);
+      await walkTo(homeAt[ax] - dir * (HALF + 3));
+      const onRoad = (await state()).inside === null;
+      await walkTo(homeAt[ax] - dir * (HALF - 12));
+      const back = await outside(6000);
+      result.fired.reentry = { arrival, onRoad, back };
+      if (arrival > 0 || !onRoad || back > 0) throw new Error(`${targetSlug} did not hold the walker: ${String(arrival)} samples out after arrival, on the road ${String(onRoad)}, ${String(back)} out after stepping back in`);
+    }
     code = 0;
     console.log('PASS gate crossing');
   } else {
@@ -315,6 +331,7 @@ try {
     // ZE10b: the arrival (the new home's own frame: its west entryway's centre line, 14 m in, facing east into the cell), then a free
     // walk back out of the new home onto the road (no wall: the home has none)
     /** @type {{ x: number, z: number, yaw: number } | null} */
+    /** @type {any} */ let reentry = null, settleOutside = /** @type {number | null} */ (null);
     let arrived = null, walkedOut = false, /** @type {any} */ oldHomeGate = null, /** @type {boolean | null} */ zonePending = null, oldHomeLeft = false, /** @type {number | null} */ controlMB = null;
     if (ready) {
       await sleep(1500);
@@ -322,7 +339,11 @@ try {
       zonePending = await page.evaluate(() => document.querySelector('.ws-load[data-navigation]') !== null).catch(() => null);
       arrived = await page.evaluate(() => { const p = /** @type {any} */ (window).__wildshard.world.player; return { x: Number(p.position.x.toFixed(2)), z: Number(p.position.z.toFixed(2)), yaw: Number(p.yaw.toFixed(3)) }; });
       // settled where it arrived (the fresh boot below stands at the same pose for as long)
-      await sleep(SETTLE_MS); controlMB = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
+      // row 21: the settle samples where the walker stands, so a bounce back onto the road after the entry shows
+      const settled = /** @type {(string | null)[]} */ ([]);
+      for (const ends = Date.now() + SETTLE_MS; Date.now() < ends; await sleep(250)) settled.push((await state()).inside ?? null);
+      settleOutside = settled.filter(inside => inside !== targetSlug).length;
+      controlMB = await page.evaluate(() => /** @type {any} */ (window).__wildshard.shard.grid.state().playingMB ?? null);
       // the new home's origin in world feet, read inside it (on the road the player's own position is the road's frame online)
       const homeAt = await page.evaluate(() => { const W = /** @type {any} */ (window), wf = W.__wildshard.shard.grid.state().live.live.worldFeet, p = W.__wildshard.world.player.position; return { x: wf.x - p.x, z: wf.z - p.z }; });
       // out onto the road: the feet in no cell (online the player's own position is the road's frame once it steps out)
@@ -342,6 +363,34 @@ try {
         await page.screenshot({ path: join(out, `${tag}-old-home-gate.png`) });
         const back = await state();
         oldHomeLeft = (back.gate?.cell ?? null) === null && await page.evaluate(slug => { const st = /** @type {any} */ (window).__wildshard.shard.grid.state(); return document.querySelector('.ws-load[data-navigation]') === null && (st.live?.live?.home ?? st.home) === slug; }, targetSlug).catch(() => false);
+        // QA 11-23-b row 21 (`--reenter`): from the road walk back into the new home, 30 m past its edge, then stand still 12 s: the
+        // walker must stay inside (Jake's Nalati clip: in, then back on the road outside its wall, again and again)
+        if (reenter) {
+          const inward = homeAt[ax] - dir * (HALF - 30);
+          const began = Date.now();
+          await walkTo(inward);
+          const walked = Date.now() - began, samples = /** @type {{ t: number, inside: string | null, at: number, cur: string | null }[]} */ ([]);
+          for (const ends = Date.now() + 12_000; Date.now() < ends; await sleep(200)) {
+            const now = await state(); samples.push({ t: Date.now() - began, inside: now.inside ?? null, cur: now.cur ?? null, at: Number((dir * (now[ax] - homeAt[ax])).toFixed(1)) });
+          }
+          await page.screenshot({ path: join(out, `${tag}-reentered.png`) });
+          const stayed = samples.length > 0 && samples.every(row => row.inside === targetSlug && row.cur === targetSlug);
+          const drift = samples.length === 0 ? null : Math.max(...samples.map(row => row.at)) - Math.min(...samples.map(row => row.at));
+          // Jake's clip (staging journal 16:33:02 out, 16:33:05 back in): out onto the road and straight back in, three times; each
+          // time the page must stand in the zone as its own (`cur`, the live grid's current cell), not only with its feet
+          const quick = [];
+          for (let round = 0; round < 3; round++) {
+            const from = Date.now();
+            await walkTo(homeAt[ax] - dir * (HALF + 3));
+            const onRoad = (await state()).inside === null;
+            await walkTo(homeAt[ax] - dir * (HALF - 12));
+            const rows = /** @type {{ t: number, inside: string | null, cur: string | null }[]} */ ([]);
+            for (const ends = Date.now() + 8000; Date.now() < ends; await sleep(250)) { const now = await state(); rows.push({ t: Date.now() - from, inside: now.inside ?? null, cur: now.cur ?? null }); }
+            await page.screenshot({ path: join(out, `${tag}-quick-${String(round + 1)}.png`) });
+            quick.push({ round: round + 1, onRoad, ms: Date.now() - from, held: rows.length > 0 && rows.slice(-8).every(row => row.inside === targetSlug && row.cur === targetSlug), last: rows.at(-1) ?? null, notHeld: rows.filter(row => row.cur !== targetSlug).length });
+          }
+          reentry = { walkedMs: walked, stayed: stayed && quick.every(row => row.held), drift, outside: samples.filter(row => row.inside !== targetSlug).length, quick, samples };
+        }
       }
     }
     /** @type {{ left: number | null, zero: number | null, zeroAt: number | null, reads: { url: string, start: number }[] } | null} */
@@ -359,7 +408,7 @@ try {
     const socketsAfter = online ? await sockets() : null, game = (/** @type {any} */ row) => staging ? row.url.startsWith('wss://rooms-staging.wildshard.io') : /:\d+\/?$/u.test(row.url) && !row.url.includes(new URL(base).host);
     const oneSocket = !online ? null : socketsBefore !== null && socketsAfter !== null && socketsBefore.some(game)
       && socketsAfter.filter(game).length === socketsBefore.filter(game).length && [...socketsAfter].reverse().find(game)?.open === true;
-    result.fired = { navigations, departure: departure?.how ?? null, samePage, oneSocket, socketsBefore, socketsAfter, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, oldHomeLeft, enteredMB, controlMB, freshMB,
+    result.fired = { navigations, departure: departure?.how ?? null, samePage, oneSocket, socketsBefore, socketsAfter, navigated: left, before, after: page.url(), ready, home, zonePending, arrived, walkedOut, oldHomeGate, oldHomeLeft, settleOutside, reentry, enteredMB, controlMB, freshMB,
       residency: pageReads !== null && pageReads.left !== null ? { clock: 'page', zeroToLeftMs: Number.isFinite(zero) ? Math.round(pageReads.left - zero) : null,
         roadViewReads: pageReads.reads.filter(row => row.start < zero).length,
         readsBeforeLeaving: pageReads.reads.filter(row => row.start >= zero && row.start < /** @type {number} */ (pageReads.left)).map(row => row.url.replace(base, '')),
@@ -377,7 +426,7 @@ try {
   // worker's reads too)
   const oneWorld = fired !== null && fired.residency.readsBeforeLeaving.length === 0 && (fired.residency.script?.readsBefore ?? 0) === 0 && (staging || (typeof fired.controlMB === 'number' && typeof fired.freshMB === 'number' && Math.abs(fired.controlMB - fired.freshMB) <= 50));
   const counted = at5?.cell === targetSlug && at5.count === 5 && at2?.cell === targetSlug && at2.count === 2 && again?.cell === targetSlug && again.count === 5;
-  code = counted && gone?.cell === null && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false && (!online || fired.oneSocket === true))) ? 0 : 1;
+  code = counted && gone?.cell === null && result.errors.length === 0 && (!fire || (arrivedPastGate(fired) && oneWorld && fired.samePage === true && fired.oldHomeGate?.cell === 'driftwood-isle' && fired.oldHomeLeft === true && fired.zonePending === false && (!online || fired.oneSocket === true) && (!reenter || (fired.reentry?.stayed === true && fired.settleOutside === 0)))) ? 0 : 1;
   }
   }
 } catch (error) {
