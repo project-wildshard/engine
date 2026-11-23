@@ -9,7 +9,10 @@ export interface CookRevision {revision:string;files:readonly string[];node:stri
 
 /** Actual runtime import walk of the byte producer, including literal worker URLs.
  * Proof execution is supplied by the host and is never a reusable verdict. */
-export function cookRevision(root=resolve(import.meta.dirname,'..')):CookRevision {
+export function cookRevision(checkout=resolve(import.meta.dirname,'..')):CookRevision {
+  // QA 11-23 row 7: cook-worker.mjs passes `fileURLToPath(new URL('..', import.meta.url))`, which ends in `/`, so every
+  // closure file failed the escape check below and the box worker never had a cook revision: every build recooked every head.
+  const root=resolve(checkout);
   const pkg=JSON.parse(readFileSync(resolve(root,'package.json'),'utf8')) as Package;
   const pending=['src/cook/game/cookJob.ts'],seen=new Set<string>();
   const sourceFile=(specifier:string,from:string):string|null=>{
@@ -56,7 +59,8 @@ export function cookRevision(root=resolve(import.meta.dirname,'..')):CookRevisio
   // The actual permission-limited child always loads these hooks. Its
   // renderer input also decides whether author preparation can be reused.
   seen.add('scripts/bake-loader.mjs');seen.add('scripts/format-hook.mjs');
-  const files=[...seen].sort(),node=process.versions.node.split('.')[0]??'',brotli=process.versions.brotli??'';
+  const {brotli=''}=process.versions;
+  const files=[...seen].sort(),node=process.versions.node.split('.')[0]??'';
   const format=pkg.dependencies['@wildshard/format'];if(format===undefined)throw new Error('No pinned cook format');
   const renderer=rendererRevision(root);
   const hash=createHash('sha256').update(JSON.stringify({schema:'cook-revision/2',node,brotli,format,renderer}));

@@ -246,6 +246,7 @@
     "../scripts/pin-shard.ts",
     "../scripts/pin-test-names.ts",
     "../scripts/pin-admit.ts",
+    "../scripts/cook-revision.ts",
     "../scripts/ring-step-paths.ts",
     "../scripts/app-build/bootFolderTiers.ts",
     "../scripts/app-build/bootExtras.ts",

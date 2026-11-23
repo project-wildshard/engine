@@ -48,8 +48,10 @@ const renderer = (() => { try { return rendererRevision(root); } catch { return 
 const validator = (() => { try { return shardfileValidationRevision(root); } catch { return undefined; } })();
 /** SHARD-COMPAT SP7, the recook rule: a build whose cook revision is unchanged carries another build's index for the same
  *  bytes instead of cooking them again. A host that can't compute it cooks every head, as before. */
-const cookRevisionId = await (async () => { try { return (await import('./cook-revision.ts')).cookRevision(root).revision; } catch { return undefined; } })();
-if (cookRevisionId === undefined) console.warn('cook-worker: no cook revision, so every head cooks again for this build (SP7)');
+let cookRevisionError = '';
+const cookRevisionId = await (async () => { try { return (await import('./cook-revision.ts')).cookRevision(root).revision; } catch (error) { cookRevisionError = error instanceof Error ? error.message : String(error); return undefined; } })();
+if (cookRevisionId === undefined) console.warn(`cook-worker: no cook revision (${cookRevisionError}), so every head cooks again for this build (SP7)`);
+else console.log(`cook-worker: cook revision ${cookRevisionId}`);
 if (validator === undefined) console.warn('cook-worker: no shardfile validator revision, so no index carries a verdict and no page enters a placed slug from it (SA48)');
 const uploadApi = env.COOK_SIGNING_KEY === undefined || env.COOK_SIGNING_KEY === '' ? undefined : cookApi(need('WILDSHARD_API_URL'), env.COOK_SIGNING_KEY, fetch, Date.now, maxBytes);
 const publicSource = apiSource(env.WILDSHARD_API_URL ?? 'https://api.wildshard.io', fetch, maxBytes);
