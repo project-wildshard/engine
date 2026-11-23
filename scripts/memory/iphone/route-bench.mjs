@@ -156,16 +156,19 @@ async function bench() {
           if (phone && trialSlots.graphics !== 'high' && typeof Reflect.get(page, 'bootstrap') === 'function') await page.bootstrap(lowGuard(phoneSlots(trialSlots)));
           return enterZone(page, { base, slug: values.zone, slots: trialSlots, cacheOff: values['cache-off'] === true });
         };
-        // DW3 (mini-dw3, 2026-11-23): the first page attached after the inspector proxy starts can leave its first evaluate
-        // unanswered for the whole 60 s (five jobs in a row: run 1's first arm failed, the next fresh Safari answered at
-        // once), and the runner then voids the job and plays it all again. One more fresh Safari, once, in the same run.
+        // DW3 (mini-dw3, 2026-11-23): the first pages attached after the inspector proxy starts can leave an evaluate
+        // unanswered (five jobs in a row: run 1's first arm failed, a later fresh Safari answered at once; one replay's
+        // second page then left its storage reset unsettled), and the runner then voids the job and plays it all again.
+        // Up to two more fresh Safaris, in the same run, before the boot counts as failed.
         let boot;
-        try { boot = await bootOn(driver); } catch (error) {
-          if (!phone || !String(error).includes('Runtime.evaluate timed out')) throw error;
-          console.log(`run ${String(run)}: the page did not answer (${String(error).slice(0, 80)}); one more fresh Safari`);
-          try { await /** @type {any} */ (driver).close?.(); } catch { /* the stuck page */ }
-          driver = await /** @type {NonNullable<typeof tools>} */ (tools).fresh();
-          boot = await bootOn(driver);
+        for (let tries = 0; ; tries++) {
+          try { boot = await bootOn(driver); break; } catch (error) {
+            if (!phone || tries >= 2 || !/Runtime\.evaluate timed out|did not settle an async script/.test(String(error))) throw error;
+            console.log(`run ${String(run)}: the page did not answer (${String(error).slice(0, 80)}); one more fresh Safari`);
+            try { await /** @type {any} */ (driver).close?.(); } catch { /* the stuck page */ }
+            await pause(10_000);
+            driver = await /** @type {NonNullable<typeof tools>} */ (tools).fresh();
+          }
         }
         row.boot = { outcome: boot.outcome, controlS: boot.controlAt !== null && boot.startedAt !== null ? (boot.controlAt - boot.startedAt) / 1000 : null,
           build: boot.state?.build ?? null, version: boot.state?.version ?? null, error: boot.state?.error ?? null };
