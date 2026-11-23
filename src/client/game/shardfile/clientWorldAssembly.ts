@@ -20,6 +20,8 @@ import { cameraCone, followResidentTiles, noteTileBytes, folderTileRing, residen
 import { StreamingCamera } from './streamingView';
 import { farStandIn } from './farStandIn';
 import { wholeRefinementCover } from './wholeRefinementCover';
+import { primeBakedTileBatches } from '../grid/kitBatch';
+import { multiDraws } from '../grid/farBatch';
 
 const enteredScopes = new WeakSet<ShardContext['scope']>();
 const residents = new WeakMap<IslandLibrary<unknown> | ShardFolder, {
@@ -72,7 +74,10 @@ export async function installClientWorldAssembly(ctx: ShardContext, row: Extract
       const scenes = await timed('scenes', () => installWorldScenes(ctx, sceneRows, owner)); check();
       const baked: ReadonlyMap<string, BakedTiles> = book === undefined ? new Map<string, BakedTiles>() : await timed('baked', () => residentBakedTiles(ctx, owner)); check();
       // T3: the baked sets by tile (their meshes' triangles, their unclaimed colliders on the collider ring)
-      for (const set of baked.values()) for (const content of bakedTileContents(set)) scenes.addTiled(content);
+      for (const set of baked.values()) {
+        for (const content of bakedTileContents(set)) scenes.addTiled(content);
+        primeBakedTileBatches(set.group, set.tiles, owner, multiDraws(game.renderer));
+      }
       const variant = construction.variant?.[cube === null ? 'standalone' : 'cell'];
       await timed('construct', () => WorldAssembly.construct(row.rows, { runtime, product, scope: owner, scenes, baked, progress,
         ...(book === undefined ? {} : { library: book.library, sites: book.sites }), ...(variant === undefined ? {} : { variant }) })); check();

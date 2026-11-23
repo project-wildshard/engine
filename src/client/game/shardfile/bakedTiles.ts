@@ -40,7 +40,6 @@ import { tiledMesh } from './tiledMesh';
 import { bakedPlacementPoses } from '../../../shared/game/shardfile/bakedPlacementPoses';
 import { readContent } from '@wildshard/engine/boot/contentRead';
 import { mergeView } from './groundMerge';
-import { bakedTileBatchOn, kitBatchOn, prepareBakedTileBatch } from '../grid/kitBatch';
 import { NO_VIEW_MERGE } from '../grid/staticViewMerge';
 
 /** What a row is drawn into: the product its files resolve against, the live world, and the scope its pieces leave with
@@ -113,7 +112,6 @@ export async function installBakedTiles(owner: BakedTilesOwner, input: BakedTile
   if (row.sky) sky.setupMaterial(material);
   group.name = row.id; owner.parent.add(group);
   const follow = row.toonDay ? followToonLook(product, row.look) : null;
-  const batchTiles = owner.multiDraw === true && kitBatchOn() && bakedTileBatchOn();
   scene.updateMatrixWorld(true);
   scene.traverse(o => {
     if (!isMesh(o) || !o.name.startsWith(row.tiles[TIER])) return;
@@ -128,7 +126,6 @@ export async function installBakedTiles(owner: BakedTilesOwner, input: BakedTile
   });
   if (tiles.length === 0) throw new Error(`Baked tiles ${row.id} has no ${TIER} tiles`);
   if (row.wear !== undefined) await wearBakedTiles(product, row.wear, TIER, owner.ground ?? null, tiles);
-  if (batchTiles) for (const tile of tiles) prepareBakedTileBatch(tile);
   const unclaimed = instances !== null && table !== null && protos !== null && plan !== null ? await placeFamilies(owner, row, instances, new Float32Array(Uint8Array.from(table).buffer), protos, plan, group) : undefined;
   const sun = row.sun, light = (): THREE.DirectionalLight | undefined => sky.csm.lights[0];
   const update = sun === null ? () => undefined : () => { setLentParam(row.look, sun.param, sunBounce(light(), sky.sunDir.y, sun.referenceY, sun.gain)); };

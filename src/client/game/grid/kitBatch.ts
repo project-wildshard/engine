@@ -34,7 +34,7 @@ import { FarBatch } from './farBatch';
 export const KIT_BATCH_SLOT = 'debug.kitBatch';
 const BAKED_TILE_MEMBER = 'bakedTileBatchMember';
 const bakedTileSlot = jsonSlot('debug.bakedTileBatch', 'device');
-export function bakedTileBatchOn(): boolean {
+function bakedTileBatchOn(): boolean {
   try { return bakedTileSlot.read() === true; } catch { return false; }
 }
 const kitBatchSlot = jsonSlot(KIT_BATCH_SLOT, 'device');
@@ -288,6 +288,7 @@ export function buildKitBatches(root: THREE.Object3D, cellPatches = false, inclu
   const sets = new Map<string, { material: THREE.Material; keyed: string; meshes: THREE.Mesh[] }>();
   root.updateWorldMatrix(true, true);
   root.traverse((object) => {
+    if (includeBakedTiles && object.userData[BAKED_TILE_MEMBER] !== true) return;
     if (!batchableMesh(object, includeBakedTiles)) return;
     const material = object.material as THREE.Material, geometry = object.geometry;
     // three's program keys on these channels' presence and size only: their storage may differ within a batch
@@ -325,6 +326,15 @@ export function buildKitBatches(root: THREE.Object3D, cellPatches = false, inclu
   return batches;
 }
 
+/** The baked set's index ranges are installed. Batch before world assembly gives the source arrays up to the GPU. */
+export function primeBakedTileBatches(root: THREE.Object3D, tiles: readonly THREE.Mesh[], scope: Scope, multiDraw: boolean): void {
+  if (!multiDraw || !kitBatchOn() || !bakedTileBatchOn() || scope.disposed || scope.disposing) return;
+  for (const tile of tiles) prepareBakedTileBatch(tile);
+  const batches = buildKitBatches(root, false, true);
+  if (batches.length > 0) skipEmptyBatches(true);
+  scope.onDispose(() => { for (const batch of batches) batch.retire(); });
+}
+
 /**
  * Batch `scene`'s kit now, once, while `scope` lives: when the slot is on at phone Low and the renderer multi-draws. The
  * boot calls it before the shaders step, while every channel's CPU copy is whole (the first frames upload and release
@@ -334,7 +344,7 @@ export function buildKitBatches(root: THREE.Object3D, cellPatches = false, inclu
 export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: boolean, enabled: () => boolean = kitBatchOn, cellPatches: () => boolean = programFoldOn): { batches: number; members: number } {
   if (!multiDraw || !enabled() || scope.disposed || scope.disposing || scene.userData['kitBatch'] !== undefined) return { batches: 0, members: 0 };
   let batches: KitBatch[];
-  try { batches = buildKitBatches(scene, cellPatches(), bakedTileBatchOn()); }
+  try { batches = buildKitBatches(scene, cellPatches()); }
   catch (error: unknown) { console.warn('[kit-batch] not built', error instanceof Error ? error.stack : error); return { batches: 0, members: 0 }; }
   // DF10 (mini-dfload): a batch whose members all left (their cell retired at the road crossing) draws nothing, so it never
   // looks its program up again: on the iPhone 13 the empty kit batches relinked their three materials as the player

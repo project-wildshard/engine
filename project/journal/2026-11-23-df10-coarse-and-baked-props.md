@@ -12,7 +12,9 @@ census stayed at 24 members because the baked cove positions use padded
 GLB strides. The optional baked-tile batch now copies the raw components
 without changing their storage, normalization or lightmap coordinates.
 Its members keep their original tile visibility and index ranges under
-the resident kit's scope.
+the resident's scope. Driftwood declares its baked cove GPU-only in
+world assembly. The baked batch is made after tile ranges exist and
+before that release, with shader warming left to the ordinary loader.
 
 The merge transforms rotated coarse-prop normals into cell space. The
 road kit test exercises the enabled path through both content fences and
