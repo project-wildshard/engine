@@ -477,6 +477,7 @@
     "src/client/engine/telemetry/deviceSnapshot.ts": "client",
     "src/client/engine/telemetry/screenOutbox.ts": "client",
     "src/client/engine/telemetry/sessionVitals.ts": "client",
+    "src/client/engine/telemetry/bootSteps.ts": "client",
     "src/client/engine/telemetry/staleBuildReport.ts": "client",
     "src/client/engine/telemetry/crossroads.ts": "client",
     "src/client/engine/telemetry/failureEpisodes.ts": "client",

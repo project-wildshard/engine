@@ -12,6 +12,9 @@ import { FailureOutbox, failureOutcomeSave } from './failureEpisodes';
 import { FailureTelemetry } from './failureTelemetry';
 import { pageActor } from './pageActor';
 import { SessionVitals, sessionDevice, type BootStep, type SessionSummary } from './sessionVitals';
+import { bootKind, bootStepTimes } from './bootSteps';
+import { bootTiming } from '../../../shared/engine/boot/timing';
+import { saveStorage } from '../saves/slots';
 
 declare const __BUILD_ID__: string;
 let vitals: SessionVitals | undefined;
@@ -28,9 +31,21 @@ export function noteWorldStep(step?: BootStep): void {
   if (vitals?.step(step) === true) health?.capture(vitals.reading());
 }
 export function noteWorldFrame(): void { vitals?.frame(diagnosticNow()); }
+/** QA 2026-11-23 row 10: the last build that reached control on this device, so the next boot knows it is an update. */
+const BOOTED_BUILD = 'telemetry.bootedBuild';
+function noteBootSteps(): void {
+  const build = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : '';
+  if (vitals === undefined || build === '') return;
+  const device = saveStorage('device');
+  let previous: string | null = null;
+  try { previous = device.getItem(BOOTED_BUILD); } catch { /* private mode: read as a first boot */ }
+  vitals.booted(bootKind(previous, build), bootStepTimes(bootTiming()));
+  try { device.setItem(BOOTED_BUILD, build); } catch { /* private mode: this load only */ }
+}
 function noteWorldJoined(): void {
   if (vitals === undefined) return;
   vitals.joined(diagnosticNow());
+  noteBootSteps();
   health?.capture(vitals.reading());
 }
 let analytics: AnalyticsSink | null = null;

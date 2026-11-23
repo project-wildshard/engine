@@ -16,3 +16,7 @@
 - The Home list is narrowed by hand like J259's renderer list; a file that changes how Home geometry is built joins it.
 - The rig reads the book and the Home store 3 s after control: the book's counters are written at `ws:control-ready`,
   which can land after the reveal ends, and the Home snapshot is written after first draw.
+- Row 10 (boot steps from real phones): the session summary carries `boot` (first, update, normal: the last build that
+  reached control on this device, `telemetry.bootedBuild`) and `bootSteps` (`page` splash, `control`, each loading
+  stage's longest span) from `__bootTiming` at control. The summary schema strips unknown keys, so the client can ship
+  before api-server stores them.
