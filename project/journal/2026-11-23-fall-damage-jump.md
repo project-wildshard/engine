@@ -12,3 +12,6 @@ fps; a 12 m fall still hurts. Client and headless host share the rule (`hardLand
 Trace re-record (same day): the wet, dry, driver and walking host traces in `seven-traces.json` record fewer `env.fall`
 hits under the new threshold. With `HARD_LANDING_SPEED` back at 9 m/s all four match their old chains, so the re-record
 (`MOTION_TRACE_RECORD=1`) carries the fall rule only.
+
+Second trace re-record: `motion-traces.test.ts`'s page, riding, legacy and versioned traces share `seven-traces.json` and were
+missed by the first re-record (main run 45229317348). With 9 m/s they match their old chains too.
