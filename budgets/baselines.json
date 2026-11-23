@@ -1364,10 +1364,10 @@
    "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
   },
   "render/phone-low/triangles/driftwood-isle": {
-   "value": 708765,
-   "contentKey": "driftwood-isle@5",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 305026,
+   "contentKey": "driftwood-isle@9",
+   "commit": "e51e3e5b5ef8ee09e996a5065895a30ca18831a8",
+   "why": "DF9 phone Low far LOD, fixed headless spawn views on Driftwood r9 (J490)"
   },
   "render/phone-low/draws/driftwood-isle": {
    "value": 73,
