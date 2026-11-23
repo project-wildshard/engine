@@ -39,6 +39,7 @@ import { emitFault } from '../../../shared/engine/core/faults';
 import { recordGpuRecovery } from '../boot/bootTrace';
 import { leaveSaved, markReload } from '../boot/lastEnd';
 import { gpuSummary } from '../render/drawCheck';
+import { replaceFresh } from '../boot/freshPage';
 
 const savedStorage = saveStorage('session');
 
@@ -123,7 +124,7 @@ export function installGpuRecovery(host: RecoveryHost): void {
     }
     phase = 'reloading';
     try { savedStorage.setItem(RELOAD_KEY, '1'); } catch { /* This document still records its reloading phase. */ }
-    leaveSaved(() => { markReload(`graphics recovery: ${why}`, 'gpu'); location.replace(to); });
+    leaveSaved(() => { markReload(`graphics recovery: ${why}`, 'gpu'); replaceFresh(to); });
   };
 
   const lose = (why: string, behind = hidden): void => {

@@ -1,5 +1,6 @@
 import { leaveSaved, markUnload } from '@wildshard/engine/boot/lastEnd';
 import { leftByPlayer } from '@wildshard/engine/boot/dropNotice';
+import { replaceFresh } from '@wildshard/engine/boot/freshPage';
 
 interface TitleNavigation {
   readonly url: string;
@@ -8,7 +9,7 @@ interface TitleNavigation {
 
 function browserNavigation(): TitleNavigation { return {
   url: location.href,
-  replace: url => { markUnload('exit to main menu (fresh page)'); location.replace(url); },
+  replace: url => { markUnload('exit to main menu (fresh page)'); replaceFresh(url); },
 }; }
 
 /** The document owns the world. Leave as soon as a held server's last save lands; the browser releases the rest.

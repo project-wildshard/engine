@@ -14,3 +14,7 @@ export const DOCUMENT_OPENER: 'same-origin';
 export function isDocumentRoute(pathname: string): boolean;
 /** DW12: the service worker's document headers: the opener policy, then the channel's isolation. */
 export function documentHeaders(text: string): Record<string, string>;
+/** DW12: the leave page's path, bytes and headers (no opener policy, never stored). */
+export const LEAVE_PATH: '/leave';
+export const LEAVE_PAGE: string;
+export const LEAVE_HEADERS: Readonly<Record<string, string>>;

@@ -49,6 +49,7 @@ import { currentSlug, exploreSlugOfPath, retiredSlugs, slugOfPath, slugPathOf } 
 
 
 import { installForceUpdate } from '@wildshard/engine/boot/forceUpdate';
+import { replaceFresh } from '@wildshard/engine/boot/freshPage';
 
 declare const __BUILD_ID__: string;
 const earlyTiming = bootTiming();
@@ -545,7 +546,7 @@ async function installInPageEntry(): Promise<void> {
       // a teardown that fails leaves this page unfit for a second session: the fresh page takes the same handoff and arrival
       console.warn('[grid] same-page entry could not retire the last world; entering on a fresh page', error);
       markUnload('zone entry (fresh page after a failed same-page retire)');
-      location.replace(url ?? location.href);
+      replaceFresh(url ?? location.href);
       return;
     }
     await start();

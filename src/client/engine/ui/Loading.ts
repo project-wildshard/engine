@@ -33,6 +33,7 @@ import { copyText, setDiagnosticsSource } from './diagnosticsCopy';
 import { holdLoadingPassSplit } from '../render/passSplit';
 import { graphicsMode } from '../core/graphicsMode';
 import './loading.css';
+import { replaceFresh } from '../boot/freshPage';
 
 const savedStorage = saveStorage('session');
 /** QA 30: the fresh title page Exit leaves for: this origin's `/`, keeping an explicit service-worker opt-out (`?sw=0`) */
@@ -353,7 +354,7 @@ export class Loading {
     };
     const exit = button('exit', engineString('s_loading_exit'), () => {
       exit.disabled = true;
-      leaveSaved(() => { if (!this.scoped) noteWorldStep(); leftByPlayer(); markUnload('exit to title from the loading card'); location.replace(exitTitleUrl(location.href)); });
+      leaveSaved(() => { if (!this.scoped) noteWorldStep(); leftByPlayer(); markUnload('exit to title from the loading card'); replaceFresh(exitTitleUrl(location.href)); });
     });
     return row;
   }

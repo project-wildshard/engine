@@ -14,6 +14,7 @@ import { exitTitleUrl } from './Loading';
 import { mountUi } from './ownership';
 import { engineString } from '../../../shared/engine/strings';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
+import { replaceFresh } from '../boot/freshPage';
 
 /** What the connection check found. */
 export type ConnectionCheck =
@@ -84,7 +85,7 @@ export function showSlowLoad(owner: Scope, step: string, stuckMs: number, card: 
     row.append(b); return b;
   };
   button('retry', engineString('s_loading_retry'), () => { leaveSaved(() => { leftByPlayer(); markReload(`slow loading retry at ${step}`); location.reload(); }); });
-  button('exit', engineString('s_loading_exit'), () => { leaveSaved(() => { leftByPlayer(); markUnload(`exit to title from the slow loading card at ${step}`); location.replace(exitTitleUrl(location.href)); }); });
+  button('exit', engineString('s_loading_exit'), () => { leaveSaved(() => { leftByPlayer(); markUnload(`exit to title from the slow loading card at ${step}`); replaceFresh(exitTitleUrl(location.href)); }); });
   box.append(head, what, link, sent, row);
   mountUi(box, scope, card ?? document.body, card?.querySelector('.ws-load-menu') ?? null);
   scope.onDispose(() => { box.remove(); });

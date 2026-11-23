@@ -62,3 +62,20 @@ export function documentIsolation(text) {
   }
   return out;
 }
+
+/**
+ * Meta IPHONE13-DRIFTWOOD DW12 (mini-dw12e): the leave page. A navigation the game chooses (a shard switch, a reload, the
+ * title) goes `location.replace('/leave?to=<path>')` first: a page with no opener policy, so WebKit moves the next game
+ * document into a new WebContent instead of booting it in the process that held the last world (on the iPhone 13 that
+ * second boot is jetsammed at the 1536 MB limit). It sends itself on with `location.replace`, so history keeps one entry; a
+ * `to` that is not this origin's, or is the leave page, goes to `/`. pages/worker.ts and the service worker serve the same
+ * bytes (a test pins them); src/client/engine/boot/freshPage.ts builds the address.
+ */
+export const LEAVE_PATH = '/leave';
+export const LEAVE_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark">'
+  + '<meta name="robots" content="noindex"><style>html,body{background:#050810}</style><script>(()=>{let to="/";'
+  + 'try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);'
+  + 'if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}location.replace(to)})()'
+  + '</script></head><body></body></html>';
+/** The leave page's headers: no opener policy, and never stored. */
+export const LEAVE_HEADERS = Object.freeze({ 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });

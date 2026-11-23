@@ -10,7 +10,7 @@ import { request, type IncomingHttpHeaders } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths for the owned fixture build.
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { DOCUMENT_OPENER, documentHeaders, isDocumentRoute, withIsolationRule } from '../scripts/app-build/isolation.mjs';
+import { DOCUMENT_OPENER, documentHeaders, isDocumentRoute, LEAVE_PAGE, withIsolationRule } from '../scripts/app-build/isolation.mjs';
 import { previewServer } from './fixtures/preview-server';
 
 const HEADERS = '/*\n  Cache-Control: public, max-age=0, must-revalidate\n';
@@ -62,9 +62,18 @@ test('the preview server (dev world, serve-local) sends COOP on the game documen
     // the warm return's stop between boots: the SPA fallback answers it with the page's bytes, but not its policy
     const robots = await head(new URL('/robots.txt', server.base), html);
     expect([robots.status, robots.headers['cross-origin-opener-policy']]).toEqual([200, undefined]);
+    // the leave page between two game documents: its own bytes, no COOP, never stored
+    const leave = await head(new URL('/leave?to=%2Fslug%2Fdriftwood-isle', server.base), html);
+    expect([leave.status, leave.headers['cross-origin-opener-policy'], leave.headers['cache-control']]).toEqual([200, undefined, 'no-store']);
     const json = await head(new URL('/version.json', server.base), '*/*');
     expect([json.status, json.headers['cross-origin-opener-policy']]).toEqual([200, undefined]);
   } finally {
     await server.close(); rmSync(root, { recursive: true, force: true, maxRetries: 5 });
   }
 }, 20_000);
+
+test('the page Worker and the service worker hold the leave page\'s bytes', () => {
+  const held = (file: string): string | undefined => /const LEAVE_PAGE = '(?<page>[^']+)'/u.exec(readFileSync(file, 'utf8'))?.groups?.['page'];
+  expect(held('pages/worker.ts')).toBe(LEAVE_PAGE);
+  expect(held('src/client/engine/pwa/sw.js')).toBe(LEAVE_PAGE);
+});

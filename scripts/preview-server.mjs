@@ -17,7 +17,7 @@ import { createEncodedFileCache } from './preview-encoded-cache.mjs';
 import { readFile as readFileAsync } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { createPreviewTelemetrySink } from './preview-telemetry.mjs';
-import { DOCUMENT_OPENER, isDocumentRoute } from './app-build/isolation.mjs';
+import { DOCUMENT_OPENER, isDocumentRoute, LEAVE_HEADERS, LEAVE_PAGE, LEAVE_PATH } from './app-build/isolation.mjs';
 
 const args = process.argv.slice(2);
 /** a `--name value` or `--name=value` argument's value */
@@ -180,6 +180,12 @@ const server = createServer((req, res) => {
     return;
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.statusCode = 405; res.end(); return; }
+  // DW12: the leave page between two game documents (no COOP, so the next one gets a new WebContent)
+  if (pathname === LEAVE_PATH) {
+    for (const [name, value] of Object.entries(LEAVE_HEADERS)) res.setHeader(name, value);
+    res.removeHeader('Cross-Origin-Opener-Policy'); res.removeHeader('Cross-Origin-Embedder-Policy');
+    res.end(req.method === 'HEAD' ? undefined : LEAVE_PAGE); return;
+  }
 
   const acceptEncoding = req.headers['accept-encoding'] ?? '';
   // DL15: a spawn part is its q11 Brotli body (see below); a missing one is a 404, never the page's fallback.

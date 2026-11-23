@@ -9,6 +9,7 @@ import { request, type IncomingHttpHeaders } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare the production quality-3 wire and decode the complete response.
 import { brotliCompressSync, brotliDecompressSync, constants, gunzipSync } from 'node:zlib';
 import { afterAll, beforeAll, expect, test } from 'vitest';
+import { LEAVE_PAGE } from '../scripts/app-build/isolation.mjs';
 import { previewServer } from './fixtures/preview-server';
 
 function wire(url: URL, headers: Record<string, string> = {}, method = 'GET'): Promise<{ status: number; headers: IncomingHttpHeaders; bytes: Buffer }> {
@@ -172,6 +173,10 @@ test('the page: no-store and COOP, ?doctor 307 as the old host answered, a missi
   for (const path of ['/b/04e1/main-Ab_3.js', '/version.json', '/robots.txt']) {
     expect((await wire(new URL(path, served()))).headers['cross-origin-opener-policy'], path).toBeUndefined();
   }
+  // DW12: the leave page between two game documents says no COOP, so WebKit starts the next game document in a new WebContent
+  const leave = await wire(new URL('/leave?to=%2Fslug%2Fdriftwood-isle', served()));
+  expect([leave.status, leave.headers['cache-control'], leave.headers['content-type'], leave.headers['cross-origin-opener-policy'], leave.bytes.toString()])
+    .toEqual([200, 'no-store', 'text/html; charset=utf-8', undefined, LEAVE_PAGE]);
   const doctor = await wire(new URL('/?doctor', served()));
   expect([doctor.status, doctor.headers.location]).toEqual([307, '/doctor/?doctor&sw=0']);
   const missing = await wire(new URL('/b/gone/main-x.js', served()));

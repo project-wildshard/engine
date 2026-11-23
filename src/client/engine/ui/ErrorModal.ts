@@ -42,6 +42,7 @@ import { bootDiagnostic, bootDiagnosticJson } from '../boot/bootTrace';
 // RELOAD HERE stops returning to the spot: one shared budget
 import { RELOADS_MAX, countReload, recentReloads } from '../core/reloadGuard';
 import FALLBACK_STYLE from './error-modal-fallback.css?inline';
+import { replaceFresh } from '../boot/freshPage';
 
 
 const scope = uiScope('ErrorModal', app.engineScope);
@@ -99,10 +100,10 @@ function reloadHere(atSpot: boolean): void {
     url.searchParams.set('at', [pose.x, pose.y - terrainDatum(), pose.z, pose.yaw, pose.pitch].map((v) => (Math.round(v * 100) / 100).toString()).join(','));
     url.searchParams.set(RELOAD_PARAM, '1'); // index.html's RESUMING screen from the first paint; main.ts skips the title and pauses
   }
-  leaveSaved(() => { leaveAfterPaint(() => { leftByPlayer(); markReload(`error modal: ${atSpot ? 'reload here' : 'reload at spawn'} (${firstText.slice(0, 80)})`); location.replace(url.toString()); }); });
+  leaveSaved(() => { leaveAfterPaint(() => { leftByPlayer(); markReload(`error modal: ${atSpot ? 'reload here' : 'reload at spawn'} (${firstText.slice(0, 80)})`); replaceFresh(url); }); });
 }
 function toTitle(): void {
-  leaveSaved(() => { leftByPlayer(); markUnload(`error modal: title screen (${firstText.slice(0, 80)})`); location.replace(new URL('/', location.origin).toString()); });
+  leaveSaved(() => { leftByPlayer(); markUnload(`error modal: title screen (${firstText.slice(0, 80)})`); replaceFresh('/'); });
 }
 
 function build(): HTMLElement {

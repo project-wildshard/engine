@@ -5,6 +5,7 @@ import { URLPattern, type URLPatternInit } from 'node:url';
 import { expect, test, vi } from 'vitest';
 // Execute the actual bundled worker, including its explicit clock import.
 import { rolldown } from 'rolldown';
+import { LEAVE_PAGE } from '../scripts/app-build/isolation.mjs';
 import { ASSET_CACHE_NAME } from '../src/client/engine/pwa/cacheNames';
 
 const workerBuild = await rolldown({input:'src/client/engine/pwa/sw.js',platform:'browser',transform:{target:'es2022'}});
@@ -953,6 +954,9 @@ test('DW12: a channel that is not isolated still answers its document with COOP,
   const slug = await held.dispatch('fetch', { request: nav('/slug/driftwood-isle') }), robots = await held.dispatch('fetch', { request: nav('/robots.txt') });
   expect([await slug?.text(), slug?.headers.get('cross-origin-opener-policy')]).toEqual([document, 'same-origin']);
   expect([await robots?.text(), robots?.headers.get('cross-origin-opener-policy')]).toEqual([document, null]);
+  // the leave page between two game documents is its own bytes with no COOP, from the worker, so it answers offline too
+  const leave = await held.dispatch('fetch', { request: nav('/leave?to=%2Fslug%2Fdriftwood-isle') });
+  expect([await leave?.text(), leave?.headers.get('cross-origin-opener-policy') ?? null, leave?.headers.get('cache-control')]).toEqual([LEAVE_PAGE, null, 'no-store']);
 });
 
 // OFFLINE OF12 (J298: "The preview build should have a different cache"): every cache name carries the channel, so preview and

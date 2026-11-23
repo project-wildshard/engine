@@ -9,6 +9,7 @@ import type { SpawnPose } from '../shard/manifest';
 import type { Inventory, ItemId } from '../Inventory';
 import { isItemId, ITEMS } from '../../../shared/game/bag/itemCatalog';
 import type { ItemRow } from '../../../shared/game/bag/items';
+import { replaceFresh } from '@wildshard/engine/boot/freshPage';
 
 /** `shown` (LS6): what the receiving card names and paints when the page loads one place and plays another (the grid). */
 /** `inPage` (ZONE-ENTRY ZE10a3): enter in this page, without a navigation, when the app installed a same-page entry
@@ -98,7 +99,7 @@ function navigateNow(request: TravelRequest): void {
   // The destination document owns any update adoption. A running world
   // neither changes controller nor waits for a worker before leaving (G898).
   // Replacing releases WebKit's previous page rather than parking its heap in the back/forward cache.
-  leaveSaved(() => { markUnload(`shard switch to ${request.to} (fresh page)`); location.replace(url.toString()); });
+  leaveSaved(() => { markUnload(`shard switch to ${request.to} (fresh page)`); replaceFresh(url); });
 }
 function arriveAt(request: TravelRequest): void {
   setTitleArrival({ slug: request.to, mode: request.mode, name: request.shown?.name ?? findTitleManifest(request.to)?.name ?? request.to, tier: arrivalTier.current,

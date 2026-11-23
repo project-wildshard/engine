@@ -97,6 +97,7 @@
     "src/client/engine/boot/imageDecode.worker.ts": "client",
     "src/client/engine/boot/ktx2.generated.ts": "client",
     "src/client/engine/boot/firstPlayMark.ts": "client",
+    "src/client/engine/boot/freshPage.ts": "client",
     "src/client/engine/boot/lastEnd.ts": "client",
     "src/client/engine/boot/leaveAfterPaint.ts": "client",
     "src/client/engine/boot/liveJsonParser.ts": "client",

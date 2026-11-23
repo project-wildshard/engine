@@ -34,6 +34,7 @@ import { fetchCodeRetention } from './codeRetention';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { installBrowserScopeEnvironment } from '@wildshard/engine/app/view/scopeEnvironment';
 import { devControls, type DevControls } from './devControl';
+import { replaceFresh } from '@wildshard/engine/boot/freshPage';
 
 // online.js is a bundle of its own with its own copy of the scope environment, and the page loads it without `identity.js`
 // (clientWorker `onlineModule`, oneWayIn `onlineGate`), so its presenters' `scope.raf` (FailureTelemetry measuring a link
@@ -496,7 +497,7 @@ export interface StartedOnline extends OnlineShell {
  *  reads again by release.ts's policy until a verified file answers; Title screen stops the load. */
 function readRelease(at: string, key: string, keep: ReleaseKeep, leaving: OnlineLeaving): ReturnType<typeof releaseToDial> {
   const waiting = new Scope('online.release-wait');
-  const toTitle = (): void => { leaving.unload('release page: title screen'); location.replace(new URL('/', location.origin).toString()); };
+  const toTitle = (): void => { leaving.unload('release page: title screen'); replaceFresh('/'); };
   // SB44: a page that can read waits FRESH_WAIT_MS for the fresh file behind a kept copy, so another build reloads it before play
   const freshWait = typeof navigator === 'undefined' || navigator.onLine ? { freshWaitMs: FRESH_WAIT_MS, timer: (ms: number) => new Promise<void>(resolve => { waiting.timeout(ms, resolve); }) } : {};
   return releaseToDial(at, key, { keep, wait: releaseScreens(waiting, { doctor, title: toTitle }), ...freshWait }).finally(() => { waiting.dispose(); });
@@ -512,7 +513,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
   // NB2: a one-shard page asks for its own shard on every dial, so a fresh title pick moves a seat held in another cell (GO7)
   // and the page and the seat agree; a door that doesn't host the shard seats it as before, and the page follows (duneRay).
   let loadedNow = link.loaded, gridNow = grid, goto = grid === undefined ? link.loaded : grid.goto === true ? grid.cell : undefined, spawn = grid?.goto === true && grid.spawn === true;
-  const toTitle = (from = 'release page'): void => { leaving.unload(`${from}: title screen`); location.replace(new URL('/', location.origin).toString()); };
+  const toTitle = (from = 'release page'): void => { leaving.unload(`${from}: title screen`); replaceFresh('/'); };
   const dial = await takeRelease(at, () => readRelease(at, key, keep ?? NO_KEEP, leaving));
   const { file: release, fresh } = dial, { socket } = release;
   // QA row 16: a level page enters only from a tap. A reload this page makes itself carries the tap that brought it here.
@@ -590,7 +591,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     placed: (cell, stand) => { if (stand !== undefined) gridNow?.placed(cell, stand); },
     regrid: cell => { regrid(cell); },
     regridInPage: cell => gridNow?.reenterInPage?.(cell, () => { regrid(cell); }) === true,
-    elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); leaving.unload(`online seat elsewhere (${seat})`); location.replace(url); },
+    elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); leaving.unload(`online seat elsewhere (${seat})`); replaceFresh(url); },
   });
   shellNow = shell;
   // the fresh read behind a kept copy: another build reloads into it, as a fresh read before the dial would (two reloads share one

@@ -507,6 +507,10 @@ async function pageCopy(href, key) {
  *  without COOP, so a warm return's stop between boots (/robots.txt) stays COOP-less and WebKit swaps processes back to the game. */
 const DOCUMENT_ROUTE = /^\/(?:index\.html)?$|^\/slug\/[\w-]+\/?$/u;
 const OPENER = 'cross-origin-opener-policy';
+/** DW12: the leave page between two game documents (scripts/app-build/isolation.mjs LEAVE_PAGE, the same bytes): no
+ *  opener policy, so the next game document starts in a new WebContent. Held here, so it answers offline too. */
+const LEAVE_PATH = '/leave';
+const LEAVE_PAGE = '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="color-scheme" content="dark"><meta name="robots" content="noindex"><style>html,body{background:#050810}</style><script>(()=>{let to="/";try{const u=new URL(new URLSearchParams(location.search).get("to")||"/",location.origin);if(u.origin===location.origin&&u.pathname!=="/leave")to=u.pathname+u.search+u.hash}catch{}location.replace(to)})()</script></head><body></body></html>';
 /** The document baked into this worker: its build's own page, whatever URL asked (the page reads its route from the URL).
  *  @param {string} pathname */
 const bakedDocument = pathname => {
@@ -555,6 +559,11 @@ workerScope.listen(self, 'fetch', event => {
   // A warm MMO tab still takes the host's Explore redirect.
   const explore = WORLD && request.mode === 'navigate' && /^\/slug\/[\w-]+\/?$/u.test(url.pathname) && url.searchParams.has('explore');
   if (doctor || explore) return;
+  // DW12: the leave page loads nothing and lives a moment, so it never pauses the precache
+  if (request.mode === 'navigate' && url.origin === self.location.origin && url.pathname === LEAVE_PATH) {
+    event.respondWith(new Response(LEAVE_PAGE, { headers: { 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' } }));
+    return;
+  }
   // A loading page (a navigation, or a client that has not reported control) gets the link: the precache waits.
   if (request.mode === 'navigate') pausePrecache(event.resultingClientId);
   else if (!controlled.has(event.clientId)) event.waitUntil(pauseForClient(event.clientId));

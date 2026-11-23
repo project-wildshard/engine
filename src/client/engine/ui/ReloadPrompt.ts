@@ -7,6 +7,7 @@ import { showReloading } from './reloadCover';
 import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { terrainDatum } from '../../../shared/engine/world/terrainHeight';
 import { setTitleArrival } from '../boot/titleArrival';
+import { replaceFresh } from '../boot/freshPage';
 
 interface Pose { x: number; y: number; z: number; yaw: number; pitch: number }
 let poseOf: () => Pose | null = () => null;
@@ -37,6 +38,6 @@ export function reloadWithPicks(why = 'reload prompt: reload now', control?: HTM
   const online = Reflect.get(globalThis, '__WS_WORLD__') !== undefined;
   leaveSaved(() => { leaveAfterPaint(() => {
     if (pose !== null && online && chunk !== null) setTitleArrival({ slug: chunk, mode: 'enter' }, { tab: true });
-    leftByPlayer(); markReload(why, pose === null ? 'reload' : 'settings'); location.replace(url.toString());
+    leftByPlayer(); markReload(why, pose === null ? 'reload' : 'settings'); replaceFresh(url);
   }); });
 }

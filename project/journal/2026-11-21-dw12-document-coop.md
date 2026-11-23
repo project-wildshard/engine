@@ -39,3 +39,11 @@ first. Freeing things on teardown (Rapier from bytes) did not help.
 and exit do; a replace is never kept in WebKit's back-forward cache) and the preview server's game document says `no-store`
 like pages/worker.ts (over HTTPS WebKit keeps no back-forward copy of a no-store main document), so serve-local benches the
 same eligibility as staging. The 11-22 runs over serve-local may have returned into a process still holding the cold page.
+
+2026-11-22 ~20:55 Cancún, job 1795398307971 (serve-local, no-store + COOP game page, replace leaves): `hop` warm returns 3 of 3
+got a new visible WebContent pid and held 40 s; `direct` was killed again (1,599,873 KB). So the fix is the hop, made the
+game's own: `/leave?to=<path>` is a COOP-less page (pages Worker, preview server and service worker serve the same bytes,
+`isolation.mjs` LEAVE_PAGE) that `location.replace`s on, and the game's own fresh-page navigations (shard switch, exit to
+title, error modal, reload prompt, GPU recovery, loading/slow-load exits, the online shell, a failed same-page retire) go
+through it (`boot/freshPage.ts` replaceFresh; a Vite dev build goes straight). The `location.reload()` sites (pause-menu
+Reload, load-failure retry) still reload in the same process: a follow-up.
