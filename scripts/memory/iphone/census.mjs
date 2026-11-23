@@ -76,25 +76,30 @@ let total = 0, count = 0;
 for (const name of names) {
   const own = window[name]; if (typeof own !== 'function') continue;
   kept[name] = own;
-  window[name] = new Proxy(own, { construct(target, args, newTarget) {
-    const made = Reflect.construct(target, args, newTarget === window[name] ? target : newTarget);
+  // the prototype's constructor is the proxy too: three's MathUtils (any switch on array.constructor) compares it with the
+  // global, and a new array.constructor(n) is then counted
+  const proxy = new Proxy(own, { construct(target, args, newTarget) {
+    const made = Reflect.construct(target, args, newTarget === proxy ? target : newTarget);
     const a0 = args[0];
     if (!(a0 instanceof kept.ArrayBuffer || (typeof SharedArrayBuffer === 'function' && a0 instanceof SharedArrayBuffer))) {
       const bytes = made.byteLength; total += bytes; count++;
       const k = byKind[name] ?? (byKind[name] = [0, 0]); k[0]++; k[1] += bytes;
-      if (bytes >= 65536 && sites.size < 400) {
-        const at = String(new Error().stack ?? '').split('\\n').slice(1, 5).map((l) => l.replace(/https?:\\/\\/[^/]+/, '').trim()).filter((l) => !l.includes('construct')).slice(0, 3).join(' < ');
-        const key = name + ' ' + at, o = sites.get(key) ?? [0, 0]; o[0]++; o[1] += bytes; sites.set(key, o);
+      // every allocation of 64 KB or more, and one small one in 64 (its count and bytes scaled back up), by call site
+      const big = bytes >= 65536;
+      if ((big || count % 64 === 0) && sites.size < 600) {
+        const at = String(new Error().stack ?? '').split('\\n').slice(1, 7).map((l) => l.replace(/https?:\\/\\/[^/]+/, '').trim()).filter((l) => !l.includes('construct') && !l.includes('[native code]')).slice(0, 3).join(' < ');
+        const key = (big ? '' : 'small ') + name + ' ' + at, o = sites.get(key) ?? [0, 0], n = big ? 1 : 64; o[0] += n; o[1] += bytes * n; sites.set(key, o);
       }
     }
     return made;
   } });
+  window[name] = proxy; own.prototype.constructor = proxy;
 }
-window.__wsLegAlloc = () => { for (const name of Object.keys(kept)) window[name] = kept[name];
+window.__wsLegAlloc = () => { for (const name of Object.keys(kept)) { window[name] = kept[name]; kept[name].prototype.constructor = kept[name]; }
   const seconds = (performance.now() - t0) / 1000;
   return { seconds: Math.round(seconds), mbPerSecond: Math.round(total / 1048576 / Math.max(seconds, 0.001) * 100) / 100, count, mb: Math.round(total / 1048576 * 10) / 10,
     byKind: Object.fromEntries(Object.entries(byKind).map(([n, [c, b]]) => [n, [c, Math.round(b / 1048576 * 10) / 10]])),
-    sites: [...sites].map(([k, [c, b]]) => [k, c, Math.round(b / 1048576 * 10) / 10]).sort((a, b) => b[2] - a[2]).slice(0, 15) }; };
+    sites: [...sites].map(([k, [c, b]]) => [k, c, Math.round(b / 1048576 * 10) / 10]).sort((a, b) => b[2] - a[2] || b[1] - a[1]).slice(0, 20) }; };
 return 'leg alloc';
 `;
 export const LEG_ALLOC_STOP = `
@@ -203,10 +208,14 @@ timed(c2, 'getImageData', '2d.getImageData');
 timed(c2, 'drawImage', '2d.drawImage(canvas)', (a) => a[0] instanceof HTMLCanvasElement);
 if (typeof g.captureFrame === 'function') { const cap = g.captureFrame; g.captureFrame = function (...args) { const t = performance.now();
   log.reads.push([Math.round(t), 'game.captureFrame ask', 0]); return cap.apply(this, args); }; }
+let timerSites = 0;
 const timer = (name) => { const own = window[name]; window[name] = function (fn, ...rest) {
   if (typeof fn !== 'function') return own.call(window, fn, ...rest);
   // DW3 (mini-dw3): a minified name (\`n\`) names nothing; a short name carries the body's start too
-  const label = name + ':' + (fn.name.length > 2 ? fn.name : (fn.name + ' ' + String(fn).slice(0, 90)).replace(/\\s+/g, ' '));
+  // and a scoped timer's callback (scope.ts TimerActivity) is the same for every owner: its scheduling site names it
+  let label = name + ':' + (fn.name.length > 2 ? fn.name : (fn.name + ' ' + String(fn).slice(0, 60)).replace(/\\s+/g, ' '));
+  if (fn.name.length <= 2 && timerSites < 4000) { timerSites++;
+    label += ' @ ' + String(new Error().stack ?? '').split('\\n').slice(2, 8).map((l) => l.replace(/https?:\\/\\/[^/]+/, '').trim()).filter((l) => l !== '' && !l.includes('[native code]')).slice(0, 4).join(' < '); }
   return own.call(window, function (...a) { const t = performance.now();
     try { return fn.apply(this, a); } finally { const ms = performance.now() - t; if (ms >= 8 && log.tasks.length < 2000) log.tasks.push([Math.round(t), label, Math.round(ms)]); } }, ...rest); }; };
 timer('setTimeout'); timer('setInterval');
