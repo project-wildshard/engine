@@ -291,6 +291,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   const STORED = { judged: 'stored' } as const;
   const { readTar } = await import('@wildshard/format/tar');
   const { restorePacks } = await import('./pin-packs.ts');
+  const { admitPin } = await import('./pin-admit.ts');
   if (source === 'format' && only.length !== 1) throw new Error('--from-format needs exactly one product: brasscap-mesa');
   const formatSlug = source === 'format' ? only[0] : undefined;
   const dependency = local ?? (formatSlug === undefined ? undefined : (await import('./pin-format.ts')).formatTemplate(formatSlug));
@@ -343,15 +344,19 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   let paths: string[];
   try {
     for await (const [pin, bytes] of inOrder(toAdmit, 6, dependency === undefined ? undefined : new Map([[dependency.pin.hash, dependency.bytes]]))) {
-      const started = performance.now(), files = readTar(bytes);
+      const started = performance.now();
+      let files: ReadonlyMap<string, Uint8Array> = readTar(bytes), applied: readonly string[] = [];
       const fileNamed = (path: string): Uint8Array => { const body = files.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); return body; };
       try {
-        const { warnings } = validateShardfileFolder(
-          { read: (path, maximum) => { const body = fileNamed(path); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => files.keys() },
+        // FE9b: a pin this validator refuses installs as the chain's validated copy, as the cook admits it (pin-admit.ts).
+        const admitted = admitPin(files, digest, rows => validateShardfileFolder(
+          { read: (path, maximum) => { const body = rows.get(path); if (body === undefined) throw new Error(`${pin.slug}: no ${path}`); if (body.length > maximum) throw new Error(`${path} is over its cap`); return body; }, paths: () => rows.keys() },
           { hash: digest, ...STORED },
-        );
+        ));
+        ({ files, applied } = admitted);
+        if (applied.length > 0) console.warn(`migrated ${pin.slug}: ${applied.join(', ')}`);
         // SS12: a grandfathered product (Pine's page.life, SERVER-PARITY SS11) is admitted with a warning; say it.
-        for (const warning of warnings) console.warn(`warning ${pin.slug}: ${warning}`);
+        for (const warning of admitted.warnings) console.warn(`warning ${pin.slug}: ${warning}`);
         // S11: every target of the KTX2 table is in the product, a tracked engine file or a pinned public asset.
         assertKtx2TableTargets({ paths: () => files.keys(), read: fileNamed }, url => shared.has(`public${url}`) || publicUrls.has(url));
       } catch (error) {
@@ -359,8 +364,9 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
         console.error(`refused ${pin.slug}: ${error instanceof Error ? error.message : String(error)}`);
         continue;
       }
-      const receipt = JSON.parse(decoder.decode(fileNamed('validation.json'))) as { readonly indexHash: string };
-      if (receipt.indexHash !== sha256(fileNamed('shard.json'))) throw new Error(`${pin.slug}: its receipt names another index`);
+      // A migrated copy carries no build receipt: the chain drops it with the old source hash.
+      const receipt = applied.length > 0 ? undefined : JSON.parse(decoder.decode(fileNamed('validation.json'))) as { readonly indexHash: string };
+      if (receipt !== undefined && receipt.indexHash !== sha256(fileNamed('shard.json'))) throw new Error(`${pin.slug}: its receipt names another index`);
       const folder = folderOf(files);
       if (folder === undefined) { failed++; console.error(`refused ${pin.slug}: no discovery document`); continue; }
       if (!folderName(folder)) { failed++; console.error(`refused ${pin.slug}: product folder ${folder}`); continue; }
