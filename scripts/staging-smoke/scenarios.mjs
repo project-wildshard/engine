@@ -18,7 +18,8 @@ import { saveFixture } from '../debug-settings.mjs';
 /** @typedef {'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6'} ScenarioId */
 /** @typedef {import('./worldFrame.mjs').WorldStats} WorldStats */
 /** @typedef {{ kind: string, at: number, [key: string]: unknown }} ProbeEvent */
-/** @typedef {{ name: string, at: number, samples: Sample[], problems: Problem[], path: string, tapAt: number, playAt: number | null, stick?: boolean, modals?: string[], blackWorld?: string, playedMs?: number }} Leg */
+/** @typedef {{ name: string, at: number, samples: Sample[], problems: Problem[], path: string, tapAt: number, playAt: number | null, stick?: boolean, modals?: string[], blackWorld?: string, playedMs?: number,
+ *   documents?: number, requests?: { t: number, document: number, url: string, status: number | string }[], ends?: { t: number, document: number, reason: string }[] }} Leg */
 /** @typedef {{ build?: string, caches: string[], databases: string[], clientVersion?: string }} StorageState */
 /**
  * What one scenario saw. `status: 'skip'` carries only `reason`.
@@ -121,7 +122,28 @@ export async function watchLeg(page, { name, tap, budgetMs = 90_000, holdMs = 20
     samples.push({ t: Date.now() - start, s });
     return s;
   };
+  // v0.1.75 K4 (Pine r12 baked, its rooms on r13): the leg said only "never reached play"; it now keeps every failed request (by
+  // document: 1 is the tap's, each reload the next) and why each document left (lastEnd's unloading line)
+  /** @type {{ t: number, document: number, url: string, status: number | string }[]} */
+  const failed = [];
+  /** @type {{ t: number, document: number, reason: string }[]} */
+  const ends = [];
+  let documents = 1;
+  const onDocument = () => { documents++; };
+  const onResponse = (/** @type {import('playwright').Response} */ r) => {
+    if (r.status() >= 400 && failed.length < 40) failed.push({ t: Date.now() - start, document: documents, url: r.url().replace(/[?#].*$/u, ''), status: r.status() });
+  };
+  const onFailed = (/** @type {import('playwright').Request} */ r) => {
+    const why = r.failure()?.errorText ?? 'failed';
+    if (!/cancel|abort/iu.test(why) && failed.length < 40) failed.push({ t: Date.now() - start, document: documents, url: r.url().replace(/[?#].*$/u, ''), status: why });
+  };
+  const onConsole = (/** @type {import('playwright').ConsoleMessage} */ m) => {
+    const text = m.text();
+    if (text.startsWith('[lastEnd] unloading:') && ends.length < 40) ends.push({ t: Date.now() - start, document: documents, reason: text.slice(21, 300) });
+  };
   await sample();
+  page.on('domcontentloaded', onDocument); page.on('response', onResponse); page.on('requestfailed', onFailed); page.on('console', onConsole);
+  try {
   await tap();
   /** @type {number | null} */
   let playAt = null, playSince = null;
@@ -151,7 +173,14 @@ export async function watchLeg(page, { name, tap, budgetMs = 90_000, holdMs = 20
   /** @type {string[]} */
   const path = [];
   for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t)}:${l}`); }
-  return { name, at: start, samples, problems: judge(judged, { budgetMs }), path: path.join(' '), tapAt: start, playAt, modals };
+  const problems = judge(judged, { budgetMs });
+  if (playAt === null) {
+    const first = failed[0], end = ends.at(-1);
+    if (first !== undefined) problems.push({ at: first.t, text: `first failed request: ${String(first.status)} ${first.url} (document ${String(first.document)} of ${String(documents)})` });
+    if (end !== undefined) problems.push({ at: end.t, text: `document ${String(end.document)} left: ${end.reason}` });
+  }
+  return { name, at: start, samples, problems, path: path.join(' '), tapAt: start, playAt, modals, documents, requests: failed, ends };
+  } finally { page.off('domcontentloaded', onDocument); page.off('response', onResponse); page.off('requestfailed', onFailed); page.off('console', onConsole); }
 }
 
 /** The samples from the first one that is not the title on, keeping the first sample's document as the tap's.

@@ -80,7 +80,7 @@ export function toMp4(webm: string, mp4: string): string;
 /** @typedef {'K1' | 'K2' | 'K3' | 'K4' | 'K5' | 'K6'} ScenarioId */
 /** @typedef {import('./worldFrame.mjs').WorldStats} WorldStats */
 /** @typedef {{ kind: string, at: number, [key: string]: unknown }} ProbeEvent */
-/** @typedef {{ name: string, at: number, samples: Sample[], problems: Problem[], path: string, tapAt: number, playAt: number | null, stick?: boolean, modals?: string[] }} Leg */
+/** @typedef {{ name: string, at: number, samples: Sample[], problems: Problem[], path: string, tapAt: number, playAt: number | null, stick?: boolean, modals?: string[], documents?: number, requests?: { t: number, document: number, url: string, status: number | string }[], ends?: { t: number, document: number, reason: string }[] }} Leg */
 /** @typedef {{ build?: string, caches: string[], databases: string[], clientVersion?: string }} StorageState */
 /**
  * What one scenario saw. `status: 'skip'` carries only `reason`.
@@ -168,6 +168,9 @@ export type Leg = {
     modals?: string[];
     blackWorld?: string;
     playedMs?: number;
+    documents?: number;
+    requests?: { t: number; document: number; url: string; status: number | string }[];
+    ends?: { t: number; document: number; reason: string }[];
 };
 export type StorageState = {
     build?: string;

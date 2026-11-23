@@ -20,3 +20,6 @@ against rooms/141, so the page reads that build's cook indexes. The loop had two
 
 After the fix: one reload, then Pine r13 reaches control (about 53 s, desktop tier, cold) and Dunes r7 in about 18 s.
 `watchLeg` (the staging smoke) now keeps each failed request with its document number, and why each document left.
+
+The smoke leg record (second commit): a K4 leg that never plays now names its first failed request (URL, status, document)
+and why the last document left, so a future hold names the step without a rerun.
