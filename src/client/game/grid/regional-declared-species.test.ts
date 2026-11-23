@@ -95,7 +95,8 @@ test('a native page with declared species and no species owner declares its own'
   expect(nativeDeclaresOwnSpecies(product(['world.forest-page'], spawn, {}, {page: false, species: 1}))).toBe(true);
   expect(nativeDeclaresOwnSpecies(product(['species.program'], spawn, {}, {page: false, species: 1}))).toBe(false);
   expect(nativeDeclaresOwnSpecies(product(['population.hull-book'], spawn, {}, {page: false, species: 1}))).toBe(false);
-  expect(nativeDeclaresOwnSpecies(product([], spawn, {}, {page: false, species: 1, programs: true}))).toBe(false);
+  // P1 (2026-11-22): an old programme section no feature reads (Driftwood r8's client product beside an r9 box) declares too
+  expect(nativeDeclaresOwnSpecies(product([], spawn, {}, {page: false, species: 1, programs: true}))).toBe(true);
   expect(nativeDeclaresOwnSpecies(product([], [], {}, {page: false, species: 1}))).toBe(false);
   expect(nativeDeclaresOwnSpecies(product([], spawn, null, {species: 1}))).toBe(false); // a data page: pageDeclaresOwnSpecies
 });

@@ -33,12 +33,14 @@ export function pageDeclaresOwnSpecies(product: Pick<ShardFolder, 'has' | 'secti
 /** The plan features that register a native page's species themselves: such a page never declares its own. */
 const SPECIES_OWNERS = new Set(['population.hull-book', 'species.program', 'population.product-creatures']);
 
-/** ONE-FORMAT OF23e4: a native runtime page whose species are only its declared rows (Pine r10): no `actors/species-programs`
- *  and no plan feature that registers species. Its page registers them itself (`declarePageCreatures`), standalone
- *  (client.ts `declaredNativePage`) and on the grid (regionalRuntime.ts's entered kit), or a row's kind is unknown. */
+/** ONE-FORMAT OF23e4: a native runtime page whose species are only its declared rows (Pine r10): no plan feature that
+ *  registers species. Its page registers them itself (`declarePageCreatures`), standalone (client.ts `declaredNativePage`)
+ *  and on the grid (regionalRuntime.ts's entered kit), or a row's kind is unknown. An old `actors/species-programs` section
+ *  no feature reads does not count (P1 2026-11-22: v0.1.72 baked Driftwood r8's client product, which still carries one,
+ *  beside the box's r9, and nobody declared the crabs, monkeys, sailors or the Captain: every enemy was invisible). */
 export function nativeDeclaresOwnSpecies(product: Pick<ShardFolder, 'has' | 'section' | 'shardfile'>): boolean {
   const source = product.shardfile;
-  if (source.runtime === null || hasDeclaredClientPage(source) || product.has('actors/species-programs')) return false;
+  if (source.runtime === null || hasDeclaredClientPage(source)) return false;
   if (source.rows.species.length === 0 || source.creatures.spawns.length === 0) return false;
   const features = product.has('client/plan') ? product.section('client/plan').features : [];
   return !features.some(row => SPECIES_OWNERS.has(row.kind));

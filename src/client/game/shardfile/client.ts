@@ -455,7 +455,7 @@ export class ShardfileClient {
   }
 
   async kit(ctx: ShardContext): Promise<void> {
-    const declaredNative = this.declaredNativePage(ctx);
+    const declaredNative = this.declaredNativePage();
     // OF19d2: a declared look drawn from a scene library's rig waits on that library's rigs
     if (this.mode === 'full' || declaredNative) this.rigLooks = await loadClientRigLooks(ctx.product, this.source.rows, ctx.scope);
     // ONE-FORMAT OF23e4: a native page with no species programme or hull book (Pine r10) draws its runtime's bodies from its
@@ -470,10 +470,11 @@ export class ShardfileClient {
     await this.phase(ctx, 'kit');
   }
 
-  /** OF23e4: a native runtime page whose species are only its declared rows: no `actors/species-programs`, and no plan
-   *  feature that registers species (`population.hull-book`, `species.program`, `population.product-creatures`). */
-  private declaredNativePage(ctx: ShardContext): boolean {
-    if (this.bindings.nativeRuntime !== true || this.mode === 'empty' || this.nativeFeatures || ctx.product.has('actors/species-programs')) return false;
+  /** OF23e4: a native runtime page whose species are only its declared rows: no plan feature that registers species
+   *  (`population.hull-book`, `species.program`, `population.product-creatures`); an unread programme section does not
+   *  count (P1 2026-11-22, `nativeDeclaresOwnSpecies`). */
+  private declaredNativePage(): boolean {
+    if (this.bindings.nativeRuntime !== true || this.mode === 'empty' || this.nativeFeatures) return false;
     if (this.source.rows.species.length === 0 || this.source.creatures.spawns.length === 0) return false;
     const owners = new Set(['population.hull-book', 'species.program', 'population.product-creatures']);
     return !(this.plan?.features ?? []).some(row => owners.has(row.kind));
