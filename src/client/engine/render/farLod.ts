@@ -35,8 +35,8 @@ import type { Renderer } from './renderer';
 
 export const FAR_LOD_SLOT = 'debug.farLod';
 export const FAR_LOD_DEFAULT = false;
-/** Unset at phone Low: off until a look board and an iPhone 13 pair decide (DF9, mini-df9). */
-export const FAR_LOD_PHONE_LOW = false;
+/** DF9: the blind look passed and the calibrated phone Low route fits the triangle and GPU gates. */
+export const FAR_LOD_PHONE_LOW = true;
 
 /** The slot's value: a boolean wins; unset, FAR_LOD_PHONE_LOW at phone Low, else FAR_LOD_DEFAULT. */
 export function farLod(saved: unknown, phoneLow = false): boolean {
