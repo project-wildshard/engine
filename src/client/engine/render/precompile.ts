@@ -1056,9 +1056,10 @@ const linkPollMs = (): number => (presenting() ? LIVE_LINK_POLL_MS : 0);
  * a batch done until the whole batch is: Nine Dragon's 61 entry programs held the card 3.6 s on 'Link 61 shader programs'
  * on the iPhone Simulator (11-23), then all landed at once. A chunk lands as one, so the card moves every chunk. The first
  * chunk is this size; later ones follow LINK_CHUNK_TARGET_MS: a fixed 8 took up to 1.0 s on Sky Reach (Simulator, load 10),
- * and a fixed 4 cost Pine's cold boot 2.6 s in waits.
+ * and a fixed 4 cost Pine's cold boot 2.6 s in waits. A first 8 still held Sky Reach's home region 1.2 s (no chunk before it
+ * to size from), so the first is 4 and the sizing grows it from there (at most 1.5x a chunk).
  */
-export const BOOT_LINK_CHUNK = 8;
+export const BOOT_LINK_CHUNK = 4;
 /** DL21b: the next chunk is sized so it lands in about this long (ms), from how long the last one took: 2 to 16 programs, and
  *  at most half again the last (programs differ: Pine's 8 landed fast, then 19 took 1.6 s on the Simulator). */
 export const LINK_CHUNK_TARGET_MS = 500;
