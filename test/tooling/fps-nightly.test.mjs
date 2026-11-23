@@ -75,3 +75,26 @@ test('the hosted job prints only a well-formed night from the mini, with the las
   expect(() => checkedReceipt({ ...night, build: '$(rm -rf /)' })).toThrow('not a DF7 night');
   expect(() => checkedReceipt({ ...night, rows: [{ name: 'phone-low', fps: '60' }] })).toThrow('not a DF7 night');
 });
+
+test('DF15: a profile left out of the gate still prints, marked report only, and cannot stop the night qualifying', () => {
+  const four = ['phone-low', 'phone-high', 'desktop-high', 'desktop-native'];
+  const lpmMissing = makeTable();
+  lpmMissing.runs = lpmMissing.runs.filter(run => run.name !== 'phone-lpm-low');
+  expect(reviewNight(lpmMissing, build).qualifies).toBe(false);
+  expect(reviewNight(lpmMissing, build, null, four)).toMatchObject({ qualifies: true, missing: [] });
+  const uncalibratedLpm = makeTable();
+  for (const run of uncalibratedLpm.runs) if (run.name === 'phone-lpm-low') run.profile.calibrated = false;
+  const night = reviewNight(uncalibratedLpm, build, null, four);
+  expect(night.qualifies).toBe(true);
+  expect(night.rows.find(row => row.name === 'phone-lpm-low')).toMatchObject({ gated: false, misses: ['incomplete or uncalibrated'] });
+  expect(summary(night, true)).toContain('incomplete or uncalibrated (report only)');
+  const slow = reviewNight(makeTable({ extraUpdateMs: 10 }), build, night, four);
+  expect(slow.qualifies).toBe(false);
+  expect(slow.rows.find(row => row.name === 'phone-low')?.misses).toContain('p95 +60.0%');
+});
+
+test('DF15: a night from before the gated set reads as every profile gated', () => {
+  const old = reviewNight(makeTable(), 'abcdef1234');
+  const stripped = { ...old, rows: old.rows.map(({ gated: _gated, ...row }) => row) };
+  expect(checkedReceipt(JSON.parse(JSON.stringify(stripped))).rows.every(row => row.gated)).toBe(true);
+});
