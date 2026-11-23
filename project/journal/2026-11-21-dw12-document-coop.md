@@ -29,3 +29,8 @@ first. Freeing things on teardown (Rapier from bytes) did not help.
   queued command (cold, then `hop` via robots.txt or `direct`, a 40 s
   hold, jetsam reports and RunningBoard's visible pid per round), for
   DW11's staging run.
+- 11-22 phone (serve-local, f12920ad5): `direct` warm returns (one COOP,
+  no swap) were killed 2 of 2 at the 1536 MB limit ~12 s after control,
+  with no JetsamEvent report, only the kernel's memorystatus lines; a
+  `hop` return showed a new visible pid and held 40 s. warm-return.mjs
+  now counts the kernel's kills.

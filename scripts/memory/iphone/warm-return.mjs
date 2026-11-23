@@ -38,6 +38,20 @@ export function visibleTimeline(lines) {
   return out;
 }
 
+/** The kernel's WebContent kills in the device log (a per-process limit kill writes no JetsamEvent report):
+ * [local clock, pid, resident KB or null, the kernel's words].
+ * @param {string[]} lines @returns {[string, number, number | null, string][]} */
+export function kernelKills(lines) {
+  /** @type {[string, number, number | null, string][]} */ const out = [];
+  for (const line of lines) {
+    const match = /^\w+ +\d+ (?<at>\d\d:\d\d:\d\d\.\d{3})\d* kernel.*memorystatus: (?<what>killing\w*(?: process| pid)+ (?<pid>\d+) \[com\.apple\.WebKit\.WebContent\][^-]*)/u.exec(line);
+    if (match?.groups?.['at'] === undefined || match.groups['pid'] === undefined) continue;
+    const kb = /(?<n>\d+)KB/u.exec(line)?.groups?.['n'];
+    out.push([match.groups['at'], Number(match.groups['pid']), kb === undefined ? null : Number(kb), (match.groups['what'] ?? '').trim()]);
+  }
+  return out;
+}
+
 /** The visible pid at a host time, from a timeline on the phone's local clock (the Mac's zone).
  * @param {[string, number][]} timeline @param {Date} when @returns {number | null} */
 export function visibleAt(timeline, when) {
@@ -223,13 +237,15 @@ async function main() {
       const killed = /** @type {{ killed?: { name: string, pid: number, bytes: number, reason: string }[] }[]} */ (round['jetsam'])
         .flatMap(r => r.killed ?? []).filter(k => /WebContent/u.test(k.name));
       round['webContentKilled'] = killed;
-      round['pass'] = round['warm']?.outcome === 'control' && round['warm']?.hold?.lost === null && killed.length === 0;
+      round['kernelKills'] = kernelKills(log.lines);
+      round['pass'] = round['warm']?.outcome === 'control' && round['warm']?.hold?.lost === null && killed.length === 0 && round['kernelKills'].length === 0;
       if (page !== undefined) { await page.navigate('about:blank').catch(() => undefined); await page.close().catch(() => undefined); }
       await inspector.stop();
       save();
       console.log(JSON.stringify({ round: index + 1, arm, cold: round['cold']?.outcome ?? null, warm: round['warm']?.outcome ?? null,
         warmMs: round['warm']?.clickToControlMs ?? null, held: round['warm']?.hold ?? null, visible: { cold: round['visible'].cold, warm: round['visible'].warm },
-        killed: killed.map(k => `${k.name}[${String(k.pid)}] ${String(Math.round(k.bytes / 1_048_576))} MB ${k.reason}`), pass: round['pass'], error: round['error'] ?? null }));
+        killed: [...killed.map(k => `${k.name}[${String(k.pid)}] ${String(Math.round(k.bytes / 1_048_576))} MB ${k.reason}`),
+          ...round['kernelKills'].map((/** @type {[string, number, number | null, string]} */ k) => `${k[0]} kernel: ${k[3]}${k[2] === null ? '' : ` ${String(k[2])} KB`}`)], pass: round['pass'], error: round['error'] ?? null }));
     }
   }
   report['finishedAt'] = new Date().toISOString(); save();
