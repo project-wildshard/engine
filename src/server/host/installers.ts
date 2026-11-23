@@ -25,7 +25,7 @@ export const SERVER_INSTALLERS: Readonly<Record<ServerInstallerKey, string>> = O
   melee: 'the runtime-plan held melee',
   movers: 'headlessRuntime.ts carried and moored movers, or the plan\'s own mover motion',
   places: 'headlessRuntime.ts room respawn places, standalone/cellWorld.ts discoveries',
-  portalRide: 'native assembly `portal.ride`, game/shardfile/declaredPortalRide.ts (a plain upload\'s `client/plan` rows, OF41b)',
+  portalRide: 'native assembly `portal.ride`, game/shardfile/declaredPortalRide.ts (a plain upload\'s plan rows, OF41b)',
   // one key for every `view.program` row: a page-only pose (Driftwood's bridge sway, Nine Dragon's movers) stays a KNOWN line until HS6
   poseViews: 'native assembly `encounter.patrol` slots and `boss.open-arena`',
   questComposition: 'native assembly `quest.composition`',
@@ -38,10 +38,10 @@ export const SERVER_INSTALLERS: Readonly<Record<ServerInstallerKey, string>> = O
 });
 
 /** One sided kind in a product: where it is declared, its kind, and the key of the server half it needs. */
-export interface ServerSide { readonly where: 'client/plan' | 'world.assembly'; readonly kind: string; readonly key: string }
+export interface ServerSide { readonly where: 'plan' | 'world.assembly'; readonly kind: string; readonly key: string }
 const serverKey = (entry: SideEntry | undefined): string | null => entry === undefined || entry.side === 'view' ? null : entry.server;
 
-/** Every `both` or `server` kind a product's `client/plan` declares, once each. A product with no plan has none. */
+/** Every `both` or `server` kind a product's plan declares (`server/plan`, HS6c), once each. A product with no plan has none. */
 export function serverSides(product: Pick<ShardFolder, 'has' | 'section'>): readonly ServerSide[] {
   if (!hasServerPlan(product)) return [];
   const out = new Map<string, ServerSide>(), add = (where: ServerSide['where'], kind: string, entry: SideEntry | undefined): void => {
@@ -51,7 +51,7 @@ export function serverSides(product: Pick<ShardFolder, 'has' | 'section'>): read
     if (key !== null) out.set(`${where} ${kind}`, { where, kind, key });
   };
   for (const feature of serverPlanFeatures(product)) {
-    add('client/plan', feature.kind, CLIENT_FEATURE_SIDES[feature.kind]);
+    add('plan', feature.kind, CLIENT_FEATURE_SIDES[feature.kind]);
     if (feature.kind === 'world.assembly') for (const stage of feature.rows.stages) add('world.assembly', stage.kind, WORLD_ASSEMBLY_STAGE_SIDES[stage.kind]);
   }
   return [...out.values()];

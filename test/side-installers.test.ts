@@ -22,8 +22,8 @@ import { builtFolder, runtimeAssets } from './fixtures/engine-lift/folder';
 // Nine Dragon's places (shard-format v0.4.9 sides `world.sets` and `world.bind-sets` as `view`: they only list placed models).
 const KNOWN: Readonly<Record<string, { readonly row: string; readonly lines: readonly string[] }>> = {
   'driftwood-isle': { row: 'HS6: `bridge-sway` is a page-only pose view, and SS2 sides every view.program `both` for the slots and open arena',
-    lines: ['client/plan view.program (poseViews)'] },
-  'nine-dragon-stack': { row: 'HS6: `movers` is a page-only pose view', lines: ['client/plan view.program (poseViews)'] },
+    lines: ['plan view.program (poseViews)'] },
+  'nine-dragon-stack': { row: 'HS6: `movers` is a page-only pose view', lines: ['plan view.program (poseViews)'] },
 };
 
 /** The pins whose products declare a `both` or `server` kind today: one that loses them in a re-cook fails, not skips. */
