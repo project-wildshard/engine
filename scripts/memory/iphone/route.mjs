@@ -429,7 +429,8 @@ export async function playRoute(driver, { slug, cap, rec = [], legs: count, log 
       const done = arguments[arguments.length - 1];
       (${routeLegOnPage.toString()})(arguments[0]).then(done, (error) => done({ error: String(error) }));
     `, [{ ...leg, cap }], (leg.seconds + 45) * 1000);
-    const probed = probe === undefined ? undefined : await driver.evaluateAsync(`const done = arguments[arguments.length - 1]; done((() => { ${probe.stop} })());`, [], 15_000)
+    // a stop body may return a promise (route-bench --leg-shots waits for the next drawn frame)
+    const probed = probe === undefined ? undefined : await driver.evaluateAsync(`const done = arguments[arguments.length - 1]; Promise.resolve((() => { ${probe.stop} })()).then(done, (error) => done({ error: String(error) }));`, [], 15_000)
       .catch((/** @type {unknown} */ error) => ({ error: String(error) }));
     const summary = result?.samples?.length ? legSummary(result.samples) : null;
     const recText = recording ? await driver.evaluateAsync(recRead, [], 45_000).catch((/** @type {unknown} */ error) => `REC unread: ${String(error)}`) : null;
