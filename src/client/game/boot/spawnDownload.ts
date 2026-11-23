@@ -6,7 +6,7 @@ import { beginLoadingWait, finishLoadingWait } from '@wildshard/engine/boot/load
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { Scope } from '@wildshard/engine/app/scope';
 import { clearFailure, showFailure } from '@wildshard/engine/telemetry/runtime';
-import {contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
+import {bootBankText, contentBase, contentURL, isContentOrigin, pageURL} from '@wildshard/engine/boot/contentBase';
 import { clearDownloadGiveUp, noteDownloadGiveUp } from '@wildshard/engine/boot/downloadGiveUp';
 import { readByDefault, scratchReader } from '@wildshard/engine/boot/scratchReader';
 import { lentResponse, loadGc } from '@wildshard/engine/boot/lentBody';
@@ -924,7 +924,7 @@ let bakedHome: {readonly text: string; readonly folders: ReadonlyMap<string, str
 function bakedLoose(pathname: string, search = ''): string | undefined {
   const owner = looseSlug(pathname);
   if (owner === undefined || typeof document === 'undefined') return undefined;
-  const text = document.getElementById('boot-module-files')?.textContent ?? '';
+  const text = bootBankText() ?? '';
   if (bakedHome?.text !== text) {
     const folders = new Map<string, string>();
     const home = text === '' ? undefined : get(get(JSON.parse(text) as unknown, 'spawnManifests'), 'home'), loose = get(home, 'loose');

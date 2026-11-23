@@ -108,3 +108,15 @@
 - Fix: `canvasWorkerRetires()` in `workerIdle.ts`; the impostor worker retires on the phone tier only (its jetsam
   reason) and lives with the page elsewhere. Look-neutral (no pixel path changes).
 - Whole native route after: 0 frames over 50 ms (max 30.6, was 61), 204 fps, p50 4.7, p95 6.6.
+
+## The dock frame at 3 s: the fetch layers re-read the boot bank (2026-11-23 09:40 Cancún)
+
+- desktop High at 2×, route profile plus a trace over 2 to 5 s: the 59–63 ms frame at 3.1 s is a rAF whose JS runs
+  35 ms (neighbours 8) as the grid's downloads start. A quarter of it is the fetch layers: `contentBase()` read
+  `#boot-module-files`' `textContent` (160 kB on Driftwood, a fresh copy each time) and compared it whole, several times
+  a request (`contentURL`, `pageURL`, `isContentOrigin`), and the spawn download's `bakedLoose` once more.
+- Fix: `bootBankText()` in `contentBase.ts` reads the bank once per element and text node; replacing either re-reads it
+  (every test that changes the bank does one or the other). `contentBase()` and `bakedLoose()` use it.
+- After: the 2× route profile has no frame over 50 ms (max 49.7, was 59–63), and the fetch layer is out of the top
+  self-time list. What leads at 2× now is the scene walk: `updateMatrixWorld` 5.5% of samples, the render list and
+  draw hooks, `aoTransparency` 1.9%, `roadCull` 1%.

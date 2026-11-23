@@ -12,6 +12,20 @@
  * content URL is looked up by `pageURL()` of it. This leaf imports nothing; the spawn download and the engine both use it.
  */
 let parsed: { readonly text: string; readonly base: string } | undefined;
+let bankRead: { readonly element: Element; readonly first: ChildNode | null; readonly text: string } | undefined;
+
+/**
+ * The boot bank's text (`#boot-module-files`), or undefined with no bank. Read once per element and text node: `textContent`
+ * copies the whole bank (160 kB on Driftwood) and the fetch layers ask for it several times a request, which was 5 ms of a
+ * 63 ms frame as the grid's downloads started (DRIFTWOOD-FPS DF14). Replacing the element or its text re-reads it.
+ */
+export function bootBankText(): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const element = document.getElementById('boot-module-files');
+  if (element === null) { bankRead = undefined; return undefined; }
+  if (bankRead?.element !== element || bankRead.first !== element.firstChild) bankRead = { element, first: element.firstChild, text: element.textContent ?? '' };
+  return bankRead.text;
+}
 
 const pageBase = (): string => typeof document === 'undefined' ? location.href : document.baseURI || location.href;
 
@@ -33,7 +47,7 @@ export function readContentBase(value: unknown): string {
 /** The content base (`https://packs.wildshard.io/content/<set>/`), or '' when content is on the page's own origin. */
 export function contentBase(): string {
   if (typeof document === 'undefined') return '';
-  const text = document.getElementById('boot-module-files')?.textContent ?? '';
+  const text = bootBankText() ?? '';
   if (parsed?.text === text) return parsed.base;
   let base = '';
   if (text !== '') {

@@ -2,7 +2,7 @@
 // PAGE-SIZE PZ3 (J276): one boot-bank field, `contentBase`, moves every content read to the content origin; empty
 // changes nothing. Each reader is pinned against a cross-origin base, and against no base.
 import {afterEach, expect, test, vi} from 'vitest';
-import {contentBase, contentURL, isContentOrigin, pageURL, readContentBase} from '../src/client/engine/boot/contentBase';
+import {bootBankText, contentBase, contentURL, isContentOrigin, pageURL, readContentBase} from '../src/client/engine/boot/contentBase';
 import {versionedUrl} from '../src/client/engine/boot/bytes';
 import {downloadSpawnManifest, releaseSpawnMembers, setSpawnPacks, shardPackBase, spawnHeldBytes, startSpawnDownload} from '../src/client/game/boot/spawnDownload';
 import {prefetchEntryReads} from '../src/client/game/grid/entryReadPrefetch';
@@ -30,6 +30,24 @@ const DOCUMENT = `<head><link rel="apple-touch-startup-image" href="/assets/titl
 </script><style>.ws-launch-hero { background: url('/assets/title/hero-1.jpg') center; }</style>
 <script type="application/json" id="boot-module-files">{"common":[]}</script></head>`;
 afterEach(() => { document.getElementById('boot-module-files')?.remove(); releaseSpawnMembers(); setSpawnPacks(false); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+test('the bank text is read once per element and text, and again when either is replaced (DF14)', () => {
+  expect(bootBankText()).toBeUndefined();
+  bank({contentBase: CDN});
+  const element = document.getElementById('boot-module-files');
+  if (element === null) throw new Error('no bank');
+  const read = vi.spyOn(element, 'textContent', 'get');
+  expect(bootBankText()).toBe(JSON.stringify({contentBase: CDN}));
+  expect(contentBase()).toBe(CDN); expect(contentBase()).toBe(CDN); bootBankText();
+  expect(read).toHaveBeenCalledTimes(1);
+  read.mockRestore();
+  element.textContent = JSON.stringify({});
+  expect(contentBase()).toBe('');
+  bank({contentBase: CDN});
+  expect(contentBase()).toBe(CDN);
+  document.getElementById('boot-module-files')?.remove();
+  expect(bootBankText()).toBeUndefined();
+});
 
 test('the bank names an origin or nothing', () => {
   expect(readContentBase(undefined)).toBe('');
