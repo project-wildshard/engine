@@ -92,6 +92,30 @@ function night(canonical, pass) {
     { cwd: checkout, stdio: 'inherit' }).status ?? 1;
 }
 
+/** A night whose process died past its SIGTERM handler (a SIGKILL; launchd tearing the job down after `launchctl kill`
+ * hit only lockf) leaves its world running: dev.mjs is detached, in its own process group. On 11-23 such a world (dev.mjs
+ * PID 61306) ran four hours on tmp/df7/world beside the next night's world, which had wiped and rebuilt that directory
+ * under it. night.lock runs one night at a time, so a group the last night recorded is a dead night's: stop it before
+ * this night touches the directory. Only a group with a process still naming `world` (a reused pid is left alone).
+ * @param {string} file the recorded process group @param {string} world its --work directory */
+export async function stopStaleWorld(file, world) {
+  let group = 0;
+  try { group = Number(readFileSync(file, 'utf8').trim()); } catch { return false; }
+  rmSync(file, { force: true });
+  if (!Number.isInteger(group) || group <= 1) return false;
+  // dev.mjs names it (--work), its world server and page host run from inside it; a reused pid's group names it nowhere
+  const members = spawnSync('ps', ['-A', '-ww', '-o', 'pgid=,command='], { encoding: 'utf8' }).stdout.split('\n')
+    .filter(line => Number(line.trim().split(/\s+/u)[0]) === group);
+  if (!members.some(line => line.includes(world))) return false;
+  try { process.kill(-group, 'SIGTERM'); } catch { return false; }
+  for (let n = 0; n < 60; n++) {
+    await sleep(500);
+    try { process.kill(-group, 0); } catch { return true; }
+  }
+  try { process.kill(-group, 'SIGKILL'); } catch { /* gone */ }
+  return true;
+}
+
 /** The newest green dispatched nights: the first one's build is "since", the first that qualifies is the p95 baseline.
  * @param {string} dir @returns {{since:string|null, previous:string|null}} */
 function lastGreen(dir) {
@@ -116,6 +140,9 @@ function lastGreen(dir) {
 async function measure(build, hours, dispatch, extra) {
   const root = resolve(import.meta.dirname, '../..');
   const out = join(root, 'tmp/df7');
+  // the night's world group, kept beside the checkout (out is wiped below) so the next night can stop it if this one dies
+  const worldGroup = join(root, 'tmp/df7-world.pgid');
+  if (await stopStaleWorld(worldGroup, join(out, 'world'))) console.error('df7-nightly: stopped the world a dead night left running');
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
   const short = build.slice(0, 10);
@@ -127,6 +154,7 @@ async function measure(build, hours, dispatch, extra) {
   const stopDev = async () => {
     const running = dev;
     dev = null;
+    rmSync(worldGroup, { force: true });
     if (running === null || running.exitCode !== null || running.signalCode !== null) return;
     const group = running.pid;
     if (group === undefined) return;
@@ -145,6 +173,7 @@ async function measure(build, hours, dispatch, extra) {
     const world = spawn(process.execPath, ['scripts/dev.mjs', '--staging', '--shard', 'driftwood-isle', '--port', String(port), '--saves', 'memory',
       '--no-watch', '--work', join(out, 'world')], { cwd: root, detached: true, stdio: ['ignore', logFd, logFd], env: { ...process.env, WS_BUILD_ID: build, HOLD_MS: '1000' } });
     dev = world;
+    if (world.pid !== undefined) writeFileSync(worldGroup, String(world.pid));
     let base = /** @type {string|null} */ (null);
     for (let n = 0; n < 900 && base === null && world.exitCode === null && world.signalCode === null; n++) {
       base = /^engine dev on (\S+)/mu.exec(readFileSync(join(out, 'dev.log'), 'utf8').slice(from))?.[1] ?? null;
@@ -284,4 +313,4 @@ function main() {
   return night(canonical, pass);
 }
 
-process.exitCode = await main();
+if (import.meta.main) process.exitCode = await main();
