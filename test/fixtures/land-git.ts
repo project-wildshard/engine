@@ -83,10 +83,8 @@ while read old new ref; do echo "$ref $new" >> "$PUSHED_LOG"; done
 export const PRE_PUSH = `#!/bin/sh
 refs=$(cat)
 echo "land=\${WS_LAND_MAIN_PUSH:-0} $refs" >> "$PREPUSH_LOG"
-[ -n "\${WS_LOCAL_LAND_DELTA:-}" ] && printf '%s\\n' "$WS_LOCAL_LAND_DELTA" >> "$PREPUSH_DELTA_LOG"
 [ -f "$PREPUSH_FAIL" ] && { echo "pre-push: planted red check"; exit 1; }
 case "$refs" in *refs/heads/main*) if [ -f "$PREPUSH_RACE" ]; then rm "$PREPUSH_RACE"; sh "$RACE_SCRIPT"; fi ;; esac
-[ -n "\${WS_LAND_HOOK_ACK:-}" ] && node "$ACK_SCRIPT"
 exit 0
 `;
 
@@ -103,7 +101,7 @@ export function fixture() {
     ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 'Land', GIT_AUTHOR_EMAIL: 'land@example.test', GIT_COMMITTER_NAME: 'Land', GIT_COMMITTER_EMAIL: 'land@example.test',
     PATH: `${bin}:${process.env['PATH'] ?? ''}`, FAKE_GH_STATE: files.state, PUSHED_LOG: files.pushed, PREPUSH_LOG: files.prepush,
-    PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript, PREPUSH_DELTA_LOG: files.delta, ACK_SCRIPT: resolve('scripts/land-hook-ack.mjs'),
+    PREPUSH_FAIL: files.fail, PREPUSH_RACE: files.race, RACE_SCRIPT: files.raceScript,
     WS_LAND_REPO: 'project-wildshard/fixture', WS_LANE_RECEIPTS: files.receipts, WS_LANE_NAME: 'fixture-lane', HERDR_PANE_ID: 'w0:p9',
     WS_SESSION_KEEP_ROOT: join(root, 'session-keep'),
     // MF12: never mint a real reader App token from a fixture, even on a machine that has the App's key.

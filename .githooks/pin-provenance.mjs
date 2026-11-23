@@ -62,19 +62,16 @@ export function checkPinPush({ cwd, refs, ciState, env = process.env }) {
     if (!git(cwd, ['cat-file', '-e', `${old}^{commit}`]).ok) continue; // main moved past us: git refuses the push itself
     const changed = git(cwd, ['diff', '--name-only', old, pushed, '--', PINS]).out.split('\n').filter(Boolean);
     if (!changed.length) continue;
-    // J400 keeps pin changes in a plan worktree, but the ordinary pre-push
-    // now runs the full local gate next, before Git can send main. A marker
-    // alone cannot turn a canonical/direct push into a local plan land.
+    // A marker alone cannot turn a canonical/direct push into a plan land.
     const head = git(cwd, ['rev-parse', 'HEAD']).out;
     const branch = git(cwd, ['symbolic-ref', '--quiet', 'HEAD']).out;
     const gitDir = git(cwd, ['rev-parse', '--absolute-git-dir']).out;
     const common = git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']).out;
     // J422 (meta FLOW-SIMPLE FS2): land's push mode is the one way onto main for every row, pins included; main's
     // hosted ci judges it and main-watch names the push on red.
-    const marker = env.WS_LAND_MAIN_PUSH === `local:${pushed}` ? 'local' : env.WS_LAND_MAIN_PUSH === `push:${pushed}` ? 'push' : '';
-    if (localOnly && marker !== '' && head === pushed && /^refs\/heads\/plan\//u.test(branch)
+    if (localOnly && env.WS_LAND_MAIN_PUSH === `push:${pushed}` && head === pushed && /^refs\/heads\/plan\//u.test(branch)
       && gitDir !== common && git(cwd, ['merge-base', '--is-ancestor', old, pushed]).ok) {
-      return { ok: true, note: marker === 'push' ? `plan HEAD ${pushed.slice(0, 10)} through land's push gate; main ci judges it (J422)` : `local plan HEAD ${pushed.slice(0, 10)}; full local pre-push gate follows (J400)` };
+      return { ok: true, note: `plan HEAD ${pushed.slice(0, 10)} through land's push gate; main ci judges it (J422)` };
     }
     // FS18 (meta FLOW-SIMPLE, J443): a no-plan fix re-recording a pin goes through main-push.mjs from a clone on main
     // (engine-quickfix), the same push gate as land (J422 Decision 2). main-push names its own HEAD; a hand push has

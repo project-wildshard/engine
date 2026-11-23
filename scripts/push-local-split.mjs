@@ -53,16 +53,16 @@ export function splitRequested(env,refs=env.WS_PUSH_REFS,mainSplit=MAIN_PUSH_SPL
  return pushed.every(row=>PLAN_REF.test(row.remote)||(mainSplit&&row.remote===MAIN_REF));
 }
 
-/** J422 `push` is land's default: the ordinary split gate runs and land, not the hook, starts main-watch. `local` is
- * J400's full local gate (the Mac mini, J388). Land's own main push, by the kind land marked it, or null for every
- * other push, which keeps its normal gate. The marker is `WS_LAND_MAIN_PUSH=<local|push>:<sha>` and binds the one SHA
+/** J422 `push` is land's only mode (FS23 deleted J400's `local`): the ordinary split gate runs and land, not the hook,
+ * starts main-watch. Land's own main push, or null for every
+ * other push, which keeps its normal gate. The marker is `WS_LAND_MAIN_PUSH=push:<sha>` and binds the one SHA
  * land pushes: a push of anything else, of any ref but main, or on hosted CI never qualifies (J206 review).
- * @param {NodeJS.ProcessEnv} env @param {string|undefined} refs @returns {'local'|'push'|null} */
+ * @param {NodeJS.ProcessEnv} env @param {string|undefined} refs @returns {'push'|null} */
 export function landMainMode(env,refs){
- const marker=/^(local|push):([a-f0-9]{40})$/u.exec(env.WS_LAND_MAIN_PUSH??'');
+ const marker=/^push:([a-f0-9]{40})$/u.exec(env.WS_LAND_MAIN_PUSH??'');
  if(env.CI||env.GITHUB_ACTIONS||marker===null)return null;
- const pushed=pushedRefs(refs),[,mode,sha]=marker;
- return pushed.length===1&&pushed.every(row=>row.remote==='refs/heads/main'&&row.local===sha)?/** @type {'local'|'push'} */(mode):null;
+ const pushed=pushedRefs(refs),[,sha]=marker;
+ return pushed.length===1&&pushed.every(row=>row.remote==='refs/heads/main'&&row.local===sha)?'push':null;
 }
 
 /** A first push of a plan branch has no remote tip. Select against the

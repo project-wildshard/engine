@@ -4,14 +4,11 @@
 // hosted full suite. No plan-branch push, no full suite in the lane, no
 // queue. The worktree stays for the next row; --done removes it. A red
 // main is fixed forward by the push main-watch names (J422 wave 2).
-// --local (J400's full local gate) stays opt-in until the Mac mini's last
-// full-gate land (J443 moved the mini to push mode, FLOW-SIMPLE FS23);
-// FS5 deleted --hosted (the
-// branch-CI land: plan push, CI wait, exact/carried main push).
-// Both modes preserve pin provenance, canonical sync, main-watch and
+// FS5 deleted --hosted (the branch-CI land: plan push, CI wait,
+// exact/carried main push); FS23 deleted --local (J400's full local gate)
+// after the Mac mini's last full-gate land (J443 moved it to push mode).
+// Land preserves pin provenance, canonical sync, main-watch and
 // owned-worktree cleanup. A red main is fixed forward at once (J249).
-// J381 exception: SKIP_CHECK=1 plus WS_LAND_J381_REASON explicitly audits a
-// skipped local gate, never a full proof or a source for delta reuse.
 import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {keepCopy,worktreeState} from './pin-keep-copy.mjs';
 import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
@@ -24,8 +21,6 @@ import {installLag} from './install-lag.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 import {assertNoLocalCandidates} from './local-candidates.ts';
-import {beginLocalHook} from './land-hook-ack.mjs';
-import {assertHeavyLease} from './heavy-lane-lease.mjs';
 
 /** The hosted workflows a green SHA needs, by workflow name (J195, J240); pin-provenance.mjs reads it. */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
@@ -34,17 +29,6 @@ const PLAN_BRANCH=/^plan\/[a-z0-9][a-z0-9._-]*$/u;
 const SHA=/^[a-f0-9]{40}$/u;
 
 class StopError extends Error{name='StopError';}
-
-/** J381: explicit audited exception; inherited SKIP_CHECK alone never changes local land.
- * @param {NodeJS.ProcessEnv} env @returns {string|undefined} */
-export function localGateHatch(env){
- if(env.SKIP_CHECK!=='1'||env.WS_LAND_J381_REASON===undefined)return undefined;
- const reason=env.WS_LAND_J381_REASON.trim();
- if(reason.length===0||reason.length>120||reason.includes('\n')||reason.includes('\r')){
-  throw new StopError('WS_LAND_J381_REASON must be one nonempty line of at most 120 characters');
- }
- return reason;
-}
 
 /** package.json `gen:inputs`, run directly: pnpm adds nothing here and a fixture's pnpm is a stub. */
 const GEN=Object.freeze(['scripts/gen.mjs','--inputs-only']);
@@ -112,17 +96,13 @@ function remoteRejection(output){
 
 /** Run git with its stderr shown live (the pre-push's progress) and kept, for the receipt's cause.
  * @param {string} cwd @param {string[]} args @param {NodeJS.ProcessEnv} env @param {string} [command]
- * @returns {Promise<{status:number,stdout:string,stderr:string,interrupted:boolean,hookGreen:boolean}>} */
+ * @returns {Promise<{status:number,stdout:string,stderr:string,interrupted:boolean}>} */
 function gitTee(cwd,args,env,command='git'){
  return new Promise(_resolve=>{
   // WL22's keepalive policy also belongs to the parent SSH session: the
-  // pre-push may spend minutes in a full gate before Git sends main.
+  // pre-push may spend minutes in its gate before Git sends main.
   /** @type {NodeJS.ProcessEnv} */
   const network={...env,GIT_SSH_COMMAND:env.GIT_SSH_COMMAND??'ssh -o ServerAliveInterval=20 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes'};
-  const localHead=command==='git'?/^local:([a-f0-9]{40})$/u.exec(env.WS_LAND_MAIN_PUSH??'')?.[1]:undefined;
-  const ack=localHead===undefined?null:beginLocalHook(cwd,localHead);
-  Reflect.deleteProperty(network,'WS_LAND_HOOK_ACK');
-  if(ack!==null)network.WS_LAND_HOOK_ACK=ack.token;
   const groups=process.platform!=='win32',child=spawn(command,args,{cwd,env:network,stdio:['ignore','pipe','pipe'],detached:groups});
   let stdout='',stderr='',interrupted=false,settled=false;
   /** @type {ReturnType<typeof setTimeout>|undefined} */let forced;
@@ -139,7 +119,7 @@ function gitTee(cwd,args,env,command='git'){
    if(settled)return;settled=true;
    clearTimeout(forced);process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);process.removeListener('SIGHUP',stop);process.removeListener('exit',exit);
    process.stdout.removeListener('error',pipeLost);process.stderr.removeListener('error',pipeLost);
-   _resolve({status,stdout,stderr:`${stderr}${error}`,interrupted,hookGreen:ack?.finish()??false});
+   _resolve({status,stdout,stderr:`${stderr}${error}`,interrupted});
   };
   child.stdout.on('data',chunk=>{stdout=`${stdout}${String(chunk)}`.slice(-(1<<16));if(command!=='git')process.stdout.write(chunk);});
   child.stderr.on('data',chunk=>{process.stderr.write(chunk);stderr=`${stderr}${String(chunk)}`.slice(-(1<<16));});
@@ -233,11 +213,13 @@ export function githubSlug(remote){
  return match?.[1]??null;
 }
 
-/** Push mode on every machine (J443, meta FLOW-SIMPLE FS23: the Mac mini moves to the push flow, replacing J388 for
- * landing). WS_LAND_MODE=local or --local still runs J400's full local gate until the mini's last full-gate land.
- * @param {NodeJS.ProcessEnv} env @param {string} [_host] kept for callers; no host gets its own default @returns {'push'|'local'} */
+const LOCAL_GONE='--local is gone (meta FLOW-SIMPLE FS23, J443): every machine lands in push mode; run node scripts/land.mjs';
+
+/** Push mode on every machine (J443, meta FLOW-SIMPLE FS23: the Mac mini moved to the push flow, replacing J388 for
+ * landing). FS23 deleted J400's full local gate (`--local`, WS_LAND_MODE=local) after the mini's last full-gate land.
+ * @param {NodeJS.ProcessEnv} env @param {string} [_host] kept for callers; no host gets its own default @returns {'push'} */
 export function defaultMode(env,_host){
- if(env.WS_LAND_MODE==='local'||env.WS_LAND_MODE==='push')return env.WS_LAND_MODE;
+ if(env.WS_LAND_MODE==='local')throw new StopError(LOCAL_GONE);
  return 'push';
 }
 
@@ -252,14 +234,15 @@ export function parseArgs(argv,env=process.env,host=hostname()){
   // Accepted for old callers, and no-ops: land never watches main (LS8) and has no preflight (FS5).
   if((name==='--no-watch-main'||name==='--no-preflight')&&value===undefined)continue;
   if(name==='--hosted')throw new StopError('--hosted is gone (J422, meta FLOW-SIMPLE FS5): land pushes main through the push gate; run node scripts/land.mjs');
-  if((name==='--local'||name==='--push')&&value===undefined)options.mode=name.slice(2);
-  else if(name==='--keep'&&value===undefined)options.keep=true;
+  if(name==='--local')throw new StopError(LOCAL_GONE);
+  if(name==='--push'&&value===undefined)continue;
+  if(name==='--keep'&&value===undefined)options.keep=true;
   else if(name==='--done'&&value===undefined)options.done=true;
   else if(value!==undefined&&Number.isSafeInteger(number)&&number>0&&name==='--rounds')options.rounds=number;
-  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--done] [--push|--local] [--rounds=N] [--keep]`);
+  else throw new StopError(`unknown option ${arg}; usage: node scripts/land.mjs [--done] [--rounds=N] [--keep]`);
  }
  // J422: push mode keeps the plan worktree for the next row unless this is the last one.
- if(options.mode==='push'&&!options.done)options.keep=true;
+ if(!options.done)options.keep=true;
  return options;
 }
 
@@ -284,7 +267,6 @@ class Landing{
  /** @param {string} cwd @param {ReturnType<typeof parseArgs>} options @param {NodeJS.ProcessEnv} env */
  constructor(cwd,options,env){
   this.options=options;this.env=env;this.started=Date.now();
-  this.localHatch=options.mode==='local'?localGateHatch(env):undefined;
   this.lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'land';
   const inside=tryGit(cwd,['rev-parse','--show-toplevel']);
   if(inside.status!==0)throw new StopError('not inside a git checkout');
@@ -476,37 +458,30 @@ class Landing{
 
  /** Fast-forward main to HEAD. Refuses before pushing unless origin/main is
   * an ancestor; the refspec has no `+` and no force flag ever.
-  * @param {boolean} local J400's full local gate (the mini); otherwise J422's push gate (lint, types, related tests)
-  * @param {{baseMain:string,testedHead:string,incomingMain:string,head:string}|null} [delta]
+  * J422's push gate (lint, types, related tests) runs in the pre-push.
   * @returns {Promise<'landed'|'moved'>} */
- async pushMain(local,delta=null){
+ async pushMain(){
   const head=this.holds('before the merge'),main=this.fetchMain();
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
   const args=mainPushArgs(head);
-  const hatch=local?this.localHatch:undefined;
-  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only${!local?'; push gate: lint, types, related tests (J422)':hatch===undefined?'; full local gate (J400)':`; J381 SKIP_CHECK=1: ${hatch}; no full proof`}`);
+  this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only; push gate: lint, types, related tests (J422)`);
   // The pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
   /** @type {NodeJS.ProcessEnv} */
-  const env={...this.env,WS_LAND_MAIN_PUSH:`${local?'local':'push'}:${head}`};
+  const env={...this.env,WS_LAND_MAIN_PUSH:`push:${head}`};
   // The outer queue authenticates this controller, never a hook or proof.
   for(const key of Object.keys(env))if(key.startsWith('WS_FULL_GATE_'))Reflect.deleteProperty(env,key);
   Reflect.deleteProperty(env,'WS_LOCAL_LAND_DELTA');
   Reflect.deleteProperty(env,'WS_LOCAL_LAND_BASE_MAIN');
-  if(local&&hatch===undefined)env.WS_LOCAL_LAND_BASE_MAIN=main;
-  if(local&&delta!==null&&hatch===undefined)env.WS_LOCAL_LAND_DELTA=JSON.stringify(delta);
-  if(local&&hatch===undefined)Reflect.deleteProperty(env,'SKIP_CHECK');
-  if(hatch!==undefined)this.receipt(`J381 SKIP_CHECK=1 ${short(head)}: ${hatch}; no full proof`);
   const result=await gitTee(this.root,args,env);
   if(result.status===0)return 'landed';
   // A lost race is main having moved; anything else (a red pre-push) stops.
   const now=this.fetchMain();
   if(isAncestor(this.root,head,now))return 'landed';
   const rejected=remoteRejection(result.stdout)!==undefined;
-  if(!result.interrupted&&(!local||result.hookGreen)&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
+  if(!result.interrupted&&rejected&&now!==main&&!isAncestor(this.root,now,head))return 'moved';
   // Structured stderr failures take priority over expected stdout controls.
-  const porcelain=local&&!result.hookGreen?'':result.stdout;
-  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(result.stderr,porcelain,local&&!result.hookGreen?result.stdout:'');
+  const cause=result.interrupted?'interrupted; owned push stopped':prePushCause(result.stderr,result.stdout,'');
   this.receipt(`STOP main push of ${short(head)} refused: ${cause}`);
   // J422: a file written in this worktree while the gate ran made the gate's after-check refuse the tree. The gate now
   // runs in a clean copy for land's push (push-gate-copy.mjs copyReason); a worktree not yet rebased past that fix says so.
@@ -558,7 +533,7 @@ class Landing{
   const lag=installLag(this.root);
   if(lag!==''){writeFileSync(this.installMarker(),`${lag}\n`);this.install(['node_modules'],`is behind: ${lag}`);}
   this.regenerate(this.pinsOnce());
-  return this.options.mode==='local'?this.runLocal(main):this.runPush(main);
+  return this.runPush(main);
  }
 
  /** J422: the ordinary split pre-push gates the main push (lint, types, related tests); main's hosted ci runs the
@@ -567,7 +542,7 @@ class Landing{
  async runPush(base){
   let main=base;
   for(let round=1;round<=this.options.rounds;round++){
-   if(await this.pushMain(false)==='landed'){
+   if(await this.pushMain()==='landed'){
     return this.landed('push','push gate (lint, types, related tests); main ci runs the full suite',round,main);
    }
    main=this.fetchMain();
@@ -578,31 +553,6 @@ class Landing{
   }
   this.receipt(`STOP gave up after ${this.options.rounds} tries; main kept moving`);
   throw new StopError(`main kept moving: ${this.options.rounds} tries each lost the race to another push. Nothing landed; run land again`);
- }
-
- /** J400: the real pre-push owns the complete local gate. No plan ref is published.
-  * A lost FF race may compose a real full-tree proof with a disjoint delta.
-  * The gate authenticates it; missing/overlapping evidence keeps the full suite.
-  * WL22's gate-before-lock principle applies: there is no shared main lock while testing.
-  * @param {string} base */
- async runLocal(base){
-  let main=base;
-  /** @type {{baseMain:string,testedHead:string,incomingMain:string,head:string}|null} */let delta=null;
-  for(let round=1;round<=this.options.rounds;round++){
-   const testedHead=this.head(),baseMain=main;
-   if(await this.pushMain(true,delta)==='landed'){
-    const hatch=this.localHatch;
-    return this.landed(hatch===undefined?'local':'local-hatch',hatch===undefined?'local full proof plus verified delta when disjoint; no hosted branch run':`J381 SKIP_CHECK=1: ${hatch}; no full proof`,round,main);
-   }
-   main=this.fetchMain();
-   this.say('moved',`main moved to ${short(main)}; rebase, then verify the prior full proof and incoming delta`);
-   this.rebase(main);
-   this.regenerate(this.pinsOnce());
-   // Reuse the directly completed full basis and check the cumulative main
-   // delta on later races; never turn a composed receipt into a full basis.
-   delta={baseMain:delta?.baseMain??baseMain,testedHead:delta?.testedHead??testedHead,incomingMain:main,head:this.head()};
-  }
-  throw new StopError(`main kept moving after ${this.options.rounds} local-gate attempts; nothing landed`);
  }
 
  /** After GitHub's main moved, bring the canonical checkout's main along (Jake, 2026-11-10 ~23:50 Cancún: "go to
@@ -733,18 +683,6 @@ export async function land(argv,cwd=process.cwd(),env=process.env){
  try{
   try{assertNoLocalCandidates(cwd,env);}catch(error){throw new StopError(error instanceof Error?error.message:String(error));}
   const landing=new Landing(cwd,parseArgs(argv,env),env);
-  if(landing.options.mode==='local'&&landing.localHatch===undefined){
-   if(env.WS_FULL_GATE_TOKEN===undefined){
-    // Refuse an active same-tree controller before joining the machine FIFO.
-    const release=landing.lock();release();landing.clean();
-    const result=await gitTee(landing.root,[resolve(import.meta.dirname,'heavy-lane.py'),'full-gate','--',process.execPath,resolve(import.meta.dirname,'land.mjs'),...argv],
-     {...env,WS_FULL_GATE_OWNER_PID:String(process.pid),WS_FULL_GATE_EXPECTED_HEAD:landing.head(),WS_FULL_GATE_EXPECTED_BRANCH:landing.branch},'python3');
-    return result.interrupted?1:result.status;
-   }
-   try{assertHeavyLease('full-gate',{...env,WS_HEAVY_ROOT:env.WS_FULL_GATE_ROOT,WS_HEAVY_TOKEN:env.WS_FULL_GATE_TOKEN});}
-   catch{throw new StopError('full-gate controller needs its live machine queue ancestor');}
-   if(landing.head()!==env.WS_FULL_GATE_EXPECTED_HEAD||landing.branch!==env.WS_FULL_GATE_EXPECTED_BRANCH)throw new StopError('queued worktree changed; run land again');
-  }
   unlock=landing.lock();
   const code=await landing.run();
   // Cleanup runs under the land lock (J206 review): no second land can start here meanwhile. The lock file lives in

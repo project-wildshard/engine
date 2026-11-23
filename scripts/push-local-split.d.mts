@@ -7,7 +7,7 @@ export const MAIN_PUSH_SPLIT: boolean;
 export const MAIN_REF: 'refs/heads/main';
 export function mainPushed(refs:string|undefined):boolean;
 export function pushedRefs(refs:string|undefined):{local:string;remote:string;base:string}[];
-export function landMainMode(env:NodeJS.ProcessEnv,refs:string|undefined):'exact'|'carried'|'local'|null;
+export function landMainMode(env:NodeJS.ProcessEnv,refs:string|undefined):'push'|null;
 export function splitRequested(env:NodeJS.ProcessEnv,refs?:string,mainSplit?:boolean):boolean;
 export function planBaseRefs(refs:string|undefined,cwd?:string):string|undefined;
 export function hostedOnlyReason(file:string,seconds:Record<string,number>):string|null;

@@ -112,13 +112,6 @@ describe('release merge-back gate', () => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stderr, /release merge-back v1\.2\.3/);
   });
-  test('J400 local land cannot reuse the release merge-back shortcut', () => {
-    const box = prepared(), sha = box.merge();
-    const result = box.check(sha, { WS_LAND_MAIN_PUSH: `local:${sha}` });
-    assert.notEqual(result.status, 0, result.stderr);
-    assert.doesNotMatch(result.stderr, /release merge-back/);
-    assert.match(result.stderr, /pnpm check failed/);
-  });
   test('code and manifest edits keep the failing full check', () => {
     for (const files of [{ 'code.txt': 'untested code\n' }, { 'package.json': JSON.stringify({ version: '1.2.3', scripts: { check: 'exit 1' }, extra: true }) }]) {
       const box = prepared();

@@ -50,7 +50,7 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
    A `main AMBER <sha> <file> <ms>/<budget>` receipt (J295): green, but that file is over budget; fix it the same day.
  - **At most one full local run at a time**, for a release or to name a red: `pnpm test:fast`.
  - **The Mac mini lands the same way (J443, meta FLOW-SIMPLE FS23):** `land.mjs` defaults to push mode on every
-   machine; `--local` (the full local gate) is opt-in until the mini's last full-gate land. `--hosted` is gone (FS5).
+   machine; `--local` (the full local gate) is gone (FS23) and `--hosted` too (FS5).
  - **`test/pins/` changes (J375)** reach main through `land.mjs` from a plan worktree or `main-push.mjs` from
    `engine-quickfix` (FS18), both through the push gate; the pre-push (`.githooks/pin-provenance.mjs`) refuses a hand
    `git push`. Escape hatch when truly stuck: `ALLOW_PIN_PUSH=1`, said in your receipt.
