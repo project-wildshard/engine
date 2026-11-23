@@ -42,6 +42,9 @@ const PUBLISHED = [
   'public/assets/music/piano/island-calm-3d097258.m4a',
   'public/assets/music/piano/pine-tension-ca1a5adc.m4a',
   'public/assets/sfx/best/bed-forest-2-c4e7f923.m4a',
+  // C0b dropped Nine Dragon's tracked lab files; its pin still writes these (opus-compat-w9, 2026-11-23)
+  'public/assets/nine-dragon/lab/grapple/dragon-hook.glb',
+  'public/assets/nine-dragon/lab/organic/leaf-atlas.webp',
 ];
 
 let scratch = '';
