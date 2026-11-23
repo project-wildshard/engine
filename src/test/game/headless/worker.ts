@@ -6,10 +6,7 @@ import * as v from 'valibot';
 import { runTickWorker } from '../../../server/host/tickWorkerLoop';
 import { parseShardfile } from '../../../shared/host/shardfile';
 import { loadRapier } from '../../../shared/engine/physics/rapier';
-import { prepareAssetDecoders, offlineMemoryAdmission } from '@wildshard/format/shardfileAssets';
-import { validateShardfileAssets } from '@wildshard/format/assetAdmission';
-import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
-import { hashImmutableBytes } from '../../../shared/host/immutable';
+import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { loadHeadlessFolder } from '../../../server/host/headlessFolder';
 import { createShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { createNativeProofAdapter } from '../headlessNative';
@@ -24,7 +21,11 @@ await runTickWorker(async raw => {
   if (module.protocol !== 'file:') throw new Error('Native proof prepare module must be a file URL');
   const shard = parseShardfile(payload.shard, payload.sections), rapier = await loadRapier(readFileSync(payload.binary));
   await prepareAssetDecoders();
-  validateShardfileAssets(shard, payload.assets, hashImmutableBytes, offlineMemoryAdmission('refuse'), undefined, scriptAdmissionRows(payload.sections), payload.sections);
+  // QA-FEEDBACK-2026-11-23 row 2: this worker's one owner (headlessWorker.ts createNativeProofWorker) admits these exact
+  // bytes with validateShardfileAssets in its preparePayload before it sends them. Repeating that here re-hashed every asset
+  // on the replay's critical path (~0.5 s of Pine's ~8 s CI21 story locally). The payload must still hold every file.
+  for (const hash of [...shard.files.map(file => file.hash), ...shard.requires.commons.map(identity => `commons:${identity}`)])
+    if (!payload.assets.has(hash)) throw new Error('Missing admitted worker bytes');
   const loaded: {prepareHeadlessRuntime?: PrepareHeadlessRuntime} = await import(module.href);
   if (typeof loaded.prepareHeadlessRuntime !== 'function') throw new Error('Native proof module needs prepareHeadlessRuntime');
   const product = payload.directory === undefined

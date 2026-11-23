@@ -48,7 +48,7 @@ export function createAdmittedFolderCache(load: typeof loadHeadlessFolder = load
     const product = shardFolderData(source, pathToFileURL(root + sep).href, bytes, true, false, nodeNamedJsonCheck, { files: true });
     const descriptor = outputDescriptor(source);
     if (descriptor === undefined) throw new Error('Missing admitted headless inventory');
-    // Full inventory in every mode: the worker performs its own admission and
+    // Full inventory in every mode: the worker's parent admits it (createNativeProofWorker) and the worker
     // must receive page assets too, not a filtered server-only bank.
     const assets = new Map(await Promise.all(descriptor.index.files.map(async file => {
       const ref = file.commons === true ? `commons:${file.hash}` : file.hash;
