@@ -32,6 +32,11 @@ import { FarBatch } from './farBatch';
  * the shared kind (it reads nothing of its mesh), run once per batch draw.
  */
 export const KIT_BATCH_SLOT = 'debug.kitBatch';
+export const BAKED_TILE_MEMBER = 'bakedTileBatchMember';
+const bakedTileSlot = jsonSlot('debug.bakedTileBatch', 'device');
+function bakedTileBatchOn(): boolean {
+  try { return bakedTileSlot.read() === true; } catch { return false; }
+}
 const kitBatchSlot = jsonSlot(KIT_BATCH_SLOT, 'device');
 /** The slot's value: a boolean wins; unset, off (a cooled iPhone 13 pair decides the phone-Low default). */
 export function kitBatch(saved: unknown): boolean { return typeof saved === 'boolean' ? saved : false; }
@@ -67,7 +72,7 @@ function inFormat(a: Attribute, format: Format): Attribute {
 }
 
 /** Whether `object` is a plain mesh the batch may draw, with every channel's CPU copy still whole. */
-export function batchableMesh(object: THREE.Object3D): object is THREE.Mesh {
+export function batchableMesh(object: THREE.Object3D, includeBakedTiles = false): object is THREE.Mesh {
   if (Object.getPrototypeOf(object) !== THREE.Mesh.prototype) return false;
   const mesh = object as THREE.Mesh, geometry = mesh.geometry;
   if (!mesh.visible || mesh.layers.mask !== 1 || !mesh.frustumCulled || mesh.userData[MERGED_VIEW] === true) return false;
@@ -78,6 +83,11 @@ export function batchableMesh(object: THREE.Object3D): object is THREE.Mesh {
   for (const attribute of Object.values(geometry.attributes)) if (!(attribute instanceof THREE.BufferAttribute) || attribute.array.length < attribute.count * attribute.itemSize) return false;
   const index = geometry.index;
   if (index !== null && index.array.length < index.count) return false;
+  if (includeBakedTiles && mesh.userData[BAKED_TILE_MEMBER] === true && mesh.material instanceof THREE.Material) {
+    const material = mesh.material;
+    return material.visible && !material.transparent && material.userData['sceneCard'] !== true
+      && material.userData['sceneAlpha'] !== true && !Object.values(geometry.attributes).some(isGpuOnlyAttribute);
+  }
   return mergeableMaterial(mesh.material) !== null;
 }
 
@@ -255,11 +265,11 @@ export class KitBatch extends ChangedBatchedMesh {
 }
 
 /** Gather `root`'s batchable meshes by material and layout; each set of two or more becomes a batch under `root`. */
-export function buildKitBatches(root: THREE.Object3D, cellPatches = false): KitBatch[] {
+export function buildKitBatches(root: THREE.Object3D, cellPatches = false, includeBakedTiles = false): KitBatch[] {
   const sets = new Map<string, { material: THREE.Material; keyed: string; meshes: THREE.Mesh[] }>();
   root.updateWorldMatrix(true, true);
   root.traverse((object) => {
-    if (!batchableMesh(object)) return;
+    if (!batchableMesh(object, includeBakedTiles)) return;
     const material = object.material as THREE.Material, geometry = object.geometry;
     // three's program keys on these channels' presence and size only: their storage may differ within a batch
     const keyed = Object.entries(geometry.attributes).filter(([name]) => KEYED.has(name)).map(([name, a]) => `${name}:${String(a.itemSize)}`).sort().join('|');
@@ -305,7 +315,7 @@ export function buildKitBatches(root: THREE.Object3D, cellPatches = false): KitB
 export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: boolean, enabled: () => boolean = kitBatchOn, cellPatches: () => boolean = programFoldOn): { batches: number; members: number } {
   if (!multiDraw || !enabled() || scope.disposed || scope.disposing || scene.userData['kitBatch'] !== undefined) return { batches: 0, members: 0 };
   let batches: KitBatch[];
-  try { batches = buildKitBatches(scene, cellPatches()); }
+  try { batches = buildKitBatches(scene, cellPatches(), bakedTileBatchOn()); }
   catch (error: unknown) { console.warn('[kit-batch] not built', error instanceof Error ? error.stack : error); return { batches: 0, members: 0 }; }
   // DF10 (mini-dfload): a batch whose members all left (their cell retired at the road crossing) draws nothing, so it never
   // looks its program up again: on the iPhone 13 the empty kit batches relinked their three materials as the player

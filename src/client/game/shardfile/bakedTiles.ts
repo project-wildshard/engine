@@ -40,6 +40,7 @@ import { tiledMesh } from './tiledMesh';
 import { bakedPlacementPoses } from '../../../shared/game/shardfile/bakedPlacementPoses';
 import { readContent } from '@wildshard/engine/boot/contentRead';
 import { mergeView } from './groundMerge';
+import { BAKED_TILE_MEMBER } from '../grid/kitBatch';
 import { NO_VIEW_MERGE } from '../grid/staticViewMerge';
 
 /** What a row is drawn into: the product its files resolve against, the live world, and the scope its pieces leave with
@@ -119,6 +120,7 @@ export async function installBakedTiles(owner: BakedTilesOwner, input: BakedTile
     const m = new THREE.Mesh(o.geometry, material);
     m.matrixAutoUpdate = false; m.matrix.copy(o.matrixWorld); m.matrix.elements[13] -= row.drop; m.matrixWorld.copy(m.matrix);
     m.name = `${row.meshPrefix}${o.name}`; m.castShadow = true; m.receiveShadow = true;
+    m.userData[BAKED_TILE_MEMBER] = true;
     if (follow !== null) m.onBeforeRender = follow;
     if (!o.geometry.hasAttribute('normal')) o.geometry.computeVertexNormals(); // flat-lit looks shade by derivatives; the normals bias the shadows
     o.geometry.computeBoundingSphere();

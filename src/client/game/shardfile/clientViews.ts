@@ -15,6 +15,7 @@ import { installDeclaredProps, type PropSurfaceBinding } from '@wildshard/engine
 import type { ClientWorldViews, ResidentTile } from './tileContent';
 import type { GraphOutlineHook } from './clientGraphs';
 import { groundMerge, mergeView } from './groundMerge';
+import { coarsePropMergeOn, mergeCoarseProps } from './coarsePropMerge';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { geometryBoundsSteps } from '@wildshard/engine/world/geometryBounds';
 import { workSlice } from '@wildshard/engine/core/workSlice';
@@ -201,9 +202,14 @@ export function clientTileViews(ports: ViewPorts): ClientTileViews {
       }
       const shadow = (enabled: boolean): void => { for (const mesh of casters) mesh.castShadow = enabled; };
       if (row.lod === 1) {
+        const meshes: Mesh<BufferGeometry, Material>[] = [];
+        if (parent !== scene && coarsePropMergeOn()) root.traverse(object => {
+          if (isMesh(object) && mergeable(object)) meshes.push(object);
+        });
+        const merged = meshes.length > 0 ? mergeCoarseProps(parent, scene, root, meshes, row, scope) : undefined;
         const apply = coarseTileMask(root, row.x, row.z, scope);
         const mask = (excluded: ReadonlySet<number>): void => {
-          apply(excluded);
+          apply(excluded); merged?.(excluded);
           root.userData['coarseTiles'] = [{ x: row.x, z: row.z, visible: excluded.size < 4 }];
         };
         mask(new Set()); shadow(false); return { mask, shadow: () => undefined };

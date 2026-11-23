@@ -1083,6 +1083,7 @@
     "src/client/game/shardfile/clientTrails.ts": "client",
     "src/client/game/shardfile/clientViewProgram.ts": "client",
     "src/client/game/shardfile/clientViews.ts": "client",
+    "src/client/game/shardfile/coarsePropMerge.ts": "client",
     "src/client/game/shardfile/clientDetails.ts": "client",
     "src/client/game/shardfile/clientSplash.ts": "client",
     "src/client/game/shardfile/clientWater.ts": "client",

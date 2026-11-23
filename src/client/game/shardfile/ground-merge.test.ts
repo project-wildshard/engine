@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { _buildAs } from '@wildshard/engine/core/tier';
 import { Scope } from '@wildshard/engine/app/scope';
 import { GroundMerge, propMerge } from './groundMerge';
+import { mergeCoarseProps } from './coarsePropMerge';
 
 // Tile streaming P1 (draws): a splat ground's resident tiles draw as one merged mesh per material; a coarse tile leaves out
 // the quadrants its fine tiles cover, and the merge follows its members' tile scopes.
@@ -30,6 +31,37 @@ test('fine tiles draw as one mesh; tiles leave with their scopes; the last takes
   expect(merge.mesh?.geometry.getIndex()?.count).toBe(6);
   b.dispose(); await settle();
   expect(merge.mesh).toBeNull(); expect(parent.children).toHaveLength(0);
+});
+
+test('coarse props share a draw without dropping partially covered fragments', async () => {
+  const parent = new THREE.Group();
+  parent.position.x = 500;
+  const a = new Scope('tile a'), b = new Scope('tile b'), material = new THREE.MeshStandardMaterial();
+  const attach = (x: number, scope: Scope): ((excluded: ReadonlySet<number>) => void) => {
+    const root = new THREE.Group(), prop = new THREE.Mesh(tile(x * 125 - 250, -250).geometry, material);
+    root.add(prop);
+    const mask = mergeCoarseProps(parent, root, root, [prop], { x, z: 0 }, scope);
+    expect(prop.visible).toBe(false);
+    parent.add(root);
+    return mask;
+  };
+  const hide = attach(0, a);
+  attach(1, b);
+  await settle();
+  const drawn = (): THREE.Mesh | undefined => parent.children.find((child): child is THREE.Mesh => child instanceof THREE.Mesh);
+  const first = drawn();
+  expect(first?.geometry.index?.count).toBe(12);
+  expect(Array.from(first?.geometry.getAttribute('wsCoarseTile').array ?? [])).toEqual([0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1]);
+  hide(new Set([0]));
+  await settle();
+  expect(drawn()).toBe(first);
+  hide(new Set([0, 1, 2, 3]));
+  await settle();
+  expect(drawn()?.geometry.index?.count).toBe(6);
+  a.dispose();
+  b.dispose();
+  await settle();
+  expect(drawn()).toBeUndefined();
 });
 
 test('a coarse tile leaves out the quadrants fine tiles cover', async () => {
