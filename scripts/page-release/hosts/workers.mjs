@@ -13,7 +13,8 @@
 // for production, J274). It reaches wrangler only through the inherited environment: never argv, never printed. Every
 // child's output is captured and printed with the token replaced.
 import {createHash} from 'node:crypto';
-import {existsSync, mkdirSync, readFileSync, readdirSync, rmSync} from 'node:fs';
+import {existsSync, readFileSync, readdirSync, rmSync} from 'node:fs';
+import {openReleaseRun} from '../../release-run.mjs';
 import {join} from 'node:path';
 import {assertAssetLimits, describeAssetLimits, measureAssets} from '../../app-build/assetLimits.mjs';
 import {CLOUDFLARE_ACCOUNT} from '../packs.mjs';
@@ -108,12 +109,14 @@ export function workersHost({token, exec = runRedacted, fetch: get = fetch, log 
       // PAGE-SIZE PZ1: dist/ is the upload set itself, and no header hides a map on Workers. Never upload one.
       const left = measureAssets(join(context.root, 'dist')).maps;
       if (left > 0) throw new Error(`dist/ still holds ${left} source maps: run the build phase (it sends them to Sentry and strips them)`);
-      const outputFile = join(context.root, 'tmp/page-release', `wrangler-${context.channel.channel}-${context.build}.ndjson`);
-      mkdirSync(join(context.root, 'tmp/page-release'), {recursive: true});
-      rmSync(outputFile, {force: true});
-      process.stdout.write(wrangler(context, ['versions', 'upload', '--tag', context.build, '--message', `v${context.version}`], {WRANGLER_OUTPUT_FILE_PATH: outputFile}));
-      const entries = existsSync(outputFile) ? readFileSync(outputFile, 'utf8').split('\n').filter(line => line.trim() !== '').map(line => JSON.parse(line)) : [];
-      const uploaded = entries.findLast(entry => entry?.type === 'version-upload');
+      const scratch = openReleaseRun(context.root, 'upload');
+      let uploaded;
+      try {
+        const outputFile = join(scratch.work, 'wrangler.ndjson');
+        process.stdout.write(wrangler(context, ['versions', 'upload', '--tag', context.build, '--message', `v${context.version}`], {WRANGLER_OUTPUT_FILE_PATH: outputFile}));
+        const entries = existsSync(outputFile) ? readFileSync(outputFile, 'utf8').split('\n').filter(line => line.trim() !== '').map(line => JSON.parse(line)) : [];
+        uploaded = entries.findLast(entry => entry?.type === 'version-upload');
+      } finally { scratch.close(); }
       if (uploaded === undefined) throw new Error('wrangler versions upload wrote no version-upload entry');
       const id = String(uploaded.version_id);
       const url = String(uploaded.preview_url ?? '');

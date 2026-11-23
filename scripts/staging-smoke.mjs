@@ -29,6 +29,7 @@ import { join, resolve } from 'node:path';
 import { SCENARIOS, runScenario } from './staging-smoke/scenarios.mjs';
 import { holds, verdictOf, worstFirst } from './staging-smoke/checks.mjs';
 import { keepRun, lastRelease, newestProfiles, saveProfiles, STORE } from './staging-smoke/store.mjs';
+import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 import { changelogBullets, deployVision, visionFindings, visionPass } from './staging-smoke/vision.mjs';
 import { bugbashRows } from './staging-smoke/bugbash.mjs';
 import { isClean, receiptLine, writeBoard } from './staging-smoke/board.mjs';
@@ -164,15 +165,21 @@ async function cli() {
   const url = (args.get('url') ?? 'https://staging.wildshard.io').replace(/\/$/u, '');
   const release = args.get('release');
   if (release === undefined) { console.error('usage: node scripts/staging-smoke.mjs --url <candidate> --release vX.Y.Z [--only K3] [--out <dir>]'); process.exit(2); }
-  const out = resolve(args.get('out') ?? `tmp/${process.env.WS_LANE_NAME ?? 'staging-smoke'}/smoke-${release}`);
+  const scratch = openReleaseRun(process.cwd(), 'smoke');
+  const out = scratch.work, proof = resolve(args.get('out') ?? scratch.proof);
   const only = args.get('only')?.split(',');
   const watch = args.get('watch');
-  const verdict = await runSmoke({
-    url, release, out, ...(only === undefined ? {} : { only }), ...(watch === undefined ? {} : { watchMs: Number(watch) * 1000 }),
-    store: args.get('store') ?? STORE, receipts: join(homedir(), '.cache/wildshard/lane-receipts.log'), ...(args.has('bugbash') ? { bugbash: resolve(String(args.get('bugbash'))) } : {}), vision: !args.has('no-vision'), ...(args.has('changelog') ? { changelog: resolve(String(args.get('changelog'))) } : {}),
-    ...(args.has('card') ? { card: String(args.get('card')) } : {}), ...(args.has('deeplink') ? { deepLink: String(args.get('deeplink')) } : {}),
-  });
-  process.exitCode = verdict.hold ? 1 : 0;
+  try {
+    const verdict = await runSmoke({
+      url, release, out, ...(only === undefined ? {} : { only }), ...(watch === undefined ? {} : { watchMs: Number(watch) * 1000 }),
+      store: args.get('store') ?? STORE, receipts: join(homedir(), '.cache/wildshard/lane-receipts.log'), ...(args.has('bugbash') ? { bugbash: resolve(String(args.get('bugbash'))) } : {}), vision: !args.has('no-vision'), ...(args.has('changelog') ? { changelog: resolve(String(args.get('changelog'))) } : {}),
+      ...(args.has('card') ? { card: String(args.get('card')) } : {}), ...(args.has('deeplink') ? { deepLink: String(args.get('deeplink')) } : {}),
+    });
+    process.exitCode = verdict.hold ? 1 : 0;
+  } finally {
+    try { keepReleaseProof(out, proof, ['verdict.json']); }
+    finally { scratch.close(); }
+  }
 }
 
 if (import.meta.url === `file://${process.argv[1] ?? ''}`) await cli();

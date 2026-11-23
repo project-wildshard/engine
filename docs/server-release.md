@@ -191,6 +191,15 @@ verdict as production's `--qa` input. For an already live release,
 `--observer-proof=<file>` supplies its saved MS9 witness for verification.
 Pass the held staging verdict (or its `zone-entry/zone-entry.json`) as
 `--zone-entry-resume=<file>` to rerun only the failing crossings.
+
+Release and QA runs use `tmp/$WS_LANE_NAME/<run>` and remove their work
+on exit, including a held run. `--out` and `--qa-out` receive the verdicts
+used by the next step. The train keeps those proof and dispatch records in
+`~/.cache/wildshard/plan-artifacts/release-qa/`. Each page build still
+keeps its phase record for the following upload and alias commands.
+`node scripts/worktree.mjs reap --dry-run` lists scratch idle for 24 hours
+with no Git metadata or open files. Omit `--dry-run` to remove that scratch.
+
 For a standalone smoke, run `scripts/browser-lane.sh node
 scripts/zone-entry-tour.mjs --expected-build=<sha> --out=<dir>`.
 Use `--seed <number>` to repeat a draw, `--retry-failed <verdict.json>`

@@ -3,6 +3,7 @@ import { agentFetch as fetch } from './agent-requests.mjs';
 import { setTimeout as delay } from 'node:timers/promises';
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { acceptPhoneMemoryWarning, deployFrameProblem, PHONE } from './journey-proof.mjs';
@@ -789,7 +790,7 @@ export function stagedTourProof(value) {
 }
 
 /** @param {string[]} argv */
-function main(argv) {
+async function main(argv) {
   /** @type {Map<string,string>} */ const options = new Map();
   for (let i=0;i<argv.length;i++) {
     const [name, ...inline] = (argv[i] ?? '').split('=');
@@ -799,31 +800,37 @@ function main(argv) {
     if (value === undefined || (name !== '--full-route' && (value === '' || value.startsWith('--')))) throw new Error(`${name} needs a value`);
     options.set(name,value);
   }
-  const build = options.get('--expected-build') ?? '', out = options.get('--out');
-  if (!/^[a-f0-9]{40}$/u.test(build) || out === undefined) throw new Error('zone-entry-tour.mjs requires --expected-build and --out');
+  const build = options.get('--expected-build') ?? '', proof = options.get('--out');
+  if (!/^[a-f0-9]{40}$/u.test(build) || proof === undefined) throw new Error('zone-entry-tour.mjs requires --expected-build and --out');
   const retry = options.get('--retry-failed'), resume = options.get('--zone-entry-resume'), input = retry ?? resume;
   if (retry !== undefined && resume !== undefined) throw new Error('Choose one zone-entry retry input');
-  if (input !== undefined && resolve(input) === resolve(out,'zone-entry.json')) throw new Error('A zone-entry retry needs a fresh --out');
+  if (input !== undefined && resolve(input) === resolve(proof,'zone-entry.json')) throw new Error('A zone-entry retry needs a fresh --out');
   const prior = input === undefined ? undefined : stagedTourProof(JSON.parse(readFileSync(input,'utf8')));
   const old = /** @type {Partial<SmokeReport> | null | undefined} */ (prior);
   const full = options.has('--full-route') || (resume !== undefined && old?.mode !== 'smoke');
-  mkdirSync(out,{recursive:true});
-  if (full) {
-    if (retry !== undefined || options.has('--seed')) throw new Error('The full route uses --zone-entry-resume and has no seed');
-    const legacy = join(out,'held-full-route.json');
-    if (prior !== undefined) writeFileSync(legacy,JSON.stringify(prior));
-    const child = spawnSync(process.execPath,[join(import.meta.dirname,'zone-gate-proof.mjs'),
-      `--base=${STAGING}`,`--out=${out}`,'--engine=webkit','--target=far-reach','--deploy','--walk-all',`--expected-build=${build}`,
-      ...(prior === undefined ? [] : [`--resume=${legacy}`])], {stdio:'inherit'});
-    if (child.error !== undefined) throw child.error;
-    return child.status ?? 1;
+  const scratch = openReleaseRun(process.cwd(), 'zone');
+  const out = scratch.work;
+  try {
+    if (full) {
+      if (retry !== undefined || options.has('--seed')) throw new Error('The full route uses --zone-entry-resume and has no seed');
+      const legacy = join(out,'held-full-route.json');
+      if (prior !== undefined) writeFileSync(legacy,JSON.stringify(prior));
+      const child = spawnSync(process.execPath,[join(import.meta.dirname,'zone-gate-proof.mjs'),
+        `--base=${STAGING}`,`--out=${out}`,'--engine=webkit','--target=far-reach','--deploy','--walk-all',`--expected-build=${build}`,
+        ...(prior === undefined ? [] : [`--resume=${legacy}`])], {stdio:'inherit'});
+      if (child.error !== undefined) throw child.error;
+      return child.status ?? 1;
+    }
+    const seedArg = options.get('--seed');
+    const seed = seedArg === undefined ? old?.seed ?? randomBytes(4).readUInt32LE(0) : /^\d+$/u.test(seedArg) ? Number(seedArg) : Number.NaN;
+    if (!validSeed(seed)) throw new Error('--seed must be an unsigned 32-bit integer');
+    if (old !== undefined && (old?.mode !== 'smoke' || old.build !== build || old.engine !== 'webkit' || old.profile !== 'phone' ||
+        old.pass !== false || old.seed !== seed)) throw new Error('Retry needs the saved seed and a held phone WebKit smoke for the same staging build');
+    return await runSmoke({build,out,seed,prior});
+  } finally {
+    try { keepReleaseProof(out, proof, ['zone-entry.json']); }
+    finally { scratch.close(); }
   }
-  const seedArg = options.get('--seed');
-  const seed = seedArg === undefined ? old?.seed ?? randomBytes(4).readUInt32LE(0) : /^\d+$/u.test(seedArg) ? Number(seedArg) : Number.NaN;
-  if (!validSeed(seed)) throw new Error('--seed must be an unsigned 32-bit integer');
-  if (old !== undefined && (old?.mode !== 'smoke' || old.build !== build || old.engine !== 'webkit' || old.profile !== 'phone' ||
-      old.pass !== false || old.seed !== seed)) throw new Error('Retry needs the saved seed and a held phone WebKit smoke for the same staging build');
-  return runSmoke({build,out,seed,prior});
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {

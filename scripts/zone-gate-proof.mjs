@@ -16,7 +16,7 @@
 // J451: `--walk-all --expected-build=<sha>` walks the phone tour. `--resume=<held zone-entry.json> --from=33`
 // continues at crossing 33 and uses a fresh `--out`. Omit `--from` to take the next crossing from the held report.
 import { agentFetch as fetch } from './agent-requests.mjs';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
@@ -25,21 +25,23 @@ import { watchFaults } from './proof-faults.mjs';
 import { guardStagingSockets } from './staging-proof-lines.mjs';
 import { deployFrameProblem, PHONE } from './journey-proof.mjs';
 import { FIRST_ZONE_PAIR, walkZoneEntryTour } from './zone-entry-tour.mjs';
+import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 
 /** @param {string} name @param {string} fallback */
 const flag = (name, fallback) => process.argv.find(arg => arg.startsWith(`--${name}=`))?.slice(name.length + 3) ?? fallback;
-const base = flag('base', '').replace(/\/$/u, ''), out = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire');
+const base = flag('base', '').replace(/\/$/u, ''), proof = absolute(flag('out', '')), engineName = flag('engine', 'chromium'), device = flag('device', ''), fire = process.argv.includes('--fire');
 const deploy = process.argv.includes('--deploy');
 const liveTour = process.argv.includes('--walk-all'), expectedBuild = flag('expected-build', '');
 const resumeFile = flag('resume', ''), fromFlag = flag('from', '');
-if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || out === absolute('')) throw new Error('usage: zone-gate-proof.mjs --base=<staging, preview or loopback url> --out=<dir>');
+if (!/^https:\/\/(preview|staging)\.wildshard\.io$|^http:\/\/127\.0\.0\.1:\d+$/u.test(base) || proof === absolute('')) throw new Error('usage: zone-gate-proof.mjs --base=<staging, preview or loopback url> --out=<dir>');
+if (engineName !== 'chromium' && engineName !== 'webkit') throw new Error('--engine takes chromium or webkit');
 // ZE15/ZE22: staging is a world build like the rig's (J205: a guest seat, the socket guarded to the staging door; never production)
 const staging = base === 'https://staging.wildshard.io', online = staging || process.argv.includes('--online');
 if (liveTour && (!staging || engineName !== 'webkit' || !/^[0-9a-f]{40}$/u.test(expectedBuild))) {
   throw new Error('--walk-all requires staging, WebKit and --expected-build');
 }
 if ((resumeFile !== '' && !liveTour) || (fromFlag !== '' && resumeFile === '') ||
-    (resumeFile !== '' && absolute(resumeFile) === join(out, 'zone-entry.json'))) {
+    (resumeFile !== '' && absolute(resumeFile) === join(proof, 'zone-entry.json'))) {
   throw new Error('Resume needs --walk-all, --resume=<held zone-entry.json> and a fresh --out; --from is the next 1-based crossing');
 }
 const prior = resumeFile === '' ? undefined : JSON.parse(readFileSync(resumeFile, 'utf8'));
@@ -63,7 +65,8 @@ const yawTo = (/** @type {number} */ sign) => ax === 'x' ? -sign * Math.PI / 2 :
 /** ZE10b: control in the new home on its Driftwood-side entryway's centre line 14 m in (within 1.5 m), facing in, then out onto the road. */
 const arrivedPastGate = (/** @type {any} */ fired) => fired?.ready === true && fired.walkedOut === true && fired.arrived !== null
   && Math.abs(dir * fired.arrived[ax] + HALF - 14) < 1.5 && Math.abs(fired.arrived[pp]) < 1.5 && Math.abs(Math.abs(fired.arrived.yaw) - Math.abs(yawTo(dir))) < 0.2;
-mkdirSync(out, { recursive: true });
+const scratch = openReleaseRun(process.cwd(), 'gate');
+const out = scratch.work;
 /** ZE10c: how long the arrival and the fresh boot each stand at the arrival pose before playingMB is read */
 const SETTLE_MS = 10_000;
 /**
@@ -124,9 +127,10 @@ async function bootDriftwood(context, page) {
   await page.getByText('DONE', { exact: true }).click({ timeout: 2000 }).catch(() => undefined);
 }
 
-const browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
+/** @type {import('playwright').Browser|undefined} */ let browser;
 let code = 1;
 try {
+  browser = await (engineName === 'webkit' ? webkit : chromium).launch({ headless: true, args: engineName === 'chromium' ? [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist'] : [] });
   result.build = await servedBuild().catch(() => '');
   if (liveTour && result.build !== expectedBuild) throw new Error('Staging serves a different build from the zone-entry request');
   const phone = device === '' ? undefined : devices[device];
@@ -364,8 +368,13 @@ try {
   console.log(`FAIL ${result.note}`);
 }
 finally {
-  if (liveTour) saveTour();
-  writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
-  await browser.close();
+  try {
+    if (liveTour) saveTour();
+    writeFileSync(join(out, `${tag}-zone-gate.json`), `${JSON.stringify(result, null, 2)}\n`);
+    keepReleaseProof(out, proof, [`${tag}-zone-gate.json`, 'zone-entry.json']);
+  } finally {
+    try { await browser?.close(); }
+    finally { scratch.close(); }
+  }
 }
-process.exit(code);
+process.exitCode = code;

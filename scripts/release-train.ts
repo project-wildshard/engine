@@ -15,7 +15,7 @@ import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page
 import { pidLock } from './pid-lock.mjs';
 import { latestReleaseRef, releaseDueFromRefs, reminderLine } from './release-due.mjs';
 import { readPublication } from './server-release/sign.mjs';
-import { scratchDir } from './scratch-dir.mjs';
+import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 
 const repo = 'project-wildshard/engine';
 const digest = /^sha256:[a-f0-9]{64}$/u;
@@ -191,11 +191,14 @@ async function main(args: string[]) {
   const unlock = pidLock(join(root, '.git', 'release-train.lock'));
   if (!unlock) throw new Error('Another train command is active');
   let stagingVerdict: string | undefined;
+  let scratch: ReturnType<typeof openReleaseRun> | undefined;
+  let evidence: string | undefined;
   try {
-    const scratch = { root, env: { ...process.env, WS_LANE_NAME: lane } };
-    const out = scratchDir(`release-train-${tag}`, `FS28 ${tag} from green main to npm next`, scratch);
-    // PGlite binds a Unix socket below this directory. Keep its macOS path short.
-    const localDir = scratchDir(`qa-${tag}-${source.headSha.slice(0, 8)}`, `FS28 ${tag} local QA`, scratch);
+    scratch = openReleaseRun(root, 'train');
+    const out = scratch.work, saved = join(dirname(scratch.proof), `train-${tag}-${source.headSha.slice(0, 8)}`);
+    evidence = saved;
+    mkdirSync(saved, { recursive: true, mode: 0o700 });
+    const localDir = join(saved, 'local');
     const local = join(localDir, 'verdict.json');
     if (!existsSync(local)) await runLogged(root, join(out, 'local.log'), 'bash', [
       'scripts/browser-lane.sh', '--max', '20', process.execPath, 'scripts/staging-qa.mjs',
@@ -234,10 +237,10 @@ async function main(args: string[]) {
     if (!existsSync(join(stageTree, 'node_modules/.pnpm/lock.yaml'))) {
       await runLogged(stageTree, join(out, 'staging-install.log'), 'pnpm', ['install', '--frozen-lockfile', '--config.ci=false']);
     }
-    const attemptPath = join(out, 'staging-attempt.json');
+    const attemptPath = join(saved, 'staging-attempt.json');
     const attempt = (read(attemptPath) as { attempt: number } | undefined)?.attempt ?? 0;
     if (!Number.isSafeInteger(attempt) || attempt < 0) throw new Error('The staging attempt number is invalid');
-    const attemptRoot = (id: number) => join(out, id === 0 ? 'staging' : `staging-${id}`);
+    const attemptRoot = (id: number) => join(saved, id === 0 ? 'staging' : `staging-${id}`);
     const previousVerdictPath = join(attemptRoot(attempt), 'verdict.json');
     const previousVerdict = read(previousVerdictPath) as Verdict | undefined;
     if (previousVerdict && previousVerdict.build !== build) throw new Error('The prior staging verdict names another build');
@@ -245,23 +248,31 @@ async function main(args: string[]) {
     const previousTour = previousVerdict?.deploy?.zoneEntry;
     const resume = retry && previousTour?.build === build && previousTour.pass === false && previousTour.failures?.length
       ? [`--zone-entry-resume=${previousVerdictPath}`] : [];
-    const deployRoot = attemptRoot(attempt + Number(retry));
+    const deployRoot = join(out, 'deployment');
+    const deployEvidence = attemptRoot(attempt + Number(retry));
     record(attemptPath, { attempt: attempt + Number(retry) });
     const env = { ...process.env, BROWSER: 'none', E7_RELEASE_SIGNING_KEY: readFileSync(join(homedir(), '.config/wildshard/e7-release-signing.pem'), 'utf8') };
     const pageArgs = [`--env-file=${join(homedir(), '.config/wildshard/cook.env')}`, 'scripts/page-release.mjs', 'staging'];
     const pageState = join(stageTree, 'tmp/page-release', `staging-${build}.json`);
     const state = () => read(pageState) as { build?: { build?: string }; 'go-live'?: Alias } | undefined;
-    if (state()?.build?.build !== build) await runLogged(stageTree, join(out, 'staging-build.log'), process.execPath,
-      [...pageArgs, 'build', '--content'], env);
-    const stageVerdict = join(deployRoot, 'verdict.json');
+    const savedAlias = join(saved, 'staging-alias.json');
+    const alias = () => state()?.['go-live'] ?? (read(savedAlias) as Alias | undefined);
+    const stageVerdict = join(deployEvidence, 'verdict.json');
     stagingVerdict = stageVerdict;
     let pageDone = existsSync(stageVerdict);
+    if (!pageDone && state()?.build?.build !== build) await runLogged(stageTree, join(out, 'staging-build.log'), process.execPath,
+      [...pageArgs, 'build', '--content'], env);
     const runPage = async () => {
       if (pageDone) return;
       try {
         await runLogged(stageTree, join(out, 'staging.log'), process.execPath,
           [...pageArgs, 'go-live', '--content', `--local-qa=${local}`, `--qa-out=${deployRoot}`, '--wait=60', ...resume], env);
-      } finally { pageDone = true; }
+      } finally {
+        pageDone = true;
+        keepReleaseProof(deployRoot, deployEvidence, ['verdict.json', 'qualification/leg.json', 'zone-entry/zone-entry.json', 'mmo-observer.json']);
+        const live = state()?.['go-live'];
+        if (live?.build === build) record(savedAlias, live);
+      }
     };
     // Install the rejection handler before waiting on the early npm handoff.
     const pageResult = failure(runPage());
@@ -308,16 +319,17 @@ async function main(args: string[]) {
       }
       const verified = names.map(ready);
       if (verified.some(asset => asset === undefined)) throw new Error('Both immutable client archives are required');
-      record(join(out, 'author-archives.json'), { stageTag, assets: verified });
+      record(join(saved, 'author-archives.json'), { stageTag, assets: verified });
       receipt(lane, `DONE ${tag} ${build.slice(0, 10)} immutable staging tag and both client archives verified.`);
     };
     const archives = failure(clientArchives());
 
     const npmNext = async () => {
       const candidateProof = () => {
-        const alias = state()?.['go-live'];
+        const active = nextAdmission(build, tag, ci, alias(), read(join(deployRoot, ...qualification)) as Leg | undefined);
+        if (active) return active;
         for (let id = attempt + Number(retry); id >= 0; id--) {
-          const proof = nextAdmission(build, tag, ci, alias, read(join(attemptRoot(id), ...qualification)) as Leg | undefined);
+          const proof = nextAdmission(build, tag, ci, alias(), read(join(attemptRoot(id), ...qualification)) as Leg | undefined);
           if (proof) return proof;
         }
         return undefined;
@@ -330,7 +342,7 @@ async function main(args: string[]) {
       }
       if (!input) throw new Error('No passing candidate and matching staging alias for npm next');
       const { serial } = JSON.parse(input.staging_qualification) as { serial: number };
-      const publish = join(out, 'npm-next-run.json');
+      const publish = join(saved, 'npm-next-run.json');
       const previousRun = read(publish) as {build: string; run?: number} | undefined;
       let run = previousRun?.build === build ? previousRun.run : undefined;
       if (run === undefined) {
@@ -367,7 +379,7 @@ async function main(args: string[]) {
               const hash = createHash('sha512');
               for await (const chunk of response.body) hash.update(chunk);
               if (`sha512-${hash.digest('base64')}` === integrity) {
-                record(join(out, 'npm-next.json'), { build, version, run, integrityVerified: true });
+                record(join(saved, 'npm-next.json'), { build, version, run, integrityVerified: true });
                 receipt(lane, `DONE ${tag} npm next verified ${version} from ${build.slice(0, 10)} run ${run}. SHA-512 matched.`);
                 return;
               }
@@ -383,14 +395,17 @@ async function main(args: string[]) {
     if (failures.length > 0) throw new Error(failures.map(error => error.message).join('\n'));
     const verdict = read(stageVerdict) as Verdict | undefined;
     if (verdict?.build !== build || verdict.status !== 'pass' || verdict.hold !== false) throw new Error(`Staging is held. See ${stageVerdict}`);
-    receipt(lane, `DONE FS28 ${tag} staging QA and J451 passed. Delivery evidence in tmp/release-train-${tag}.`);
+    receipt(lane, `DONE FS28 ${tag} staging QA and J451 passed. Delivery evidence in ${saved}.`);
   } catch (error) {
     const failed = stagingVerdict === undefined ? undefined : (read(stagingVerdict) as Verdict | undefined)?.deploy?.zoneEntry?.failures?.[0];
     const pair = failed && /^[a-z0-9_-]+$/u.test(failed.from) && /^[a-z0-9_-]+$/u.test(failed.to)
       ? ` ${failed.from} -> ${failed.to}.` : '';
-    receipt(lane, `HOLD ${tag} train.${pair} See tmp/release-train-${tag}.`);
+    receipt(lane, `HOLD ${tag} train.${pair}${evidence === undefined ? '' : ` See ${evidence}.`}`);
     throw error;
-  } finally { unlock(); }
+  } finally {
+    try { scratch?.close(); }
+    finally { unlock(); }
+  }
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {

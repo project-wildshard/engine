@@ -8,6 +8,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { readPublication } from '../server-release/sign.mjs';
 import { worstFirst } from '../staging-smoke/checks.mjs';
 import { CHANNELS, RELEASE_PUBLIC_KEY, RefusedError, localQaGap, qaGap, zoneEntryGap } from './flow.mjs';
+import { keepReleaseProof, openReleaseRun } from '../release-run.mjs';
 
 const stage = CHANNELS.staging;
 const scripts = absolute(import.meta.dirname, '..');
@@ -110,10 +111,12 @@ async function runZoneEntry(out, build, resume) {
  * localQa?:import('./flow.mjs').QaVerdict, readState:() => any, get:(url:string) => Promise<any>,
  * phase:(name:import('./flow.mjs').Phase, qa?:import('./flow.mjs').QaVerdict) => Promise<unknown>, log:(line:string)=>void }} opts */
 export async function deployStaging({ root, build, release, source, out, observerProof, zoneEntryResume, localQa, readState, get, phase, log }) {
-  const reportPath = join(out, 'verdict.json'), shared = join(toolsRoot, 'tmp', 'staging-observer'), observerRoot = join(root, 'tmp', 'staging-deploy', build);
+  const reportPath = join(out, 'verdict.json');
   if (existsSync(reportPath)) throw new RefusedError('Choose a fresh staging deploy evidence directory');
   mkdirSync(out, { recursive: true, mode: 0o700 });
-  const observedPath = join(observerRoot, observerFile);
+  const scratch = openReleaseRun(toolsRoot, 'deploy');
+  const work = scratch.work, shared = join(work, 'observer');
+  const observedPath = join(out, observerFile);
   /** @type {ReturnType<typeof observeMove>|undefined} */ let running;
   /** @type {DeploymentQa|undefined} */ let qa;
   /** @type {DeploymentQa|undefined} */ let live;
@@ -142,14 +145,13 @@ export async function deployStaging({ root, build, release, source, out, observe
     const page = await get(`${stage.origin}/version.json`), alreadyLive = page.build === build;
     if (!alreadyLive && zoneEntryResume !== undefined) throw new RefusedError('A zone-entry resume requires the build already live on staging');
     try {
-      mkdirSync(observerRoot, { recursive: true, mode: 0o700 });
       observation = read((alreadyLive ? observerProof : undefined) ?? observedPath);
       if (!alreadyLive && observation === undefined) {
         const signed = readPublication(JSON.stringify(await get(stage.release)), RELEASE_PUBLIC_KEY);
         if (signed.engineBuild === build) {
           noteObserver('rooms-already-switched', 'Signed rooms already changed before the observer could seat its baseline.');
         } else {
-          running = observeMove({ root: observerRoot, out, shared });
+          running = observeMove({ root: out, out: work, shared });
           await running.baseline();
         }
       }
@@ -163,7 +165,7 @@ export async function deployStaging({ root, build, release, source, out, observe
       if (readState().check === undefined) {
         const signed = readPublication(JSON.stringify(await get(stage.release)), RELEASE_PUBLIC_KEY);
         if (signed.engineBuild !== build) {
-          const signer = start({file: 'gh', args: ['workflow', 'run', 'server-release.yml', '--ref', 'main', '-f', `build=${build}`], cwd: root, out, name: 'sign'});
+          const signer = start({file: 'gh', args: ['workflow', 'run', 'server-release.yml', '--ref', 'main', '-f', `build=${build}`], cwd: root, out: work, name: 'sign'});
           await signer.done; // The exact hosted-CI admission also invokes the signer automatically.
         }
         await phase('check');
@@ -171,7 +173,8 @@ export async function deployStaging({ root, build, release, source, out, observe
     }
     step = 'deploy smoke';
     const candidate = alreadyLive ? undefined : readState().check.deployment.url;
-    qa = await runQa({ root, build, release, out, name: 'qualification', ...(candidate === undefined ? {} : { candidate }), deploy: true });
+    qa = await runQa({ root, build, release, out: work, name: 'qualification', ...(candidate === undefined ? {} : { candidate }), deploy: true });
+    keepReleaseProof(work, out, ['qualification/leg.json']);
     const bad = qaGap(qa, build);
     if (bad !== undefined) throw new RefusedError(bad);
     const serial = alreadyLive ? (await get(stage.health)).serial : readState().check.serial;
@@ -182,17 +185,17 @@ export async function deployStaging({ root, build, release, source, out, observe
       aliasMoved = true;
       step = 'live smoke';
       try {
-        live = await runQa({ root, build, release, out, name: 'live', deploy: false });
+        live = await runQa({ root, build, release, out: work, name: 'live', deploy: false });
         liveProblem = qaGap(live, build);
       } catch (error) {
         liveProblem = error instanceof RefusedError ? error.message : 'Live M3 did not complete';
       }
     }
     step = 'zone entry';
-    zoneEntry = await runZoneEntry(out, build, zoneEntryResume);
+    zoneEntry = await runZoneEntry(work, build, zoneEntryResume);
     try {
       observation ??= read(observedPath);
-      observation = resumedObservation(observerRoot, observedPath, observation);
+      observation = resumedObservation(out, observedPath, observation);
       const exact = observation?.to?.build === build && observation.to.serial === serial;
       if (exact && observation?.status === 'observed' && observation.continuity === 'restored') {
         observerNote = undefined;
@@ -217,7 +220,10 @@ export async function deployStaging({ root, build, release, source, out, observe
     log(`staging go-live HOLD ${release} ${build.slice(0,8)} (${reportPath})`);
     throw error;
   } finally {
-    running?.stop();
-    await running?.done;
+    try {
+      running?.stop();
+      await running?.done;
+      keepReleaseProof(work, out, ['live/leg.json', 'zone-entry/zone-entry.json']);
+    } finally { scratch.close(); }
   }
 }

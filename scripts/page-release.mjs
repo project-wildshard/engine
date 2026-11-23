@@ -36,6 +36,7 @@ import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
 import {deployStaging} from './page-release/staging-deploy.mjs';
+import {openReleaseRun} from './release-run.mjs';
 
 /** SQ15: the staging-qa verdict.json, or why it could not be read. @param {string} file */
 function readQa(file) {
@@ -94,6 +95,8 @@ const contentCopies = flag('content') === undefined ? undefined : r2Copies(proce
 if (contentCopies !== undefined) secrets.push(...contentCopies.secrets);
 
 let phase = '';
+/** @type {ReturnType<typeof openReleaseRun>|undefined} */
+let scratch;
 const phases = phaseList.split(',');
 const bundled = channel === 'staging' && !flag('dry-run') && phases.includes('go-live');
 const localQa = value('local-qa') === undefined ? undefined : readQa(resolve(value('local-qa') ?? ''));
@@ -105,12 +108,13 @@ const manifest = {
 /** @param {import('./page-release/flow.mjs').Phase} step @param {import('./page-release/flow.mjs').QaVerdict} [generatedQa] */
 async function run(step, generatedQa) {
     const qa = generatedQa ?? (value('qa') === undefined ? undefined : readQa(resolve(value('qa') ?? '')));
+    const work = scratch?.work;
     const {refusals} = await runPhase(step, {
       root, channel: /** @type {any} */ (channel), build, host, releaseKey, codeRetention: channel !== 'explore',
       packs: r2Packs({log}),
-      ...(flag('content') === undefined ? {} : {content: {
+      ...(flag('content') === undefined || work === undefined ? {} : {content: {
         publish: ({dir, cors, dryRun}) => publishContent({dir, origin: cors, dryRun, log,
-          scratch: join(root, 'tmp/page-release/content'), store: r2Content({root, scratch: join(root, 'tmp/page-release/content'), token: cloudflareToken, copies: contentCopies})}),
+          scratch: work, store: r2Content({root, scratch: work, token: cloudflareToken, copies: contentCopies})}),
       }}),
       run: (file, argv, env) => {
         const signing = file === 'node' && (argv[2] === 'scripts/page-release/preview.mjs' || argv[0] === 'scripts/code-retention.mjs') && signingKey !== undefined
@@ -146,12 +150,13 @@ async function run(step, generatedQa) {
     if (refusals.length > 0) log(`DRY-RUN ${channel} ${step}: ${refusals.length} gate(s) would refuse today`);
 }
 try {
+  scratch = openReleaseRun(root, 'page');
   for (phase of phases) {
     if (bundled && (phase === 'upload' || phase === 'check')) continue;
     if (bundled && phase === 'go-live' && localQaSource !== undefined) {
       const proof = value('observer-proof'), resume = value('zone-entry-resume');
       await deployStaging({ root, build, release: `v${manifest.version}`, source: localQaSource,
-        out: resolve(value('qa-out') ?? join(root, 'tmp', 'staging-deploy', build, String(Date.now()))),
+        out: resolve(value('qa-out') ?? scratch.proof),
         ...(localQa === undefined ? {} : { localQa }), ...(proof === undefined ? {} : { observerProof: resolve(proof) }),
         ...(resume === undefined ? {} : { zoneEntryResume: resolve(resume) }),
         readState, get: async url => (await fetch200(url)).json(), phase: run, log });
@@ -162,4 +167,7 @@ try {
   console.error(redact(error instanceof RefusedError ? error.message : `${channel} ${phase} failed: ${error instanceof Error ? error.message : String(error)}`));
   console.error('the alias did not move unless an ALIAS MOVED line is above');
   process.exitCode = 1;
-} finally { contentCopies?.close(); }
+} finally {
+  try { contentCopies?.close(); }
+  finally { scratch?.close(); }
+}

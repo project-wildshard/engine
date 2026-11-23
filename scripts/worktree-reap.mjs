@@ -1,10 +1,11 @@
 // REPO-DISK J358: report plan-worktree liveness for a human audit.
-// This command never removes worktrees or branches and never stops processes.
+// Linked worktrees stay report-only. Reap also removes idle scratch with no Git or open files.
 import {execFileSync,spawnSync} from 'node:child_process';
 import {existsSync,readdirSync,readlinkSync,statSync,statfsSync} from 'node:fs';
 import {basename,join,resolve,sep} from 'node:path';
 import {laneLive} from './lane-live.mjs';
 import {WORKTREES} from './worktree-ignore.mjs';
+import {reapTmp} from './tmp-reap.mjs';
 
 const REAP_USAGE='usage: node scripts/worktree.mjs reap [--dry-run] [--grace=HOURS] [--stale=HOURS] [--no-remote]';
 
@@ -152,5 +153,6 @@ export function reap(canonical,options,env,say){
   const landed=onMain(canonical,tree.head);
   say(`${state.state} ${slug}: ${state.reason}; ${landed?'on origin/main':'not on origin/main'}; manual audit, copy before removal`);
  }
+ reapTmp(canonical,options,say);
  return 0;
 }

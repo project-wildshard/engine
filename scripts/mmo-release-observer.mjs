@@ -11,6 +11,7 @@ import {prepareObserverClient} from './mmo-observer-client.mjs';
 import {observeRelease} from '../test/fixtures/dedicated/releaseObserver.ts';
 import {CHANNELS} from './page-release/flow.mjs';
 import {agentHeaders} from './agent-marker.mjs';
+import {openReleaseRun} from './release-run.mjs';
 
 const ROOT=resolve(import.meta.dirname,'..');
 /** @param {string[]} args @param {string} [root] */
@@ -52,12 +53,11 @@ export async function runObserver(args,root=ROOT){
  mkdirSync(base,{recursive:true});
  const realBase=realpathSync(base);
  if(!realBase.startsWith(`${tmp}/`))throw new Error('Observer scratch resolves outside checkout tmp/');
- const id=randomUUID(),work=join(realBase,id),owner=process.env.CODEX_THREAD_ID??process.env.WS_LANE_NAME??`observer-${process.pid}`;
- mkdirSync(work,{mode:0o700});
- writeFileSync(join(work,'.owner'),`${JSON.stringify({session:owner,lane:process.env.WS_LANE_NAME??'mmo-release-observer',purpose:'Bounded signed staging observation',started:new Date().toISOString()})}\n`,{flag:'wx'});
  const publicKey=/^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(readFileSync(join(root,'scripts/vps/setup.sh'),'utf8'))?.[1];
  if(publicKey===undefined)throw new Error('No pinned release public key');
  const inputs=observationInputs({publicKey}),cancel=new AbortController();
+ const id=randomUUID(),scratch=openReleaseRun(root,'observer');
+ const work=scratch.work,reportPath=join(realBase,`report-${id}.json`);
  const stop=()=>{cancel.abort();};process.once('SIGINT',stop);process.once('SIGTERM',stop);
  try{
   const report=await observeRelease({read:(signal,liveGenerations)=>inputs.read(signal,liveGenerations),
@@ -71,10 +71,13 @@ export async function runObserver(args,root=ROOT){
    labels:[`E7-${id.slice(0,6)}-0`,`E7-${id.slice(0,6)}-1`],durationMs:seconds*1000,signal:cancel.signal,requireDurableBaseline:true,reloadClient:true,
    retryMs:60_000,
    event:phase=>{console.log(JSON.stringify({at:'release-observer',phase}));}});
-  writeFileSync(join(work,'report.json'),`${JSON.stringify(report,null,2)}\n`,{mode:0o600});
-  console.log(JSON.stringify({status:report.status,reason:report.reason,from:report.from,to:report.to,continuity:report.continuity,report:join(work,'report.json')}));
+  writeFileSync(reportPath,`${JSON.stringify(report,null,2)}\n`,{mode:0o600,flag:'wx'});
+  console.log(JSON.stringify({status:report.status,reason:report.reason,from:report.from,to:report.to,continuity:report.continuity,report:reportPath}));
   return report.status==='observed'?0:report.status==='refused'||report.status==='failed'?1:report.status==='cancelled'?130:75;
- }finally{process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);}
+ }finally{
+  process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);
+  scratch.close();
+ }
 }
 // The staging door requires its page Origin. Node's global WebSocket does not supply it.
 export class StagingSocket extends NodeWebSocket {

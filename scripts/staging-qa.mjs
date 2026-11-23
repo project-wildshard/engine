@@ -22,6 +22,7 @@ import { budgetFinding, budgetLines, LEGS } from './staging-qa-budget.mjs';
 import { iosSafari } from './staging-qa-sim.mjs';
 import { readOnlyPhoneLoad } from './journey-proof.mjs';
 import { roomsRevisionFindings } from './rooms-revision-check.ts';
+import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 
 /** @typedef {import('./staging-smoke/checks.mjs').Finding} Finding */
 /** @typedef {{ id: string, browser: string, pass: boolean, seconds: number, playedMs: number, reason?: string, log: string }} Proof */
@@ -189,19 +190,23 @@ async function cli() {
   }
   const legStarted = Date.now();
   const root = resolve(args.get('root') ?? '.');
-  const out = resolve(args.get('out') ?? join(root, 'tmp', 'staging-qa', release, String(Date.now())));
-  if (existsSync(join(out, 'verdict.json')) || existsSync(join(out, 'smoke')) || expected.some(id => existsSync(join(out, id)))) throw new Error('Use a fresh staging QA output directory');
-  const liveStore = resolve(args.get('store') ?? STORE);
-  const store = local ? join(out, 'local-store') : candidateUrl === undefined ? liveStore : join(out, 'candidate-store');
-  if (candidateUrl !== undefined) {
-    const saved = newestProfiles(liveStore, url, release);
-    if (saved !== undefined) cpSync(saved.dir, join(store, saved.note.release, 'profiles'), { recursive: true });
-    mkdirSync(out, { recursive: true });
-  }
-  const rig = local && source !== undefined ? await openQaRig({ root, build: source, out, ...(tourSeed === undefined ? {} : {tourSeed}) }) : undefined;
-  const candidate = candidateUrl !== undefined && source !== undefined ? await openQaCandidate({ root, out, candidate: candidateUrl, build: source }) : undefined;
+  const scratch = openReleaseRun(root, 'qa');
+  const out = scratch.work, proof = resolve(args.get('out') ?? scratch.proof);
+  /** @type {Awaited<ReturnType<typeof openQaRig>>|undefined} */ let rig;
+  /** @type {Candidate|undefined} */ let candidate;
   let unbind;
+  let fresh = false;
   try {
+    if (existsSync(join(proof, 'verdict.json')) || existsSync(join(proof, 'zone-entry', 'zone-entry.json'))) throw new Error('Use a fresh staging QA proof directory');
+    fresh = true;
+    const liveStore = resolve(args.get('store') ?? STORE);
+    const store = local ? join(out, 'local-store') : candidateUrl === undefined ? liveStore : join(out, 'candidate-store');
+    if (candidateUrl !== undefined) {
+      const saved = newestProfiles(liveStore, url, release);
+      if (saved !== undefined) cpSync(saved.dir, join(store, saved.note.release, 'profiles'), { recursive: true });
+    }
+    rig = local && source !== undefined ? await openQaRig({ root, build: source, out, ...(tourSeed === undefined ? {} : {tourSeed}) }) : undefined;
+    candidate = candidateUrl !== undefined && source !== undefined ? await openQaCandidate({ root, out, candidate: candidateUrl, build: source }) : undefined;
     unbind = candidate === undefined ? undefined : bindCandidateBrowser(candidate);
     if (runQa) await qualify({ url: rig?.base ?? url, release, root: rig?.source ?? root, out, store, local, kind, legStarted,
       selected, expected, owner, full: requested === undefined && tourSeed === undefined,
@@ -220,9 +225,18 @@ async function cli() {
     // become the live store's: the next release's old cache and time-to-play baseline
     if (candidate !== undefined && process.exitCode === 0 && existsSync(join(store, release))) cpSync(join(store, release), join(liveStore, release), { recursive: true });
   } finally {
-    unbind?.();
-    await candidate?.close();
-    await rig?.close();
+    try {
+      try { unbind?.(); }
+      finally {
+        try { await candidate?.close(); }
+        finally { await rig?.close(); }
+      }
+    } finally {
+      try {
+        if (fresh) keepReleaseProof(out, proof, ['verdict.json', 'zone-entry/zone-entry.json', 'zone-entry-retry/zone-entry.json']);
+        if (fresh && existsSync(proof)) console.log(`staging QA evidence ${proof}`);
+      } finally { scratch.close(); }
+    }
   }
 }
 
@@ -277,7 +291,7 @@ async function qualify({ url, release, root, out, store, local, kind, legStarted
     mkdirSync(dirname(receipts), { recursive: true });
     appendFileSync(receipts, `${new Date().toISOString()} ${process.env.WS_LANE_NAME ?? 'staging-qa'} ${line}\n`);
   }
-  console.log(`${line} (${file})`);
+  console.log(line);
   process.exitCode = verdict.hold ? 1 : 0;
 }
 

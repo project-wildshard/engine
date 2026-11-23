@@ -12,6 +12,7 @@
 // staging gate (J386), run before any prod promote. It only reads: every request but a GET is aborted.
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 import { join, resolve as resolvePath } from 'node:path';
 import { watchFaults } from './proof-faults.mjs';
 
@@ -409,8 +410,9 @@ async function cli() {
     if (next !== undefined && !next.startsWith('--')) { args.set(key, next); i++; } else args.set(key, 'true');
   }
   const url = args.get('url') ?? 'https://staging.wildshard.io', card = args.get('card') ?? 'driftwood-isle';
-  const out = resolvePath(args.get('out') ?? `tmp/${process.env.WS_LANE_NAME ?? 'journey'}/journey`);
   const browsers = (args.get('browsers') ?? 'chromium,webkit').split(','), runs = (args.get('runs') ?? 'cold,warm').split(',');
+  if (browsers.some(name => name !== 'chromium' && name !== 'webkit')) throw new Error('--browsers takes chromium and webkit');
+  if (runs.some(run => run !== 'cold' && run !== 'warm')) throw new Error('--runs takes cold and warm');
   const paths = /** @type {JourneyPath[]} */ ((args.get('paths') ?? 'select,mmo,deeplink').split(','));
   if (paths.some((p) => !['select', 'mmo', 'deeplink'].includes(p))) throw new Error('--paths takes select, mmo and deeplink');
   if (paths.includes('deeplink') && !/^[a-z0-9_-]+$/u.test(card)) throw new Error(`--card ${card}: the deep link needs a slug, not a name`);
@@ -419,75 +421,87 @@ async function cli() {
   // SB3: --prime <dir> starts each browser from a saved profile (<dir>/<browser>), an old shell as Jake's phone holds one
   const prime = args.get('prime');
   if (/wildshard\.io/u.test(url) && !/staging/u.test(url)) throw new Error('The journey proof joins a world: staging or local only');
-  const pw = await import('./browser-playwright.mjs');
-  // SB3: the build staging serves, read before and after; a run whose build moved under it names none (the gate skips it)
-  const served = async () => { try { return String((await (await fetch(`${url}/version.json`, { cache: 'no-store' })).json()).build); } catch { return undefined; } };
-  const before = await served();
-  mkdirSync(out, { recursive: true });
-  let failed = false;
-  /** @type {unknown[]} */
-  const report = [];
-  for (const name of browsers) for (const way of paths) {
-    const engine = name === 'webkit' ? pw.webkit : pw.chromium;
-    // one profile per browser and way: each way's cold run is a first visit, its warm run the same profile again
-    const profile = join(out, `profile-${name}-${way}`);
-    if (prime !== undefined) {
-      if (!existsSync(join(prime, name))) throw new Error(`--prime ${prime} has no ${name} profile`);
-      cpSync(join(prime, name), profile, { recursive: true });
-    }
-    const context = await engine.launchPersistentContext(profile, {
-      ...PHONE, isMobile: name !== 'webkit', headless: true,
-      ...(args.has('video') ? { recordVideo: { dir: join(out, `video-${name}`), size: PHONE.viewport } } : {}),
-      ...(name === 'webkit' ? {} : { args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }),
-    });
-    // rAF capped at 60 fps, as the smoke and the zone sweep run: the GPU is Jake's (lane rules, opus-deskperf)
-    await context.addInitScript(capFrames);
-    await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
-    // SB42: the lane's door pass, so a proof's joins never spend the address Jake's phone shares
-    const pass = (await import('./door-pass.mjs')).doorPassInit(process.env.WS_LANE_NAME ?? 'journey-proof'); if (pass !== null) await context.addInitScript(pass);
-    // --developer: Settings ▸ Developer on, for a local build whose only cards are Developer ones (T1's ring 1, Brasscap)
-    if (args.has('developer')) await (await import('./debug-settings.mjs')).saveFixture(context, { scope: 'device', key: 'devMode', data: true });
-    try {
-      for (const run of runs) {
-        const page = context.pages()[0] ?? await context.newPage();
-        if (throttle > 1 && name !== 'webkit') await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
-        /** @type {string[]} */
-        const errors = [];
-        // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
-        const faults = await watchFaults(page, errors);
-        await page.goto(way === 'deeplink' ? `${url}/slug/${card}` : `${url}/`, { waitUntil: 'commit' });
-        let n = 0;
-        const dir = join(out, `${name}-${way}-${run}`);
-        mkdirSync(dir, { recursive: true });
-        const samples = await tapJourney(page, { card, path: way, frames: async (row) => {
-          await page.screenshot({ path: join(dir, `${String(n++).padStart(3, '0')}-${String(row.t).padStart(6, '0')}-${label(row.s)}.png`), timeout: 5000 });
-        } });
-        const problems = deploy ? judgeDeploy(samples) : judge(samples);
-        const stuck = problems.length === 0 ? await stickProblem(page) : null;
-        if (stuck !== null) problems.push({ at: samples.at(-1)?.t ?? 0, text: stuck });
-        const watchStarted = Date.now();
-        const dark = deploy && problems.length === 0 ? await deployFrameProblem(page) : null;
-        if (dark !== null) problems.push({ at: samples.at(-1)?.t ?? 0, text: dark });
-        const playedMs = deploy && problems.length === 0 ? Date.now() - watchStarted : 0;
-        await faults.settle();
-        if (!deploy) for (const text of errors) problems.push({ at: samples.at(-1)?.t ?? 0, text });
-        /** @type {string[]} */
-        const path = [];
-        for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t)}:${l}`); }
-        const ok = problems.length === 0;
-        const zones = [...new Set(samples.map((row) => row.s?.zone ?? '').filter((zone) => zone !== ''))];
-        const resumed = /** @type {{ resumed?: boolean }} */ (samples).resumed === true;
-        report.push({ browser: name, way, run, ok, problems, path: path.join(' '), zones, errors, samples, playedMs, ...(resumed ? { resumed } : {}) });
-        if (!ok) failed = true;
-        console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${way} ${run}${resumed ? ' (resumed into its world)' : ''}: ${path.join(' ')}${zones.length > 0 ? ` (card: ${zones.join(', ')})` : ''}`);
-        for (const p of problems) console.log(`  - ${String(p.at)} ms: ${p.text}`);
-        await page.goto('about:blank');
+  const scratch = openReleaseRun(process.cwd(), 'journey');
+  const out = scratch.work, proof = resolvePath(args.get('out') ?? scratch.proof);
+  try {
+    const pw = await import('./browser-playwright.mjs');
+    // SB3: the build staging serves, read before and after; a run whose build moved under it names none (the gate skips it)
+    const served = async () => { try { return String((await (await fetch(`${url}/version.json`, { cache: 'no-store' })).json()).build); } catch { return undefined; } };
+    const before = await served();
+    mkdirSync(out, { recursive: true });
+    let failed = false;
+    /** @type {unknown[]} */
+    const report = [];
+    for (const name of browsers) for (const way of paths) {
+      const engine = name === 'webkit' ? pw.webkit : pw.chromium;
+      // one profile per browser and way: each way's cold run is a first visit, its warm run the same profile again
+      const profile = join(out, `profile-${name}-${way}`);
+      if (prime !== undefined) {
+        if (!existsSync(join(prime, name))) throw new Error(`--prime ${prime} has no ${name} profile`);
+        cpSync(join(prime, name), profile, { recursive: true });
       }
-    } finally { await context.close(); }
+      const context = await engine.launchPersistentContext(profile, {
+        ...PHONE, isMobile: name !== 'webkit', headless: true,
+        ...(args.has('video') ? { recordVideo: { dir: join(out, `video-${name}`), size: PHONE.viewport } } : {}),
+        ...(name === 'webkit' ? {} : { args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }),
+      });
+      try {
+        // rAF capped at 60 fps, as the smoke and the zone sweep run: the GPU is Jake's (lane rules, opus-deskperf)
+        await context.addInitScript(capFrames);
+        await context.route('**/*', async (route) => { await (route.request().method() === 'GET' ? route.continue() : route.abort()); });
+        // SB42: the lane's door pass, so a proof's joins never spend the address Jake's phone shares
+        const pass = (await import('./door-pass.mjs')).doorPassInit(process.env.WS_LANE_NAME ?? 'journey-proof'); if (pass !== null) await context.addInitScript(pass);
+        // --developer: Settings ▸ Developer on, for a local build whose only cards are Developer ones (T1's ring 1, Brasscap)
+        if (args.has('developer')) await (await import('./debug-settings.mjs')).saveFixture(context, { scope: 'device', key: 'devMode', data: true });
+        for (const run of runs) {
+          const page = context.pages()[0] ?? await context.newPage();
+          if (throttle > 1 && name !== 'webkit') await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: throttle });
+          /** @type {string[]} */
+          const errors = [];
+          // ZE23: a page error, a faulted system, the error card or the glitch chip each fail the run (proof-faults.mjs)
+          const faults = await watchFaults(page, errors);
+          await page.goto(way === 'deeplink' ? `${url}/slug/${card}` : `${url}/`, { waitUntil: 'commit' });
+          let n = 0;
+          const dir = join(out, `${name}-${way}-${run}`);
+          mkdirSync(dir, { recursive: true });
+          const samples = await tapJourney(page, { card, path: way, frames: async (row) => {
+            await page.screenshot({ path: join(dir, `${String(n++).padStart(3, '0')}-${String(row.t).padStart(6, '0')}-${label(row.s)}.png`), timeout: 5000 });
+          } });
+          const problems = deploy ? judgeDeploy(samples) : judge(samples);
+          const stuck = problems.length === 0 ? await stickProblem(page) : null;
+          if (stuck !== null) problems.push({ at: samples.at(-1)?.t ?? 0, text: stuck });
+          const watchStarted = Date.now();
+          const dark = deploy && problems.length === 0 ? await deployFrameProblem(page) : null;
+          if (dark !== null) problems.push({ at: samples.at(-1)?.t ?? 0, text: dark });
+          const playedMs = deploy && problems.length === 0 ? Date.now() - watchStarted : 0;
+          await faults.settle();
+          if (!deploy) for (const text of errors) problems.push({ at: samples.at(-1)?.t ?? 0, text });
+          /** @type {string[]} */
+          const path = [];
+          for (const { t, s } of samples) { const l = label(s); if (!path.at(-1)?.endsWith(`:${l}`)) path.push(`${String(t)}:${l}`); }
+          const ok = problems.length === 0;
+          const zones = [...new Set(samples.map((row) => row.s?.zone ?? '').filter((zone) => zone !== ''))];
+          const resumed = /** @type {{ resumed?: boolean }} */ (samples).resumed === true;
+          report.push({ browser: name, way, run, ok, problems, path: path.join(' '), zones, errors, samples, playedMs, ...(resumed ? { resumed } : {}) });
+          if (!ok) failed = true;
+          console.log(`${ok ? 'PASS' : 'FAIL'} ${name} ${way} ${run}${resumed ? ' (resumed into its world)' : ''}: ${path.join(' ')}${zones.length > 0 ? ` (card: ${zones.join(', ')})` : ''}`);
+          for (const p of problems) console.log(`  - ${String(p.at)} ms: ${p.text}`);
+          await page.goto('about:blank');
+        }
+      } finally { await context.close(); }
+    }
+    const after = await served(), build = before !== undefined && before === after ? before : undefined;
+    writeFileSync(join(out, 'report.json'), `${JSON.stringify({ url, card, ...(build === undefined ? {} : { build }), ...(prime === undefined ? {} : { prime }), at: new Date().toISOString(), report }, null, 1)}\n`);
+    process.exitCode = failed ? 1 : 0;
+  } finally {
+    try {
+      keepReleaseProof(out, proof, ['report.json']);
+      if (args.has('video')) for (const name of browsers) {
+        const dir = `video-${name}`;
+        if (existsSync(join(out, dir))) cpSync(join(out, dir), join(proof, dir), { recursive: true });
+      }
+    } finally { scratch.close(); }
   }
-  const after = await served(), build = before !== undefined && before === after ? before : undefined;
-  writeFileSync(join(out, 'report.json'), `${JSON.stringify({ url, card, ...(build === undefined ? {} : { build }), ...(prime === undefined ? {} : { prime }), at: new Date().toISOString(), report }, null, 1)}\n`);
-  process.exitCode = failed ? 1 : 0;
 }
 
 if (import.meta.url === `file://${process.argv[1] ?? ''}`) await cli();
