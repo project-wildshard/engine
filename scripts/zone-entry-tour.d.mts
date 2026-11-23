@@ -10,7 +10,7 @@ interface Pair {
   to: string;
 }
 interface Leg { from: Cell; to: Cell }
-interface SmokeArrival extends Pair { index: number; ms: number }
+interface SmokeArrival extends Pair { index: number; ms: number; rejoinMs?: number; returnMs?: number }
 export interface Tour {
   expected: number;
   arrivals: (Pair & {ms: number})[];
@@ -27,6 +27,8 @@ export function retrySmokeEntries(route: readonly Leg[], proof: unknown, build: 
   {arrivals: SmokeArrival[]; pending: number[]};
 export function runLoopbackSmoke(options: {build:string; out:string; seed:number; prior?:unknown; base:string; socket:string; batch?:number}): Promise<number>;
 export function smokeGap(proof: unknown): string | undefined;
+/** QA 11-23-b row 20: the route indexes whose crossing also goes to the main menu and back. */
+export function rejoinLegs(route: readonly Leg[]): number[];
 export function stagedTourProof(value: unknown): unknown;
 export function zoneEntryTour(cells: readonly Cell[]): {from: Cell; to: Cell}[];
 export function resumeZoneEntry(route: readonly {from: Cell; to: Cell}[], proof: unknown, build: string, from: number): Tour['arrivals'];
