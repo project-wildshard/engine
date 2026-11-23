@@ -60,6 +60,27 @@ test('a copy hidden when the batch merges joins the merge when it is shown', () 
   expect(drawn(batch)).toEqual(['stillx1']); expect(still(batch)?.geometry.getAttribute('position').count).toBe(72);
 });
 
+test('settling poses in one tick publish one identical still mesh', () => {
+  const normal = kit(), coalesced = kit();
+  normal.batch.mergeStill();
+  coalesced.batch.mergeStill();
+  const original = still(coalesced.batch);
+  let published = 0;
+  coalesced.batch.addEventListener('childadded', () => { published++; });
+  const pose = ({ batch, ids }: ReturnType<typeof kit>): void => {
+    ids.forEach((id, index) => { batch.setMatrixAt(id, at(index * 8 + 2, 0.2 * index, index + 1)); });
+  };
+  pose(normal);
+  coalesced.batch.coalesceBakes(() => {
+    pose(coalesced);
+    expect(still(coalesced.batch)).toBe(original);
+  });
+  expect(published).toBe(1);
+  expect(still(coalesced.batch)?.geometry.getAttribute('position').array).toEqual(still(normal.batch)?.geometry.getAttribute('position').array);
+  expect(still(coalesced.batch)?.geometry.getAttribute('normal').array).toEqual(still(normal.batch)?.geometry.getAttribute('normal').array);
+  expect(still(coalesced.batch)?.geometry.index?.array).toEqual(still(normal.batch)?.geometry.index?.array);
+});
+
 test('copies named in except, and tinted copies, are not still', () => {
   const { batch, ids } = kit(); const [a = -1, b = -1] = ids;
   batch.setColorAt(b, new Color(0.5, 0.5, 0.5));

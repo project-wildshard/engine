@@ -26,7 +26,7 @@ import * as THREE from 'three';
 import { ChangedBatchedMesh } from '../../render/changedTextureUploads';
 import { app } from '../../app/runtime';
 import { lowPolyLookMaterial } from '../lowpolyKit';
-import { litRestMergeOn, REST_TICKS } from './restMerge';
+import { coalescedStillBakesOn, litRestMergeOn, REST_TICKS } from './restMerge';
 import type { SkyRig as Sky } from '../skyRig';
 import type { BoxSpec as Collider } from '../../../../shared/engine/physics/box';
 import { boxInFrame } from '../../physics/boxFrame';
@@ -161,6 +161,7 @@ export class Interactables {
   readonly placed: Placed[] = [];
   private byId = new Map<string, Live>();
   private batches!: Record<BatchId, THREE.BatchedMesh | InstancedBatch>;
+  private coalescedLit: InstancedBatch | null = null;
   private geoIds = new Map<string, { batch: BatchId; id: number }>();
   private pending: { key: string; batch: BatchId; geo: THREE.BufferGeometry }[] = [];
   private instCount: Record<BatchId, number> = { lit: 0, glow: 0 };
@@ -241,6 +242,7 @@ export class Interactables {
       return bm;
     };
     this.batches = { lit: batch('lit', litMat), glow: batch('glow', glowMat) };
+    this.coalescedLit = this.batches.lit instanceof InstancedBatch && coalescedStillBakesOn() ? this.batches.lit : null;
     for (const p of this.pending) this.geoIds.set(p.key, { batch: p.batch, id: this.batches[p.batch].addGeometry(p.geo) });
     // a BatchedMesh copies its shapes; an instanced batch draws (and frees) them itself
     for (const p of this.pending) if (this.batches[p.batch] instanceof THREE.BatchedMesh) p.geo.dispose();
@@ -635,6 +637,12 @@ export class Interactables {
   // ── per frame ──────────────────────────────────────────────────────────────────────────────────
 
   update(dt: number, t: number): void {
+    const lit = this.coalescedLit;
+    if (lit === null) this.updateRows(dt, t);
+    else lit.coalesceBakes(() => { this.updateRows(dt, t); });
+  }
+
+  private updateRows(dt: number, t: number): void {
     const pl = this.host.player.position, F = this.host.flags, physics = app.physics;
     // barrels first: their pose from the body (plates feel the body itself)
     for (const lv of this.lives) if (lv.def.kind === 'barrel' && lv.shown) this.syncBarrel(lv, dt);

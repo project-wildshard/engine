@@ -462,6 +462,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/'debug.interactStillCoalesce'": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/'debug.phoneBudget'": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",

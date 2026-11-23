@@ -11,6 +11,13 @@ import { TIER } from '../../core/tier';
 import { graphicsMode } from '../../core/graphicsMode';
 
 export const LIT_REST_MERGE_SLOT = 'debug.litRestMerge';
+const coalescedStillSlot = jsonSlot('debug.interactStillCoalesce', 'device');
+
+/** DW3: apply a tick's poses before publishing the lit still mesh. */
+export function coalescedStillBakesOn(): boolean {
+  try { return TIER === 'phone' && graphicsMode() === 'low' && coalescedStillSlot.read() === true; }
+  catch { return false; }
+}
 export const LIT_REST_MERGE_DEFAULT = false;
 /** Unset at phone Low: on (DF10, mini-df10b: iPhone 13 route draws p95 about 93 -> 79, a matched 35 °C pair held its frames, the blind board passed). */
 export const LIT_REST_MERGE_PHONE_LOW = true;

@@ -114,6 +114,8 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
   private ticks = 0;
   private merging: string | null = null;
   private merged: THREE.InstancedMesh | null = null;
+  private heldBakes = 0;
+  private bakeOwed = false;
   private copies = 0;
   private readonly scratchMatrix = new THREE.Matrix4();
   private readonly scratchColor = new THREE.Color();
@@ -263,10 +265,21 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
 
   /** Free the instance buffers (and the geometries when it owns them); the material stays its owner's. */
   override dispose(): void {
+    this.bakeOwed = false;
     if (this.merged !== null) { this.merged.geometry.dispose(); this.merged.dispose(); this.merged.removeFromParent(); this.merged = null; }
     for (const slot of this.slots) {
       slot.mesh?.dispose(); slot.mesh?.removeFromParent(); slot.mesh = null;
       if (this.options.ownsGeometry === true) slot.geometry.dispose();
+    }
+  }
+
+  /** Publish one still mesh after a synchronous set of pose and visibility changes. */
+  coalesceBakes(update: () => void): void {
+    this.heldBakes++;
+    try { update(); }
+    finally {
+      this.heldBakes--;
+      if (this.heldBakes === 0 && this.bakeOwed) this.bake();
     }
   }
 
@@ -299,6 +312,8 @@ export class InstancedBatch extends THREE.Group implements BatchSink {
 
   /** (Re)build the merged mesh of the still copies now shown. */
   private bake(): void {
+    if (this.heldBakes > 0) { this.bakeOwed = true; return; }
+    this.bakeOwed = false;
     const old = this.merged; this.merged = null;
     if (old !== null) { old.geometry.dispose(); old.dispose(); old.removeFromParent(); }
     const copies: { geometry: THREE.BufferGeometry; matrix: THREE.Matrix4 }[] = [];
