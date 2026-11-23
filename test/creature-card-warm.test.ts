@@ -17,13 +17,17 @@ vi.mock('../src/client/engine/render/spriteViews', () => ({
 const { AnimalHerdView, warmCreatureCards } = await import('../src/client/engine/entities/AnimalHerdView');
 const { SkyRig } = await import('../src/client/engine/world/skyRig');
 const { app } = await import('../src/client/engine/app/runtime');
-const { programFoldOn } = await import('../src/client/engine/render/programFold');
+const { PROGRAM_FOLD_SLOT, programFoldOn, resetProgramFold } = await import('../src/client/engine/render/programFold');
+const { jsonSlot } = await import('../src/client/engine/saves/slots');
 const { TIER_CONFIG } = await import('../src/client/engine/core/tier');
 const { installKitWorldFixture } = await import('./fixtures/kit-world');
 
 await installKitWorldFixture();
 
 test('a tier that draws cards warms their shot and card under the loader, fold or not', () => {
+  // fold off (DF14 turned it on by default on desktop, this test's tier): the cards warm without it
+  const fold = jsonSlot(PROGRAM_FOLD_SLOT, 'device');
+  fold.write(false); resetProgramFold();
   expect(programFoldOn()).toBe(false);
   expect(TIER_CONFIG.animalSpriteDist).toBeGreaterThan(TIER_CONFIG.animalHideDist);
   expect(warmCreatureCards()).toBe(true);
@@ -45,4 +49,5 @@ test('a tier that draws cards warms their shot and card under the loader, fold o
   expect(shots[2]?.material).toBe(shots[0]?.material);
   expect(scene.getObjectByName('creature-warm:card')).toBeDefined();
   vi.restoreAllMocks();
+  fold.reset(); resetProgramFold();
 });
