@@ -1364,6 +1364,8 @@
     "./scripts/grid-runtime-evidence.mjs": "./scripts/grid-runtime-evidence.mjs",
     "./scripts/boot-memory-peak.mjs": "./scripts/boot-memory-peak.mjs",
     "./scripts/proof-state.mjs": "./scripts/proof-state.mjs",
+    "./scripts/chromium-memory-browser.mjs": "./scripts/chromium-memory-browser.mjs",
+    "./scripts/grid-ready-memory.mjs": "./scripts/grid-ready-memory.mjs",
     "./scripts/model-spin-recording.mjs": "./scripts/model-spin-recording.mjs",
     "./scripts/progress-recording.mjs": "./scripts/progress-recording.mjs",
     "./scripts/sim-node-loader.mjs": "./scripts/sim-node-loader.mjs",
