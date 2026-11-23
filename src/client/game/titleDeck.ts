@@ -66,7 +66,7 @@ export interface TitleCard {
   closed?: true;
 }
 
-/** Which shards need an upgrade before this client can enter them (G86): the shardfile version each was built for. Every
+/** Which shards need an upgrade before this client can enter them (G86): the format version each was built for. Every
  *  built-in shard reads at the current format today, so the default is none; the shardfile loader's cached-product
  *  admission (src/client/game/shardfile/folder.ts, previous versions) is where an outside author's older shard will report one. */
 export type UpgradeNeeded = (slug: string) => number | null;
