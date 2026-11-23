@@ -8,6 +8,7 @@ import { gatewayDoor } from './fixtures/dedicated/gatewayDoor';
 import { ServerMetrics, metricsPort } from '../src/server/host/dedicated/serverMetrics';
 import { roomBench, type RoomBench } from './fixtures/dedicated/roomBench';
 import { RoomBot } from './fixtures/dedicated/roomBot';
+import { loadScaledMs } from './fixtures/loadBudget';
 
 // SERVER-CELLS SC1 (J328): the dedicated server's `/metrics`, Prometheus text on 127.0.0.1 only behind METRICS_PORT. A two-cell world on
 // one worker with its road, as main.ts wires it: the scrape names every family, from the process's own numbers to a crossing's time.
@@ -22,7 +23,9 @@ const FAMILIES = [
 let bench: RoomBench | undefined, metrics: ServerMetrics | undefined;
 const lines: Record<string, unknown>[] = [];
 const bots: RoomBot[] = [];
-afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await bench?.close(); bench = undefined; await metrics?.close(); metrics = undefined; });
+// QA-11-22 row 12: every fence here is a real clock on worker threads and sockets, so it stretches with the machine's load (a
+// file-level red at load 44 during another lane's gate, 5 of 5 green alone); what each wait proves stays the same.
+afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await bench?.close(); bench = undefined; await metrics?.close(); metrics = undefined; }, loadScaledMs(10_000));
 
 /** One scrape, as `name{labels}` → value. */
 async function scrape(port: number): Promise<{ readonly text: string; readonly rows: ReadonlyMap<string, number> }> {
@@ -43,7 +46,7 @@ test('METRICS_PORT: unset or blank is off, a port is a port, anything else refus
   expect(() => metricsPort({ METRICS_PORT: '70000' })).toThrow(/not a port/u);
 });
 
-test('a two-cell world serves every family on 127.0.0.1 only, from boot to a crossing', { timeout: 120_000 }, async () => {
+test('a two-cell world serves every family on 127.0.0.1 only, from boot to a crossing', { timeout: loadScaledMs(120_000) }, async () => {
   const port = metricsPort({ METRICS_PORT: '0' }) ?? -1, served = new ServerMetrics(line => { lines.push(line); }, 'staging');
   metrics = served;
   bench = await roomBench({ cells: [HOME, SOUTH], workers: 1, crossing: true, readingMs: 250,
@@ -55,16 +58,16 @@ test('a two-cell world serves every family on 127.0.0.1 only, from boot to a cro
   bots.push(a);
   expect(await a.arrived()).toBe(true);
   // A reading with the player in Driftwood (every 250 ms here): one cell awake.
-  await vi.waitFor(async () => { const { rows } = await scrape(at); expect(value(rows, 'wildshard_players')).toBe(1); expect(value(rows, 'wildshard_cells_awake')).toBe(1); }, { timeout: 10_000, interval: 100 });
+  await vi.waitFor(async () => { const { rows } = await scrape(at); expect(value(rows, 'wildshard_players')).toBe(1); expect(value(rows, 'wildshard_cells_awake')).toBe(1); }, { timeout: loadScaledMs(10_000), interval: 100 });
   // SC8: the awake cell's own tick time, by name (what the worker table's weights are read from).
   expect((await scrape(at)).rows.get(`wildshard_cell_tick_seconds{cell="${HOME}"}`)).toBeGreaterThan(0);
   // Off Driftwood's south edge onto the road: one crossing, timed by the door.
   const home = bench.room(HOME), body = home?.bodyOf('device:a');
   if (body === undefined) throw new Error('A stands in Driftwood');
   body.resetPose({ x: 0, y: body.position.y, z: -(CHUNK_HALF + 3) }, body.yaw);
-  await vi.waitFor(() => { expect(bench?.road(ROAD)?.holds('device:a')).toBe(true); }, { timeout: 10_000 });
+  await vi.waitFor(() => { expect(bench?.road(ROAD)?.holds('device:a')).toBe(true); }, { timeout: loadScaledMs(10_000) });
   // On the road the player still counts, and no cell is awake: the road is no cell.
-  await vi.waitFor(async () => { const { rows } = await scrape(at); expect(value(rows, 'wildshard_players')).toBe(1); expect(value(rows, 'wildshard_cells_awake')).toBe(0); }, { timeout: 10_000, interval: 100 });
+  await vi.waitFor(async () => { const { rows } = await scrape(at); expect(value(rows, 'wildshard_players')).toBe(1); expect(value(rows, 'wildshard_cells_awake')).toBe(0); }, { timeout: loadScaledMs(10_000), interval: 100 });
   const { text, rows } = await scrape(at);
   for (const family of FAMILIES) expect(text, family).toMatch(new RegExp(`^# TYPE ${family} `, 'mu'));
   expect(rows.get('wildshard_cells_resident{worker="0"}'), 'both cells on the one worker').toBe(2);
@@ -81,16 +84,16 @@ test('a two-cell world serves every family on 127.0.0.1 only, from boot to a cro
   expect((await fetch(`http://127.0.0.1:${String(at)}/health`)).status).toBe(404);
   expect((await fetch(`http://127.0.0.1:${String(at)}/metrics`, { method: 'POST' })).status).toBe(404);
   a.drop();
-  await vi.waitFor(() => { expect(bench?.world.health()).toMatchObject({ players: 1, humans: 0, agents: 0 }); });
+  await vi.waitFor(() => { expect(bench?.world.health()).toMatchObject({ players: 1, humans: 0, agents: 0 }); }, { timeout: loadScaledMs(1000) });
   const back = new RoomBot(`${bench.url}?agent=metrics-proof`, 'bench', 'device:a', 'A');
   bots.push(back);
   expect(await back.arrived()).toBe(true);
-  await vi.waitFor(() => { expect(bench?.world.livePlayers()).toEqual({ humans: 0, agents: 1, zones: { _road: { human: 0, agent: 1 } } }); });
+  await vi.waitFor(() => { expect(bench?.world.livePlayers()).toEqual({ humans: 0, agents: 1, zones: { _road: { human: 0, agent: 1 } } }); }, { timeout: loadScaledMs(1000) });
   expect(bench.crashes).toEqual([]);
   expect(lines, 'no metrics.error').toEqual([]);
 });
 
-test('it listens on loopback only', async () => {
+test('it listens on loopback only', { timeout: loadScaledMs(30_000) }, async () => {
   const served = new ServerMetrics(line => { lines.push(line); }, 'staging');
   metrics = served;
   const at = await served.listen(0), { networkInterfaces } = await import('node:os');
@@ -99,7 +102,7 @@ test('it listens on loopback only', async () => {
   expect((await fetch(`http://127.0.0.1:${String(at)}/metrics`)).status).toBe(200);
 });
 
-test('the scrape and health count confirmed linked humans and agents by zone', async () => {
+test('the scrape and health count confirmed linked humans and agents by zone', { timeout: loadScaledMs(30_000) }, async () => {
   const served = new ServerMetrics(() => undefined, 'staging');
   metrics = served;
   const arrivals = new ZoneEntries(memoryZoneEntryStore(), 'staging', 'test', () => undefined);
