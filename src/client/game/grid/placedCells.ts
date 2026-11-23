@@ -262,11 +262,16 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     unknown.forEach((slug, n) => { const found = contents[n]; if (found !== undefined) cooked.set(slug, found); });
     await following;
     if (cards.length === 0 || wentOn()) return { ...built, ...outcome() };
-    const carded = new Set(cards.filter(row => cooked.has(row.slug)).map(row => row.slug)), more = addPlacedCells(placed.document, file, slug => carded.has(slug));
-    const opened = new Set(more.added.map(cell => cell.slug)), rows = cards.filter(row => opened.has(row.slug)).map(row => heroed(row, cooked.get(row.slug)));
+    // QA 11-23-b row 26: the carded cells go in at their place in the file, as the box numbers them (`placementSlots`), never after
+    // the build's own: a frame is a cell's index here, so staging's Pastel Plain (carded, before Mossgate in the file) appended last
+    // put every later cell one frame off, and entering Mossgate asked the door for Pastel Plain's frame, in a loop
+    const carded = new Set(cards.filter(row => cooked.has(row.slug)).map(row => row.slug));
+    const more = addPlacedCells(document, file, slug => carded.has(slug) || known(slug)), before = new Set(placed.added.map(cell => cell.slug));
+    const opened = new Set(more.added.map(cell => cell.slug).filter(slug => !before.has(slug)));
+    const rows = cards.filter(row => opened.has(row.slug)).map(row => heroed(row, cooked.get(row.slug)));
     for (const slug of opened) { const found = cooked.get(slug); if (found !== undefined) installPlacedContent(found); }
-    if (more.added.length > 0) installCatalogue(more.document);
+    if (opened.size > 0) installCatalogue(more.document);
     if (rows.length > 0) installTitleManifests([...titleManifests(), ...rows]);
-    return { added: [...placed.added, ...more.added], left: more.left, serial: file.serial, carded: rows.map(row => row.slug), ...outcome() };
+    return { added: opened.size > 0 ? more.added : placed.added, left: opened.size > 0 ? more.left : placed.left, serial: file.serial, carded: rows.map(row => row.slug), ...outcome() };
   } catch (error) { return { kept: error instanceof Error ? error.message : String(error) }; } finally { scope.dispose(); }
 }

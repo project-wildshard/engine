@@ -9,6 +9,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { installCatalogue, installedCatalogue } from '../src/shared/game/grid/catalogueSlot';
 import { PLACEMENT_PUBLIC_KEY, placementsURL } from '../src/shared/game/grid/placementRows';
 import { readPlacementFile } from '../src/server/host/dedicated/placementFile';
+import { placementSlots } from '../src/server/host/dedicated/gridCells';
 import { PLACEMENT_PUBLIC_KEY as PREVIEW_GRID_KEY } from '../scripts/preview-grid';
 import { addPlacedCells, learnPlacedCells, placementsOf, readSignedPlacement, type PlacedKeep } from '../src/client/game/grid/placedCells';
 import { installTitleManifests, titleManifests, type TitleManifest } from '../src/client/game/shard/titleList';
@@ -230,6 +231,20 @@ test('SA46: the build\'s own cells go in before the catalogue is asked: a page t
   const ok = await learnPlacedCells(URL_AT, { keep: device, fetch: routes({ [ENTRY_AT]: () => json(ENTRY) }, signed(both)), publicKey: api.hex, api: API, content: cooked });
   expect(ok).toEqual({ added: both, left: [], serial: 1, carded: ['new-author-shard'] });
   expect(titleManifests().find(row => row.slug === 'new-author-shard')?.order).toBe(42);
+});
+
+// QA 11-23-b row 26: staging's file placed Pastel Plain (no card in the build, carded from the API) before Mossgate (in the build).
+// The page appended the carded cell after the build's own, the box numbers the file's order, so every frame after it was one off and
+// entering Mossgate asked the door for Pastel Plain's frame. The page's order is now the box's.
+test('row 26: a carded cell takes its place in the file\'s order, so the page\'s frames are the box\'s', async () => {
+  const both: Cells = [...FRESH, ...THIN_ICE];
+  const read = await learnPlacedCells(URL_AT, { keep: device, fetch: routes({ [ENTRY_AT]: () => json(ENTRY) }, signed(both)), publicKey: api.hex, api: API, content: cooked });
+  expect(read).toEqual({ added: both, left: [], serial: 1, carded: ['new-author-shard'] });
+  const instances = (installedCatalogue()?.grid.cells ?? []).map(cell => cell.instance), base = PIN.grid.cells.length;
+  installCatalogue(PIN);
+  const slots = placementSlots(both.map(row => ({ instance: row.instance, slug: row.slug, cell: [row.cell[0], row.cell[1]] })));
+  expect(instances.slice(base)).toEqual([...slots.keys()]);
+  expect(instances.slice(base)).toEqual(['new-author-shard', 'open-plot-thin-ice']);
 });
 
 // OFFLINE OF20: the last believed file is kept on the device, so an offline Shard Select has the layout it had online
