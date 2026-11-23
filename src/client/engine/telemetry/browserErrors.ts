@@ -7,6 +7,7 @@ import { jsonSlot, type Json } from '../saves/slots';
 /** Optional, error-only Sentry channel. The existing /api/errors report remains the primary local inbox. */
 import type { captureException, ErrorEvent, getClient, httpContextIntegration, init, withScope } from '@sentry/browser';
 import type { StaleBuildNote } from '../saves/staleBuildNote';
+import { admitEvent, agentSampled, emptyLedger, environmentSends, eventFingerprint, parseLedger, WARNING_TRAIL_MAX, type SessionLedger } from './sendPolicy';
 
 declare const __BUILD_ID__: string;
 /** vite.config.ts: package.json's version (scripts/changelog.mjs); absent under Node */
@@ -93,8 +94,6 @@ export function browserErrorAudience(environment: ActorFacts & { readonly origin
   if (!origins.includes(environment.origin)) return null;
   return classifyActor({ ...environment, webdriver: environment.automated }).actor === 'agent' ? 'automation' : 'player';
 }
-/** S21: the most events an automated page sends (beforeSend refuses the rest), so an agent soak cannot spend the project's quota */
-export const AUTOMATION_EVENTS_MAX = 20;
 /** The Sentry environment an allowed origin reports as: its entry in the identity's map, else `production`; an automated page
  *  reports as `<environment>-automation` (S21), so `environment:staging` stays the players'. */
 export function browserErrorEnvironment(origin: string, environments: Readonly<Record<string, string>>, audience: BrowserErrorAudience = 'player'): string {
@@ -103,6 +102,11 @@ export function browserErrorEnvironment(origin: string, environments: Readonly<R
 }
 
 const EXTENSION_FRAME = /^(?:chrome-extension|moz-extension|safari-extension|safari-web-extension|webkit-masked-url):/u;
+/**
+ * SZ2: the network, not the game: a read the game itself names as the connection's (`· connection unavailable`, `· the download
+ * stopped`), and the browsers' bare fetch and module-load failures. The player's card and the /api/errors inbox keep them.
+ */
+const NETWORK_MESSAGE = /· connection unavailable$|· the download stopped$|^(?:TypeError: )?(?:Failed to fetch|Load failed|NetworkError when attempting to fetch resource\.)$|^Importing a module script failed\.$|FetchEvent\.respondWith received an error: TypeError: Load failed$/u;
 
 /**
  * Why an event is noise and must not reach Sentry, or null to keep it (SENTRY-TRIAGE S6). Pure, so each case is tested:
@@ -116,6 +120,11 @@ export function browserErrorNoise(event: ErrorEvent, page: { readonly environmen
   // Every frame counts, a nameless or <anonymous> one too: only a stack that is all extension is the extension's.
   const files = exceptions.flatMap((value) => value.stacktrace?.frames ?? []).map((frame) => frame.filename ?? '');
   if (files.length > 0 && files.every((file) => EXTENSION_FRAME.test(file))) return 'extension';
+  const frames = exceptions.flatMap((value) => value.stacktrace?.frames ?? []);
+  // SZ2: a tool driving the page, not the page: Safari's Web Inspector (WILDSHARD-GAME-AA), Playwright's evaluate probing every getter
+  // of a built-in (WILDSHARD-GAME-AY to -BH, "Illegal invocation")
+  if (frames.some((frame) => (frame.filename ?? '').startsWith('web-inspector:') || (frame.function ?? '').startsWith('UtilityScript.'))) return 'tool';
+  if (messages.some((message) => NETWORK_MESSAGE.test(message))) return 'network';
   if (messages.some((message) => message.startsWith('Probe control requires the harness pins'))) return 'probe';
   if (page.environment !== 'staging' && messages.some((message) => message.startsWith('QB8 capture:'))) return 'qb8';
   if (messages.some((message) => message.startsWith('ResizeObserver loop'))) return 'resize-observer';
@@ -144,9 +153,41 @@ function pageAudience(): BrowserErrorAudience | null {
   if (installedIdentity()?.errorReportOrigins?.includes(location.origin) !== true) return null;
   return pageActor().actor === 'agent' ? 'automation' : 'player';
 }
-function productionPage(): boolean { return pageAudience() !== null; }
-/** S21: the distinct events this automated page sent; an outbox resend keeps its event id, so it is not a second one */
-const automationEvents = new Set<string>();
+/**
+ * SENTRY-ZERO SZ2: whether this page sends at all: an allowed origin whose environment sends (production, staging; never preview
+ * or local), and for an agent's page only the 1% of tab sessions the sample drew. A page that does not send never loads the SDK.
+ */
+function productionPage(): boolean {
+  const audience = pageAudience();
+  if (audience === null) return false;
+  if (!environmentSends(browserErrorEnvironment(location.origin, installedIdentity()?.errorReportEnvironments ?? {}, audience))) return false;
+  if (audience === 'player') return true;
+  const ledger = readLedger(), sampled = agentSampled(ledger, () => (crypto.getRandomValues(new Uint32Array(1))[0] ?? 0) / 2 ** 32);
+  writeLedger(ledger);
+  return sampled;
+}
+
+// ── SZ2: the tab session's ledger (sendPolicy.ts), in sessionStorage so a reload loop is one session, else this page's memory ──
+const LEDGER_KEY = 'wildshard.sentry.session';
+let pageLedger: SessionLedger | null = null;
+function readLedger(): SessionLedger {
+  // oxlint-disable-next-line wildshard/no-raw-save -- a tab-scoped send ledger; telemetry loads before (and without) the save store
+  try { const raw = sessionStorage.getItem(LEDGER_KEY); if (raw !== null) return parseLedger(raw); } catch { /* the page's copy */ }
+  return pageLedger ?? emptyLedger();
+}
+function writeLedger(ledger: SessionLedger): void {
+  pageLedger = ledger;
+  // oxlint-disable-next-line wildshard/no-raw-save -- the same tab-scoped ledger
+  try { sessionStorage.setItem(LEDGER_KEY, JSON.stringify(ledger)); } catch { /* kept for this page only */ }
+}
+/** SZ2: the warnings this page met, newest last: never events of their own, they ride the next real event as context */
+const warningTrail: string[] = [];
+function noteWarning(error: unknown, tags: BrowserErrorTags): void {
+  warningTrail.push(`${tags.screen ?? tags.system}: ${asError(error).message.slice(0, 200)}`);
+  if (warningTrail.length > WARNING_TRAIL_MAX) warningTrail.splice(0, warningTrail.length - WARNING_TRAIL_MAX);
+}
+/** SZ2, for tests: the warnings this page holds */
+export function recentWarnings(): readonly string[] { return [...warningTrail]; }
 
 function loadSdk(): Promise<BrowserSdk | null> {
   if (!productionPage()) return Promise.resolve(null);
@@ -173,12 +214,17 @@ function loadSdk(): Promise<BrowserSdk | null> {
       beforeSend(event) {
         if (pageAudience() !== audience) return refused(event.event_id); // stopped reporting, or became automated after the SDK loaded
         if (browserErrorNoise(event, { environment }) !== null) return refused(event.event_id);
-        // a screen's report (the card the agent saw) always goes; other automated events stop at the cap
-        if (audience === 'automation' && event.tags?.['screen'] === undefined) {
-          const id = event.event_id ?? '';
-          if (!automationEvents.has(id) && automationEvents.size >= AUTOMATION_EVENTS_MAX) return refused(event.event_id);
-          automationEvents.add(id);
-        }
+        // SZ2: one event per kind a tab session, none past the session cap, no warnings (sendPolicy.ts)
+        const ledger = readLedger();
+        const screen = event.tags?.['screen'], system = event.tags?.['system'];
+        const fingerprint = eventFingerprint({ screen: typeof screen === 'string' ? screen : undefined, system: typeof system === 'string' ? system : undefined,
+          message: event.exception?.values?.[0]?.value ?? event.message ?? '' });
+        const admitted = admitEvent(ledger, { id: event.event_id ?? '', level: event.level ?? 'error', fingerprint });
+        writeLedger(ledger);
+        if (!admitted.send) return refused(event.event_id);
+        event.tags = { ...event.tags, session_count: String(admitted.count), ...(audience === 'automation' ? { agent: 'sampled' } : {}) };
+        event.contexts = { ...event.contexts, ...(Object.keys(admitted.repeats).length === 0 ? {} : { session_repeats: { ...admitted.repeats } }),
+          ...(warningTrail.length === 0 ? {} : { warnings: { recent: [...warningTrail] } }) };
         if (event.request) {
           event.request.url = `${location.origin}${location.pathname}`;
           // The user agent names the browser, OS and device; no referrer or other header leaves the page.
@@ -239,6 +285,8 @@ export function engineScreenTags(screen: ErrorScreen, system: string, bootStage:
 }
 
 export function captureBrowserError(error: unknown, tags: BrowserErrorTags): void {
+  // SZ2: a warning is never an event (it rides the next real one), so it loads no SDK and writes no outbox
+  if (browserErrorLevel(error, tags.fatal, tags.screen) === 'warning') { noteWarning(error, tags); return; }
   if (!dsn || !productionPage()) return;
   if (tags.screen !== undefined) { reportScreen(error, tags); return; }
   void send(error, tags);
