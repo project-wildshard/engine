@@ -83,6 +83,8 @@ function deadlineWait(deadline) {
     },
   }
 }
+/** The query words the world door reads on a dial (FM3): the cell, its spawn and the agent marker. */
+const DOOR_WORDS = ['chunk', 'at', 'agent']
 /** @param {string} text */
 function upstream(text) {
   const url = new URL(text)
@@ -754,14 +756,20 @@ export async function openChaosProxy(options) {
       return
     }
     // FM3: the world door is `/`; a page Shard select sent to a grid cell names it (`/?chunk=<cell>`, shell.ts gotoSocket), and
-    // only that one bounded query passes on to the upstream
+    // only the door's bounded words pass on to the upstream: that cell, its spawn (`at=spawn`, QA 11-19 row 52) and an agent page's
+    // marker (`agent=<lane>|1`, webSocketTransport.ts, METRICS MT2). Meta QA-FEEDBACK-2026-11-22 row 7: the proxy refused every
+    // marked page's dial with a 404 (since 4900858fc), so no FM11 page ever seated and no socket fault matched
     const asked = new URL(request.url ?? '', 'http://127.0.0.1'),
-      cell = asked.searchParams.get('chunk')
+      cell = asked.searchParams.get('chunk'),
+      spawn = asked.searchParams.get('at'),
+      agent = asked.searchParams.get('agent')
     if (
       asked.pathname !== '/' ||
-      [...asked.searchParams.keys()].some(name => name !== 'chunk') ||
-      asked.searchParams.getAll('chunk').length > 1 ||
-      (cell !== null && !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(cell))
+      [...asked.searchParams.keys()].some(name => !DOOR_WORDS.includes(name)) ||
+      DOOR_WORDS.some(name => asked.searchParams.getAll(name).length > 1) ||
+      (cell !== null && !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(cell)) ||
+      (spawn !== null && (cell === null || spawn !== 'spawn')) ||
+      (agent !== null && !/^[a-z0-9][a-z0-9._-]{0,63}$/iu.test(agent))
     ) {
       socket.end(
         'HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n',
@@ -795,6 +803,8 @@ export async function openChaosProxy(options) {
     const address = new URL(worldTarget)
     address.protocol = 'ws:'
     if (cell !== null) address.searchParams.set('chunk', cell)
+    if (spawn !== null) address.searchParams.set('at', spawn)
+    if (agent !== null) address.searchParams.set('agent', agent)
     const offered = request.headers['sec-websocket-protocol']
     /** @type {WebSocket} */
     let remote
