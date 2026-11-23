@@ -16,7 +16,7 @@ function deferred() {
 async function flush(): Promise<void> {for (let i = 0; i < 5; i++) await Promise.resolve();}
 async function settle(promise: Promise<void>): Promise<unknown> {try {await promise; return null;} catch (error) {return error;}}
 
-function fixture(options: {models?: boolean; prepare?: (root: Object3D) => Promise<void>; enabled?: boolean; worldOnly?: boolean; boot?: boolean; roadKit?: boolean} = {}) {
+function fixture(options: {models?: boolean; prepare?: (root: Object3D) => Promise<void>; enabled?: boolean; worldOnly?: boolean; boot?: boolean; roadKit?: boolean; primeRoadKit?: () => Promise<void>} = {}) {
   const calls: string[] = [];
   const source = readFileSync(new URL('regionalRuntime.ts', import.meta.url), 'utf8');
   const declarationsStart = source.indexOf('          let enteredWarm:');
@@ -31,8 +31,11 @@ function fixture(options: {models?: boolean; prepare?: (root: Object3D) => Promi
     return {start: () => hooks.afterWorld(null), kit: () => {if (typeof equipmentReady === 'function') equipmentReady();},
       content: () => {contentReady(); forgetContent();}, result: () => enteredWarm};
   })`), {Promise,timeClientPreparation:(_slug:string,_step:string,work:()=>unknown)=>Promise.resolve(work()),
-    kitBatchOn:(): boolean => options.roadKit === true,multiDraws:(): boolean => true,
-    primeKitBatches:(): void => {expect(options.roadKit).toBe(true); calls.push('kit-prime');}});
+    multiDraws:(): boolean => true,
+    primeRoadKitBatches:(): Promise<void> | undefined => {
+      if (options.roadKit !== true) return undefined;
+      calls.push('kit-prime'); return options.primeRoadKit?.();
+    }});
   if (typeof factory !== 'function') throw new Error('Regional hook factory missing');
   const owner = new Scope('equipment-overlap'), root = new Group(), models = new Group();
   root.visible = false; models.visible = false; models.name = 'staged-equipment';
@@ -83,13 +86,16 @@ test('the complete inventory waits for all content without speculative compilati
 });
 
 test('the phone Low road kit primes only after the completed inventory and final look', async () => {
-  const f = fixture({roadKit: true});
+  const started = deferred(), done = deferred();
+  const f = fixture({roadKit: true, primeRoadKit: () => {started.resolve(); return done.promise;}});
   await f.start(); const result = f.result(), observed = settle(result);
   try {
     f.kit(); await flush(); expect(f.calls).toEqual([]);
-    f.content(); await result;
+    f.content(); await started.promise;
+    expect(f.calls).toEqual(['before-final', 'kit-prime']);
+    done.resolve(); await result;
     expect(f.calls).toEqual(['before-final', 'kit-prime', 'final']);
-  } finally {f.kit(); f.content(); f.owner.dispose(); await observed;}
+  } finally {done.resolve(); f.kit(); f.content(); f.owner.dispose(); await observed;}
 });
 
 test('the final inventory still waits for equipment when play finishes first', async () => {

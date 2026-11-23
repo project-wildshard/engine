@@ -11,6 +11,8 @@ import { skipEmptyBatches } from '@wildshard/engine/render/drawGuards';
 import { retainBatchFarLod } from '@wildshard/engine/render/farLod';
 import { copyBatchIndex } from '@wildshard/engine/render/memorySaver';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { workSlice } from '@wildshard/engine/core/workSlice';
+import { geometryBoundsSteps } from '@wildshard/engine/world/geometryBounds';
 import { programFoldOn } from '@wildshard/engine/render/programFold';
 import { hasShaderPatch } from '@wildshard/engine/render/shaderPatches';
 import { mergeableMaterial, readsNoNormals, sharedHook } from './staticViewMerge';
@@ -34,6 +36,7 @@ import { FarBatch } from './farBatch';
  * the shared kind (it reads nothing of its mesh), run once per batch draw.
  */
 export const KIT_BATCH_SLOT = 'debug.kitBatch';
+const roadKitPacedSlot = jsonSlot('debug.roadKitPaced', 'device');
 const BAKED_TILE_MEMBER = 'bakedTileBatchMember';
 const bakedTileSlot = jsonSlot('debug.bakedTileBatch', 'device');
 function bakedTileBatchOn(): boolean {
@@ -151,7 +154,7 @@ export class KitBatch extends ChangedBatchedMesh {
   private stale = false;
   /** a batch of `meshes` (one material, one keyed layout), each channel stored as `formats` has it (a custom channel a
    *  member lacks is filled with zeros) */
-  static of(meshes: readonly THREE.Mesh[], material: THREE.Material, formats: ReadonlyMap<string, Format>, cellPatches: boolean, space: THREE.Object3D): KitBatch {
+  static of(meshes: readonly THREE.Mesh[], material: THREE.Material, formats: ReadonlyMap<string, Format>, cellPatches: boolean, space: THREE.Object3D, roadBounds = false): KitBatch {
     const geometries = meshes.map(mesh => mesh.geometry);
     const vertices = geometries.reduce((sum, g) => sum + g.getAttribute('position').count, 0);
     const indices = geometries.reduce((sum, g) => sum + (g.index?.count ?? g.getAttribute('position').count), 0);
@@ -161,6 +164,7 @@ export class KitBatch extends ChangedBatchedMesh {
     batch.matrixAutoUpdate = false;
     batch.space = space; batch.refreshSpace();
     const hooks = new Set<() => void>();
+    const bounds = roadBounds ? new THREE.Box3() : null;
     for (const mesh of meshes) {
       const farLod = mesh.userData[BAKED_TILE_MEMBER] === true ? null : retainBatchFarLod(mesh, batch);
       const geometry = mesh.geometry, position = geometry.getAttribute('position');
@@ -176,9 +180,15 @@ export class KitBatch extends ChangedBatchedMesh {
       }
       if (geometry.index !== null) copy.setIndex(geometry.index);
       else { const identity = ownedArray(Uint32Array, position.count, { owner: 'game/kit-batch', asset: 'identity-index', kind: 'geometry-cpu' }); for (let i = 0; i < identity.length; i++) identity[i] = i; copy.setIndex(new THREE.BufferAttribute(identity, 1)); }
-      if (geometry.boundingBox === null) geometry.computeBoundingBox();
-      if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
+      const needsBox = geometry.boundingBox === null, needsSphere = geometry.boundingSphere === null;
+      if (roadBounds && (needsBox || needsSphere)) {
+        for (const _ of geometryBoundsSteps(geometry, needsBox ? (needsSphere ? 'both' : 'box') : 'sphere')) { /* scan the source */ }
+      } else {
+        if (needsBox) geometry.computeBoundingBox();
+        if (needsSphere) geometry.computeBoundingSphere();
+      }
       copy.boundingBox = geometry.boundingBox; copy.boundingSphere = geometry.boundingSphere;
+      if (geometry.boundingBox !== null) bounds?.union(geometry.boundingBox);
       const geometryId = batch.addGeometry(copy);
       // bounds now, from the source: the batch's own arrays go at upload
       batch.getBoundingBoxAt(geometryId, new THREE.Box3()); batch.getBoundingSphereAt(geometryId, new THREE.Sphere());
@@ -197,6 +207,12 @@ export class KitBatch extends ChangedBatchedMesh {
       // a channel that gives its CPU copy up at upload goes now: the member never uploads, and the batch holds its copy
       for (const attribute of attributes) if (attribute !== null && isGpuOnlyAttribute(attribute)) attribute.onUploadCallback();
       mesh.layers.disableAll(); mesh.userData[BATCHED_VIEW] = true;
+    }
+    // Cell clipping reads the exact per-member bounds. Supplying the already
+    // known buffer envelope avoids a second scan on the batch's childadded event.
+    if (bounds !== null && !bounds.isEmpty()) {
+      batch.geometry.boundingBox = bounds;
+      batch.geometry.boundingSphere = bounds.getBoundingSphere(new THREE.Sphere());
     }
     batch.hooks = [...hooks];
     batch.patches = cellPatches ? CELL_PATCHES.filter(id => hasShaderPatch(material, id)) : null;
@@ -295,30 +311,38 @@ export class KitBatch extends ChangedBatchedMesh {
   }
 }
 
+function kitLayout(geometry: THREE.BufferGeometry, material: THREE.Material): string {
+  // Flat kit props shade by derivatives, so normal presence does not split their layout.
+  const flat = readsNoNormals(material);
+  return Object.entries(geometry.attributes).filter(([name]) => KEYED.has(name) && (name !== 'normal' || !flat))
+    .map(([name, a]) => `${name}:${String(a.itemSize)}`).sort().join('|');
+}
+
 /** Gather `root`'s batchable meshes by material and layout; each set of two or more becomes a batch under `root`. */
 export function buildKitBatches(root: THREE.Object3D, cellPatches = false, includeBakedTiles = false): KitBatch[] {
+  return [...kitBatchSteps(root, cellPatches, includeBakedTiles, false)];
+}
+
+function* kitBatchSteps(root: THREE.Object3D, cellPatches: boolean, includeBakedTiles: boolean, roadBounds: boolean): Generator<KitBatch> {
   const sets = new Map<string, { material: THREE.Material; keyed: string; meshes: THREE.Mesh[] }>();
   root.updateWorldMatrix(true, true);
   root.traverse((object) => {
     if (includeBakedTiles && object.userData[BAKED_TILE_MEMBER] !== true) return;
     if (!batchableMesh(object, includeBakedTiles)) return;
     const material = object.material as THREE.Material, geometry = object.geometry;
-    // Flat kit props shade by derivatives. A missing normal doesn't split their layout; keep every normal a member has.
-    const flat = readsNoNormals(material);
-    const keyed = Object.entries(geometry.attributes).filter(([name]) => KEYED.has(name) && (name !== 'normal' || !flat))
-      .map(([name, a]) => `${name}:${String(a.itemSize)}`).sort().join('|');
+    const keyed = kitLayout(geometry, material);
     const key = `${material.uuid}|${keyed}`;
     let set = sets.get(key);
     if (set === undefined) { set = { material, keyed, meshes: [] }; sets.set(key, set); }
     set.meshes.push(object);
   });
-  const batches: KitBatch[] = [];
   for (const { material, keyed, meshes } of sets.values()) {
     // each channel's storage: the members' own where they agree, else floats; a custom channel's size must agree (a
     // member whose differs stays out), and a vec4 one (it reads (0,0,0,1) when missing) every member must have
     const formats = new Map<string, Format>(), members: THREE.Mesh[] = [];
     let vertices = 0;
     for (const mesh of meshes) {
+      if (roadBounds && (mesh.material !== material || !batchableMesh(mesh) || kitLayout(mesh.geometry, material) !== keyed)) continue;
       const own = Object.entries(mesh.geometry.attributes) as [string, Attribute][];
       if (own.some(([name, a]) => { const like = formats.get(name); return like !== undefined && like.itemSize !== a.itemSize; })) continue;
       const count = mesh.geometry.getAttribute('position').count;
@@ -332,12 +356,11 @@ export function buildKitBatches(root: THREE.Object3D, cellPatches = false, inclu
     }
     const kept = members.filter(mesh => [...formats].every(([name, format]) => format.itemSize <= 3 || mesh.geometry.hasAttribute(name)));
     if (kept.length < 2) continue;
-    const batch = KitBatch.of(kept, material, formats, cellPatches, root);
+    const batch = KitBatch.of(kept, material, formats, cellPatches, root, roadBounds);
     batch.userData['layout'] = keyed;
     root.add(batch); batch.updateMatrixWorld(true);
-    batches.push(batch);
+    yield batch;
   }
-  return batches;
 }
 
 /** The baked set's index ranges are installed. Batch before world assembly gives the source arrays up to the GPU. */
@@ -360,6 +383,38 @@ export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: 
   let batches: KitBatch[];
   try { batches = buildKitBatches(scene, cellPatches()); }
   catch (error: unknown) { console.warn('[kit-batch] not built', error instanceof Error ? error.stack : error); return { batches: 0, members: 0 }; }
+  return publishKitCensus(scene, scope, batches);
+}
+
+/** Keep each material batch atomic, and let the road draw between groups. The
+ * caller still waits for all batches before collecting the final shader inventory. */
+export function primeRoadKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: boolean): Promise<void> | undefined {
+  if (!multiDraw || !kitBatchOn() || scope.disposed || scope.disposing || scene.userData['kitBatch'] !== undefined) return undefined;
+  let pace = false;
+  try { pace = roadKitPacedSlot.read() === true; } catch { /* storage blocked: the default */ }
+  if (!pace) { primeKitBatches(scene, scope, multiDraw); return undefined; }
+  return buildRoadKit(scene, scope);
+}
+
+async function buildRoadKit(scene: THREE.Object3D, scope: Scope): Promise<void> {
+  const batches: KitBatch[] = [], slice = workSlice(4, scope);
+  // Register retirement before the first yield, even when the cell leaves
+  // before all of its material groups have been built.
+  publishKitCensus(scene, scope, batches);
+  try {
+    for (const batch of kitBatchSteps(scene, programFoldOn(), false, true)) {
+      batches.push(batch);
+      skipEmptyBatches(true);
+      const pause = slice.check();
+      if (pause !== undefined) await pause;
+    }
+  } catch (error: unknown) {
+    if (scope.disposed || scope.disposing) throw error;
+    console.warn('[kit-batch] road build stopped', error instanceof Error ? error.stack : error);
+  }
+}
+
+function publishKitCensus(scene: THREE.Object3D, scope: Scope, batches: KitBatch[]): { batches: number; members: number } {
   // DF10 (mini-dfload): a batch whose members all left (their cell retired at the road crossing) draws nothing, so it never
   // looks its program up again: on the iPhone 13 the empty kit batches relinked their three materials as the player
   // crossed the road and came back (1.1 to 1.4 s frames). A batch with no copy to draw draws no pixel either way.

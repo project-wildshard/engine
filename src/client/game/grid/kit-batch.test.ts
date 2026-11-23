@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { expect, test } from 'vitest';
 import { patchShader } from '@wildshard/engine/render/shaderPatches';
 import { prepareFarCopyIndices, resetFarLod, settleFarCopies } from '@wildshard/engine/render/farLod';
-import { batchableMesh, buildKitBatches, kitBatch, prepareBakedTileBatch } from './kitBatch';
+import { batchableMesh, buildKitBatches, KitBatch, kitBatch, prepareBakedTileBatch } from './kitBatch';
 
 // DF10 (mini-df10e): the level's plain meshes of one material draw as one batch; each member stays the source of its pose,
 // visibility and draw range, and a member that changes leaves for good and draws itself again.
@@ -30,6 +30,23 @@ test('a flat material batches members with and without normals together', () => 
   const normals = batch?.geometry.getAttribute('normal');
   expect(normals?.getX(0)).toBe(withNormals.getAttribute('normal').getX(0));
   expect(normals?.getX(withNormals.getAttribute('position').count)).toBe(0);
+});
+
+test('road kit supplies the combined buffer bounds and retains the exact member bounds', () => {
+  const scene = new THREE.Scene(), material = new THREE.MeshStandardMaterial();
+  const a = new THREE.Mesh(box(false), material);
+  const b = new THREE.Mesh(box(false).translate(5, 2, -4), material);
+  a.position.set(11, 0, 8);
+  scene.add(a, b);
+  scene.updateWorldMatrix(true, true);
+  const format = { itemSize: 3, normalized: false, Typed: Float32Array };
+  const batch = KitBatch.of([a, b], material, new Map([['position', format], ['normal', format]]), false, scene, true);
+  const fromBuffer = new THREE.Box3().setFromBufferAttribute(batch.geometry.getAttribute('position') as THREE.BufferAttribute);
+  expect(batch.geometry.boundingBox).toEqual(fromBuffer);
+  expect(batch.geometry.boundingSphere).toEqual(fromBuffer.getBoundingSphere(new THREE.Sphere()));
+  expect(batch.getBoundingBoxAt(0, new THREE.Box3())).toEqual(a.geometry.boundingBox);
+  expect(batch.getBoundingSphereAt(1, new THREE.Sphere())).toEqual(b.geometry.boundingSphere);
+  batch.retire();
 });
 
 test('opaque baked tiles keep their lightmap UVs and changing draw ranges in a batch', () => {

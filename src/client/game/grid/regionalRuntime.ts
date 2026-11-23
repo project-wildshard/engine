@@ -41,7 +41,7 @@ import { runtimeTierLimits } from '../../../shared/game/shardfile/runtimeTier';
 import { pageFeatureBudget } from '../../../shared/game/shardfile/pageFeatureTier';
 import { createRegionalView, type RegionalView } from './regionalView';
 import { multiDraws } from './farBatch';
-import { kitBatchOn, primeKitBatches } from './kitBatch';
+import { primeRoadKitBatches } from './kitBatch';
 import { installEnteredRuntimeService } from "../shard/retainedHooks";
 import { Progress } from '../Progress';
 import { Inventory } from '../Inventory';
@@ -308,11 +308,11 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
           let equipmentReady: () => void = () => undefined;
           let contentReady: () => void = () => undefined;
           let forgetContent: () => void = () => undefined;
-          const primeRoadKit = (): void => {
+          const primeRoadKit = (): Promise<void> | undefined => {
             const pageGame = request.page.world.game;
-            if (pageGame.frameCount === 0 || !kitBatchOn()) return;
+            if (pageGame.frameCount === 0) return undefined;
             // DF10: the first view's batch leaves with its geometry. A rebuilt cell primes its own kit before upload.
-            primeKitBatches(view.root, view.scope, multiDraws(pageGame.renderer));
+            return primeRoadKitBatches(view.root, view.scope, multiDraws(pageGame.renderer));
           };
           return { ...installation, context,
             ...(prepareFrame === undefined ? {} : { prepareConstruction: () => {
@@ -366,7 +366,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
                 // Late content gets the same final look and complete inventory;
                 // an early census never publishes readiness or skips this fence.
                 await timeClientPreparation(request.cell.slug, 'entry.final-look', () => foundation.beforeWarm !== undefined ? foundation.beforeWarm() : foundation.prepareWorldMaterials?.());
-                primeRoadKit();
+                await primeRoadKit();
               }, arrivalAt());
               // Observe an early failure now; afterPlay still awaits the original rejection before readiness.
               void enteredWarm.catch(() => undefined);
@@ -495,7 +495,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
               contentReady(); forgetContent();
               await timeClientPreparation(request.cell.slug, 'entry.warm-tail', () => enteredWarm ?? request.page.world.game.warmEnteredFrame(owner, view.root, async () => {
                 await foundation.beforeWarm?.();
-                primeRoadKit();
+                await primeRoadKit();
               }, arrivalAt()));
               const trace = request.page.world.game.entryPreparation;
               if (isDev() && trace?.root === view.root.uuid) for (const [index, stage] of trace.stages.entries()) {
