@@ -205,8 +205,10 @@ function withSectionTaming(product: ShardFolder, features: readonly NativeAssemb
 }
 /** ONE-FORMAT OF38d4a: where a plan names no held host, the arsenal its `held/slots.json` declares (a blade with its passes,
  *  a bow and a polearm, Nalati's) stands as the `held.arms` host would, at the held hosts' place: before the patrol and the
- *  open arena, else last. The step is the slots' own id, its four script inputs `<id>.attack`, `.swap`, `.aim` and `.pitch`
- *  (a room reads its net commands instead), its motion the engine's sprint speed and its wind the weather owner's rows. */
+ *  open arena, else last. Its names come from the slots id's namespace (`nalati` of `nalati.arsenal`): the step and save
+ *  owner `<ns>.weapons`, the script inputs `<ns>.weapon.attack`, `.swap`, `.aim` and `.pitch` (a room routes its net
+ *  commands through them), so a save made under a plan that named the host restores. Its motion is the engine's sprint
+ *  speed and its wind the weather owner's rows. */
 const HELD_SLOTS_FILE = 'held/slots.json';
 async function withSectionArms(product: ShardFolder, features: readonly NativeAssemblyFeature[]): Promise<readonly NativeAssemblyFeature[]> {
   if (!product.hasFile(HELD_SLOTS_FILE) || features.some(row => HELD_HOSTS.has(row.host))) return features;
@@ -215,8 +217,9 @@ async function withSectionArms(product: ShardFolder, features: readonly NativeAs
   if (blade?.kind !== 'blade' || blade.source.kind !== 'passes' || kind('bow') === undefined || kind('polearm') === undefined) return features;
   const weather = features.find(row => row.host === 'weather.native');
   if (weather?.host !== 'weather.native') throw new Error('A held arsenal reads its wind from a weather.native owner');
-  const id = slots.id, arms: NativeAssemblyFeature = { host: 'held.arms', step: id, slots: HELD_SLOTS_FILE, speed: SPRINT_SPEED, weather: weather.rows,
-    input: { attack: `${id}.attack`, swap: `${id}.swap`, aim: `${id}.aim`, pitch: `${id}.pitch` } };
+  const ns = slots.id.split('.')[0] ?? slots.id, input = (verb: string): string => `${ns}.weapon.${verb}`;
+  const arms: NativeAssemblyFeature = { host: 'held.arms', step: `${ns}.weapons`, slots: HELD_SLOTS_FILE, speed: SPRINT_SPEED, weather: weather.rows,
+    input: { attack: input('attack'), swap: input('swap'), aim: input('aim'), pitch: input('pitch') } };
   const at = features.findIndex(row => row.host === 'encounter.patrol' || row.host === 'boss.open-arena');
   return at === -1 ? [...features, arms] : [...features.slice(0, at), arms, ...features.slice(at)];
 }

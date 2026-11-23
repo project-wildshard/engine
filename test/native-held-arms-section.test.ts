@@ -1,10 +1,10 @@
 // ONE-FORMAT OF38d4a: Nalati's arsenal from its files. Its pinned plan (r6) still names the `held.arms` host: a step, the
 // slots file, the sprint speed, the storm's wind rows and four script inputs. Every fact it carries is already in the
-// product: `held/slots.json` declares the blade with its passes, the bow and the polearm and names the arsenal, the engine
-// owns the sprint speed, and the weather owner the cooked files stand reads the same storm rows. So a plan that names no
-// held host stands the arsenal itself, at the held hosts' place, with the slots' id as its step and `<id>.attack` and so
-// on as its inputs. This proves the cut plan runs tick for tick with the plan that names the host under those names,
-// draws, looses, swaps to the sabre and the spear, and restores either world's save.
+// product: `held/slots.json` declares the blade with its passes, the bow and the polearm and names the arsenal
+// (`nalati.arsenal`, whose namespace gives the step `nalati.weapons` and the inputs `nalati.weapon.attack` and so on), the
+// engine owns the sprint speed, and the weather owner the cooked files stand reads the same storm rows. So a plan that
+// names no held host stands the arsenal itself, at the held hosts' place. This proves the cut plan runs tick for tick with
+// the r6 plan as shipped, draws, looses, swaps to the sabre and the spear, and restores either world's save.
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
@@ -45,16 +45,17 @@ const State = v.object({ slot: v.string(), shots: v.number(), thrusts: v.number(
 
 test('Nalati with no held host stands its arsenal from held/slots.json, tick for tick, and restores either save', async () => {
   const fixture = await shipped(), plan = await planOf(fixture.product);
-  const id = parseHeldSlots(await fixture.product.json('held/slots.json')).id;
+  const ns = parseHeldSlots(await fixture.product.json('held/slots.json')).id.split('.')[0], id = `${ns}.weapons`;
+  // r6 names the host; r7 (OF38d4b) drops it, and the r6 row is put back to compare against
+  const r6: NativeAssemblyFeature = { host: 'held.arms', step: id, slots: 'held/slots.json', speed: 7.2, weather: { file: 'world/forest-weather.json', path: ['storm', 'world'] },
+    input: { attack: `${ns}.weapon.attack`, swap: `${ns}.weapon.swap`, aim: `${ns}.weapon.aim`, pitch: `${ns}.weapon.pitch` } };
   const named = plan.features.find(row => row.host === 'held.arms');
-  expect(named?.host, 'the r6 plan names the arsenal').toBe('held.arms');
-  if (named?.host !== 'held.arms') return;
-  const at = plan.features.indexOf(named);
-  // the plan as the host would be named under the slots' own id: what the engine stands for a plan that names none
-  const renamed: NativeAssemblyFeature = { ...named, step: id, input: { attack: `${id}.attack`, swap: `${id}.swap`, aim: `${id}.aim`, pitch: `${id}.pitch` } };
-  const hosted = withPlan(fixture.product, { ...plan, features: plan.features.map(row => row === named ? renamed : row) });
-  const cut = withPlan(fixture.product, { ...plan, features: plan.features.filter(row => row !== named) });
-  expect(plan.features[at + 1]?.host, 'the arsenal stood before the patrol').toBe('encounter.patrol');
+  // the names r6 wrote are the ones the engine stands from the slots' namespace
+  if (named !== undefined) expect(named).toEqual(r6);
+  const without = plan.features.filter(row => row.host !== 'held.arms'), at = without.findIndex(row => row.host === 'encounter.patrol');
+  expect(at, 'the arsenal stands before the patrol').toBeGreaterThan(0);
+  const hosted = withPlan(fixture.product, { ...plan, features: [...without.slice(0, at), r6, ...without.slice(at)] });
+  const cut = withPlan(fixture.product, { ...plan, features: without });
   const before = await open(fixture, hosted), after = await open(fixture, cut);
   let restored: NativeHeadlessResident | undefined;
   try {
@@ -64,7 +65,7 @@ test('Nalati with no held host stands its arsenal from held/slots.json, tick for
       if (typeof saved !== 'string') throw new Error('Missing the arsenal');
       return v.parse(State, JSON.parse(saved));
     };
-    const swap = (index: number): HeadlessCommand => ({ kind: 'script', actorId: `${id}.swap`, value: index });
+    const swap = (index: number): HeadlessCommand => ({ kind: 'script', actorId: `${ns}.weapon.swap`, value: index });
     const stand = (live: NativeHeadlessResident, extra: Partial<Extract<HeadlessCommand, { kind: 'player' }>> = {}): HeadlessCommand =>
       ({ kind: 'player', moveX: 0, moveZ: 0, yaw: leadPlayer(live.host).yaw, ...extra });
     const play = (live: NativeHeadlessResident): string[] => {
@@ -87,7 +88,7 @@ test('Nalati with no held host stands its arsenal from held/slots.json, tick for
     restored = await open(fixture, cut, serializeSimSnapshot(snapshotSimHostBytes(after.host)));
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(after.host)));
     restored.dispose();
-    // a save made under the plan that named the host restores into the cut world
+    // an r6 save, made under the plan that named the host, restores into the cut world
     restored = await open(fixture, cut, serializeSimSnapshot(snapshotSimHostBytes(before.host)));
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(before.host)));
   } finally { restored?.dispose(); after.dispose(); before.dispose(); }
