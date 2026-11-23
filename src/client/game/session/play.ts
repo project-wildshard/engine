@@ -8,6 +8,7 @@ import { initialHomeMetadataRequired } from '../grid/homeMetadata';
 import { DEVSERVER } from '../grid/menu';
 import { devCookedMap } from '../boot/placedSpawn';
 import { enterZone } from '../grid/pageEntry';
+import { MapCreatures } from '../grid/mapCreatures';
 import { timeClientPreparation } from '../shardfile/preparationTiming';
 import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { Audio } from '@wildshard/engine/audio/Audio';
@@ -74,6 +75,7 @@ import { animalPositions } from './positions';
 import { describeKeyBindings } from '../keyBindings';
 import { app } from '@wildshard/engine/app/runtime';
 import { beginExploreEntry, recordBootCheckpoint } from '@wildshard/engine/boot/bootTrace';
+import { leftByPlayer } from '@wildshard/engine/boot/dropNotice';
 import { exploreChannel } from '@wildshard/engine/app/view/exploreChannel';
 import { startMenuPreload, type Preload, type AudioBanks } from '@wildshard/engine/boot/extras';
 import { macrotask, type Plan, type StepRunner } from '@wildshard/engine/boot/plan';
@@ -572,7 +574,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   // ── Explore World (project/archive/2026-09-23-explore-world.md): the title's EXPLORE WORLD panel — the viewer over this same loaded shard (a
   // lazy chunk). God-mode camera, Model Explorer, one ✎ to the review inbox; ✕ comes back here to the title.
   const exitExplore = () => {
-    if (exploreApp) { location.assign('/'); return; }
+    if (exploreApp) { leftByPlayer('explore close'); location.assign('/'); return; }
     perf.setActive(false); audio.worldMuted = true; music.setState({ mode: 'menu' }); hud.showIntro(enter);
   };
   const noteSheet = async (): Promise<void> => { const f = await loadFeedback(); await f.openSheet(); };
@@ -727,6 +729,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     if (grid === null) return player.position;
     const feet = grid.worldFeet(); return { x: feet.x - grid.home.origin.x, z: feet.z - grid.home.origin.z };
   };
+  const mapCreatures = new MapCreatures(); // QA 11-23-b row 7: the entered region's creatures on the minimap
   let musicPoll = 0;
   const alertOnlyHostile = manifest.audio?.alertOnlyHostile === true;
   // the dev fps panel's split of this updater (src/shared/engine/core/frameCost.ts; free while the panel is closed): `mark(b)` books the
@@ -823,7 +826,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     lockOn.update();
     speedLines.update(dt, player.dashing, meleeLock.lunging);
     // G782: held at a cell's wall, the maps redraw every 4th drawn frame (a held second shows no travel)
-    if (hud.entered && heldFrameTurn(4)) { const at = mapAt(); hud.setAnimals(away() ? [] : animalPositions(animals.animals)); minimap.update(at, player.yaw, away() ? [] : animals.animals); fullMap.update(at, player.yaw); } // a practice room's map is its own (Minimap.setRoom, E321), not the shard's terrain
+    if (hud.entered && heldFrameTurn(4)) { const at = mapAt(); const seen = away() ? [] : mapCreatures.of(animals.animals, gridLive?.mapCreatures() ?? null); hud.setAnimals(animalPositions(seen)); minimap.update(at, player.yaw, seen); fullMap.update(at, player.yaw); } // a practice room's map is its own (Minimap.setRoom, E321), not the shard's terrain
     hud.setState({
       bolts: weapons.state.ammo, maxBolts: weapons.state.magazine, reserve: weapons.state.reserve, loaded: weapons.state.loaded, reloading: weapons.state.reloading, reloadProgress: weapons.state.reloadProgress,
       weaponUi: weapons.current.row.ui,

@@ -1,3 +1,4 @@
+import type { RegionCreatures } from './mapCreatures';
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { emitFault } from '@wildshard/engine/core/faults';
@@ -506,6 +507,19 @@ export class LiveGridSession {
   enteredAnimals(): ReturnType<PreparedRegionalRuntime['animals']> {
     const instance = this.enteredRuntimeInstance();
     return instance === null ? null : this.runtimeRegions.get(instance)?.animals() ?? null;
+  }
+
+  /** QA 11-23-b row 7: the creatures the minimap shows beside the page's: the entered region's in its cell's metres, or on the
+   *  road the home's, each with its frame's offset from the home frame (play.ts `mapAt`); null in a data cell or with none. */
+  mapCreatures(): RegionCreatures | null {
+    const road = this.roadAnimals();
+    if (road !== null) return { animals: road.animals.animals, dx: 0, dz: 0 };
+    const instance = this.enteredRuntimeInstance();
+    const animals = instance === null ? null : this.runtimeRegions.get(instance)?.animals() ?? null;
+    const cell = animals === null ? undefined : this.ports.assembly.cells.find(row => row.instance === instance);
+    if (animals === null || cell === undefined) return null;
+    const home = this.ports.home.origin;
+    return { animals: animals.animals, dx: cell.origin.x - home.x, dz: cell.origin.z - home.z };
   }
 
   /** MMO-PLAN MP5.2b: on the road, the home region's creature manager and the home's origin in the world's frame, where the road's rows
