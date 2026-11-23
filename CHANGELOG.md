@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.76 (2026-11-23)
+
+- Pine Hollow and Signal Dunes load into play after a room revision update.
+- The update splash keeps moving while the new version gets ready.
+
 ## v0.1.67 (2026-11-21)
 
 - Mirror Salt shows the dock prompt at seat height and lets drivers get back into their buggies.
