@@ -776,7 +776,9 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       (() => {
         // SB53: a page offline before its entry graph ran never boots (a failed module stays failed in this document), and
         // the one retry may be spent on a reload made offline: when the network returns, it reloads, retry spent or not.
-        let arrived = 0, away = navigator.onLine === false;
+        let arrived = 0, away = navigator.onLine === false, failed = '';
+        // J501 (QA 11-23-b row 22): a module this document names that fails to load (a 404, a refused fetch) is known at once
+        addEventListener('error', e => { const el = e.target; if (el instanceof HTMLScriptElement && el.type === 'module' && el.src) { failed = el.src; setTimeout(check, 1500); } }, true);
         try { new PerformanceObserver(list => { for (const row of list.getEntries()) arrived = Math.max(arrived, row.responseEnd); }).observe({ type: 'resource', buffered: true }); } catch { /* no observer: the 12 s rule alone */ }
         const waiting = () => {
           const pending = document.getElementById('ws-loading-shell');
@@ -785,14 +787,45 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         const reload = () => (globalThis.__wsShellReload || location.reload.bind(location))();
         addEventListener('offline', () => { away = true; });
         addEventListener('online', () => { if (away && waiting()) reload(); });
+        // J501 (QA 11-23-b row 22): the one retry spent and still no game code: the card says so with a code and a Retry, and
+        // the Sentry report waits in the device's screen outbox (telemetry/browserErrors.ts screen.reports, screen boot-fail)
+        // for the next page that boots to send it, as self-reload's does; this page has no Sentry.
+        // Before this the card sat at START with its clock running, saying nothing, for as long as the player waited.
+        const stuck = () => {
+          const card = document.querySelector('.ws-load[data-shell]');
+          if (!card || card.querySelector('.ws-load-fail')) return;
+          const file = (failed || '').split('/').pop() || 'the game code', code = 'BOOT-FAIL';
+          const why = failed ? file : 'nothing arrived for 12 s';
+          document.documentElement.dataset.bootFail = code;
+          try {
+            const key = 'wildshard.save.v2@2.device', doc = JSON.parse(localStorage.getItem(key) || '{"keys":{}}'), keys = doc.keys ??= {};
+            const outbox = Array.isArray(keys['screen.reports']?.data) ? keys['screen.reports'].data : [];
+            const id = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+            outbox.push({ id, at: Date.now(), message: code + ': the game code didn\'t load (' + why + ')', stack: '',
+              tags: { system: 'boot', build: String(globalThis.__WS_BUILD_ID__ || ''), shard: '', bootStage: 'loading', fatal: true, screen: 'boot-fail',
+                exit: { code, zone: new URLSearchParams(location.search).get('chunk') || '', revision: '', room: '', step: card.dataset.step || '' } } });
+            keys['screen.reports'] = { v: 1, data: outbox.slice(-8) }; localStorage.setItem(key, JSON.stringify(doc));
+          } catch { /* storage off: the card still says it */ }
+          const kicker = card.querySelector('[data-el="kicker"]'); if (kicker) kicker.textContent = 'Couldn\'t start';
+          const box = document.createElement('div'); box.className = 'ws-load-fail'; box.setAttribute('role', 'alert');
+          box.style.cssText = 'margin-top:14px;padding:12px;border:1px solid rgba(255,170,90,.6);color:#ffc890;font:13px/1.4 ui-monospace,monospace';
+          const line = document.createElement('div'); line.textContent = 'The game code didn\'t load (' + why + '). Code ' + code + '.';
+          const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Retry'; retry.className = 'ws-load-retry';
+          retry.style.cssText = 'margin-top:10px;padding:8px 18px;background:transparent;border:1px solid currentColor;color:inherit;font:inherit;letter-spacing:.1em';
+          retry.onclick = () => { try { const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') || '{"keys":{}}'); delete doc.keys?.['boot.selfReload']; sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify(doc)); } catch { /* reload anyway */ } reload(); };
+          box.append(line, retry); (card.querySelector('.ws-load-panel') || card).append(box);
+          console.error('[boot] ' + code + ': ' + why);
+        };
+        let decided = false;
         const check = () => {
-          if (!waiting()) return;
-          if (arrived > 0 && performance.now() - arrived < 4000) { setTimeout(check, 1000); return; }
+          if (!waiting() || decided) return;
+          if (!failed && arrived > 0 && performance.now() - arrived < 4000) { setTimeout(check, 1000); return; }
+          decided = true;
           try { // the session save key boot.selfReload (src/client/engine/saves/slots.ts), shared with stuck.ts's one retry
             const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') || '{"keys":{}}');
-            if (doc.keys?.['boot.selfReload']) return;
+            if (doc.keys?.['boot.selfReload']) { stuck(); return; }
             (doc.keys ??= {})['boot.selfReload'] = { v: 1, data: String(Date.now()) }; sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify(doc));
-          } catch { return; }
+          } catch { stuck(); return; }
           reload();
         };
         setTimeout(check, 12000);

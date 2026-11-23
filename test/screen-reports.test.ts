@@ -262,6 +262,43 @@ walk('release-unsigned', 'a release file that fails its signature puts up its pa
   expect(opened()).toEqual(['release-unsigned']);
 });
 
+walk('boot-fail', "index.html's card says BOOT-FAIL with a Retry when the game code never loads, and the next page sends it (J501)", async () => {
+  // the inline watchdog as index.html has it, run against a world page whose main module answered 404 and whose one retry is spent
+  const html = readFileSync('index.html', 'utf8');
+  const code = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gu)].map((m) => m[1] ?? '').find((text) => text.includes("screen: 'boot-fail'"));
+  expect(code).toBeDefined();
+  vi.useFakeTimers();
+  try {
+    document.body.innerHTML = '<div data-title-shell></div><div class="ws-load" data-shell data-step="start.app:main-import"><b data-el="kicker">Loading</b><div class="ws-load-panel"></div></div>';
+    sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify({ keys: { 'boot.selfReload': { v: 1, data: '1' } } }));
+    const reload = vi.fn();
+    (globalThis as unknown as { __wsShellReload?: () => void }).__wsShellReload = reload;
+    // oxlint-disable-next-line no-new-func -- the inline script is the unit under test
+    new Function(code ?? '')();
+    const main = document.createElement('script'); main.type = 'module'; main.src = '/b/x/main-Dei4nAgP.js'; document.body.append(main);
+    main.dispatchEvent(new Event('error'));
+    vi.advanceTimersByTime(1600);
+    const card = document.querySelector('.ws-load-fail');
+    expect(card?.textContent).toContain('Code BOOT-FAIL');
+    expect(card?.textContent).toContain('main-Dei4nAgP.js');
+    expect(document.querySelector('[data-el="kicker"]')?.textContent).toBe("Couldn't start");
+    expect(reload).not.toHaveBeenCalled(); // the retry was spent: no second silent reload
+    document.querySelector<HTMLButtonElement>('.ws-load-retry')?.click();
+    expect(reload).toHaveBeenCalledTimes(1);
+    // the report the next page's outbox sends, read the way it reads it
+    const { ScreenOutbox } = await import('../src/client/engine/telemetry/screenOutbox');
+    const stored = JSON.parse(localStorage.getItem('wildshard.save.v2@2.device') ?? '{}') as { keys?: Record<string, { data?: Json }> };
+    const outbox = new ScreenOutbox({ read: () => stored.keys?.['screen.reports']?.data ?? null, write: () => undefined });
+    for (const report of outbox.pending()) reports.push({ error: new Error(report.message), tags: report.tags });
+    expect(opened()).toEqual(['boot-fail']);
+    expect(reports[0]?.tags).toMatchObject({ system: 'boot', fatal: true, bootStage: 'loading', exit: { code: 'BOOT-FAIL', step: 'start.app:main-import' } });
+  } finally {
+    vi.useRealTimers();
+    delete (globalThis as unknown as { __wsShellReload?: () => void }).__wsShellReload;
+    sessionStorage.clear(); localStorage.removeItem('wildshard.save.v2@2.device');
+  }
+});
+
 test('the walk covers every screen in ERROR_SCREENS', async () => {
   const { ERROR_SCREENS } = await import('../src/client/engine/telemetry/browserErrors');
   expect([...covered].sort()).toEqual([...ERROR_SCREENS].sort());

@@ -50,13 +50,16 @@ export interface BrowserErrorTags {
  *                 once per cell a session; warning
  *   map-tile-missing   a full-map cell the world map atlas has no tile for, drawn as a plain plot or its own map instead
  *                 (game/grid/mapAtlas.ts; QA-FEEDBACK 2026-11-13 row 44), once per slug a page; warning
+ *   boot-fail     index.html's card when the page's game code never loaded and its one self-reload is spent (J501, QA 11-23-b
+ *                 row 22): "Couldn't start · Code BOOT-FAIL" with a Retry; the inline script stores it in the outbox and the next
+ *                 page that boots sends it, since that page has no Sentry
  *   release-unsigned   FM5 mode 39's page, "Couldn't check the world": the release file failed its signature, so the page dials
  *                 nothing (host/online/releaseScreens.ts), once a page
  * Not screens of a fault, so never reported: the player's own reload, back or exit (QA 11-12 row 35), "Playing somewhere else",
  * "The world is full", the reconnect banner (counted in `net` telemetry), title refusal lines and the Connection doctor.
  */
 export const ERROR_SCREENS = ['error-modal', 'stuck-step', 'glitch-chip', 'load-failure', 'title-drop', 'link-lost', 'link-refused', 'stale-build',
-  'loading-stall', 'stale-reload', 'self-reload', 'save-failed', 'cell-unavailable', 'map-tile-missing', 'release-unsigned'] as const;
+  'loading-stall', 'stale-reload', 'self-reload', 'save-failed', 'cell-unavailable', 'map-tile-missing', 'release-unsigned', 'boot-fail'] as const;
 /** S18: screens common enough on a bad network that each is a Sentry warning, never an error */
 export const WARNING_SCREENS: readonly ErrorScreen[] = ['loading-stall', 'stale-reload', 'self-reload', 'cell-unavailable', 'map-tile-missing'];
 export type ErrorScreen = typeof ERROR_SCREENS[number];

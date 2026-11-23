@@ -11,3 +11,5 @@ Row 23 rides beside it: a neighbour's bad spawn file (Brasscap's discovery.json)
 Now it is skipped and reported as NEIGHBOUR-FILE; the zone's own bad file still refuses.
 
 Row 23 landed as its own commit: the neighbour test is `test/spawn-download.test.ts`'s last case (Brasscap's 9-byte discovery.json against its listed 5).
+
+Boot 404 (the forced third failure): a world page whose main module 404s sat on its START card forever once index.html's one self-reload was spent, with the clock running and no word. The inline watchdog now hears the module's error event, and with the retry spent says "Couldn't start · Code BOOT-FAIL" with a Retry, storing a `boot-fail` screen report in the device outbox for the next page to send to Sentry.
