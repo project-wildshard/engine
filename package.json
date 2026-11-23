@@ -868,6 +868,7 @@
     "./game/weather/rainPresentation": "./src/client/game/weather/rainPresentation.ts",
     "./game/ambient/ambientFlock": "./src/client/game/ambient/ambientFlock.ts",
     "./game/shardfile/bakedTiles": "./src/client/game/shardfile/bakedTiles.ts",
+    "./game/shardfile/skinPlayback": "./src/client/game/shardfile/skinPlayback.ts",
     "./game/shardfile/serverPack": "./src/shared/game/shardfile/serverPack.ts",
     "./game/shardfile/saveRevision": "./src/shared/game/shardfile/saveRevision.ts",
     "./game/quest/chapterBindings": "./src/shared/game/quest/chapterBindings.ts",
