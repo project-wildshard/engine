@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "885f41459efd394e4c3ff2635ff129b55a0232b0131c1388074d9659d95cf2ba",
+  "catalogueHash": "3b8134cd6cc18366c110f68509a9a363fb0d4b72066b067e2cd7ee6807913086",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -622,8 +622,8 @@
       {
         "slug": "nalati-grasslands",
         "name": "Nalati Grasslands",
-        "revision": 6,
-        "hash": "4e99b83cde17151cacce01b6e8a755cc4442049ff73cabf769c21b3a6f9bbf6f"
+        "revision": 7,
+        "hash": "e99c258c2deef063e87ca720e149695b609de89814598fc139c0ca18e4de5dab"
       },
       {
         "slug": "nine-dragon-stack",
@@ -634,8 +634,8 @@
       {
         "slug": "open-plot-alien-plain",
         "name": "Open Plot · Pastel Alien Plain",
-        "revision": 2,
-        "hash": "c1ed1cacbfc41423c16b2196833d342f56906674eaf583a711a89bc26e38d392"
+        "revision": 3,
+        "hash": "dc9530e30ae211dc1319ea380b97c13ecd6b15d47697dde1ef7b8976542f0234"
       },
       {
         "slug": "open-plot-clockwork-canyon",
@@ -775,9 +775,9 @@
     },
     {
       "slug": "nalati-grasslands",
-      "revision": 6,
-      "hash": "4e99b83cde17151cacce01b6e8a755cc4442049ff73cabf769c21b3a6f9bbf6f",
-      "bytes": 223361024
+      "revision": 7,
+      "hash": "e99c258c2deef063e87ca720e149695b609de89814598fc139c0ca18e4de5dab",
+      "bytes": 235185152
     },
     {
       "slug": "nine-dragon-stack",
@@ -787,9 +787,9 @@
     },
     {
       "slug": "open-plot-alien-plain",
-      "revision": 2,
-      "hash": "c1ed1cacbfc41423c16b2196833d342f56906674eaf583a711a89bc26e38d392",
-      "bytes": 8543232
+      "revision": 3,
+      "hash": "dc9530e30ae211dc1319ea380b97c13ecd6b15d47697dde1ef7b8976542f0234",
+      "bytes": 8552960
     },
     {
       "slug": "open-plot-clockwork-canyon",
