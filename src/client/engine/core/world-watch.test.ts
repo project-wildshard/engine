@@ -3,7 +3,7 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { Scope } from '../../../shared/engine/app/scope';
 import { onFault, type Fault } from '../../../shared/engine/core/faults';
 import { jsonSlot } from '../saves/slots';
-import { canvasHiddenBy, captureWaitMs, installWorldWatch, judgeWorldPixels, worldWatchAsync, type WorldWatchHost } from './worldWatch';
+import { canvasHiddenBy, installWorldWatch, judgeWorldPixels, lookVerdict, worldWatchAsync, type WorldWatchHost } from './worldWatch';
 
 /** n RGBA pixels of one colour */
 const fill = (n: number, rgba: readonly [number, number, number, number]): number[] => Array.from({ length: n }, () => [...rgba]).flat();
@@ -96,36 +96,37 @@ test('no look while the loop is held or play is not on screen', async () => {
   scope.dispose();
 });
 
-test('nightly 45148332920: a look waits three of the loop\'s own frame intervals since control, 3 s at least and 15 s at most', () => {
-  expect(captureWaitMs(3000, 180)).toBe(3000); // 60 fps
-  expect(captureWaitMs(3000, 2)).toBe(4500); // a frame every 1.5 s on SwiftShader
-  expect(captureWaitMs(3000, 0)).toBe(9000); // none since control: three times that gap
-  expect(captureWaitMs(60_000, 1)).toBe(15_000);
+test('nightly 45158091056: a look judges a missing frame by the loop\'s own turns, not wall time', () => {
+  expect(lookVerdict(3000, 180, 180)).toBe('undrawn'); // 60 fps of turns and no frame: the world cannot draw
+  expect(lookVerdict(3000, 0, 0)).toBe('wait'); // the browser gave no animation frame (a screenshot copying the surface)
+  expect(lookVerdict(30_000, 0, 0)).toBe('wait');
+  expect(lookVerdict(3000, 2, 2)).toBe('wait'); // a slow SwiftShader turn is still drawing
+  expect(lookVerdict(12_000, 400, 1)).toBe('wait');
+  expect(lookVerdict(15_000, 400, 1)).toBe('undrawn'); // frames given for 15 s and the pacing let none draw
 });
 
-test('a slow loop that still draws is not called undrawn; a loop that stops is, after its own cadence', async () => {
+test('a loop given no animation frames is waited for; one that takes its turns and draws nothing is named', async () => {
   vi.useFakeTimers();
   off = onFault((f) => { faults.push(f); });
-  const scope = new Scope('slow'), sky = fill(100, [120, 190, 240, 255]);
-  let drawn = 0;
+  const scope = new Scope('frozen'), sky = fill(100, [120, 190, 240, 255]);
+  let given = 0, due = 0;
   const base = host(() => sky, scope);
-  // a frame every 1.5 s, as Driftwood drew on the runner's SwiftShader: the look's frame lands 3.2 s in
-  scope.interval(1500, () => { drawn++; });
-  const slow: WorldWatchHost = { ...base, frames: () => drawn,
-    captureFrame: (w) => new Promise((resolve) => { scope.timeout(3200, () => { void base.captureFrame(w).then(resolve); }); }) };
-  installWorldWatch(slow, [3]);
-  await vi.advanceTimersByTimeAsync(7000);
+  // the gameplay screenshot holds the compositor 7 s: no animation frame, then the next one draws
+  const frozen: WorldWatchHost = { ...base, turns: () => ({ given, due }),
+    captureFrame: (w) => new Promise((resolve) => { scope.timeout(7000, () => { given++; due++; void base.captureFrame(w).then(resolve); }); }) };
+  installWorldWatch(frozen, [3]);
+  await vi.advanceTimersByTimeAsync(3000 + 8000);
   expect(faults).toEqual([]);
   scope.dispose();
-  // two frames since control, then the loop never draws again: named once three of its 1.5 s intervals pass
-  const stopped = new Scope('stopped');
-  drawn = 0;
-  const ticking = stopped.interval(1000, () => { drawn++; });
-  stopped.timeout(2900, () => { stopped.cancelTimer(ticking); });
-  installWorldWatch({ ...host(() => sky, stopped), frames: () => drawn, captureFrame: () => new Promise<HTMLCanvasElement>(() => { /* the loop never draws again */ }) }, [3]);
-  await vi.advanceTimersByTimeAsync(3000 + 4400);
+  // the loop is given frames and takes its turns, but no frame ever draws: named at the first slice
+  const stuck = new Scope('stuck');
+  given = 0; due = 0;
+  stuck.interval(16, () => { given++; due++; });
+  installWorldWatch({ ...host(() => sky, stuck), turns: () => ({ given, due }),
+    captureFrame: () => new Promise<HTMLCanvasElement>(() => { /* the world never draws */ }) }, [3]);
+  await vi.advanceTimersByTimeAsync(3000 + 2900);
   expect(faults).toEqual([]);
   await vi.advanceTimersByTimeAsync(200);
-  expect(faults.map((f) => String(f.error))).toEqual(['Error: World not drawn: no world frame drew in 4500 ms of play']);
-  stopped.dispose();
+  expect(faults.map((f) => String(f.error))).toEqual([expect.stringMatching(/^Error: World not drawn: no world frame drew in 3000 ms of play \(\d+ draw turns, \d+ animation frames\)$/u)]);
+  stuck.dispose();
 });

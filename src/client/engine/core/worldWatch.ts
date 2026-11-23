@@ -65,27 +65,36 @@ export interface WorldWatchHost {
   playing: () => boolean;
   /** what the report carries besides the look (graphics mode, pass split, drawing buffer...) */
   detail: () => Record<string, unknown>;
-  /** frames drawn so far (Game.frameCount); absent: the look waits CAPTURE_WAIT_MS */
-  frames?: () => number;
+  /** the loop's turns so far (Game.animationFrames, Game.drawTurns); absent: a look calls the world undrawn after CAPTURE_WAIT_MS */
+  turns?: () => LoopTurns;
   /** the page's timers, owned by the level */
   scope: Scope;
 }
 
-/** How long a look waits for the next drawn frame, at least. */
+/** Counters of the frame loop (Game). */
+export interface LoopTurns {
+  /** animation frames the browser gave the loop */
+  given: number;
+  /** turns its frame cap and pacing let draw (forced draws too): each one draws unless the world cannot */
+  due: number;
+}
+
+/** A look judges a missing frame in slices this long. */
 export const CAPTURE_WAIT_MS = 3000;
-/** The longest a look waits, however slow the loop's recent frames were: a loop this far past its own cadence has stalled. */
+/** Given animation frames this long and none drawn, the loop's own pacing is holding the world back: undrawn. */
 export const CAPTURE_WAIT_MAX_MS = 15_000;
-/** A look waits this many of the loop's own drawn-frame intervals before it calls the world undrawn. */
+/** Draw turns with no drawn frame that call the world undrawn. */
 export const CAPTURE_WAIT_FRAMES = 3;
 
-/** How long a look waits for the next frame: three of the loop's own drawn-frame intervals since control, 3 s at least,
- *  15 s at most. Nightly 45148332920: on the runner's SwiftShader Mossgate and Driftwood draw a frame every second or more
- *  (Driftwood's 30 draw-phase frames took 54 s on 11-22), so a flat 3 s wait called a slow, drawn world undrawn. A loop that
- *  stops after normal frames is still named in 3 s; one that drew nothing since control waits three times that gap.
- *  `elapsedMs` since control, `drawn` frames drawn in it. */
-export function captureWaitMs(elapsedMs: number, drawn: number): number {
-  const interval = drawn > 0 ? elapsedMs / drawn : elapsedMs;
-  return Math.min(CAPTURE_WAIT_MAX_MS, Math.max(CAPTURE_WAIT_MS, Math.ceil(CAPTURE_WAIT_FRAMES * interval)));
+/** A look that saw no frame after `waitedMs`: `undrawn` to report, `wait` for another slice. Judged by the loop's own turns
+ *  since the look began, never wall time alone. Nightly 45148332920 and 45158091056: on the runner's SwiftShader Driftwood
+ *  draws a frame every 1.1 to 1.4 s, and while the harness's gameplay screenshot copies the surface (26 s) every 2.4 s, with
+ *  gaps over 3.2 s; each animation frame the browser gave the loop still drew. A loop given no animation frame had nothing to
+ *  draw in (a busy compositor, a screenshot), so the look waits. `given`, `due`: the LoopTurns counted during the look. */
+export function lookVerdict(waitedMs: number, given: number, due: number): 'undrawn' | 'wait' {
+  if (due >= CAPTURE_WAIT_FRAMES) return 'undrawn'; // the loop took its turns to draw, and no frame came
+  if (given > 0 && waitedMs >= CAPTURE_WAIT_MAX_MS) return 'undrawn'; // frames given, its pacing let none draw
+  return 'wait';
 }
 
 /** The device slot `debug.worldWatchDrawCheck`: on, the watch reads its thumbnails in a worker and stands in for DrawCheck's two
@@ -104,7 +113,6 @@ export const LOOKS_S: readonly number[] = [3, 8, 20, 45];
 /** Watch a world reached control: the looks in LOOKS_S, each skipped while it cannot judge. */
 export function installWorldWatch(host: WorldWatchHost, looks: readonly number[] = LOOKS_S): void {
   let reported = false, failed = 0, stopped = false;
-  const controlFrames = host.frames?.() ?? 0;
   const asyncRead = looks.length > 0 && worldWatchAsync();
   const readPixels = asyncRead ? watchPixelReader(host.scope) : null;
   const canLook = (): boolean => !stopped && !host.scope.disposed && !host.scope.disposing
@@ -114,8 +122,7 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
     console.warn(`[world-watch] ${why}`, detail);
     emitFault({ system: 'world-watch', error: Object.assign(new Error(`World not drawn: ${why}`), { detail }), verdict: fatal ? 'uncaught' : 'retry' });
   };
-  /** `atMs`: how long after control this look runs (its LOOKS_S entry) */
-  const lookOnce = async (atMs: number): Promise<void> => {
+  const lookOnce = async (): Promise<void> => {
     if (!canLook()) return;
     const hiddenBy = canvasHiddenBy(getComputedStyle(host.canvas));
     if (hiddenBy !== null) {
@@ -124,12 +131,23 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
       host.canvas.style.visibility = 'visible'; host.canvas.style.opacity = ''; if (host.canvas.style.display === 'none') host.canvas.style.display = '';
       return;
     }
-    const wait = host.frames === undefined ? CAPTURE_WAIT_MS : captureWaitMs(atMs, host.frames() - controlFrames);
-    const copy = await Promise.race([host.captureFrame(48), new Promise<null>((resolve) => { host.scope.timeout(wait, () => { resolve(null); }); })]);
-    if (stopped || host.scope.disposed) return;
-    if (copy === null) {
-      // no frame drew in that time while play shows and the loop is not held: say so once (the loop's own faults name why)
-      if (!reported && !host.hold && document.visibilityState === 'visible') { reported = true; report(`no world frame drew in ${String(wait)} ms of play`, 'black', false); }
+    const start = host.turns?.(), frame = host.captureFrame(48);
+    let copy: HTMLCanvasElement | null = null, waited = 0;
+    while (copy === null) {
+      copy = await Promise.race([frame, new Promise<null>((resolve) => { host.scope.timeout(CAPTURE_WAIT_MS, () => { resolve(null); }); })]);
+      if (stopped || host.scope.disposed) return;
+      if (copy !== null) break;
+      waited += CAPTURE_WAIT_MS;
+      const now = host.turns?.(), given = now === undefined || start === undefined ? 0 : now.given - start.given;
+      const due = now === undefined || start === undefined ? CAPTURE_WAIT_FRAMES : now.due - start.due;
+      if (!canLook()) return; // play left the screen, or the loop was held: this look cannot judge
+      if (lookVerdict(waited, given, due) === 'wait') continue;
+      // the loop had its turns while play shows and is not held, and no frame drew: say so once (its own faults name why)
+      if (!reported) {
+        reported = true;
+        const turns = now === undefined ? '' : ` (${String(due)} draw turns, ${String(given)} animation frames)`;
+        report(`no world frame drew in ${String(waited)} ms of play${turns}`, 'black', false);
+      }
       return;
     }
     if (copy.width === 0 || copy.height === 0) return;
@@ -148,6 +166,6 @@ export function installWorldWatch(host: WorldWatchHost, looks: readonly number[]
     stopped = true;
     report(`the world still reads ${look} ${String(failed)} looks after control`, look, true);
   };
-  for (const s of looks) host.scope.timeout(s * 1000, () => { void lookOnce(s * 1000); });
+  for (const s of looks) host.scope.timeout(s * 1000, () => { void lookOnce(); });
   if (asyncRead) bindDrawWatch(host.canvas, host.scope);
 }

@@ -1,0 +1,5 @@
+# 2026-11-23 The world watch judges by the loop's turns (opus-compat-w10)
+
+Nightly 45158091056 on 75936dc836: Driftwood (heads 3) passed draw, hover, cook and Explorer, then failed boot on "no world frame drew in 3215 ms of play" at the 45 s look. The page clock puts that look at 90.7 to 93.9 s, inside the harness's gameplay screenshot (native capture 87.7 to 113.7 s, 25.9 s). Drawn frames went 44 to 55 over that capture: a frame every 2.4 s, against 1.1 to 1.4 s before it. Boot evidence shows no stall, link or upload in play (play stall 108 ms busy at 3.4 s). The gap is host cadence with no game work behind it.
+
+Wall time can't separate a slow host from a world that can't draw. The loop now counts the animation frames the browser gives it (`Game.animationFrames`) and the turns its pacing and frame cap let draw (`Game.drawTurns`). A look judges in 3 s slices (`lookVerdict`): three draw turns with no frame means the world is undrawn. With no animation frame given, the look waits. Frames given for 15 s with none drawn means the pacing is holding the world back. This replaces the mean-interval wait from 75936dc836.

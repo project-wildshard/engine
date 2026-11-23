@@ -282,7 +282,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   whenControl(game.levelScope, game.levelScope, () => {
     installWorldWatch({ canvas: game.canvas, get hold() { return game.hold; }, captureFrame: (w) => game.captureFrame(w),
       contextLost: () => game.renderer.getContext().isContextLost(),
-      frames: () => game.frameCount,
+      turns: () => ({ given: game.animationFrames, due: game.drawTurns }),
       playing: () => hud.entered && document.querySelector('#hud.ws-grid-revealing') === null && document.querySelector('.ws-load:not(.hide)') === null,
       detail: () => {
         const gl = game.renderer.getContext();

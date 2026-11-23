@@ -428,6 +428,9 @@ export class Game {
   updateMs: Float32Array<ArrayBuffer> = new Float32Array(120); renderMs: Float32Array<ArrayBuffer> = new Float32Array(120);
   /** frames drawn since start() */
   frameCount = 0;
+  /** animation frames the browser gave the loop, and the turns its pacing and frame cap let draw (forced draws too);
+   *  the world watch judges a missing frame by these, not by wall time (worldWatch.ts `lookVerdict`) */
+  animationFrames = 0; drawTurns = 0;
   /** QA 2026-11-13 row 6: two reads after the first frames that make a world drawing nothing loud (render/drawCheck.ts) */
   private readonly drawCheck = new DrawCheck({
     renderer: { getContext: () => this.renderer.getContext(), getRenderTarget: () => this.renderer.getRenderTarget(), setRenderTarget: (t) => { this.renderer.setRenderTarget(t); } },
@@ -1854,7 +1857,7 @@ export class Game {
     // steps account for the whole interval, and input includes everything since the previous draw.
     let lastDrawn = -Infinity;
     const loop = (now:number|undefined, forceFrame:boolean) => {
-      if (now !== undefined) { if (now === lastNow) return; lastNow = now; }
+      if (now !== undefined) { if (now === lastNow) return; lastNow = now; this.animationFrames++; }
       if (this.dead) return; // a core system died (faults.ts): the fatal modal is up, nothing more to draw
       lastRun = diagnosticNow();
       // TR-4b: the first animation frame after a paced draw waited for the GPU to raster it (slowGpuPacing.ts `presented`)
@@ -1878,6 +1881,7 @@ export class Game {
         lastDrawn = anchor;
       }
       if (this.hold) { this.clock.getDelta(); return; } // the context is lost / being rebuilt (GpuRecovery.ts): a draw now would re-link every program in one stall
+      this.drawTurns++;
       if (!forceFrame && !this.frameGate()) { this.clock.getDelta(); return; } // keep the clock moving so the next frame's dt is sane
       this.renderer.info.reset();
       const liveDt = Math.min(0.1, this.clock.getDelta());
