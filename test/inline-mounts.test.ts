@@ -2,7 +2,7 @@
 // cook-made files (S12d's phone ASTC KTX2s) the preparation client's byte table never listed.
 import { expect, test, vi } from 'vitest';
 import { adoptInlineMounts, inlineMountBytes } from '../src/client/app/assetTables';
-import { installAssetTables, publicBytes } from '../src/shared/engine/boot/tables';
+import { installAssetTables, musicManifests, publicBytes, sfxManifests } from '../src/shared/engine/boot/tables';
 
 const SLOT = Symbol.for('engine.asset-tables');
 function withTables(run: () => Promise<void>): Promise<void> {
@@ -18,6 +18,25 @@ test('an inline candidate adds its cook mounts to the byte table', () => withTab
   expect(await adoptInlineMounts({ cook: { path: 'cook.json', hash: 'h', bytes: 1 } }, 'http://127.0.0.1:4000/', read)).toBe(2);
   expect(read).toHaveBeenCalledExactlyOnceWith('http://127.0.0.1:4000/cook.json');
   expect(publicBytes()).toEqual({ '/assets/kept.bin': 42, '/assets/gpu/models/trees/cards.phone-1210f7ed.ktx2': 7, '/programs/pine-hollow.json': 9 });
+}));
+
+// SHARD-COMPAT SM8 (opus-compat-w9): the showcase template, retired from the pins, had no sfx table row, so its scene
+// cue bank refused at level.play ("requires its credit") and prepare timed out at 240 s.
+test('an inline candidate adds its own music and sfx manifests to the audio tables', () => withTables(async () => {
+  const cook = { mounts: [{ url: '/assets/sfx/showcase-template/sfx.json', path: 'm/a', bytes: 5, hash: 'h' },
+    { url: '/assets/music/showcase-template/music.json', path: 'm/b', bytes: 6, hash: 'h' },
+    { url: '/assets/sfx/showcase-template/bed-1.m4a', path: 'm/c', bytes: 7, hash: 'h' }] };
+  const files: Record<string, unknown> = {
+    'http://127.0.0.1:4000/cook.json': cook,
+    'http://127.0.0.1:4000/assets/sfx/showcase-template/sfx.json': { credit: 'Sound effects: test', beds: {}, provenance: [{ file: 'x' }] },
+    'http://127.0.0.1:4000/assets/music/showcase-template/music.json': { style: 'showcase-template', synth_keeps: 1 },
+  };
+  const read = vi.fn((url: string) => Promise.resolve(new Response(JSON.stringify(files[url]))));
+  expect(await adoptInlineMounts({ cook: { path: 'cook.json' } }, 'http://127.0.0.1:4000/', read)).toBe(3);
+  expect(read).toHaveBeenCalledTimes(3);
+  expect(sfxManifests()).toEqual({ 'showcase-template': { credit: 'Sound effects: test', beds: {} } });
+  expect(musicManifests()).toEqual({ 'showcase-template': { style: 'showcase-template' } });
+  expect(publicBytes()['/assets/sfx/showcase-template/bed-1.m4a']).toBe(7);
 }));
 
 test('a candidate with no cook reads nothing and keeps the table', () => withTables(async () => {

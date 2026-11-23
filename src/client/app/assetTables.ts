@@ -102,6 +102,20 @@ export async function adoptInlineMounts(descriptor: unknown, base: string, read:
   const response = await read(new URL(cook['path'], base).href);
   if (!response.ok) throw new Error(`Inline candidate cook unreadable: ${String(response.status)}`);
   const added = inlineMountBytes(await response.json());
-  installAssetTables({ bytes: { ...publicBytes(), ...added }, versions: assetVersions(), music: musicManifests(), sfx: sfxManifests(), packs: bootPacks() });
+  // SHARD-COMPAT SM8: the build's music and sfx tables list only pinned shards, so a candidate no pin names (the retired
+  // showcase template, a new shard) refused at level.play ("Scene cue bank requires its credit") and prepare timed out at
+  // 240 s. The candidate's own mounted music.json and sfx.json join those tables, minus their provenance, as gen.ts
+  // compiles them; the candidate's copy wins over a pinned one, since the mounts served beside the page are its own.
+  const music: Record<string, unknown> = { ...musicManifests() }, sfx: Record<string, unknown> = { ...sfxManifests() };
+  for (const url of Object.keys(added)) {
+    const audio = /^\/assets\/(music|sfx)\/([^/]+)\/(music|sfx)\.json$/u.exec(url);
+    if (audio === null || audio[1] !== audio[3] || audio[2] === undefined) continue;
+    const manifestResponse = await read(new URL(url, base).href);
+    if (!manifestResponse.ok) throw new Error(`Inline candidate ${url} unreadable: ${String(manifestResponse.status)}`);
+    const manifest: unknown = await manifestResponse.json();
+    if (!record(manifest)) throw new Error(`Inline candidate ${url} is not a manifest`);
+    (audio[1] === 'music' ? music : sfx)[audio[2]] = Object.fromEntries(Object.entries(manifest).filter(([key]) => key !== 'provenance' && key !== 'synth_keeps'));
+  }
+  installAssetTables({ bytes: { ...publicBytes(), ...added }, versions: assetVersions(), music, sfx, packs: bootPacks() });
   return Object.keys(added).length;
 }
