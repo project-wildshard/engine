@@ -178,6 +178,9 @@ function install(canonical) {
     + ` && exec ${q(process.execPath)} ${q(launcher)} --canonical ${q(canonical)}`;
   const args = ['/usr/bin/lockf', '-t', '0', join(root, 'night.lock'), '/bin/sh', '-c', shell];
   const xml = (/** @type {string} */ s) => s.replaceAll('&', '&amp;').replaceAll('<', '&lt;');
+  // DF15 (2026-11-23): with no ProcessType, launchd spawns the job as a daemon under its "light resource limits" (every
+  // process in the night at scheduling priority 20, a hand-started run's at 31): the night's phone-low drew 15-22 fps
+  // where the same build and profile started by hand drew 59.9. Interactive runs it with an app's limits.
   mkdirSync(dirname(plist), { recursive: true });
   writeFileSync(plist, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -187,6 +190,7 @@ function install(canonical) {
   <key>WorkingDirectory</key><string>${xml(root)}</string>
   <key>EnvironmentVariables</key><dict><key>PATH</key><string>${xml(path)}</string><key>HOME</key><string>${xml(homedir())}</string><key>WS_LANE_NAME</key><string>df7-nightly</string></dict>
   <key>StartCalendarInterval</key><dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>17</integer></dict>
+  <key>ProcessType</key><string>Interactive</string>
   <key>StandardOutPath</key><string>${xml(join(root, 'launchd.log'))}</string>
   <key>StandardErrorPath</key><string>${xml(join(root, 'launchd.log'))}</string>
 </dict></plist>
