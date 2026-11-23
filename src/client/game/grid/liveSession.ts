@@ -171,6 +171,8 @@ export interface LiveGridSessionPorts {
   /** Render-only destination preparation; the signal releases its temporary entry-tile pins. False: its inputs were deferred
    *  (no room yet), nothing is pinned; `required` (the road's ground, J500) reads them as an entry would. */
   readonly prepareNeighbourTiles?: (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal, required?: boolean) => Promise<boolean>;
+  /** J500: false keeps a tile-ground zone's far view beside the road instead of pinning its ground (`debug.roadGround`) */
+  readonly roadGround?: boolean;
   /** Borrow the page render scheduler when an entered data region replaces neighbour views. */
   readonly tiles?: ClientTileRegistration;
   /** Told once the lighting a crossing changes is in place (an entered runtime's activation settled, or the road again
@@ -1208,7 +1210,7 @@ export class LiveGridSession {
   private roadGroundReady(instance: string): boolean {
     if (this.startedRuntimes.has(instance) || this.runtimeRegions.get(instance)?.ownsGround === true) return true;
     const prepare = this.ports.prepareNeighbourTiles;
-    if (prepare === undefined) return false;
+    if (prepare === undefined || this.ports.roadGround === false) return false;
     const held = this.roadGround.get(instance);
     // a deferred pin (no room for its inputs yet) asks again after a while
     if (held !== undefined && !(held.state === 'deferred' && diagnosticNow() - held.at > ROAD_GROUND_RETRY_MS)) return held.ready;

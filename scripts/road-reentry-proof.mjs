@@ -12,7 +12,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
-import { webkit } from './browser-playwright.mjs';
+import { chromium, webkit } from './browser-playwright.mjs';
 import { acceptPhoneMemoryWarning, PHONE } from './journey-proof.mjs';
 import { saveFixture } from './debug-settings.mjs';
 import { agentUserAgent } from './agent-marker.mjs';
@@ -37,7 +37,8 @@ const gridState = page => page.evaluate(() => {
   if (st === undefined) return null;
   const live = st.live, load = document.querySelector('.ws-load:not(.hide)');
   const card = load !== null && getComputedStyle(load).display !== 'none' && load.getBoundingClientRect().height > 0;
-  return { home: st.home ?? null, inside: st.inside ?? null, feet: st.feet === undefined ? null : { x: Number(st.feet.x), z: Number(st.feet.z) },
+  const chip = /** @type {HTMLElement | null} */ (document.querySelector('.ws-grid-budget'));
+  return { mem: chip === null ? null : Number(chip.dataset.playingBytes), home: st.home ?? null, inside: st.inside ?? null, feet: st.feet === undefined ? null : { x: Number(st.feet.x), z: Number(st.feet.z) },
     residents: live?.live?.residents ?? [], drawn: live?.roadDisplays ?? [], ground: live?.roadGround ?? null, ahead: live?.live?.ahead?.instance ?? null,
     current: live?.live?.current ?? null, ready: live?.live?.gameplayReady === true, card, pitch: st.pitch, cells: st.cells, walls: st.softWalls ?? null,
     t: Math.round(performance.now()), retained: live?.live?.retainedCell ?? null, retirements: (live?.live?.retirements ?? []).slice(-3), issues: live?.live?.issues ?? {} };
@@ -67,6 +68,34 @@ const whatIsAhead = page => page.evaluate(() => {
   }
   return found;
 }).catch(String);
+/** `--heap-at=<stop>` (Chromium): write a heap snapshot at that board stop, after a forced collection @param {Page} page @param {string} name */
+const heapAt = async (page, name) => {
+  const wanted = process.argv.find(value => value.startsWith('--heap-at='))?.slice('--heap-at='.length).split(',') ?? [];
+  if (!onChromium || !wanted.includes(name)) return;
+  const cdp = await page.context().newCDPSession(page), { createWriteStream } = await import('node:fs');
+  const file = createWriteStream(join(dir, `heap-${name}.heapsnapshot`));
+  cdp.on('HeapProfiler.addHeapSnapshotChunk', event => { file.write(event.chunk); });
+  await cdp.send('HeapProfiler.collectGarbage');
+  await cdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
+  await new Promise(resolve => { file.end(resolve); }); await cdp.detach();
+};
+/** churn or force a collection: dead ArrayBuffers the ledger still counts drop out, live ones stay @param {Page} page */
+const collect = async page => {
+  if (onChromium) {
+    const cdp = await page.context().newCDPSession(page);
+    for (let round = 0; round < 3; round++) { await cdp.send('HeapProfiler.collectGarbage'); await delay(500); }
+    await cdp.detach(); await delay(1000); return;
+  }
+  // WebKit with `$vm` (JSC_useDollarVM): a full collection, as Chromium's
+  if (await page.evaluate(() => { const vm = /** @type {any} */ (globalThis).$vm; if (vm === undefined) return false; vm.gc(); vm.gc(); return true; }).catch(() => false)) { await delay(1500); return; }
+  await page.evaluate(async () => {
+    for (let round = 0; round < 40; round++) {
+      let junk = []; for (let i = 0; i < 2000; i++) junk.push(new ArrayBuffer(64 * 1024)); junk = [];
+      await new Promise(resolve => { setTimeout(resolve, 50); });
+    }
+  }).catch(() => undefined);
+  await delay(5000);
+};
 /** the page's attributed memory (the budget's model input) and the worlds held, at one moment @param {Page} page */
 const memory = page => page.evaluate(() => {
   const w = /** @type {any} */ (window), m = w.__wildshard.memory(), live = w.__wildshard.shard.grid.state().live;
@@ -77,7 +106,14 @@ const memory = page => page.evaluate(() => {
   const domains = ledger === undefined ? null : Object.fromEntries(Object.entries(ledger).map(([domain, rows]) => [domain, Math.round(Object.values(rows).reduce((/** @type {number} */ sum, bytes) => sum + (typeof bytes === 'number' ? bytes : 0), 0))]));
   const top = ledger === undefined ? null : Object.entries(ledger).flatMap(([domain, rows]) => Object.entries(rows).map(([key, bytes]) => /** @type {[string, number]} */ ([`${domain}:${key}`, Math.round(typeof bytes === 'number' ? bytes : 0)])))
     .sort((a, b) => b[1] - a[1]).slice(0, 14);
-  return { totals: m.totals, accountedBytes: m.accountedBytes, ledger: domains, top, residents: live?.live?.residents ?? [], drawn: live?.roadDisplays ?? [],
+  // the attribution's owners of live RAM, largest first (who holds the walk's ArrayBuffers)
+  /** @type {Map<string, number>} */ const held = new Map();
+  for (const row of /** @type {{ domain: string, owner: string, asset: string, kind: string, bytes: number }[]} */ (m.allocations ?? [])) {
+    if (row.domain !== 'ram') continue;
+    const key = `${row.owner} ${row.kind} ${row.asset === row.owner ? '' : row.asset}`.trim(); held.set(key, (held.get(key) ?? 0) + row.bytes);
+  }
+  const owners = [...held].sort((a, b) => b[1] - a[1]).slice(0, 20);
+  return { totals: m.totals, accountedBytes: m.accountedBytes, ledger: domains, top, owners, residents: live?.live?.residents ?? [], drawn: live?.roadDisplays ?? [],
     headline: chip === null ? null : { bytes: Number(chip.dataset.playingBytes), peak: Number(chip.dataset.peakBytes), source: chip.dataset.source ?? null } };
 }).catch(() => null);
 
@@ -98,7 +134,19 @@ const portalRoutes = async (page, slug) => {
   return (edge.entryways ?? []).flatMap(row => row.portal === undefined ? [] : [row.portal]);
 };
 
-const browser = await webkit.launch({ headless: true });
+/** JSC options for the page's WebContent process (`__XPC_` carries them into the XPC service): `--gc-each` exposes `$vm` so a
+ *  collection can be forced; `--jsc-ram=<bytes>` sizes JSC's heap policy as a phone's RAM instead of this Mac's */
+const webkitEnv = () => {
+  /** @type {Record<string, string>} */ const env = {};
+  const ram = process.argv.find(value => value.startsWith('--jsc-ram='))?.slice('--jsc-ram='.length);
+  if (process.argv.includes('--gc-each') || process.argv.includes('--gc-probe')) env.JSC_useDollarVM = '1';
+  if (ram !== undefined) env.JSC_forceRAMSize = ram;
+  for (const [key, value] of Object.entries(env)) env[`__XPC_${key}`] = value;
+  return { ...process.env, ...env };
+};
+// `--chromium`: the same walk on headless Chromium, whose collections can be forced (`--gc-each` then reads live bytes only)
+const onChromium = process.argv.includes('--chromium');
+const browser = onChromium ? await chromium.launch({ headless: true, args: ['--mute-audio', '--use-mock-keychain', '--password-store=basic', '--use-angle=metal'] }) : await webkit.launch({ headless: true, env: webkitEnv() });
 /** @type {Record<string, unknown>} */
 const report = { base, zone, side: flag('side', 'e'), frames: [], shots: [] };
 let code = 1;
@@ -107,6 +155,11 @@ try {
   await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   await saveFixture(context, { scope: 'global', key: 'settings', merge: true, data: { volume: 0 } });
+  // `--debug=<key>:<json>` saves a device debug slot first (`--debug=debug.roadGround:false` measures the walk without the road's ground pins)
+  for (const arg of process.argv.filter(value => value.startsWith('--debug='))) {
+    const [key = '', value = 'null'] = arg.slice('--debug='.length).split(/:(.*)/su);
+    await saveFixture(context, { scope: 'device', key, data: JSON.parse(value) });
+  }
   const page = await context.newPage();
   page.on('pageerror', error => { console.log(`pageerror ${String(error).slice(0, 200)}`); });
   // a preview build's way into its in-page grid (J311): SHARD SELECT, the zone's card, PLAY; a world build's: ENTER THE MMO
@@ -233,7 +286,10 @@ try {
       const st = await gridState(page); if (st === null || st.feet === null) return;
       await setYaw(page, yawTo(st.feet, toward)); await delay(2500);
       await page.screenshot({ path: join(dir, `board-${name}.png`), scale: 'css' });
-      /** @type {any[]} */ (report.shots).push({ name, wait, ...(await gridState(page)), cells: undefined, memory: await memory(page), ahead: await whatIsAhead(page) });
+      /** @type {any[]} */ (report.shots).push({ name, wait, ...(await gridState(page)), cells: undefined, memory: await memory(page), ahead: await whatIsAhead(page),
+        // `--gc-each`: the same reading after a collection, what the stop truly holds
+        ...(process.argv.includes('--gc-each') ? { collected: await collect(page).then(() => memory(page)) } : {}) });
+      await heapAt(page, name);
     };
     const c = (/** @type {number} */ x, /** @type {number} */ z) => ({ x: center.x + x, z: center.z + z });
     const zoneAt = (/** @type {number} */ x, /** @type {number} */ z) => /** @type {any[]} */ (report.cells ?? []).find(row => row.cell[0] === x && row.cell[1] === z)?.instance ?? null;
@@ -252,6 +308,13 @@ try {
     await walkTo(c(-R, -R), 180_000, 3);
     await stop('road-s', c(0, -R), c(0, -pitch), zoneAt(0, -1));
     await stop('road-s-near', c(60, -edge), c(60, -pitch), zoneAt(0, -1));
+    // `--gc-probe`: churn short-lived garbage so the engine collects, then read again: dead ArrayBuffers still counted by the
+    // ledger drop out, live ones stay (what the walk truly holds)
+    if (process.argv.includes('--gc-probe')) {
+      const before = await memory(page);
+      await collect(page);
+      report.gcProbe = { before, after: await memory(page) };
+    }
     sampling.on = false; await sampler;
     code = 0; await context.close();
     throw BOARD_DONE;

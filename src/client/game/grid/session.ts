@@ -1181,7 +1181,7 @@ export class GridSession {
       // a left page never wakes the wait: its entry's release settles it
       wait: () => new Promise<void>(resolve => { if (!this.host.scope.disposed) this.host.scope.timeout(16, resolve); }),
       uploads: () => this.rings.stats().uploads });
-    this.live = new LiveGridSession({ assembly: this.assembly, home: this.home, physics: this.host.physics, scope: this.host.scope, walls: this.walls, strips: this.strips, initialStripBytes: this.initialStripBytes,
+    this.live = new LiveGridSession({ assembly: this.assembly, home: this.home, roadGround: jsonSlot('debug.roadGround', 'device').read() !== false, physics: this.host.physics, scope: this.host.scope, walls: this.walls, strips: this.strips, initialStripBytes: this.initialStripBytes,
       prepareStrips: cell => Math.max(Math.abs(cell.cell[0] - this.home.cell[0]), Math.abs(cell.cell[1] - this.home.cell[1])) <= 1 ? Promise.resolve() : this.prepareOuterStrips(), allocator: this.allocator,
       residency: this.host.residency.home(), tiles, lightingSettled: () => { this.prelinkViews(); }, backgroundReady: () => this.host.backgroundReady?.() !== false,
       ...(this.admitNeighbour === undefined ? {} : { prepareDataTiles: async (cell: GridCell, scope: Scope, start: { readonly x: number; readonly z: number }) => {
