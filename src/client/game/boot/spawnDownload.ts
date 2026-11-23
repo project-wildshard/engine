@@ -14,7 +14,7 @@ import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { CACHE_BYTE_LIMITS, ResidentByteCache } from '@wildshard/engine/core/memoryBudget';
 import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
-import {looseSlug, placedLoose, placedSpawn} from './placedSpawn';
+import {behindRooms, looseSlug, placedLoose, placedSpawn} from './placedSpawn';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -898,7 +898,8 @@ function bookSelection(book: unknown, slug: string, flow: 'client' | 'grid', tie
 }
 /** The packs book's row, or SA48's whole-level row for a slug placed after the build (`placedSpawn.ts`): the book never has one. */
 function packsSelection(book: unknown, slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): SpawnManifestAddress | null {
-  return bookSelection(book, slug, flow, tier, mode) ?? placedSpawn(slug)?.whole[tier] ?? null;
+  // NB2 (J494): an installed rooms' copy wins over the build's own row
+  return placedSpawn(slug)?.whole[tier] ?? bookSelection(book, slug, flow, tier, mode);
 }
 /** A book's page path (`/assets/spawn/…`) on the packs base. The content base mirrors page paths under its own folder (PZ13:
  * `content/<set>/`), so a path keeps that folder; a J138 home or the page resolves it as a URL path, as it always did. */
@@ -961,12 +962,17 @@ export function entryProgramsURL(slug: string): string | null {
 const channelCache = (baked: unknown): unknown => typeof baked === 'string' ? assetCacheName() : baked;
 function spawnSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): {address: SpawnManifestAddress; cacheName: unknown; base: string} | null {
   const text = document.getElementById('boot-module-files')?.textContent; if (!text) return null;
-  const manifests = get(JSON.parse(text), 'spawnManifests'), address = bookSelection(manifests, slug, flow, tier, mode);
-  if (address !== null) return {address, cacheName: channelCache(get(manifests, 'cacheName')), base: packBase(get(manifests, 'home'), slug)};
+  // NB2 (J494, Jake 2026-11-22): the page never plays other bytes than the rooms run; one it could not load refuses with Reload
+  const rooms = behindRooms(slug);
+  if (rooms !== undefined) throw new Error(`${bareSlug(slug)}: the world runs a newer revision (${rooms.slice(0, 12)}) than this page has. Reload to play it.`);
+  const manifests = get(JSON.parse(text), 'spawnManifests');
   // SA48: a slug placed after the build reads the cook's entry rows from the store, on either flow (no build has its grid manifest;
-  // the grid's own code and seams are this page's and load as they always do)
+  // the grid's own code and seams are this page's and load as they always do). NB2: so does a build's own slug whose rooms run
+  // another upload, ahead of the build's row.
   const placed = placedSpawn(slug), cooked = placed?.entry[tier];
-  return placed === undefined || cooked === undefined ? null : {address: cooked, cacheName: channelCache(get(manifests, 'cacheName')), base: placed.base};
+  if (placed !== undefined && cooked !== undefined) return {address: cooked, cacheName: channelCache(get(manifests, 'cacheName')), base: placed.base};
+  const address = bookSelection(manifests, slug, flow, tier, mode);
+  return address === null ? null : {address, cacheName: channelCache(get(manifests, 'cacheName')), base: packBase(get(manifests, 'home'), slug)};
 }
 /** DL16: the packs book (the whole level with its parts) is this build's own file, fetched only with Runtime packs on,
  * so the default page carries nothing for an off row. */

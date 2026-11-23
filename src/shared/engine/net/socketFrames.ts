@@ -23,7 +23,11 @@ export interface WorldWord { readonly cells: number; readonly shards: readonly s
   readonly moving?: { readonly inS: number };
   /** QA-FEEDBACK-2026-11-20-mini row 9: 1 when this door answers a seated page's `saves` word (its saves here, New Game). An older
    *  door never says it, and closes `refused` on a prefix it does not know, so a page asks only after hearing this. */
-  readonly saves?: 1 }
+  readonly saves?: 1;
+  /** SHARD-COMPAT NB2 (J494, Jake 2026-11-22: "the page should always run the server revision"): each cell's upload hash, for a
+   *  slug whose rooms run an upload (`gridCells.ts` `placedHash`), so a page that baked other bytes follows them (`roomsRevision.ts`).
+   *  An older door never says it; an older page ignores it. */
+  readonly revisions?: Readonly<Record<string, string>> }
 /** J218: a voice word is JSON in a few hundred bytes; an SDP travels in pieces of this many characters, under the room's 1024-byte cap. */
 export const VOICE_PIECE_CHARS = 400;
 /** The server sends no frame while this much is waiting (E7.1). Delta-against-ack heals, and the next frame is just bigger. */

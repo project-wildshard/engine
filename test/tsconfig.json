@@ -285,6 +285,7 @@
     "../scripts/pins-catalogue.ts",
     "../scripts/preview-grid.ts",
     "../scripts/nightly-model.ts",
+    "../scripts/rooms-revision-check.ts",
     "../scripts/cook-cache-model.ts",
     "../scripts/pin-format.ts",
     "../scripts/pin-local.ts",

@@ -28,7 +28,15 @@ const bare = (slug: string): string => slug.replace(/^_/u, '');
 export function installPlacedSpawn(row: PlacedSpawn): void { placed.set(bare(row.slug), row); }
 /** A placed slug's rows, by its grid slug or its product's; undefined for every slug the build has. */
 export function placedSpawn(slug: string): PlacedSpawn | undefined { return placed.get(bare(slug)); }
-export function clearPlacedSpawns(): void { placed.clear(); }
+/** SHARD-COMPAT NB2 (J494, Jake 2026-11-22: "the page should always run the server revision"): a slug this build baked whose rooms
+ *  run other bytes (the signed placement file's hash), until the page installs the rooms' own copy (`placedCells.ts`). P1: staging's
+ *  rooms ran Driftwood r9 while the page drew its baked r8 and every enemy was invisible. Entering it refuses with Reload instead. */
+const behind = new Map<string, string>();
+export function markBehindRooms(slug: string, hash: string): void { behind.set(bare(slug), hash); }
+export function clearBehindRooms(slug: string): void { behind.delete(bare(slug)); }
+/** The hash the rooms run for `slug` when this page could not load it; undefined when the page runs what the rooms run. */
+export function behindRooms(slug: string): string | undefined { return behind.get(bare(slug)); }
+export function clearPlacedSpawns(): void { placed.clear(); behind.clear(); }
 const LOOSE_PATH = /^\/(?:shardfiles\/([a-z0-9_-]+)\/|programs\/([a-z0-9_-]+)\.json$)/u;
 /** Where a placed slug's loose file is read, by its page path (`/shardfiles/<slug>/…`, `/programs/<slug>.json`): this upload's own copy.
  *  Undefined for every other path, and for every slug the build has. */

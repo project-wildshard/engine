@@ -94,6 +94,11 @@ export function placeCell(given: PlacedCell, file?: readonly PlacedCell[]): bool
 export function catalogueCell(slug: string): PlacedCell | undefined { return catalogueCells().find(row => new Set([slug]).has(shardSlugOf(row.slug))); }
 /** SA47: the shardfile hash the placement named for a placed slug, so its room can open from the cook's index; undefined for any other. */
 export function placedHash(slug: string): string | undefined { return hashes.get(slug); }
+/** SHARD-COMPAT NB2 (J494): the world word's `revisions`, each open shard's upload hash the rooms run; none for a door with no upload. */
+export function worldRevisions(shards: readonly string[], hashOf: (slug: string) => string | undefined = placedHash): { readonly revisions?: Readonly<Record<string, string>> } {
+  const revisions = Object.fromEntries(shards.flatMap(slug => { const hash = hashOf(slug); return hash === undefined ? [] : [[slug, hash]]; }));
+  return Object.keys(revisions).length === 0 ? {} : { revisions };
+}
 let assembled: { readonly from: unknown; readonly placed: number; readonly assembly: GridAssembly } | null = null;
 /**
  * SA34a: the grid a road walks: the installed catalogue's cells and then the placed ones, so a road and its cells know a placed cell's

@@ -28,7 +28,8 @@ test('a placed world reads packed metadata before probing a missing loose copy',
     if(path === '/loose/'+hash+'/shardfiles/example/shard.json')return Promise.resolve(new Response('header'));
     return Promise.resolve(new Response('', {status: 404}));
   }));
-  installPlacedSpawn({slug:'example',entry:{phone:address},whole:{phone:address},base:page,loose:page+'loose/'+hash+'/',programs:false});
+  // NB2: a placed copy's own entry row wins over the build's; as a cook's, it is not its whole-level row
+  installPlacedSpawn({slug:'example',entry:{phone:{...address,url:'/assets/spawn/example-entry.json'}},whole:{phone:address},base:page,loose:page+'loose/'+hash+'/',programs:false});
   setSpawnPacks(true); prefetchSpawnDownload('example', 'phone', 'client');
   await currentSpawnDownload()?.ready;
   releaseSpawnMembers(); stored.clear(); reads.length = 0;

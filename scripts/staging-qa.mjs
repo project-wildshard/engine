@@ -21,6 +21,7 @@ import { openQaCandidate } from './staging-qa-candidate.mjs';
 import { budgetFinding, budgetLines, LEGS } from './staging-qa-budget.mjs';
 import { iosSafari } from './staging-qa-sim.mjs';
 import { readOnlyPhoneLoad } from './journey-proof.mjs';
+import { roomsRevisionFindings } from './rooms-revision-check.ts';
 
 /** @typedef {import('./staging-smoke/checks.mjs').Finding} Finding */
 /** @typedef {{ id: string, browser: string, pass: boolean, seconds: number, playedMs: number, reason?: string, log: string }} Proof */
@@ -253,8 +254,12 @@ async function qualify({ url, release, root, out, store, local, kind, legStarted
   if (local) checkLocalSource(root, build);
   const after = await served(url);
   const legSeconds = (Date.now() - legStarted) / 1000, overCap = budgetFinding(kind, legSeconds);
+  // NB2 (J494): page and rooms agree for every zone (the rooms' upload is baked or followable)
+  const rooms = local || candidate !== undefined ? [] : await roomsRevisionFindings({ origin: STAGING, socket: CHANNELS.staging.socket })
+    .catch((/** @type {unknown} */ error) => [{ scenario: 'rooms-revision', key: 'unread', severity: 'P2', text: String(error), source: 'check' }]);
+  const runner = [...(overCap === undefined ? [] : [overCap]), ...rooms];
   const merged = mergeVerdict({ build, smoke, proofs, expected, selected, ...(after.build === undefined ? {} : { after: after.build }), full,
-    ...(overCap === undefined ? {} : { runner: [overCap] }) });
+    ...(runner.length === 0 ? {} : { runner }) });
   const verdict = { ...smoke, ...merged, build, qa: true, kind, status: merged.hold ? 'hold' : 'pass', legSeconds,
     ...(candidate === undefined ? {} : { deploymentId: candidate.deploymentId, roomsSerial: candidate.serial, aliasBuild: candidate.aliasBuild }),
     startedAt: new Date(started).toISOString(), at: new Date().toISOString(),

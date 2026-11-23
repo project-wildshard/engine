@@ -33,7 +33,7 @@ import { SaveQuarantinedError, type SaveReceipt, type SaveWrite } from './saves/
 import type { ClaimResult } from './saves/claim';
 import type { AccountExport } from './saves/account';
 import { workerTable, type DeclaredCells } from './workerTable';
-import { cellName, cellShard, gridAssembly, placedCells, roadHome } from './gridCells';
+import { cellName, cellShard, gridAssembly, placedCells, placedHash, roadHome, worldRevisions } from './gridCells';
 import { VoiceRelay, type VoiceIceServer } from './voiceRelay';
 import { DEFAULT_ALLOWED_ORIGINS, DEFAULT_TRUST_PROXY, originAllowed, clientAddress, type TrustProxy } from './doorTrust';
 import {checkpointWord,type CheckpointCertificate} from './checkpointWitness';
@@ -997,7 +997,10 @@ export class World {
     return [...new Set([...this.links].filter(([cell, link]) => roadHome(cell) === null && this.up.has(link)).map(([cell]) => cellShard(cell)))];
   }
 
-  private discovery():Pick<WorldWord,'cells'|'shards'>{return {cells:this.links.size,shards:[...new Set([...this.links.keys()].map(cellShard))]};}
+  private discovery():Pick<WorldWord,'cells'|'shards'|'revisions'>{
+    const shards=[...new Set([...this.links.keys()].map(cellShard))];
+    return {cells:this.links.size,shards,...worldRevisions(shards,placedHash)};
+  }
   private seat(slug: string, end: SocketTransport, entry: SeatEntry, hello: ArrayBuffer, entering = false): void {
     if (!end.isOpen || this.draining) return;
     const { port1, port2 } = new MessageChannel();

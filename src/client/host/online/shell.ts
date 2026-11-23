@@ -35,6 +35,10 @@ import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { installBrowserScopeEnvironment } from '@wildshard/engine/app/view/scopeEnvironment';
 import { devControls, type DevControls } from './devControl';
 import { replaceFresh } from '@wildshard/engine/boot/freshPage';
+import { heardRooms } from '@wildshard/engine/game/grid/roomsRevision';
+import { installedCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
+/** NB2: the slug a grid cell runs, by the page's catalogue (the instance itself when it names none). */
+const cellSlug = (cell: string): string => installedCatalogue()?.grid.cells.find(row => row.instance === cell)?.slug ?? cell;
 
 // online.js is a bundle of its own with its own copy of the scope environment, and the page loads it without `identity.js`
 // (clientWorker `onlineModule`, oneWayIn `onlineGate`), so its presenters' `scope.raf` (FailureTelemetry measuring a link
@@ -179,7 +183,12 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
     transport.onControl((control, bytes) => {
       if(control==='playtest'){playtest=true;return;}
       // DEVICE-TELEMETRY DT3: a door whose first word says it reads the device word hears this page's snapshot, once per socket
-      if (control === 'world') { if (worldReadsDevice(bytes)) sendDevice(transport, config.build); if (worldReadsSaves(bytes)) savesDoors.add(transport); return; }
+      if (control === 'world') {
+        if (worldReadsDevice(bytes)) sendDevice(transport, config.build); if (worldReadsSaves(bytes)) savesDoors.add(transport);
+        // NB2 (J494): the page runs the rooms' revision of its zone, never its own; it reloads once onto it, or entry refuses
+        try { heardRooms(JSON.parse(decoder.decode(bytes)), gridCell === undefined ? config.loaded : cellSlug(gridCell)); } catch { /* a word that says no revisions changes nothing */ }
+        return;
+      }
       if (control === 'voice') {
         let word: VoiceHeard;
         try { word = JSON.parse(decoder.decode(bytes)) as VoiceHeard; } catch { return; }

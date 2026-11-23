@@ -16,7 +16,9 @@ import type { Json, jsonSlot } from '@wildshard/engine/saves/slots';
 import { GRID_RADIUS } from '@wildshard/format/contentBounds';
 import { adoptSlugAliases } from '../../../shared/game/slugNames';
 import { PLACEMENT_PUBLIC_KEY, PlacementSchema, SignedPlacementSchema, placementsURL, type PlacementFile } from '../../../shared/game/grid/placementRows';
-import { installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
+import { bareSlug, installCatalogue, installedCatalogue, type CatalogueDocument } from '../../../shared/game/grid/catalogueSlot';
+import { clearBehindRooms, markBehindRooms } from '../boot/placedSpawn';
+import { noteFollowed, sessionHints, type RoomsHints } from './roomsRevision';
 import { findTitleManifest, installTitleManifests, titleManifests, type TitleManifest } from '../shard/titleList';
 import { catalogueCards } from './placedCards';
 import { installPlacedContent, placedContent, type PlacedContent } from './placedContent';
@@ -83,10 +85,25 @@ export function addPlacedCells(document: CatalogueDocument, file: PlacementFile,
   return { document: { ...document, grid, placed: [...document.placed ?? [], ...added.map(row => row.slug)] }, added, left };
 }
 
+/** SHARD-COMPAT NB2 (J494, Jake 2026-11-22: "the page should always run the server revision"): the build's own slugs whose cell in
+ *  the signed file names other bytes than this build baked (`catalogue.shards`), with the hash the rooms run. P1: staging's rooms ran
+ *  Driftwood r9 (an upload moves its catalogue cell's hash, `uploadActivation.ts`) while the page drew its baked r8. */
+export function roomsRevisions(document: CatalogueDocument, file: PlacementFile, heard: Readonly<Record<string, string>> = {}): ReadonlyMap<string, string> {
+  const baked = new Map((document.shards ?? []).map(row => [bareSlug(row.slug), row.hash]));
+  // the door's own word this tab heard for this build (`roomsRevision.ts`), then the signed file, which wins for a slug it names
+  const named = new Map<string, string>(Object.entries(heard).map(([slug, hash]) => [bareSlug(slug), hash]));
+  for (const row of file.cells) if (row.hash !== undefined) named.set(bareSlug(row.slug), row.hash);
+  const out = new Map<string, string>();
+  for (const [slug, hash] of named) { const own = baked.get(slug); if (own !== undefined && own !== hash) out.set(slug, hash); }
+  return out;
+}
+
 /** What a page's read of its placement file did, for the console and the tests: `carded` names the added slugs whose card came
  *  from the API's catalogue (SA46). */
 export type PlacedRead = { readonly added: readonly Cell[]; readonly left: readonly string[]; readonly serial: number; readonly carded: readonly string[];
-  /** OF20: the device's kept file, because the fresh one did not come (why) */ readonly cached?: string } | { readonly kept: string };
+  /** OF20: the device's kept file, because the fresh one did not come (why) */ readonly cached?: string;
+  /** NB2: the build's own slugs now drawn from the upload their rooms run, and those it could not load (they refuse with Reload) */
+  readonly followed?: readonly string[]; readonly behind?: readonly string[] } | { readonly kept: string };
 /** OF20: the last placement file this device believed, by its address. */
 export interface PlacedKeep {
   readonly read: (url: string) => string | null | Promise<string | null>;
@@ -129,6 +146,8 @@ export interface PlacedPorts {
   /** SA48: a carded slug's content from the cook (`placedContent.ts`), by the hash its cell names; default: this page's build's index in
    *  the store at the placement file's origin. A slug with none stays out. */
   readonly content?: (slug: string, hash: string | undefined, signal: AbortSignal) => Promise<PlacedContent | undefined>;
+  /** NB2: the door's world word this tab heard for this build (default: the tab's session storage, `roomsRevision.ts`) */
+  readonly hints?: RoomsHints;
   /** OF20: where the last believed file is kept (default: the device, `devicePlacedKeep`) */
   readonly keep?: PlacedKeep;
   /** An online page reads its kept file once the fresh read has taken this long (default `KEPT_AFTER_MS`); offline at once. */
@@ -218,10 +237,22 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     // SA46: a cell the box would open whose slug this build has no card for (an upload after the build) is carded from its catalogue
     // entry, after the build's own cells are in, so a slow or absent API costs them nothing; a slug it does not card stays out
     const unknown = addPlacedCells(placed.document, file).added.map(cell => cell.slug);
+    const content = ports.content ?? cookContent(url, ports.fetch ?? fetch);
+    // NB2 (J494): a slug the build baked whose rooms run another upload: until that upload's own copy is in, entering it refuses
+    // with Reload (`spawnDownload.ts`). The cook's index for this build and those bytes is what the rooms preloaded (activation).
+    const follow = roomsRevisions(document, file, (ports.hints ?? sessionHints()).read().revisions), followed: string[] = [], behind: string[] = [];
+    for (const [slug, hash] of follow) markBehindRooms(slug, hash);
+    const following = Promise.all([...follow].map(async ([slug, hash]) => {
+      const found = await content(slug, hash, abort.signal).catch(() => undefined);
+      if (found === undefined) { behind.push(slug); return; }
+      installPlacedContent(found); clearBehindRooms(slug); noteFollowed(slug, hash); followed.push(slug);
+    }));
+    const outcome = (): { readonly followed?: readonly string[]; readonly behind?: readonly string[] } =>
+      follow.size === 0 ? {} : { followed: [...followed].sort(), behind: [...behind].sort() };
     const built = { added: placed.added, left: placed.left, serial: file.serial, carded: [] };
-    if (unknown.length === 0) return built;
+    if (unknown.length === 0) { await following; return { ...built, ...outcome() }; }
     // SA48: its content from the cook beside its card, so ENTER WORLD loads it; a card with no content would only fail at the door
-    const hashes = new Map(file.cells.map(cell => [cell.slug, cell.hash])), content = ports.content ?? cookContent(url, ports.fetch ?? fetch);
+    const hashes = new Map(file.cells.map(cell => [cell.slug, cell.hash]));
     const [cards, contents] = await Promise.all([
       catalogueCards(unknown, { fetch: ports.fetch ?? fetch, signal: abort.signal, order: nextOrder(titleManifests()), ...(ports.api === undefined ? {} : { api: ports.api }),
         ...(ports.cardDeadlineMs === undefined ? {} : { deadlineMs: ports.cardDeadlineMs }) }),
@@ -229,12 +260,13 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     ]);
     const cooked = new Map<string, PlacedContent>();
     unknown.forEach((slug, n) => { const found = contents[n]; if (found !== undefined) cooked.set(slug, found); });
-    if (cards.length === 0 || wentOn()) return built;
+    await following;
+    if (cards.length === 0 || wentOn()) return { ...built, ...outcome() };
     const carded = new Set(cards.filter(row => cooked.has(row.slug)).map(row => row.slug)), more = addPlacedCells(placed.document, file, slug => carded.has(slug));
     const opened = new Set(more.added.map(cell => cell.slug)), rows = cards.filter(row => opened.has(row.slug)).map(row => heroed(row, cooked.get(row.slug)));
     for (const slug of opened) { const found = cooked.get(slug); if (found !== undefined) installPlacedContent(found); }
     if (more.added.length > 0) installCatalogue(more.document);
     if (rows.length > 0) installTitleManifests([...titleManifests(), ...rows]);
-    return { added: [...placed.added, ...more.added], left: more.left, serial: file.serial, carded: rows.map(row => row.slug) };
+    return { added: [...placed.added, ...more.added], left: more.left, serial: file.serial, carded: rows.map(row => row.slug), ...outcome() };
   } catch (error) { return { kept: error instanceof Error ? error.message : String(error) }; } finally { scope.dispose(); }
 }
