@@ -569,7 +569,7 @@ async function rejoinFromMenu(page, zone, center) {
   await step('main menu', () => page.locator('.ws-main-mmo').waitFor({state:'visible', timeout:45_000}));
   const started = Date.now(), end = started+ENTRY_MS;
   // the card shows the zone's public name (Signal Dunes for sunscar-dunes): it must stay one name, and never Driftwood's
-  const driftwood = DRIFTWOOD.replaceAll(/-/gu, ' ');
+  const driftwood = DRIFTWOOD.replaceAll('-', ' ');
   /** @type {string | null} */ let named = null;
   let navigated = false;
   const nav = (/** @type {import('playwright').Frame} */ frame) => { if (frame === page.mainFrame()) navigated = true; };
