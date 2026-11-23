@@ -18,14 +18,15 @@ export const DEFAULT_PER_DAY = 5;
 /**
  * The issues over the line: more than `perDay` events a day on average over `days`. Takes the API's `count` (a string) or the
  * MCP's `occurrences`.
- * @param {readonly Record<string, unknown>[]} issues
+ * @typedef {{shortId?: string, title?: string, count?: string | number, occurrences?: number}} Issue
+ * @param {readonly Issue[]} issues
  * @param {{days: number, perDay: number}} line
  * @returns {{id: string, title: string, events: number, perDay: number}[]}
  */
 export function overLine(issues, { days, perDay }) {
   return issues.map((issue) => {
-    const events = Number(issue['count'] ?? issue['occurrences'] ?? 0);
-    return { id: String(issue['shortId'] ?? ''), title: String(issue['title'] ?? '').slice(0, 90), events, perDay: events / days };
+    const events = Number(issue.count ?? issue.occurrences ?? 0);
+    return { id: issue.shortId ?? '', title: (issue.title ?? '').slice(0, 90), events, perDay: events / days };
   }).filter((row) => row.perDay > perDay).sort((a, b) => b.events - a.events);
 }
 
@@ -45,18 +46,18 @@ function parse(argv) {
 
 async function main() {
   const { days, perDay, json } = parse(process.argv.slice(2));
-  /** @type {Record<string, unknown>[]} */
+  /** @type {Issue[]} */
   let issues;
   if (json !== undefined) {
     const read = /** @type {unknown} */ (JSON.parse(readFileSync(json, 'utf8')));
-    issues = /** @type {Record<string, unknown>[]} */ (Array.isArray(read) ? read : (/** @type {{issues?: unknown}} */ (read).issues ?? []));
+    issues = /** @type {Issue[]} */ (Array.isArray(read) ? read : (/** @type {{issues?: unknown}} */ (read).issues ?? []));
   } else {
     const token = sentryToken();
     if (token === '') { console.log('sentry-weekly: no SENTRY_AUTH_TOKEN and no ~/.config/wildshard/sentry-auth-token: nothing read'); return 0; }
     const url = `${SENTRY_API}/organizations/${SENTRY_ORG}/issues/?query=${encodeURIComponent('is:unresolved')}&statsPeriod=${String(days)}d&sort=freq&limit=100`;
     const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
     if (!response.ok) { console.error(`sentry-weekly: Sentry answered ${String(response.status)}`); return 1; }
-    issues = /** @type {Record<string, unknown>[]} */ (await response.json());
+    issues = /** @type {Issue[]} */ (await response.json());
   }
   const rows = overLine(issues, { days, perDay });
   console.log(table(rows, { days, perDay }));
