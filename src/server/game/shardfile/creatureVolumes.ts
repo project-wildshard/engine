@@ -5,7 +5,7 @@ import { resolveSkinLookFiles, skinLookParameters } from '@wildshard/format/skin
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { SimHost } from '@wildshard/engine/sim';
-import { RestCreatureVolumes } from '../../../shared/game/shardfile/creatureVolumes';
+import { RestCreatureVolumes, type CreatureRestJoint } from '../../../shared/game/shardfile/creatureVolumes';
 import { CreatureSockets } from '../../../shared/game/shardfile/creatureSockets';
 import { ClipCreatureVolumes } from '../../../shared/game/shardfile/creatureClipVolumes';
 import { PartHealth } from '../../../shared/game/shardfile/partHealth';
@@ -15,11 +15,26 @@ import type { Vector3 } from 'three';
 import { checkCreatureHeight } from './creatureSizes';
 import { bodyContract } from '../../../shared/game/shardfile/creatureContract';
 import { creatureRestRig } from '../../../shared/game/shardfile/creatureRestRig';
+import { creatureSkinBounds } from '../../../shared/game/shardfile/creatureSkinBounds';
 
 /** The actual admitted skin supplies rest joints. Native rows with no body layer
  * install nothing, retaining their existing posed-volume/publication owner. */
 export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'rows' | 'files' | 'creatures'>,
   assets: ReadonlyMap<string, Uint8Array>): void {
+  // QA 2026-11-23 row 2b4: spawns share skins, so each skin GLB is read once per install (its rest rig per joint list,
+  // and its bounds); every spawn still gets its own joint rows, and a refused skin refuses at the same first spawn.
+  const rigs = new Map<Uint8Array, Map<string, readonly CreatureRestJoint[]>>(), bounds = new Map<Uint8Array, { lower: number; upper: number }>();
+  const restRig = (bytes: Uint8Array, expected: readonly string[]): readonly CreatureRestJoint[] => {
+    const byJoints = rigs.get(bytes) ?? new Map<string, readonly CreatureRestJoint[]>(), key = JSON.stringify(expected);
+    let rig = byJoints.get(key);
+    if (rig === undefined) { rig = creatureRestRig(bytes, expected); byJoints.set(key, rig); rigs.set(bytes, byJoints); }
+    return rig.map(joint => ({ name: joint.name, parent: joint.parent, position: [joint.position[0], joint.position[1], joint.position[2]] }));
+  };
+  const skinBounds = (bytes: Uint8Array): { lower: number; upper: number } => {
+    let known = bounds.get(bytes);
+    if (known === undefined) { known = creatureSkinBounds(bytes); bounds.set(bytes, known); }
+    return known;
+  };
   const pending = shard.creatures.spawns.flatMap(spawn => {
     const species = shard.rows.species.find(row => row.id === spawn.species);
     const strikeNames = [...new Set((species?.abilities ?? []).flatMap(row => row.from === undefined ? [] : [row.from]))];
@@ -43,15 +58,15 @@ export function installCreatureVolumes(host: SimHost, shard: Pick<Shardfile, 'ro
     if (body.hits === 'clip' && Object.keys(skin.binding.poseLayers ?? {}).length > 0) throw new Error(`species ${spawn.species}: clip hits do not admit presentation-only pose layers`);
     const bytes = assets.get(skin.row.file);
     if (bytes === undefined) throw new Error(`species ${spawn.species}: missing admitted skin GLB`);
-    if (!needsPorts) { checkCreatureHeight(body, bytes, actor, undefined); return []; }
-    const joints = creatureRestRig(bytes, skin.row.rig.joints[0] ?? []);
+    if (!needsPorts) { checkCreatureHeight(body, bytes, actor, undefined, skinBounds); return []; }
+    const joints = restRig(bytes, skin.row.rig.joints[0] ?? []);
     const root = { position: actor.position, get yaw() { return actor.yaw; }, get scale() { return actor.scale; } };
     const parameters = skinLookParameters(look);
     const pose = body.skeleton === 'serpent' ? new TrailCreatureVolumes(body, root, (x, z) => host.heightAt(x, z))
       : body.stance === 'horizontal' ? new TailCreatureVolumes(body, joints, root)
       : body.hits === 'clip' ? new ClipCreatureVolumes(body, bytes, joints, actor, () => host.clock.now, parameters.attackSpan, parameters.clipMap)
       : body.skeleton === undefined && body.volumes === undefined ? undefined : new RestCreatureVolumes(body, joints, root);
-    checkCreatureHeight(body, bytes, actor, pose);
+    checkCreatureHeight(body, bytes, actor, pose, skinBounds);
     const canonicalSockets = bodyContract(body)?.sockets;
     for (const name of strikeNames) {
       if (canonicalSockets?.[name] === undefined && !skin.row.rig.sockets.includes(name)) throw new Error(`species ${spawn.species}: unknown strike socket ${name}`);

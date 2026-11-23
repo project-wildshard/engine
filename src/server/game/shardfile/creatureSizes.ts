@@ -22,10 +22,11 @@ export function sizeCreatureSpawns(spawns: readonly SimSpawn[], rows: ShardRows,
 
 /** The actual admitted mesh and rest hit envelope supplement declared dimensions.
  * A small claimed dimension cannot admit a giant whose real rig exceeds its cap. */
-export function checkCreatureHeight(body: CreatureBody, bytes: Uint8Array, actor: AnimalSim, pose: CreatureVolumePose | undefined): void {
+export function checkCreatureHeight(body: CreatureBody, bytes: Uint8Array, actor: AnimalSim, pose: CreatureVolumePose | undefined,
+  skinBounds: (bytes: Uint8Array) => { lower: number; upper: number } = creatureSkinBounds): void {
   const cap = CREATURE_SIZES[body.size].maxHeight;
   if (cap === undefined) return;
-  const bounds = creatureSkinBounds(bytes);
+  const bounds = skinBounds(bytes);
   let lower = bounds.lower * actor.scale, upper = bounds.upper * actor.scale;
   const rear = new Vector3(), front = new Vector3();
   for (const [index, volume] of (pose?.volumes ?? []).entries()) {
