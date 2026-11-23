@@ -19,7 +19,8 @@ export function routeLegOnPage(leg: RouteLeg & { cap: 0 | 30 | 60 | null }): Pro
 export function legSummary(samples: LegSample[]): LegSummary;
 export function playRoute(driver: { evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<unknown> },
   options: { slug: string; cap: 30 | 60 | null; rec?: string[]; legs?: number; log?: (line: string) => void; probe?: { start: string; stop: string };
-    /** DF18: legs after which the driver's heapSnapshot sums the live heap */ heapAt?: string[] }): Promise<LegResult[]>;
+    /** DF18: legs after which the driver's heapSnapshot sums the live heap */ heapAt?: string[];
+    /** DF18: false leaves out the busy ping loop (its message events are garbage of their own) */ busy?: boolean }): Promise<LegResult[]>;
 export function routeTable(legs: LegResult[]): string;
 export function worstSegment(report: { legs: LegResult[] }[], cap: number): { name: string; p95Ms: number; over50Per30s: number; fps: number; runs: number }[];
 

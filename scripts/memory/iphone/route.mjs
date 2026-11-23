@@ -100,15 +100,19 @@ export function routeLegOnPage(leg) {
     }
     // main-thread busy: a MessageChannel ping loop runs between tasks, so its longest gap is the longest task. A long frame
     // with short gaps waited on the GPU; with a long gap the main thread was busy (DW2)
-    const channel = new MessageChannel();
-    let lastPing = performance.now();
-    channel.port1.onmessage = () => {
-      const now = performance.now();
-      tally.busyMs = Math.max(tally.busyMs, now - lastPing);
-      lastPing = now;
-      setTimeout(() => { channel.port2.postMessage(0); }, 0);
-    };
-    channel.port2.postMessage(0);
+    // DF18 (mini-dw3): the ping loop allocates a message event per task, garbage that outlives the young generation on
+    // its own (Chromium: ~4 MB/s promoted over DW1's route); `busy: false` leaves it out (busyMs then reads 0)
+    if (leg.busy !== false) {
+      const channel = new MessageChannel();
+      let lastPing = performance.now();
+      channel.port1.onmessage = () => {
+        const now = performance.now();
+        tally.busyMs = Math.max(tally.busyMs, now - lastPing);
+        lastPing = now;
+        setTimeout(() => { channel.port2.postMessage(0); }, 0);
+      };
+      channel.port2.postMessage(0);
+    }
     return tally;
   })());
   // the Memory saver installs its own bufferData on the context (memorySaver.ts), bound before this wrap: count that one too
@@ -407,9 +411,9 @@ const recRead = `
 /** Play `slug`'s route on a driver at control, one leg at a time.
  * @param {{ evaluateAsync: (script: string, args: unknown[], timeoutMs: number) => Promise<any> }} driver
  * @param {{ slug: string, cap: 30 | 60 | null, rec?: string[], legs?: number, log?: (line: string) => void,
- *   probe?: { start: string, stop: string }, heapAt?: string[] }} options probe: page scripts run around each leg (route-bench --fenced-gpu); stop's value is the leg's `probe`.
+ *   probe?: { start: string, stop: string }, heapAt?: string[], busy?: boolean }} options probe: page scripts run around each leg (route-bench --fenced-gpu); stop's value is the leg's `probe`.
  *   heapAt: legs after which the driver (`heapSnapshot`, the iPhone's Web Inspector) sums the live JavaScript heap (DF18) */
-export async function playRoute(driver, { slug, cap, rec = [], legs: count, log = () => undefined, probe, heapAt = [] }) {
+export async function playRoute(driver, { slug, cap, rec = [], legs: count, log = () => undefined, probe, heapAt = [], busy = true }) {
   const legs = [];
   // the grid's sky-down reveal (grid/reveal.ts: the camera comes down from ~400 m over the pier, 3 s) runs after control;
   // the route measures play, so it starts once the reveal has ended, and says how long the reveal took
@@ -429,7 +433,7 @@ export async function playRoute(driver, { slug, cap, rec = [], legs: count, log 
     const result = await driver.evaluateAsync(`
       const done = arguments[arguments.length - 1];
       (${routeLegOnPage.toString()})(arguments[0]).then(done, (error) => done({ error: String(error) }));
-    `, [{ ...leg, cap }], (leg.seconds + 45) * 1000);
+    `, [{ ...leg, cap, busy }], (leg.seconds + 45) * 1000);
     // a stop body may return a promise (route-bench --leg-shots waits for the next drawn frame)
     const probed = probe === undefined ? undefined : await driver.evaluateAsync(`const done = arguments[arguments.length - 1]; Promise.resolve((() => { ${probe.stop} })()).then(done, (error) => done({ error: String(error) }));`, [], 15_000)
       .catch((/** @type {unknown} */ error) => ({ error: String(error) }));
