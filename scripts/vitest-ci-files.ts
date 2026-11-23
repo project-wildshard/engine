@@ -36,6 +36,9 @@ export const CI_NATIVE_GROUPS = {
   // cook-stale-preparation.test.ts, which passed the 60 s file budget, it keeps the same no-neighbour placement.
   'native-cook-stale': ['test/cook-stale-preparation-worker.test.ts'],
   'native-cook-cpu': ['test/cook-cpu-limit.test.ts'],
+  // SHARD-COMPAT C2: four cells and a road booted from server packs on two real workers, then a walker held at a gate and
+  // walked home on the real clock; 136 s beside sibling workers on a 4-CPU runner (run 45124836499), so it runs alone.
+  'native-pack-crossing': ['test/dedicated-pack-crossing.test.ts'],
   'driftwood-population': [
     'test/driftwood-headless-population.test.ts',
   ],

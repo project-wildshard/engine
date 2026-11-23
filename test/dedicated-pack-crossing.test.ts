@@ -62,12 +62,21 @@ test('C2: a world whose rooms and road read only server packs holds a walker at 
   body.resetPose({ x: CHUNK_HALF - 5, y: 1, z: 0 }, -Math.PI / 2);
   a.thumb = () => ({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: -Math.PI / 2, pitch: 0, buttons: NET_BUTTONS.sprint });
   await vi.waitFor(() => { expect(road.holds('device:a'), 'onto the road').toBe(true); }, { timeout: 20_000, interval: 50 });
+  // The open road between the two cells is plain strip ground: the walker is set down 15 m short of Nalati's edge on it, so the
+  // file walks only what it proves (the gate held on the pack's strips, both hand-offs) and fits its 60 s CI file budget (J193).
+  const walker = road.bodyOf('device:a');
+  if (walker === undefined) throw new Error('A stands on the road');
+  walker.resetPose({ x: EAST_EDGE - 15, y: walker.position.y + 2, z: 0 }, -Math.PI / 2);
   await vi.waitFor(() => { expect(road.bodyOf('device:a')?.position.x ?? 0, 'into Nalati\'s buffer, on the pack\'s strips').toBeGreaterThan(EAST_EDGE + 2); }, { timeout: 30_000, interval: 50 });
   let deepest = -Infinity;
   for (const ends = Date.now() + 3000; Date.now() < ends;) { await new Promise(resolve => { setTimeout(resolve, 50); }); deepest = Math.max(deepest, road.bodyOf('device:a')?.position.x ?? -Infinity); }
   expect(deepest, 'held at Nalati\'s gate').toBeLessThan(EAST_GATE);
   expect(east.holds('device:a'), 'never handed into Nalati').toBe(false);
   a.thumb = () => ({ viewTick: 0, steer: { keyX: 0, keyY: 1, stickX: 0, stickY: 0 }, yaw: Math.PI / 2, pitch: 0, buttons: NET_BUTTONS.sprint });
+  // Back along the road to 15 m off Driftwood's edge, then walked home across it.
+  const held = road.bodyOf('device:a');
+  if (held === undefined) throw new Error('A is still on the road');
+  held.resetPose({ x: CHUNK_HALF + 15, y: held.position.y + 2, z: 0 }, Math.PI / 2);
   await vi.waitFor(() => { expect(home.holds('device:a'), 'back in Driftwood').toBe(true); }, { timeout: 40_000, interval: 50 });
   expect(closes, 'never redialled').toBe(0);
   expect([bench.restarts, bench.crashes]).toEqual([0, []]);
