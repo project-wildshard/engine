@@ -109,7 +109,8 @@ test('a ?chunk= page of a shard the world leaves out never takes a grid entry, a
   expect(entry, 'and before the title-first rule, by the kept word, so a bare link says why')
     .toMatch(/if \(requested !== null && await notInWorld\(\)\) return notInWorldTitle\(requested\);\n\s+const tapped = /u);
   expect(entry).toMatch(/online && requested !== null && [^\n]*\n\s+&& !\(await [^\n]*\)\)\.worldOpens\(world\)\(requested\);/u);
-  expect(entry).toMatch(/return showPageTitle\(notInWorldLine\(findTitleManifest\(slug\)\?\.name \?\? slug\)\);/u);
+  // J501: the line also feeds the end modal (showEnd), so it is named once, then shown on the title
+  expect(entry).toMatch(/const line = notInWorldLine\(findTitleManifest\(slug\)\?\.name \?\? slug\);\n(?:[^\n]*\n){0,3}\s+return showPageTitle\(line\);/u);
 });
 
 test('a word that answers after the deadline is kept for the next launch only: this page enters as J300 says', async () => {
