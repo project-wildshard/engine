@@ -14,8 +14,8 @@
  *   for draws of nothing).
  * - **Batched members** (precompile.ts): a mesh a batch draws (`BATCHED_VIEW`, layers off) is never warmed for its own
  *   program.
- * - The far ring's batch programs warm before their batch replaces its proxies (game/grid/farBatch.ts), and a creature's
- *   card shot keeps one plain material (entities/AnimalHerdView.ts), so its program is not freed and linked again.
+ * - The far ring's batch programs warm before their batch replaces its proxies (game/grid/farBatch.ts). A creature's
+ *   card shot keeps one plain material (entities/AnimalHerdView.ts) on every tier whose cards draw, fold or not.
  * Off by default; on at phone Low (DF8, mini-dwfps2).
  */
 import * as THREE from 'three';

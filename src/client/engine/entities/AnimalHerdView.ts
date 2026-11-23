@@ -30,6 +30,16 @@ import { speciesDef } from '../../../shared/engine/entities/species/registry';
 
 /** DF8: the card shot's plain materials (with a map, without), kept for the page (`debug.programFold`) */
 const shotMaterials = new Map<boolean, THREE.MeshStandardMaterial>();
+
+/**
+ * QA 2026-11-22 row 8 (opus-qa1): whether this page keeps one card-shot material and warms the cards under the loader.
+ * Every tier whose cards draw (past animalHideDist, to animalSpriteDist) does, not only phone Low's fold (DF8): Sky
+ * Reach's phone layout shot the roc's cards 10 s into a walk, when it came within 300 m, and linked the shot's program
+ * and the card's in that frame (Chromium, phone tier: one 67 to 133 ms frame every run).
+ */
+export function warmCreatureCards(): boolean {
+  return programFoldOn() || TIER_CONFIG.animalSpriteDist > TIER_CONFIG.animalHideDist;
+}
 function keptShotMaterial(mapped: boolean): THREE.MeshStandardMaterial {
   let material = shotMaterials.get(mapped);
   if (material === undefined) { material = new THREE.MeshStandardMaterial({ roughness: 0.9 }); material.name = `card-shot:${mapped ? 'mapped' : 'plain'}`; shotMaterials.set(mapped, material); }
@@ -282,7 +292,7 @@ export class AnimalHerdView implements RowBodiesDraw {
         this.warmLeases.push(leaveWithResources(mesh));
       } catch (error) { console.warn(`[warm] creature rig ${model.kind}:${model.variant} not parked`, error); }
     }
-    if (programFoldOn()) this.stageWarmCards(group, new Set(models));
+    if (warmCreatureCards()) this.stageWarmCards(group, new Set(models));
     this.scene.add(group);
     // DF11: nothing poses a parked rig, so its local matrices are composed once here and left off three's per-frame
     // recompose. Each `updateMatrix` boxed about 72 B; this group's 348 nodes were 24 of the scene walk's 28 KB a call.
@@ -292,7 +302,7 @@ export class AnimalHerdView implements RowBodiesDraw {
   }
 
   /**
-   * DF8 (mini-df8c, `debug.programFold`): the far cards' two programs link here, under the loader, not at the first card
+   * DF8 (mini-df8c; every tier with cards since QA 11-22 row 8, `warmCreatureCards`): the far cards' two programs link here, under the loader, not at the first card
    * (~42 s into the Driftwood route, two links at draw). Each model's card shot runs once, one view of 4², through the
    * real shot (`lodViews`: its kept material, lights and target kind), so the shot program of every rig layout exists;
    * one parked card (a HerdSprites of one copy, hidden in `group`) is drawn by the first frame's parked draws, so the card
@@ -404,7 +414,7 @@ export class AnimalHerdView implements RowBodiesDraw {
     const map = fur !== undefined && 'map' in fur ? fur.map : null, color = fur?.color ?? 0xffffff;
     // DF8 (`debug.programFold`): one kept plain material per map presence, so the shot's program outlives each shot (a new
     // material per shot freed it, and the next herd's shot linked the same program again)
-    const kept = programFoldOn() ? keptShotMaterial(map !== null) : null;
+    const kept = warmCreatureCards() ? keptShotMaterial(map !== null) : null;
     const plain = kept ?? new THREE.MeshStandardMaterial({ map, color, roughness: 0.9 });
     if (kept !== null) { kept.map = map; kept.color.set(color); }
     rig.mesh.material = plain;
