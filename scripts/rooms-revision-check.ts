@@ -6,6 +6,7 @@
 //   node scripts/rooms-revision-check.ts [--channel staging|production]
 import { pathToFileURL } from 'node:url';
 import { CHANNELS } from './page-release/flow.mjs';
+import { agentFetch, markedSocket } from './agent-requests.mjs';
 
 const PACKS = 'https://packs.wildshard.io';
 const AGENT = 'rooms-revision-check';
@@ -27,9 +28,8 @@ export function pageBake(html: string): { readonly build: string; readonly baked
 /** The door's first word (`SOCKET_WORLD` then JSON), or null when it says none in time. */
 export function worldWord(socket: string, timeoutMs = 10_000): Promise<Word> {
   return new Promise(resolve => {
-    const at = new URL(socket);
-    at.searchParams.set('agent', AGENT);
-    const ws = new WebSocket(at.href);
+    // the Node actor marker (METRICS MT2): `?agent=` and the agent user-agent on the hosted door
+    const Socket = markedSocket(WebSocket), ws = new Socket(socket);
     ws.binaryType = 'arraybuffer';
     let timer: ReturnType<typeof setTimeout> | undefined = undefined;
     const done = (value: Word): void => { clearTimeout(timer); try { ws.close(); } catch { /* closed */ } resolve(value); };
@@ -53,9 +53,9 @@ export interface RoomsCheck {
 }
 /** The findings: a P0 for each zone whose rooms run bytes the page neither baked nor can follow; a P2 when the door says nothing
  *  (a busy door answers 429: the check is missing, not failed). */
-export async function roomsRevisionFindings({ origin, socket, packs = PACKS, read = fetch, word = worldWord }: RoomsCheck): Promise<readonly RoomsFinding[]> {
+export async function roomsRevisionFindings({ origin, socket, packs = PACKS, read = agentFetch, word = worldWord }: RoomsCheck): Promise<readonly RoomsFinding[]> {
   const finding = (key: string, severity: RoomsFinding['severity'], text: string): RoomsFinding => ({ scenario: 'rooms-revision', key, severity, text, source: 'check' });
-  const page = await read(`${origin}/?agent=${AGENT}`, { headers: { 'user-agent': `WildshardAgent/1 (${AGENT})` } });
+  const page = await read(`${origin}/?agent=${AGENT}`);
   const { build, baked } = pageBake(await page.text());
   const heard = await word(socket);
   if (heard === null) return [finding('no-word', 'P2', `${socket} said no world word`)];
