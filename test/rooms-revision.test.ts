@@ -8,7 +8,8 @@ import { installCatalogue, installedCatalogue, type CatalogueDocument } from '..
 import { learnPlacedCells, roomsRevisions, type PlacedKeep } from '../src/client/game/grid/placedCells';
 import type { PlacedContent } from '../src/client/game/grid/placedContent';
 import { behindRooms, clearPlacedSpawns, placedLoose, placedSpawn } from '../src/client/game/boot/placedSpawn';
-import { clearFollowed, heardRooms, pageRevision, type RoomsHints } from '../src/client/game/grid/roomsRevision';
+import { clearFollowed, heardRooms, pageRevision, sessionHints, type RoomsHints } from '../src/client/game/grid/roomsRevision';
+import { installSaveEnvironment, saveEnvironment } from '../src/shared/engine/saves/environment';
 import { worldRevisions } from '../src/server/host/dedicated/gridCells';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
 
@@ -116,4 +117,43 @@ test('the release chain: a zone whose rooms run bytes the page neither baked nor
   expect(await roomsRevisionFindings({ origin: 'https://s', socket: 'wss://r', read: read(false), word })).toMatchObject([{ key: 'behind-driftwood-isle', severity: 'P0' }]);
   expect(await roomsRevisionFindings({ origin: 'https://s', socket: 'wss://r', read: read(true), word })).toEqual([]);
   expect(await roomsRevisionFindings({ origin: 'https://s', socket: 'wss://r', read: read(true), word: () => Promise.resolve(null) })).toMatchObject([{ severity: 'P2' }]);
+});
+
+// v0.1.75 K4 (staging, 20:13 UTC): the page baked Pine r12, its rooms ran r13 (published after the cut). The online door heard the
+// word through a save environment that keeps nothing, so the one-reload guard never held: nine reloads in 90 s, never in play.
+test('the one reload holds in the tab\'s own session storage when the save environment keeps nothing', () => {
+  const store = new Map<string, string>(), tabStore = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => { store.set(k, v); } };
+  const before = saveEnvironment();
+  installSaveEnvironment({ storage: () => null, persistent: () => false, persist: () => Promise.resolve(false) });
+  Reflect.set(globalThis, 'sessionStorage', tabStore);
+  try {
+    const word = { cells: 1, shards: ['driftwood-isle'], revisions: { 'driftwood-isle': R9 } };
+    let reloads = 0;
+    // each boot reads its hints afresh, as a reloaded document does
+    expect(heardRooms(word, 'driftwood-isle', () => { reloads++; }, sessionHints('b75'))).toBe('reload');
+    expect(heardRooms(word, 'driftwood-isle', () => { reloads++; }, sessionHints('b75'))).toBe('behind');
+    expect(heardRooms(word, 'driftwood-isle', () => { reloads++; }, sessionHints('b75'))).toBe('behind');
+    expect(reloads).toBe(1);
+    expect(JSON.parse(store.get('ws-rooms-revision:b75') ?? '{}')).toMatchObject({ reloaded: { 'driftwood-isle': R9 } });
+  } finally { Reflect.deleteProperty(globalThis, 'sessionStorage'); installSaveEnvironment(before); }
+});
+
+test('a tab that keeps nothing at all never reloads for the rooms: it stays behind', () => {
+  let reloads = 0;
+  const word = { cells: 1, shards: ['driftwood-isle'], revisions: { 'driftwood-isle': R9 } };
+  for (let boot = 0; boot < 3; boot++) expect(heardRooms(word, 'driftwood-isle', () => { reloads++; }, sessionHints('b75', () => null))).toBe('behind');
+  expect(reloads).toBe(0);
+});
+
+// v0.1.75 K4: Pine r13's manifests list the content-named blobs r12 already had, which its upload folder does not hold (the build
+// serves them). Read from the folder they 404ed ("The world didn't download"); the build's own copy is the same bytes.
+test('a content-named blob the upload folder lacks is the build\'s own copy; what the folder holds is read there', async () => {
+  const blob = (name: string): string => `/shardfiles/driftwood-isle/blobs/glb/${name.repeat(64)}.glb`;
+  const listed = new Set(['/shardfiles/driftwood-isle/shard.json', blob('a')]);
+  await learnPlacedCells(URL_AT, { keep: keep(), hints: tab(), fetch: serving(signed(R9)), publicKey,
+    content: () => Promise.resolve({ ...R9_COPY, spawn: { ...R9_COPY.spawn, listed } }) });
+  expect(placedLoose(blob('a'))).toBe(`https://packs.example/loose/${R9}${blob('a')}`);
+  expect(placedLoose(blob('b'))).toBeUndefined();
+  // a file named by path, not by its bytes, is always the upload's: the build's would be the other revision
+  expect(placedLoose('/shardfiles/driftwood-isle/sections/world/edge.json')).toBe(`https://packs.example/loose/${R9}/shardfiles/driftwood-isle/sections/world/edge.json`);
 });

@@ -22,6 +22,10 @@ export interface PlacedSpawn {
   readonly programs: boolean;
   /** J450: whether the cook drew this upload's map (`cookedMapPath`, both sizes, under `loose`); an index from before J450 has none. */
   readonly maps?: boolean;
+  /** The page paths this upload's loose folder holds (the cook index's `keys`). v0.1.75 K4 (staging, Pine r12 baked, its rooms on
+   *  r13): r13's manifests list 1,809 content-named blobs its folder does not hold, the ones r12 already had, which the build serves
+   *  itself; read from the folder they 404ed and the world never downloaded. Absent (an older row): every path is the folder's. */
+  readonly listed?: ReadonlySet<string>;
 }
 const placed = new Map<string, PlacedSpawn>();
 const bare = (slug: string): string => slug.replace(/^_/u, '');
@@ -38,11 +42,16 @@ export function clearBehindRooms(slug: string): void { behind.delete(bare(slug))
 export function behindRooms(slug: string): string | undefined { return behind.get(bare(slug)); }
 export function clearPlacedSpawns(): void { placed.clear(); behind.clear(); }
 const LOOSE_PATH = /^\/(?:shardfiles\/([a-z0-9_-]+)\/|programs\/([a-z0-9_-]+)\.json$)/u;
+/** A content-named file (`…/blobs/<kind>/<sha256>.<ext>`): the same bytes wherever it is served. */
+const NAMED_BLOB = /\/blobs\/[a-z0-9]+\/[a-f0-9]{64}\.[a-z0-9]+$/u;
 /** Where a placed slug's loose file is read, by its page path (`/shardfiles/<slug>/…`, `/programs/<slug>.json`): this upload's own copy.
  *  Undefined for every other path, and for every slug the build has. */
 export function placedLoose(pathname: string, search = ''): string | undefined {
   const owner = looseSlug(pathname), row = owner === undefined ? undefined : placed.get(owner);
-  return row === undefined ? undefined : new URL(`.${pathname}${search}`, row.loose).href;
+  if (row === undefined) return undefined;
+  // a content-named blob the upload's folder does not hold is the build's own copy of the same bytes
+  if (row.listed !== undefined && !row.listed.has(pathname) && NAMED_BLOB.test(pathname)) return undefined;
+  return new URL(`.${pathname}${search}`, row.loose).href;
 }
 /** J450: the cook's map of a placed slug at `size`, at its upload's loose copy; undefined for a slug the cook drew none for, and
  *  for every slug the build has (its atlas tile covers it). */

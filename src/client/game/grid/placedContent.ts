@@ -95,7 +95,9 @@ export async function placedContent(slug: string, hash: string, ports: PlacedCon
     const verdict = index.verdict === undefined ? null : { ...index.verdict, path: `/${index.header}` };
     const fetched = async (path: string): Promise<Uint8Array> => bounded(await read(at(path), { credentials: 'omit', redirect: 'error', signal: ports.signal }), DISCOVERY_BYTES);
     const card = await cookedHero(product, index, fetched, at);
-    return { spawn: { slug: product, entry, whole: pick('whole'), base: ports.packs, loose: at(index.loose),
+    // the page paths the upload's folder holds: a content-named blob it lacks is one the build already serves (placedSpawn.ts)
+    const listed = new Set(index.keys.filter(key => key.startsWith(index.loose)).map(key => `/${key.slice(index.loose.length)}`));
+    return { spawn: { slug: product, entry, whole: pick('whole'), base: ports.packs, loose: at(index.loose), listed,
       programs: index.keys.includes(`${index.loose}programs/${product}.json`),
       // J450: the cook's map, both sizes, as this index lists them (an index from before J450 lists none: the cell draws its plot)
       maps: index.keys.includes(`${index.loose}${cookedMapPath(product, 'full')}`) && index.keys.includes(`${index.loose}${cookedMapPath(product, 'cell')}`) }, verdict, ...(card === undefined ? {} : { card }) };

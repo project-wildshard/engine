@@ -41,26 +41,39 @@ export function aheadOfPage(revisions: ReadonlyMap<string, string>): ReadonlyMap
 
 /** The rooms' last word this tab heard, for this build: which uploads to draw, and the one reload each was given. */
 export interface RoomsHints {
+  /** False when nothing the tab keeps survives a reload: the one-reload guard cannot hold, so the page never reloads for the rooms */
+  readonly durable?: boolean;
   readonly read: () => { readonly revisions: Readonly<Record<string, string>>; readonly reloaded: Readonly<Record<string, string>> };
   readonly write: (hints: { readonly revisions: Readonly<Record<string, string>>; readonly reloaded: Readonly<Record<string, string>> }) => void;
 }
 const NONE = { revisions: {}, reloaded: {} };
 const flat = (value: unknown): Record<string, string> => typeof value === 'object' && value !== null
   ? Object.fromEntries(Object.entries(value).filter((pair): pair is [string, string] => typeof pair[1] === 'string' && HEX.test(pair[1]))) : {};
+type TabStore = Pick<Storage, 'getItem' | 'setItem'>;
+/** The tab's own session storage. v0.1.75 K4 (staging, Pine r12 baked, its rooms on r13): the online door hears the world word
+ *  before (or without) the page installing its save environment, whose default keeps nothing, so the one-reload guard never held
+ *  and every boot reloaded again, nine times in 90 s. The browser's own store is read when the save environment has none. */
+function tabStore(): TabStore | null {
+  const installed = saveEnvironment().storage('session');
+  if (installed !== null) return installed;
+  // oxlint-disable-next-line wildshard/no-raw-save -- online.js has no save store (OF4, as worldRestart.ts): one tab-scoped hint
+  try { return typeof sessionStorage === 'undefined' ? null : sessionStorage; } catch { return null; }
+}
 /** The tab's session storage, under this build's id: a new release starts with none. */
-export function sessionHints(build: unknown = Reflect.get(globalThis, '__WS_BUILD_ID__')): RoomsHints {
+export function sessionHints(build: unknown = Reflect.get(globalThis, '__WS_BUILD_ID__'), store: () => TabStore | null = tabStore): RoomsHints {
   const key = `ws-rooms-revision:${typeof build === 'string' ? build : 'dev'}`;
   return {
+    get durable() { return store() !== null; },
     read: () => {
       try {
-        const text = saveEnvironment().storage('session')?.getItem(key) ?? null;
+        const text = store()?.getItem(key) ?? null;
         if (text === null) return NONE;
         const parsed = JSON.parse(text) as unknown;
         if (typeof parsed !== 'object' || parsed === null) return NONE;
         return { revisions: flat(Reflect.get(parsed, 'revisions')), reloaded: flat(Reflect.get(parsed, 'reloaded')) };
       } catch { return NONE; }
     },
-    write: hints => { try { saveEnvironment().storage('session')?.setItem(key, JSON.stringify(hints)); } catch { /* a tab that keeps nothing follows the file only */ } },
+    write: hints => { try { store()?.setItem(key, JSON.stringify(hints)); } catch { /* a tab that keeps nothing follows the file only */ } },
   };
 }
 
@@ -80,7 +93,8 @@ export function heardRooms(word: unknown, loaded: string | undefined, reload: (z
   const next = { revisions: Object.fromEntries([...revisions].filter(([slug]) => pageRevision(slug) !== undefined)), reloaded: { ...kept.reloaded } };
   const zone = loaded === undefined ? undefined : bareSlug(loaded), want = zone === undefined ? undefined : ahead.get(zone);
   if (zone === undefined || want === undefined) { hints.write(next); return 'same'; }
-  if (kept.reloaded[zone] === want) { hints.write(next); return 'behind'; }
+  // a tab that keeps nothing cannot remember the reload it was given: it stays behind rather than reload forever
+  if (kept.reloaded[zone] === want || hints.durable === false) { hints.write(next); return 'behind'; }
   hints.write({ ...next, reloaded: { ...next.reloaded, [zone]: want } });
   reload(zone, want);
   return 'reload';
