@@ -6,5 +6,6 @@ import { formatJsonSchema } from '../src/shared/host/formatJsonSchema';
 // the JSON Schema bridge had no lowering for, so every movers document failed to convert (sharddev dev's platform families).
 test('the movers document converts, and its sail wind refuses the zero direction', () => {
   const text = JSON.stringify(formatJsonSchema(MoversSchema));
-  expect(text).toContain('"not":{"items":{"const":0}}');
+  // FP9b: the format's projection refuses the two-axis zero exactly.
+  expect(text).toContain('"not":{"const":[0,0]}');
 });
