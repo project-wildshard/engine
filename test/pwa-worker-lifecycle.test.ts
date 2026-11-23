@@ -948,7 +948,11 @@ test('DW12: a channel that is not isolated still answers its document with COOP,
   const page = await held.dispatch('fetch', { request: new Request(url('/')) });
   expect([page?.headers.get('cross-origin-opener-policy'), page?.headers.get('cross-origin-embedder-policy')]).toEqual(['same-origin', null]);
   const served = await held.dispatch('fetch', { request: worker(script) });
-  expect([served?.headers.get('cross-origin-opener-policy') ?? null, served?.headers.get('cross-origin-embedder-policy') ?? null]).toEqual([null, null]);
+  expect([served?.headers.get('cross-origin-opener-policy') ?? null, served?.headers.get('cross-origin-embedder-policy') ?? null]).toEqual([null, null]);  // the warm return's stop between boots (staging: /robots.txt) gets the baked page, but not its policy, so WebKit still
+  // swaps processes on the way back to the game
+  const slug = await held.dispatch('fetch', { request: nav('/slug/driftwood-isle') }), robots = await held.dispatch('fetch', { request: nav('/robots.txt') });
+  expect([await slug?.text(), slug?.headers.get('cross-origin-opener-policy')]).toEqual([document, 'same-origin']);
+  expect([await robots?.text(), robots?.headers.get('cross-origin-opener-policy')]).toEqual([document, null]);
 });
 
 // OFFLINE OF12 (J298: "The preview build should have a different cache"): every cache name carries the channel, so preview and

@@ -18,3 +18,10 @@ first. Freeing things on teardown (Rapier from bytes) did not help.
   The only popup (`titleDeck` drafts) is `noopener` already.
 - Preview's isolation rule puts COOP on `/*`, robots.txt included, so
   the robots.txt hop does not swap there.
+- 11-22: a held service worker answers every navigation with its baked
+  page, so on staging `/robots.txt` came back as the game with COOP and
+  the hop no longer swapped. Off the game's routes the baked page now
+  drops COOP (not on an isolated channel). Phone, 11-21 (serve-local,
+  no worker): the warm game reuses the cold game's pid after a swap out
+  to robots.txt (the visible pid goes cold -> robots -> cold), and 3 of
+  3 warm returns held control with no WebContent jetsam.

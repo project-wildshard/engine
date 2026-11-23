@@ -503,8 +503,17 @@ async function pageCopy(href, key) {
   return undefined;
 }
 
-/** The document baked into this worker: its build's own page, whatever URL asked (the page reads its route from the URL). */
-const bakedDocument = () => new Response(DOCUMENT, { headers: { ...DOCUMENT_HEADERS, 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' } });
+/** DW12: the game's routes (scripts/app-build/isolation.mjs DOCUMENT_ROUTE). Off them, a channel that is not isolated answers
+ *  without COOP, so a warm return's stop between boots (/robots.txt) stays COOP-less and WebKit swaps processes back to the game. */
+const DOCUMENT_ROUTE = /^\/(?:index\.html)?$|^\/slug\/[\w-]+\/?$/u;
+const OPENER = 'cross-origin-opener-policy';
+/** The document baked into this worker: its build's own page, whatever URL asked (the page reads its route from the URL).
+ *  @param {string} pathname */
+const bakedDocument = pathname => {
+  const headers = { ...DOCUMENT_HEADERS, 'content-type': 'text/html;charset=utf-8', 'cache-control': 'no-store' };
+  if (!ISOLATED && !DOCUMENT_ROUTE.test(pathname)) delete headers[OPENER];
+  return new Response(DOCUMENT, { headers });
+};
 /** STALESHELL: how long a navigation waits on the network before a worker whose code is not all held answers with its own
  *  document anyway (offline, or a link that never answers). */
 const NAVIGATION_WAIT_MS = 6000;
@@ -530,11 +539,12 @@ async function holdsGeneration() {
 async function navigation(request) {
   // row 50: once a newer build is live the network's page answers, so a reload (or the next launch while this worker lives)
   // boots the new shell instead of this worker's old one; offline, or no answer in NAVIGATION_WAIT_MS, still boots this one
-  if (await holdsGeneration() && !newerLive()) return bakedDocument();
+  const pathname = new URL(request.url).pathname;
+  if (await holdsGeneration() && !newerLive()) return bakedDocument(pathname);
   const waited = new Promise(resolve => { workerScope.timeout(NAVIGATION_WAIT_MS, () => { resolve(undefined); }); });
   const online = fetch(request).then(response => response.type === 'opaqueredirect' || response.ok && isHtml(response) ? response : undefined,
     () => undefined);
-  return await Promise.race([online, waited]) ?? bakedDocument();
+  return await Promise.race([online, waited]) ?? bakedDocument(pathname);
 }
 
 workerScope.listen(self, 'fetch', event => {

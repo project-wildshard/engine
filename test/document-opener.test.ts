@@ -4,7 +4,7 @@
 // WebContent when the opener policy changes between documents, so a COOP-less page in between and a COOP game page
 // make each boot start in a clean process. A reload of the game page keeps its process (same policy both sides).
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture build and its owned ./tmp directory.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the preview server's raw response headers.
 import { request, type IncomingHttpHeaders } from 'node:http';
 // oxlint-disable-next-line import/no-nodejs-modules -- Paths for the owned fixture build.
@@ -30,6 +30,12 @@ test('the game routes are the document routes; robots.txt, assets and the doctor
   expect(DOCUMENT_OPENER).toBe('same-origin');
   for (const path of ['/', '/index.html', '/slug/driftwood-isle', '/slug/driftwood-isle/']) expect(isDocumentRoute(path), path).toBe(true);
   for (const path of ['/robots.txt', '/version.json', '/b/04e1/main-Ab_3.js', '/doctor/', '/slug/', '/slug/a/b']) expect(isDocumentRoute(path), path).toBe(false);
+});
+
+test('the service worker names the same routes as the page hosts', () => {
+  const route = (file: string): string | undefined => /const DOCUMENT_ROUTE = (?<re>\/.+\/u);/u.exec(readFileSync(file, 'utf8'))?.groups?.['re'];
+  expect(route('src/client/engine/pwa/sw.js')).toBeDefined();
+  expect(route('src/client/engine/pwa/sw.js')).toBe(route('scripts/app-build/isolation.mjs'));
 });
 
 test('the service worker\'s baked document carries the opener policy on every channel, COEP only when isolated', () => {
