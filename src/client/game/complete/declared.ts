@@ -6,6 +6,7 @@ import { findTitleManifest } from '../shard/titleList';
 import { findChunk } from '../shard/registry';
 import { ShardComplete, completeEntry, setCompleteEntry, type CompleteEntry, type ShardCompleteData } from './ShardComplete';
 import { installEnteredLevelService } from '../shard/retainedHooks';
+import { app } from '@wildshard/engine/app/runtime';
 
 /** Live progress remains in its existing owner; the card reads these values without copying or saving them. */
 export interface CompletionProgress {
@@ -95,7 +96,8 @@ export function installCompletion(ctx: CompletionContext, flags: Flags, progress
   ctx.system({ id: rows.system, phase: 'update', before: rows.before, after: rows.after, run: (_dt, t) => {
     if (offered || t - checkT < rows.pollSeconds) return;
     checkT = t;
-    if (!flags.has(rows.doneFlag) || flags.has(rows.seenFlag) || player.carried || card.isOpen
+    // MZ37: not over another box (the talk that set the done flag): its Escape or Enter would be the card's back or keep
+    if (!flags.has(rows.doneFlag) || flags.has(rows.seenFlag) || player.carried || card.isOpen || app.ui.blocking
       || play.animals.animals.some(animal => animal.alive && animal.aggressive === true && Math.hypot(animal.position.x - player.position.x, animal.position.z - player.position.z) < rows.safeRadius)) return;
     offered = true;
     if (rows.trigger === 'quest') open(); else play.hud.toast(`${title}${rows.toastSuffix}`);

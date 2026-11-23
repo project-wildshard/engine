@@ -7,3 +7,6 @@
   (install time has a live owner), which is why it looked like a gate problem.
 - `ShardComplete` now takes an owner; `installCompletion` passes the stay scope. `complete-card-owner.test.ts` shows both
   the miss (no owner, disposed ambient) and the fix.
+- Second half: with the owner fixed the card opened, and a second later its modal `back` ran: the report talk box was
+  still up when the done flag landed, so the card opened over it and the Escape that closes the talk closed the card.
+  The poll now also waits while any UI layer blocks (`app.ui.blocking`); `data-cell-completion.test.ts` covers it.

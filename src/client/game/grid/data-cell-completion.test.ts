@@ -4,6 +4,7 @@
 // cell. While the feet stand in the copy the card opens once the cell server's done flag is up, and leaves with the stay.
 import { afterEach, expect, test } from 'vitest';
 import { Scope } from '@wildshard/engine/app/scope';
+import { app } from '@wildshard/engine/app/runtime';
 import type { SystemSpec } from '@wildshard/engine/app/systems';
 import { Flags } from '@wildshard/engine/world/interact/flags';
 import type { CompletionRows } from '@wildshard/format/completion';
@@ -47,4 +48,24 @@ test('a copy\'s card opens on the cell server\'s done flag while entered, with i
   stay.dispose();
   expect(card.up).toBe(false);
   expect(completeEntry()).toBeNull();
+});
+
+test('the card waits for the talk box that set its flag to close (MZ37)', () => {
+  installShards([]);
+  const systems: SystemSpec[] = [], stay = new Scope('grid.data-completion.fixture'), book = new Flags('fixture-copy', false);
+  const player = { position: { x: 0, z: 0 }, velocity: { set: () => undefined }, carried: false };
+  const play = { weapons: { visible: true }, audio: { worldMuted: false }, hud: { toast: () => undefined }, animals: { animals: [] } };
+  const game = { runtime: { world: { player }, play } } as unknown as CompletionContext['game'];
+  const card = installCellCompletion(source, rows, stay, book, { context: { system: (spec) => { systems.push(spec); }, game }, progress: undefined });
+  const frame = (t: number): void => { for (const system of systems) system.run(1 / 60, t); };
+  const talk = new Scope('ui.dialogue'), root = document.createElement('div');
+  document.body.append(root);
+  app.ui.push('modal', { root, back: () => undefined }, talk); // the hermit's report, still on screen
+  book.set('template.complete');
+  frame(2);
+  expect(card.up).toBe(false);
+  talk.dispose();
+  frame(4);
+  expect(card.up).toBe(true);
+  stay.dispose();
 });
