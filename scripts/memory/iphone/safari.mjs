@@ -148,13 +148,16 @@ export async function startSafari(udid) {
 
 /** @param {Record<string, unknown>} overrides @param {boolean} developer */
 export function phoneSlots(overrides = {}, developer = true) {
+  // DW3 (mini-dw3): a `settings.<pick>` override is a global settings pick (`settings.time=midday`, `settings.weather=clear`:
+  // the look loop's pinned clock and sky, so two boots of a look board light the same), merged with the tier and volume
+  const picks = Object.fromEntries(Object.entries(overrides).filter(([key]) => key.startsWith('settings.')).map(([key, data]) => [key.slice('settings.'.length), data]));
   return [
     NAME_ASKED,
     { scope: 'device', key: 'firstPlayDone', data: true },
     ...(developer ? [{ scope: 'device', key: 'devMode', data: true }] : []),
     { scope: 'device', key: 'graphics', data: 'low' },
-    { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0 } },
-    ...Object.entries(overrides).map(([key, data]) => ({ scope: 'device', key, data })),
+    { scope: 'global', key: 'settings', merge: true, data: { tier: 'phone', volume: 0, ...picks } },
+    ...Object.entries(overrides).filter(([key]) => !key.startsWith('settings.')).map(([key, data]) => ({ scope: 'device', key, data })),
   ];
 }
 
