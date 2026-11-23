@@ -141,12 +141,18 @@ export class BodyBandClocks {
   /** One frame of `dt` seconds. */
   beginTick(dt: number): void { this.time += dt; this.frameDt = dt; this.frame++; }
   has(rate: string): boolean { return this.rates.has(rate); }
-  private row(id: string, rate: string): { row: BandRow; band: (distance: number) => TickBand } {
-    const table = this.rates.get(rate);
-    if (table === undefined) throw new Error(`Unknown tick rate: ${rate}`);
+  // QA 2026-11-23 row 2 (opus-qa1): every body and brain asks this each tick, so it makes no object or closure (Pine's
+  // story asked it ~500k times)
+  private row(id: string, rate: string): BandRow {
+    if (!this.rates.has(rate)) throw new Error(`Unknown tick rate: ${rate}`);
     let row = this.rows.get(id);
     if (row?.rate !== rate) { row = { rate, brain: freshClock(this.time, this.frameDt), body: freshClock(this.time, this.frameDt) }; this.rows.set(id, row); }
-    return { row, band: (distance) => { const band = bandAt(table, distance); if (band === undefined) throw new Error(`Uncovered tick distance: ${rate}`); return band; } };
+    return row;
+  }
+  private band(rate: string, distance: number): TickBand {
+    const table = this.rates.get(rate), band = table === undefined ? undefined : bandAt(table, distance);
+    if (band === undefined) throw new Error(`Uncovered tick distance: ${rate}`);
+    return band;
   }
   /** Reuse the existing clock decision when the same body and rate ask again this frame. */
   settledBodyDt(id: string, rate: string, active: boolean): number | undefined {
@@ -156,8 +162,8 @@ export class BodyBandClocks {
   }
   /** This frame's body step for `id` at `distance` (m) on `rate`; 0 = paused or the off frame of 'half'. */
   bodyDt(id: string, rate: string, distance: number, active = false): number {
-    const { row, band } = this.row(id, rate);
-    const dt = tickClock(row.body, active ? activeBodyBand : band(distance), true, this.time, this.frame,
+    const row = this.row(id, rate);
+    const dt = tickClock(row.body, active ? activeBodyBand : this.band(rate, distance), true, this.time, this.frame,
       active && row.body.frame === this.frame && row.body.dt === 0, id);
     // A newly started attack/impulse never consumes time owed by a previous dormant body phase.
     return active ? Math.min(dt, this.frameDt) : dt;
@@ -166,10 +172,10 @@ export class BodyBandClocks {
   takeBrainDt(id: string, rate: string, distance: number, urgent: boolean, maximumHz?: number, damage?: number): number {
     if (maximumHz !== undefined && !(maximumHz > 0)) throw new RangeError('Invalid authored decision frequency');
     if (damage !== undefined && !Number.isFinite(damage)) throw new RangeError('Invalid decision damage wake');
-    const { row, band } = this.row(id, rate);
+    const row = this.row(id, rate);
     const hit = damage !== undefined && (row.brain.damage === undefined || damage > row.brain.damage);
     if (hit) row.brain.damage = damage;
-    const dt = tickClock(row.brain, band(distance), false, this.time, this.frame, urgent || hit, undefined, maximumHz);
+    const dt = tickClock(row.brain, this.band(rate, distance), false, this.time, this.frame, urgent || hit, undefined, maximumHz);
     row.brain.dt = 0; row.brain.due = false;
     return hit && dt === 0 ? this.frameDt : dt;
   }
@@ -180,7 +186,7 @@ export class BodyBandClocks {
         || (row.damage !== undefined && !Number.isFinite(row.damage)))) throw new RangeError('Invalid unbanded cadence continuation');
     this.time = tick / 60; this.frame = tick; this.frameDt = 1 / 60; this.rows.clear();
     for (const subject of subjects) {
-      const { row } = this.row(subject.id, subject.rate), remainder = tick % subject.divisor;
+      const row = this.row(subject.id, subject.rate), remainder = tick % subject.divisor;
       row.brain.last = this.time; row.brain.frame = tick; row.brain.tickFrame = tick - remainder;
       row.brain.credit = remainder / 60; row.brain.elapsed = remainder / 60;
       if (subject.damage !== undefined) row.brain.damage = subject.damage;

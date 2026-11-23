@@ -292,6 +292,9 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
     if (!Number.isInteger(ports.limit) || ports.limit < 1 || ports.limit > 512
       || !['combined', 'interrupt'].includes(ports.order)) throw new RangeError('Invalid hunt roster cadence');
     const { player, noise, sight } = ports;
+    // QA 2026-11-23 row 2 (opus-qa1): the noise decay for one step length, computed once per length (the portable pow is
+    // a log and an exp in JS; Pine's eight hunts paid ~0.15 s of its story for the same fixed step each tick)
+    let decayDt = Number.NaN, decay = 0;
     const reported = new WeakSet<A>();
     const refused = (actor: A, error: unknown): void => {
       if (!reported.has(actor)) { reported.add(actor); emitFault({system: 'ai.roster', error, verdict: 'retry'}); }
@@ -323,7 +326,8 @@ export class StalkerBrain<A extends AnimalSim> extends HuntingStalkerCore<A> {
         const moved = Math.hypot(player.x - noise.prev.x, player.z - noise.prev.z);
         noise.prev.copy(player);
         // oxlint-disable-next-line prefer-exponentiation-operator -- `**` never reaches the portable Math (test/portable-math.test.ts).
-        noise.speed += (Math.min(moved / dt, 9) - noise.speed) * (1 - Math.pow(0.5, dt * 10));
+        if (dt !== decayDt) { decayDt = dt; decay = 1 - Math.pow(0.5, dt * 10); }
+        noise.speed += (Math.min(moved / dt, 9) - noise.speed) * decay;
       },
       decide: () => {
         this.resetRepaths();
