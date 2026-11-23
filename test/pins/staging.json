@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "3640f43e6ded0fe9fd7c063b15053f718b424797380d49429dcdd829b09fbd89",
+  "catalogueHash": "35d20ab6f3f7b922a99136bb1bd46db7ae0559b2f6a22b6beae007bd65960ee0",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -684,8 +684,8 @@
       {
         "slug": "far-reach",
         "name": "Sky Reach",
-        "revision": 6,
-        "hash": "15008d514ec0f693630ef4e83cc31e9d2c3346891f2bcf4e94afdc8cae352d5f"
+        "revision": 7,
+        "hash": "a932beacbb73dbeef36f39dba36234a20d2a359dc14fc2a9f1a5cb1aecfa67e0"
       },
       {
         "slug": "glowfen",
@@ -861,9 +861,9 @@
     },
     {
       "slug": "far-reach",
-      "revision": 6,
-      "hash": "15008d514ec0f693630ef4e83cc31e9d2c3346891f2bcf4e94afdc8cae352d5f",
-      "bytes": 52609024
+      "revision": 7,
+      "hash": "a932beacbb73dbeef36f39dba36234a20d2a359dc14fc2a9f1a5cb1aecfa67e0",
+      "bytes": 52611072
     },
     {
       "slug": "glowfen",
