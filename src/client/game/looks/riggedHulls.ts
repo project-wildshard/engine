@@ -62,6 +62,24 @@ export function folderRiggedHulls(slug: string): RiggedHulls {
   folderFamilies.set(key, result); return result;
 }
 
+/** ONE-FORMAT OF30: a crowd's own rig, named by its file, with no `look/rigged-hulls` family (Nalati's sheep). `file` is the
+ *  desktop rig (`<hull>.rigged.glb`); the phone tier reads its `<hull>.phone.rigged.glb` twin, as a family's tiers did.
+ *  It loads exactly as a family's rig does (vertex colours, its own atlas, no coats), once per file. */
+export function isCrowdRigFile(hull: string): boolean { return hull.endsWith('.rigged.glb'); }
+const crowdRigs = new Map<string, Promise<RiggedHullAsset>>();
+export function crowdRig(file: string): Promise<RiggedHullAsset> {
+  if (!isCrowdRigFile(file) || file.endsWith('.phone.rigged.glb')) throw new Error(`Crowd rig ${file} is not a desktop rigged hull file`);
+  const url = TIER === 'phone' ? file.replace(/\.rigged\.glb$/u, '.phone.rigged.glb') : file;
+  let loading = crowdRigs.get(url);
+  if (loading === undefined) {
+    const name = file.slice(file.lastIndexOf('/') + 1).replace(/\.rigged\.glb$/u, '');
+    const made = riggedHulls({ label: 'crowd', rigs: [name], hulls: {} }, { files: { [name]: url }, coats: {}, vertexColours: true }).load(name);
+    made.catch(() => { if (crowdRigs.get(url) === made) crowdRigs.delete(url); });
+    crowdRigs.set(url, made); loading = made;
+  }
+  return loading;
+}
+
 /** A shard's live rigged-hull family. */
 export interface RiggedHulls {
   /** One declared rest rig, including coats, borrowed by a specialised view. */

@@ -22,7 +22,7 @@ export async function prepareClientSpeciesCatalogue(ctx: ShardContext, input: un
   };
   live();
   if (presentEntryOwner(scope, 'species', source.owner) !== null) throw new Error('Species catalogue is already prepared');
-  const actors = parse(object({species: pick(SpeciesPresentationSchema, ['lookBook'])}), await product.json<unknown>(source.actors)); live();
+  const actors = parse(object({species: pick(SpeciesPresentationSchema, ['lookBook', 'packedBodies'])}), await product.json<unknown>(source.actors)); live();
   const looks = await product.json<unknown>(source.looks); live();
   const catalogue = await folderSpeciesCatalogueSliced(product, actors.species, looks, () => buildYield(scope)); live();
   publishEntryOwner(scope, 'species', source.owner, catalogue);

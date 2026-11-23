@@ -518,7 +518,7 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
         if (!product.hasFile(row.source)) throw new Error('Quest spawns require their admitted runtime file');
         if (!plan.features.some(owner => owner.kind === 'quest.composition' && owner.id === row.quest && owner.equipment?.animals === row.animals && owner.equipment.sounds === row.sounds)) throw new Error('Quest spawns require their declared composition owners');
       }
-      const required = row.kind === 'world.updates' && !row.rows.some(update => update.kind === 'toon-look') ? [] : row.kind === 'held.claims.prepare' && row.source !== undefined ? [] : row.kind === 'species.program' && row.catalogue !== undefined ? ['look/hull-book'] as const : row.kind === 'content.catalogue' && !(row.finishes || row.effects.includes('finishes')) ? [] : CLIENT_FEATURES[row.kind].sections;
+      const required = row.kind === 'world.updates' && !row.rows.some(update => update.kind === 'toon-look') ? [] : row.kind === 'held.claims.prepare' && row.source !== undefined ? [] : row.kind === 'species.program' && row.catalogue !== undefined ? (product.has('look/hull-book') ? ['look/hull-book'] as const : []) /* OF30: else its actors' packed bodies */ : row.kind === 'content.catalogue' && !(row.finishes || row.effects.includes('finishes')) ? [] : CLIENT_FEATURES[row.kind].sections;
       for (const name of required) {
         if (!product.has(name)) throw new Error(`Missing feature section ${name}`);
         product.section(name); // A listed stream section is not an admitted boot dependency.
