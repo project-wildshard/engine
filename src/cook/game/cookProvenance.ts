@@ -23,3 +23,12 @@ export function provenanceRefusal(slug: string, provenance: CookProvenance | und
   if (provenance === undefined || expected === undefined || expected.chainId !== provenance.chainId || expected.digest === provenance.digest) return undefined;
   return `${slug}: the migrated copy's digest ${provenance.digest} differs from the API's ${expected.digest} under chain ${provenance.chainId}`;
 }
+
+/** One migrated copy the API lists in a channel block (`channels.<name>.migrations`). */
+export interface ListedCopy {readonly raw: string; readonly format: string; readonly hash?: string | undefined; readonly chainId: string; readonly status: string}
+
+/** SHARD-COMPAT CP2b2b: the API's copy of `raw` at `format` (the engine's), as the cook must match it; undefined with none. */
+export function expectedCopyOf(raw: string, listed: readonly ListedCopy[], format: string): ExpectedCopy | undefined {
+  const row = listed.find(copy => copy.raw === raw && copy.format === format && copy.status === 'ok' && copy.hash !== undefined);
+  return row?.hash === undefined ? undefined : {chainId: row.chainId, digest: row.hash};
+}

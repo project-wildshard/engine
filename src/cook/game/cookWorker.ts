@@ -28,14 +28,17 @@ import * as v from 'valibot';
 import {Scope} from '@wildshard/engine/app/scope';
 import {shardSlugOf} from '@wildshard/format/standaloneCatalogue';
 import {ShardfileHashSchema, ShardSlugSchema, RevisionNumberSchema} from '@wildshard/format/uploadWire';
+import {SHARDFILE_VERSION} from '@wildshard/format/version';
 import {MAX_SHARDFILE_BYTES, type CookJobReport} from './cookJob';
+import {expectedCopyOf, provenanceRefusal, type ExpectedCopy, type ListedCopy} from './cookProvenance';
 import {stalePreparationLine, type PreparationState} from './shardCook';
 import {cookPreparedLine, sidecarPath} from './cookSidecar';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
 import {installedRuntimeReads} from './installedRuntimeReads';
 import {cookIndexPath, readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
 
-export interface CatalogueRow {readonly slug: string; readonly revision?: number; readonly hash: string}
+/** `expected`: the API's migrated copy of this head at the engine's format (CP2b2b), which the cook's own copy must match. */
+export interface CatalogueRow {readonly slug: string; readonly revision?: number; readonly hash: string; readonly expected?: ExpectedCopy}
 /** A head the cook can be asked for. `live` is production and `preview` the preview channel (the old two stages); MS2.4:
  *  `staging` is the staging channel's pointer, which is where `upload --channel staging` puts a new author's shard. */
 export type CookStage = 'live' | 'preview' | 'staging';
@@ -59,8 +62,18 @@ const RevisionSchema: v.GenericSchema<RevisionRef> = v.object({revision: Revisio
 /** `GET /api/catalogue`: it answers before a grid is set, unlike the `catalogue.json` a build bakes. */
 /** J275 (AC17): a channel's pointer names the raw upload (`raw`); the cook downloads and migrates that, as for `live`. The API
  *  sends every channel's block for every slug and leaves `raw` out where the channel has no pointer. */
-const ChannelHeadSchema: v.GenericSchema<{readonly raw?: string | undefined}> = v.object({raw: v.optional(ShardfileHashSchema)});
-const CatalogueSchema: v.GenericSchema<{readonly shards: readonly {readonly slug: string; readonly live?: RevisionRef | undefined; readonly preview?: RevisionRef | undefined; readonly channels?: {readonly staging?: {readonly raw?: string | undefined} | undefined} | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(RevisionSchema), preview: v.optional(RevisionSchema), channels: v.optional(v.object({staging: v.optional(ChannelHeadSchema)}))}))});
+/** CP2b2b: each block also lists the API's migrated copies (`migrations`), whose digest the cook's own copy must match. */
+interface ChannelHead {readonly raw?: string | undefined; readonly migrations?: readonly ListedCopy[] | undefined}
+const ListedCopySchema: v.GenericSchema<ListedCopy> = v.object({raw: ShardfileHashSchema, format: v.string(), hash: v.optional(ShardfileHashSchema), chainId: v.string(), status: v.string()});
+const ChannelHeadSchema: v.GenericSchema<ChannelHead> = v.object({raw: v.optional(ShardfileHashSchema), migrations: v.optional(v.array(ListedCopySchema))});
+interface Channels {readonly staging?: ChannelHead | undefined; readonly preview?: ChannelHead | undefined; readonly production?: ChannelHead | undefined}
+const CatalogueSchema: v.GenericSchema<{readonly shards: readonly {readonly slug: string; readonly live?: RevisionRef | undefined; readonly preview?: RevisionRef | undefined; readonly channels?: Channels | undefined}[]}> = v.object({shards: v.array(v.object({slug: ShardSlugSchema, live: v.optional(RevisionSchema), preview: v.optional(RevisionSchema), channels: v.optional(v.object({staging: v.optional(ChannelHeadSchema), preview: v.optional(ChannelHeadSchema), production: v.optional(ChannelHeadSchema)}))}))});
+/** The head with the API's copy of it attached when one is listed at the engine's format. */
+function withExpected(head: CatalogueRow, channels: Channels | undefined): CatalogueRow {
+  const listed = [channels?.staging, channels?.preview, channels?.production].flatMap(block => block?.migrations ?? []);
+  const expected = expectedCopyOf(head.hash, listed, SHARDFILE_VERSION);
+  return expected === undefined ? head : {...head, expected};
+}
 
 /** What a request needs from a cook: one shard of one build, by the two things packs are keyed by. */
 export interface CookIndex {
@@ -257,8 +270,8 @@ export function apiSource(base: string, read: typeof fetch = fetch, maxBytes: nu
       const response = await read(`${base}/api/catalogue`, {signal: AbortSignal.timeout(30_000)});
       if (!response.ok) throw new Error(`Catalogue answered ${response.status}`);
       return v.parse(CatalogueSchema, await response.json()).shards.flatMap(row => {
-        if (stage === 'staging') { const raw = row.channels?.staging?.raw; return raw === undefined ? [] : [{slug: row.slug, hash: raw}]; }
-        const head = row[stage]; return head === undefined ? [] : [{slug: row.slug, ...head}];
+        if (stage === 'staging') { const raw = row.channels?.staging?.raw; return raw === undefined ? [] : [withExpected({slug: row.slug, hash: raw}, row.channels)]; }
+        const head = row[stage]; return head === undefined ? [] : [withExpected({slug: row.slug, ...head}, row.channels)];
       });
     },
     download: async hash => {
@@ -439,6 +452,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       ...(carryKey === undefined ? {} : {cook: carryKey})};
     await put(indexKey(build, hash), new TextEncoder().encode(JSON.stringify(index)), {type: 'application/json', cache: 'public, max-age=300'});
   };
+  /** CP2b2b: the API's copy digest for each head it listed (`source.heads`), checked after the job, before publishing. */
+  const expectations = new Map<string, ExpectedCopy>();
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
     const file = join(work, 'shard.tar'), out = join(work, 'out');
     writeFileSync(file, tarball);
@@ -450,6 +465,9 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     if (!outcome.report.check?.pass) return {...head, state: 'failed', detail: 'The job supplied no successful full check'};
     if (outcome.report.hash !== head.hash) return {...head, state: 'failed', detail: 'The job cooked other bytes'};
     if (!new Set([shardSlugOf(head.slug)]).has(outcome.report.slug)) return {...head, state: 'refused', detail: `A shardfile for ${outcome.report.slug} under ${head.slug}`};
+    // CP2b2b: the cook and the API ran one chain on one original; a different digest under the same chain is never published.
+    const disagrees = provenanceRefusal(head.slug, outcome.report.provenance, expectations.get(head.hash));
+    if (disagrees !== undefined) return {...head, state: 'refused', detail: disagrees};
     await publish(work, outcome.report, head.hash);
     const {preparation} = outcome.report.cook;
     return {...head, state: 'cooked', check: outcome.report.check, seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};
@@ -555,7 +573,10 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const headsOf = async (stages: readonly CookStage[]): Promise<{readonly slug: string; readonly hash: string}[]> => {
     const seen = new Map<string, {readonly slug: string; readonly hash: string}>();
-    for (const stage of stages) for (const row of await source.heads(stage)) seen.set(row.hash, {slug: row.slug, hash: row.hash});
+    for (const stage of stages) for (const row of await source.heads(stage)) {
+      seen.set(row.hash, {slug: row.slug, hash: row.hash});
+      if (row.expected !== undefined) expectations.set(row.hash, row.expected);
+    }
     return [...seen.values()];
   };
   const started = clock();
