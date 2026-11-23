@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test, vi } from 'vitest';
 import { emptyShardfile } from '../src/shared/host/author';
+import type { Shardfile } from '@wildshard/format/shardSchema';
 import {frozenLegacyGuest as compileScript} from './fixtures/frozen/scriptGuests';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
@@ -288,7 +289,7 @@ test('SDK worker executes the declared v1 section and reports its real fuel rath
   const f = fixture(); f.source.budgets.sim.resident = 1_000_000;
   // This frozen ABI-1 SDK product captured the preceding format, not today's author default.
   f.source.version = '0.1';
-  f.source.requires.sdk = '0.1';
+  f.source.requires = { sdk: '0.1', ...f.source.requires }; // the frozen product's key order: sdk first (CP8 dropped it from today's default)
   const product = frozenDecisionWorkerFolder(f.source,bytes);
   const session = await HeadlessSimulation.create(product.shard, product.assets, undefined, { deadline: 'advisory', sections: f.sections });
   try {
@@ -309,7 +310,7 @@ test('author proof admits the declared v1 section only when given the sections, 
   const f = fixture(); f.source.budgets.sim.resident = 1_000_000;
   // The same frozen ABI-1 SDK product retains its captured input versions.
   f.source.version = '0.1';
-  f.source.requires.sdk = '0.1';
+  f.source.requires = { sdk: '0.1', ...f.source.requires }; // the frozen product's key order: sdk first (CP8 dropped it from today's default)
   const product = frozenDecisionWorkerFolder(f.source, bytes);
   const plan = { version: 1 as const, tape: Array.from({ length: 8 }, () => []), checkpointTick: 4, requiredFacts: ['tc-ne5b.never-filed'] };
   await expect(proveAuthorSimulation(product.shard, product.assets, plan)).rejects.toThrow(/Import signature outside ABI|wrong ABI export/u);
@@ -602,7 +603,7 @@ test('a region re-entered after a revision keeps its decision clock in step', as
     for (let i = 0; i < 9; i++) first.host.step();
     expect(first.decisions?.host.snapshot().tick).toBe(9);
     expect(before.checkpoint(snapshotSimHost(first.host))).toBe(true);
-    const revised = { ...f.source, identity: { ...f.source.identity, revision: saveRevision(f.source.identity) + 1 } };
+    const next = saveRevision(f.source.identity) + 1, revised = { ...f.source, identity: Object.assign({}, f.source.identity, 'saveRevision' in f.source.identity ? { saveRevision: next } : { revision: next }) as Shardfile['identity'] }; // FP26: either spelling
     const after = new GridRegionDurability(new SaveStore({ local: storage, session: null }), identity, revised, []);
     fresh = createShardfileSim(revised, f.assets, { ...f.options, rapier: R, quest: after.quest });
     after.setPhysicsBasis(fresh.host.physics.snapshot());
