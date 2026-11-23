@@ -33,7 +33,7 @@ import { Flags, test as testFlags } from '@wildshard/engine/world/interact/flags
 import type { BoxSpec } from '@wildshard/engine/physics/box';
 import { boxInFrame } from '@wildshard/engine/physics/boxFrame';
 import type { Interactable } from '@wildshard/engine/world/interact/types';
-import type { Place, QuestPlace } from '@wildshard/format/interactTable';
+import type { QuestPlace } from '@wildshard/format/interactTable';
 import { questMessageHandlers, type QuestMessageRows, QuestState, type QuestDef, type QuestStep, type NpcDef } from '@wildshard/engine/quest/core';
 import type { QuestView } from '@wildshard/engine/quest/viewPort';
 import { QuestChip, NpcTalk, type LiveMarker, type NpcTalkOpts } from '@wildshard/engine/quest/view';
@@ -380,7 +380,7 @@ export interface PresentedQuestDef extends Omit<QuestDef, 'steps'> { steps: Pres
 export interface QuestPresentationOptions {
   flags?: Flags;
   /** Resolve existing POI-local markers; simple target positions need no resolver. */
-  place?: (at: Place) => { x: number; y: number; z: number };
+  place?: (at: QuestPlace) => { x: number; y: number; z: number };
   /** Admitted world coordinates keyed by the authored marker placement. */
   placements?: Readonly<Record<string, { readonly x: number; readonly y: number; readonly z: number }>>;
   introTitle?: string;
@@ -445,13 +445,6 @@ export interface QuestPresentationContext {
   } };
 }
 
-/** Frozen callbacks keep their closed Place vocabulary until NEXT N5. */
-function legacyQuestPlace(at: QuestPlace): Place {
-  const poi = at.poi;
-  if (poi === 'world' || poi === 'hut' || poi === 'lookout' || poi === 'wreck' || poi === 'shrine' || poi === 'cave' || poi === 'pier') return { ...at, poi };
-  throw new Error('Authored quest frame requires a live frame resolver');
-}
-
 /** The MAP card a quest shows: read from the view, so the page's quest and a client's replica draw the same card. */
 export function questCard(quest: QuestView, introTitle?: string): MapQuest {
   return { title: quest.isStarted ? quest.def.title : introTitle ?? quest.def.title, objective: quest.objective(), hint: quest.isComplete ? '' : quest.hint() };
@@ -472,7 +465,7 @@ export function presentQuest<Q extends QuestView & { readonly flags?: Flags }>(h
       if (point === undefined) throw new Error('Quest marker lacks an admitted frame placement');
       return point;
     }
-    if (legacy !== undefined) return legacy(legacyQuestPlace(at));
+    if (legacy !== undefined) return legacy(at);
     if (at.poi !== 'world' || at.anchor !== undefined) throw new Error('Quest POI markers require a place resolver');
     return { x: at.x, y: (at.y ?? 0) + (at.dy ?? 0), z: at.z };
   };

@@ -38,7 +38,7 @@ import { BARREL_BODY, BARREL_HALF, BARREL_R, BarrelWatch, barrelAtPlate, plateOv
 import { waterLevel } from '../../../../shared/engine/world/Heightfield';
 import { test, bindInteractionState, type Flags } from '../../../../shared/engine/world/interact/flags';
 import { interactProps, pickupLook, type Interactable } from '../../../../shared/engine/world/interact/types';
-import { bindInteractPlacements, autoFlag, type InteractDef, type InteractTable, type Place } from '@wildshard/format/interactTable';
+import { bindInteractPlacements, autoFlag, type InteractDef, type InteractTable, type QuestPlace } from '@wildshard/format/interactTable';
 import { modelContext, type ModelDef, type Placement } from '../../models/model';
 import { place, type Placed } from '../../models/place';
 import { InstancedBatch } from '../../models/instancedBatch';
@@ -65,7 +65,7 @@ export interface InteractHost {
   player: { position: THREE.Vector3; velocity: THREE.Vector3 };
   flags: Flags;
   /** a placement → world point (y = the floor there unless pinned) + world yaw */
-  place: (p: Place) => { x: number; y: number; z: number; yaw: number };
+  place: (p: QuestPlace) => { x: number; y: number; z: number; yaw: number };
   /** walkable floor height at (x, z): the highest platform, else the terrain */
   floorAt: (x: number, z: number) => number;
   /** the game's interactable list (main.ts scans it for the nearest "[E] …" prompt) */
