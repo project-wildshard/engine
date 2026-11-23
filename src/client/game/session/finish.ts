@@ -31,7 +31,7 @@ import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { withoutOffscreenBakes } from '@wildshard/engine/render/offscreenPreparation';
 import { bootRoadPrograms, liveWarmPacing, precompileLevel, queuedLinks, unbuiltObjects } from '@wildshard/engine/render/precompile';
 import { textureBytes } from '@wildshard/engine/render/textureBytes';
-import { beginFarCopies, farLodOn, settleFarCopies } from '@wildshard/engine/render/farLod';
+import { beginFarCopies, farLodOn, settleFarCopies, uploadFarCopyIndices } from '@wildshard/engine/render/farLod';
 import { budgetCollection, budgetCollectionEnabled, collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
@@ -381,6 +381,10 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       let units: ((done: number) => void) | undefined;
       const settled = await settleFarCopies({ scene: game.rootScene, progress: (done, total) => { units ??= loadingUnits('Far copies', total); units(done); } });
       bootMark('render:far-copies', { ms: Math.round(settled.ms), built: settled.built, left: settled.left, captured: settled.captured });
+      const current = (): boolean => !game.levelScope.disposed && !game.levelScope.disposing;
+      const at = diagnosticNow();
+      const uploaded = await uploadFarCopyIndices(game.renderer, game.rootScene, game.camera, game.composer.inputBuffer, current, macrotask);
+      bootMark('render:far-copy-uploads', { ms: Math.round(diagnosticNow() - at), ...uploaded });
     });
   }
   // DL11: setup overlapped the spawn download; control still waits for the whole set

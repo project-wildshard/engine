@@ -6,7 +6,7 @@
  *
  * With the device slot `debug.farLod` on, each such mesh's triangles are sorted into squares of its local xz at its
  * first draw (before the Memory saver lets its arrays go): `SQUARE` m, or the tiles of a tiled mesh (tiledMesh.ts, whose
- * index the tile driver owns: `farTiles`). After control, in slices, each square gets coarser copies (meshoptimizer's
+ * index the tile driver owns: `farTiles`). In slices under the loading card, each square gets coarser copies (meshoptimizer's
  * simplifier, three's wasm build): within `error` m of the square's surface, its border locked, so a coarse square meets
  * a fine one on the same vertices with no crack; a loose piece smaller than `error` (a far coconut) is pruned. A copy keeps the mesh's own vertices (colour, cover, sway) and is only a
  * new list of them. Each view draw, the squares past `at` m of the camera draw their copy: the index is rewritten
@@ -96,6 +96,7 @@ interface Tracked {
 export const farLodReport = { meshes: 0, tiled: 0, squares: 0, ready: 0, reused: 0, writes: 0, full: 0, drawn: 0, captureMs: 0, buildMs: 0, refused: 0,
   /** DF9 (mini-dfload): build ms at the loading pace, the settle step's ms, what it left for play and captured itself */
   loadingBuildMs: 0, settleMs: -1, settleLeft: -1, settleCaptured: 0, buildAtSettle: -1,
+  loadingWrites: 0, loadingDraws: 0,
   whole: {} as Record<string, number>, log: [] as [string, number, number][] };
 
 const tracked = new WeakMap<THREE.BufferGeometry, Tracked | null>();
@@ -646,7 +647,7 @@ const local = new THREE.Vector3(), inverse = new THREE.Matrix4();
 let wroteAt = -1;
 
 /** Each view draw of a tracked mesh: pick each square's level from the camera, and draw them when any changed. */
-function look(entry: Tracked, camera: THREE.Camera, frame: number): boolean {
+function look(entry: Tracked, camera: THREE.Camera, frame: number | null): boolean {
   camera.getWorldPosition(local);
   if (entry.looked && local.distanceToSquared(entry.last) < MOVED * MOVED) return true;
   if (wroteAt === frame) return true; // one rewrite a frame: the others wait for the next view draw
@@ -664,8 +665,48 @@ function look(entry: Tracked, camera: THREE.Camera, frame: number): boolean {
   }
   entry.looked = true;
   if (!changed) return true;
-  wroteAt = frame; farLodReport.writes++;
+  if (frame === null) farLodReport.loadingWrites++;
+  else wroteAt = frame;
+  farLodReport.writes++;
   return entry.apply();
+}
+
+/** Select the spawn bands under the card. A released index writes directly to its GL buffer. Return the
+ * meshes with a new or dirty CPU index so a parked draw uploads those before their first visible draw. */
+export async function prepareFarCopyIndices(scene: THREE.Object3D, camera: THREE.Camera,
+  current: () => boolean, pause: () => Promise<void>): Promise<ReadonlySet<THREE.Mesh>> {
+  const entries: Tracked[] = [], refresh = new Set<THREE.Mesh>();
+  scene.traverseVisible(object => {
+    if (!isMesh(object) || !object.layers.test(camera.layers)) return;
+    const entry = tracked.get(object.geometry);
+    if (entry?.ready === true && entry.mesh === object) entries.push(entry);
+  });
+  let slice = diagnosticNow();
+  for (const entry of entries) {
+    if (!current()) break;
+    const mesh = entry.mesh, geometry = mesh.geometry;
+    if (mesh.parent === null || tracked.get(geometry) !== entry) continue;
+    const previous = geometry.index, version = previous?.version;
+    if (!look(entry, camera, null)) tracked.set(geometry, null);
+    else if (geometry.index !== previous || geometry.index?.version !== version) refresh.add(mesh);
+    if (diagnosticNow() - slice >= LOAD_SLICE_MS) { await pause(); slice = diagnosticNow(); }
+  }
+  return refresh;
+}
+
+/** Prime only the changed CPU indices through the same offscreen draw that warms the spawn's buffers. */
+export async function uploadFarCopyIndices(renderer: Renderer, scene: THREE.Scene, camera: THREE.Camera,
+  target: THREE.WebGLRenderTarget, current: () => boolean, pause: () => Promise<void>):
+Promise<{ writes: number; queued: number; drawn: number }> {
+  const before = farLodReport.loadingWrites;
+  const refresh = await prepareFarCopyIndices(scene, camera, current, pause);
+  let drawn = 0;
+  if (refresh.size > 0 && current()) {
+    const { warmParkedDraws } = await import('./parkedDraws');
+    if (current()) drawn = await warmParkedDraws(renderer, scene, camera, target, scene, current, pause, { refresh });
+  }
+  farLodReport.loadingDraws += drawn;
+  return { writes: farLodReport.loadingWrites - before, queued: refresh.size, drawn };
 }
 
 /**

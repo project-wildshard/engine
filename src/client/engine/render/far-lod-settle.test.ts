@@ -1,7 +1,7 @@
 // meta DRIFTWOOD-FPS DF9 (mini-dfload): the far copies build under the loading card, not after control.
 import { afterEach, expect, test, vi } from 'vitest';
 import * as THREE from 'three';
-import { FAR_LEVELS, SETTLE_BUDGET_MS, farCopiesPending, farLodReport, resetFarLod, settleFarCopies } from './farLod';
+import { FAR_LEVELS, SETTLE_BUDGET_MS, farCopiesPending, farLodReport, prepareFarCopyIndices, resetFarLod, settleFarCopies } from './farLod';
 
 afterEach(() => { resetFarLod(); });
 
@@ -47,4 +47,21 @@ test('the step keeps its budget and leaves the rest to the play pace', async () 
   expect(settled.left).toBeGreaterThan(0);
   expect(progress[0]?.[0]).toBe(0);
   await vi.waitFor(() => { expect(farCopiesPending()).toBe(0); }, { timeout: 30_000, interval: 50 });
+});
+
+test('the loader selects each ready index and only refreshes buffers that changed', async () => {
+  resetFarLod(true);
+  const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera();
+  const meshes = [ground(64, 2, 20), ground(64, 2, 21)];
+  scene.add(...meshes);
+  camera.position.set(-200, 8, -150);
+  await settleFarCopies({ scene });
+  const versions = meshes.map(mesh => mesh.geometry.index?.version);
+  const selected = await prepareFarCopyIndices(scene, camera, () => true, () => Promise.resolve());
+  expect(selected).toEqual(new Set(meshes));
+  for (const [i, mesh] of meshes.entries()) {
+    expect(mesh.geometry.index?.version).toBe((versions[i] ?? -1) + 1);
+    expect(mesh.geometry.drawRange.count).toBeLessThan(mesh.geometry.index?.count ?? 0);
+  }
+  await expect(prepareFarCopyIndices(scene, camera, () => true, () => Promise.resolve())).resolves.toEqual(new Set());
 });

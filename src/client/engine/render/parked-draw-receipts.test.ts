@@ -39,10 +39,10 @@ function fixture(materials: readonly Material[]) {
     getScissor: value => value.copy(scissor), setScissor: () => undefined,
     getScissorTest: () => scissorTest, setScissorTest: value => { scissorTest = value; },
   };
-  const warm = async (budget: ParkedDrawBudget = ONE_A_SLICE): Promise<{ drawn: number; pauses: number }> => {
+  const warm = async (budget: ParkedDrawBudget = ONE_A_SLICE, refresh?: ReadonlySet<Object3D>): Promise<{ drawn: number; pauses: number }> => {
     let pauses = 0;
     const drawn = await warmParkedDraws(renderer, scene, camera, target, root, () => true, () => { pauses++; return Promise.resolve(); },
-      { budget, onPlan: (original, selected) => { plans.push({ original, selected }); } });
+      { budget, ...(refresh === undefined ? {} : { refresh }), onPlan: (original, selected) => { plans.push({ original, selected }); } });
     return { drawn, pauses };
   };
   /** precompile's link: the material holds the program its entry draw will use before any parked draw */
@@ -125,6 +125,24 @@ test('a later parked warm of the same pipelines draws nothing new; a fresh geome
     f.root.add(new Mesh(other, material));
     expect((await f.warm()).drawn).toBe(1);
   } finally { f.dispose(); geometry.dispose(); other.dispose(); material.dispose(); }
+});
+
+test('a buffer refresh redraws a previously warmed mesh without adding hidden alternatives', async () => {
+  const material = new MeshBasicMaterial(), otherMaterial = new MeshBasicMaterial();
+  const geometry = new BoxGeometry(), otherGeometry = new BoxGeometry(), f = fixture([material, otherMaterial]);
+  const mesh = new Mesh(geometry, material), other = new Mesh(otherGeometry, otherMaterial);
+  try {
+    f.root.add(mesh);
+    expect((await f.warm()).drawn).toBe(1);
+    expect((await f.warm()).drawn).toBe(0);
+    other.visible = false;
+    f.root.add(other);
+    if (geometry.index === null) throw new Error('Missing test index');
+    geometry.index.needsUpdate = true;
+    expect(await f.warm(ONE_A_SLICE, new Set([mesh]))).toEqual({ drawn: 1, pauses: 1 });
+    expect(f.draws.at(-1)).toEqual([mesh]);
+    expect(other.visible).toBe(false);
+  } finally { f.dispose(); geometry.dispose(); otherGeometry.dispose(); material.dispose(); otherMaterial.dispose(); }
 });
 
 test('a new instance buffer, a disposed material or a disposed geometry keeps its warm draw', async () => {

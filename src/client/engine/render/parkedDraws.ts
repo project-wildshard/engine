@@ -80,12 +80,14 @@ function sortNearest(drawables: Drawable[], at: THREE.Vector3): void {
   drawables.sort((a, b) => (distance.get(a) ?? 0) - (distance.get(b) ?? 0));
 }
 
-function parkedDrawables(root: THREE.Object3D, camera: THREE.Camera, reveal: Set<THREE.Object3D>, include?: (object: THREE.Object3D) => boolean): Drawable[] {
+function parkedDrawables(root: THREE.Object3D, camera: THREE.Camera, reveal: Set<THREE.Object3D>, include?: (object: THREE.Object3D) => boolean,
+  refresh?: ReadonlySet<THREE.Object3D>): Drawable[] {
   const out: Drawable[] = [], hidden: { readonly object: Drawable; readonly chain: readonly THREE.Object3D[] }[] = [];
   const visit = (object: THREE.Object3D, chain: readonly THREE.Object3D[]): void => {
     const shown = object === root || object.visible || reveal.has(object), path = shown ? chain : [...chain, object];
     // the view's drawables, and the shadow-only casters (SHADOW_LAYER) the shadow pass draws
-    if (isDrawable(object) && (object.layers.test(camera.layers) || object.castShadow && object.layers.isEnabled(SHADOW_LAYER))) {
+    if ((refresh === undefined || refresh.has(object)) && isDrawable(object) &&
+      (object.layers.test(camera.layers) || object.castShadow && object.layers.isEnabled(SHADOW_LAYER))) {
       if (path.length > 0) hidden.push({ object, chain: path });
       else if (include === undefined || include(object)) out.push(object);
     }
@@ -645,6 +647,8 @@ async function prepareParkedInstanceBounds(drawables: readonly Drawable[], curre
 export async function warmParkedDraws(renderer: ParkedDrawRenderer, scene: THREE.Scene, camera: THREE.Camera,
   target: THREE.WebGLRenderTarget | null, root: THREE.Object3D, current: () => boolean, pause: () => Promise<void>,
   options: { environment?: THREE.Texture | null; budget?: ParkedDrawBudget;
+    /** Redraw only these meshes. Their buffer contents changed since the warm receipt. */
+    refresh?: ReadonlySet<THREE.Object3D>;
     /** Parked camera weapons hide their direct roots as well as their staging group. Descendant visibility stays authored. */
     revealChildren?: boolean;
     /** A parked world's lights must be present for camera equipment to acquire its entry-frame programs. */
@@ -668,7 +672,7 @@ export async function warmParkedDraws(renderer: ParkedDrawRenderer, scene: THREE
     onDrawn?: (objects: readonly THREE.Object3D[]) => void } = {}): Promise<number> {
   const reveal = new Set(options.revealChildren === true ? root.children : []);
   if (options.lightingRoot !== undefined) reveal.add(options.lightingRoot);
-  const drawables = parkedDrawables(root, camera, reveal, options.include);
+  const drawables = parkedDrawables(root, camera, reveal, options.include, options.refresh);
   if (options.nearest !== undefined) sortNearest(drawables, options.nearest);
   const warmed = warmedFor(renderer), context = warmContextKey(renderer, scene, camera, root, reveal, options.environment, target);
   const formats = targetFormats(target);
@@ -723,7 +727,7 @@ export async function warmParkedDraws(renderer: ParkedDrawRenderer, scene: THREE
         }
         whole = merged;
       }
-      const slice = whole.filter(object => !alreadyWarmed(warmed, renderer, object, camera, context));
+      const slice = options.refresh === undefined ? whole.filter(object => !alreadyWarmed(warmed, renderer, object, camera, context)) : whole;
       done += whole.length - slice.length;
       if (slice.length === 0) { options.onDrawn?.(whole); options.onProgress?.(done, total); continue; }
       try { drawSlice(renderer, scene, camera, view, target, root, slice, options.environment, standIns, reveal, benched); }
