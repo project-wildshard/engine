@@ -1054,8 +1054,8 @@ export class Game {
    *  switch for A/B captures, off with the device slot `debug.aoQuietRestore: false` */
   aoQuietRestore: boolean = jsonSlot('debug.aoQuietRestore', 'device').read() !== false;
   /** a transparent that writes depth (water) takes AO as an opaque does: n8ao's depth-writing pre-pass is skipped (aoTransparency.ts;
-   *  DRIFTWOOD-FPS DF14, a look change awaiting its J430 board) — a live switch, on with the device slot `debug.aoOpaqueDepthWriters: true` */
-  aoOpaqueDepthWriters: boolean = jsonSlot('debug.aoOpaqueDepthWriters', 'device').read() === true;
+   *  DRIFTWOOD-FPS DF14, J430 board passed 2026-11-23) — a live switch, off with the device slot `debug.aoOpaqueDepthWriters: false` */
+  aoOpaqueDepthWriters: boolean = jsonSlot('debug.aoOpaqueDepthWriters', 'device').read() !== false;
   /**
    * A cinematic chain's shafts, fringe and grain for a page that runs another chain (`regionCinematic.ts`; the grid's frame);
    * where this page's own chain leaves its god rays out (its tier's `godRays: false`), god rays built as the chain builds its

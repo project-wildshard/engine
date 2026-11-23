@@ -67,3 +67,16 @@
   frame, middle and far every 4th) instead of the stagger's 1.75. Live A/B: render −0.34 ms mean, interval −0.4; cold
   ABBA could not resolve it (off 96.8 / 104.6 fps, on 92.2 / 102). Landed off; a moving caster's shadow near the camera
   would step at 60 Hz, which a still board cannot judge.
+
+## AO on water, and stale bodies in every back-to-back bench boot (2026-11-23, 07:15)
+
+- `debug.aoOpaqueDepthWriters` (off): n8ao takes the ocean and the two pools (transparent, depth-writing) as opaque, so
+  its depth-writing pre-pass has nothing to draw and is skipped. Same-instant diff: 4.5% of pixels, mean 1.2 levels,
+  91% under 2. Live 2× A/B: render −0.23 ms; with `debug.shadowOneMap`, interval −1.07 ms mean and −2.1 ms p95, the
+  only pair that got near the floors (p50 9.0, p95 10.4). AO quality knobs (half the samples, one denoise pass) bought
+  nothing. Both slots wait on a J430 board.
+- The first board's candidate shots had two Guest bodies on the dock. A dropped player's body stands 5 minutes
+  (`cellProtocol.ts` `HOLD_MS`) and a bench browser closes without leaving, so any boot within 5 minutes of the last
+  one on the same world draws the earlier boots' bodies: every cold ABBA on a dev world, and every cell of the nightly
+  `table.mjs` (one cell every 6 to 13 minutes, and a cell's warm boot right after its cold one). The nightly world now
+  runs with `HOLD_MS=1000`; bench worlds should too (`HOLD_MS=1000 node scripts/dev.mjs ...`).

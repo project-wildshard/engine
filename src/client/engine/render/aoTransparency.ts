@@ -54,7 +54,7 @@ export interface AoTransparencySwitches {
   skipEmpty: () => boolean;
   /** DF14: the objects a pre-pass hid are shown again as the pass's own restore (passVisibility.ts), not as a reveal */
   quietRestore?: () => boolean;
-  /** DF14 (look change, J430 board): a transparent that writes depth (water) takes AO as an opaque does, so the
+  /** DF14 (a look change; its J430 board passed): a transparent that writes depth (water) takes AO as an opaque does, so the
    *  depth-writing pre-pass draws nothing and is skipped (cut 3) */
   opaqueDepthWriters?: () => boolean;
 }
@@ -71,7 +71,7 @@ const merge = (a: number, b: number): number => a | b;
  * it in each (`was && (transparent && !depthWrite && !treatAsOpaque || cannotReceiveAO)`, then
  * `was && transparent && depthWrite && !treatAsOpaque`, where a multi-material mesh's undefined `transparent` draws).
  */
-function prepassBits(material: THREE.Material | THREE.Material[], userData: Record<string, unknown>, lean: boolean, opaqueWriters = false): number {
+export function prepassBits(material: THREE.Material | THREE.Material[], userData: Record<string, unknown>, lean: boolean, opaqueWriters = false): number {
   const noAo = Boolean(userData['cannotReceiveAO']);
   if (Array.isArray(material)) {
     let transparent = false;
