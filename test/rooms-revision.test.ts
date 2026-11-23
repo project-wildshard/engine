@@ -14,9 +14,9 @@ import { catalogueBeforePlacements } from './fixtures/catalogue-before-placement
 
 const URL_AT = 'https://packs.example/releases/staging-placements.json';
 const key = generateKeyPairSync('ed25519'), publicKey = key.publicKey.export({ type: 'spki', format: 'der' }).toString('hex');
-// Driftwood r8 (the page's bake on staging v0.1.72) and r9 (the upload the rooms ran)
-const R8 = '8475f343133a648bc902e08b6b59c677622a89c9fea00e61468255781c117e46';
-const R9 = 'cbfe82bd50defdd40f3aeb87d15959bb4d3e9b729efcca1947bb0612739c0ca0';
+// Driftwood's page bake (r8 on staging v0.1.72) and the rooms' upload (r9): stand-in hashes, since the rule reads no shard bytes (NB10)
+const R8 = 'a8'.repeat(32);
+const R9 = 'b9'.repeat(32);
 const PAGE: CatalogueDocument = { ...catalogueBeforePlacements,
   shards: (catalogueBeforePlacements.shards ?? []).map(row => row.slug === 'driftwood-isle' ? { ...row, revision: 8, hash: R8 } : row) };
 const own = PAGE.grid.cells.find(row => row.slug === 'driftwood-isle') as { readonly instance: string; readonly slug: string; readonly cell: readonly [number, number] };

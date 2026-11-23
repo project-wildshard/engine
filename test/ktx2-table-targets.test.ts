@@ -1,10 +1,6 @@
 // S11 (meta SENTRY-TRIAGE): admission refuses a product whose KTX2 table names a file nothing serves (Pine Hollow rev 1's
 // phone and desktop 404s, Nine Dragon's phone 404).
-import { existsSync, readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { readTar } from '@wildshard/format/tar';
 import { assertKtx2TableTargets, missingKtx2Targets, type Ktx2TableFolder } from '../src/shared/game/shardfile/ktx2Targets';
 
 const json = (value: unknown): Uint8Array => new TextEncoder().encode(JSON.stringify(value));
@@ -58,22 +54,4 @@ describe('the KTX2 table rule', () => {
   });
 });
 
-// The real tarballs: Pine Hollow rev 1 (`0e246ab0…`, on the `pins` release) and rev 2 as prepared (`1c334833…`; the uploaded
-// pin `f45e25f2…` holds the same mounts and table). They live in the pin cache; CI's cache holds only the pinned set, where
-// `pins.ts install` runs this rule over every pin.
-const CACHE = process.env['WILDSHARD_PIN_CACHE'] ?? join(homedir(), '.cache/wildshard/pins');
-const REV1 = '0e246ab03210d777619bf1fb09bbaa9da1bbcaea5093a8adfce913508762f084';
-const REV2 = '1c334833af01bc70dd9096f9ac3b5ab9b9b33498e5aca8c7bf259eae280ca518';
-const tarball = (hash: string): Ktx2TableFolder => {
-  const files = readTar(readFileSync(join(CACHE, `${hash}.tar`)));
-  return { paths: () => files.keys(), read: path => { const body = files.get(path); if (body === undefined) throw new Error(`no ${path}`); return body; } };
-};
-
-test.skipIf(!existsSync(join(CACHE, `${REV1}.tar`)))('Pine Hollow rev 1 is refused, naming its first missing target', () => {
-  // 81 of its targets are absent; 3 are phone GLB rows whose source it carries, which the S12d cook makes
-  expect(() => assertKtx2TableTargets(tarball(REV1))).toThrow('KTX2 table names a missing file: /assets/gpu/pine-hollow/creatures/antler-king-rig.phone.rigged-4aa793ec.glb (78 of 321 targets missing)');
-}, 60_000);
-
-test.skipIf(!existsSync(join(CACHE, `${REV2}.tar`)))('Pine Hollow rev 2 is admitted', () => {
-  expect(missingKtx2Targets(tarball(REV2))).toEqual({ total: 374, missing: [] });
-}, 60_000);
+// NB10: no retired revision's tarball by hash here; `pins.ts install` runs this rule over every pinned product.
