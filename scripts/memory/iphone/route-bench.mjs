@@ -2,7 +2,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13, 2026-11-19): one command runs a zone's route bench cold and writes a table.
 //
 //   node scripts/memory/iphone/route-bench.mjs [--zone driftwood-isle] [--route <name>] [--runs 3] [--caps 30,60] [--base <origin>]
-//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>|<slot>=<on>/<off>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--fenced-gpu <n>] [--leg-census] [--leg-alloc] [--leg-shots] [--leg-vsync] [--heap-at <leg> ...] [--out <dir>] [--dry-run]
+//     [--driver inspector|webkit] [--slots key=value ...] [--rec <segment> ...] [--legs <n>] [--ab <slot>|<slot>=<on>/<off>] [--profile <s>] [--profile-delay <s>] [--cool-to <°C> [--cool-outside]] [--census] [--voices] [--frames [--gpu-fence]] [--fenced-gpu <n>] [--leg-census] [--leg-alloc] [--leg-shots] [--leg-vsync] [--heap-at <leg> ...] [--page-eval <body> ...] [--page-read <body> ...] [--out <dir>] [--dry-run]
 //
 // --route plays another of route.mjs's routes in the zone (DF2's turning `driftwood-fps`); the default is the zone's own.
 // --census reads, at the route's end, which owners draw the triangles in each pass (census.mjs), on the device itself.
@@ -16,6 +16,9 @@
 // --leg-shots saves the world canvas at each leg's end (shot-<n>-<leg>.jpg in the run's folder): a look board off the route.
 // --leg-alloc counts, on every leg, the new typed-array storage and its largest call sites (JSC's full-collection pressure).
 // --leg-census reads, on every leg, which owners draw the triangles of the leg's heaviest tenth of sampled frames (DW3).
+// --page-eval <body> (DF20, mini-df20) runs a page-function body once the zone has control, before the route (a compositor
+// trial: `document.getElementById('hud').style.display='none'` hides the HUD); repeatable, each result is logged.
+// --page-read <body> runs a page-function body after the route (what a --page-eval probe gathered); its result goes in route.json.
 // --slots graphics=high runs phone High. --rec presses the game's REC 30 S over the named segments (DW2's frame split). --legs n plays the first n segments only.
 //
 // Each run plays the route (route.mjs) once per cap, each from its own cold boot (fresh Safari on the phone, a fresh WebKit
@@ -40,6 +43,7 @@ const { values } = parseArgs({ options: {
   base: { type: 'string', default: 'https://staging.wildshard.io/' }, driver: { type: 'string', default: 'inspector' },
   slots: { type: 'string', multiple: true }, 'lock-log': { type: 'string', default: 'tmp/iphone13/lockstate.log' }, rec: { type: 'string', multiple: true }, 'heap-at': { type: 'string', multiple: true }, legs: { type: 'string' }, ab: { type: 'string' }, profile: { type: 'string' }, 'profile-delay': { type: 'string' }, 'cool-to': { type: 'string' }, 'cool-outside': { type: 'boolean' }, cooled: { type: 'boolean' }, out: { type: 'string' }, udid: { type: 'string' },
   'dry-run': { type: 'boolean' }, census: { type: 'boolean' }, voices: { type: 'boolean' }, 'cache-off': { type: 'boolean' }, frames: { type: 'boolean' }, 'gpu-fence': { type: 'boolean' }, 'fenced-gpu': { type: 'string' }, 'leg-census': { type: 'boolean' }, 'leg-alloc': { type: 'boolean' }, 'leg-shots': { type: 'boolean' }, 'leg-vsync': { type: 'boolean' }, 'with-locks': { type: 'boolean' },
+  'page-eval': { type: 'string', multiple: true }, 'page-read': { type: 'string', multiple: true },
 } });
 const runs = Number(values.runs), caps = /** @type {(30|60)[]} */ (values.caps.split(',').map(Number));
 if (!Number.isSafeInteger(runs) || runs < 1 || caps.length === 0 || caps.some((cap) => cap !== 30 && cap !== 60)) throw new Error('--runs is a positive integer, --caps a list of 30 and 60');
@@ -182,6 +186,13 @@ async function bench() {
           // mini-phone-pairs (2026-11-21): a phone boot seeded Low that renders above DPR 1 lost its Low save (codex-tc48's
           // DF5 finding); refuse it before the route plays, so a pair never compares a High arm and the hold ends early
           if (phone && trialSlots.graphics !== 'high' && row.raster?.dpr !== 1) throw new Error(`NOT AT LOW: raster ${JSON.stringify(row.raster)}`);
+          // --page-eval (DF20): the trial's page changes, after the witness and before the route
+          row.pageEval = [];
+          for (const body of values['page-eval'] ?? []) {
+            const result = await driver.evaluate(body).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
+            row.pageEval.push(result);
+            console.log(`  page eval: ${JSON.stringify(result)?.slice(0, 400)}`);
+          }
           if ('gesture' in driver && typeof driver.gesture === 'function') await driver.gesture(askWake).catch(() => undefined);
           row.wakeLock = await driver.evaluateAsync(holdWake, [], 10_000).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
           console.log(`  wake lock: ${String(row.wakeLock)}`);
@@ -226,6 +237,13 @@ async function bench() {
               ${legCensus ? `out.census = (() => { ${LEG_CENSUS_STOP} })();` : ''} ${legAlloc ? `out.alloc = (() => { ${LEG_ALLOC_STOP} })();` : ''} ${legVsync ? `out.vsync = (() => { ${LEG_VSYNC_STOP} })();` : ''}
               ${legShots ? `return window.__wildshard.world.game.captureFrame(390).then((c) => new Promise((done) => { c.toBlob(done, 'image/jpeg', 0.9); })).then((b) => b.arrayBuffer()).then((bytes) => { out.shot = Array.from(new Uint8Array(bytes)); return out; });` : `return ${many ? 'out' : 'out.fenced'};`}` } : undefined;
           row.legs = await playRoute(driver, { slug: route, cap, rec: values.rec ?? [], legs: values.legs === undefined ? undefined : Number(values.legs), probe, heapAt: values['heap-at'] ?? [], log: (line) => { console.log(`  ${String(cap)} ${line}`); } });
+          // --page-read (DF20): what the trial's page probes gathered over the route
+          row.pageRead = [];
+          for (const body of values['page-read'] ?? []) {
+            const result = await driver.evaluate(body).catch((/** @type {unknown} */ error) => `error: ${String(error)}`);
+            row.pageRead.push(result);
+            console.log(`  page read: ${JSON.stringify(result)}`);
+          }
           if (every > 0) for (const leg of row.legs) console.log(`  fenced ${leg.name}: ${JSON.stringify(many ? leg.probe?.fenced : leg.probe)}`);
           if (legShots) for (const [i, leg] of row.legs.entries()) {
             const shot = leg.probe?.shot; if (!Array.isArray(shot) || shot.length === 0) { console.log(`  leg shot ${leg.name}: none`); continue; }

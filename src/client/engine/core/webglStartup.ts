@@ -1,6 +1,7 @@
 /** Wait for WebKit's graphics context to be usable before Three reads its capabilities. */
 import type { Scope } from '../../../shared/engine/app/scope';
 import { pageScope } from '../../../shared/engine/app/resources';
+import { jsonSlot } from '../saves/slots';
 
 export const GAME_CONTEXT_ATTRIBUTES: WebGLContextAttributes = {
   // E257: on the physical iPhone, even an empty 16px canvas immediately loses a
@@ -9,6 +10,15 @@ export const GAME_CONTEXT_ATTRIBUTES: WebGLContextAttributes = {
   alpha: true, antialias: false, powerPreference: 'default', stencil: false,
   depth: true, premultipliedAlpha: true, preserveDrawingBuffer: false,
 };
+
+/** DF20 (mini-df20): an opaque drawing buffer (`alpha: false`), so Safari's compositor takes the canvas as an opaque layer and
+ *  blends nothing under it. A saved `true` turns it on (off: the attributes above). */
+export const OPAQUE_CANVAS_SLOT = 'debug.opaqueCanvas';
+export function gameContextAttributes(): WebGLContextAttributes {
+  let saved: unknown = null;
+  try { saved = jsonSlot(OPAQUE_CANVAS_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
+  return saved === true ? { ...GAME_CONTEXT_ATTRIBUTES, alpha: false } : GAME_CONTEXT_ATTRIBUTES;
+}
 
 export interface ContextStartupState { attempt: number; elapsedMs: number; contextLost: boolean; precisionReady: boolean; contextCreated: boolean }
 
@@ -25,10 +35,11 @@ export async function readyWebGLContext(
   scope.listen(canvas, 'webglcontextlost', allowRestore);
   const start = performance.now();
   let attempt = 0;
+  const attributes = gameContextAttributes();
   try {
     for (;;) {
       if (scope.disposed || scope.disposing) throw new Error('Graphics startup owner left');
-      const gl = canvas.getContext('webgl2', GAME_CONTEXT_ATTRIBUTES);
+      const gl = canvas.getContext('webgl2', attributes);
       const contextLost = gl?.isContextLost() ?? false;
       // A non-null getContext result is insufficient: lost contexts return null for precision.
       // Three dereferences these objects in its constructor before installing game recovery.

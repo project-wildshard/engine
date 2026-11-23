@@ -702,6 +702,11 @@
       "shape": "e3b0c44298fc1c14",
       "migrations": []
     },
+    "json:device/OPAQUE_CANVAS_SLOT": {
+      "version": 1,
+      "shape": "e3b0c44298fc1c14",
+      "migrations": []
+    },
     "json:device/OUTER_COLLIDERS_NEAR_SLOT": {
       "version": 1,
       "shape": "e3b0c44298fc1c14",
