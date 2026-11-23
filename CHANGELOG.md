@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.75 (2026-11-23)
+
+- Enter MMO stays in the chosen zone when the room switches to a new revision.
+- The update splash keeps moving while the new version gets ready.
+
 ## v0.1.67 (2026-11-21)
 
 - Mirror Salt shows the dock prompt at seat height and lets drivers get back into their buggies.
