@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.73 (2026-11-23)
+
+- Players on older builds see an update notice and switch to the new build automatically.
+- Driftwood’s crabs, monkeys and sailors draw when you enter from the grid.
+- Nalati Grasslands uses its new shard revision.
+
 ## v0.1.67 (2026-11-21)
 
 - Mirror Salt shows the dock prompt at seat height and lets drivers get back into their buggies.
