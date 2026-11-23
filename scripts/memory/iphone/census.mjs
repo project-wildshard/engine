@@ -64,7 +64,7 @@ export const VOICE_WORKER_READ = `return window.__wildshard?.world?.audio?.voice
 export const FRAME_LOG_START = `
 const g = window.__wildshard?.world?.game, r = g?.renderer;
 if (r === undefined) return 'no game';
-const gl = r.getContext(), log = (window.__wsFrameLog = { frames: [], adds: [] });
+const gl = r.getContext(), log = (window.__wsFrameLog = { count: 0, from: 0, frames: [], adds: [] });
 let cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0, uloc: 0, ulocProgs: new Set(), slow: 0, slowName: '' };
 const render = r.render; r.render = function (...args) { cur.renders++; return render.apply(this, args); };
 // DF8 (mini-driftwood13h): the frame's slowest single draw (renderBufferDirect: a first draw's vertex pack and upload, a
@@ -88,7 +88,13 @@ const texels = (a) => { for (const x of a) if (x && typeof x === 'object' && 'wi
   const n = a.filter((x) => typeof x === 'number'); return n.length >= 5 ? (n[3] | 0) * (n[4] | 0) : 0; };
 for (const n of ['texImage2D', 'texSubImage2D', 'texImage3D', 'texSubImage3D', 'texStorage2D', 'compressedTexImage2D', 'compressedTexSubImage2D'])
   wrap(n, (a) => { cur.tex++; cur.texels += texels(a); });
-for (const n of ['bufferData', 'bufferSubData']) wrap(n, (a) => { const d = a[1]; cur.buf += typeof d === 'number' ? d : (d?.byteLength ?? 0); });
+const bufferBytes = (data, start = 0, count = 0) => {
+  if (typeof data === 'number') return data;
+  const stride = data?.BYTES_PER_ELEMENT ?? 1;
+  return count > 0 ? count * stride : Math.max(0, (data?.byteLength ?? 0) - start * stride);
+};
+wrap('bufferData', (a) => { cur.buf += bufferBytes(a[1], a[3], a[4]); });
+wrap('bufferSubData', (a) => { cur.buf += bufferBytes(a[2], a[3], a[4]); });
 const seen = new Set(r.info.programs?.map((p) => p.id) ?? []);
 const proto = Object.getPrototypeOf(g.scene); let o3 = proto; while (o3 && !Object.prototype.hasOwnProperty.call(o3, 'add')) o3 = Object.getPrototypeOf(o3);
 const note = (sign, parent, kids) => { try { if (log.adds.length < 600) for (const k of kids) { if (k.isLight) continue; let tris = 0;
@@ -154,12 +160,18 @@ if (fc && typeof fc === 'object') { fc.on = true; fc.onFrame = (f) => { if (f.up
   const parts = []; BUCKETS.forEach((b, i) => { const v = f.buckets[i] ?? 0; if (v >= 1) parts.push(b + ':' + Math.round(v)); });
   for (const [k, v] of f.otherParts) if (v >= 1) parts.push(k + ':' + Math.round(v));
   log.costs.push([Math.round(f.t), Math.round(f.update), Math.round(f.render), f.top + ':' + Math.round(f.topMs), parts.join(',')]); }; }
-let last = performance.now();
+let last = performance.now(), previous = null;
 const tick = (now) => { if (window.__wsFrameLog !== log) return;
   const progs = r.info.programs ?? [], fresh = [];
   for (const p of progs) if (!seen.has(p.id)) { seen.add(p.id); fresh.push(p.name ?? '?'); }
-  log.frames.push([Math.round(now), Math.round((now - last) * 10) / 10, cur.links, cur.tex, cur.texels, cur.buf, r.info.render.triangles, r.info.memory.geometries, fresh.join(','), cur.renders, Math.round(cur.uloc * 10) / 10, [...cur.ulocProgs].join(','), gameSplit(), slowSystems.join(','), cur.slow >= 5 ? [Math.round(cur.slow), cur.slowName] : null]); slowSystems = [];
-  if (log.frames.length > 4000) log.frames.shift();
+  const frame = [Math.round(now), Math.round((now - last) * 10) / 10, cur.links, cur.tex, cur.texels, cur.buf, r.info.render.triangles, r.info.memory.geometries, fresh.join(','), cur.renders, Math.round(cur.uloc * 10) / 10, [...cur.ulocProgs].join(','), gameSplit(), slowSystems.join(','), cur.slow >= 5 ? [Math.round(cur.slow), cur.slowName] : null];
+  if (log.count++ === 0) log.from = frame[0];
+  // Keep the events and their immediate predecessors as they arrive, including the dock at the start of a long route.
+  if (frame[1] > 45 || cur.links > 0 || cur.texels > 65536 || cur.buf > 65536 || cur.renders > 1 || frame[10] > 5 || slowSystems.length > 0) {
+    if (previous !== null && log.frames[log.frames.length - 1] !== previous) log.frames.push(previous);
+    log.frames.push(frame);
+  }
+  previous = frame; slowSystems = [];
   last = now; cur = { links: 0, tex: 0, texels: 0, buf: 0, renders: 0, uloc: 0, ulocProgs: new Set(), slow: 0, slowName: '' }; requestAnimationFrame(tick); };
 requestAnimationFrame(tick);
 return 'logging';
@@ -174,15 +186,14 @@ export const FRAME_LOG_READ = `
 const log = window.__wsFrameLog ?? null; window.__wsFrameLog = undefined;
 const fc = window.__wildshard?.frameCost; if (fc && typeof fc === 'object') { fc.on = false; fc.onFrame = null; }
 if (log === null) return null;
-const f = log.frames, keep = new Set();
-f.forEach((x, i) => { if (x[1] > 45 || x[2] > 0 || x[4] > 65536 || x[5] > 65536 || x[9] > 1 || x[10] > 5 || (x[13] ?? '') !== '') { keep.add(i); if (i > 0) keep.add(i - 1); } });
+const f = log.frames;
 // mini-driftwood13m: with \`debug.taskStamp\` on (core/taskStamp.ts), each frame over 45 ms's stamped callbacks (the 8 longest,
 // [start, ms, label]) and its late probes (the longest and the sum, ms): [frame page ms, stamps, longest late, late sum,
 // collections the probe's sentinel saw in it]
 const ts = window.__wsTaskStamp, stamps = [];
 if (ts && typeof ts.read === 'function') for (const x of f) if (x[1] > 45) { const from = x[0] - x[1], late = ts.lates(from, x[0]);
   stamps.push([x[0], ts.read(from, x[0]).sort((a, b) => b[1] - a[1]).slice(0, 8), late.reduce((m, l) => Math.max(m, l[1]), 0), late.reduce((m, l) => m + l[1], 0), typeof ts.collections === 'function' ? ts.collections(from, x[0]).length : null]); }
-return { count: f.length, from: f[0]?.[0] ?? 0, stamps: ts ? stamps : null, frames: [...keep].sort((a, b) => a - b).map((i) => f[i]), adds: log.adds, colliders: log.colliders, costs: log.costs ?? [], reads: log.reads ?? [], tasks: log.tasks ?? [], sys: Object.entries(log.sysHist ?? {}).filter(([, h]) => h[3] > 0).map(([id, h]) => [id, h[0], Math.round(h[1]), h[2], h[3], Math.round(h[4])]) };
+return { count: log.count, from: log.from, stamps: ts ? stamps : null, frames: f, adds: log.adds, colliders: log.colliders, costs: log.costs ?? [], reads: log.reads ?? [], tasks: log.tasks ?? [], sys: Object.entries(log.sysHist ?? {}).filter(([, h]) => h[3] > 0).map(([id, h]) => [id, h[0], Math.round(h[1]), h[2], h[3], Math.round(h[4])]) };
 `;
 
 /**

@@ -1,7 +1,7 @@
 // meta IPHONE13-DRIFTWOOD DW1 (mini-driftwood13): the route bench's numbers. The device half runs on the iPhone 13
 // (meta project/evidence/iphone13-driftwood/).
 import { expect, test } from 'vitest';
-import { gapWork, nameLongFrames, otherKind, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
+import { FRAME_LOG_READ, FRAME_LOG_START, gapWork, nameLongFrames, otherKind, OWNER_CENSUS } from '../scripts/memory/iphone/census.mjs';
 import { fenceFrames, fenceWaits } from '../scripts/memory/iphone/gpuFence.mjs';
 import { linkStages, linkTable } from '../scripts/memory/iphone/link.mjs';
 import { legSummary, routeFor, routeTable, worstSegment, type LegSample } from '../scripts/memory/iphone/route.mjs';
@@ -87,6 +87,25 @@ test('the owner census sums each pass\'s draws by owner, per frame, and puts the
     expect(result.owners).toEqual([['shadow|Scene>palm', 1, 300], ['main|Scene>palm', 1, 300], ['main|Scene>rock', 1, 100]]);
     expect(renderer.renderBufferDirect).toBe(draw);
   } finally { delete globals['window']; delete globals['requestAnimationFrame']; }
+});
+
+test('the route frame log keeps the dock and its upload after more than 4,000 frames', () => {
+  let tick: (time: number) => void = () => undefined;
+  const gl = { bufferSubData: (..._args: unknown[]): void => undefined };
+  const renderer = { getContext: () => gl, info: { render: { triangles: 0 }, memory: { geometries: 0 } } };
+  const page = { __wildshard: { world: { game: { renderer, scene: Object.create(null) as object } } } };
+  const start = new Function('window', 'requestAnimationFrame', 'performance', FRAME_LOG_START);
+  const read = new Function('window', FRAME_LOG_READ);
+  expect(start(page, (next: typeof tick) => { tick = next; }, { now: () => 0 })).toBe('logging');
+  tick(16);
+  gl.bufferSubData(0, 4096, new Uint16Array(100), 5, 20);
+  tick(32);
+  tick(92);
+  for (let frame = 1; frame <= 4100; frame++) tick(92 + frame * 16);
+  const log = read(page) as { count: number; from: number; frames: number[][] };
+  expect(log.count).toBe(4103);
+  expect(log.from).toBe(16);
+  expect(log.frames.map(frame => [frame[0], frame[1], frame[5]])).toEqual([[32, 16, 40], [92, 60, 0]]);
 });
 
 test('a long frame is named by what ran in the interval before it: a collection, a link, an upload, the update or the render', () => {
