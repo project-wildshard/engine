@@ -169,11 +169,14 @@ function withProgramWeather(shard: ShardFolder['shardfile'], features: readonly 
 }
 /** OF29e1: where a plan with no population host finds the family's declared files (Pine's names). */
 const POPULATION_FILES = { environment: 'server/habitat.json', shelter: 'actors/shelter.json', roster: 'actors/roster.json', elites: 'actors/elites.json' } as const;
-/** ONE-FORMAT OF29e1: a plan that names no `population.*` host stands the population family from the product's declared files,
- *  in the hosts' own order (Pine r10's plan): environment, shelter, roster, elites, each spawn script no elite fight owns
- *  (the night director), then elites ready. The roster gates it; a plan naming any population host keeps its own (J486). */
+/** ONE-FORMAT OF29e1: a native plan stands the population family from the product's declared files, in the hosts' own order
+ *  (Pine r10's plan): environment, shelter, roster, elites, each spawn script no elite fight owns (the night director), then
+ *  elites ready. The roster gates it. OF29e3 (J486 deprecate, then delete): no pinned product names a `population.*` host since
+ *  Pine r11 and Nalati r6, so a plan that still names one is refused by name rather than run as written. */
 async function withSectionPopulation(product: ShardFolder, features: readonly NativeAssemblyFeature[]): Promise<readonly NativeAssemblyFeature[]> {
-  if (!product.hasFile(POPULATION_FILES.roster) || features.some(row => row.host.startsWith('population.'))) return features;
+  const named = features.find(row => row.host.startsWith('population.'));
+  if (named !== undefined) throw new Error(`Native plan names the retired host ${named.host}: the engine stands the population family from ${POPULATION_FILES.roster} and its neighbours, so a plan names no population host (ONE-FORMAT OF29e3, J486)`);
+  if (!product.hasFile(POPULATION_FILES.roster)) return features;
   const family: NativeAssemblyFeature[] = [];
   if (product.hasFile(POPULATION_FILES.environment)) family.push({ host: 'population.environment', rows: { file: POPULATION_FILES.environment } });
   if (product.hasFile(POPULATION_FILES.shelter)) family.push({ host: 'population.shelter', rows: { file: POPULATION_FILES.shelter } });

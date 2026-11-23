@@ -1,6 +1,6 @@
 // ONE-FORMAT OF29e1: a native plan that names no `population.*` host stands the population family from the product's declared
 // files (environment, shelter, roster, elites, the night director, elites ready), in the hosts' order. The current Pine pin
-// has no explicit population hosts. Compare it with the same product using the six declarations from the r10 pin.
+// has no explicit population hosts; OF29e3 refuses the six declarations from the r10 pin by name.
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
@@ -53,16 +53,19 @@ function run(live: NativeHeadlessResident, ticks: number): string[] {
   return digests;
 }
 
-test('Pine with no population host in its plan runs tick for tick as with them, and saves and restores', async () => {
+test('Pine with no population host in its plan stands the family from its files, and saves and restores', async () => {
   const fixture = await shipped();
   expect((await plan(fixture.product)).features.some(row => row.host.startsWith('population.')), 'the shipped plan has no population hosts').toBe(false);
-  const hosted = await open(fixture, await withLegacyPopulation(fixture)), declared = await open(fixture, fixture.product);
+  // OF29e3 (J486): the r10 spelling, six named population hosts, is refused by name; OF29e1 proved it ran tick for tick the same.
+  await expect(open(fixture, await withLegacyPopulation(fixture))).rejects.toThrow('Native plan names the retired host population.environment');
+  const declared = await open(fixture, fixture.product);
   let restored: NativeHeadlessResident | undefined;
   try {
-    expect(canonicalSimDigest(snapshotSimHost(declared.host)), 'boot').toBe(canonicalSimDigest(snapshotSimHost(hosted.host)));
-    expect(run(declared, 1800)).toEqual(run(hosted, 1800));
+    expect(declared.host.entities.size, 'the declared family stands Pine\'s population').toBeGreaterThan(0);
+    const digests = run(declared, 1800);
     restored = await open(fixture, fixture.product, serializeSimSnapshot(snapshotSimHostBytes(declared.host)));
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(declared.host)));
     expect(run(restored, 300)).toEqual(run(declared, 300));
-  } finally { restored?.dispose(); declared.dispose(); hosted.dispose(); }
+    expect(digests).toHaveLength(30);
+  } finally { restored?.dispose(); declared.dispose(); }
 }, 600_000);
