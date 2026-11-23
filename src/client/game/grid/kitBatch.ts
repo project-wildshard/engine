@@ -390,8 +390,9 @@ export function primeKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: 
  * caller still waits for all batches before collecting the final shader inventory. */
 export function primeRoadKitBatches(scene: THREE.Object3D, scope: Scope, multiDraw: boolean): Promise<void> | undefined {
   if (!multiDraw || !kitBatchOn() || scope.disposed || scope.disposing || scene.userData['kitBatch'] !== undefined) return undefined;
-  let pace = false;
-  try { pace = roadKitPacedSlot.read() === true; } catch { /* storage blocked: the default */ }
+  // DW3 (mini-dw3, 2026-11-23): on unless saved false (iPhone 13 pairs: regionalWorld.ts quickRoadCardWarm)
+  let pace = true;
+  try { pace = roadKitPacedSlot.read() !== false; } catch { /* storage blocked: the default */ }
   if (!pace) { primeKitBatches(scene, scope, multiDraw); return undefined; }
   return buildRoadKit(scene, scope);
 }

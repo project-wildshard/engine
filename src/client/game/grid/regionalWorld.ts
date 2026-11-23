@@ -110,8 +110,10 @@ import { programFoldOn } from '@wildshard/engine/render/programFold';
 
 const roadWarmCardSlot = jsonSlot('debug.roadWarmCards', 'device');
 
+/** DW3 (mini-dw3, 2026-11-23): on at phone Low unless saved false (iPhone 13 pairs with the other two road slots: the road
+ *  crossing's frames over 50 ms 8, 8, 8, 8, 6 on against 7, 14, 16, 11 off). */
 function quickRoadCardWarm(): boolean {
-  try { return TIER === 'phone' && graphicsMode() === 'low' && roadWarmCardSlot.read() === true; }
+  try { return TIER === 'phone' && graphicsMode() === 'low' && roadWarmCardSlot.read() !== false; }
   catch { return false; }
 }
 
