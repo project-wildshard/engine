@@ -70,7 +70,7 @@ export function installCompletion(ctx: CompletionContext, flags: Flags, progress
   rows: CompletionRows = ctx.product.section('ui/completion')): Completion {
   const runtime = ctx.game.runtime, world = runtime?.world, play = runtime?.play;
   if (world === undefined || world === null || play === undefined || play === null) throw new Error('Completion requires the normal play owner');
-  const player = world.player, card = new ShardComplete(), title = (findChunk(ctx.manifest.slug)??findTitleManifest(ctx.manifest.slug))?.name ?? rows.title;
+  const player = world.player, card = new ShardComplete(ctx.scope), title = (findChunk(ctx.manifest.slug)??findTitleManifest(ctx.manifest.slug))?.name ?? rows.title;
   const project = () => completionProjection(rows, flags, progress, title, anchors);
   let wasMuted = false;
   const close = (): void => { card.close(); player.carried = false; play.weapons.visible = true; objective?.classList.remove('ws-quest-hide'); };
