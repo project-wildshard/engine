@@ -46,8 +46,10 @@ const CONTENT_NAMED = /\/[a-f0-9]{64}\.[a-z0-9]+$/u;
 
 /** J262 (SP1a): which author preparation a cook goes by. `current`: recorded on this renderer fingerprint, the fast path.
  *  `stale`: recorded on another one and used as it is (fence, fence policy, recorded programs): a stale list costs link
- *  hitches after control, never a wrong frame, and nobody re-uploads. `none`: no author preparation (`sdk: '0.2'`), or a
- *  capture-only open. A cook preparation made for this renderer (SP1b) is not built yet. */
+ *  hitches after control, never a wrong frame, and nobody re-uploads. `none`: no author preparation (no preparation spec),
+ *  or a capture-only open. SHARD-COMPAT PR4 (J487): preparation spec 4 names no renderer, so any engine that reads the spec
+ *  takes it as `current`; only spec 3 still compares the renderer fingerprint. A cook preparation made for this renderer
+ *  (SP1b) is not built yet. */
 export type PreparationState = 'current' | 'stale' | 'none';
 /** The line every entry point prints for a cook that took the stale path, so `grep 'stale preparation'` finds them all. */
 export const stalePreparationLine = (slug: string): string => `stale preparation: ${slug}`;
@@ -103,6 +105,7 @@ export function openShardfile(tarball: Uint8Array, options: Readonly<{preparatio
     requireCookPreparation(index, cook, sha256);
     // J262: a renderer move no longer refuses. The cook goes by the author's lists and says so (SP1a).
     if (cook?.version === 3) preparation = cook.renderer === (options.renderer ?? engineRenderer()) ? 'current' : 'stale';
+    if (cook?.version === 4) preparation = 'current';
   }
   return {slug: index.identity.slug, index, source: assembleOutputShardfile(raw, sections), sections, cook, header, read, preparationOnly: options.preparationOnly === true, preparation};
 }
@@ -130,7 +133,7 @@ function fenceHints(shard: OpenShardfile, warn: (line: string) => void): {readon
   if (shard.preparationOnly === true) return {hashes: new Set(), mounts: []};
   const reads = shard.cook?.fence;
   if (reads === undefined) return {hashes: new Set(), mounts: []};
-  if (shard.cook?.version === 3 || shard.cook?.version === 2) {
+  if (shard.cook?.version === 4 || shard.cook?.version === 3 || shard.cook?.version === 2) {
     const hashes = new Set(reads);
     return {hashes, mounts: downloaded(shard).filter(row => hashes.has(row.hash)).map(row => row.url)};
   }

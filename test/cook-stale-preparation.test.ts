@@ -15,7 +15,7 @@ import {readTar, writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
 import {cookShard, openShardfile, type CookReport} from '../src/cook/game/shardCook';
 import {createPartEncoder} from '../src/cook/game/spawnParts';
-import {digest, json, legacyBrasscap, MOVED, PREPARED, prepared} from './fixtures/stale-preparation';
+import {digest, json, legacyBrasscap, MOVED, PREPARED, prepared, preparedSpec4} from './fixtures/stale-preparation';
 
 const legacy = legacyBrasscap();
 const brasscap = readTar(legacy);
@@ -48,6 +48,13 @@ test('a preparation from another renderer opens as stale, a matching one as curr
   expect(openShardfile(tarball, {renderer: MOVED}).preparation).toBe('stale');
   expect(openShardfile(legacy, {renderer: MOVED}).preparation).toBe('none');
   expect(openShardfile(tarball, {preparationOnly: true}).preparation).toBe('none');
+});
+
+test('PR4: a spec 4 preparation names no renderer, so every engine opens it as current', () => {
+  const tarball = writeTar(preparedSpec4(brasscap));
+  expect(openShardfile(tarball, {renderer: PREPARED}).preparation).toBe('current');
+  expect(openShardfile(tarball, {renderer: MOVED}).preparation).toBe('current');
+  expect(openShardfile(tarball).index.preparation).toBe(4);
 });
 
 test('a stale preparation cooks to the same bytes as the matching renderer, and says so', {timeout: 60_000}, async () => {

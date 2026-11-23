@@ -6,6 +6,7 @@ import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {readTar, writeTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
+import {outputIndexEnvelope} from '@wildshard/format/version';
 import {folderTarball} from '../../src/cook/game/folderTarball';
 import {builtFolder} from './engine-lift/folder';
 
@@ -40,6 +41,23 @@ export function prepared(product: ReadonlyMap<string, Uint8Array>, renderer: str
   const index = parseOutputIndex({...held, sdk: '0.3'});
   const cook = validationSourceBytes({version: 3, renderer, mounts, packs: 'fence', fence: fenced ? [digest(asset)] : [], programs: json(program),
     inputHash: digest(cookPreparationBytes(index, mounts, renderer))});
+  files.set('cook.json', cook);
+  files.set('shard.json', validationSourceBytes({...index, cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
+  return files;
+}
+
+/** SHARD-COMPAT PR4: the same preparation at spec 4 in format 0.1.0.3: `preparation: 4`, no renderer, programs v3. */
+export function preparedSpec4(product: ReadonlyMap<string, Uint8Array>): Map<string, Uint8Array> {
+  const files = prepared(product, PREPARED), held = parseOutputIndex(json(files.get('shard.json')));
+  const old = readCookData(json(files.get('cook.json')));
+  if (old.version !== 3) throw new Error('prepared() writes spec 3');
+  const slug = held.identity.slug, {sdk: _sdk, ...rows} = held;
+  const program = validationSourceBytes({version: 3, lines: ['void main() {}'], shaders: [[0]], programs: [[0, 0]]});
+  files.set(`mounts/programs/${slug}.json`, program);
+  const mounts = old.mounts.map(row => row.url === `/programs/${slug}.json` ? {...row, hash: digest(program), bytes: program.length} : row);
+  const index = parseOutputIndex(outputIndexEnvelope({...rows, version: '0.1.0.3', preparation: 4}));
+  const cook = validationSourceBytes({version: 4, mounts, packs: old.packs, fence: old.fence, programs: json(program),
+    inputHash: digest(cookPreparationBytes(index, mounts))});
   files.set('cook.json', cook);
   files.set('shard.json', validationSourceBytes({...index, cook: {path: 'cook.json', hash: digest(cook), bytes: cook.length}}));
   return files;

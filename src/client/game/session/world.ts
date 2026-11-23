@@ -48,7 +48,8 @@ async function bakedEntryPrograms(slug: string): Promise<BakedPrograms | null> {
   const response = await fetch(url);
   if (!response.ok) return null;
   const data: unknown = await response.json();
-  if (typeof data !== 'object' || data === null || !('version' in data) || data.version !== 2 || !('lines' in data) || !('shaders' in data)
+  // SHARD-COMPAT PR4: programs version 3 (preparation spec 4) is version 2 without the engine `build`.
+  if (typeof data !== 'object' || data === null || !('version' in data) || (data.version !== 2 && data.version !== 3) || !('lines' in data) || !('shaders' in data)
     || !('programs' in data)) return null;
   const { lines, shaders, programs } = data;
   const indices = (row: unknown): row is number[] => Array.isArray(row) && row.every((at: unknown) => typeof at === 'number');
