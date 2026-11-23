@@ -50,6 +50,7 @@ import { assertKtx2TableTargets } from '../src/shared/game/shardfile/ktx2Targets
 import { trackedPublic } from './tracked-public.mjs';
 import { catalogueSlugs, documentSlugs, pinnedSlugs, releaseNamed, unlistedMessage, unlistedSlugs } from './pins-catalogue.ts';
 import { servedSlug } from './server-release/served-slug.mjs';
+import { assertTestsDropped } from './pin-test-names.ts';
 import {clearLocalCandidates, recordLocalCandidate} from './local-candidates.ts';
 import type {localProduct} from './pin-local.ts';
 
@@ -119,6 +120,7 @@ async function refresh(drop: readonly string[]): Promise<void> {
   const pinned = existsSync(PINS) ? pinnedSlugs(readJson(PINS)) : [], liveSlugs = catalogueSlugs(catalogue);
   const wrongDrop = drop.filter(slug => !pinned.includes(slug) || liveSlugs.has(servedSlug(slug)));
   if (wrongDrop.length > 0) throw new Error(`pins refresh refused: --drop ${wrongDrop.join(',')} names no pin, or one GET /api/catalogue still lists`);
+  assertTestsDropped(drop);
   const held = pinned.filter(slug => !drop.includes(slug));
   const unlisted = unlistedSlugs(liveSlugs, { [PINS]: held, 'GET /api/catalogue.json?stage=live': documentSlugs(document), ...releaseNamed(process.env) });
   if (unlisted.length > 0) throw new Error(`pins refresh refused, nothing written:\n${unlistedMessage(unlisted)}\n`

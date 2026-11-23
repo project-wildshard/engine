@@ -5,7 +5,8 @@
 // and drop the staging revisions pinned by hand. Node built-ins only; .github/workflows/shard-pin.yml runs it.
 //
 //   node scripts/pin-shard.ts <slug> <revision> <hash> [staging|prod] [--first]
-//   node scripts/pin-shard.ts --drop <slug...>  remove pins after the reviewed catalogue removes them
+//   node scripts/pin-shard.ts --drop <slug...>  remove pins after the reviewed catalogue removes them and no test
+//                                               names them (NB10, pin-test-names.ts)
 //
 // It refuses unless the API's channel document names exactly that revision and hash for the slug, and a slug engine
 // never pinned (a first pin is a reviewed `pins.ts refresh`, DEL9) unless `--first` asks for one: meta MOSSGATE-ZONE MZ26,
@@ -15,6 +16,7 @@ import {existsSync, readFileSync, writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {refreshStaging} from './pins-staging.ts';
 import {documentSlugs} from './pins-catalogue.ts';
+import {assertTestsDropped} from './pin-test-names.ts';
 
 interface Pin {slug: string; revision: number; hash: string; bytes: number}
 interface PinFile {api: string; shards: Pin[]}
@@ -127,6 +129,7 @@ async function main(argv: readonly string[]): Promise<void> {
         throw new Error(`${name}: must be pinned and absent from the reviewed catalogue before --drop`);
       }
     }
+    assertTestsDropped(names);
     writeFileSync(PINS, json({...pins, shards: pins.shards.filter(row => !names.includes(row.slug))}));
     console.log(`Removed grid pins for ${names.join(', ')}`);
     return;
