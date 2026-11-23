@@ -8,7 +8,7 @@ import * as v from 'valibot';
 import {builtFolder} from '../../../src/test/game/builtFolder';
 import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {snapshotSimHostBytes,serializeSimSnapshot,decodeSimSnapshotBytes} from '../../../src/shared/engine/sim/snapshot';
 import {canonicalSimDigest} from '../../../src/test/engine/simState';

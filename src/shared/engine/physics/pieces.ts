@@ -11,18 +11,14 @@ import type { Physics } from './Physics';
 import { groups } from './groups';
 import { solidReach } from './nearColliders';
 import { tagCollider, untagCollider, type Material } from './surface';
+import { treadBoxes as formatTreadBoxes } from '@wildshard/format/treadBoxes';
 
 /** One tread of a stair: a solid block from the stair's foot up to this tread's top. */
 export function treadBoxes(d: Extract<ColliderDesc, { kind: 'treads' }>): Extract<ColliderDesc, { kind: 'box' }>[] {
-  const dx = d.to.x - d.from.x, dz = d.to.z - d.from.z, run = Math.hypot(dx, dz) / d.count, rise = (d.to.y - d.from.y) / d.count;
-  const yaw = Math.atan2(dx, dz);
-  const out: Extract<ColliderDesc, { kind: 'box' }>[] = [];
-  for (let i = 0; i < d.count; i++) {
-    const f = (i + 0.5) / d.count, top = d.from.y + rise * (i + 1), hy = Math.max(0.01, (top - d.from.y) / 2);
-    out.push({ kind: 'box', x: d.from.x + dx * f, y: d.from.y + hy, z: d.from.z + dz * f, hx: d.width / 2, hy, hz: run / 2, yaw, ...(d.surface === undefined ? {} : { surface: d.surface }),
-      ...(d.friction === undefined ? {} : { friction: d.friction }), ...(d.groups === undefined ? {} : { groups: d.groups }) });
-  }
-  return out;
+  // SHARD-COMPAT PR6b (J487): the tread rule is format's; the stair's own material type rides on every box.
+  const boxes: Extract<ColliderDesc, { kind: 'box' }>[] = [];
+  for (const { surface: _surface, ...box } of formatTreadBoxes(d)) boxes.push(d.surface === undefined ? box : { ...box, surface: d.surface });
+  return boxes;
 }
 
 // Rapier copies a descriptor into each native collider. Retain one repeated box

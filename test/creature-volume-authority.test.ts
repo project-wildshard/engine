@@ -13,7 +13,7 @@ import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
 import { keepHitHistory } from '../src/server/engine/net/hitHistory';
 import { seenBodies, seenRay } from '../src/server/game/plugin/nativeRewind';
 import { creatureVolumeFixture, creatureVolumeGlb, volumeJoints } from './fixtures/creature-volume-skin';
-import { creatureRestRig } from '../src/shared/game/shardfile/creatureRestRig';
+import { creatureRestRig } from '@wildshard/format/creatureRestRig';
 
 const rapier = loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
 test.each([{ part: 'head', x: 0, y: 2, damage: 20 }, { part: 'body', x: 0, y: .6, damage: 10 },

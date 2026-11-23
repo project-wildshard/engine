@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as v from 'valibot';
 import {builtFolder} from '../../../src/test/game/builtFolder';
 import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {mountedPlayerOf} from '../../../src/server/game/riding/native';
 import {createNativeProofResident} from '../../../src/test/game/headlessNative';

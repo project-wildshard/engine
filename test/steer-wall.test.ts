@@ -13,7 +13,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { Physics } from '../src/shared/engine/physics/Physics';
 import { groups } from '../src/shared/engine/physics/groups';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
-import { vehicleHulls } from '../src/shared/game/shardfile/vehicleHulls';
+import { vehicleHulls } from '@wildshard/format/vehicleHulls';
 import { emptyShardfile } from '../src/shared/host/author';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 

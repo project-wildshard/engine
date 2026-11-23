@@ -1,7 +1,8 @@
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
 import { prepareRuntimePlan, type NativeRuntimeRecipe } from '../plugin/simulation';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
-import { outputDescriptor, serverReadsFile } from '../../../shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
+import { serverReadsFile } from '@wildshard/format/serverReads';
 import { hasNativeAssembly, prepareNativeAssembly, type NativeAssemblyRuntime } from './nativeAssembly';
 import type { NativeAssemblyContext, NativeAssemblyPorts } from './nativeAssemblyInput';
 

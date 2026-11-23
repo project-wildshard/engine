@@ -1,7 +1,7 @@
 import { skinLookParameters } from '@wildshard/format/skinAssets';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { serverReadsFile } from './outputDescriptor';
+import { serverReadsFile } from '@wildshard/format/serverReads';
 import type { OutputIndex } from '@wildshard/format/outputIndex';
 
 /**

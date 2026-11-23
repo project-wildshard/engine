@@ -16,7 +16,7 @@ import type { Shardfile } from '@wildshard/format/shardSchema';
 import { FollowedMovers, type MoverView } from '../plugin/followedMovers';
 import { moverPanelPose } from '../grid/neighbourPanels';
 import { wirePage } from './wirePage';
-import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
+import { vehicleHulls } from '@wildshard/format/vehicleHulls';
 import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
 import { FollowedVehicles, type FollowedVehiclePorts } from '../plugin/followedVehicles';
 import { vehicleDress } from '../plugin/vehicleFx';

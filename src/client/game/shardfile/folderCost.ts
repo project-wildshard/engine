@@ -13,7 +13,7 @@ import { frameBudgetSpent } from '@wildshard/engine/core/framePacing';
 import { preflightShardfile, preflightShardfileSteps } from '@wildshard/format/preflight';
 import { jsonDataHeapBytes } from '@wildshard/format/json';
 import { outputDescriptor, isBuildValidatedOutput, type OutputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
-import { cookedSplatLayers, otherTierSplatFiles } from '../../../shared/game/shardfile/wholeInputs';
+import { cookedSplatLayers, otherTierSplatFiles } from '@wildshard/format/wholeInputs';
 import {builtShardfilePostCost} from '@wildshard/format/validationReceipt';
 import {postStackCost,type PostStackCost} from '@wildshard/format/postStack';
 import { isPlatformDataSection } from '@wildshard/format/outputFields';

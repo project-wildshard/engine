@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import * as v from 'valibot';
 import {builtFolder} from '../../../src/test/game/builtFolder';
 import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
 import {snapshotSimHostBytes,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';
 import {canonicalSimDigest} from '../../../src/test/engine/simState';

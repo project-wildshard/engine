@@ -17,7 +17,7 @@ import {checkedReplayPipeline} from '../../../src/test/game/headless/checkedRepl
 import {builtFolder} from '../../../src/test/game/builtFolder';
 import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {serializeSimSnapshot,snapshotSimHostBytes} from '../../../src/shared/engine/sim/snapshot';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 // FAST-SLOW-TESTS FS5: each replay part costs a full ~13 MB worker checkpoint, so the independent replay checks its

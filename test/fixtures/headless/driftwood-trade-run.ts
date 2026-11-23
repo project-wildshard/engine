@@ -17,7 +17,7 @@ import { prepareHeadlessRuntime } from '../driftwood-trade-native';
 import { nativeEconomy, NATIVE_TRADE } from '../native-hosts/loot/nativeEconomy';
 import type { HeadlessCommand, HeadlessEffect } from '../../../src/shared/host/tickProtocol';
 import type { HeadlessTapeObservation, HeadlessTapeSegment } from '../../../src/shared/host/headlessTape';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import {TradeHandoffSchema,tradeWire,tradeRead,tradeHash,tradeSnapshotHashes,checkTradeLedger,checkTradeHandoff,type TradeHandoff,type TradePart} from './tradeHandoff';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 

@@ -19,7 +19,7 @@ import {decodeSimSnapshot,leadSnapshot,serializeSimSnapshot,snapshotSimHostBytes
 import {SIM_API_VERSION} from '../src/shared/engine/sim/apiVersion';
 import {openCellWorld} from '../src/server/host/standalone/cellWorld';
 import {leadPlayer} from '../src/shared/engine/sim/leadPlayer';
-import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
 import {builtFolder,runtimeAssets} from './fixtures/engine-lift/folder';
 import {SaveStore,type SaveStorage,type SchemaFailure} from '../src/shared/engine/saves/store';

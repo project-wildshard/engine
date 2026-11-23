@@ -5,7 +5,7 @@ import * as v from 'valibot';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {snapshotSimHost,serializeSimSnapshot} from '../src/shared/engine/sim/snapshot';
-import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import {questObservation} from '../src/shared/game/quest/questObservation';
 import {AdventurePersistenceSchema} from '@wildshard/format/namedJsonContracts';
 import {parseChapterStoryPresentation} from '@wildshard/format/questStory';

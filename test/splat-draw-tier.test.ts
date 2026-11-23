@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { splatTierOn } from '../src/client/engine/boot/gpuFiles';
 import type { Ktx2Probe } from '../src/client/engine/render/ktx2Probe';
-import { cookedSplatLayers, otherTierSplatFiles } from '../src/shared/game/shardfile/wholeInputs';
+import { cookedSplatLayers, otherTierSplatFiles } from '@wildshard/format/wholeInputs';
 import { splatLayerFiles, splatLayerKey } from '../src/shared/engine/boot/splatLayerRows';
 
 const verdict = (probe: Partial<Ktx2Probe>) => (): Ktx2Probe => ({ ran: true, note: '', families: {}, formats: [], veto: null, ...probe });

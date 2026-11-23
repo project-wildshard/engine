@@ -17,10 +17,8 @@ import { homedir } from "node:os";
 import { readTar } from "@wildshard/format/tar";
 import * as v from "valibot";
 import { loadHeadlessFolder } from "../../src/server/host/headlessFolder.ts";
-import {
-  serverReadsFile,
-  outputDescriptor,
-} from "../../src/shared/game/shardfile/outputDescriptor.ts";
+import { serverReadsFile } from "@wildshard/format/serverReads";
+import { outputDescriptor } from "../../src/shared/game/shardfile/outputDescriptor.ts";
 import { playTape, type TapeRequest, type TapeWitness } from "./runtime.ts";
 
 const option = (name: string, fallback: string): string =>

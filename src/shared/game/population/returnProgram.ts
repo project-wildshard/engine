@@ -19,7 +19,7 @@ import { isJsonData } from '@wildshard/format/json';
 import { checkReturnProjectionV2Rows } from '@wildshard/format/returnProjectionV2';
 import { ReturnProjectionV2,type PreparedProjectionV2 } from './returnProjectionV2';
 import type {ShardFolder} from '../shardfile/shardFolder';
-import {outputDescriptor} from '../shardfile/outputDescriptor';
+import { outputDescriptor } from '../shardfile/outputDescriptor';
 
 type RawReturnRow = ReturnModuleRow;
 interface ReturnOwnerBook {

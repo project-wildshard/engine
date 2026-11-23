@@ -17,7 +17,7 @@ import {emptyShardfile} from '../src/shared/host/author';
 import { parseOutputIndex } from '@wildshard/format/outputIndex';
 import { outputSectionPayloads } from '@wildshard/format/outputFields';
 import {parseShardfile} from '@wildshard/format/shardSchema';
-import {resolveOutputDescriptor,carryOutputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
+import { resolveOutputDescriptor, carryOutputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import {shardFolderData} from '../src/shared/game/shardfile/folderData';
 import { outputIndexEnvelope } from '@wildshard/format/version';
 

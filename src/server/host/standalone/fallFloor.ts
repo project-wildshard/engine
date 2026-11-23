@@ -4,7 +4,8 @@ import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { Bounds } from '@wildshard/engine/level/spec';
-import { declaredPlayArea, type PlayArea } from '@wildshard/engine/game/shardfile/playArea';
+import { declaredPlayArea } from '@wildshard/engine/game/shardfile/playArea';
+import type { PlayArea } from '@wildshard/format/playArea';
 import type { ShardFolder } from '@wildshard/engine/game/shardfile/shardFolder';
 
 /** Below this a player has left a cell's world (half a chunk down): what recovery falls back to where a shard declares no floor. */

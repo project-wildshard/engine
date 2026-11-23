@@ -13,7 +13,7 @@ import type { Physics } from '@wildshard/engine/physics/Physics';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { FollowedMovers, type MoverView } from '../plugin/followedMovers';
 import { moverLookKey, wirePage } from '../shardfile/wirePage';
-import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
+import { vehicleHulls } from '@wildshard/format/vehicleHulls';
 import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
 import { FollowedVehicles, type FollowedVehiclePorts, type VehicleDress } from '../plugin/followedVehicles';
 

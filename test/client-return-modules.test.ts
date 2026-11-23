@@ -7,7 +7,7 @@ import {ReturnProgram} from '../src/shared/game/population/returnProgram';
 import {prepareClientReturnModules} from '../src/client/game/shardfile/clientReturnModules';
 import {clientNativeBook} from '../src/client/game/shardfile/clientNativeBook';
 import * as descriptors from '../src/shared/game/shardfile/outputDescriptor';
-import type {OutputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
+import type { OutputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {emptyShardfile} from '../src/shared/host/author';
 import type {ShardContext} from '../src/client/game/plugin/context';

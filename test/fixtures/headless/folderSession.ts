@@ -3,7 +3,7 @@ import '../../../src/shared/engine/core/portableMathFirst';
 import {HeadlessSimulation} from '../../../src/server/host/headless';
 import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
 import {folderHeadlessSections} from '../../../src/shared/host/headlessSections';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import {builtFolder} from '../../../src/test/game/builtFolder';
 import {createNativeProofWorker,type NativeProofKind} from '../headless-worker';
 import {recordNativeProcessUsage} from '../../../src/test/game/headless/processUsage';

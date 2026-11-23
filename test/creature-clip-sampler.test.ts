@@ -2,7 +2,7 @@ import { beforeAll, expect, test } from 'vitest';
 import { Vector3 } from 'three';
 import { prepareGlbCost } from '@wildshard/format/glbCost';
 import { CreatureClipSampler } from '../src/shared/game/shardfile/creatureClipSampler';
-import { creatureRestRig } from '../src/shared/game/shardfile/creatureRestRig';
+import { creatureRestRig } from '@wildshard/format/creatureRestRig';
 import { creatureVolumeGlb, volumeJoints } from './fixtures/creature-volume-skin';
 
 beforeAll(prepareGlbCost);

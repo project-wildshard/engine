@@ -12,7 +12,7 @@ import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor'
 import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { shardVehicles } from '../src/shared/game/shardfile/shardVehicles';
-import { vehicleHulls } from '../src/shared/game/shardfile/vehicleHulls';
+import { vehicleHulls } from '@wildshard/format/vehicleHulls';
 import { playerVehicle, vehicleDockPrompt, vehicleLeavePrompt, vehicleSeatPrompt } from '../src/shared/game/shardfile/wirePrompts';
 import { createShardfileSim, prepareShardfileSimRestore } from '../src/server/game/plugin/simulation';
 import { createSimHost } from '../src/server/engine/sim';

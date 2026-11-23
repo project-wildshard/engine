@@ -4,7 +4,7 @@
 // leaves that blob out too: it reads the neighbour's phone table (its discovery document) for the cooked rows.
 import { afterEach, expect, test, vi } from 'vitest';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import { cookedSplatLayers } from '../src/shared/game/shardfile/wholeInputs';
+import { cookedSplatLayers } from '@wildshard/format/wholeInputs';
 import { splatLayerKey } from '../src/shared/engine/boot/splatLayerRows';
 
 const hex = (c: string): string => c.repeat(64);

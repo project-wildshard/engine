@@ -8,7 +8,7 @@ import * as v from 'valibot';
 import {Vector3} from 'three';
 import {builtFolder} from '../../../src/test/game/builtFolder';
 import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
 import {canonicalSimDigest} from '../../../src/test/engine/simState';
 import {decodeSimSnapshot,snapshotSimHost,serializeSimSnapshot} from '../../../src/shared/engine/sim/snapshot';

@@ -22,9 +22,9 @@ import {SPAWN_PART_ALIGN, readSpawnManifest, type SpawnFile, type SpawnManifest,
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import {readTar} from '@wildshard/format/tar';
 import type {ServerPack, ServerPackPart} from '../../shared/game/shardfile/serverPack';
-import {serverReadsFile} from '../../shared/game/shardfile/outputDescriptor';
+import { serverReadsFile } from '@wildshard/format/serverReads';
 import {serverSkinRigs} from '../../shared/game/shardfile/serverSkinRigs';
-import {entryReadSet} from './entryReadSet';
+import { entryReadSet } from '@wildshard/format/entryReadSet';
 import {phoneTier, splatPhoneTier, type Astc6Encode, type SplatPhoneLayer} from './tierTextures';
 import {splatTerrainOf} from '@wildshard/format/splatTerrain';
 import {wasmAstc6} from './astc6Wasm';

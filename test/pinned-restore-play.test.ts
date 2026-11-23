@@ -10,7 +10,7 @@ import {createNativeHeadlessResident} from '../src/server/host/headlessRuntime';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {serializeSimSnapshot,snapshotSimHostBytes} from '../src/shared/engine/sim/snapshot';
-import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import type {HeadlessCommand} from '../src/shared/host/tickProtocol';
 import {builtFolder,runtimeAssets} from './fixtures/engine-lift/folder';
 

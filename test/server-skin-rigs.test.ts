@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
-import { serverReadsFile } from '../src/shared/game/shardfile/outputDescriptor';
+import { serverReadsFile } from '@wildshard/format/serverReads';
 import { serverSkinRigs } from '../src/shared/game/shardfile/serverSkinRigs';
 import { creatureVolumeFixture } from './fixtures/creature-volume-skin';
 

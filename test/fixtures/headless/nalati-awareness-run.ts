@@ -16,7 +16,7 @@ import {beginFolderSession} from './folderSession';
 import {checkedReplayPipeline} from '../../../src/test/game/headless/checkedReplayPipeline';
 import {builtFolder} from '../../../src/test/game/builtFolder';
 import {loadHeadlessFolder} from '../../../src/server/host/headlessFolder';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 console.info(JSON.stringify({phase:'prepare-start'}));

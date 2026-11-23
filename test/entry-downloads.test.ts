@@ -13,8 +13,8 @@ import {serverPackPart} from '../src/shared/game/shardfile/serverPack';
 import {gridEntryDownloads} from '../src/cook/game/gridEntryDownloads';
 import {packEntryDownloads, unpackEntryDownloads} from '../src/shared/game/grid/entryDownloadsWire';
 import {startGridStripDownload, gridStripDownloadRows} from '../src/client/game/grid/entryDownloads';
-import {entryReadSet} from '../src/cook/game/entryReadSet';
-import {wholeGeometryInputs} from '../src/shared/game/shardfile/wholeInputs';
+import { entryReadSet } from '@wildshard/format/entryReadSet';
+import { wholeGeometryInputs } from '@wildshard/format/wholeInputs';
 import { outputIndexEnvelope } from '@wildshard/format/version';
 
 test('named native assembly declares the same ordered whole inputs it actually reads', () => {

@@ -13,7 +13,7 @@ import {nativeKingOf} from '../nalati-king-host';
 import {readNalatiKingData} from '../nalati-king-data';
 import {kingEntryInputs,kingPhaseInputs,kingHomeInputs,kingCheckpointSettleInputs} from '../../proof/nalati-grasslands/king';
 import {loadRapier} from '../../../src/shared/engine/physics/rapier';
-import {outputDescriptor} from '../../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescriptor';
 import {parseCarriedQuest} from '@wildshard/format/questSteps';
 import {parseHeldSlots} from '@wildshard/format/heldArms';
 import {HeldBowFileSchema} from '@wildshard/format/weaponProfiles';

@@ -2,7 +2,7 @@
 import {readFileSync} from 'node:fs';
 import {expect,test} from 'vitest';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
-import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {snapshotSimHost} from '../src/shared/engine/sim/snapshot';
 import {nativePopulationOf} from '../src/server/game/riding/nativePopulation';

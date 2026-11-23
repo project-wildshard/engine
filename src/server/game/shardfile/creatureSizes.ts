@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { CREATURE_SIZES, creatureScale } from '@wildshard/format/creatureSizes';
-import { creatureSkinBounds } from '../../../shared/game/shardfile/creatureSkinBounds';
+import { creatureSkinBounds } from '@wildshard/format/creatureSkinBounds';
 import type { CreatureBody } from '@wildshard/format/creatureLayers';
 import type { ShardRows } from '@wildshard/format/rows';
 import type { ShardCreatures } from '@wildshard/format/creatures';

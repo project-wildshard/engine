@@ -6,7 +6,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { ShardContext } from '../plugin/context';
 import { entryOwner } from '../../../shared/game/shardfile/entryOwners';
 // An admitted play-area policy over the current entered world's player; a room reads the same rows (SS6).
-import { outerFloor, type RuntimeBoundsRows } from '@wildshard/engine/game/shardfile/playArea';
+import { outerFloor, type RuntimeBoundsRows } from '@wildshard/format/playArea';
 
 /** Preserve the authored fall floor inside the declared threshold and without a player.
  * The getter observes the current world rather than retaining an earlier player. */

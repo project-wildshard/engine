@@ -85,7 +85,7 @@ import { bindPlayerColumns, dataCreaturePorts } from "../../../shared/game/shard
 import { prepareDeclaredGroupBrains, type DeclaredGroupPorts, type DeclaredGroupPolicy } from "../shardfile/groupRuntime";
 import { prepareDeclaredCrowds, type DeclaredCrowdPorts, type PreparedCrowds } from "../../../shared/game/shardfile/crowdRuntime";
 import { installLadders, type LadderClientPorts } from '../../../shared/game/shardfile/ladder';
-import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
+import { vehicleHulls } from '@wildshard/format/vehicleHulls';
 import { shardVehicles } from '../../../shared/game/shardfile/shardVehicles';
 import { hostVehicles, installVehicles, type VehicleRuntime } from './vehicleRuntime';
 import { MoverScriptDriver, playerGrounds, verifiedMoverModules, proveTerrainEntries, type TerrainEntryWalk, type DeclaredMoverComposition, type MoverRuntime } from "./mover";

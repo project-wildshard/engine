@@ -3,7 +3,7 @@ import '../../../shared/engine/core/portableMathFirst';
 import {HeadlessSimulation} from '../../../server/host/headless';
 import {loadHeadlessFolder} from '../../../server/host/headlessFolder';
 import {folderHeadlessSections} from '../../../shared/host/headlessSections';
-import {outputDescriptor} from '../../../shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import {builtFolder} from '../builtFolder';
 import {createNativeProofWorker} from '../headlessWorker';
 import {admittedFolder} from './admittedFolderCache';

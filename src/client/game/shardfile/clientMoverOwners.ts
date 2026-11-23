@@ -7,7 +7,7 @@ import { boundResidentWorldScope } from './runtimePagePresentation';
 import { hasLentLook, lentLooksOf, setLentParam, type LentLooks } from './lentLooks';
 import { folderClosureFile } from '../../../shared/game/shardfile/shardFolder';
 import { materialGraphIr } from '@wildshard/format/materials';
-import { vehicleHulls } from '../../../shared/game/shardfile/vehicleHulls';
+import { vehicleHulls } from '@wildshard/format/vehicleHulls';
 import { folderVehicles } from '../../../shared/game/shardfile/shardVehicles';
 import { FollowedVehicles } from '../plugin/followedVehicles';
 import { recordingReader, vehicleSoundPort } from '../plugin/vehicleSounds';

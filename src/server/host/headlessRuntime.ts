@@ -39,7 +39,7 @@ import { holdPageState, type RuntimeStateValue } from '@wildshard/engine/game/sh
 import type { NativeAssemblyPorts } from '@wildshard/engine/game/shardfile/nativeAssemblyInput';
 import type { LedgerCatalogueItem } from '@wildshard/engine/game/ledger';
 import { installCellHome } from '@wildshard/engine/game/grid/cellHome';
-import { vehicleHulls } from '@wildshard/engine/game/shardfile/vehicleHulls';
+import { vehicleHulls } from '@wildshard/format/vehicleHulls';
 import { folderVehicles, shardVehicles } from '@wildshard/engine/game/shardfile/shardVehicles';
 import { installVehicles } from '@wildshard/engine/game/plugin/vehicleRuntime';
 import { saveRevision } from '@wildshard/engine/game/shardfile/saveRevision';

@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {expect, test} from 'vitest';
 import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
 import {HeadlessSimulation} from '../src/server/host/headless';
-import {outputDescriptor} from '../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import {folderHeadlessSections} from '../src/shared/host/headlessSections';
 import {OBSERVATION_TICKS} from '../src/shared/host/headlessObservation';
 import {builtFolder} from './fixtures/engine-lift/folder';

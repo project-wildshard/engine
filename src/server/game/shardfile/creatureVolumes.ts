@@ -14,8 +14,8 @@ import { TailCreatureVolumes } from '../../../shared/game/shardfile/tailCreature
 import type { Vector3 } from 'three';
 import { checkCreatureHeight } from './creatureSizes';
 import { bodyContract } from '../../../shared/game/shardfile/creatureContract';
-import { creatureRestRig } from '../../../shared/game/shardfile/creatureRestRig';
-import { creatureSkinBounds } from '../../../shared/game/shardfile/creatureSkinBounds';
+import { creatureRestRig } from '@wildshard/format/creatureRestRig';
+import { creatureSkinBounds } from '@wildshard/format/creatureSkinBounds';
 
 /** The actual admitted skin supplies rest joints. Native rows with no body layer
  * install nothing, retaining their existing posed-volume/publication owner. */

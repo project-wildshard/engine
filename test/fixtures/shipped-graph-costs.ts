@@ -5,7 +5,7 @@ import {resolve,sep} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Join measured programs to actual graph and lowered-code identities.
 import {createHash} from 'node:crypto';
 import {loadHeadlessFolder} from '../../src/server/host/headlessFolder';
-import {outputDescriptor} from '../../src/shared/game/shardfile/outputDescriptor';
+import { outputDescriptor } from '../../src/shared/game/shardfile/outputDescriptor';
 import {emitClassicGraph} from '../../src/client/engine/render/graph/glslProgram';
 import {graphFragmentIdentity} from './graph-fragment-identity';
 import {ToonLook} from '../../src/client/engine/render/families/toon';
