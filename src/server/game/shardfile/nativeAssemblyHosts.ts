@@ -110,6 +110,10 @@ export function prepareSectionMelee<C extends NativeAssemblyContext>(product: Sh
 }
 
 /** The held hosts whose families (format `primitiveOfHost`: `held.melee`, `held.ranged`) a section now stands. */
+/** ONE-FORMAT OF22c3: Driftwood's island population (its reserved Captain, item reactions, settle and poses) is declared rows
+ *  now (OF22b4, OF22c2); no shard stands these hosts, so a plan naming one is refused. Kept originals Driftwood r4 and r5
+ *  still name them (`test/kept-native-plans.test.ts`). */
+export const RETIRED_HOSTS: ReadonlySet<string> = new Set(['population.mixed', 'population.reactions', 'population.settle', 'population.poses']);
 export const HELD_HOSTS: ReadonlySet<string> = new Set(['item.swept', 'held.arms', 'item.ranged', 'loadout', 'combat.motion', 'ammunition']);
 /** The engine's sprint speed (`walkingSpeed`), the motion a held ranged kit scales its spread and sway against. */
 export const SPRINT_SPEED = 7.2;
@@ -365,8 +369,6 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     case 'population.elites': { const input = await readEliteFeature(product, row.file); return run => { run.elites = installNativeEliteFeature(run.host, dayOf(run), input, shard.creatures.spawns); }; }
     case 'population.spawn-script': { const input = await readSpawnScript(product, row.id); return run => { installNativeSpawnScript(run.host, dayOf(run), input, undefined, undefined, undefined, { spawns: shard.creatures.spawns, restoring: run.context.restoring }); }; }
     case 'population.elites-ready': return run => { need(run.elites, 'Native elites are not installed').initialize(); };
-    // ONE-FORMAT OF22c3: Driftwood's island population (its reserved Captain, item reactions, settle and poses) is declared
-    // rows now (OF22b4, OF22c2); no shard stands these hosts, so a plan naming one is refused
     case 'population.mixed': case 'population.reactions': case 'population.settle': case 'population.poses':
       throw new Error(`Native assembly host ${row.host} is retired (ONE-FORMAT OF22c3): declare the creatures instead`);
     case 'quest.composition': return prepareQuest(row, at);

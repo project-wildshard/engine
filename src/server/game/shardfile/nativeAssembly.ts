@@ -176,11 +176,11 @@ function withProgramWeather(shard: ShardFolder['shardfile'], features: readonly 
 const POPULATION_FILES = { environment: 'server/habitat.json', shelter: 'actors/shelter.json', roster: 'actors/roster.json', elites: 'actors/elites.json' } as const;
 /** ONE-FORMAT OF29e1: a native plan stands the population family from the product's declared files, in the hosts' own order
  *  (Pine r10's plan): environment, shelter, roster, elites, each spawn script no elite fight owns (the night director), then
- *  elites ready. The roster gates it. OF29e3 (J486 deprecate, then delete): no pinned product names a `population.*` host since
- *  Pine r11 and Nalati r6, so a plan that still names one is refused by name rather than run as written. */
-async function withSectionPopulation(product: ShardFolder, features: readonly NativeAssemblyFeature[]): Promise<readonly NativeAssemblyFeature[]> {
-  const named = features.find(row => row.host.startsWith('population.'));
-  if (named !== undefined) throw new Error(`Native plan names the retired host ${named.host}: the engine stands the population family from ${POPULATION_FILES.roster} and its neighbours, so a plan names no population host (ONE-FORMAT OF29e3, J486)`);
+ *  elites ready. The roster gates it. OF29e3 (J486): no writer names a `population.*` host since Pine r11 and Nalati r6.
+ *  SHARD-COMPAT CP16 (kept originals admit as stored): a plan that still names them (Pine r5, r6 and r10, kept and Pine r5
+ *  prod's head) runs its own rows as written, as before OF29e3; OF29e1 proved them tick for tick the derived family. */
+export async function withSectionPopulation(product: ShardFolder, features: readonly NativeAssemblyFeature[]): Promise<readonly NativeAssemblyFeature[]> {
+  if (features.some(row => row.host.startsWith('population.'))) return features;
   if (!product.hasFile(POPULATION_FILES.roster)) return features;
   const family: NativeAssemblyFeature[] = [];
   if (product.hasFile(POPULATION_FILES.environment)) family.push({ host: 'population.environment', rows: { file: POPULATION_FILES.environment } });
