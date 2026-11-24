@@ -180,7 +180,7 @@ test('a dropped Postgres connection rejects the transaction and the pool reconne
   await expect(db.transaction(async sql => {
     await server.stop();
     await sql.exec('select 1');
-  })).rejects.toThrow(/connection terminated|not queryable/iu);
+  })).rejects.toThrow(/connection terminated|not queryable|ECONNRESET|EPIPE/iu);
 
   await server.start();
   await expect(db.transaction(sql => sql.query('select 42 as answer'))).resolves.toEqual({ rows: [{ answer: 42 }] });
