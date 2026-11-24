@@ -11,6 +11,7 @@ export const preparedRepos: readonly string[] = ['shard-sky-reach', 'shard-open-
 export const shardRepos = ['shard-dunes', 'shard-sky-reach', 'shard-nalati', 'shard-nine-dragon', 'shard-driftwood', 'shard-pine-hollow', 'shard-open-plots'] as const;
 interface Row {repo: string; prepareUrl?: string; status: 'pending' | 'success' | 'failure' | 'error' | 'timeout'; runId?: number; runUrl?: string; shardSha?: string; conclusion?: string | null; issue?: string; error?: string}
 /** `packed`: the commit the receivers install, the candidate plus its npm archive's build outputs (ring3-pack.ts, QA 11-23-b row 40). */
+interface Run {id: number; event: string; path: string; head_sha: string; status: string; conclusion: string | null; run_attempt: number}
 export interface Aggregate {version: 1; engine: string; originRun: string; ok: boolean; rows: Row[]; packed?: string}
 export type Api = (method: 'GET' | 'POST', path: string, body?: unknown) => Promise<unknown>;
 interface Options {api: Api; packed?: string; now?: () => number; sleep?: (ms: number) => Promise<void>; deadlineMs?: number; pollMs?: number; checkpoint?: (report: Aggregate) => void; issues?: boolean}
@@ -30,7 +31,6 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
     report.packed = options.packed;
   }
   const install = report.packed ?? report.engine;
-  type Run = {id: number; event: string; path: string; head_sha: string; status: string; conclusion: string | null; run_attempt: number};
   const dispatch = async (repo: string, workflow: string): Promise<number> => {
     const response = await api('POST', `repos/project-wildshard/${repo}/actions/workflows/${workflow}/dispatches`,
       {ref: 'main', inputs: {engine: install}, return_run_details: true}) as {workflow_run_id?: number};
