@@ -25,18 +25,6 @@
       "bytes": 30294,
       "sha256": "2347097af1972ce82d973b7162e97efd8b76f6cb016aa32b8614ef311c3400f3"
     },
-    "mounted-figure.json": {
-      "bytes": 1821,
-      "sha256": "22a09833675469e3eac270e2293d3bcc00f47262fc7d65bcb68a0f7fc7c6f8e6"
-    },
-    "shape-pins.json": {
-      "bytes": 2800,
-      "sha256": "a480d13d3f050916764078919fc558bf5aa4a0f4457c18f240f82c9a5abc66de"
-    },
-    "grass.json": {
-      "bytes": 4886,
-      "sha256": "9041d2f03d2b0e4f20299d9a6d032fb875fe76566584b3fafed77019b399f9d9"
-    },
     "pine-creature-world.json": {
       "bytes": 126490,
       "sha256": "67941097975ee9df3a65b3b99c4c2f2f1b2cf69a377706dd46d592d35a7fd5d4",

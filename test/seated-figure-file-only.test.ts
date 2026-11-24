@@ -3,8 +3,8 @@ import * as v from 'valibot';
 import {zlibSync} from 'fflate';
 import {MountedSpecimenSeatSchema} from '@wildshard/format/mountedSpecimenRows';
 import {prepareSeatedFigure,seatedFigureView} from '../src/client/game/riding/seatedFigure';
-import {MOUNTED_FIGURE} from './fixtures/frozen/renderRows';
-import {SHAPE_BYTES} from './fixtures/frozen/renderRows';
+import {MOUNTED_FIGURE} from './fixtures/liveRenderRows';
+import {SHAPE_BYTES} from './fixtures/liveRenderRows';
 import * as geometry from '../src/client/game/plugin/geometry';
 
 

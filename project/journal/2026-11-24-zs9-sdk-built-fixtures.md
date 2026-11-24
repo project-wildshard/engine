@@ -62,3 +62,13 @@ the night's contact, the elite constructs' plan rows, the titan fight's cuts, ha
 encounter's parameters and the weather reactions and guest follow. The charge spawn script reads engine-lift's live
 `charge`. `livePath` finds a script row's module by its hash (a witness ships under `blobs/bin`). The frozen loader's
 own self-test and the dead `titanFightOwners.ts` go.
+
+## Ninth step: render rows and geography
+
+The mounted figure, the painted shape book and its fourteen shapes, and the grass field with its twelve blocks are all
+files in Nalati r8 (`riding/mounted-figure.json`, `models/shape-book.json`, `models/shapes/paint-*.bin`,
+`look/post.json`, `look/grass/*.bin`), so `liveRenderRows.ts` reads them there. The geography extract was author-side
+(`boot/geography.generated.json`), but every block it bundled ships byte-identical as `data/geography-*.bin`, its ground,
+pigment, surface and map palette are the product's discovery rows, and its population field is `world/meadow.json`:
+`liveGeography.ts` reads those and writes only the map channels' lattice rows by hand. `frozen/nalati/` and its loader
+are gone.

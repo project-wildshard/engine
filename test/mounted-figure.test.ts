@@ -1,4 +1,4 @@
-import {SHAPE_BYTES,MOUNTED_FIGURE as rows} from './fixtures/frozen/renderRows';
+import {SHAPE_BYTES,MOUNTED_FIGURE as rows} from './fixtures/liveRenderRows';
 import { parse } from 'valibot';
 import { MountedSpecimenSeatSchema } from '@wildshard/format/mountedSpecimenRows';
 import { expect, test } from 'vitest';

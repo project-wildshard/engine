@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { SHAPES } from './fixtures/frozen/renderRows';
+import { SHAPES } from './fixtures/liveRenderRows';
 
 
 it('returns independent geometry for dungeon transforms and refuses missing shapes', () => {

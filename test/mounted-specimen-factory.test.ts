@@ -1,9 +1,9 @@
-import {SHAPE_BYTES} from './fixtures/frozen/renderRows';
+import {SHAPE_BYTES} from './fixtures/liveRenderRows';
 import { expect, test } from 'vitest';
 import { Bone, BufferGeometry, Group, Object3D } from 'three';
 import { mountedSpecimens, type MountedSpecimenPorts } from '../src/client/game/models/mountedSpecimen';
 import { Scope } from '../src/shared/engine/app/scope';
-import { MOUNTED_FIGURE } from './fixtures/frozen/renderRows';
+import { MOUNTED_FIGURE } from './fixtures/liveRenderRows';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { ModelContext } from '../src/client/engine/models/model';
 import type { Rng } from '@wildshard/format/seededRng';

@@ -1,5 +1,5 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Runtime fixture admission avoids a large generated JSON type.
-import { frozenNalatiJson } from './frozen/nalati';
+import { liveGeographyRows } from './liveGeography';
 import * as v from 'valibot';
 import type { MapGroundPaint, MapPaletteRow } from '@wildshard/format/minimap';
 import { ScalarLatticeSchema } from '@wildshard/format/scalarChannel';
@@ -32,6 +32,6 @@ const geography:v.GenericSchema<unknown,GeographyFixture>=v.object({res:finite,s
 
 /** Independent admitted fixture for map/sampler comparisons, without static JSON inference. */
 export function readNalatiGeography():GeographyFixture{
-  const input:unknown=frozenNalatiJson('nalati-geography-original.json');
+  const input:unknown=liveGeographyRows;
   return v.parse(geography,input);
 }

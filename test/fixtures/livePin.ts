@@ -4,13 +4,14 @@
 import { readFileSync } from 'node:fs';
 import { builtFolder } from '../../src/test/game/builtFolder';
 
-type Entry = { name: string; path: string; hash: string };
+type Entry = { name?: string; path: string; hash: string };
+type Section = { name: string; path: string };
 const products = new Map<string, { root: string; files: Map<string, string>; hashes: Map<string, string>; sections: Map<string, string> }>();
 function product(slug: string) {
   let row = products.get(slug);
   if (row === undefined) {
-    const root = builtFolder(slug), shard = JSON.parse(readFileSync(`${root}/shard.json`, 'utf8')) as { files: Entry[]; sections: Entry[] };
-    row = { root, files: new Map(shard.files.map(file => [file.name, file.path])), hashes: new Map(shard.files.map(file => [file.hash, file.path])), sections: new Map(shard.sections.map(section => [section.name, section.path])) };
+    const root = builtFolder(slug), shard = JSON.parse(readFileSync(`${root}/shard.json`, 'utf8')) as { files: Entry[]; sections: Section[] };
+    row = { root, files: new Map(shard.files.flatMap(file => file.name === undefined ? [] : [[file.name, file.path] as const])), hashes: new Map(shard.files.map(file => [file.hash, file.path])), sections: new Map(shard.sections.map(section => [section.name, section.path])) };
     products.set(slug, row);
   }
   return row;
@@ -37,4 +38,9 @@ export function livePath(slug: string, path: string): Uint8Array<ArrayBuffer> {
   const hash = /^blobs\/[a-z0-9]+\/([0-9a-f]{64})\.[a-z0-9]+$/u.exec(path)?.[1], row = product(slug), file = hash === undefined ? undefined : row.hashes.get(hash);
   if (file === undefined) throw new Error(`Live pin ${slug} has no file ${path}`);
   return new Uint8Array(readFileSync(`${row.root}/${file}`));
+}
+/** A live pin's mounted file (`shardfiles/<slug>/discovery.json`), as the product mounts it. */
+export function liveMount(slug: string, path: string): unknown {
+  if (path.includes('..')) throw new Error(`Not a mount path: ${path}`);
+  return JSON.parse(readFileSync(`${product(slug).root}/mounts/${path}`, 'utf8'));
 }

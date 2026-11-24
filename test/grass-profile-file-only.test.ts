@@ -1,7 +1,7 @@
 import {expect,test,vi} from 'vitest';
 import {DataTexture} from 'three';
 import {GrassPresentationProfile} from '../src/client/game/looks/grassPresentation';
-import { GRASS_FILES, GRASS_ROWS } from './fixtures/frozen/renderRows';
+import { GRASS_FILES, GRASS_ROWS } from './fixtures/liveRenderRows';
 
 const original=GRASS_ROWS;
 const inline='eJxjYGBgAAAABAAB';
