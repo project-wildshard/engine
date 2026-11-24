@@ -14,15 +14,15 @@ export const MUTE_ARG = '--mute-audio';
 export function silencePage() {
   const scope = /** @type {any} */ (globalThis);
   const base = scope.BaseAudioContext?.prototype ?? scope.AudioContext?.prototype ?? scope.webkitAudioContext?.prototype;
-  const real = base === undefined ? undefined : Object.getOwnPropertyDescriptor(base, 'destination')?.get;
-  if (real !== undefined && base.__wildshardSilenced !== true) {
+  const destination = base === undefined ? undefined : Object.getOwnPropertyDescriptor(base, 'destination');
+  if (destination?.get !== undefined && base.__wildshardSilenced !== true) {
     const sinks = new WeakMap();
     Object.defineProperty(base, '__wildshardSilenced', { value: true });
     Object.defineProperty(base, 'destination', {
       configurable: true,
       enumerable: true,
       get() {
-        const speakers = real.call(this);
+        const speakers = destination.get?.call(this);
         // Rendering to a buffer makes no sound, and the buffer must keep what was rendered.
         if (scope.OfflineAudioContext !== undefined && this instanceof scope.OfflineAudioContext) return speakers;
         let sink = sinks.get(this);
@@ -41,11 +41,11 @@ export function silencePage() {
   if (media !== undefined && muted?.set !== undefined && media.__wildshardSilenced !== true) {
     const mute = (/** @type {unknown} */ element) => muted.set?.call(element, true);
     Object.defineProperty(media, '__wildshardSilenced', { value: true });
-    Object.defineProperty(media, 'muted', { configurable: true, enumerable: true, get: muted.get, set() { mute(this); } });
-    const play = media.play;
-    media.play = function silentPlay(/** @type {unknown[]} */ ...args) {
+    Object.defineProperty(media, 'muted', { configurable: true, enumerable: true, get() { return muted.get?.call(this); }, set() { mute(this); } });
+    const original = media.play;
+    media.play = function play(/** @type {unknown[]} */ ...args) {
       mute(this);
-      return play.apply(this, args);
+      return original.apply(this, args);
     };
     // An autoplay element starts without a play() call.
     scope.addEventListener?.('play', (/** @type {Event} */ event) => mute(event.target), true);
