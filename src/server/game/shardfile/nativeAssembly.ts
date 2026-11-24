@@ -198,33 +198,66 @@ async function withSectionPopulation(product: ShardFolder, features: readonly Na
   if (elites) family.push({ host: 'population.elites-ready' });
   return [...features, ...family];
 }
-/** FORMAT-PRUNE FP16 (carries ONE-FORMAT OF17b3): the quest family's home, `quests/server` (format `quest-server.ts`). */
-const QUEST_SECTION = 'quests/server';
-/** The four quest hosts the section stands. */
-const QUEST_HOSTS: ReadonlySet<string> = new Set(['quest.chapter', 'quest.kill-steps', 'quest.body-scripts', 'quest.composition']);
-/** The untyped presence check and read, for a section this engine's pinned format may not name yet. */
+/**
+ * FORMAT-PRUNE FP16 (carries ONE-FORMAT OF17b3): each primitive family's server hosts have a home section (format
+ * `server-hosts.ts`, `quest-server.ts`), holding the native plan's own rows for that family's hosts in install order.
+ */
+const HOST_SECTIONS: readonly { readonly name: string; readonly owns: (host: string) => boolean }[] = [
+  { name: 'server/quest', owns: host => host.startsWith('quest.') },
+  { name: 'server/riding', owns: host => host.startsWith('riding.') },
+  { name: 'server/boss', owns: host => host.startsWith('boss.') },
+  { name: 'server/patrol', owns: host => host === 'encounter.patrol' },
+];
+/**
+ * The one install order a derived plan takes: the three pinned native plans' order (Driftwood r10, Pine r13, Nalati r7),
+ * each proven digest for digest against its named plan. A host the list leaves out keeps its place after these.
+ */
+const HOST_ORDER: readonly string[] = ['decisions', 'commands', 'collision', 'collision.pieces', 'day.keyed-sky', 'day.toon', 'day.declared',
+  'water.sea', 'water.field', 'riding.roster', 'riding.trample', 'riding.environment', 'riding.groups', 'riding.elites', 'riding.hunt',
+  'riding.mounted', 'boss.ground', 'boss.arena', 'riding.taming', 'riding.elites-ready', 'held.arms', 'encounter.patrol', 'boss.open-arena',
+  'quest.chapter', 'quest.kill-steps', 'quest.body-scripts', 'quest.composition'];
+/** The untyped presence check and read, for sections this engine's pinned format may not name yet. */
 interface AnySectionProduct { readonly has: (name: string) => boolean; readonly section: (name: string) => unknown }
-/** The section's rows, admitted as the native plan admits its own quest rows (the section holds the same rows). */
-function questSectionRows(value: unknown): readonly NativeAssemblyFeature[] {
+/** A family section's rows, admitted as the native plan admits its own (the section holds the same rows). */
+function sectionHostRows(name: string, owns: (host: string) => boolean, value: unknown): readonly NativeAssemblyFeature[] {
   const section = value as { readonly version?: unknown; readonly hosts?: unknown };
-  if (section.version !== 1 || !Array.isArray(section.hosts) || section.hosts.length === 0) throw new Error(`${QUEST_SECTION} needs version 1 and at least one quest host`);
+  if (section.version !== 1 || !Array.isArray(section.hosts) || section.hosts.length === 0) throw new Error(`${name} needs version 1 and at least one host`);
   const rows = parseNativeAssembly({ kind: 'native-assembly', level: { speed: 1, ground: { size: 1, height: 0 } }, terrain: { kind: 'flat' }, navigation: 'shard', entries: {}, features: section.hosts }).features;
-  const other = rows.find(row => !QUEST_HOSTS.has(row.host));
-  if (other !== undefined) throw new Error(`${QUEST_SECTION} holds quest hosts only, not ${other.host}`);
-  if (new Set(rows.map(row => row.host)).size !== rows.length) throw new Error(`${QUEST_SECTION} names a quest host twice`);
+  const other = rows.find(row => !owns(row.host));
+  if (other !== undefined) throw new Error(`${name} holds its own family's hosts only, not ${other.host}`);
+  if (new Set(rows.map(row => row.host)).size !== rows.length) throw new Error(`${name} names a host twice`);
   return rows;
 }
 /**
- * FORMAT-PRUNE FP16: a native plan that names no quest host stands the quest family from the product's `quests/server`
- * section, in the section's order, after the plan's own hosts (where Pine's plan stood `quest.composition`) and before the
- * families the engine stands from files. A plan that names a quest host beside the section is refused: one place only.
+ * FORMAT-PRUNE FP16: a plan whose families all stand from their sections names no host. Format `c4a4a1a` admits an empty
+ * list; until this engine pins that format, an empty list is admitted here with every other field checked as written.
  */
-function withSectionQuest(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
-  const any = product as unknown as AnySectionProduct;
-  if (!any.has(QUEST_SECTION)) return features;
-  const named = features.find(row => QUEST_HOSTS.has(row.host));
-  if (named !== undefined) throw new Error(`Native plan names ${named.host} beside the ${QUEST_SECTION} section: the quest family stands from the section alone (FORMAT-PRUNE FP16)`);
-  return [...features, ...questSectionRows(any.section(QUEST_SECTION))];
+function parseWrittenPlan(raw: unknown): NativeAssemblyPlan {
+  const empty = typeof raw === 'object' && raw !== null && Array.isArray((raw as { features?: unknown }).features) && (raw as { features: readonly unknown[] }).features.length === 0;
+  if (!empty) return parseNativeAssembly(raw);
+  return { ...parseNativeAssembly({ ...raw, features: [{ host: 'decisions' }] }), features: [] };
+}
+const rank = (host: string): number => { const at = HOST_ORDER.indexOf(host); return at === -1 ? HOST_ORDER.length : at; };
+/**
+ * FORMAT-PRUNE FP16: the hosts a native plan stands. A plan with no family section keeps its own list as written. With
+ * one, each section's family stands from the section (a plan naming one of its hosts as well is refused: one place
+ * only); the quest family brings its plumbing (`decisions`, `commands`, FP16e) and a plan whose bake is read whole
+ * (`bake.read: 'bake'`) its `collision` host (FP16d, Pine's and Nalati's; Driftwood's `solids` bake stands its own solids,
+ * OF22a3), where the plan names none; and the list takes `HOST_ORDER`.
+ */
+function withHostSections(product: ShardFolder, plan: NativeAssemblyPlan): NativeAssemblyFeature[] {
+  const any = product as unknown as AnySectionProduct, present = HOST_SECTIONS.filter(row => any.has(row.name));
+  if (present.length === 0) return plan.features;
+  const rows = [...plan.features];
+  for (const { name, owns } of present) {
+    const named = plan.features.find(row => owns(row.host));
+    if (named !== undefined) throw new Error(`Native plan names ${named.host} beside the ${name} section: a family stands from its section alone (FORMAT-PRUNE FP16)`);
+    rows.push(...sectionHostRows(name, owns, any.section(name)));
+  }
+  const has = (...hosts: readonly string[]): boolean => rows.some(row => hosts.includes(row.host));
+  if (present.some(row => row.name === 'server/quest') && !has('decisions', 'commands')) rows.push({ host: 'decisions' }, { host: 'commands' });
+  if (plan.bake?.read === 'bake' && !has('collision', 'collision.pieces')) rows.push({ host: 'collision' });
+  return rows.map((row, at) => ({ row, at })).sort((a, b) => rank(a.row.host) - rank(b.row.host) || a.at - b.at).map(({ row }) => row);
 }
 /** Put cooked taming at the same installation point as its explicit predecessor. */
 function withSectionTaming(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
@@ -263,7 +296,8 @@ export function hasNativeAssembly(product: ShardFolder): boolean { return produc
  */
 export async function prepareNativeAssembly<C extends NativeAssemblyContext>(input: ShardFolder, assets: ReadonlyMap<string, Uint8Array>, ports: NativeAssemblyPorts<C>): Promise<NativeAssemblyRuntime<C>> {
   const preparation = { product: input, assets }, lendReturns = await prepareReturns(preparation);
-  const plan = parseNativeAssembly(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await input.file(NATIVE_ASSEMBLY_FILE))));
+  const written = parseWrittenPlan(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await input.file(NATIVE_ASSEMBLY_FILE))));
+  const plan: NativeAssemblyPlan = { ...written, features: withHostSections(input, written) };
   const patrol = ports.room === true ? plan.features.find(row => row.host === 'encounter.patrol') : undefined;
   const product = patrol === undefined ? input : await withEncounters(input, mergedIntake(await readPatrolIntake(input, patrol), await readSlotIntake(input, patrol), await readWindIntake(input, patrol.actors)));
   const shard = product.shardfile, bake = await prepareBake(product, plan.bake), ground = await prepareGround(product, assets, plan, bake);
@@ -273,7 +307,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const declaredRoster = declaredBootSpawns(plan.features.some(row => row.host === 'riding.roster') ? boot : null, shard);
   const meadow = plan.field === undefined && plan.features.some(row => row.host === 'riding.roster') && product.hasFile(MEADOW_FILE);
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake, meadow), product, assets, ports, plan, bake, nav, boot, declaredRoster };
-  const features = await withSectionArms(product, withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, withSectionQuest(product, plan.features))))));
+  const features = await withSectionArms(product, withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, plan.features)))));
   const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   // OF30: an older pending carcass restores by the declared rows' harvest
   const harvest = declaredHarvest(shard.rows);

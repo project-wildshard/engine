@@ -1,5 +1,5 @@
 // FORMAT-PRUNE FP16 (carries ONE-FORMAT OF17b3): a native plan that names no quest host stands the quest family from the
-// product's `quests/server` section, after the plan's own hosts. Driftwood's and Pine's pinned plans, with their quest rows
+// product's `server/quest` section, after the plan's own hosts. Driftwood's and Pine's pinned plans, with their quest rows
 // moved into the section, run tick for tick as the plans that name them, and save and restore; a plan naming a quest host
 // beside the section, or a section holding another host, is refused.
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
@@ -16,7 +16,7 @@ import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
 
-const SECTION = 'quests/server';
+const SECTION = 'server/quest';
 const QUEST = new Set(['quest.chapter', 'quest.kill-steps', 'quest.body-scripts', 'quest.composition']);
 
 async function shipped(slug: string) {
@@ -31,7 +31,7 @@ async function shipped(slug: string) {
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
 
-/** `fixture`'s product with its plan's features replaced and, when given, a `quests/server` section of `hosts`. */
+/** `fixture`'s product with its plan's features replaced and, when given, a `server/quest` section of `hosts`. */
 function rewritten(fixture: Shipped, features: readonly NativeAssemblyFeature[], hosts?: readonly unknown[]): ShardFolder {
   const bytes = new TextEncoder().encode(JSON.stringify({ ...fixture.plan, features }));
   const section = { version: 1, hosts };
@@ -59,7 +59,7 @@ function run(live: NativeHeadlessResident, ticks: number): string[] {
   return digests;
 }
 
-for (const slug of ['driftwood-isle', 'pine-hollow']) test(`${slug}'s quest rows in quests/server run as its plan's own, and save and restore`, async () => {
+for (const slug of ['driftwood-isle', 'pine-hollow']) test(`${slug}'s quest rows in server/quest run as its plan's own, and save and restore`, async () => {
   const fixture = await shipped(slug), product = moved(fixture);
   const named = await open(fixture, fixture.product), section = await open(fixture, product);
   let restored: NativeHeadlessResident | undefined;
@@ -77,9 +77,9 @@ for (const slug of ['driftwood-isle', 'pine-hollow']) test(`${slug}'s quest rows
   } finally { restored?.dispose(); section.dispose(); named.dispose(); }
 }, 600_000);
 
-test('a quest host named in the plan beside quests/server, or another host in the section, is refused', async () => {
+test('a quest host named in the plan beside server/quest, or another host in the section, is refused', async () => {
   const fixture = await shipped('driftwood-isle'), quest = fixture.plan.features.filter(row => QUEST.has(row.host));
-  await expect(open(fixture, rewritten(fixture, fixture.plan.features, quest))).rejects.toThrow('beside the quests/server section');
+  await expect(open(fixture, rewritten(fixture, fixture.plan.features, quest))).rejects.toThrow('beside the server/quest section');
   const rest = fixture.plan.features.filter(row => !QUEST.has(row.host));
   await expect(open(fixture, rewritten(fixture, rest, [...quest, { host: 'commands' }]))).rejects.toThrow();
   await expect(open(fixture, rewritten(fixture, rest, [...quest, quest[0]]))).rejects.toThrow();
