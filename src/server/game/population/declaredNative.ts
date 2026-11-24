@@ -90,7 +90,7 @@ interface AnySectionProduct { readonly has: (name: string) => boolean; readonly 
 const SPECIES_PROGRAMS = 'actors/species-programs';
 /** SHARD-COMPAT CP16: a kept original's species programme. OF30 cut B dropped the programme reads, but kept originals still
  *  carry `actors/species-programs` (Pine r5, prod's head, and r6; Driftwood r4 to r8), so they read it; a product with none
- *  reads its declared rows (`test/kept-originals-play.test.ts`). */
+ *  reads its declared rows (the kept-originals play test went with ZONE-SNAPSHOTS ZS8). */
 export function keptSpeciesPrograms(product: object): SpeciesPrograms | undefined {
   const any = product as AnySectionProduct;
   return any.has(SPECIES_PROGRAMS) ? readSpeciesPrograms(any.section(SPECIES_PROGRAMS)) : undefined;

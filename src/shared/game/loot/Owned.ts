@@ -52,7 +52,7 @@ const NONE = new KeptItems([]);
  * deleted. Kept originals Driftwood r4 (prod's head) to r8 and Pine r5 to r10 declare no kept rows yet name these ids (their
  * loadout effects, shop, progression rewards and trophies), so a room refused Driftwood r4 ("Unknown progression reward
  * charm-1"). A shard with no kept rows whose items section names one of its goods (not a trophy) keeps the whole table, as it did when
- * stored; one naming none keeps nothing (`test/kept-originals-play.test.ts`).
+ * stored; one naming none keeps nothing.
  */
 const gauge = (name: KeptGauge, level: number) => ({ gauge: { name, level } });
 const STORED_KEPT = new KeptItems([

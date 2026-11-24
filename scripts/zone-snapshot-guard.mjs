@@ -3,7 +3,8 @@
 // pins in test/pins/ by slug, and made-up minimal fixtures. No checked-in copy of a zone may come back:
 //   (a) pin-record   a shard-file pin record (`slug` + a 64-hex `hash`/`sha256`) or a `pins/<hash>.tar` path
 //                    outside test/pins/ (the live pin files, moved by pin lanes);
-//   (b) shard-folder a checked-in `shard.json` whose format is older than the current one, or that names a zone slug;
+//   (b) shard-folder a checked-in `shard.json` whose format is older than the current one (a made-up product under
+//                    test/fixtures/ excepted), or that names a zone slug;
 //   (c) revision-path a test, src or script path naming a zone revision (`<zone>-r<N>`);
 //   (d) frozen-path  a frozen zone extract or lift original (`test/fixtures/frozen/`, `legacy-oracles/`, `*-original*`, `kept-*`).
 // The baseline (scripts/zone-snapshot-guard.baseline.json) lists today's offenders. It may only shrink: a new offender
@@ -73,9 +74,11 @@ export function zoneSnapshotOffenders({paths,read,current,zones}){
       /** @type {unknown} */
       let json;
       try{json=JSON.parse(text);}catch{continue;}
-      const version=shardVersion(json),slug=shardSlug(json);
-      if(version!==undefined&&/^[0-9.]+$/u.test(version)&&compareVersions(version,current)<0)found.add(`shard-folder ${path}`);
-      else if(slug!==undefined&&slugs.has(slug))found.add(`shard-folder ${path}`);
+      const version=shardVersion(json),slug=shardSlug(json),zone=slug!==undefined&&slugs.has(slug);
+      // ZS8: a made-up product (no zone slug) under test/fixtures/ may sit at an old format: the chain's old original.
+      const madeUp=!zone&&path.startsWith('test/fixtures/');
+      if(!madeUp&&version!==undefined&&/^[0-9.]+$/u.test(version)&&compareVersions(version,current)<0)found.add(`shard-folder ${path}`);
+      else if(zone)found.add(`shard-folder ${path}`);
     }
   }
   return [...found].sort();

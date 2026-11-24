@@ -16,8 +16,10 @@ describe('zone-snapshot guard', () => {
     expect(scan({ 'test/pine.test.ts': `readPin('~/.cache/wildshard/pins/${'b'.repeat(64)}.tar')` })).toEqual(['pin-record test/pine.test.ts']);
   });
 
-  it('refuses a 0.1 shard folder and a folder naming a zone, not a made-up current one', () => {
-    expect(scan({ 'test/fixtures/old/shard.json': JSON.stringify({ formatVersion: 2, version: '0.1' }) })).toEqual(['shard-folder test/fixtures/old/shard.json']);
+  it('refuses a 0.1 shard folder outside the fixtures and a folder naming a zone, not a made-up one at any format', () => {
+    expect(scan({ 'test/old/shard.json': JSON.stringify({ formatVersion: 2, version: '0.1' }) })).toEqual(['shard-folder test/old/shard.json']);
+    expect(scan({ 'test/fixtures/made-up-old/shard.json': JSON.stringify({ version: '0.1', identity: { slug: 'cli-fixture' } }) })).toEqual([]);
+    expect(scan({ 'test/fixtures/old/shard.json': JSON.stringify({ version: '0.1', identity: { slug: 'pine-hollow' } }) })).toEqual(['shard-folder test/fixtures/old/shard.json']);
     expect(scan({ 'test/fixtures/z/shard.json': JSON.stringify({ formatVersion: CURRENT, identity: { slug: 'nalati-grasslands' } }) })).toEqual(['shard-folder test/fixtures/z/shard.json']);
     expect(scan({ 'test/fixtures/made-up/shard.json': JSON.stringify({ formatVersion: CURRENT, identity: { slug: 'closure-a' } }) })).toEqual([]);
   });

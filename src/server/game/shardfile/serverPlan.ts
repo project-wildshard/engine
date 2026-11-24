@@ -3,7 +3,7 @@
  * sided-kind census) all come through here. HS6c: it reads the server's own `server/plan` section (format HS6b) first and
  * falls back to the page's `client/plan` only for a file written before the SDK wrote one (HS6d). SHARD-COMPAT CP16 keeps
  * the fallback: kept originals written before HS6d (Nalati r2, prod's head, to r6; Driftwood r4 to r9) carry no `server/plan`,
- * and HS6e's server/plan-only read stood them with no plan at all (`test/kept-originals-play.test.ts`). */
+ * and HS6e's server/plan-only read stood them with no plan at all (its kept-originals play test went with ZS8). */
 import { type ClientPlan, parseClientPlan } from '@wildshard/format/clientPlan';
 import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 

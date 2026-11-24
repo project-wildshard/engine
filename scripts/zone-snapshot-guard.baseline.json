@@ -250,7 +250,6 @@
   "frozen-path test/fixtures/grazer-herd-original.ts",
   "frozen-path test/fixtures/held-slot-author-original.json",
   "frozen-path test/fixtures/hibiscusFiles-original.json",
-  "frozen-path test/fixtures/kept-native-plans.json",
   "frozen-path test/fixtures/legacy-oracles/movers/1371d8959aebb567404fc8db59592b0d63f7afeb7060f0b74ea4f12389e6bafd",
   "frozen-path test/fixtures/legacy-oracles/movers/9a5171bc3dd84488aae9de29ebd07fdb12dfbd2500c45cf91cf37e5bbbc712f0",
   "frozen-path test/fixtures/legacy-oracles/movers/f8f90ba2e03401910448a2af1e8b02420bc7b2e1003076bc6241d9cb0c688a22",
@@ -261,7 +260,6 @@
   "frozen-path test/fixtures/legacy-oracles/nine-light.json",
   "frozen-path test/fixtures/legacy-oracles/pine-hollow-log.json",
   "frozen-path test/fixtures/legacy-oracles/pine-weather.json",
-  "frozen-path test/fixtures/legacy-slot-originals.json",
   "frozen-path test/fixtures/manual-coat-bow-original.json",
   "frozen-path test/fixtures/nalati-ambient-original.json",
   "frozen-path test/fixtures/nalati-audio-original.json",
@@ -297,11 +295,8 @@
   "revision-path test/fixtures/frozen/dunes-r4-matriarch-decision.wasm",
   "revision-path test/fixtures/frozen/nine-r3-held-items.json",
   "shard-folder test/fixtures/corpus/brasscap-mesa/shard.json",
-  "shard-folder test/fixtures/frozen-hall/shard.json",
-  "shard-folder test/fixtures/gameplay-slice/shard.json",
   "shard-folder test/fixtures/host-ruler/native-driftwood-isle/shard.json",
   "shard-folder test/fixtures/host-ruler/native-pine-hollow/shard.json",
-  "shard-folder test/fixtures/host-ruler/pine-hollow/shard.json",
-  "shard-folder test/fixtures/shardfile/look/shard.json"
+  "shard-folder test/fixtures/host-ruler/pine-hollow/shard.json"
  ]
 }

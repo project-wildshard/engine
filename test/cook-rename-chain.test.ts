@@ -38,20 +38,28 @@ const renameStep: FormatMigration = {
 };
 const chain = [...FORMAT_MIGRATIONS, renameStep];
 
-/** The original with one kind spelt the old way, its index row re-hashed so the original still passes its own inventory. */
-function seeded(real: Uint8Array): Uint8Array {
+/** The original with its quest section's text edited by `edit`, its index row re-hashed so it still passes its own inventory. */
+function edited(real: Uint8Array, edit: (text: string) => string): Uint8Array {
   const files = new Map(readTar(real)), bytes = files.get(SECTION), header = files.get('shard.json');
   if (bytes === undefined || header === undefined) throw new Error(`no ${SECTION}`);
-  const text = new TextDecoder().decode(bytes), old = text.replace(`"kind":"${NEW}"`, `"kind":"${OLD}"`);
-  if (old === text) throw new Error(`${SECTION} names no ${NEW} kind`);
+  const text = new TextDecoder().decode(bytes), old = edit(text);
+  if (old === text) throw new Error(`${SECTION} did not change`);
   const changed = new TextEncoder().encode(old), index: unknown = JSON.parse(new TextDecoder().decode(header));
   if (typeof index !== 'object' || index === null || !('sections' in index) || !Array.isArray(index.sections)) throw new Error('no sections');
   for (const row of index.sections as {path: string; hash: string; bytes: number}[]) {
     if (row.path === SECTION) { row.hash = createHash('sha256').update(changed).digest('hex'); row.bytes = changed.length; }
   }
+  // The made-up product packs its sections; an edited section leaves its pack, so the copy ships the sections loose.
+  Reflect.deleteProperty(index, 'packs');
+  for (const name of [...files.keys()]) if (name.startsWith('blobs/pack/')) files.delete(name);
   files.set(SECTION, changed); files.set('shard.json', new TextEncoder().encode(`${JSON.stringify(index)}\n`));
   return writeTar(files);
 }
+/** ZONE-SNAPSHOTS ZS8: the made-up product holds no region trigger, so one is written in (today's spelling). */
+const withRegion = (real: Uint8Array): Uint8Array => edited(real, text => text.replace('"flags":[]', '"flags":["made-up.zone"]')
+  .replace('"triggers":[]', `"triggers":[{"flag":"made-up.zone","id":"made-up.zone","kind":"${NEW}","radius":4,"x":0,"z":0}]`));
+/** The original with its one region kind spelt the old way. */
+const seeded = (real: Uint8Array): Uint8Array => edited(withRegion(real), text => text.replace(`"kind":"${NEW}"`, `"kind":"${OLD}"`));
 function tree(dir: string): Record<string, string> {
   const out: Record<string, string> = {};
   for (const entry of readdirSync(dir, {recursive: true, withFileTypes: true})) {
@@ -73,7 +81,7 @@ describe('a renameKind step through the cook (FE9d)', () => {
 
   it('cooks the renamed copy byte for byte as the original with today\'s name', async () => {
     // The original as today's format writes it: the registry's own chain, so the cook takes it as it is.
-    const today = writeTar(migrateShardfile(readTar(h.real), {hash: hashOf}).files);
+    const today = writeTar(migrateShardfile(readTar(withRegion(h.real)), {hash: hashOf}).files);
     const plain = await runCookJob(today, join(h.scratch, 'plain'), ports(chain));
     expect(plain.provenance?.applied ?? []).toEqual([]);
     const copy = await runCookJob(seeded(h.real), join(h.scratch, 'renamed'), ports(chain));

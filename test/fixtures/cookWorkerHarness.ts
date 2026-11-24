@@ -17,7 +17,9 @@ import {compileCookWorker} from './compileCookWorker';
  * entry and owns a fresh scratch folder, so no file depends on another's store, cache or order. */
 export const root = process.cwd(), slug = 'sunscar-dunes';
 export const hashOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
-export const legacyMigrationFixture = { folder: join('test', 'fixtures', 'frozen-hall'), slug: 'blender-template' };
+/** ZONE-SNAPSHOTS ZS8 (J507): an old-format product the chain carries forward, made up (shard-format's CLI fixture at
+ *  format 0.1, one terrain tile), never a stored zone. */
+export const legacyMigrationFixture = { folder: join('test', 'fixtures', 'made-up-old'), slug: 'cli-fixture' };
 
 /** A ustar with one entry `writeTar` would never write, its checksum right, so only a reader's rules refuse it. */
 export function rawTar(name: string, body: Uint8Array, type = '0'): Uint8Array {

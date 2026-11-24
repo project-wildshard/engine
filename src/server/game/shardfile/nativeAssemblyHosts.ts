@@ -114,7 +114,7 @@ export function prepareSectionMelee<C extends NativeAssemblyContext>(product: Sh
 /** The held hosts whose families (format `primitiveOfHost`: `held.melee`, `held.ranged`) a section now stands. */
 /** ONE-FORMAT OF22c3: Driftwood's island population (its reserved Captain, item reactions, settle and poses) is declared rows
  *  since OF22b4 and OF22c2, so no writer names these hosts. Kept originals Driftwood r4 (prod's head) and r5 still do, so
- *  they stand for them (SHARD-COMPAT CP16, FORMAT-PRUNE FP21 s8; `test/kept-native-plans.test.ts`). */
+ *  they stand for them (SHARD-COMPAT CP16, FORMAT-PRUNE FP21 s8); ZONE-SNAPSHOTS ZS8 dropped their kept-plan test. */
 export const ISLAND_HOSTS: ReadonlySet<string> = new Set(['population.mixed', 'population.reactions', 'population.settle', 'population.poses']);
 export const HELD_HOSTS: ReadonlySet<string> = new Set(['item.swept', 'held.arms', 'item.ranged', 'loadout', 'combat.motion', 'ammunition']);
 /** The engine's sprint speed (`walkingSpeed`), the motion a held ranged kit scales its spread and sway against. */
