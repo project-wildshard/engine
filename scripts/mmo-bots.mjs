@@ -12,6 +12,8 @@
 //     saves on the box's scratch cluster. Add --pg-restart-checkpoint to arm at that second and restart during a write.)
 //   node scripts/mmo-bots.mjs staging [--bots 2] [--seconds 60]   (at most 4: one address)
 //   node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60   (TC45: public Tunnel, no private health)
+//   node scripts/mmo-bots.mjs staging --restart-proof [--bots 4] [--seconds 600]   (MW5, J504: once every bot sits, asks
+//     staging-room-restart.yml for one staging restart; each bot must hear why, come back within 2 m and keep what it owns)
 //   node scripts/mmo-bots.mjs staging --tailnet ...   (NET-LAG NL3: the same, over staging's tailnet Serve address, no Cloudflare)
 // Both read the signed staging release file and check it against the public key setup.sh pins. The bots are built from that
 // release's own commit (its tree, an offline install, build-server's `--entry`), so their source and wire match the signed release's claim.
@@ -56,12 +58,16 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
   cells: { type: 'string', default: 'driftwood-isle' }, database: { type: 'string', default: 'memory:' }, keep: { type: 'boolean', default: false },
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
   'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false },
-  'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false }, 'outside-proof': { type: 'boolean', default: false },
+  'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false }, 'outside-proof': { type: 'boolean', default: false }, 'restart-proof': { type: 'boolean', default: false },
   box: { type: 'boolean', default: false }, 'box-saves': { type: 'string', default: 'memory' }, 'pg-restart-at': { type: 'string' },
   'pg-restart-checkpoint': { type: 'boolean', default: false } } });
 const outsideProof = values['outside-proof'];
 if (outsideProof && (mode !== 'staging' || values.tailnet || values.remote !== undefined || values['bots-on-host']))
   throw new Error('--outside-proof is one public staging client, without tailnet, SSH or a replica');
+// MW5 (J504 signs off one staging restart under bots): the restart is staging's own workflow, asked for once the bots sit.
+const restartProof = values['restart-proof'];
+if (restartProof && (mode !== 'staging' || outsideProof || values.tailnet || values.remote !== undefined || values['bots-on-host']))
+  throw new Error('--restart-proof is staging over the public Tunnel, without --outside-proof, tailnet, SSH or a replica');
 if (values.spread && (mode !== 'replica' || values.remote !== undefined)) throw new Error('--spread is for a local replica');
 const serverFrom = values['server-from'];
 if (serverFrom !== undefined && (mode !== 'replica' || !/^[0-9a-f]{40}$/u.test(serverFrom))) throw new Error('--server-from is a full commit, for a replica');
@@ -91,8 +97,9 @@ if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.m
 const bots = Number(values.bots ?? (outsideProof ? 1 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
 if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > 3600) throw new Error('--bots 1..64, --seconds 5..3600');
 if (outsideProof && (bots !== 1 || seconds > 120)) throw new Error('--outside-proof needs --bots 1 and at most 120 seconds');
-const candidate = outsideProof ? execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim() : null;
-if (outsideProof && execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {cwd: ROOT, encoding: 'utf8'}).trim() !== '')
+if (restartProof && (bots > PER_ADDRESS || seconds < 60 || seconds > 900)) throw new Error('--restart-proof needs at most 4 bots and 60 to 900 seconds');
+const candidate = outsideProof || restartProof ? execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim() : null;
+if ((outsideProof || restartProof) && execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {cwd: ROOT, encoding: 'utf8'}).trim() !== '')
   throw new Error('Commit the outside proof candidate before observing staging');
 const workRoot = absolute(ROOT, 'tmp'), workBase = absolute(ROOT, values['work-dir'] ?? 'tmp/mmo-bots');
 if (workBase !== workRoot && !workBase.startsWith(`${workRoot}/`)) throw new Error('--work-dir stays under tmp/');
@@ -132,7 +139,7 @@ if (mode === 'staging' && !outsideProof) await stagingRoom('before the build');
 const tree = join(work, 'src'), out = join(work, 'build');
 const git = (/** @type {string[]} */ args) => execFileSync('git', args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 30 });
 const requireCandidate = () => {
-  if (outsideProof && (git(['rev-parse', 'HEAD']).toString().trim() !== candidate || git(['status', '--porcelain', '--untracked-files=all']).toString().trim() !== ''))
+  if ((outsideProof || restartProof) && (git(['rev-parse', 'HEAD']).toString().trim() !== candidate || git(['status', '--porcelain', '--untracked-files=all']).toString().trim() !== ''))
     throw new Error('Outside proof candidate changed during the run');
 };
 try { git(['cat-file', '-e', `${release.engineBuild}^{commit}`]); } catch { git(['fetch', '--quiet', 'origin', release.engineBuild]); }
@@ -142,11 +149,13 @@ if (serverFrom !== undefined) try { git(['merge-base', '--is-ancestor', release.
 execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', source]) });
 const botFiles = ['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts'];
 if (outsideProof) botFiles.push('outsideBotEntry.ts', 'outsideJourney.ts');
+if (restartProof) botFiles.push('restartBotEntry.ts', 'restartJourney.ts');
+const botEntry = outsideProof ? 'outsideBotEntry' : restartProof ? 'restartBotEntry' : 'mmoBotsEntry';
 for (const name of botFiles) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
 let begun = performance.now();
 // CI=1 keeps the install non-interactive; --config.ci=false keeps the global store on, which pnpm drops under ci (GVS G9)
 execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent', '--config.ci=false'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
-execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', `mmoBots=test/fixtures/dedicated/${outsideProof ? 'outsideBotEntry' : 'mmoBotsEntry'}.ts`], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
+execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', `mmoBots=test/fixtures/dedicated/${botEntry}.ts`], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
 note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), from: source });
 /** `--server-from`: that commit's server from the bots' own tree, under the release's build name, packed as a release bundle is. */
 let serverBundle = null;
@@ -281,6 +290,16 @@ if (botsOnHost && hostSsh !== null) {
 }
 /** @type {{startedAt: string, ms: number, checkpointInFlight: true} | null} */
 let checkpointRestart = null;
+/** MW5: the restart workflow's dispatch, once the bots sit. @type {{ askedAt: string, error?: string } | null} */
+let restartAsked = null;
+const askRestart = () => {
+  if (restartAsked !== null) return;
+  restartAsked = { askedAt: new Date().toISOString() };
+  execFile('gh', ['workflow', 'run', 'staging-room-restart.yml', '-R', 'project-wildshard/engine', '-f', 'channel=staging'], { timeout: 60_000 }, error => {
+    if (error !== null && restartAsked !== null) restartAsked.error = error.message;
+    note({ step: 'restart-asked', ...restartAsked });
+  });
+};
 const code = await new Promise(resolve => {
   const child = botsOnHost && remote !== undefined
     ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" '${url}' ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
@@ -312,11 +331,11 @@ const code = await new Promise(resolve => {
     });
   }, pgRestartAt * 1000);
   child.once('exit', () => { if (pgRestart !== null) clearTimeout(pgRestart); });
-  child.stdout.on('data', (/** @type {Buffer} */ chunk) => { process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
+  child.stdout.on('data', (/** @type {Buffer} */ chunk) => { if (restartProof && chunk.toString().includes('"at":"restart.ready"')) askRestart(); process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   /** @type {ReturnType<typeof setTimeout> | null} */let force = null;
-  const watchdog = outsideProof ? setTimeout(() => {
+  const watchdog = outsideProof || restartProof ? setTimeout(() => {
     child.kill('SIGTERM'); force = setTimeout(() => {child.kill('SIGKILL');}, 10_000);
-  }, (seconds + 10) * 1000) : null;
+  }, (seconds + (restartProof ? 60 : 10)) * 1000) : null;
   child.once('exit', status => {if (watchdog !== null) clearTimeout(watchdog); if (force !== null) clearTimeout(force); void restart.then(() => resolve(status), () => resolve(1));});
 });
 let exit = typeof code === 'number' ? code : 1;
@@ -333,8 +352,10 @@ try {
   requireCandidate();
   if (outsideProof && (observed?.complete !== true || observed?.left !== true || observed?.signedReleaseBuild !== release.engineBuild || observed?.url !== url))
     throw new Error(typeof observed.error === 'string' ? observed.error : 'Outside child did not return its complete, released witness');
+  if (restartProof && (observed?.complete !== true || restartAsked === null || restartAsked.error !== undefined))
+    throw new Error(typeof observed.error === 'string' ? observed.error : restartAsked?.error ?? 'The bots did not all ride the restart');
 } catch (error) {
-  if (!outsideProof) throw error;
+  if (!outsideProof && !restartProof) throw error;
   exit = 1; failure = error instanceof Error ? error.message : String(error);
 }
 const after = mode === 'staging' && !outsideProof ? await health() : null;
@@ -345,6 +366,7 @@ const report = { ...observed, mode, exit, ...(outsideProof ? {outsideProof: true
   ...(exit === 0 ? {} : {error: failure ?? (typeof observed.error === 'string' ? observed.error : 'Outside child did not exit successfully')})} : {}), ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
   ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}),
   ...(pgRestartCheckpoint ? { checkpointRestart } : {}),
+  ...(restartProof ? { restartProof: true, candidate, restartAsked, ...(failure === null ? {} : { failure }) } : {}),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };
