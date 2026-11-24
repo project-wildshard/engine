@@ -110,6 +110,20 @@ jobs:
       - name: Install the source's own tree
         working-directory: source
         run: pnpm install --frozen-lockfile --config.ci=false
+      - name: Play every advertised production head on the candidate
+        if: env.RELEASE_CHANNEL == 'production'
+        id: production-play
+        working-directory: source
+        run: >-
+          node --experimental-transform-types --import ./scripts/bake-loader.mjs
+          scripts/release-prod-play.ts "$SOURCE_SHA" "$RUNNER_TEMP/production-play.json"
+      - name: Keep the production play verdict
+        if: ${{ !cancelled() && (steps.production-play.outcome == 'success' || steps.production-play.outcome == 'failure') }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: production-play
+          path: ${{ runner.temp }}/production-play.json
+          if-no-files-found: ignore
       # The same bytes CI built for this SHA: the asset step refuses a tag asset that differs, so no run can
       # sign a replaced archive.
       - name: Build deterministic dedicated bundle

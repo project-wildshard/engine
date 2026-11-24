@@ -29,6 +29,11 @@ the packs and then re-run that tag's server-release run.
 `test/server-release-ci.test.ts` proves held and published on both
 channels, and the forward-only alignment, against a real S3 boundary.
 
+Before production signing, the exact candidate also boots every head the
+production catalogue currently advertises and advances each room by 600
+ticks. Any refused head or a catalogue change during the replay blocks
+signing. The `production-play` workflow artifact records the verdict.
+
 The order is: publish the build's server book and parts (the staging
 page/pack publish), then sign the release file (this workflow), then the
 server moves (its poller preloads, counts down 60 s and restarts), then
