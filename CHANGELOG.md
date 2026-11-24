@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.82 (2026-11-24)
+
+- Driftwood Isle, Pine Hollow and Nalati Grasslands have updated zone revisions.
+- The coin purse and shop appear in zones that have their own currency.
+- Returning to Nine Dragon Stack after leaving or reloading no longer snaps you across the exit pad.
+- Brasscap Mesa uses its latest zone revision.
+
 ## v0.1.81 (2026-11-24)
 
 - Older published revisions of Driftwood, Pine Hollow and Nalati Grasslands load in online play.
