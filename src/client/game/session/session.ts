@@ -76,7 +76,7 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
     // SF21a: the one-shot EXPERIMENTAL Wildshard intent, consumed by every boot; grid mode drops the URL to the title's
     const mode = options.mode ?? bootPageMode(selected);
     session.ownedGridHome = useOwnedGridHome(mode, manifest, manifestAdmittedSource(manifest));
-    const pageManifest = session.ownedGridHome ? gridPageShell(manifest) : manifest;
+    const pageManifest = session.ownedGridHome ? gridPageShell(manifest, manifestAdmittedSource(manifest)) : manifest;
     if (mode === 'grid' && options.residency === undefined) throw new Error('Grid boot requires residency admission before hydration');
     // T7: an owned data home has no data page to admit its claim; admit it at the regional charge its entry hands off
     const homeSource = manifestAdmittedSource(manifest), homeInstance = pageGridInstance();
@@ -158,7 +158,7 @@ async function buildSession(manifest: ShardManifest, stage: LoadStage, kit: KitP
   app.levelAdapters.debugRow = (spec) => registerLevelDebugRow(spec, manifest.slug);
   app.levelAdapters.playground = (spec) => registerPlayground(manifest.slug, spec);
   try {
-    return await bootLevel(session.ownedGridHome ? gridPageShellLevel(manifest) : gridLevel(toLevelSpec(manifest, product)), {
+    return await bootLevel(session.ownedGridHome ? gridPageShellLevel(manifest, manifestAdmittedSource(manifest)) : gridLevel(toLevelSpec(manifest, product)), {
       sequence, scope, progress: () => boot.progress,
       afterData: (spec) => { if (boot.handoff?.arrive) spec.spawn = boot.handoff.arrive; },
       dispose: () => {

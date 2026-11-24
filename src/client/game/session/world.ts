@@ -22,6 +22,7 @@ import type { LevelContext } from '@wildshard/engine/level/context';
 import { toLevelSpec } from '../shard/spec';
 import { gridLevel } from '../../../shared/game/grid/pageMode';
 import { gridPageShellLevel } from '../grid/pageShell';
+import { manifestAdmittedSource } from '../shardfile/runtimeFolder';
 import type * as THREE from 'three';
 import type { dataStage } from './data';
 import { app } from '@wildshard/engine/app/runtime';
@@ -65,7 +66,7 @@ async function buildWorld(ctx: Awaited<ReturnType<typeof dataStage>>, level: Lev
   const selected = { ...manifest, spawn: boot.handoff?.arrive ?? manifest.spawn };
   // DL10 (Debug 'Early shader compile'): the entry's recorded programs start linking from the renderer step (bootstrap)
   if (earlyProgramsOn()) queueBakedPrograms(bakedEntryPrograms(ctx.slug));
-  const world = Object.assign(await bootstrap(step, session.ownedGridHome ? gridPageShellLevel(selected) : gridLevel(toLevelSpec(selected, product)), INPUT_CONTEXTS), { chunk: manifest });
+  const world = Object.assign(await bootstrap(step, session.ownedGridHome ? gridPageShellLevel(selected, manifestAdmittedSource(manifest)) : gridLevel(toLevelSpec(selected, product)), INPUT_CONTEXTS), { chunk: manifest });
   const { game, sky, player, forest, params, chunk, registry } = world;
   // TR-4b: a software rasterizer paints the lean loading card from here on (Loading.leanForSoftwareGl): the full card's repaints
   // shared its GPU queue with the boot's GL work and held each first-frame unit a painted frame behind them

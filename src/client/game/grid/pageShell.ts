@@ -5,6 +5,7 @@ import { type ShardContext, type PageMode, ShardPlugin } from '../plugin/context
 import type { ShardManifest } from '../shard/manifest';
 import { runtimePagePointer } from '../shard/pointer';
 import { toLevelSpec } from '../shard/spec';
+import { declaredLevel, withoutHorizon, type LevelLookSource } from '../shardfile/declaredLook';
 import { EmptyEquipment } from '../shardfile/emptyEquipment';
 import { emptyLook } from '../shardfile/emptyLook';
 import { ROAD_SKY } from '@wildshard/format/roadLight';
@@ -27,7 +28,18 @@ export function useOwnedGridHome(mode: PageMode, manifest: Pick<ShardManifest, '
  * scalar presentation data here: the original manifest remains in the catalogue and its owned region builds its
  * terrain, creatures, equipment and hooks through the ordinary native factory. Standalone boots never use this copy.
  */
-export function gridPageShell(source: ShardManifest): ShardManifest {
+/**
+ * FORMAT-PRUNE FP47b: the shell's level look is its product's own (`look/look`'s `level` first, then an older product's
+ * `ui/level`, `declaredLevel`), the discovery document's only when it has no product or the product declares none. Today's
+ * builds copy `look.level` into discovery byte for byte, so the values (and the shell's pixels) are the same; this lets
+ * discovery drop the four words.
+ */
+function productLook(manifest: ShardManifest, product: LevelLookSource | undefined): ShardManifest {
+  return product === undefined ? manifest : { ...withoutHorizon(manifest), ...declaredLevel(manifest, product) };
+}
+
+export function gridPageShell(manifest: ShardManifest, product?: LevelLookSource): ShardManifest {
+  const source = productLook(manifest, product);
   const { slug, api, order, status, name, label, seed, biome, blurb, card, sky, atmosphere, grade, style, weapon, spawn } = source;
   const tools = [...(source.loadout?.tools ?? [])];
   return {
@@ -46,8 +58,8 @@ export function gridPageShell(source: ShardManifest): ShardManifest {
 }
 
 /** The neutral page cannot read a home terrain/navmesh bake merely because it keeps the picker's identity. */
-export function gridPageShellLevel(shell: ShardManifest): LevelSpec {
-  return { ...toLevelSpec(shell), id: 'platform.grid', boundary: { visible: false } };
+export function gridPageShellLevel(shell: ShardManifest, product?: LevelLookSource): LevelSpec {
+  return { ...toLevelSpec(productLook(shell, product)), id: 'platform.grid', boundary: { visible: false } };
 }
 
 /** Select the neutral engine level before its staged boot; catalogue identity and each resident's frame stay separate. */

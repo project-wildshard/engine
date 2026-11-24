@@ -652,7 +652,8 @@ export function hangCellDataSky(request: CellDataSkyRequest): Promise<RegionSkyO
   if (page === null || manifest === undefined || request.look.keys.length === 0) return Promise.resolve('off');
   const sky = page.world.sky, game = page.world.game;
   if (!(sky instanceof SkyRig)) return Promise.resolve('off');
-  const level = toLevelSpec(manifest), look = shardfileLook(request.look, request.assets), make = look.backdrop;
+  // FORMAT-PRUNE FP47b: the cell's own level look (`look.level`) over its discovery's (`declaredLevel`)
+  const level = toLevelSpec({ ...withoutHorizon(manifest), ...declaredLevel(manifest, { look: request.look }) }), look = shardfileLook(request.look, request.assets), make = look.backdrop;
   if (make === undefined) return Promise.resolve('off');
   scope.onDispose(() => { look.dispose?.(); });
   const air = new Fog(0xffffff, 1, 2);
