@@ -7,6 +7,9 @@
 # private temporary file that goes when the check ends.
 #   sudo [AGE_IDENTITY=<key file>] restore-check.sh [<dump file> [<key file>]]
 set -euo pipefail
+# Under pipefail a pipeline's `grep -q` exits at its first match and can SIGPIPE the writer, failing a check whose line
+# was there (engine aecc059f5, harden.sh). Pipelines end in `matches`, a grep that reads all its input.
+matches() { grep "$@" >/dev/null; }
 
 DIR=${DUMP_DIR:-/var/lib/wildshard/dumps} DATABASE=${DUMP_DATABASE:-saves_production} SCRATCH=saves_restore_check
 as_postgres() { if [ "$(id -u)" = 0 ]; then runuser -u postgres -- "$@"; else "$@"; fi; }
@@ -22,7 +25,7 @@ if [ "${DUMP%.age}" != "$DUMP" ]; then
   if [ -z "${AGE_IDENTITY:-}" ] || [ ! -r "$AGE_IDENTITY" ]; then echo 'restore: an encrypted dump needs AGE_IDENTITY, the off-box key file'; exit 1; fi
   PLAIN=$(umask 077; mktemp)
   age -d -i "$AGE_IDENTITY" -o "$PLAIN" "$DUMP"
-  head -c 5 "$PLAIN" | grep -q '^PGDMP' || { echo 'restore: the decrypted file is not a pg_dump archive'; exit 1; }
+  head -c 5 "$PLAIN" | matches '^PGDMP' || { echo 'restore: the decrypted file is not a pg_dump archive'; exit 1; }
   DUMP=$PLAIN
 fi
 as_postgres dropdb --if-exists "$SCRATCH"

@@ -14,6 +14,9 @@
 # Run by harden-apply.sh as root. The certificate and key come from the lane that minted them (J264, opus-dns), copied to
 # /etc/caddy/origin/ by hand; until both are there, the file is written and Caddy stays off.
 set -euo pipefail
+# Under pipefail a pipeline's `grep -q` exits at its first match and can SIGPIPE the writer, failing a check whose line
+# was there (engine aecc059f5, harden.sh). Pipelines end in `matches`, a grep that reads all its input.
+matches() { grep "$@" >/dev/null; }
 say() { printf '%-7s %-5s %s\n' "$1" "$2" "$3"; }
 ORIGIN=/etc/caddy/origin CERT=/etc/caddy/origin/rooms-origin.pem KEY=/etc/caddy/origin/rooms-origin.key
 PULL_CA=/etc/caddy/origin/cloudflare-origin-pull-ca.pem
@@ -149,7 +152,7 @@ if [ "${1:-}" = --print ]; then
   if [ -z "${2:-}" ]; then say stop VH9 'usage: harden-caddy.sh --print <addresses>'; exit 1; fi
   render "$2"; exit 0
 fi
-if ! dpkg-query -W -f='${Status}' caddy 2>/dev/null | grep -q 'ok installed'; then say stop VH9 'Caddy is not installed (rebuild.sh Phase 1)'; exit 1; fi
+if ! dpkg-query -W -f='${Status}' caddy 2>/dev/null | matches 'ok installed'; then say stop VH9 'Caddy is not installed (rebuild.sh Phase 1)'; exit 1; fi
 
 install -d -m 750 -o root -g caddy "$ORIGIN"
 if [ -f "$PULL_CA" ] && [ "$(sha256sum < "$PULL_CA" | cut -d' ' -f1)" = "$PULL_CA_SHA256" ]; then say ok VH9 "$PULL_CA"

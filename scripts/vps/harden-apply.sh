@@ -9,6 +9,9 @@
 # Port 443 opens only by --open-443 (J264: Cloudflare in front; ufw is the last gate, Jake handed the opening to lanes).
 # It never prints a secret: env files are tested for a name, never read out.
 set -euo pipefail
+# Under pipefail a pipeline's `grep -q` exits at its first match and can SIGPIPE the writer, failing a check whose line
+# was there (engine aecc059f5, harden.sh). Pipelines end in `matches`, a grep that reads all its input.
+matches() { grep "$@" >/dev/null; }
 MODE=apply
 case "${1:-}" in '') ;; --open-443) MODE=open ;; --close-443) MODE=close ;; *) printf 'stop    Expected no arguments, --check, --open-443 or --close-443\n'; exit 1 ;; esac
 if [ "$(id -u)" != 0 ]; then printf 'stop    Run with sudo; --check reads without it\n'; exit 1; fi
@@ -28,7 +31,7 @@ put() {
   printf '%s\n' "$text" > "$temporary"; chmod "$mode" "$temporary"; chown "$owner" "$temporary"; mv -f -- "$temporary" "$path"
   CHANGED=1
 }
-installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'ok installed'; }
+installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | matches 'ok installed'; }
 need_packages() {
   local missing=() name
   for name in "$@"; do installed "$name" || missing+=("$name"); done
@@ -194,7 +197,7 @@ if ! cmp -s "$HERE/wildshard-box-gate" /usr/local/sbin/wildshard-box-gate; then
   install -m 755 -o root -g root "$HERE/wildshard-box-gate" /usr/local/sbin/wildshard-box-gate; say doing MA7c 'install /usr/local/sbin/wildshard-box-gate'
 fi
 if put "/etc/ssh/authorized_keys/$AGENT" 644 root:root J266 < <(cat "$HERE/wildshard-agent.pub"; printf '%s %s\n' "$BOX_GATE_OPTIONS" "$(cat "$HERE/wildshard-ci.pub")"); then :; fi
-if ! id -nG "$AGENT" | tr ' ' '\n' | grep -qx systemd-journal; then usermod -aG systemd-journal "$AGENT"; say doing J266 "$AGENT reads the journal by group"; fi
+if ! id -nG "$AGENT" | tr ' ' '\n' | matches -x systemd-journal; then usermod -aG systemd-journal "$AGENT"; say doing J266 "$AGENT reads the journal by group"; fi
 
 # Shutting public SSH before the box is on the tailnet would lock everyone out of a fresh Rebuild, so VH3 and VH4 wait for it.
 tailnet_up() { tailscale status --json 2>/dev/null | python3 -I -c 'import json, sys; j = json.load(sys.stdin); sys.exit(0 if j.get("BackendState") == "Running" else 1)'; }
@@ -203,8 +206,8 @@ if ! tailnet_up; then
 else
 # --- VH4: ufw. Deny in; the tailnet and Tailscale's direct-path port in; 443 only by --open-443.
 ufw_rules=$(ufw status verbose 2>/dev/null || true)
-if printf '%s\n' "$ufw_rules" | grep -q '^Status: active' && printf '%s\n' "$ufw_rules" | grep -q 'deny (incoming)' \
-  && printf '%s\n' "$ufw_rules" | grep -q 'ALLOW IN.*on tailscale0\|on tailscale0.*ALLOW IN' && printf '%s\n' "$ufw_rules" | grep -q '^41641/udp '; then
+if printf '%s\n' "$ufw_rules" | matches '^Status: active' && printf '%s\n' "$ufw_rules" | matches 'deny (incoming)' \
+  && printf '%s\n' "$ufw_rules" | matches 'ALLOW IN.*on tailscale0\|on tailscale0.*ALLOW IN' && printf '%s\n' "$ufw_rules" | matches '^41641/udp '; then
   say ok VH4 'ufw is active: deny in, allow tailscale0 and 41641/udp'
 else
   arm_deadman
@@ -230,7 +233,7 @@ sshd_verify() {
   local agent raynos
   agent=$(sshd_keys "$AGENT") || { say stop VH3 'sshd -T -C failed for the agent'; exit 1; }
   raynos=$(sshd_keys raynos) || { say stop VH3 'sshd -T -C failed for raynos'; exit 1; }
-  if [ "$agent" != /etc/ssh/authorized_keys/wildshard-agent ] || ! printf '%s\n' "$raynos" | grep -q '\.ssh/authorized_keys'; then
+  if [ "$agent" != /etc/ssh/authorized_keys/wildshard-agent ] || ! printf '%s\n' "$raynos" | matches '\.ssh/authorized_keys'; then
     say stop VH3 "sshd's key files are wrong (agent '$agent', raynos '$raynos'); not reloaded, and the dead-man undoes the file"; exit 1
   fi
 }
@@ -259,7 +262,7 @@ then
 fi
 sshd_verify
 if ! [ -s /home/raynos/.ssh/authorized_keys ]; then say stop VH3 'raynos has no authorized_keys: refusing to turn Tailscale SSH off'; exit 1; fi
-if tailscale debug prefs 2>/dev/null | grep -q '"RunSSH": true'; then
+if tailscale debug prefs 2>/dev/null | matches '"RunSSH": true'; then
   arm_deadman
   say doing VH3 'turn Tailscale SSH off: tailnet SSH reaches sshd, which refuses root (MS3.3)'
   tailscale set --ssh=false
@@ -283,7 +286,7 @@ if [ "$HERE" != "$OPT" ] && ! diff -rq "$HERE" "$OPT" >/dev/null 2>&1; then
 else say ok J266 "$OPT"; fi
 # The audit watches load after the folders they watch exist; a replaced /opt/wildshard-vps needs its watch again.
 if [ "$audit_changed" = 1 ]; then
-  if augenrules --load >/dev/null 2>&1 && auditctl -l 2>/dev/null | grep -q 'wildshard-vps'; then say ok VH16 'audit watches loaded'
+  if augenrules --load >/dev/null 2>&1 && auditctl -l 2>/dev/null | matches 'wildshard-vps'; then say ok VH16 'audit watches loaded'
   else say warn VH16 'the audit watches did not load; auditd keeps its old ones until it restarts'; fi
 fi
 # The two helpers (MS3.5): settings without secrets, and a signed tag's scripts.
@@ -345,7 +348,7 @@ if visudo -cqf "$sudoers"; then
   if cmp -s "$sudoers" /etc/sudoers.d/21-wildshard-agent; then rm -f "$sudoers"; say ok J266 '/etc/sudoers.d/21-wildshard-agent'
   else chmod 440 "$sudoers"; chown root:root "$sudoers"; mv -f "$sudoers" /etc/sudoers.d/21-wildshard-agent; say doing J266 'write /etc/sudoers.d/21-wildshard-agent'; fi
 else rm -f "$sudoers"; say stop J266 'the agent allowlist does not parse; nothing written'; exit 1; fi
-if ! id -nG raynos | tr ' ' '\n' | grep -qx systemd-journal; then usermod -aG systemd-journal raynos; say doing VH8 'raynos reads the journal by group, not sudo'; fi
+if ! id -nG raynos | tr ' ' '\n' | matches -x systemd-journal; then usermod -aG systemd-journal raynos; say doing VH8 'raynos reads the journal by group, not sudo'; fi
 
 # --- VH5: updates and reboots. D6: no Ubuntu Pro.
 if put /etc/apt/apt.conf.d/52wildshard-unattended 644 root:root VH5 <<'EOF'

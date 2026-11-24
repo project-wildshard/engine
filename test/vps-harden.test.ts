@@ -228,10 +228,15 @@ test('VH16: auditd is skipped only inside a container, where the proofs run (MS3
 });
 
 // `set -o pipefail` with a pipeline's `grep -q` races: grep exits at its first match, the writer before it dies of SIGPIPE,
-// and the check reads a line that was there as absent (main run 45359415900: "ok VH2 nothing on 11434" on the audited box).
-// harden.sh's pipelines end in `matches`, a grep that reads all its input; no code line pipes into `grep -q`.
-test('harden.sh pipes into no grep -q (pipefail SIGPIPE race)', () => {
-  const code = readFileSync(HARDEN, 'utf8').split('\n').filter(line => !line.trimStart().startsWith('#'));
-  expect(code.filter(line => /\|\s*grep\s+-[A-Za-z]*q/u.test(line))).toEqual([]);
-  expect(readFileSync(HARDEN, 'utf8')).toContain('matches() { grep "$@" >/dev/null; }');
+// and the check reads a line that was there as absent (main run 45359415900: "ok VH2 nothing on 11434" on the audited box;
+// 264 of 300 misses on a long input). Every script under scripts/vps/ ends such a pipeline in `matches`, a grep that reads
+// all its input, and defines it; no code line pipes into `grep -q`.
+test('no scripts/vps/ script pipes into grep -q (pipefail SIGPIPE race)', () => {
+  const dir = resolve('scripts/vps'), scripts = readdirSync(dir).filter(name => name.endsWith('.sh'));
+  expect(scripts).toContain('harden.sh');
+  for (const name of scripts) {
+    const text = readFileSync(join(dir, name), 'utf8'), code = text.split('\n').filter(line => !line.trimStart().startsWith('#'));
+    expect(code.filter(line => /\|\s*grep\s+-[A-Za-z]*q/u.test(line)), name).toEqual([]);
+    if (code.some(line => /\|\s*matches\b/u.test(line))) expect(text, name).toContain('matches() { grep "$@" >/dev/null; }');
+  }
 });

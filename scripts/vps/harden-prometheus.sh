@@ -8,6 +8,9 @@
 #   harden-prometheus.sh --print               print every file it writes and stop (the engine's test reads them)
 # Run by harden-apply.sh as root. A rerun on a box that has it changes nothing and restarts nothing.
 set -euo pipefail
+# Under pipefail a pipeline's `grep -q` exits at its first match and can SIGPIPE the writer, failing a check whose line
+# was there (engine aecc059f5, harden.sh). Pipelines end in `matches`, a grep that reads all its input.
+matches() { grep "$@" >/dev/null; }
 say() { printf '%-7s %-5s %s\n' "$1" "$2" "$3"; }
 # Each channel's METRICS_PORT; wildshard-config pins the same two (the engine's test holds them equal).
 PRODUCTION_METRICS=9790 STAGING_METRICS=9791
@@ -134,7 +137,7 @@ if put "$CONFIG" "$check" < <(config); then config_changed=1; fi
 chmod 755 "$(dirname "$CONFIG")" || exit 1
 if [ "$units_changed" = 1 ]; then systemctl daemon-reload; fi
 
-installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'ok installed'; }
+installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | matches 'ok installed'; }
 missing=()
 for name in prometheus prometheus-node-exporter; do installed "$name" || missing+=("$name"); done
 if [ "${#missing[@]}" != 0 ]; then
@@ -164,7 +167,7 @@ metrics_setting staging "$STAGING_METRICS"
 # a game server's /metrics off loopback is reported (harden.sh --check fails it too), and the rest of harden goes on.
 listeners() { ss -ltnH | awk '{print $4}' | sed -E 's/%[^]:]+//'; }
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-  if listeners | grep -qx "$PROMETHEUS" && listeners | grep -qx "$NODE"; then break; fi
+  if listeners | matches -x "$PROMETHEUS" && listeners | matches -x "$NODE"; then break; fi
   sleep 1
 done
 off_loopback() { listeners | grep -E ":($1)\$" | grep -Ev '^(127\.0\.0\.1|\[::1\]):' | tr '\n' ' ' | sed 's/ $//' || true; }
@@ -175,5 +178,5 @@ if [ -n "$exposed" ]; then
 fi
 servers=$(off_loopback "$PRODUCTION_METRICS|$STAGING_METRICS")
 if [ -n "$servers" ]; then say warn SC2 "a game server's /metrics listens off loopback: $servers"; fi
-if listeners | grep -qx "$PROMETHEUS" && listeners | grep -qx "$NODE"; then say ok SC2 "Prometheus on $PROMETHEUS only, node metrics on $NODE only"
+if listeners | matches -x "$PROMETHEUS" && listeners | matches -x "$NODE"; then say ok SC2 "Prometheus on $PROMETHEUS only, node metrics on $NODE only"
 else say warn SC2 "Prometheus or the node exporter is not listening yet: journalctl -u prometheus -u prometheus-node-exporter"; fi

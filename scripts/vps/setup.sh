@@ -5,6 +5,9 @@
 # bash setup.sh --check    run every read-only probe; unreadable state is unknown
 # Keep this script beside the other scripts/vps files. A fresh VPS needs Phase 1.
 set -euo pipefail
+# Under pipefail a pipeline's `grep -q` exits at its first match and can SIGPIPE the writer, failing a check whose line
+# was there (engine aecc059f5, harden.sh). Pipelines end in `matches`, a grep that reads all its input.
+matches() { grep "$@" >/dev/null; }
 CHECK=0
 if [ "${1:-}" = --check ]; then CHECK=1
 elif [ "$#" != 0 ]; then printf 'stop   Expected no arguments or --check\n'; exit 1; fi
@@ -107,7 +110,7 @@ check_listeners() {
 }
 
 check_node() {
-  "$NODE" --version 2>/dev/null | grep -qE '^v(2[4-9]|[3-9][0-9])\.'
+  "$NODE" --version 2>/dev/null | matches -E '^v(2[4-9]|[3-9][0-9])\.'
 }
 wait_health() {
   local port=$1 attempt

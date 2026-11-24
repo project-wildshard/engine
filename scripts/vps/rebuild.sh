@@ -14,6 +14,9 @@
 # is signed, so a host that still holds OpenClaw, Coolify, clawdbot or Ollama state is refused in both modes.
 # Port 443 and `rooms.wildshard.io` are Jake's, after VPS-HARDENING VH16 (J179): Caddy is installed and left off.
 set -euo pipefail
+# Under pipefail a pipeline's `grep -q` exits at its first match and can SIGPIPE the writer, failing a check whose line
+# was there (engine aecc059f5, harden.sh). Pipelines end in `matches`, a grep that reads all its input.
+matches() { grep "$@" >/dev/null; }
 CHECK=0 COOK_ONLY=0 PHASE2=0
 if [ "$#" = 1 ] && [ "$1" = --check ]; then CHECK=1
 elif [ "$#" = 1 ] && [ "$1" = --cook ]; then COOK_ONLY=1
@@ -79,7 +82,7 @@ put_once() {
   if put "$path" "$mode" "$owner"; then return 0; fi
 }
 pg() { runuser -u postgres -- psql --cluster "$PG_VERSION/main" -v ON_ERROR_STOP=1 -qtAc "$1"; }
-installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'ok installed'; }
+installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | matches 'ok installed'; }
 # The value of NAME= in an env file, or nothing.
 env_value() { sed -n "s/^$2=//p" "$1" 2>/dev/null | tail -n 1; }
 # The cook worker starts only once its env file names a build, an API, a token and one store (R2's four rows or a folder).
@@ -202,7 +205,7 @@ make_caddy() {
 }
 step 'caddy, installed and not started' have_caddy make_caddy
 if [ "$CHECK" = 0 ] || [ -x "$NODE" ]; then
-  if ! "$NODE" --version 2>/dev/null | grep -qE "^v(2[4-9]|[3-9][0-9])\."; then say stop "The server needs Node $NODE_MAJOR or newer at $NODE"; exit 1; fi
+  if ! "$NODE" --version 2>/dev/null | matches -E "^v(2[4-9]|[3-9][0-9])\."; then say stop "The server needs Node $NODE_MAJOR or newer at $NODE"; exit 1; fi
   say ok "node $("$NODE" --version)"
 fi
 
@@ -240,7 +243,7 @@ make_user() { useradd --system --user-group --home-dir "$HOME_DIR" --shell /usr/
 step 'user wildshard' have_user make_user
 # VPS-HARDENING VH11: each channel runs as its own user, so a staging bug cannot reach production's saves. Both are in the
 # wildshard group, which only lets them into the shared roots.
-have_channel_user() { id "wildshard-$CHANNEL" >/dev/null 2>&1 && id -nG "wildshard-$CHANNEL" | tr ' ' '\n' | grep -qx wildshard; }
+have_channel_user() { id "wildshard-$CHANNEL" >/dev/null 2>&1 && id -nG "wildshard-$CHANNEL" | tr ' ' '\n' | matches -x wildshard; }
 make_channel_user() {
   if id "wildshard-$CHANNEL" >/dev/null 2>&1; then usermod -aG wildshard "wildshard-$CHANNEL"
   else useradd --system --user-group --groups wildshard --home-dir "$HOME_DIR/$CHANNEL" --shell /usr/sbin/nologin "wildshard-$CHANNEL"; fi
