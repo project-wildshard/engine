@@ -47,6 +47,8 @@ if [ "$mode" = code ]; then
   check fire-drill fire_drill
   # TC22 (J186, AD2): the release gate's nightly reader soaked 414 clean ci-reports runs, 11-17 to 11-23.
   check release-nightly node --test --test-timeout=10000 scripts/release-nightly.proof.ts
+  # XR-3 (J186, AD2): an extra nightly receipt cannot hide behind a green table; 414 clean soak runs, 11-17 to 11-23.
+  check nightly-identity node --test --test-name-pattern='extra receipt' scripts/nightly.proof.ts
 fi
 check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then

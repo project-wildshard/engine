@@ -255,12 +255,6 @@ jobs:
         run: |
           node scripts/pins.ts install --ring 1
           WILDSHARD_RING=1 node scripts/vitest-tmp.ts run test/roster-owners.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-coverage-edges/roster.json
-      - name: Soak malformed nightly receipt refusal
-        if: steps.code.outputs.run == 'true'
-        continue-on-error: true
-        run: |
-          mkdir -p tmp/ci-coverage-edges
-          NIGHTLY_IDENTITY_SOAK=1 node --test --test-name-pattern='extra receipt' scripts/nightly.proof.ts > tmp/ci-coverage-edges/identity.tap
       # TC8: exercise rejected live-clock admission without consuming a tap.
       - name: Soak hover presses across rejected network ticks
         if: steps.code.outputs.run == 'true'
