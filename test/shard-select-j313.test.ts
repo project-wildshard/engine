@@ -49,6 +49,8 @@ test('J313: with Developer off, the three unlocked shards enter with their label
     { name: 'Pine Hollow', tag: 'Early access', enters: true },
     { name: 'Nalati Grasslands', tag: 'Early access', enters: true },
     { name: 'Nine Dragon Stack', tag: 'Partial', enters: true },
+    // QA 11-23-b row 3 (Jake, ~11:25 Cancún: "brasscap is not developer only"): the pinned placement is earlyAccess
+    { name: 'Brasscap Mesa', tag: 'Early access', enters: true },
     { name: 'Signal Dunes', tag: 'Experimental', enters: true },
     { name: 'Sky Reach', tag: 'Experimental', enters: true },
   ]);
@@ -76,7 +78,7 @@ test('SB46: the title summary counts an opened shard for a player, never the Tem
   const { summaryView } = await import('../src/client/game/summary');
   const view = summaryView({ v: 1, shards: { _proto: { earned: 2, total: null, playS: 10, at: 0 }, 'far-reach': { earned: 3, total: null, playS: 10, at: 0 } } }, ROWS);
   expect(view.lines.map(({ slug }) => slug)).toContain('far-reach');
-  expect(view.lines.some(({ slug }) => slug === '_proto' || slug === 'brasscap-mesa')).toBe(false);
+  expect(view.lines.some(({ slug }) => slug === '_proto')).toBe(false);
 });
 
 // FM4 9b/10b (meta MMO-FAILURE-MODES-PLAN; review of plan/mfm2): a world build's title gate may hold ENTER WORLD while it asks the world.
