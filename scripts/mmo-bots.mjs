@@ -42,7 +42,7 @@ import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, ve
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseArgs } from 'node:util';
+import { parseArgs, promisify } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..');
 const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
@@ -292,13 +292,16 @@ if (botsOnHost && hostSsh !== null) {
 let checkpointRestart = null;
 /** MW5: the restart workflow's dispatch, once the bots sit. @type {{ askedAt: string, error?: string } | null} */
 let restartAsked = null;
-const askRestart = () => {
+const askRestart = async () => {
   if (restartAsked !== null) return;
-  restartAsked = { askedAt: new Date().toISOString() };
-  execFile('gh', ['workflow', 'run', 'staging-room-restart.yml', '-R', 'project-wildshard/engine', '-f', 'channel=staging'], { timeout: 60_000 }, error => {
-    if (error !== null && restartAsked !== null) restartAsked.error = error.message;
-    note({ step: 'restart-asked', ...restartAsked });
-  });
+  const asked = { askedAt: new Date().toISOString() };
+  restartAsked = asked;
+  try {
+    await promisify(execFile)('gh', ['workflow', 'run', 'staging-room-restart.yml', '-R', 'project-wildshard/engine', '-f', 'channel=staging'], { timeout: 60_000 });
+  } catch (error) {
+    Object.assign(asked, { error: error instanceof Error ? error.message : String(error) });
+  }
+  note({ step: 'restart-asked', ...asked });
 };
 const code = await new Promise(resolve => {
   const child = botsOnHost && remote !== undefined
@@ -331,7 +334,7 @@ const code = await new Promise(resolve => {
     });
   }, pgRestartAt * 1000);
   child.once('exit', () => { if (pgRestart !== null) clearTimeout(pgRestart); });
-  child.stdout.on('data', (/** @type {Buffer} */ chunk) => { if (restartProof && chunk.toString().includes('"at":"restart.ready"')) askRestart(); process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
+  child.stdout.on('data', (/** @type {Buffer} */ chunk) => { if (restartProof && chunk.toString().includes('"at":"restart.ready"')) void askRestart(); process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   /** @type {ReturnType<typeof setTimeout> | null} */let force = null;
   const watchdog = outsideProof || restartProof ? setTimeout(() => {
     child.kill('SIGTERM'); force = setTimeout(() => {child.kill('SIGKILL');}, 10_000);
