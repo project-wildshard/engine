@@ -227,7 +227,7 @@ export async function writeSpawnManifests(outDir: string, input: unknown,
     if (index.runtime !== null && (!('kind' in index.runtime) || index.runtime.kind !== 'client-plan')) continue;
     const sidecar = sidecarIn(build.sidecars, pinnedHash(product), build.rendererRevision);
     const reopen = (): Promise<ShardHalf> => preparedShardHalf(openShardfile(folderTarball(product), {preparationOnly: build.preparationOnly === true,
-      ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision}), ...(sidecar === undefined ? {} : {sidecar, warn: line => { console.warn(line); }})}), wireBytes, undefined, directory, tiers);
+      ...(build.rendererRevision === undefined ? {} : {renderer: build.rendererRevision}), ...(sidecar === undefined ? {} : {sidecar, warn: line => { console.warn(line); }})}), wireBytes, directory, tiers);
     const half = await reopen();
     open.set(directory, reopen);
     // What no part answers serves at its URL: the tiered discovery document (beside its product) and the phone's own files.

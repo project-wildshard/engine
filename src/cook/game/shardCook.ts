@@ -12,7 +12,6 @@ import {createHash} from 'node:crypto';
 import {mkdirSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The cook is a Node process (J28).
 import {dirname, join} from 'node:path';
-import {assetIdentities, identityFiles, resolveFenceReads, sectionRefs} from './fenceReads';
 import {COOK_DATA_PATH, readCookData, type CookData, type CookMount} from '@wildshard/format/cookData';
 import {requireCookPreparation} from '@wildshard/format/cookPreparation';
 import {cookPreparedLine, judgeSidecar, sidecarRefusedLine, type CookSidecar} from './cookSidecar';
@@ -135,26 +134,15 @@ function namedPlaces(sections: ReadonlyMap<string, unknown>): ReadonlyMap<string
  *  a page reads them by their own fetch, so no manifest or part holds them and the cook writes them at their URL. */
 const downloaded = (shard: OpenShardfile): readonly CookMount[] => (shard.cook?.mounts ?? []).filter(row => row.url.startsWith('/assets/'));
 
-/** D5: a stale hint warns and costs seconds; it never refuses a cook. Asset identities here name only this shard's
- *  mounts: one that names an engine file belongs to the app build's half. */
-function fenceHints(shard: OpenShardfile, warn: (line: string) => void): {readonly hashes: ReadonlySet<string>; readonly mounts: readonly string[]} {
-  if (shard.preparationOnly === true) return {hashes: new Set(), mounts: []};
+/** D5: a stale hint costs seconds; it never refuses a cook. A prepared cook (version 2 and up) records its fence as the
+ *  content hashes a cold boot read before control; this shard's mounts with those hashes are the fence. FORMAT-PRUNE FP23:
+ *  version 1's identity fence (resolved against the sections) is gone: no kept original carries one, and version 1 now
+ *  means an unprepared build, which records no fence. */
+function fenceHints(shard: OpenShardfile): {readonly hashes: ReadonlySet<string>; readonly mounts: readonly string[]} {
   const reads = shard.cook?.fence;
-  if (reads === undefined) return {hashes: new Set(), mounts: []};
-  if (shard.cook?.version === 4 || shard.cook?.version === 3 || shard.cook?.version === 2) {
-    const hashes = new Set(reads);
-    return {hashes, mounts: downloaded(shard).filter(row => hashes.has(row.hash)).map(row => row.url)};
-  }
-  const resolved = resolveFenceReads({version: 1, files: reads.filter(row => !row.startsWith('asset'))}, shard.index.files, shard.sections);
-  const stale = resolved.unresolved.filter(row => !row.startsWith('ref:'));
-  if (stale.length > 0) warn(`${shard.slug}: ${stale.length} fence reads this revision no longer has (${stale.slice(0, 3).join(', ')})`);
-  const hashOf = new Map(downloaded(shard).map(row => [row.url, row.hash]));
-  const owners = identityFiles(assetIdentities([...hashOf.keys()], new Map(), sectionRefs(shard.sections, new Set(hashOf.keys())),
-    {digests: url => { const hash = hashOf.get(url); return hash === undefined ? [] : [hash]; }, sources: new Map()}));
-  // S4: the app build reads a pack member through its bin. A cook has no bins, so the member is the mount itself.
-  const member = (row: string): string => /^asset-pack-member:[^:]+:[^:]+:(.+)$/u.exec(row)?.[1] ?? '';
-  const shell = [...reads.filter(row => row.startsWith('asset')).map(row => member(row) === '' ? row : `asset:${member(row)}`), ...resolved.unresolved.filter(row => row.startsWith('ref:'))];
-  return {hashes: resolved.hashes, mounts: [...new Set(shell.flatMap(identity => { const named = owners.get(identity); return named?.length === 1 && named[0] !== undefined ? [named[0]] : []; }))]};
+  if (shard.preparationOnly === true || reads === undefined || shard.cook?.version === 1) return {hashes: new Set(), mounts: []};
+  const hashes = new Set(reads);
+  return {hashes, mounts: downloaded(shard).filter(row => hashes.has(row.hash)).map(row => row.url)};
 }
 
 /** A mount's tier by its name: `.desktop`, `.phone` and a shard's `astc6/` overlay say so, and a file with a `.phone` sibling is the desktop's. */
@@ -203,22 +191,22 @@ export async function defaultCookTiers(cacheDir?: string): Promise<CookTiers> {
 }
 
 /** `shardHalf` with its encodes run in parallel first, when the tiers can. */
-export async function preparedShardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: ((line: string) => void) | undefined, folder: string, tiers: CookTiers): Promise<ShardHalf> {
+export async function preparedShardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: string, tiers: CookTiers): Promise<ShardHalf> {
   if (tiers.phone === true && tiers.prepare !== undefined) {
     // Only the encodes' inputs matter here: no file of this pass is sized or kept.
-    shardHalf(shard, () => 0, undefined, folder, {phone: true, encode: tiers.prepare.record});
+    shardHalf(shard, () => 0, folder, {phone: true, encode: tiers.prepare.record});
     await tiers.prepare.flush();
   }
-  return shardHalf(shard, wireBytes, warn, folder, tiers);
+  return shardHalf(shard, wireBytes, folder, tiers);
 }
 
 /** The shard half of every manifest: what the app build's `write` and the standalone cook share. `folder` is where the
  *  product is served; a catalogue names it by slug, and a `_` prototype's folder (`_proto`) differs from its slug (`proto`). */
-export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, warn: (line: string) => void = () => undefined, folder: string = shard.slug, tiers: CookTiers = {}): ShardHalf {
+export function shardHalf(shard: OpenShardfile, wireBytes: WireBytes, folder: string = shard.slug, tiers: CookTiers = {}): ShardHalf {
   const prefix = `/shardfiles/${folder}/`, {index, source, sections} = shard, named = namedPlaces(sections);
   // D5-4: a preparation-only preview lists the default set alone (no stored fence), so `wildshard prepare` sees the boot's
   // own reads beyond it. Listing the whole level there made every recorded fence the whole level (Pine, Nalati).
-  const fence = fenceHints(shard, warn), fenceSet = shard.preparationOnly === true || shard.cook?.packs === 'fence';
+  const fence = fenceHints(shard), fenceSet = shard.preparationOnly === true || shard.cook?.packs === 'fence';
   // S3: a shard's `fence` set is a phone's recorded reads, so a desktop always lists its whole level.
   const wholeSet = (tier: CookTier, set: CookSet): boolean => set === 'whole' && (!fenceSet || tier === 'desktop');
   const sources = new Map<string, () => Uint8Array>(), stableKeys = new Map<string, string>(), rows = new Map<string, SpawnFile>();
@@ -419,7 +407,7 @@ async function cookWith(tarball: Uint8Array, out: string, options: CookShardOpti
   const started = options.now(), shard = openShardfile(tarball, opened);
   if (shard.preparation === 'stale') options.warn?.(stalePreparationLine(shard.slug));
   if (shard.preparation === 'cook') options.warn?.(cookPreparedLine(shard.slug));
-  const half = await preparedShardHalf(shard, options.wireBytes, options.warn, shard.slug, options.tiers ?? await defaultCookTiers());
+  const half = await preparedShardHalf(shard, options.wireBytes, shard.slug, options.tiers ?? await defaultCookTiers());
   options.onPhase?.('client-packs');
   const before = encoder.stats();
   const table = COOK_TIERS.flatMap(tier => COOK_SETS.map(set => ({tier, set, rows: [...half.folderRows(tier, set), ...half.mountRows(tier, set)]})));

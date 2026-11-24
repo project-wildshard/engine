@@ -1,0 +1,3 @@
+# FORMAT-PRUNE engine rows (lane opus-prune4)
+
+- FP23 (engine slice): the shard cook's fence hints drop cook data version 1's identity fence, which it resolved against the sections (`resolveFenceReads` and friends). The cook-aware census of the 121 kept originals finds no `cook.legacy-data` user, and version 1 now only means an unprepared `wildshard build`, which records no fence. Versions 2 to 4 keep their hash fence. `shardHalf` and `preparedShardHalf` lose the `warn` parameter only that branch used. What stays: format's `LegacyCookData` and the unprepared path (the SDK's build still writes version 1 before `prepare`, and the Brasscap corpus export is one), `PreparationState` `none` (preparation-only opens).
