@@ -5,6 +5,7 @@ import { TraversalReadiness, readinessModel, type ReadinessBundle, type Readines
 import type { ReadinessWalls } from '@wildshard/engine/physics/readinessWalls';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
+import { collectBeforeShaders } from '@wildshard/engine/render/memorySaver';
 import { GhostWorlds, type GhostRegion } from '../../../shared/game/grid/ghosts';
 import { WORK_SLICE_MS, workSlice } from '@wildshard/engine/core/workSlice';
 import type { DisposeStep } from '@wildshard/engine/app/scope';
@@ -94,7 +95,9 @@ export interface LiveGridPorts {
 export interface LiveGridState {
   current: string | null; worldFeet: GridPoint; crossings: number;
   /** GC5: the world built ahead of the traveller (on the road or pre-warmed inside the source), and how many pre-warms began */
-  ahead?: { readonly instance: string | null; readonly warms: number; readonly refused?: string | null; readonly deferred?: readonly string[]; readonly demanded?: string | null; readonly released?: number };
+  ahead?: { readonly instance: string | null; readonly warms: number; readonly refused?: string | null; readonly deferred?: readonly string[]; readonly demanded?: string | null; readonly released?: number;
+    /** QA 11-23-b row 17: WebKit collection hints on the road (`collectOnRoad`) */
+    readonly collections?: number };
   /** Last complete world remains fully charged and pressure-evictable on the road. */
   retainedCell?: { readonly instance: string; readonly remainingMs: number; readonly playingBytes: number; readonly capBytes: number } | null;
   transitions: readonly { from: string | null; to: string | null }[];
@@ -281,6 +284,16 @@ export class LiveGridHost {
   /** J500 rule 2: the feet at the last fixed step (the heading and speed), and how many builds ahead began */
   private aheadFeet: GridPoint | null = null;
   private aheadBuilds = 0;
+  /** QA 11-23-b row 17: WebKit collection hints given on the road (a world retired, a world built ahead) */
+  private roadCollections = 0;
+  /**
+   * QA 11-23-b row 17 (free at upload): a world retired or built ahead on the road leaves its build's garbage (decode
+   * scratch, file bytes, the retired world's arrays) to JSC's next full collection, which unforced waits until the page
+   * has grown by about what it already holds: WebKit's footprint climbed a zone at a time (0.88, 1.0, 1.22, 1.51 GB past
+   * Pine, Dunes and Sky Reach with free at upload alone). MG10's hint (`collectBeforeShaders`, WebKit only, off with
+   * `debug.collectionHint` 0) starts that collection now, when the garbage is greatest.
+   */
+  private collectOnRoad(): number { const bytes = collectBeforeShaders(); if (bytes > 0) this.roadCollections++; return bytes; }
   private transportApproach: { instance: string; controller: AbortController; work: Promise<void> } | null = null;
   private retiredTransport: Promise<void> = Promise.resolve();
   private stopApproachTransport(): void {
@@ -511,7 +524,7 @@ export class LiveGridHost {
     if (best === undefined) return;
     const id = best.instance;
     this.ahead = id; this.aheadBuilds++;
-    void this.ensure(id).catch(() => { if (this.ahead === id) this.ahead = null; });
+    void this.ensure(id).then(() => this.collectOnRoad(), () => { if (this.ahead === id) this.ahead = null; });
   }
   /** J500 rules 1 and 2: on the road, the ready resident worlds the page draws from outside their cells (the zone just left,
    *  the zone built ahead); none inside a cell. */
@@ -558,6 +571,7 @@ export class LiveGridHost {
       this.residents.delete(instance); this.readiness.invalidate(instance);
       this.forgetLastCell(instance);
       resident.lease.release();
+      this.collectOnRoad();
     } };
   }
   /** Leave active/home/highway worlds intact; unload only a durably checkpointed frozen region. */
@@ -624,7 +638,7 @@ export class LiveGridHost {
       resident.evicting = false; resident.disposalFailed = true; resident.lease.update({ needed: true }); this.residents.set(instance, resident);
       this.issues.set(`cleanup:${instance}`, error instanceof Error ? error.message : String(error)); this.noteRetirement({ ...row, failed: true }); return;
     }
-    resident.lease.release(); this.noteRetirement(row);
+    resident.lease.release(); this.noteRetirement(row); this.collectOnRoad();
   }
   private noteRetirement(row: Retirement): void { this.retirements.push(row); if (this.retirements.length > 16) this.retirements.shift(); }
   unload(instance: string): boolean { if (!this.residents.has(instance)) return true; const prepared = this.prepareUnload(instance); if (prepared === null) return false; prepared.commit(); return !this.residents.has(instance); }
@@ -691,7 +705,7 @@ export class LiveGridHost {
       playingBytes: this.ports.allocator.ownerCost(last.instance).playing, capBytes: policy.playingBytes };
   }
   /** Read-only crossing evidence and failures for the real grid physics harness. */
-  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.aheadBuilds }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.folderRequests.keys()])].sort(), pendingWork: [
+  state(): LiveGridState { return { current: this.active, worldFeet: this.worldFeet(), crossings: this.crossings, ahead: { instance: this.ahead, warms: this.aheadBuilds, collections: this.roadCollections }, transitions: this.transitions.map((row) => ({ ...row })), residents: [...this.residents.keys()].sort(), pending: [...new Set([...this.requests.keys(), ...this.folderRequests.keys()])].sort(), pendingWork: [
     ...[...this.requests.keys()].sort().map(instance => ({ instance, kind: 'world' as const, trigger: 'entry' as const })),
     ...[...this.folderRequests].sort(([a], [b]) => a.localeCompare(b)).map(([instance, request]) => ({ instance, kind: request.required ? 'required-metadata' as const : 'optional-metadata' as const, trigger: request.trigger })),
   ], issues: Object.fromEntries(this.issues), gameplayReady: this.active === null || this.ports.gameplayReady(this.active), ...(this.ports.lastCell === undefined ? {} : { retainedCell: this.retainedState() }), retirements: this.retirements.map(row => ({ ...row })), retiring: [...this.retiring.keys()], ghosts: { count: this.ghosts.count(), regions: this.ghosts.regions() } }; }

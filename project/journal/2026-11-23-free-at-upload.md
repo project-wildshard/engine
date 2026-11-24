@@ -7,3 +7,6 @@
 - Unforced WebKit road walk (local world rig, 402x874, Driftwood to Pine, Dunes, Sky Reach), WebContent footprint peak:
   before 2.08 GB, after 1.80 GB. Attributed RAM at Sky Reach halves (1.09 to 0.65 GB); the rest of the climb is garbage
   that is not ArrayBuffers, which JSC still collects late.
+- live.ts `collectOnRoad`: MG10's WebKit collection hint (`collectBeforeShaders`, off with `debug.collectionHint` 0) when a
+  road world retires and when a world built ahead is ready. Same walk: WebContent flat 1.11 to 1.27 GB through Sky Reach
+  (peak 1.27 GB, at boot), attributed RAM flat 0.26 GB, worst sample gap 270 ms (before 303 ms); every board stop matches.
