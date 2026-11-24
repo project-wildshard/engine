@@ -47,15 +47,15 @@ const owned = (bot: RoomBot): string => JSON.stringify([...bot.client.owned.entr
 /** One bot's ride: `seat` before the restart is asked for, `ride` through it. The caller owns the clock. */
 export class RestartRider {
   readonly ride: RestartRide;
-  private bot: RoomBot | null = null;
+  protected bot: RoomBot | null = null;
   private readonly started = performance.now();
-  private ownedBefore = '';
+  protected ownedBefore = '';
   constructor(private readonly connect: () => RoomBot, index: number, private readonly fights: boolean) {
     this.ride = {bot: index, seatedMs: null, walkedMeters: 0, countdowns: [], closed: null, closedAtMs: null, redials: 0, backMs: null,
       before: null, after: null, movedMeters: null, ownedKept: null, ownedLines: 0, fight: null, ok: false};
   }
-  private ms(): number { return Math.round(performance.now() - this.started); }
-  private dial(): RoomBot {
+  protected ms(): number { return Math.round(performance.now() - this.started); }
+  protected dial(): RoomBot {
     const bot = this.connect();
     bot.transport.onControl((control, bytes) => {
       if (control !== 'countdown') return;
@@ -87,7 +87,7 @@ export class RestartRider {
     this.ownedBefore = owned(bot);
     this.ride.ownedLines = bot.client.owned.size;
   }
-  private async hurtOne(bot: RoomBot, budgetMs: number): Promise<void> {
+  protected async hurtOne(bot: RoomBot, budgetMs: number): Promise<void> {
     const until = performance.now() + budgetMs, at0 = body(bot);
     const target = at0 === null ? null : foe(bot, at0);
     if (target === null) return;
@@ -105,11 +105,21 @@ export class RestartRider {
     bot.thumb = thumb;
     while (performance.now() < until && bot.closed === null) {
       const at = body(bot), current = at === null ? null : foe(bot, at, target.id);
+      // the pose a restart mid-fight must come back to
+      if (at !== null) this.ride.before = at;
       if (current !== null && current.hp < target.hp) { this.ride.fight.hurtHp = current.hp; break; }
       await sleep(20);
     }
     bot.thumb = stillThumb;
     await sleep(500);
+  }
+  /** The lines this bot owns now, as `owned` compares them. */
+  protected ownedNow(): string { return this.bot === null ? '' : owned(this.bot); }
+  /** One 20 ms look while standing: the last pose the bot saw. */
+  protected async watch(bot: RoomBot): Promise<void> {
+    const at = body(bot);
+    if (at !== null) this.ride.before = at;
+    await sleep(20);
   }
   /** Stand until the link ends, then dial again until a room seats this device, and compare. */
   async rideThrough(deadline: number): Promise<RestartRide> {
@@ -121,6 +131,10 @@ export class RestartRider {
       await sleep(20);
     }
     if (first.closed === null) { this.ride.error = 'no restart reached this bot before the deadline'; return this.ride; }
+    return await this.comeBack(first, deadline);
+  }
+  /** The link ended: dial again until a room seats this device, and compare with the pose and lines before it. */
+  protected async comeBack(first: RoomBot, deadline: number): Promise<RestartRide> {
     this.ride.closed = first.closed; this.ride.closedAtMs = this.ms();
     first.drop();
     let second: RoomBot | null = null;

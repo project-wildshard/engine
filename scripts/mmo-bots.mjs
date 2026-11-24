@@ -14,6 +14,11 @@
 //   node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60   (TC45: public Tunnel, no private health)
 //   node scripts/mmo-bots.mjs staging --restart-proof [--bots 4] [--seconds 600]   (MW5, J504: once every bot sits, asks
 //     staging-room-restart.yml for one staging restart; each bot must hear why, come back within 2 m and keep what it owns)
+//   node scripts/mmo-bots.mjs staging --release-proof [--bots 3] [--seconds 50400] --work-dir tmp/<lane>   (MW5, Jake 2026-11-24
+//     "Bots ride the next release": the bots sit for up to 14 hours, sitting again after any drop, until the next staging release's
+//     countdown; the fighter hurts a creature inside it, and each bot must come back to the new build within 2 m, keeping its lines.
+//     It reads the signed release file when the countdown is heard (the bots' preload) and staging's build after. It never asks
+//     for a release or a restart, and it builds once: the checkout may move during the hours it waits)
 //   node scripts/mmo-bots.mjs staging --tailnet ...   (NET-LAG NL3: the same, over staging's tailnet Serve address, no Cloudflare)
 // Both read the signed staging release file and check it against the public key setup.sh pins. The bots are built from that
 // release's own commit (its tree, an offline install, build-server's `--entry`), so their source and wire match the signed release's claim.
@@ -59,6 +64,7 @@ const { values } = parseArgs({ args: rest, options: { bots: { type: 'string' }, 
   remote: { type: 'string' }, cpus: { type: 'string', default: '9-13' }, 'server-from': { type: 'string' },
   'bots-on-host': { type: 'boolean', default: false }, 'bot-cpus': { type: 'string', default: '14-15' }, tailnet: { type: 'boolean', default: false },
   'work-dir': { type: 'string' }, spread: { type: 'boolean', default: false }, 'outside-proof': { type: 'boolean', default: false }, 'restart-proof': { type: 'boolean', default: false },
+  'release-proof': { type: 'boolean', default: false },
   box: { type: 'boolean', default: false }, 'box-saves': { type: 'string', default: 'memory' }, 'pg-restart-at': { type: 'string' },
   'pg-restart-checkpoint': { type: 'boolean', default: false } } });
 const outsideProof = values['outside-proof'];
@@ -68,6 +74,9 @@ if (outsideProof && (mode !== 'staging' || values.tailnet || values.remote !== u
 const restartProof = values['restart-proof'];
 if (restartProof && (mode !== 'staging' || outsideProof || values.tailnet || values.remote !== undefined || values['bots-on-host']))
   throw new Error('--restart-proof is staging over the public Tunnel, without --outside-proof, tailnet, SSH or a replica');
+const releaseProof = values['release-proof'];
+if (releaseProof && (mode !== 'staging' || outsideProof || restartProof || values.tailnet || values.remote !== undefined || values['bots-on-host']))
+  throw new Error('--release-proof is staging over the public Tunnel, without the other proofs, tailnet, SSH or a replica');
 if (values.spread && (mode !== 'replica' || values.remote !== undefined)) throw new Error('--spread is for a local replica');
 const serverFrom = values['server-from'];
 if (serverFrom !== undefined && (mode !== 'replica' || !/^[0-9a-f]{40}$/u.test(serverFrom))) throw new Error('--server-from is a full commit, for a replica');
@@ -94,12 +103,13 @@ if (pgRestartCheckpoint && (pgRestartAt === undefined || pgRestartAt + 75 >= Num
   throw new Error('--pg-restart-checkpoint needs --pg-restart-at and more than 75 s of bot time after it');
 if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
-const bots = Number(values.bots ?? (outsideProof ? 1 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (mode === 'replica' ? 120 : 60));
-if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > 3600) throw new Error('--bots 1..64, --seconds 5..3600');
+const bots = Number(values.bots ?? (outsideProof ? 1 : releaseProof ? 3 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (releaseProof ? 50_400 : mode === 'replica' ? 120 : 60));
+if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > (releaseProof ? 50_400 : 3600)) throw new Error('--bots 1..64, --seconds 5..3600 (50,400 with --release-proof)');
 if (outsideProof && (bots !== 1 || seconds > 120)) throw new Error('--outside-proof needs --bots 1 and at most 120 seconds');
 if (restartProof && (bots > PER_ADDRESS || seconds < 60 || seconds > 900)) throw new Error('--restart-proof needs at most 4 bots and 60 to 900 seconds');
-const candidate = outsideProof || restartProof ? execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim() : null;
-if ((outsideProof || restartProof) && execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {cwd: ROOT, encoding: 'utf8'}).trim() !== '')
+if (releaseProof && (bots > PER_ADDRESS || seconds < 60)) throw new Error('--release-proof needs at most 4 bots and 60 to 50,400 seconds');
+const candidate = outsideProof || restartProof || releaseProof ? execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim() : null;
+if ((outsideProof || restartProof || releaseProof) && execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {cwd: ROOT, encoding: 'utf8'}).trim() !== '')
   throw new Error('Commit the outside proof candidate before observing staging');
 const workRoot = absolute(ROOT, 'tmp'), workBase = absolute(ROOT, values['work-dir'] ?? 'tmp/mmo-bots');
 if (workBase !== workRoot && !workBase.startsWith(`${workRoot}/`)) throw new Error('--work-dir stays under tmp/');
@@ -137,9 +147,11 @@ if (mode === 'staging' && !outsideProof) await stagingRoom('before the build');
 
 // --- The bots, built from the release's own tree with this checkout's entry.
 const tree = join(work, 'src'), out = join(work, 'build');
+/** The release proof checks the candidate until the bots are built: then the checkout may move. */
+let built = false;
 const git = (/** @type {string[]} */ args) => execFileSync('git', args, { cwd: ROOT, stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 30 });
 const requireCandidate = () => {
-  if ((outsideProof || restartProof) && (git(['rev-parse', 'HEAD']).toString().trim() !== candidate || git(['status', '--porcelain', '--untracked-files=all']).toString().trim() !== ''))
+  if ((outsideProof || restartProof || (releaseProof && !built)) && (git(['rev-parse', 'HEAD']).toString().trim() !== candidate || git(['status', '--porcelain', '--untracked-files=all']).toString().trim() !== ''))
     throw new Error('Outside proof candidate changed during the run');
 };
 try { git(['cat-file', '-e', `${release.engineBuild}^{commit}`]); } catch { git(['fetch', '--quiet', 'origin', release.engineBuild]); }
@@ -150,13 +162,15 @@ execFileSync('tar', ['-x', '-C', tree], { input: git(['archive', source]) });
 const botFiles = ['mmoBotsEntry.ts', 'mmoBotsGuard.ts', 'mmoBotsStats.ts'];
 if (outsideProof) botFiles.push('outsideBotEntry.ts', 'outsideJourney.ts');
 if (restartProof) botFiles.push('restartBotEntry.ts', 'restartJourney.ts');
-const botEntry = outsideProof ? 'outsideBotEntry' : restartProof ? 'restartBotEntry' : 'mmoBotsEntry';
+if (releaseProof) botFiles.push('releaseBotEntry.ts', 'releaseJourney.ts', 'restartJourney.ts');
+const botEntry = outsideProof ? 'outsideBotEntry' : restartProof ? 'restartBotEntry' : releaseProof ? 'releaseBotEntry' : 'mmoBotsEntry';
 for (const name of botFiles) copyFileSync(join(ROOT, 'test/fixtures/dedicated', name), join(tree, 'test/fixtures/dedicated', name));
 let begun = performance.now();
 // CI=1 keeps the install non-interactive; --config.ci=false keeps the global store on, which pnpm drops under ci (GVS G9)
 execFileSync('pnpm', ['install', '--frozen-lockfile', '--prefer-offline', '--ignore-scripts', '--reporter=silent', '--config.ci=false'], { cwd: tree, stdio: 'inherit', env: { ...process.env, CI: '1' } });
 execFileSync(process.execPath, ['scripts/build-server.mjs', '--build', release.engineBuild, '--out', out, '--entry', `mmoBots=test/fixtures/dedicated/${botEntry}.ts`], { cwd: tree, stdio: ['ignore', 'ignore', 'inherit'] });
 note({ step: 'built', seconds: Math.round((performance.now() - begun) / 1000), from: source });
+built = true;
 /** `--server-from`: that commit's server from the bots' own tree, under the release's build name, packed as a release bundle is. */
 let serverBundle = null;
 if (serverFrom !== undefined) {
@@ -292,6 +306,20 @@ if (botsOnHost && hostSsh !== null) {
 let checkpointRestart = null;
 /** MW5: the restart workflow's dispatch, once the bots sit (a holder, so the closure's write is seen). */
 const stagingRestart = { asked: /** @type {{ askedAt: string, error?: string } | null} */ (null) };
+/** MW5 release proof: the signed release file as the bots' page would preload it, read when the countdown is heard. */
+const preload = { read: /** @type {{ readAt: string, error?: string, serial?: number, engineBuild?: string, shards?: number } | null} */ (null) };
+const readSigned = async () => {
+  const file = await (await fetch(`${ORIGIN}/releases/staging.json`, { cache: 'no-store', signal: AbortSignal.timeout(30_000) })).json();
+  if (!verify(null, Buffer.from(file.body), createPublicKey({ key: Buffer.from(key, 'hex'), format: 'der', type: 'spki' }), Buffer.from(file.signature, 'hex'))) throw new Error('The staging release file has a bad signature');
+  const body = JSON.parse(file.body);
+  return { serial: body.serial, engineBuild: body.engineBuild, shards: body.shards.length };
+};
+const readPreload = async () => {
+  if (preload.read !== null) return;
+  preload.read = { readAt: new Date().toISOString() };
+  try { Object.assign(preload.read, await readSigned()); } catch (error) { preload.read.error = error instanceof Error ? error.message : String(error); }
+  note({ step: 'preload', ...preload.read });
+};
 const askRestart = async () => {
   if (stagingRestart.asked !== null) return;
   const asked = { askedAt: new Date().toISOString() };
@@ -335,34 +363,46 @@ const code = await new Promise(resolve => {
     });
   }, pgRestartAt * 1000);
   child.once('exit', () => { if (pgRestart !== null) clearTimeout(pgRestart); });
-  child.stdout.on('data', (/** @type {Buffer} */ chunk) => { if (restartProof && chunk.toString().includes('"at":"restart.ready"')) void askRestart(); process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
+  child.stdout.on('data', (/** @type {Buffer} */ chunk) => { if (restartProof && chunk.toString().includes('"at":"restart.ready"')) void askRestart(); if (releaseProof && chunk.toString().includes('"at":"release.countdown"')) void readPreload(); process.stdout.write(chunk); writeFileSync(join(work, 'bots.log'), chunk, { flag: 'a' }); });
   /** @type {ReturnType<typeof setTimeout> | null} */let force = null;
-  const watchdog = outsideProof || restartProof ? setTimeout(() => {
+  const watchdog = outsideProof || restartProof || releaseProof ? setTimeout(() => {
     child.kill('SIGTERM'); force = setTimeout(() => {child.kill('SIGKILL');}, 10_000);
-  }, (seconds + (restartProof ? 60 : 10)) * 1000) : null;
+  }, (seconds + (restartProof ? 60 : releaseProof ? 180 : 10)) * 1000) : null;
   child.once('exit', status => {if (watchdog !== null) clearTimeout(watchdog); if (force !== null) clearTimeout(force); void restart.then(() => resolve(status), () => resolve(1));});
 });
 let exit = typeof code === 'number' ? code : 1;
 if (pgRestartCheckpoint && checkpointRestart === null) exit = 1;
 if (botsOnHost && hostSsh !== null) writeFileSync(result, hostSsh(`cat ${away}/bots.json`));
 /** @type {{complete?:unknown,left?:unknown,signedReleaseBuild?:unknown,url?:unknown,error?:unknown,
- * seated?:unknown,steady?:unknown,walked?:unknown,sawEveryone?:unknown,interArrivalMs?:unknown}} */
+ * seated?:unknown,steady?:unknown,walked?:unknown,sawEveryone?:unknown,interArrivalMs?:unknown,countdownBuilds?:unknown}} */
 let observed = {};
 /** @type {string | null} */let failure = null;
 try {
   const raw = JSON.parse(readFileSync(result, 'utf8'));
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('Bot report must be an object');
   observed = raw;
-  requireCandidate();
+  if (!releaseProof) requireCandidate();
   if (outsideProof && (observed?.complete !== true || observed?.left !== true || observed?.signedReleaseBuild !== release.engineBuild || observed?.url !== url))
     throw new Error(typeof observed.error === 'string' ? observed.error : 'Outside child did not return its complete, released witness');
   if (restartProof && (observed?.complete !== true || stagingRestart.asked === null || stagingRestart.asked.error !== undefined))
     throw new Error(typeof observed.error === 'string' ? observed.error : stagingRestart.asked?.error ?? 'The bots did not all ride the restart');
+  if (releaseProof && (observed?.complete !== true || preload.read === null || preload.read.error !== undefined))
+    throw new Error(typeof observed.error === 'string' ? observed.error : preload.read?.error ?? 'The bots did not all ride the release');
 } catch (error) {
-  if (!outsideProof && !restartProof) throw error;
+  if (!outsideProof && !restartProof && !releaseProof) throw error;
   exit = 1; failure = error instanceof Error ? error.message : String(error);
 }
-const after = mode === 'staging' && !outsideProof ? await health() : null;
+const after = mode === 'staging' && !outsideProof ? await health().catch((/** @type {unknown} */ error) => ({ error: String(error) })) : null;
+/** The release proof: staging's build and its signed file after the ride, against the countdown's build. */
+let releaseAfter = null;
+if (releaseProof) {
+  const signedAfter = await readSigned().catch((/** @type {unknown} */ error) => ({ error: String(error) }));
+  const builds = Array.isArray(observed.countdownBuilds) ? observed.countdownBuilds : [];
+  releaseAfter = { from: { serial: release.serial, engineBuild: release.engineBuild }, preload: preload.read, signedAfter,
+    servingAfter: after !== null && 'build' in after ? after.build : null, countdownBuilds: builds,
+    newBuild: after !== null && 'build' in after && builds.length === 1 && after.build === builds[0] ? builds[0] !== release.engineBuild : null };
+  if (exit === 0 && (after === null || !('build' in after) || builds.length !== 1 || after.build !== builds[0])) { exit = 1; failure = 'Staging does not serve the build the countdown named'; }
+}
 await stopRoom();
 const full = readings.slice(playing).filter(row => values.spread ? row.players > 0 : row.players === bots);
 const report = { ...observed, mode, exit, ...(outsideProof ? {outsideProof: true, candidate, signedReleaseBuild: release.engineBuild, releaseSerial: release.serial, url,
@@ -371,6 +411,7 @@ const report = { ...observed, mode, exit, ...(outsideProof ? {outsideProof: true
   ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}),
   ...(pgRestartCheckpoint ? { checkpointRestart } : {}),
   ...(restartProof ? { restartProof: true, candidate, restartAsked: stagingRestart.asked, ...(failure === null ? {} : { failure }) } : {}),
+  ...(releaseProof ? { releaseProof: true, candidate, release: releaseAfter, ...(failure === null ? {} : { failure }) } : {}),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };
