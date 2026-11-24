@@ -9,6 +9,8 @@ interface GateModule { readonly titleEntryGate: (world: unknown) => ((go: () => 
 /** The title deck's gate for `world`; `load` brings the asking code in only when a tap needs it (no title weight). */
 export function titleGate(world: unknown, load: () => Promise<GateModule>, recent: () => boolean = restartRecent): (go: () => void) => Promise<void> | void {
   let asking: Promise<void> | null = null;
+  // QA 11-24 row 10: a tab that heard a restart will ask the world on the tap; its code comes in now, not after the tap
+  if (recent()) void load().catch(() => undefined);
   return go => {
     if (asking === null && !recent()) { go(); return undefined; }
     // one tap at a time: a second tap while the first is asked or held enters nothing

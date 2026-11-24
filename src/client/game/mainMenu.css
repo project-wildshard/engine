@@ -51,13 +51,17 @@
    tapped MMO button sweeps while the world gate asks; once the title leaves, a bar sweeps along the top until the page goes (a
    first visit's worker install, an old worker's network-first wait for a newer build's page). Transforms, so the compositor
    keeps them moving while the main thread works. Reduced motion pulses; it never stops. */
+/* QA 11-24 row 10 (Jake, ~12:25 Cancún: "enter zone button is not instant"): after a heard world restart ENTER ZONE asks the world
+   first (0.75 s on a desktop, seconds on a phone), and its busy state had no look, so nothing moved. It now presses and sweeps in
+   the frame after the tap, like Enter MMO. */
+.ws-menu .ws-menu-play[aria-busy="true"] { overflow: hidden; filter: brightness(0.86); }
 .ws-main .ws-main-mmo[aria-busy="true"] { overflow: hidden; }
-.ws-main .ws-main-mmo[aria-busy="true"]::after, .ws-main-leaving::after { content: ''; position: absolute; left: 0; bottom: 0; width: 30%; height: 3px; background: linear-gradient(90deg, transparent, rgba(7, 20, 32, 0.75), transparent); transform: translateX(-100%); will-change: transform; animation: ws-main-sweep 1.2s linear infinite; }
+.ws-main .ws-main-mmo[aria-busy="true"]::after, .ws-menu .ws-menu-play[aria-busy="true"]::after, .ws-main-leaving::after { content: ''; position: absolute; left: 0; bottom: 0; width: 30%; height: 3px; background: linear-gradient(90deg, transparent, rgba(7, 20, 32, 0.75), transparent); transform: translateX(-100%); will-change: transform; animation: ws-main-sweep 1.2s linear infinite; }
 .ws-main-leaving { position: fixed; left: 0; right: 0; top: env(safe-area-inset-top, 0px); height: 3px; z-index: calc(var(--ws-layer-hud) + 4); overflow: hidden; pointer-events: none; background: rgba(143, 227, 255, 0.12); }
 .ws-main-leaving::after { background: linear-gradient(90deg, transparent, rgba(143, 227, 255, 0.9), transparent); }
 @keyframes ws-main-sweep { from { transform: translateX(-100%); } to { transform: translateX(334%); } }
 @keyframes ws-main-pulse { from { opacity: 0.15; } to { opacity: 0.8; } }
-@media (prefers-reduced-motion: reduce) { .ws-main .ws-main-mmo[aria-busy="true"]::after, .ws-main-leaving::after { width: 100%; transform: none; animation: ws-main-pulse 1.6s ease-in-out infinite alternate; } }
+@media (prefers-reduced-motion: reduce) { .ws-main .ws-main-mmo[aria-busy="true"]::after, .ws-menu .ws-menu-play[aria-busy="true"]::after, .ws-main-leaving::after { width: 100%; transform: none; animation: ws-main-pulse 1.6s ease-in-out infinite alternate; } }
 .ws-main .ws-main-settings { min-width: 150px; min-height: 44px; box-sizing: border-box; touch-action: manipulation; padding: 10px 22px; appearance: none; -webkit-appearance: none; background: rgba(9, 22, 36, 0.86); border: 1px solid var(--ws-cyan-line); outline: 1px solid rgba(143, 227, 255, 0.18); outline-offset: 3px; font-family: var(--ws-mono); font-size: 12px; letter-spacing: 0.24em; text-indent: 0.24em; text-transform: uppercase; color: var(--ws-cyan); cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
 .ws-main .ws-main-settings:focus-visible { border-color: var(--ws-cyan); }
 /* E483: SETTINGS and the compact DEV switch share one row; the switch wears SETTINGS' frame and a small track whose knob
