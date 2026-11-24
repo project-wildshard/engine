@@ -17,8 +17,8 @@ const row = (slug: string, name: string, status: TitleManifest['status'], shardS
 const ROWS: readonly TitleManifest[] = [
   row('driftwood-isle', 'Driftwood Isle', 'live'), row('pine-hollow', 'Pine Hollow', 'earlyAccess'),
   row('nalati-grasslands', 'Nalati Grasslands', 'earlyAccess'), row('nine-dragon-stack', 'Nine Dragon Stack', 'experimental'),
-  row('brasscap-mesa', 'Brasscap Mesa', 'hidden'), row('pastel-plain', 'Pastel Plain', 'hidden', false),
-  row('ink-cel-valley', 'Ink & Cel Valley', 'hidden', false), row('open-plot-night-market', 'Open Plot · Night Market', 'experimental', false),
+  row('brasscap-mesa', 'Brasscap Mesa', 'hidden'), row('proof-plain', 'Proof Plain', 'hidden', false),
+  row('proof-valley', 'Proof Valley', 'hidden', false), row('open-plot-night-market', 'Open Plot · Night Market', 'experimental', false),
   row('open-plot-thin-ice', 'Open Plot · Thin Ice', 'earlyAccess', false), row('open-plot-desert-ruin', 'Open Plot · Desert Ruin', 'hidden', false),
   row('open-plot-coral-drift', 'Open Plot · Coral Drift', 'earlyAccess', false),
   row('sunscar-dunes', 'Signal Dunes', 'experimental'), row('far-reach', 'Sky Reach', 'experimental'), row('_proto', 'Prototype shard', 'hidden'),

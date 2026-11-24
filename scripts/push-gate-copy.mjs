@@ -104,8 +104,8 @@ export function sweepDeadCopies(root,directory=join(root,GATE_DIR)){
 /** Make the clean copy of `sha`. Returns its path and a remover; on failure removes what it made and throws.
  * @param {string} root the pushing checkout @param {string} sha
  * An isolated J400 copy uses its own pnpm layout and keeps only verified pin and build outputs.
- * @param {{say?:(line:string)=>void,env?:NodeJS.ProcessEnv,directory?:string,installIsolated?:boolean,testPins?:boolean}} [options] */
-export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n`),env=process.env,directory=join(root,GATE_DIR),installIsolated=false,testPins=false}={}){
+ * @param {{say?:(line:string)=>void,env?:NodeJS.ProcessEnv,directory?:string,installIsolated?:boolean}} [options] */
+export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n`),env=process.env,directory=join(root,GATE_DIR),installIsolated=false}={}){
  const path=join(directory,`${sha.slice(0,12)}-${process.pid}`),began=performance.now();
  /** @type {string[]} */const steps=[];
  /** @param {string} step @param {() => (string|void)} work */
@@ -162,15 +162,14 @@ export function makeGateCopy(root,sha,{say=line=>process.stderr.write(`${line}\n
   let dirt=checkedTreeDirt(path);
   // Only a tree that pins shards (test/pins/shardfiles.json) has outputs to publish.
   const unpinned=existsSync(join(path,'test/pins/shardfiles.json'))&&verifiedPinsOutputs(path).key==='';
-  const proofPins=testPins&&existsSync(join(path,'test/fixtures/retired-grid-products.json'));
-  if((dirt.length>0||unpinned||proofPins)&&existsSync(join(path,'node_modules'))){
+  if((dirt.length>0||unpinned)&&existsSync(join(path,'node_modules'))){
    // A commit that moves the pins key leaves the cloned mounts unverified, and a checkout with no current pins manifest
    // lends none: publish this tree's own, once, or gen:inputs stamps the missing mounts out of the boot tables.
    timed('pins',()=>{
-    const args=['--silent','pins',...(proofPins?['--for-tests']:[])];
+    const args=['--silent','pins'];
     const child=spawnSync('pnpm',args,{cwd:path,env:Object.fromEntries(Object.entries(env).filter(([key])=>!key.startsWith('GIT_'))),stdio:['ignore','ignore','pipe'],encoding:'utf8'});
     if(child.status!==0)throw new Error(`pnpm pins in the gate copy exited ${String(child.status)}: ${child.stderr.trim().split('\n').slice(-3).join(' | ')}`);
-    return proofPins?'include frozen test products':dirt.length>0?`${dirt.length} unclean path(s)`:'no verified pins outputs cloned';
+    return dirt.length>0?`${dirt.length} unclean path(s)`:'no verified pins outputs cloned';
    });
    dirt=checkedTreeDirt(path);
   }

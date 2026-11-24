@@ -41,7 +41,7 @@ assert all(str(path) in registry for path in Path('test/scripts').glob('*.test.t
 `], { encoding: 'utf8' });
   expect(JSON.parse(result)).toEqual([
     ['brasscap-mesa'], ['far-reach'],
-    ['driftwood-isle', 'far-reach', 'nalati-grasslands', 'nine-dragon-stack', 'pastel-plain', 'pine-hollow', 'sunscar-dunes'],
+    ['driftwood-isle', 'far-reach', 'nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'sunscar-dunes'],
     [], [], [], [], ['driftwood-isle', 'pine-hollow'], [], ['pine-hollow'],
   ]);
 });

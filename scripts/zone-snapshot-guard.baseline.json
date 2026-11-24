@@ -176,7 +176,6 @@
   "pin-record test/fixtures/approved-population-returns.json",
   "pin-record test/fixtures/approved-quest-families.json",
   "pin-record test/fixtures/approved-sheep-root.json",
-  "pin-record test/fixtures/retired-grid-products.json",
   "revision-path test/fixtures/dunes-r3-keeper.json",
   "revision-path test/fixtures/dunes-r3-keeper.ts",
   "revision-path test/fixtures/frozen/dunes-r4-matriarch-decision.json",

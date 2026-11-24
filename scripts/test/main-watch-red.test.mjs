@@ -213,7 +213,7 @@ test('MD8 a mini-landed red still prompts its mini lander through sweep', () => 
 
 test('MD9 sweep persists observations, processes newest-first API runs in order, and queues only confirmed/hard misses', () => withRedSpan(({io,receipts})=>{
   const base={status:'completed',event:'push',conclusion:'failure'};
-  const line='BUDGET regressed key=ledger/ink-cel-valley/control measured=41767511 baseline=34715334 line=38186867 contentKey=ink@7';
+  const line='BUDGET regressed key=ledger/made-up-valley/control measured=41767511 baseline=34715334 line=38186867 contentKey=ink@7';
   const budgetRuns=[],qa=[];
   io.budgetRuns=()=>budgetRuns;
   io.budgetAnnotations=(id)=>id===111?line.replace('regressed','over-hard'):line;
@@ -221,7 +221,7 @@ test('MD9 sweep persists observations, processes newest-first API runs in order,
   const add=(id,sha,conclusion='failure')=>budgetRuns.unshift({...base,id,head_sha:sha,created_at:`2026-11-21T19:${String(id-100).padStart(2,'0')}:00Z`,conclusion});
   add(101,newer); sweep(io);
   expect(qa).toEqual([]);
-  expect(readState(io.state)?.budgetPending?.['ledger/ink-cel-valley/control']?.sha).toBe(newer);
+  expect(readState(io.state)?.budgetPending?.['ledger/made-up-valley/control']?.sha).toBe(newer);
   add(102,newer); sweep(io); expect(qa).toEqual([]);
   add(103,older); sweep(io); expect(qa).toHaveLength(1);
   expect(qa[0]?.id).toBe(103);

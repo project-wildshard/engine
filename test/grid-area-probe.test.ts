@@ -35,7 +35,7 @@ test('a grid cell reports its door panel standing until its row opens it', async
   region.open = 1;
   panels.late();
   expect(panels.targets('pine-hollow')).toEqual([{ panel: 'blender.door', visible: false, solid: false }]);
-  expect(panels.targets('ink-cel-valley')).toEqual([]);
+  expect(panels.targets('mossgate')).toEqual([]);
 });
 
 test.each([false, true])('warm-up restores authored NPC panels with a target panel present: %s', async (withDoor) => {

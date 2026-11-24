@@ -9,7 +9,7 @@ import { HOME, PageStorage, running, start, until, walk } from './fixtures/stand
 // GRID-CROSSING GC36 (J322, Jake 11-13: "There should never be any walls [...] no way back is better than the wall"): a one-shard page
 // has one world and no walls. Its player walks off the shard's edge, falls, and the server puts them back on the ground they last
 // stood on, in that world, on the same frame.
-test.each([['a grid shard', HOME], ['a slug the grid does not place', 'pastel-plain']])('a lone cell runs %s with no wall at its edge', { timeout: 120_000 }, async (_name, slug) => {
+test.each([['a grid shard', HOME], ['a slug the grid does not place', 'mossgate']])('a lone cell runs %s with no wall at its edge', { timeout: 120_000 }, async (_name, slug) => {
   const storage = new PageStorage(), { shell, stop } = start(storage, undefined, slug, true), travels: NetTravel[] = [];
   shell.client.onTravel(event => { travels.push(event); });
   await shell.booted;
@@ -38,7 +38,7 @@ test.each([['a grid shard', HOME], ['a slug the grid does not place', 'pastel-pl
 });
 
 test('a player who falls out of a world is the server\'s to put back', { timeout: 60_000 }, async () => {
-  const storage = new PageStorage(), { shell, stop } = start(storage, undefined, 'pastel-plain', true);
+  const storage = new PageStorage(), { shell, stop } = start(storage, undefined, 'open-plot-thin-ice', true);
   await shell.booted;
   shell.ready();
   await until(() => shell.client.latest !== null);

@@ -14,12 +14,10 @@ function put(path: string, text: string): void {
   writeFileSync(join(root, path), text);
 }
 
-put('test/fixtures/retired-grid-products.json', JSON.stringify({ shards: [{ slug: 'frozen-vale', revision: 1, hash: 'a'.repeat(64), bytes: 1 }] }));
 put('test/pins/shardfiles.json', JSON.stringify({ shards: [{ slug: 'old-cove' }] }));
 put('test/pins/catalogue.json', JSON.stringify({ shards: [{ slug: 'old-cove' }] }));
 put('test/ring.test.ts', "// old-cove retired in 11-20\nconst ring = ['old-cove', 'pine-hollow'];\nconst other = 'old-cove-two';\n");
 put('test/pins/saves/old-cove.json', '{"slug": "old-cove"}\n');
-put('test/frozen.test.ts', "const shard = 'frozen-vale';\n");
 put('test/notes.md', 'old-cove\n');
 
 test('a whole slug on a code line names it; a longer slug, a comment or a doc does not', () => {
@@ -31,11 +29,6 @@ test('a whole slug on a code line names it; a longer slug, a comment or a doc do
 test('every test file naming a dropped slug is listed, but not the pin files the drop edits', () => {
   expect(testsNaming(['old-cove'], root).map(row => `${row.path}:${row.line}`).toSorted())
     .toEqual(['test/pins/saves/old-cove.json:1', 'test/ring.test.ts:2']);
-});
-
-test('a slug frozen for test suites may stay named', () => {
-  expect(testsNaming(['frozen-vale'], root)).toEqual([]);
-  expect(() => assertTestsDropped(['frozen-vale'], root, {})).not.toThrow();
 });
 
 test('the drop refuses by file and line until the tests drop the slug, unless ALLOW_PIN_DROP_TEST_NAMES=1', () => {

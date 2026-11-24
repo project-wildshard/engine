@@ -32,7 +32,6 @@
   "test/pickup-catalogue.test.ts",
   "test/pine-posed-tier-loading.test.ts",
   "test/scene-instances.test.ts",
-  "test/script-seats.test.ts",
   "test/script-v2-group-authorities.test.ts",
   "test/script-v2-group-context.test.ts",
   "test/script-v2-group-native.test.ts",

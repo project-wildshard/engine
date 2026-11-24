@@ -1,14 +1,14 @@
 // Meta SHARD-COMPAT NB10 (audit B12, B16, B19): a retired shard leaves every test list in the same commit. Dropping a pin
 // (`pin-shard.ts --drop`, `pins.ts refresh --drop`) refuses while a file under test/ still names the slug, and names each
-// file and line, so the drop and the test edits land as one commit instead of a main red and a follow-up. A slug frozen
-// in test/fixtures/retired-grid-products.json stays installable for tests (`pins.ts install --for-tests`), so tests may
-// keep naming it. Node built-ins only: shard-pin.yml runs pin-shard.ts before `pnpm install`.
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+// file and line, so the drop and the test edits land as one commit instead of a main red and a follow-up. No retired
+// product stays installable for tests (ZONE-SNAPSHOTS ZS7, J507). Node built-ins only: shard-pin.yml runs pin-shard.ts
+// before `pnpm install`.
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const TESTS = 'test', FROZEN = 'test/fixtures/retired-grid-products.json';
+const TESTS = 'test';
 // The pin files the drop itself edits, or that DEL9 already checks against the catalogue.
-const SKIP = new Set(['test/pins/shardfiles.json', 'test/pins/catalogue.json', FROZEN]);
+const SKIP = new Set(['test/pins/shardfiles.json', 'test/pins/catalogue.json']);
 const SOURCE = /\.(?:[cm]?[jt]sx?|json)$/u;
 
 /** One test line that names a slug. */
@@ -34,20 +34,11 @@ function testFiles(root: string, dir: string): readonly string[] {
   });
 }
 
-/** The slugs frozen for test suites, which tests may keep naming after their pin goes. */
-export function frozenSlugs(root = '.'): ReadonlySet<string> {
-  const path = join(root, FROZEN);
-  if (!existsSync(path)) return new Set();
-  const { shards } = JSON.parse(readFileSync(path, 'utf8')) as { shards: readonly { slug: string }[] };
-  return new Set(shards.map(row => row.slug));
-}
-
-/** Every test line naming one of `slugs` that is not frozen for tests. */
+/** Every test line naming one of `slugs`. */
 export function testsNaming(slugs: readonly string[], root = '.'): readonly Naming[] {
-  const frozen = frozenSlugs(root), live = slugs.filter(slug => !frozen.has(slug));
-  if (live.length === 0) return [];
+  if (slugs.length === 0) return [];
   const files = testFiles(root, TESTS).map(path => ({ path, text: readFileSync(join(root, path), 'utf8') }));
-  return live.flatMap(slug => files.flatMap(({ path, text }) => namingLines(slug, path, text)));
+  return slugs.flatMap(slug => files.flatMap(({ path, text }) => namingLines(slug, path, text)));
 }
 
 /** Throws, naming every file and line, while a test still names a slug being dropped. `ALLOW_PIN_DROP_TEST_NAMES=1` (J381)
@@ -63,5 +54,5 @@ export function assertTestsDropped(slugs: readonly string[], root = '.', env: No
   const shown = rows.slice(0, 40).map(row => `  ${row.path}:${row.line}  ${row.text}`);
   throw new Error(`pin drop refused, nothing written: ${rows.length} test line(s) still name ${slugs.join(', ')} (SHARD-COMPAT NB10:`
     + ` a retired shard leaves every test list in the same commit)\n${shown.join('\n')}${rows.length > 40 ? `\n  ... ${rows.length - 40} more` : ''}\n`
-    + `Drop the slug from each, or freeze its product in ${FROZEN} for tests, then run the drop again.`);
+    + 'Drop the slug from each, then run the drop again.');
 }

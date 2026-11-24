@@ -4,7 +4,7 @@ import { Scope } from '../src/shared/engine/app/scope';
 import { ClientScriptViews } from '../src/client/game/plugin/ui';
 
 // ZONE-ENTRY ZE3a (J352): a frozen neighbour cell draws none of its client-script particles. On the laptop's road drive
-// (2026-11-15) ink-cel-valley's particle pool, added to its cell root visible, was drawn on the road and linked its program
+// (2026-11-15) a retired test shard's particle pool, added to its cell root visible, was drawn on the road and linked its program
 // in the frame (65 ms at (211, 1402)); `neighbourLife.ts` now shows the pool only while its cell is the active one.
 test('a client script view hides and shows its particle pool on request', () => {
   const root = new Object3D(), scope = new Scope('script-particles');

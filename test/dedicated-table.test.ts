@@ -1,17 +1,17 @@
 import { expect, test } from 'vitest';
 import { cellCost, declaredCell, declaredCells, workerTable, worldSettings, type DeclaredCells } from '../src/server/host/dedicated/workerTable';
 // J182, J185: which worker runs which cell, fixed at startup, on a worker count the bench sets.
-const REST = ['blender-template', 'ink-cel-valley', 'pastel-plain', ...Array.from({ length: 16 }, (_unused, index) => `open-plot-${String(index)}`)];
+const REST = ['blender-template', 'made-up-valley', 'made-up-plain', ...Array.from({ length: 16 }, (_unused, index) => `open-plot-${String(index)}`)];
 const ALL = ['driftwood-isle', 'nalati-grasslands', 'nine-dragon-stack', 'pine-hollow', 'sunscar-dunes', 'far-reach', ...REST];
 // The grid as production opens it (`WORLD_CELLS=grid`): instances, as `server.listening` names them.
-const GRID = ['driftwood-isle', 'pine-hollow', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'pastel-plain', 'blender-template', 'nine-dragon-stack',
-  'ink-cel-valley', ...['0-0', '1-0', '2-0', '3-0', '4-0', '0-1', '4-1', '0-2', '4-2', '0-3', '4-3', '0-4', '2-4', '3-4', '4-4'].map(at => `open-plot-${at}`)];
+const GRID = ['driftwood-isle', 'pine-hollow', 'sunscar-dunes', 'nalati-grasslands', 'far-reach', 'made-up-plain', 'blender-template', 'nine-dragon-stack',
+  'made-up-valley', ...['0-0', '1-0', '2-0', '3-0', '4-0', '0-1', '4-1', '0-2', '4-2', '0-3', '4-3', '0-4', '2-4', '3-4', '4-4'].map(at => `open-plot-${at}`)];
 const sorted = (rows: readonly string[]): string[] => [...rows].sort();
 /** ONE-FORMAT OF31h3/OF31h4: what each shard's own file declares (`admission.serverBudget`): the awake costs cell-mem-bench
  *  measured on 2026-11-14 (ms per tick), and Far Reach sharing Sunscar Dunes' worker. The engine keeps no table of its own. */
 const DECLARED: DeclaredCells = new Map(Object.entries({
   'nalati-grasslands': 2.741, 'driftwood-isle': 1.755, 'pine-hollow': 1.594, 'blender-template': 1.311, 'far-reach': 0.866,
-  'sunscar-dunes': 0.682, 'nine-dragon-stack': 0.63, 'pastel-plain': 0.608, 'ink-cel-valley': 0.576,
+  'sunscar-dunes': 0.682, 'nine-dragon-stack': 0.63, 'made-up-plain': 0.608, 'made-up-valley': 0.576,
 }).map(([cell, awakeMs]) => [cell, cell === 'far-reach' ? { awakeMs, shares: 'sunscar-dunes' } : { awakeMs }]));
 const load = (row: readonly string[]): number => row.reduce((total, slug) => total + cellCost(slug, DECLARED), 0);
 

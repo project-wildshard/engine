@@ -24,5 +24,5 @@ test('a gathered shard publishes its entry reads at the same URL with the same b
 
 test('a shard not gathered yet keeps its entry reads in public', () => {
   expect(entryReadsFile('/repo', 'open-plot-thin-ice')).toBe('/repo/public/assets/open-plot-thin-ice/entry-reads.json');
-  expect(entryReadsFile('/repo', 'pastel-plain')).toBe('/repo/src/shards/pastel-plain/look/entry-reads.json');
+  expect(entryReadsFile('/repo', 'sunscar-dunes')).toBe('/repo/src/shards/sunscar-dunes/look/entry-reads.json');
 });

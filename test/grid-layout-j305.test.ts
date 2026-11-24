@@ -10,7 +10,6 @@ import catalogue from '../test/pins/catalogue.json' with { type: 'json' };
 const MAIN = ['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack', 'sunscar-dunes', 'far-reach'];
 const TEMPLATES = ['brasscap-mesa'];
 const EMPTY = ['1,1', '-1,1', '-1,2'];
-const GONE = ['ink-cel-valley', 'pastel-plain'];
 const LEGACY = ['open-plot-showcase-template'];
 type Cell = { readonly slug: string; readonly cell: readonly number[] };
 const grids: readonly (readonly [string, readonly Cell[]])[] = [
@@ -42,7 +41,6 @@ for (const [name, selected] of grids) {
     expect(new Set(plots).size).toBe(plots.length);
     for (const slug of ring) expect(slug.startsWith('open-plot-') || TEMPLATES.includes(slug)).toBe(true);
     for (const slug of MAIN) expect(cells.filter(row => row.slug === slug)).toHaveLength(1);
-    for (const slug of GONE) expect(cells.filter(row => row.slug === slug)).toHaveLength(0);
     // a template copy takes a ring slot only once no catalogue open plot is left off the grid
     const unplaced = catalogue.placements.map(row => row.slug).filter(slug => slug.startsWith('open-plot-') && !LEGACY.includes(slug) && !plots.includes(slug));
     if (unplaced.length > 0) expect(ring.filter(slug => TEMPLATES.includes(slug))).toEqual([]);

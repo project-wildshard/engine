@@ -15,14 +15,12 @@ import { headlessSections } from '@wildshard/format/headlessSections';
 // ONE-FORMAT OF42b: a verb tape's attack reaches a shard's declared kit weapon on the worker, as a player's wire does on the
 // cell server (cellWorld feeds each command to `installDeclaredKitItems`). Before it the worker fed tape attacks to native
 // catalogue weapons only, so a tape never landed a blow with a sword or whip a shard declares. J434 retired the Template and its
-// whip (TEMPLATE-E2E TR-5): Brasscap's declared lever-action, the kit OF42b was built for, takes the ranged case; Pastel Plain's
-// declared whip on its grey blob keeps the melee swing the Template's case held (opus-tr678).
+// whip (TEMPLATE-E2E TR-5): Brasscap's declared lever-action, the kit OF42b was built for, takes the case. Pastel Plain's whip
+// case left with Pastel Plain (ZONE-SNAPSHOTS ZS7, J507).
 const PLAYER = 'actor.player';
 const CASES = [
   // the lever's rounds (10 each, more than one landed)
   { shard: 'brasscap-mesa', target: 'bandit.camp-1.1', blow: 10, segment: 'lever' },
-  // the whip's light blows (18 each, more than one landed)
-  { shard: 'pastel-plain', target: 'grey-blob:1', blow: 18, segment: 'whip' },
 ] as const;
 
 test.each(CASES)('a tape attack swings $shard\'s declared kit weapon ($segment) on the worker', async ({ shard: slug, target, blow, segment }) => {

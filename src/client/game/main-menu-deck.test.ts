@@ -363,11 +363,11 @@ test('row 26: with no door answer (preview, a `?chunk=` boot) a hidden shard\'s 
 test('row 26: a hidden or test shard is on no player tab, even served and placed; Developer\'s ALL still lists it', () => {
   const tester = (slug: string, status: string | null = null): ZoneSelectCard => ({ ...zone(slug), status });
   const leaky: ZoneSelectDocument = { channel: 'staging', serial: 1,
-    featured: [zone('a-one'), tester('pastel-plain'), tester('proof-town')],
-    popular: [tester('pastel-plain'), tester('ink-cel-valley'), zone('a-one'), tester('c-three', 'hidden')],
-    new: [tester('ink-cel-valley'), tester('_template'), zone('b-two'), tester('open-plot-thin-ice')],
+    featured: [zone('a-one'), tester('proof-plain'), tester('proof-town')],
+    popular: [tester('proof-plain'), tester('proof-valley'), zone('a-one'), tester('c-three', 'hidden')],
+    new: [tester('proof-valley'), tester('_template'), zone('b-two'), tester('open-plot-thin-ice')],
     all: [zone('a-one'), tester('c-three', 'hidden')] };
-  const cards = [...SIX, card('pastel-plain', 'PASTEL PLAIN'), card('ink-cel-valley', 'INK-CEL VALLEY'), card('proof-town', 'PROOF TOWN'),
+  const cards = [...SIX, card('proof-plain', 'PROOF PLAIN'), card('proof-valley', 'PROOF VALLEY'), card('proof-town', 'PROOF TOWN'),
     { ...card('g-seven', 'G-SEVEN'), badge: 'Developer only' as const }];
   const leakyMenu = (developer: boolean) => {
     const view = buildTitleMenu({ cards, zoneSelect: leaky, active: null, onEnter: () => undefined, onSettings: () => undefined,
@@ -386,6 +386,6 @@ test('row 26: a hidden or test shard is on no player tab, even served and placed
   pressTab(developer.root, 'popular');
   expect(names(developer.root)).toEqual(['A-ONE']);
   pressTab(developer.root, 'all');
-  expect(names(developer.root)).toEqual(expect.arrayContaining(['PASTEL PLAIN', 'INK-CEL VALLEY', 'C-THREE', 'G-SEVEN']));
+  expect(names(developer.root)).toEqual(expect.arrayContaining(['PROOF PLAIN', 'PROOF VALLEY', 'C-THREE', 'G-SEVEN']));
   pressTab(developer.root, 'featured');
 });

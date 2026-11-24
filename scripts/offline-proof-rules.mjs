@@ -7,7 +7,6 @@ export const DECK_SHARDS = Object.freeze([
   { slug: 'pine-hollow', card: 'Pine Hollow' }, { slug: 'far-reach', card: 'Sky Reach' },
   { slug: 'nine-dragon-stack', card: 'Nine Dragon Stack' }, { slug: 'sunscar-dunes', card: 'Signal Dunes' },
   { slug: 'brasscap-mesa', card: 'Brasscap Mesa' },
-  { slug: 'pastel-plain', card: 'Pastel Plain' }, { slug: 'ink-cel-valley', card: 'Ink & Cel Valley' },
 ]);
 /** Open Plots have no deck card (the open-plots audit): a player reaches them by a deep link with Developer on, or a resume. */
 export const OPEN_PLOTS = Object.freeze(['open-plot-thin-ice', 'open-plot-night-market', 'open-plot-mosslight-ruins']);

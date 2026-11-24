@@ -6,7 +6,6 @@
 //                                           release pair or a set E7_*_SHARDS names a slug GET /api/catalogue no longer
 //                                           lists (DEL9); `--drop <slug>` lets refresh drop a deleted pin
 //   node scripts/pins.ts install [slug...]  fetch, check, validate, then write out/<folder> and publish its mounts
-//   node scripts/pins.ts install --for-tests  also install frozen retired grid products for test suites
 //   node scripts/pins.ts install --staging  install the reviewed staging snapshot for a public dev build
 //   node scripts/pins.ts install --ring 1   Ring 1: pinned Brasscap Mesa and Dunes (J434), and server slices
 //   node scripts/pins.ts install --ring-slices 1  add Ring 1 server slices beside installed full pins
@@ -14,7 +13,8 @@
 //                                                      without network or cook
 //   node scripts/pins.ts slice              cut Ring 1's server slices from the pinned heads into test/pins/slices.json
 //   node scripts/pins.ts keep <dir>         copy every pinned and sliced tarball to <dir>, for the release that outlives J85
-//   node scripts/pins.ts status             what the tree holds against the pins
+//   node scripts/pins.ts status             what the tree holds against the pins, and the cache tarballs no pin or slice
+//                                           names (listed with the command that removes them; deletes are by hand, J358)
 //
 // `install` is what a build runs first. For each pin, in order:
 //   1. The tarball comes from the cache, the mirror or the API, and its sha256 has to be the pin.
@@ -276,7 +276,7 @@ function pruneStale(root: string): void {
 
 /** One install of this tree at a time, full or reused: out/.pins.lock (pins-reuse.mjs). */
 type LocalProduct = Awaited<ReturnType<typeof localProduct>>;
-async function install(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' | 'staging' | 'tests' = 'pins', localPath?: string): Promise<readonly Pin[]> {
+async function install(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' | 'staging' = 'pins', localPath?: string): Promise<readonly Pin[]> {
   const release = lockPins(process.cwd());
   try {
     const local = localPath === undefined ? undefined : await (await import('./pin-local.ts')).localProduct(localPath, process.cwd());
@@ -284,17 +284,16 @@ async function install(only: readonly string[], source: 'pins' | 'format' | 'rin
   } finally { release?.(); }
 }
 
-async function installLocked(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' | 'staging' | 'tests', local?: LocalProduct): Promise<readonly Pin[]> {
+async function installLocked(only: readonly string[], source: 'pins' | 'format' | 'ring' | 'local' | 'staging', local?: LocalProduct): Promise<readonly Pin[]> {
   // DS12: a full install whose pins match this tree's last one, or another worktree's, clones and verifies (pins-reuse.mjs).
   const full = only.length === 0 && source === 'pins', root = process.cwd();
   const revision = shardfileValidationRevision(root), inputs = full ? pinsCompatibilityKey(root, revision) : '';
   const key = full ? pinsKey(root, revision, inputs) : '';
   const canReuse = full && process.env.WILDSHARD_PINS_REUSE !== '0';
   const overlay = source === 'format' || source === 'local';
-  const testFixtures = source === 'tests';
-  const output = testFixtures ? 'out/.test-products' : 'out';
+  const output = 'out';
   const trackedPins = source === 'staging' ? (await import('./pins-staging.ts')).readStaging().shards
-    : overlay ? [] : (readJson(testFixtures ? 'test/fixtures/retired-grid-products.json' : PINS) as Pick<PinFile, 'shards'>).shards;
+    : overlay ? [] : (readJson(PINS) as Pick<PinFile, 'shards'>).shards;
   let retained: Awaited<ReturnType<typeof reuseUnchangedPins>>;
   if (canReuse) {
     const reused = await reusePins(root, key, { log: line => { console.log(line); } });
@@ -311,7 +310,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
     }
     retained = await reuseUnchangedPins(root, inputs, trackedPins);
   }
-  if (!testFixtures) dropManifest(root);
+  dropManifest(root);
   const folderHashes = new Map(Object.entries(retained?.products ?? {})), mountHashes = new Map(Object.entries(retained?.mounts ?? {}));
   const owners = new Map<string, PinOwner>(Object.entries(retained?.owners ?? {}));
   // The validator hashes most members already; the manifest reuses those digests rather than hashing twice.
@@ -341,7 +340,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
   // install replaces the whole set.
   const replaced = dependency === undefined || !overlay ? new Set<string>() : mountsOf(resolve('out', local?.folder ?? dependency.pin.slug));
   for (const path of local?.preservedMounts ?? []) replaced.delete(path);
-  const before = !testFixtures && existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : [];
+  const before = existsSync(LEDGER) ? (readJson(LEDGER) as Ledger).published : [];
   const shared = trackedPublic(), publicUrls = new Set(publicAssets.map(asset => asset.url));
   const published = new Set([...mountHashes.keys()].filter(path => !shared.has(path)));
   // Mark before writing: a failed local install must still prevent publication.
@@ -407,7 +406,7 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       const target = resolve(output, folder);
       rmSync(target, { recursive: true, force: true });
       const written = new Map<string, string>(), mounts = new Set<string>();
-      const publishMount = (url: string, body: Uint8Array): void => { if (!testFixtures) { publish(url, body); mounts.add(url); } };
+      const publishMount = (url: string, body: Uint8Array): void => { publish(url, body); mounts.add(url); };
       const beforeMounts = published.size;
       for (const [path, body] of files) {
         if (path.endsWith('/') || path === 'validation.json') continue;
@@ -438,18 +437,16 @@ async function installLocked(only: readonly string[], source: 'pins' | 'format' 
       if (preparation === 'stale') console.warn(`stale preparation: ${pin.slug}`);
       if (preparation === 'cook') console.warn(`prepared by cook: ${pin.slug}`);
     }
-    if (!testFixtures) for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
+    for (const asset of publicAssets) publish(`public${asset.url}`, asset.body);
   } finally {
     // The install lock has created out/. Keep cleanup information even if publication stopped midway.
     const kept = overlay ? before.filter(path => !replaced.has(path) && existsSync(path)) : [];
     paths = [...new Set([...kept, ...published])].sort((a, b) => a.localeCompare(b));
-    if (!testFixtures) {
-      writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
-      excludePublished(paths);
-    }
+    writeFileSync(LEDGER, json({ revision, published: paths } satisfies Ledger));
+    excludePublished(paths);
   }
   if (failed > 0) process.exitCode = 1;
-  if (!testFixtures && remoteSlugs.length > 0) await installSaves(remoteSlugs);
+  if (remoteSlugs.length > 0) await installSaves(remoteSlugs);
   if (full) pruneStale(root);
   if (source === 'staging') pruneStalePinProducts(root, pins.map(pin => pin.hash));
   // The manifest certifies these bytes only for the inputs the install read: a pin or source edited meanwhile changes the key.
@@ -580,6 +577,11 @@ function status(): void {
   }) : [];
   console.log(JSON.stringify({ pins: shards.length, installed: shards.length - missing.length, missing: missing.map(row => row.slug), stale: ledger !== undefined && ledger.revision !== shardfileValidationRevision(process.cwd()), sources }));
   if (missing.length > 0) process.exitCode = 1;
+  // ZONE-SNAPSHOTS ZS7: a cache tarball no pin or slice names is a retired product. Status lists it with the command
+  // that removes it; nothing here deletes (J358: deletes are by hand).
+  const named = new Set([...shards.map(row => row.hash), ...(existsSync(SLICES) ? (readJson(SLICES) as { slices: readonly Slice[] }).slices.map(row => row.hash) : [])]);
+  const orphans = existsSync(CACHE) ? readdirSync(CACHE).filter(name => /^[0-9a-f]{64}\.tar$/u.test(name) && !named.has(name.slice(0, 64))).sort() : [];
+  if (orphans.length > 0) console.log(`${orphans.length} cache tarball(s) no pin names; remove by hand: rm ${orphans.map(name => join(CACHE, name)).join(' ')}`);
 }
 
 const [command = 'status', ...rest] = process.argv.slice(2);
@@ -593,10 +595,6 @@ if (command === 'refresh') {
   }
 }
 else if (command === 'install' && rest.length === 1 && rest[0] === '--staging') await install([], 'staging');
-else if (command === 'install' && rest.length === 1 && rest[0] === '--for-tests') {
-  await install([]);
-  if (process.exitCode !== 1) await install([], 'tests');
-}
 else if (command === 'install' && rest[0] === '--ring') await installRing(rest[1] ?? '1', rest.slice(2));
 else if (command === 'install' && rest.length === 2 && rest[0] === '--ring-slices') await installRingSlices(ringOf(rest[1] ?? '1').slices);
 else if (command === 'install' && rest[0] === '--from-format') await install(rest.slice(1), 'format');
@@ -610,4 +608,4 @@ else if (command === 'verify-slices') await slice(true);
 else if (command === 'install-saves') await installSaves(rest);
 else if (command === 'keep') await keep(rest[0] ?? 'tmp/pins-release');
 else if (command === 'status') status();
-else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --for-tests | install --staging | install --ring 1 [extra slug...] | install --ring-slices 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');
+else throw new Error('usage: pins.ts refresh [--drop slug] | install [slug...] | install --staging | install --ring 1 [extra slug...] | install --ring-slices 1 | install-saves [slug...] | slice | verify-slices | keep <dir> | status');

@@ -10,7 +10,7 @@ export function folderRecipe(root:string,name:string,flags:string[],toolchain:st
 export function retainFolderInputs(root:string,name:string,receipt:string,key:string,recipe:string[],memo:InputHashMemo):void;
 /** Read an exact-SHA CI product or a matching sealed local product, retaining cache lifetime pins.
  * Ring 1 requires its configured server slice, even beside full output. Never generates or builds. */
-export function readBuiltShardfile(root:string,name:string,options?:{cacheRoot?:string;env?:NodeJS.ProcessEnv;testFixture?:boolean}):string;
+export function readBuiltShardfile(root:string,name:string,options?:{cacheRoot?:string;env?:NodeJS.ProcessEnv}):string;
 /** Partition suites by the same verified product intake, without building or admitting stale products. */
 export function selectBuiltTestFolders(root:string,files:readonly string[],options?:{cacheRoot?:string;env?:NodeJS.ProcessEnv}):{ready:string[];blocked:string[];missing:string[];buildCommand:string|undefined};
 /** Check only selected product suites before worker setup, without building or accepting stale products. */

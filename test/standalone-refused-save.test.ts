@@ -63,7 +63,7 @@ function laterBuild(storage: PageStorage): void {
   }
 }
 
-test.each(['pastel-plain', 'nalati-grasslands'])('%s: a save a later build refuses still gives back its flags, and the next save stands', { timeout: 20_000 }, async slug => {
+test.each(['open-plot-thin-ice', 'nalati-grasslands'])('%s: a save a later build refuses still gives back its flags, and the next save stands', { timeout: 20_000 }, async slug => {
   const storage = new PageStorage(), refused: unknown[] = [];
   await played(boot(storage, slug), 'kept.flag');
   laterBuild(storage);
@@ -79,13 +79,13 @@ test.each(['pastel-plain', 'nalati-grasslands'])('%s: a save a later build refus
 });
 
 test('a page\'s continuation with a lane from another build, holding a page\'s items, keeps its progress', { timeout: 20_000 }, async () => {
-  const slug = 'pastel-plain', input = await serverInput(slug), storage = new PageStorage(), sim = createShardfileSim(input.shard, input.assets, { rapier: input.rapier, quest: { fact: () => undefined, coins: () => undefined } });
+  const slug = 'open-plot-thin-ice', input = await serverInput(slug), storage = new PageStorage(), sim = createShardfileSim(input.shard, input.assets, { rapier: input.rapier, quest: { fact: () => undefined, coins: () => undefined } });
   sim.host.flags.set('imported.flag');
   const checkpoint = captureClientState(input.shard, sim, new Map());
   sim.dispose();
   installAppIdentity({ name: '', wordmark: '', tagline: '', savePrefix: PREFIX, saveFormat: '', fileSlug: '', exposeProbe: () => undefined, harness: () => undefined });
   installSaveEnvironment({ storage: () => storage, persistent: () => true, persist: () => Promise.resolve(false) });
-  const item = { version: 1 as const, id: 'weapon.pastel-whip', tick: 1, cooldown: 0, fuel: 1, lit: false, held: false, chargeTime: 0, pending: [] };
+  const item = { version: 1 as const, id: 'weapon.made-up-whip', tick: 1, cooldown: 0, fuel: 1, lit: false, held: false, chargeTime: 0, pending: [] };
   const lane: unknown = JSON.parse(checkpoint.lane ?? '{}');
   expect(instanceSave(saves, clientStateSave, { id: slug, shard: slug }).write({ ...checkpoint, lane: JSON.stringify({ ...lane as object, contract: 'another build' }), items: { [item.id]: item } })).toBe(true);
   const refused: unknown[] = [], shell = boot(storage, slug, refused);
@@ -97,8 +97,8 @@ test('a page\'s continuation with a lane from another build, holding a page\'s i
 // EV5: the late write behind the nalati case's flake. A progress save the worker posted just before the page ended the session
 // still reached the page's port, and landed after the next session had read storage, with a world tick that outranked its save.
 test('a write the worker posted before the page ended its session never lands', async () => {
-  const storage = new PageStorage(), control = new MessageChannel(), game = new MessageChannel(), key = `${PREFIX}standalonealt-lone-pastel-plain`;
-  const shell = connectStandalone({ slug: 'pastel-plain', base: '/shards/pastel-plain/', build: 'test', savePrefix: PREFIX, storage, lone: true }, control.port2, game.port2, () => undefined);
+  const storage = new PageStorage(), control = new MessageChannel(), game = new MessageChannel(), key = `${PREFIX}standalonealt-lone-open-plot-thin-ice`;
+  const shell = connectStandalone({ slug: 'open-plot-thin-ice', base: '/shards/open-plot-thin-ice/', build: 'test', savePrefix: PREFIX, storage, lone: true }, control.port2, game.port2, () => undefined);
   // The server answers the page's save, and the progress save queued behind it posts its write in the same turn. Node runs
   // the microtasks after `saved` (the dispose) before it hands over `write`, which is the order the flake hit.
   control.port1.onmessage = (event: MessageEvent<{ readonly kind: string; readonly id?: number }>): void => {

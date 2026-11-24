@@ -18,7 +18,7 @@ import {promisify} from 'node:util';
 import {holdCpu} from '../../scripts/cpu-admission.mjs';
 
 await test('the worker-only cold bake retains every plain-grid collision byte', {timeout:180_000}, async()=>{
-  for(const slug of ['sunscar-dunes','pastel-plain','driftwood-isle','nine-dragon-stack','nalati-grasslands'])
+  for(const slug of ['sunscar-dunes','driftwood-isle','nine-dragon-stack','nalati-grasslands'])
     assert.ok(existsSync(join('out',slug,'shard.json')),`Prepare the actual pinned ${slug} product`);
   const {VITEST_TMP_ROOT:temporaryRoot}=process.env;
   const parent=temporaryRoot??'tmp';mkdirSync(parent,{recursive:true});

@@ -237,7 +237,7 @@ function worker(slug: string, storage: SaveStorage, input: HeadlessRuntimeInput)
 const until = async (ready: () => boolean): Promise<void> => { await vi.waitFor(() => { expect(ready()).toBe(true); }, { timeout: 8_000, interval: 5 }); };
 
 // The whole worker, over real MessagePorts: a native cell and a data cell, whose input takes different roads to the tick.
-test.each([['native', 'pine-hollow'], ['data', 'pastel-plain']])('the %s worker takes hostile bytes on both ports, keeps ticking and saves', { timeout: 10_000 }, async (_kind, slug) => {
+test.each([['native', 'pine-hollow'], ['data', 'open-plot-thin-ice']])('the %s worker takes hostile bytes on both ports, keeps ticking and saves', { timeout: 10_000 }, async (_kind, slug) => {
   const input = await product(slug), storage = new PageStorage(), { shell, control, game, refused, close } = worker(slug, storage, input), { client } = shell;
   await shell.booted; shell.ready();
   await until(() => client.latest !== null);

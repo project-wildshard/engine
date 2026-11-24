@@ -213,7 +213,7 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
     const timed=async(/** @type {string} */phase,/** @type {()=>Promise<void>} */work)=>{const started=Date.now();await work();phases.push({phase,started,ended:Date.now()});};
     await timed('before-pins',async()=>{results.push(...await runPhase(mine.filter(unit=>unit.phase===0),concurrency,logs,0));});
     let pinsCode=0;
-    if(mine.some(unit=>unit.phase>=2))await timed('pins',async()=>{const started=Date.now();pinsCode=await step(['bash','-c',mine.some(unit=>unit.phase===2)?'pnpm pins --for-tests && pnpm gen:inputs':'pnpm pins && pnpm gen:inputs']);setupMs+=Date.now()-started;});
+    if(mine.some(unit=>unit.phase>=2))await timed('pins',async()=>{const started=Date.now();pinsCode=await step(['bash','-c','pnpm pins && pnpm gen:inputs']);setupMs+=Date.now()-started;});
     if(pinsCode!==0)console.log('::error title=pins::pnpm pins && pnpm gen:inputs failed; no test unit ran');
     else{
       await timed('tests',async()=>{results.push(...await runPhase(mine.filter(unit=>unit.phase===2),1,logs,setupMs));});

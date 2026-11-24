@@ -66,7 +66,7 @@ test('in Actions the check prints an error annotation only for a failing row, ne
 
 // MD9: soft readings need two consecutive runs measuring distinct commits.
 test('single Ink Cel and Nalati readings stay quiet; two distinct-SHA misses confirm', () => {
-  const ink = parseBudgetResults('BUDGET regressed key=ledger/ink-cel-valley/control measured=41767511 baseline=34715334 line=38186867 contentKey=ink@7');
+  const ink = parseBudgetResults('BUDGET regressed key=ledger/made-up-valley/control measured=41767511 baseline=34715334 line=38186867 contentKey=ink@7');
   const nalati = parseBudgetResults('BUDGET regressed key=render/phone-low/draws/nalati-grasslands measured=191 baseline=79 line=87 contentKey=nalati@2');
   const first = confirmBudgetResults({ head_sha: '29e750d3a1' }, ink);
   expect(first.confirmed).toEqual([]); expect(first.quiet).toEqual(ink);

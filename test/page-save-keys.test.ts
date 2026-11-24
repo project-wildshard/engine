@@ -20,9 +20,9 @@ test('a file from before the flip keeps what only a server reads, on a page that
   definePageSaveKeys(store);
   const keys = { 'platform.continuation': { v: 1, data: { flags: ['door'] } }, 'platform.encounters': { v: 1, data: { boss: { defeated: true } } },
     'platform.region': { v: 1, data: { revision: 3, snapshot: null } }, 'platform.runtime-logical': { v: 1, data: { revision: 3, actors: [] } } };
-  const report = store.importAll(JSON.stringify({ format: 'wildshard', version: 2, build: 'old', exported: 'then', docs: { 'pastel-plain': { keys } } }));
+  const report = store.importAll(JSON.stringify({ format: 'wildshard', version: 2, build: 'old', exported: 'then', docs: { 'open-plot-thin-ice': { keys } } }));
   expect(report.skipped).toEqual([]);
-  expect(new Set(report.imported)).toEqual(new Set(Object.keys(keys).map(key => `pastel-plain/${key}`)));
+  expect(new Set(report.imported)).toEqual(new Set(Object.keys(keys).map(key => `open-plot-thin-ice/${key}`)));
   expect(JSON.parse([...local.items.values()].find(doc => doc.includes('platform.region')) ?? 'null')).toMatchObject({ keys });
 });
 test('a page on a shard that reads a key still takes it over, and a file for another shard keeps it', () => {

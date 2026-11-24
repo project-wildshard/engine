@@ -82,7 +82,7 @@ test('a mark is not set over a failed copy: the next boot finishes it', async ()
 });
 
 test('a data cell takes a page\'s progress, in a world of its own', { timeout: 60_000 }, async () => {
-  const slug = 'pastel-plain', input = await serverInput(slug), storage = new PageStorage(), sim = createShardfileSim(input.shard, input.assets, { rapier: input.rapier, quest: { fact: () => undefined, coins: () => undefined } });
+  const slug = 'open-plot-thin-ice', input = await serverInput(slug), storage = new PageStorage(), sim = createShardfileSim(input.shard, input.assets, { rapier: input.rapier, quest: { fact: () => undefined, coins: () => undefined } });
   sim.host.flags.set('imported.flag');
   const checkpoint = captureClientState(input.shard, sim, new Map());
   sim.dispose();

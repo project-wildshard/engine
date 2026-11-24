@@ -252,7 +252,7 @@ test("a fresh guest reaches the gate's centre line first, then walks along it to
   // it joins the line on the gate's half, clear of the centre (open-plot-4-2's centre piece held the walker at (1134.9, 8.7))
   expect(spawnApproach('open-plot-4-2', {x:1124, z:-45}, {x:1125, z:0}, -1, 0)).toEqual([
     {x:1000, z:0, ride:false}, {x:890, z:0, ride:false}]);
-  expect(spawnApproach('pastel-plain', {x:-562.5+200, z:30}, {x:-562.5, z:0}, 0, 1)).toEqual([
+  expect(spawnApproach('made-up-plain', {x:-562.5+200, z:30}, {x:-562.5, z:0}, 0, 1)).toEqual([
     {x:-562.5, z:125, ride:false}, {x:-562.5, z:235, ride:false}]);
   // already on the line: straight along it
   expect(spawnApproach('open-plot-2-0', {x:-1, z:-1170}, {x:0, z:-1125}, 0, 1)).toEqual([{x:0, z:-890, ride:false}]);

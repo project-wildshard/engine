@@ -205,7 +205,7 @@ export class NeighbourLife {
         return { entity, object, anchor, emitters };
       });
       const views = new ClientScriptViews(scripts.lane, targets, { root, scope: this.ports.scope });
-      // ZE3a: its particles too, hidden from birth unless its cell is active (ink-cel-valley's pool linked its program for 65 ms
+      // ZE3a: its particles too, hidden from birth unless its cell is active (a retired test shard's pool linked its program for 65 ms
       // on the road, 2026-11-15)
       views.show(this.ports.active(instance));
       return { scripts, views };

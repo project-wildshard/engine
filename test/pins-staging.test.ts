@@ -24,7 +24,7 @@ async function fixture(run: (root: string, api: string, requests: string[], docu
   mkdirSync('tmp/codex-pins', {recursive: true});
   const root = mkdtempSync(resolve('tmp/codex-pins/staging-')), requests: string[] = [], live: {release: string | null} = {release};
   // A slug whose folder is its own name: the Template's `template` → `_template` alias went with its staging cell (meta TEMPLATE-E2E TR-9).
-  const document = {shards: [{slug: 'pastel-plain', revision: 6, hash: 'a'.repeat(64)}], missing: [], placements: [{slug: 'pastel-plain'}], grid: {cells: [{slug: 'pastel-plain'}]}};
+  const document = {shards: [{slug: 'open-plot-thin-ice', revision: 6, hash: 'a'.repeat(64)}], missing: [], placements: [{slug: 'open-plot-thin-ice'}], grid: {cells: [{slug: 'open-plot-thin-ice'}]}};
   const server = createServer((request, response) => {
     requests.push(request.url ?? '');
     const body = request.url === '/api/catalogue.json?channel=staging' ? document : request.url === '/api/shardfiles' ? {shardfiles: [{hash: 'a'.repeat(64), bytes: 512}]} : undefined;

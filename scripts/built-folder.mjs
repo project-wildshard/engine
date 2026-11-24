@@ -90,23 +90,10 @@ export function retainFolderInputs(root, name, receipt, key, recipe, memo) {
  * the checkout's GITHUB_SHA. Local callers require a matching sealed input receipt.
  * The caller still admits the returned product's complete bytes through its normal loader.
  * @param {string} sourceRoot @param {string} name
- * @param {{cacheRoot?:string,env?:NodeJS.ProcessEnv,testFixture?:boolean}} [options] */
-export function readBuiltShardfile(sourceRoot, name, { cacheRoot = shardfileCacheRoot(), env = process.env, testFixture = false } = {}) {
+ * @param {{cacheRoot?:string,env?:NodeJS.ProcessEnv}} [options] */
+export function readBuiltShardfile(sourceRoot, name, { cacheRoot = shardfileCacheRoot(), env = process.env } = {}) {
   if (!/^[a-z0-9_-]+$/u.test(name)) throw new Error('Invalid built product name');
   const root = resolve(sourceRoot);
-  if (testFixture) {
-    const manifest = resolve(root, 'test/fixtures/retired-grid-products.json');
-    if (existsSync(manifest)) {
-      const pins = v.parse(v.object({shards: v.array(v.object({slug: v.string(), hash: v.string()}))}), JSON.parse(readFileSync(manifest, 'utf8')));
-      const expected = pins.shards.find(row => row.slug === name)?.hash;
-      if (expected !== undefined) {
-        const folder = resolve(root, 'out/.test-products', name), stamp = resolve(folder, 'validation.json');
-        const receipt = existsSync(stamp) ? v.safeParse(v.object({pin: v.object({hash: v.string()})}), JSON.parse(readFileSync(stamp, 'utf8'))) : undefined;
-        if (receipt?.success === true && receipt.output.pin.hash === expected) return folder;
-        throw new Error(`Missing current product ${name}; install the frozen fixture with pnpm pins --for-tests`);
-      }
-    }
-  }
   // Ring 1's server suites must use their reviewed slice even when a prior
   // full install left the complete product here. Missing slices are a setup
   // failure, never permission to test against client assets instead.
@@ -170,7 +157,7 @@ export function selectBuiltTestFolders(root, files, options = {}) {
   /** @type {Set<string>} */
   const missing = new Set();
   for (const name of new Set(selected.flatMap(file => products[file] ?? []))) {
-    try { readBuiltShardfile(root, name, {...options, testFixture: true}); }
+    try { readBuiltShardfile(root, name, options); }
     catch (error) {
       if (!(error instanceof Error) || !error.message.startsWith(`Missing current product ${name};`)) throw error;
       missing.add(name);
