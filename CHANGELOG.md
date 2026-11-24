@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.85 (2026-11-24)
+
+- The title screen answers ENTER ZONE at once, the zone picker swipes full screen, and an idle title hands over again.
+- Clicking just beside a person starts the talk, and creatures you fell on the grid can be harvested.
+- Music keeps playing while the Bag is open.
+- Phones show the storm badge and pickup line in a tidier HUD, and keep the sharper High look on capable phones.
+- A world map at full fit no longer crowds the view with zone names.
+
 ## v0.1.84 (2026-11-24)
 
 - Lights in a zone can now brighten step by step as a quest moves along, starting with Glowfen's shrine lanterns.
