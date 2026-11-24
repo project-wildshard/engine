@@ -24,7 +24,6 @@
   "test/graph-wind.test.ts",
   "test/headless-byte-capture.test.ts",
   "test/held-arms-platform.test.ts",
-  "test/held-slot-entered.test.ts",
   "test/loot-continuation-ports.test.ts",
   "test/mounted-figure.test.ts",
   "test/patrol-encounter-view.test.ts",

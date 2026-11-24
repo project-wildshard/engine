@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { expect, test, vi } from "vitest";
-import { parse, object, looseObject, optional, nullable, string, number } from "valibot";
-import { SpeciesSchema, HuntTuningSchema } from "@wildshard/format/speciesPrograms";
-import { frozenRuntimeJson } from "./fixtures/frozen/snapshots";
+import { array, boolean, parse, object, looseObject, optional, nullable, string, number } from "valibot";
+import { HuntTuningSchema } from "@wildshard/format/speciesPrograms";
+import { liveSection } from "./fixtures/livePin";
 import { Vector3 } from "three";
 import {
   createShardfileSim,
@@ -176,19 +176,23 @@ test("omitted-sensing hunt restores its original unbanded native continuation an
 });
 
 test.each(["boar", "elk"] as const)(
-  "omitted sensing retains frozen Pine %s tuning, awareness and exact memory continuation",
+  "omitted sensing retains live Pine %s tuning, awareness and exact memory continuation",
   async (kind) => {
+    // ZONE-SNAPSHOTS ZS9 (J507): Pine r16's live declared species row for the kind (its first: the plain boar or elk).
     const pine = parse(
-      object({ boar: SpeciesSchema, elk: SpeciesSchema }),
-      frozenRuntimeJson("pine-creature-world.json"),
-    )[kind];
+      object({ rows: object({ species: array(looseObject({ kind: string(), aggressive: optional(boolean()), temperament: looseObject({ tuning: looseObject({}) }) })) }) }),
+      liveSection("pine-hollow", "actors/species"),
+    ).rows.species.find((row) => row.kind === kind);
+    if (pine === undefined) throw new Error(`Pine declares no ${kind}`);
+    // The declared row carries the species motion beside its hunt tuning (declaredNative.ts splits them).
+    const { motion: _motion, ...hunt } = pine.temperament.tuning, tuning = parse(HuntTuningSchema, hunt);
     const shard = huntFixture(),
       species = shard.rows.species[0];
-    if (species?.temperament === undefined || pine.tuning === undefined)
+    if (species?.temperament === undefined || false)
       throw new Error("Missing original Pine tuning");
     species.aggressive = pine.aggressive ?? false;
     species.temperament.reaction = species.aggressive ? "aggressive" : "passive";
-    species.temperament.tuning = pine.tuning;
+    species.temperament.tuning = tuning;
     shard.spawn.z = -13; // twenty metres away, outside either native panic distance
     const bytes = JSON.stringify(shard),
       sim = createShardfileSim(shard, new Map(), { rapier: await rapier });
@@ -205,7 +209,7 @@ test.each(["boar", "elk"] as const)(
         object({ species: object({ tuning: HuntTuningSchema }) }),
         JSON.parse(native.contract),
       );
-      expect(JSON.stringify(contract.species.tuning)).toBe(JSON.stringify(pine.tuning));
+      expect(JSON.stringify(contract.species.tuning)).toBe(JSON.stringify(tuning));
       // Captured from the unchanged native path before target/restore edits;
       // Rapier feet settling is part of this exact awareness continuation.
       expect(native.memory.awareness).toBe(

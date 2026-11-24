@@ -86,3 +86,22 @@ frozen elk).
 Still on `pine-creature-world.json`: species-health-fallback. On Pine r16's declared rows the page computes Old
 Ironhide at 75 health where the native server spawns it at 300, so moving that test to the live rows turns it red on a
 real page/server gap; it waits on that fix.
+
+## Eleventh step: the last extracts, and `test/fixtures/frozen/` is gone
+
+- The pickup bake witness reads its two tables live: Driftwood r12's `quests/interaction-source.json` interact constants and
+  Pine r16's `quests/runtime.json` table, both byte-identical to the extract; the committed catalogue bytes still match.
+- sword-profile-key-order reads Driftwood r12's live `combat/items` (its wood and iron melee weapons, damage 12 and 28).
+- The dormant herd's wolf pack is Nalati r8's live `actors/wildlife.json` group (the extract minus home and members, which
+  the fixture names itself).
+- layer-hunt-targets reads Pine r16's declared boar and elk rows; their tuning now carries `motion` beside the hunt
+  numbers, split off as `declaredNative.ts` does.
+- species-health-fallback reads Pine r16's declared species. Correction to the tenth step: the Old Ironhide "gap" was
+  not one. It is an elite-ranked spawn (`creature:164`), and the server multiplies its 75 by the rank's health (300),
+  `declaredRanks.ts`; the test now applies the rank. Pine r16 also authors its deer health, so the no-health premise
+  lives in the unit test above it.
+- held-slot-entered and `nineHeldEntry.ts` are deleted: they proved a starter blade plus a grapple tool in held claims
+  on Nine r3's runtime and item rows. Nine r5 moved its Jian to a kit.melee row and its grapple to a `state/modes` row,
+  and no live pin declares a tool item with held claims, so the test proved nothing a player loads (J507).
+
+The guard's only offender left is Brasscap's corpus, which ZS10 re-exports.

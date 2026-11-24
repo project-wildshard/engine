@@ -1,11 +1,9 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- SB25 loads the pinned Pine Hollow product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { object, parse, unknown } from 'valibot';
-import { SpeciesSchema } from '@wildshard/format/speciesPrograms';
-import { HullLookBook } from '../src/client/game/looks/speciesBook';
-import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
-import { LEGACY_HEALTH, speciesHealth, variantOf, type SpeciesDef, type VariantTable } from '../src/shared/engine/entities/species/registry';
+import { creatureRank } from '@wildshard/format/creatureRanks';
+import { array, boolean, looseObject, number, object, optional, parse, string } from 'valibot';
+import { LEGACY_HEALTH, speciesHealth } from '../src/shared/engine/entities/species/registry';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
@@ -28,9 +26,6 @@ test('authored health wins; a species with none gets the pre-d39d6c1d built-in f
   }
 });
 
-/** What health reads of a species: its variants, tuning and aggression. */
-type HealthSource = VariantTable & Pick<SpeciesDef, 'kind' | 'aggressive' | 'tuning'>;
-
 test('pinned Pine Hollow: the page gives every creature the health the server gives it, its plain deer 60', async () => {
   const directory = builtFolder('pine-hollow'), shard = await loadHeadlessFolder(directory), product = shard.shardfile;
   const descriptor = outputDescriptor(product);
@@ -38,23 +33,32 @@ test('pinned Pine Hollow: the page gives every creature the health the server gi
   const assets = new Map(descriptor.index.files.map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const resident = await createNativeHeadlessResident({ shard: product, assets, rapier: await loadRapier(readFileSync('public/assets/physics/rapier.wasm')), product: shard });
   try {
-    // The page's Pine species, frozen from the full world (test/fixtures/frozen/pine-creature-world.json, boar-world.ts).
-    const frozen = parse(object({ boar: SpeciesSchema, elk: SpeciesSchema, looks: unknown() }), frozenRuntimeJson('pine-creature-world.json'));
-    const book = new HullLookBook(frozen.looks);
-    const species = (kind: string): HealthSource => kind === 'boar' ? frozen.boar : kind === 'elk' ? frozen.elk : book.definition(kind);
+    // ZONE-SNAPSHOTS ZS9 (J507): the page's Pine species are the live product's declared species rows (actors/species),
+    // one kind's rows merged (Pine declares its thralls as a second elk and boar row).
+    const declared = parse(object({ rows: object({ species: array(looseObject({ kind: string(), aggressive: boolean(),
+      temperament: optional(looseObject({ tuning: optional(looseObject({ hp: optional(number()) })) })),
+      variants: array(looseObject({ id: string(), hp: optional(number()) })) })) }) }), shard.section('actors/species')).rows.species;
+    const species = (kind: string) => {
+      const rows = declared.filter(row => row.kind === kind), first = rows[0];
+      if (first === undefined) throw new Error(`Pine declares no ${kind}`);
+      const variants = rows.flatMap(row => row.variants);
+      return { kind, aggressive: first.aggressive, tuning: first.temperament?.tuning,
+        variant: (id: string | undefined) => variants.find(row => row.id === id) ?? variants[0] };
+    };
+    const ranks = new Map(product.creatures.spawns.flatMap(row => row.rank === undefined ? [] : [[row.id, creatureRank(row.rank).hp] as const]));
     const actors = [...resident.host.entities.values()];
     const deer = actors.filter(actor => actor.kind === 'deer');
     expect(deer.length).toBeGreaterThan(0);
-    // Pine authors no deer health: the throw this fixes. Its plain deer keep the old 60; big variants keep their own.
-    expect(species('deer').tuning?.hp).toBeUndefined();
-    expect(deer.filter(actor => variantOf(species('deer'), actor.variant).hp === undefined).map(actor => actor.maxHp)).toContain(60);
+    // Pine r16 authors its deer health now (tuning and every variant); the no-health fallback is the unit test above.
+    expect(deer.filter(actor => actor.variant === 'hind').map(actor => actor.maxHp)).toContain(60);
     const checked = new Set<string>();
     for (const actor of actors.filter(row => ['deer', 'boar', 'elk'].includes(row.kind))) {
       checked.add(actor.kind);
       const def = species(actor.kind);
       // The same call AnimalView and RowBodies make (Pine sets no faunaTuning).
-      const health = speciesHealth(def.kind, variantOf(def, actor.variant).hp, def.tuning?.hp, def.aggressive);
-      expect(health, `${actor.kind}/${actor.variant}`).toBe(actor.maxHp);
+      const health = speciesHealth(def.kind, def.variant(actor.variant)?.hp, def.tuning?.hp, def.aggressive);
+      // A ranked spawn (Old Ironhide) is the same creature made stronger by its rank's multiplier (declaredRanks.ts).
+      expect(health * (ranks.get(actor.entityId) ?? 1), `${actor.kind}/${actor.variant}`).toBe(actor.maxHp);
     }
     expect([...checked].sort()).toEqual(['boar', 'deer', 'elk']);
   } finally { resident.dispose(); }

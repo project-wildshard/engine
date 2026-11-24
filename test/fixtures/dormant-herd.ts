@@ -5,8 +5,9 @@ import type { SimHost } from '@wildshard/engine/sim';
 import { nativeGroupBrain } from '@wildshard/format/groupBrains';
 import { NativeGroupCollection } from '@wildshard/engine/game/shardfile/groupRuntime';
 import {parse,object,record,string,unknown} from 'valibot';
-import {frozenRuntimeJson} from './frozen/snapshots';
-const brains=parse(object({pack:record(string(),unknown())}),frozenRuntimeJson('nalati-brains.json'));
+import {liveJson} from './livePin';
+// ZONE-SNAPSHOTS ZS9 (J507): Nalati r8's live wolf pack group (actors/wildlife.json); the fixture names its own home and members.
+const brains=parse(object({groups:object({pack:record(string(),unknown())})}),liveJson('nalati-grasslands','actors/wildlife.json')).groups;
 import { SIM_LEVEL } from './sim-level/level';
 
 /** A real group owner that never acts, for a riding fixture: no host entity, random stream or step participant. */

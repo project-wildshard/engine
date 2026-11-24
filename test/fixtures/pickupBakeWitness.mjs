@@ -7,14 +7,18 @@ import { zlibSync, unzlibSync } from 'fflate';
 import { authoredPickups } from '@wildshard/engine/game/generators/pickups';
 import { readFileSync } from 'node:fs';
 import { jsonBytes } from '../../scripts/bake-output.mjs';
-import { frozenRuntimeJson } from './frozen/snapshots.ts';
-import { parse, record, string } from 'valibot';
+import { liveJson } from './livePin.ts';
+import { parse, object, record, string } from 'valibot';
 import { QuestInteractionTableSchema } from '@wildshard/format/questInteractionSource';
 import { installKitProps } from '@wildshard/engine/game/models/interact';
 import { Interactables, Live } from '@wildshard/engine/world/interact/Interactables';
 import { pickupLook, registerPickupLook } from '@wildshard/engine/world/interact/types';
 import { readBakedGeometry } from '@wildshard/engine/game/plugin/geometry';
-const tables = parse(record(string(),QuestInteractionTableSchema),frozenRuntimeJson('pickup-tables.json'));
+// ZONE-SNAPSHOTS ZS9 (J507): the two live interaction tables (Driftwood r12's interact constants, Pine r16's runtime table).
+const tables = parse(record(string(),QuestInteractionTableSchema),{
+  'driftwood-isle': parse(object({constants: object({interact: QuestInteractionTableSchema})}), liveJson('driftwood-isle', 'quests/interaction-source.json')).constants.interact,
+  'pine-hollow': parse(object({table: QuestInteractionTableSchema}), liveJson('pine-hollow', 'quests/runtime.json')).table,
+});
 
 const seed = 0x1a7e, variants = new Map(), traces = {};
 const add = (part, value) => {

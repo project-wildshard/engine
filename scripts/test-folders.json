@@ -1,5 +1,4 @@
 {
-  "test/held-slot-entered.test.ts": ["nine-dragon-stack"],
   "test/admitted-product-cache.test.ts": [],
   "test/net-link-play.test.ts": ["driftwood-isle"],
   "test/engine-rule-successors.test.ts": ["pine-hollow", "nalati-grasslands", "driftwood-isle"],

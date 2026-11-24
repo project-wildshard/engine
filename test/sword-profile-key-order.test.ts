@@ -4,8 +4,10 @@ import { expect, test } from 'vitest';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
 import { emptyShardfile } from '../src/shared/host/author';
 import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
-import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
-const items = frozenRuntimeJson('melee-sword-items.json');
+import { parse, object, unknown } from 'valibot';
+import { liveSection } from './fixtures/livePin';
+// ZONE-SNAPSHOTS ZS9 (J507): Driftwood r12's live item catalogue, its wood and iron melee weapons.
+const items = parse(object({ items: unknown() }), liveSection('driftwood-isle', 'combat/items')).items;
 const source = {items};
 
 const shardfile = emptyShardfile({ slug: 'sword-profiles-test', name: 'Sword', author: 'Wildshard', revision: 1, seed: 1 });
