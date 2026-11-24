@@ -4,7 +4,7 @@ import { CharacterMotor } from '../src/shared/engine/physics/CharacterMotor';
 import { SkinnedMesh } from 'three';
 import { SpawnScript,installNativeSpawnScript } from '../src/server/game/population/spawnScript';
 import { installPopulationRoster } from '../src/server/game/population/roster';
-import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
+import { sdkBuiltJson } from './fixtures/sdk-built/snapshots';
 import { readSpeciesPrograms, SpeciesSchema } from '@wildshard/format/speciesPrograms';
 import { createSimHost } from '../src/server/engine/sim';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
@@ -46,7 +46,7 @@ async function fixture() {
   const host = createSimHost({ ...SIM_LEVEL,quests: [],entities: [] },{ rapier });
   const sample = SIM_LEVEL.entities[0];if (sample === undefined) throw new Error('Missing native recipe');
   flatPopulationEnvironment(host);
-  const population = readSpeciesPrograms({ page: [],native: [v.parse(SpeciesSchema,frozenRuntimeJson('query-boar.json'))],hunt: { limit: 32,player: 'host',fight: {},bands: { states: [],legacyKinds: [] },hit: { namespace: 'fixture',tags: [] } } });
+  const population = readSpeciesPrograms({ page: [],native: [v.parse(SpeciesSchema,sdkBuiltJson('query-boar.json'))],hunt: { limit: 32,player: 'host',fight: {},bands: { states: [],legacyKinds: [] },hit: { namespace: 'fixture',tags: [] } } });
   const roster = installPopulationRoster(host,{ population,nav: null,spawnY: 0,bake: { actors: [],parked: [{ ...sample,kind: 'boar',variant: 'boar' }],herds: [] } },{
     version: 1,environment: 'fixture.habitat',step: 'fixture.roster',seed: 13,bodyCount: 0,limit: 32,scripted: 'sidestep',encounter: 'test',poseKinds: [],spawn: { x: 0,z: 0 },fauna: [],identities: [],ordinary: {},reserves: [],homes: [] });
   const first = roster.spawn('boar',3,4,0,'boar'),second = roster.spawn('boar',1,0,0,'boar');

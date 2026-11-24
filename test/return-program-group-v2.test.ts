@@ -6,12 +6,12 @@ import {ReturnProjectionV2} from '../src/shared/game/population/returnProjection
 import {parseReturnProjectionV2} from '@wildshard/format/returnProjectionV2';
 import {ReturnProgramSchema} from '@wildshard/format/namedJsonContracts';
 import {parse} from 'valibot';
-import {frozenRuntimeJson} from './fixtures/frozen/snapshots';
+import {sdkBuiltJson} from './fixtures/sdk-built/snapshots';
 
 // SDK retains all seven cases. Keep the original private unscoped refusal
 // and its complete cache identity case against the exact compiled descriptor.
 test('full group metadata participates in cache identity before any second instance can be constructed', () => {
-  const parsed=parse(ReturnProgramSchema,frozenRuntimeJson('sdk-return-group.json'));
+  const parsed=parse(ReturnProgramSchema,sdkBuiltJson('sdk-return-group.json'));
   if(parsed.v2===undefined || parsed.v2.groups===undefined)throw new Error('Missing group descriptor');
   const descriptor={...parsed,v2:parsed.v2},groups=parsed.v2.groups;
   const owner = new Scope('shared-group-declarations');

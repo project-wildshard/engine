@@ -1,0 +1,85 @@
+{
+  "about": "ZONE-SNAPSHOTS ZS9 (J507): SDK outputs of made-up inputs (no zone), moved from test/fixtures/frozen. Each entry keeps its pinned size, sha256 and export recipe.",
+  "sourceRevisions": {
+    "sharddev": "23d05fd147700fe5e9c929749f7d8cb63cdf7761"
+  },
+  "files": {
+    "cosmetic-zero-channel.json": {
+      "bytes": 109,
+      "sha256": "7cb634457faab03c5b9f9769d21fb3e649c38ec0455ec7b9df52876d371e37bf",
+      "sourceRepository": "project-wildshard/sharddev",
+      "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+      "captureEngineRevision": "aeb86d13"
+    },
+    "cosmetic-one-channel.json": {
+      "bytes": 109,
+      "sha256": "8dbb048e8b0aafaf76b5b314df5d520283355f6398227bf325c9f447ecd6ee90",
+      "sourceRepository": "project-wildshard/sharddev",
+      "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+      "captureEngineRevision": "aeb86d13"
+    },
+    "decision-worker-folder.json": {
+      "bytes": 21393,
+      "sha256": "d5a136d9c23b809a0ac7fcff43a8348fd904f8960c3d9ee6e85346780c226934",
+      "sourceRepository": "project-wildshard/sharddev",
+      "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+      "captureEngineRevision": "aeb86d13"
+    },
+    "sdk-return-group.json": {
+      "bytes": 22036,
+      "sha256": "bb60e05985b8a61f1f9074b53f974588c5e5093e8b948ac4bee0f4103922dc54",
+      "sourceRepo": "project-wildshard/sharddev",
+      "sourceRevision": "9b3a2509a69b3009cc2bbb23c7a6864941d376d6",
+      "sourceModule": "test/fixtures/return-group.ts",
+      "sourceBlob": "2ff969f809f06ca15724e5274518792cbc20bf56",
+      "exportRecipe": "capture-group.mjs",
+      "exportCommand": "node --import @wildshard/engine/scripts/sim-node-loader.mjs tmp/codex-tc48/capture-group.mjs",
+      "exportCwd": "project-wildshard/sharddev@9b3a2509a69b3009cc2bbb23c7a6864941d376d6 repository root",
+      "inputs": "Exact original group/profile/IO layout and full original AssemblyScript sources, retained in the SDK compiler-admitted helper. Both V1 compatibility witness and V2 executable produced by actual SDK compilers.",
+      "copyRecipe": "Copy unchanged tmp/codex-tc48/sdk-return-group.json to engine test/fixtures/frozen/sdk-return-group.json after requiring 22036 bytes and SHA-256 bb60e05985b8a61f1f9074b53f974588c5e5093e8b948ac4bee0f4103922dc54; frozen loader rechecks both on every read.",
+      "dependencyVersions": {
+        "sdk": "0.3.2",
+        "engine": "0.1.24",
+        "format": "0.5.10",
+        "node": "24.18.1"
+      }
+    },
+    "sdk-scene-graphs.json": {
+      "bytes": 2363,
+      "sha256": "d02d0fa0007688d55c8a019facf9a2e4f27b87592a1da2c00da92f1b4f547db3",
+      "sourceRepo": "project-wildshard/sharddev",
+      "sourceRevision": "a5d8dbdad977e0cdb0c3d124e83cfc96956daddc",
+      "sourceModule": "src/sharddev/worldScenes.ts",
+      "sourceBlob": "934fa063a1d3ecb1be1d63e0400d4e0330ff5e1b",
+      "exportRecipe": "export-scene-graphs.mjs",
+      "exportCommand": "node --import ./node_modules/@wildshard/engine/scripts/sim-node-loader.mjs tmp/codex-tc48/export-scene-graphs.mjs",
+      "inputs": "Original defining graph literals and their full parsed rows; exact parseWorldSceneModels catalogue output passed to the original native consumer (including parser defaults), and actual SDK-produced page wire.",
+      "exportCwd": "project-wildshard/sharddev@a5d8dbdad977e0cdb0c3d124e83cfc96956daddc repository root",
+      "exportScriptPath": "tmp/codex-tc48/export-scene-graphs.mjs",
+      "dependencyVersions": {
+        "sdk": "0.3.2",
+        "engine": "0.1.24",
+        "format": "0.5.10",
+        "node": "24.18.1"
+      },
+      "copyRecipe": "Run from engine root after capture. Read <checkouts>/sharddev/tmp/codex-tc48/sdk-scene-graphs.json, require 2363 bytes and SHA-256 d02d0fa0007688d55c8a019facf9a2e4f27b87592a1da2c00da92f1b4f547db3, then copy its unchanged bytes to test/fixtures/frozen/sdk-scene-graphs.json. The bank loader verifies both receipt fields on every read."
+    },
+    "query-boar.json": {
+      "sourceRepository": "project-wildshard/engine",
+      "sourceCommit": "b3d31d608f9cad04407e066416b80e670de19471",
+      "sourcePath": "src/client/game/systems/species/boar.ts BOAR",
+      "sdkRevision": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
+      "bytes": 1435,
+      "sha256": "7296283c55755307a03752ef955d1020dcf5ab46b0fa51f2f34497c25925caa7"
+    }
+  },
+  "exportRecipes": {
+    "ci21-cosmetic-zero-channel.mjs": "// SDK source da2a4ddb; run pnpm install --frozen-lockfile first.\nimport {writeFileSync} from 'node:fs';\nimport {ClientChannels} from '<checkouts>/sharddev/src/sharddev/clientChannels.ts';\nconst row=new ClientChannels('cosmetic');row.output('y',row.constant(0));\nwriteFileSync('<checkouts>/engine/test/fixtures/frozen/cosmetic-zero-channel.json',JSON.stringify([row.build()])+'\\n');\n// Run under Node with the SDK format hook and relative TypeScript resolution.\n",
+    "ci21-cosmetic-one-channel.mjs": "// SDK source da2a4ddb; run pnpm install --frozen-lockfile first.\nimport {writeFileSync} from 'node:fs';\nimport {ClientChannels} from '<checkouts>/sharddev/src/sharddev/clientChannels.ts';\nconst row=new ClientChannels('cosmetic');row.output('y',row.constant(1));\nwriteFileSync('<checkouts>/engine/test/fixtures/frozen/cosmetic-one-channel.json',JSON.stringify([row.build()])+'\\n');\n// Run under Node with the SDK format hook and relative TypeScript resolution.\n",
+    "ci21-decision-worker-product.ts": "// SDK da2a4ddb; pnpm install --frozen-lockfile first.\n// Replay original engine aeb86d13:test/decision-simulation.test.ts, case SDK worker executes.\n// Alias its ../src/sharddev/projectOutput to this wrapper; nameBlob to the pinned SDK, compileScript through the source-keyed guest export recipe.\n// The original fixture() and beforeAll define the exact shard, Wasm and arguments; preserve native Maps/bytes over v8 I/O.\nimport {mergeProjectBlobs as merge} from '<checkouts>/sharddev/src/sharddev/projectOutput.ts';\nimport {writeFileSync} from 'node:fs';\nimport {createHash} from 'node:crypto';\nexport function mergeProjectBlobs(...args:Parameters<typeof merge>){\n const inputSha256=createHash('sha256').update(JSON.stringify(args[0])).digest('hex');\n const result=merge(...args);\n writeFileSync('tmp/codex-tc48/decision-worker-folder.json',JSON.stringify({inputSha256,sourceCommit:'da2a4ddb564db35b5c3bcba4ba1358de92ced1af',shard:result.shard,assets:[...result.assets].map(([hash,bytes])=>[hash,Buffer.from(bytes).toString('base64')])})+'\\n');\n return result;\n}\n",
+    "export-scene-graphs.mjs": "import {writeFileSync} from 'node:fs';\nimport {worldSceneGraphPages} from '../../src/sharddev/worldScenes.ts';\nimport {parseWorldSceneWeld} from '@wildshard/format/worldSceneWeld';\nimport {parseWorldSceneModels} from '@wildshard/format/worldSceneModels';\nconst graph=name=>parseWorldSceneWeld({id:name,root:'root',nodes:[{kind:'group',id:'shared',parent:'root'},{kind:'light',id:'light',parent:'shared',color:1,intensity:1,distance:1,decay:2}]});\nconst expected=[graph('phone'),graph('desktop')],pages=worldSceneGraphPages('specimens','weld',expected.map((row,i)=>({name:String(i),row}))),blob=pages.files[0];\nif(blob===undefined)throw new Error('Missing native graph page');\nconst references=[...pages.references.values()];\nconst catalogue=parseWorldSceneModels({product:'page-contract',models:[{key:'model',id:'page-contract/model',name:'Model',file:'source',category:'props',pipeline:'code',defaults:{},variants:[],assembly:'scene',choices:[{id:'only',params:{},size:[1,1,1],draws:[],colliders:[],scene:{phone:references[0],desktop:references[1]}}]}]});\nwriteFileSync('tmp/codex-tc48/sdk-scene-graphs.json',JSON.stringify({name:blob.file.name,wire:new TextDecoder().decode(blob.bytes),catalogue,expected})+'\\n');\n",
+    "capture-group.mjs": "import {writeFileSync} from 'node:fs';\nimport {buildGroupFixture} from '../../test/fixtures/return-group.ts';\nwriteFileSync('tmp/codex-tc48/sdk-return-group.json',JSON.stringify((await buildGroupFixture()).descriptor)+'\\n');\n",
+    "ci21-query-boar.txt": "SDK da2a4ddb bakeSpecies(engine b3d31d60 src/client/game/systems/species/boar.ts BOAR, fixture.boar); JSON.stringify + newline. Full query export recipe is in script-guests manifest."
+  },
+  "recipePathConvention": "Local checkout prefixes in recorded recipes are replaced with <checkouts>; expand this placeholder before replay. Recipes write complete provenance entries using actual git revisions."
+}

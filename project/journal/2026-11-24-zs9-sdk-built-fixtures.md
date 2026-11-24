@@ -8,3 +8,10 @@ in the tests, keyed by their source; J342 keeps compilers out of engine CI) and 
 `staticGlb` baked from made-up primitives, keyed by their input). Neither holds a zone, so both move to
 `test/fixtures/sdk-built/` unchanged, and the guard's baseline drops their 112 entries. The zone extracts left in
 `frozen/` (Nalati, Nine, Pine, Dunes, Driftwood rows) are the second half.
+
+## Second step
+
+Six more SDK outputs of made-up inputs move to `test/fixtures/sdk-built/` with their pins and export recipes, under their
+own loader (`sdk-built/snapshots.ts`, `sdkBuiltJson`): the two cosmetic client channels, the decision worker product,
+the return group, the scene-graph page and the boar query (engine's own BOAR baked by the SDK). `workerFolder.ts`
+follows its JSON. `arena-page.json` is a made-up orchard page, so it leaves `frozen/` for `test/fixtures/`.

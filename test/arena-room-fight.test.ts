@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { ArenaFightPageSchema } from '../src/shared/game/boss/arenaRoomRows';
-import page from './fixtures/frozen/arena-page.json' with { type: 'json' };
+import page from './fixtures/arena-page.json' with { type: 'json' };
 
 test('the arena body adapter admits an unrelated orchard guardian and its own placement and strikes', () => {
   const original = v.parse(ArenaFightPageSchema, page);

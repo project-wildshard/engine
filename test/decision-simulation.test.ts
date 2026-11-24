@@ -20,8 +20,8 @@ import { ShardDecisions, type DecisionRuntime } from '../src/server/game/shardfi
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import * as v from 'valibot';
 import {parseClientChannels} from '@wildshard/format/clientChannels';
-import {frozenRuntimeJson} from './fixtures/frozen/snapshots';
-import {frozenDecisionWorkerFolder} from './fixtures/frozen/workerFolder';
+import {sdkBuiltJson} from './fixtures/sdk-built/snapshots';
+import {frozenDecisionWorkerFolder} from './fixtures/sdk-built/workerFolder';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { GridRegionDurability } from '../src/server/game/grid/durability';
 import { FIXTURE_RUNTIME_COST } from './fixtures/clientPlanRuntime';
@@ -415,7 +415,7 @@ test('retained actors lend their actual body, public memory and strike owner wit
     const actor = sim.host.entities.get('actor.a'); if (actor === undefined) throw new Error('Missing retained actor');
     actor.mem['phase'] = 2;
     const source = structuredClone(f.source);
-    source.clientChannels = parseClientChannels(frozenRuntimeJson('cosmetic-zero-channel.json'));
+    source.clientChannels = parseClientChannels(sdkBuiltJson('cosmetic-zero-channel.json'));
     source.runtime = { kind: 'client-plan', cost: FIXTURE_RUNTIME_COST, binds: ['spawns'], spawns: { homes: [], bosses: [], actors: source.creatures.spawns.map(row => ({
       id: `retained.${row.id}`, kind: row.species, look: row.variant, at: [row.at[0], row.at[2]], yaw: row.yaw,
     })) } };
@@ -456,7 +456,7 @@ test('retained actors lend their actual body, public memory and strike owner wit
       expect(actor.mem['phase']).toBe(3); expect(decisions.snapshot()).toBe(saved); expect(invoke).not.toHaveBeenCalled();
       const legacy = v.parse(v.record(v.string(), v.unknown()), JSON.parse(saved));
       const declaration = v.parse(v.record(v.string(), v.unknown()), JSON.parse(v.parse(v.string(), legacy['contract'])));
-      declaration['channels'] = parseClientChannels(frozenRuntimeJson('cosmetic-one-channel.json')); declaration['movers'] = [];
+      declaration['channels'] = parseClientChannels(sdkBuiltJson('cosmetic-one-channel.json')); declaration['movers'] = [];
       legacy['contract'] = JSON.stringify(declaration);
       decisions.restore(JSON.stringify(legacy)); expect(decisions.snapshot()).toBe(saved); expect(invoke).not.toHaveBeenCalled();
       declaration['state'] = {}; legacy['contract'] = JSON.stringify(declaration);

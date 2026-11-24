@@ -1,8 +1,8 @@
 import {parse,object,string,array,tuple,unknown} from 'valibot';
 import {parseShardfile,type Shardfile} from '@wildshard/format/shardSchema';
 import {sha256} from '../../../src/shared/game/plugin/moduleHash';
-import {frozenRuntimeJson} from './snapshots';
-const pin=parse(object({inputSha256:string(),shard:unknown(),assets:array(tuple([string(),string()]))}),frozenRuntimeJson('decision-worker-folder.json'));
+import {sdkBuiltJson} from './snapshots';
+const pin=parse(object({inputSha256:string(),shard:unknown(),assets:array(tuple([string(),string()]))}),sdkBuiltJson('decision-worker-folder.json'));
 /** Exact SDK fixture output; engine still runs its actual native worker and admission. */
 export function frozenDecisionWorkerFolder(input:Shardfile,moduleBytes:Uint8Array):{shard:Shardfile;assets:Map<string,Uint8Array>}{
  // FP26 (format 0.1.0.4): the pin hashed the source as format 0.1.0.3 parsed it, `identity` in the order slug, name, author,

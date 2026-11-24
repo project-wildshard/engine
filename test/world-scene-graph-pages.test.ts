@@ -4,7 +4,7 @@ import { parseWorldSceneWeld } from '@wildshard/format/worldSceneWeld';
 import { parseWorldSceneModels } from '@wildshard/format/worldSceneModels';
 import { admitWorldSceneModelGraphs } from '../src/client/game/shardfile/worldSceneWeld';
 import { encodeCanonicalJson } from '../src/shared/host/immutable';
-import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
+import { sdkBuiltJson } from './fixtures/sdk-built/snapshots';
 
 const graph = (name: string) => parseWorldSceneWeld({ id: name, root: 'root', nodes: [
   { kind: 'group', id: 'shared', parent: 'root' },
@@ -14,7 +14,7 @@ const graph = (name: string) => parseWorldSceneWeld({ id: name, root: 'root', no
 // The five author/format cases live in the paired SDK file. This keeps the
 // original private catalogue consumer on engine, with exact SDK-produced bytes.
 test('native variants reconstruct from shared nodes with independent member identities', async () => {
-  const captured = v.parse(v.object({ name: v.string(), wire: v.string(), catalogue: v.unknown(), expected: v.array(v.unknown()) }), frozenRuntimeJson('sdk-scene-graphs.json'));
+  const captured = v.parse(v.object({ name: v.string(), wire: v.string(), catalogue: v.unknown(), expected: v.array(v.unknown()) }), sdkBuiltJson('sdk-scene-graphs.json'));
   const bytes = new TextEncoder().encode(captured.wire), catalogue = parseWorldSceneModels(captured.catalogue);
   const original = [graph('phone'), graph('desktop')];
   expect(encodeCanonicalJson(original)).toBe(encodeCanonicalJson(captured.expected));
