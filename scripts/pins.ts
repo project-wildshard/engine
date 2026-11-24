@@ -34,10 +34,10 @@
 // The cache is tried first, then the mirror, then the API. A missing slice is rebuilt from its pinned parent, and must
 // match its committed hash, byte count and file count exactly. Coverage rows 4 and 5.
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
-import { setTimeout as sleep } from 'node:timers/promises';
 import './bake-loader.mjs';
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { createHash } from 'node:crypto';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
