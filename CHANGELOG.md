@@ -13,6 +13,10 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.83 (2026-11-24)
+
+- Nalati Grasslands supports the updated night guest encounter, with the same creature looks and animations.
+
 ## v0.1.81 (2026-11-24)
 
 - Older published revisions of Driftwood, Pine Hollow and Nalati Grasslands load in online play.
