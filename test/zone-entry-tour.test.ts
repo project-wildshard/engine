@@ -271,6 +271,19 @@ test("a fresh Mossgate guest goes north round the wall west of the spawn to the 
   expect(spawnApproach('mossgate', spawn, center, 1, 0)).toEqual([{x:797.5, z:562.5, ride:false}]);
 });
 
+test("a fresh Mossgate guest leaves the spawn's fenced yard east before the south gate", (): void => {
+  // v0.1.81's smoke (seed 2374405940) and its retry held at (559.0, 545.1) against the yard's low south fence; the
+  // x 18 column is clear to the gate (opus-fp21's capsule scan and a staging walk on 1e4f845e, 40 s)
+  const center = {x:562.5, z:562.5}, spawn = {x:563.7, z:565};
+  expect(spawnApproach('mossgate', spawn, center, 0, -1)).toEqual([
+    {x:570.5, z:563.5, ride:false},
+    {x:580.5, z:553.5, ride:false},
+    {x:580.5, z:352.5, ride:false},
+    {x:562.5, z:327.5, ride:false}]);
+  // the north gate keeps the shared rule
+  expect(spawnApproach('mossgate', spawn, center, 0, 1)).toEqual([{x:562.5, z:797.5, ride:false}]);
+});
+
 test("a fresh Brasscap guest leaves town around the canyon wall before taking the east gate", (): void => {
   const center = {x:-562.5, z:-562.5}, depot = {x:-564.1, z:-559.9};
   expect(spawnApproach('brasscap-mesa', depot, center, 1, 0)).toEqual([
