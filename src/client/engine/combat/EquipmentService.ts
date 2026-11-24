@@ -180,6 +180,8 @@ export class EquipmentService implements WeaponHooks {
     if (w === undefined) throw new Error(`EquipmentService: no weapon '${String(id)}' in the kit`);
     return w;
   }
+  /** FORMAT-PRUNE FP22b: the weapon an item row declares (`row.id`), whatever its runtime id; undefined when the kit lacks it. */
+  byItem(item: string): Weapon | undefined { return this.list.find((w) => w.row.id === item); }
   /** Is this slot owned? */
   has(id: Equipment['id']): boolean { return this.unlocked.has(id); }
   /** the unlocked weapons, in kit order */

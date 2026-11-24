@@ -9,6 +9,7 @@ import type { ShardContext } from '../plugin/context';
 import { installEnteredRuntimeService, installRetainedPlayerEffects, retainsRuntimeServices } from '../shard/retainedHooks';
 import type { EffectDef } from '@wildshard/engine/combat/effects/types';
 import { wirePage } from '../shardfile/wirePage';
+import { weaponIdOf } from '@wildshard/engine/combat/Equipment';
 
 /** The shared permanent cosmetic grant; authored finish identity and weapon determine its exclusive group. */
 export const heldFinishEffect = (id: string, weapon: string): EffectDef => ({
@@ -31,8 +32,8 @@ export function installItemEffects(context: ShardContext): void {
     || row.worn.some(grant => !owned.kept.has(grant.key) || !owned.kept.cosmetic(grant.key))) throw new Error('Unknown item effect ownership');
   const targets = row.weapons.map(entry => ({ grants: entry.grants, items: entry.items.map(id => {
     const item = items.rows.find(value => value.id === id);
-    if (item?.kind !== 'weapon' || item.equipment?.legacySlot === undefined) throw new Error('Item effect needs a native equipment slot');
-    return play.weapons.get(item.equipment.legacySlot);
+    if (item?.kind !== 'weapon' || item.equipment === undefined) throw new Error('Item effect needs a weapon with equipment');
+    return play.weapons.get(weaponIdOf(item.equipment));
   }) }));
   if (retained) installRetainedPlayerEffects(context, { movement: player, position: () => player.position });
   else bindPlayerEffects({ effects, target: health, movement: player, combat: context.app.combat, position: () => player.position, scope: context.scope });

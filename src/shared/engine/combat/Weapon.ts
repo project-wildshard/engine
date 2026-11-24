@@ -1,6 +1,6 @@
 import type { Vector3, Matrix4, Quaternion } from 'three';
 import { shotRandom } from './shotSpread';
-import { Equipment, type WeaponId, type EquipmentRow, type EquipContext } from './Equipment';
+import { Equipment, weaponIdOf, type WeaponId, type EquipmentRow, type EquipContext } from './Equipment';
 import type { AimCommand, FightCommand } from '../input/commands';
 import type { WeaponChargePhase } from '../../../client/engine/combat/cues';
 
@@ -59,8 +59,7 @@ export abstract class Weapon extends Equipment implements WeaponHooks {
   override readonly id: WeaponId;
   constructor(row: EquipmentRow) {
     super(row);
-    if (row.legacySlot === undefined) throw new Error(`Equipment ${row.id} has no main slot`);
-    this.id = row.legacySlot;
+    this.id = weaponIdOf(row);
   }
   private commandedAim: AimCommand | null = null;
   private aimSource: (() => AimCommand) | null = null;

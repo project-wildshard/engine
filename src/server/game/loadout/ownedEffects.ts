@@ -4,6 +4,7 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
 import type { Owned } from '../../../shared/game/loot/Owned';
+import { weaponIdOf } from '@wildshard/engine/combat/Equipment';
 
 type Grants = NonNullable<Shardfile['items']['loadout']['effects']>['player'];
 const weaponEffects = new WeakMap<SimHost, Map<PlayerSim, (weapon: string, attr: string, base: number) => number>>();
@@ -38,7 +39,7 @@ export function installOwnedEffects(host: SimHost, owned: Owned, source: Shardfi
   };
   const weapon=(id:string)=>row.weapons.find(entry=>entry.items.some(item=>{
     const equipment=source.items.rows.find(value=>value.id===item)?.equipment;
-    return item===id||equipment?.id===id||equipment?.legacySlot===id;
+    return item===id||equipment?.id===id||(equipment!==undefined&&weaponIdOf(equipment)===id);
   }));
   const read=(id:string,attr:string,base:number):number=>fold(select(weapon(id)?.grants??[]),attr,base);
   const readers=weaponEffects.get(host)??new Map<PlayerSim, typeof read>();readers.set(player,read);weaponEffects.set(host,readers);
