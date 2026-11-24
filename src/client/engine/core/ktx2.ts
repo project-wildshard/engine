@@ -60,6 +60,8 @@ let loader: KTX2Loader | null = null;
 let gameRenderer: Renderer | null = null;
 /** SENTRY-ZERO: a page reports its first missing KTX2 stand-in only */
 let standInFaultSent = false;
+/** Tests: a fresh page, whose first missing stand-in reports again (production never calls it). */
+export function resetStandInFault(): void { standInFaultSent = false; }
 
 function createLoader(): KTX2Loader {
   const made = new KTX2Loader().setTranscoderPath(BASIS_PATH);

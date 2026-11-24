@@ -1,6 +1,6 @@
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import type { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { installGltfKtx2 } from './ktx2';
+import { installGltfKtx2, resetStandInFault } from './ktx2';
 import { isRegisteredGpuFile, registerGpuFiles, standIn } from '../boot/gpuFiles';
 import { onFault, type Fault } from '../../../shared/engine/core/faults';
 
@@ -10,7 +10,10 @@ import { onFault, type Fault } from '../../../shared/engine/core/faults';
 // reported once as a recoverable fault.
 const SERVED = '/assets/game89/npcs/miller.glb', GPU = '/assets/gpu/game89/npcs/miller-2d664352.glb';
 const RANGER = '/assets/game89/npcs/ranger.glb', RANGER_GPU = '/assets/gpu/game89/npcs/ranger-c5f60d88.glb';
-registerGpuFiles({ phone: { [SERVED]: GPU, [RANGER]: RANGER_GPU }, desktop: { [SERVED]: GPU, [RANGER]: RANGER_GPU } });
+// each test retires its own stand-in, so the tests hold in any order (vitest --sequence.shuffle)
+const SMITH = '/assets/game89/npcs/smith.glb', SMITH_GPU = '/assets/gpu/game89/npcs/smith-0a1b2c3d.glb';
+const TABLE = { [SERVED]: GPU, [RANGER]: RANGER_GPU, [SMITH]: SMITH_GPU };
+registerGpuFiles({ phone: TABLE, desktop: TABLE });
 
 class HttpError extends Error {
   readonly response: { status: number; url: string };
@@ -33,6 +36,8 @@ class FakeLoader {
 installGltfKtx2(FakeLoader as unknown as typeof GLTFLoader);
 const load = (loader: FakeLoader, url: string): Promise<unknown> => new Promise((resolve, reject) => { loader.load(url, resolve, undefined, reject); });
 
+// each test is a fresh page: the first missing stand-in a page meets reports once (SENTRY-ZERO)
+beforeEach(() => { resetStandInFault(); });
 afterEach(() => { vi.restoreAllMocks(); });
 
 test('a stand-in that answers 404 falls back to the served file, is retired for the page and is reported once', async () => {
@@ -67,7 +72,8 @@ test('concurrent loads that all saw the 404 all fall back, and it is reported on
 test('an absolute URL with a query names the stand-in by its page path', async () => {
   const { retireGpuFile } = await import('../boot/gpuFiles');
   expect(retireGpuFile('https://play.wildshard.io/assets/gpu/game89/npcs/none-00000000.glb?v=1')).toBeUndefined();
-  expect(retireGpuFile(`https://play.wildshard.io${GPU}?v=1`)).toBe('retired');
+  expect(retireGpuFile(SMITH_GPU)).toBe('new');
+  expect(retireGpuFile(`https://play.wildshard.io${SMITH_GPU}?v=1`)).toBe('retired');
 });
 
 test('a 404 on a file that is no stand-in still fails as before', async () => {
