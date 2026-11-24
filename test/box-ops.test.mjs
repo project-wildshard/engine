@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {afterAll, expect, test} from 'vitest';
-import {GATE, GATE_MISSING, gateProbeCommand, gateRestartCommand, main, probeQueries, promCommand, restartCommand, shq, summarize, throughGate} from '../scripts/box-ops.mjs';
+import {GATE, GATE_MISSING, gateProbeCommand, gateRestartCommand, main, playerQueries, probeQueries, promCommand, restartCommand, shq, summarize, summarizePlayers, throughGate} from '../scripts/box-ops.mjs';
 
 const ok = result => ({status: 'success', data: {resultType: 'vector', result}});
 const sample = (labels, value) => ({metric: labels, value: [1, String(value)]});
@@ -118,4 +118,14 @@ test('the gate refuses a production restart, a shell line and anything else befo
     expect(result.out, ask).toBe('');
     expect(result.err, ask).toMatch(/^refused: /u);
   }
+});
+
+test('MW2: players reads seats now and the fewest over the window, through the gate', () => {
+  const asked = [];
+  const answer = value => JSON.stringify({status: 'success', data: {result: [{metric: {}, value: [0, String(value)]}]}});
+  const out = main(['players', 'staging'], command => { asked.push(command); return answer(asked.length === 1 ? 12 : 11); });
+  expect(out).toEqual({channel: 'staging', players: 12, fewestOverWindow: 11, window: '10m'});
+  expect(asked).toEqual([gateProbeCommand(playerQueries('staging').now), gateProbeCommand(playerQueries('staging').fewest)]);
+  expect(() => summarizePlayers('staging', {now: {status: 'success', data: {result: []}}, fewest: {status: 'success', data: {result: []}}})).toThrow(/no player series/u);
+  expect(() => playerQueries('prod')).toThrow(/unknown channel/u);
 });

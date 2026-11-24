@@ -4,6 +4,7 @@
 // through the agents' sudo allowlist (MS3.5, J266); any other channel is refused before anything connects.
 //   node scripts/box-ops.mjs probe staging|production
 //   node scripts/box-ops.mjs restart staging
+//   node scripts/box-ops.mjs players staging|production   (MW2: seated now, and the fewest over the probe's window)
 // The host is the ssh alias `wildshard-agent` (this Mac's ~/.ssh/config, or the one box-probe.yml writes from secrets).
 // MA7c: both verbs go through the box's gate (scripts/vps/wildshard-box-gate), the only command the workflows' own key
 // may run (its authorized_keys line forces it). Until a signed release has put the gate on the box, a box without it
@@ -41,6 +42,21 @@ export function probeQueries(channel) {
     rss: `max(max_over_time(process_resident_memory_bytes{channel="${c}"}[${WINDOW}]))`,
     heapSlope: `sum(deriv(wildshard_thread_memory_bytes{channel="${c}",kind="heap"}[${WINDOW}]))`,
   };
+}
+
+/** Meta MACBOOK-WAITS MW2: players seated now, and the fewest over the probe's window, so a bot load's numbers say how
+ * many bots the window really held. @param {string} channel */
+export function playerQueries(channel) {
+  const c = known(channel);
+  return {now: `sum(wildshard_players{channel="${c}"})`, fewest: `min_over_time(sum(wildshard_players{channel="${c}"})[${WINDOW}:15s])`};
+}
+
+/** @param {string} channel @param {{now: unknown, fewest: unknown}} answers */
+export function summarizePlayers(channel, answers) {
+  const c = known(channel);
+  const [now] = rows(answers.now), [fewest] = rows(answers.fewest);
+  if (now === undefined || !Number.isFinite(now.value)) throw new Error(`${c}: Prometheus holds no player series`);
+  return {channel: c, players: now.value, fewestOverWindow: fewest !== undefined && Number.isFinite(fewest.value) ? fewest.value : null, window: WINDOW};
 }
 
 /** POSIX single-quote a string for the remote shell. @param {string} text */
@@ -150,12 +166,18 @@ export function main(argv, run = ssh) {
     const answers = {tick: read(queries.tick), rss: read(queries.rss), heapSlope: read(queries.heapSlope)};
     return summarize(channel, answers);
   }
+  if (verb === 'players') {
+    const queries = playerQueries(channel);
+    /** @param {string} query @returns {unknown} */
+    const read = query => JSON.parse(throughGate(run, gateProbeCommand(query), promCommand(query)));
+    return summarizePlayers(channel, {now: read(queries.now), fewest: read(queries.fewest)});
+  }
   if (verb === 'restart') {
     const state = throughGate(run, gateRestartCommand(channel), restartCommand(channel)).trim().split('\n').at(-1);
     if (state !== 'active') throw new Error(`staging server is '${state}' after the restart`);
     return {channel, restarted: true, state};
   }
-  throw new Error('usage: box-ops.mjs probe <staging|production> | restart staging');
+  throw new Error('usage: box-ops.mjs probe <staging|production> | players <staging|production> | restart staging');
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {

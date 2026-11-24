@@ -1,0 +1,123 @@
+# Meta MACBOOK-WAITS MW2 (EG-25, EG-29; J504 names the staging rooms box as the box for the nightly bot load): ordinary bots
+# from three hosted runners sit on the staging server for 15 minutes, and the box's own Prometheus reads what they cost:
+# tick p95 (worst worker), resident memory and heap slope over a 10-minute window the bots fill, plus how many players that
+# window held at its emptiest. Read-only on the box: the probe goes through the gate (wildshard-box-gate probe), exactly
+# as box-probe.yml does; the bots are mmo-bots.mjs staging, built from the signed staging release's own tree.
+#   gh workflow run box-load.yml -R project-wildshard/engine
+# Seats: staging seats 16 and the door 4 sockets per address (mmo-bots.mjs), so each runner brings 4 bots and refuses to
+# take the last 4 seats from people; the load is as many legs as staging has room for, at most 12 bots. 32 bots on this box
+# need staging's seats raised or the box replica (`mmo-bots.mjs replica --box`) open to the workflows' key: a box change.
+name: box-load
+on:
+  schedule:
+    - cron: '23 8 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: box-load
+  cancel-in-progress: false
+env:
+  BOT_SECONDS: '900'
+jobs:
+  bots:
+    if: github.repository == 'project-wildshard/engine'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    continue-on-error: true
+    environment: box
+    strategy:
+      fail-fast: false
+      matrix:
+        leg: [0, 1, 2]
+    env:
+      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Stop before the box without a tailnet client (OPEN QUESTION)
+        if: env.TS_OAUTH_CLIENT_ID == ''
+        run: |
+          echo "::error::no Tailscale OAuth client in environment box (TS_OAUTH_CLIENT_ID); staging's health read is tailnet-only"
+          exit 1
+      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - uses: ./.github/actions/ring-setup
+        with:
+          pins-cache-scope: full
+      - name: Four bots on staging for the window
+        run: |
+          # Legs start a little apart, so their seat checks see each other's bots.
+          sleep $(( ${{ matrix.leg }} * 20 ))
+          node scripts/mmo-bots.mjs staging --bots 4 --seconds "$BOT_SECONDS" --work-dir tmp/box-load/leg${{ matrix.leg }}
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: box-load-leg${{ matrix.leg }}
+          path: |
+            tmp/box-load/**/report.json
+            tmp/box-load/**/run.log
+          if-no-files-found: warn
+          retention-days: 14
+  probe:
+    if: github.repository == 'project-wildshard/engine'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: box
+    env:
+      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: scripts/box-ops.mjs
+          sparse-checkout-cone-mode: false
+      - name: Stop before the box without a tailnet client (OPEN QUESTION)
+        if: env.TS_OAUTH_CLIENT_ID == ''
+        run: |
+          echo "::error::no Tailscale OAuth client in environment box (TS_OAUTH_CLIENT_ID); the box is tailnet-only"
+          exit 1
+      - uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+      - name: Write the agents' ssh alias from secrets
+        env:
+          BOX_SSH_KEY: ${{ secrets.BOX_SSH_KEY }}
+          BOX_SSH_HOST: ${{ secrets.BOX_SSH_HOST }}
+          BOX_KNOWN_HOSTS: ${{ secrets.BOX_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          (umask 077; printf '%s\n' "$BOX_SSH_KEY" > ~/.ssh/wildshard-agent; printf '%s\n' "$BOX_KNOWN_HOSTS" > ~/.ssh/known_hosts)
+          printf 'Host wildshard-agent\n  HostName %s\n  User wildshard-agent\n  IdentityFile ~/.ssh/wildshard-agent\n  IdentitiesOnly yes\n  StrictHostKeyChecking yes\n' "$BOX_SSH_HOST" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+      - name: Wait for the bots, let them fill a 10-minute window, read the box
+        shell: bash
+        run: |
+          players() { node scripts/box-ops.mjs players staging | node -e 'process.stdin.on("data", d => console.log(JSON.parse(d).players))'; }
+          base=$(players); want=$(( base + 8 )); echo "staging seats $base before the load; waiting for $want (two legs at least)"
+          for _ in $(seq 1 90); do now=$(players); [ "$now" -ge "$want" ] && break; sleep 10; done
+          [ "$now" -ge "$want" ] || { echo "::error::the bots never sat: $now players, wanted $want"; exit 1; }
+          echo "seated: $now players; holding 600 s so the probe's 10-minute window is all load"
+          sleep 600
+          node scripts/box-ops.mjs probe staging | tee "$RUNNER_TEMP/probe.json"
+          node scripts/box-ops.mjs players staging | tee "$RUNNER_TEMP/players.json"
+          node -e '
+            const fs = require("fs"), s = JSON.parse(fs.readFileSync(process.argv[1], "utf8")), p = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+            const rows = [["players (fewest over the window / before)", p.fewestOverWindow + " / " + process.argv[3], "the load"],
+              ["tick p95 (worst worker, ms)", s.tickP95MaxMs + " (worker " + s.tickP95Worker + " of " + s.workers + ")", s.tickOk ? "under 12 ms" : "OVER 12 ms"],
+              ["RSS (MiB)", s.rssMiB, s.rssOk ? "under 60% of cap" : "OVER 60% of cap"], ["heap slope (KiB/min)", s.heapSlopeKiBPerMin, "trend"]];
+            const table = "### box-load staging (last " + s.window + ", bots seated)\n\n| Read | Value | Budget |\n|---|---|---|\n" + rows.map(r => "| " + r.join(" | ") + " |").join("\n");
+            console.log(table); fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, table + "\n");
+            console.log(JSON.stringify({at: "box-load", ...s, playersFewest: p.fewestOverWindow, playersBefore: Number(process.argv[3])}));
+            if (!s.tickOk || !s.rssOk) process.exitCode = 1;
+          ' "$RUNNER_TEMP/probe.json" "$RUNNER_TEMP/players.json" "$base"
+      - name: Forget the key
+        if: always()
+        run: rm -f ~/.ssh/wildshard-agent ~/.ssh/config
