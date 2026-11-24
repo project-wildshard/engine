@@ -213,7 +213,7 @@ describe('ci.yml on main', () => {
     expect(reports).toContain('github.event.workflow_run.head_sha');
     expect(reports).toContain('github.event.workflow_run.id');
     expect(reports).toContain('node scripts/test-timings.mjs collect');
-    expect(reports).toContain('Soak socket loss');
+    expect(reports).toContain('Soak hover presses');
     // Reports are read-only source-run follow-ups, never a workflow_run token
     // exposed to fork PR code or granted write permission.
     expect(reports).toContain("github.event.workflow_run.event == 'push'");
