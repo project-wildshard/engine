@@ -56,7 +56,7 @@ try {
   }
   // the board: one row a zone; columns 2.3 km with / without, 3.5 km with / without
   const heads = DISTANCES.flatMap(d => [`${String(d / 1000)} km, impostor (today)`, `${String(d / 1000)} km, GLB only (cap kept)`]);
-  const img = name => `<img src="/${name}.png"><img class="crop" src="/${name}-crop.png">`;
+  const img = /** @param {string} name */ name => `<img src="/${name}.png"><img class="crop" src="/${name}-crop.png">`;
   const html = `<!doctype html><style>body{margin:0;background:#111;color:#eee;font:15px system-ui}table{border-collapse:collapse}td,th{padding:4px}img{width:420px;display:block}img.crop{width:420px;height:158px;image-rendering:pixelated;margin-top:2px}th{text-align:left}</style>
 <h2 style="margin:8px">FP40: legacy far views with and without the G539 impostor (J439: the 1.6 MB far cap)</h2><p style="margin:8px">Each cell: the traveller's frame (40° lens, on a neighbour's road), then the same pixels round the zone at ×4.</p>
 <table><tr><th></th>${heads.map(h => `<th>${h}</th>`).join('')}</tr>${cells.map((row, i) => `<tr><th>${SLUGS[i]}</th>${row.map(n => `<td>${img(n)}</td>`).join('')}</tr>`).join('')}</table>`;
