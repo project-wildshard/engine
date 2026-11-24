@@ -13,6 +13,13 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.84 (2026-11-24)
+
+- Lights in a zone can now brighten step by step as a quest moves along, starting with Glowfen's shrine lanterns.
+- Nalati Grasslands supports the updated night guest encounter, with the same creature looks and animations.
+- Saved gear from older versions carries over to the new item names, so nothing goes missing from your hands.
+- Ammunition always finds the weapon it belongs to after an update.
+
 ## v0.1.81 (2026-11-24)
 
 - Older published revisions of Driftwood, Pine Hollow and Nalati Grasslands load in online play.
