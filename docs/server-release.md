@@ -218,8 +218,10 @@ The staging deploy smoke checks entry to play, world draw, movement, the
 load budget, error cards, deep links and a gate crossing. Vision reports
 separately. On P0 or P1, keep the verdict and board, write the
 `staging-qa HOLD` receipt, and add or update the STAGING-BUGBASH row
-with the fix-forward lane. Hold unrelated cuts until the fix passes
-staging QA. The live page stays in place (J426).
+with the fix-forward lane. Hold promotion of that build. Engine, SDK and
+format cuts continue. Any staging publish pause applies only to the
+colliding revision, for at most 30 minutes (J505). The live page stays
+in place (J426).
 
 `release.sh vX.Y.Z
 --finish` tags the exact green head; the tag signs production and

@@ -72,9 +72,11 @@ export function mergeVerdict({ build, smoke, proofs, expected, selected, after, 
 
 /** @param {{ release: string, findings: readonly Finding[] }} verdict @param {string} owner */
 export function holdLine(verdict, owner) {
-  const problems = verdict.findings.filter(row => row.source !== 'vision' && (row.severity === 'P0' || row.severity === 'P1'));
+  const problems = verdict.findings.filter(row => row.source !== 'vision' && holds([row]));
   if (problems.length === 0) return undefined;
-  return `staging-qa HOLD ${verdict.release} ${problems.map(row => `${row.severity} ${row.scenario} ${row.key}`).join(', ')}. Fix forward with ${owner}; block unrelated cuts until the fix passes staging QA.`;
+  const details = problems.map(row => `${row.severity} ${row.scenario} ${row.key}`).join(', ');
+  return `staging-qa HOLD ${verdict.release} ${details}. Fix forward with ${owner}. Hold promotion of this build only. ` +
+    'Engine, SDK and format cuts continue. A staging publish pause applies to only the colliding revision for at most 30 minutes (J505).';
 }
 
 /** @param {string} file */

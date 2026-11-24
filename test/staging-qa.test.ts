@@ -4,7 +4,7 @@ import { deployFrameProblem } from '../scripts/journey-proof.mjs';
 import { gateLeg, holdLine, JOURNEY_CARD, mergeVerdict } from '../scripts/staging-qa.mjs';
 import { QA_RIG_SHARDS, tourFixture } from '../scripts/staging-qa-local.mjs';
 import { TOUR_FEATURED } from '../scripts/zone-entry-featured.mjs';
-import { CHANNELS } from '../scripts/page-release/flow.mjs';
+import { CHANNELS, qaGap, QA_LEGS } from '../scripts/page-release/flow.mjs';
 import { chromiumCandidateArgs } from '../scripts/staging-qa-browser.mjs';
 import { pickPhone, qaDevice } from '../scripts/staging-qa-sim.mjs';
 import { budgetFinding, LEG_CAP_S, LEG_TARGET_S, LEGS, nominalSeconds, STEPS } from '../scripts/staging-qa-budget.mjs';
@@ -45,6 +45,23 @@ describe('staging QA deploy verdict', () => {
     const result = mergeVerdict({ ...clean, smoke: { ...smoke, findings: [vision] } });
     expect(result).toMatchObject({ hold: false, worst: 'none', minutesInPlay: 0.1 });
     expect(holdLine({ release: 'v0.1.44', findings: [vision] }, 'opus-drift')).toBeUndefined();
+  });
+
+  it('J505 holds only the failing build and leaves the fix-forward release independent', () => {
+    const failed = mergeVerdict({ ...clean, proofs: [{ ...proof, pass: false }] });
+    const staging = {
+      qa: true, kind: 'staging' as const, full: true, url: CHANNELS.staging.origin,
+      scenarios: QA_LEGS.staging.map(id => ({ id, status: 'ran' })),
+    };
+    const held = { ...staging, ...failed, full: true, build };
+    const fixed = 'b'.repeat(40);
+    expect(qaGap(held, build)).toContain('it holds');
+    expect(qaGap(held, fixed)).toContain('the verdict is for');
+    expect(qaGap({ ...staging, build: fixed, hold: false }, fixed)).toBeUndefined();
+    const line = holdLine({ ...held, release: 'v0.1.77' }, 'codex-ms');
+    expect(line).toContain('Hold promotion of this build only');
+    expect(line).toContain('Engine, SDK and format cuts continue');
+    expect(line).toContain('only the colliding revision for at most 30 minutes');
   });
 
   it('holds on any P0 or a missing journey and names the fix-forward lane', () => {

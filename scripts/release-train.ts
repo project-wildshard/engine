@@ -188,8 +188,9 @@ async function main(args: string[]) {
     return;
   }
 
-  const unlock = pidLock(join(root, '.git', 'release-train.lock'));
-  if (!unlock) throw new Error('Another train command is active');
+  const unlock = pidLock(join(root, '.git', `release-train-${tag}.lock`));
+  if (!unlock) throw new Error(`Another train command for ${tag} is active`);
+  let unlockStaging: (() => void) | undefined;
   let stagingVerdict: string | undefined;
   let scratch: ReturnType<typeof openReleaseRun> | undefined;
   let evidence: string | undefined;
@@ -223,8 +224,19 @@ async function main(args: string[]) {
     if (!provesTrainCi(await watchRun(ci, join(out, 'release-ci.log')), build)) {
       throw new Error('Exact release CI did not prove the release build');
     }
-    receipt(lane, `DONE ${tag} ${build.slice(0, 10)} exact release CI ${ci} green. Starting staging.`);
+    receipt(lane, `DONE ${tag} ${build.slice(0, 10)} exact release CI ${ci} green.`);
 
+    // J505: a busy staging alias has no say over preparing or proving another release.
+    unlockStaging = pidLock(join(root, '.git', 'release-train.lock'));
+    if (!unlockStaging) {
+      receipt(lane, `NOTE ${tag} is cut and CI is green. Staging is in use. Rerun this command to stage the same build.`);
+      process.exitCode = 1;
+      return;
+    }
+    const stagingPage = await get(`${stage.origin}/version.json`) as Version | null;
+    const liveTag = `v${stagingPage?.clientVersion ?? ''}`;
+    if (tagPattern.test(liveTag) && newer(liveTag, tag)) throw new Error(`Staging already serves newer ${liveTag}`);
+    receipt(lane, `NOTE ${tag} starting staging.`);
     const stageTree = join(out, 'stage-tree');
     if (!existsSync(stageTree)) {
       await runLogged(root, join(out, 'staging-install.log'), 'git', ['clone', '--quiet', '--shared', '--no-checkout', root, stageTree]);
@@ -404,7 +416,7 @@ async function main(args: string[]) {
     throw error;
   } finally {
     try { scratch?.close(); }
-    finally { unlock(); }
+    finally { unlockStaging?.(); unlock(); }
   }
 }
 
