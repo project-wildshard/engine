@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.78 (2026-11-23)
+
+- Enter MMO returns you to your saved zone with one loading screen.
+- Crossing into Nalati loads its creatures and lets you play.
+- The road prepares nearby ground and frees uploaded terrain data to reduce memory use.
+- Driftwood and Brasscap Mesa have new revisions.
+- Mossgate opens in its own room, and test shards stay off the player tabs.
+
 ## v0.1.67 (2026-11-21)
 
 - Mirror Salt shows the dock prompt at seat height and lets drivers get back into their buggies.
