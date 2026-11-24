@@ -2,7 +2,7 @@
 // gate runs the cheap checks behind 11-19's main reds. Vitest's related selection follows imports only, and a test that
 // reads a file by path, a pin or a digest has no import edge to it; a pin push is a harness change, so the split gate
 // sends all but its native files to hosted CI. Each such reader is declared here and runs at push:
-//   - every code push: check-css (CI static, ~1 s) and the host-ruler and section-host tables (three Vitest files, ~1.2 s);
+//   - every code push: check-css (CI static, ~1 s), agent-markers (~0.1 s) and the host-ruler and section-host tables (three Vitest files, ~1.2 s);
 //   - a changed path in PATH_EDGES: the files that read it (a static check named by `static` already runs every push);
 //   - a shard pin or Ring 1 digest change: ring-step.ts for the Ring 1 slugs it moves (~4 s each), not all seven (17 s).
 // test/push-path-edges.test.ts holds a push for each row that would have gone red, and fails if the gate skips its run.
@@ -11,6 +11,8 @@ import { execFileSync } from 'node:child_process';
 /** CI static's sub-10-second checks the push gate lacked (scripts/ci-static.sh code). */
 export const FS27_STATIC = Object.freeze([
   { name: 'check-css', commands: [[process.execPath, 'scripts/check-css.mjs']] },
+  // Main red 45410583837: a new script fetched with no agent marker (METRICS MT2/MT3); ~0.1 s, so every code push runs it.
+  { name: 'agent-markers', commands: [[process.execPath, 'scripts/agent-marker-check.mjs']] },
 ]);
 
 /** The host-ruler and section-host tables (HOST-RULER HR1-HR4): cheap, and read by every built product. */

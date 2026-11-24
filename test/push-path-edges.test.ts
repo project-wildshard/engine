@@ -44,11 +44,12 @@ it('names only reader files that exist', () => {
   for (const file of [...TABLE_TESTS, ...PATH_EDGES.flatMap(row => row.tests ?? [])]) expect(existsSync(file), file).toBe(true);
 });
 
-it('runs check-css and the host-ruler tables on every code push, and nothing on a docs push', () => {
+it('runs check-css, agent-markers and the host-ruler tables on every code push, and nothing on a docs push', () => {
   expect(staticNames).toContain('check-css');
+  expect(staticNames).toContain('agent-markers');
   const plan = fs27Plan({ mode: 'related', files: ['src/client/engine/ui/hud.ts'] }, { split: true, slugs: [] });
   expect(plan.tests).toEqual([...TABLE_TESTS]);
-  expect(plan.tasks.map(task => task.name)).toEqual(['check-css']);
+  expect(plan.tasks.map(task => task.name)).toEqual(['check-css', 'agent-markers']);
   expect(fs27Plan({ mode: 'docs', files: ['docs/dev.md'] }, { split: true, slugs: [] })).toEqual({ tasks: [], tests: [] });
   // The non-split full gate already runs the whole suite.
   expect(fs27Plan({ mode: 'full', files: ['package.json'] }, { split: false, slugs: [] }).tests).toEqual([]);

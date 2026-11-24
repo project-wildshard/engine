@@ -11,10 +11,10 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { agentFetch } from './agent-requests.mjs';
 
 const REPO = 'project-wildshard/engine';
 const API = 'https://api.wildshard.io';
-const UA = process.env.WS_AGENT_UA ?? 'WildshardAgent/1 (pins-mirror)';
 
 /** @param {{shards: readonly {slug: string, hash: string}[]}} pins @param {ReadonlySet<string>} assets */
 export function missingPins(pins, assets) {
@@ -29,7 +29,7 @@ function mirrorAssets() {
 /** @param {string} url */
 async function bytesOf(url) {
   for (let attempt = 1; ; attempt++) {
-    const response = await fetch(url, { headers: { 'user-agent': UA } }).catch(() => undefined);
+    const response = await agentFetch(url).catch(() => undefined);
     if (response?.ok === true) return new Uint8Array(await response.arrayBuffer());
     if (attempt === 3) throw new Error(`${url}: ${response?.status ?? 'no response'}`);
     await sleep(2000 * attempt);
