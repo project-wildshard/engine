@@ -23,7 +23,7 @@ import type { SimCommand } from '@wildshard/engine/sim';
 import { parseShardfile } from '@wildshard/format/shardSchema';
 import { runTickWorker } from '../tickWorkerLoop';
 import { simPlayerCommand, MAX_TICK_SNAPSHOT_CHARS, type HeadlessEffect, type HeadlessCommand } from '../../../shared/host/tickProtocol';
-import { headlessSections } from '@wildshard/format/headlessSections';
+import { engineHeadlessSections as headlessSections } from '../../../shared/host/headlessSections';
 import { planPortalRide } from '@wildshard/engine/game/shardfile/declaredPortalRide';
 import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { validateShardfileAssets } from '@wildshard/format/assetAdmission';

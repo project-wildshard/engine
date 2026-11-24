@@ -62,7 +62,7 @@ test('OF41b: a shard with no portal link installs no ride', () => {
 });
 
 test('the author simulation runs the ordinary portal declared in the plan', async () => {
-  const sections = new Map([['client/plan', { version: 1, features: [{ kind: 'portal.ride', rows: ride }] }]]);
+  const sections = new Map([['server/plan', { version: 1, features: [{ kind: 'portal.ride', rows: ride }] }]]); // HS6: the server reads server/plan only
   const shard = { ...portalShard(true), spawn: { x: 0, y: 0, z: 240, yaw: Math.PI } };
   const sim = await HeadlessSimulation.create(shard, new Map(), undefined, { sections, deadline: 'advisory' });
   const facts: string[] = [];
