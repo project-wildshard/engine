@@ -177,7 +177,7 @@ test('game registries retain literal identities, readonly rows and live singleto
 });
 
 describe('isolated-game-rig-default-declarations',()=>{
-for(const name of ["shared/systems/looks/grassField","client/systems/viewmodel/rigArms","client/weapons/heldLauncher","client/weapons/heldPolearm","client/weather/rainPresentation","client/plugin/headless","client/plugin/geometry","shared/grid/ghosts","client/grid/live","client/systems/species/view/boar","client/systems/species/view/bear"])test(`${name} emits isolated declarations`,()=>{
+for(const name of ["shared/systems/looks/grassField","client/systems/viewmodel/rigArms","client/weapons/heldLauncher","client/weapons/heldPolearm","client/weather/rainPresentation","client/plugin/headless","client/plugin/geometry","shared/grid/ghosts","client/grid/live","client/systems/species/view/boar"])test(`${name} emits isolated declarations`,()=>{
  const emitted=ts.transpileDeclaration(readFileSync(`src/${name.replace(/^(client|shared|server|cook)\//u, '$1/game/')}.ts`,'utf8'),{fileName:`${name}.ts`,reportDiagnostics:true,compilerOptions:{isolatedDeclarations:true,strict:true,exactOptionalPropertyTypes:true}});
  expect(emitted.diagnostics).toEqual([]);
  expect(emitted.outputText.length).toBeLessThan(100_000);

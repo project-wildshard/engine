@@ -2107,7 +2107,7 @@
       "@wildshard/engine/test/terrain",
       "@wildshard/engine/entities/species/registry",
       "@wildshard/engine/entities/species/look",
-      "../src/client/game/systems/species/boar",
+      "../src/test/game/species/boar",
       "../src/client/game/systems/species/view/boar",
       "@wildshard/sharddev/blobs",
       "@wildshard/sharddev/formatJsonSchema",

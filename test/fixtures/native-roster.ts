@@ -4,7 +4,7 @@ import { populationEnvironment } from '../../src/server/game/population/environm
 import { flatPopulationEnvironment } from './population-environment';
 import type { SimHost } from '../../src/server/engine/sim';
 import type { Rng } from '@wildshard/format/seededRng';
-import { BOAR } from '../../src/client/game/systems/species/boar';
+import { BOAR } from '../../src/test/game/species/boar';
 /** Real scoped services for lifecycle tests, without structural callback admission. */
 export function fixtureNativeRoster(host: SimHost, rng: Rng) {
   flatPopulationEnvironment(host);

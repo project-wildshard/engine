@@ -9,7 +9,7 @@ import { HuntBrain, type HuntBody } from '../src/server/engine/ai/hunt';
 import { NativeManager } from '../src/server/game/population/nativeManager';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 
-import { BOAR } from '../src/client/game/systems/species/boar';
+import { BOAR } from '../src/test/game/species/boar';
 import { Vector3 } from 'three';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createSimHost } from '../src/server/engine/sim';

@@ -20,7 +20,7 @@ import { Rng } from '@wildshard/format/seededRng';
 import { createNativeCreatureRoster } from '../src/server/game/shardfile/homeKeeper';
 import { fixtureNativeRoster } from './fixtures/native-roster';
 import { admitSpeciesBrains, installSpeciesHomes } from '../src/server/game/plugin/brain';
-import { BOAR } from '../src/client/game/systems/species/boar';
+import { BOAR } from '../src/test/game/species/boar';
 
 let rapier: Awaited<ReturnType<typeof loadRapier>>;
 beforeAll(async () => { rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))); });
