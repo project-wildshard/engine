@@ -8,6 +8,7 @@ type Context=EventTarget&Pick<AudioContext,'state'|'resume'|'suspend'>;
 export class AudioActivity {
   private readonly scope:Scope;
   private readonly now:()=>number;
+  private readonly presentation:Pick<PresentationState,'menuAudible'>;
   private context:Context|undefined;
   private contextScope:Scope|undefined;
   private view:ViewState='covered';
@@ -19,11 +20,12 @@ export class AudioActivity {
   private failed=false;
   private pending:{action:'resume'|'suspend'}|undefined;
   constructor(scope:Scope,presentation:PresentationState,now:()=>number=diagnosticNow){
-    this.scope=scope;this.now=now;
+    this.scope=scope;this.now=now;this.presentation=presentation;
     presentation.observe(scope,(view,front)=>{
       if(view!==this.view)this.denied=false;
       this.view=view;this.foreground=front;
-      if(front==='play')this.coveredAt=undefined;else this.coveredAt??=now();
+      // a game menu over play is not a cover: the grace starts when another cover takes the front (QA 11-24 row 17)
+      if(front==='play'||presentation.menuAudible)this.coveredAt=undefined;else this.coveredAt??=now();
       this.update();
     });
   }
@@ -45,8 +47,11 @@ export class AudioActivity {
     const ctx=this.context;
     if(this.scope.disposed||this.scope.disposing||ctx===undefined||ctx.state==='closed')return;
     const remaining=this.coveredAt===undefined?Infinity:5000-(this.now()-this.coveredAt);
-    const allowed=this.view!=='hidden'&&(this.foreground==='play'||remaining>0);
-    if(allowed&&this.foreground!=='play'&&(this.wanted||ctx.state==='running')){
+    // QA 11-24 row 17 (Jake, ~13:25 Cancún: "if the bag menu is open too long the music stops"; it stopped 5 s in): a game menu over
+    // play keeps the audio on however long it is open; other covers (a loading card, the title) keep the five second grace
+    const menu=this.presentation.menuAudible;
+    const allowed=this.view!=='hidden'&&(this.foreground==='play'||menu||remaining>0);
+    if(allowed&&this.foreground!=='play'&&!menu&&(this.wanted||ctx.state==='running')){
       this.timer=this.scope.timeout(remaining,()=>{this.timer=undefined;this.update();});
     }
     const action=allowed?'resume':'suspend';

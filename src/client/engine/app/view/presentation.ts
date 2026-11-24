@@ -12,6 +12,12 @@ export class PresentationState {
   private foreground:ForegroundView='covered';
   private mode:ViewState='covered';
   private readonly listeners=new Set<Listener>();
+  /** QA 11-24 row 17: the front of the page is one of the game's own menus over play (the Bag, the map, the pause menu): audio
+   *  stays on however long it is open (AudioActivity); the world may still be covered */
+  private audibleMenu=false;
+  private heardAudible=false;
+  get menuAudible():boolean{return this.audibleMenu;}
+  setMenuAudible(on:boolean):void{if(this.audibleMenu!==on){this.audibleMenu=on;this.refresh();}}
   get state():ViewState{return this.mode;}
   get front():ForegroundView{return this.foreground;}
   setVisible(visible:boolean):void{if(this.visible!==visible){this.visible=visible;this.refresh();}}
@@ -24,8 +30,8 @@ export class PresentationState {
   refresh():void{
     const foreground=this.coverage==='play'&&this.gate?.read()!==true?'covered':this.coverage;
     const mode=this.visible?foreground:'hidden';
-    if(mode===this.mode&&foreground===this.foreground)return;
-    this.mode=mode;this.foreground=foreground;
+    if(mode===this.mode&&foreground===this.foreground&&this.audibleMenu===this.heardAudible)return;
+    this.mode=mode;this.foreground=foreground;this.heardAudible=this.audibleMenu;
     for(const listener of this.listeners){
       if(!this.listeners.has(listener))continue;
       try{listener(mode,foreground);}catch(error){emitFault({system:'view.state',error,verdict:'uncaught'});}

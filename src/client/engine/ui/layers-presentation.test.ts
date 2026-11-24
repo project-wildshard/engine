@@ -71,3 +71,15 @@ test('J473 (Jake, 2026-11-19: FIRE, AIM, DODGE and JUMP stay live in a talk): a 
   expect(uiInputContext(true,true,true)).toBe('menu');
   expect(uiInputContext(true,false,false)).toBe('menu');
 });
+
+test('QA 11-24 row 17: the game menu (the Bag) at the front is a game menu over play; a modal over it or a loading cover is not',()=>{
+  const layers=new UiLayers(),scope=new Scope('game-menu-front');
+  try{
+    expect(layers.gameMenuFront).toBe(false);
+    const bag=scope.child('bag');layers.push('gameMenu',view(),bag);expect(layers.gameMenuFront).toBe(true);
+    const modal=scope.child('modal');layers.push('modal',view('glass'),modal);expect(layers.gameMenuFront).toBe(false);modal.dispose();
+    expect(layers.gameMenuFront).toBe(true);
+    const loading=scope.child('loading');layers.holdCovered(loading);expect(layers.gameMenuFront).toBe(false);loading.dispose();
+    bag.dispose();expect(layers.gameMenuFront).toBe(false);
+  }finally{scope.dispose();}
+});

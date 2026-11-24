@@ -65,3 +65,14 @@ test('idle PCM warm-up cancels on suspend and ignores a late delivery after show
   audioIdle(f.scope,f.context,{request:run=>{const id=++serial;pending.set(id,run);return id;},cancel:id=>{pending.delete(id);}},warm);
   const raced=pending.get(1);expect(pending.size).toBe(1);f.context.set('suspended');expect(pending.size).toBe(0);f.context.set('running');raced?.();expect(warm).not.toHaveBeenCalled();pending.get(2)?.();expect(warm).toHaveBeenCalledOnce();expect(f.scope.census.listeners).toBe(1);
 });
+// QA-FEEDBACK-2026-11-24 row 17 (Jake, ~13:25 Cancún: "if the bag menu is open too long the music stops"): the Bag is the game
+// menu (Menu.ts, an opaque gameMenu layer), so the page read covered and the five second grace suspended the audio 5 s in
+test('a game menu over play (the Bag) keeps the audio on however long it is open; leaving it for another cover starts the grace',async()=>{
+  const f=fixture();f.policy.resume();await settle();
+  f.view.setMenuAudible(true);f.view.setCoverage('covered');vi.advanceTimersByTime(10*60_000);await settle();
+  expect(f.context.state,'ten minutes in the Bag').toBe('running');expect(f.context.suspends).toBe(0);
+  f.view.setMenuAudible(false);vi.advanceTimersByTime(4999);await settle();expect(f.context.state).toBe('running');
+  vi.advanceTimersByTime(1);await settle();expect(f.context.state).toBe('suspended');
+  f.view.setMenuAudible(true);await settle();expect(f.context.state,'back in a game menu').toBe('running');
+  f.view.setVisible(false);await settle();expect(f.context.state,'a hidden page is silent even with the Bag open').toBe('suspended');
+});

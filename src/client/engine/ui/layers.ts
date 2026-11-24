@@ -72,6 +72,8 @@ export class UiLayers {
     if (scope.disposed || scope.disposing || this.covers.has(scope)) return;
     this.covers.add(scope);scope.onDispose(() => {this.covers.delete(scope);this.refresh();});this.refresh();
   }
+  /** QA 11-24 row 17: one of the game's own menus (the Bag, the map, the pause menu) is the front, with no loading cover */
+  get gameMenuFront(): boolean { return this.covers.size === 0 && this.input().at(-1)?.layer === 'gameMenu'; }
   get presentation(): ForegroundView {
     if (this.covers.size > 0) return 'covered';
     const front=this.input().at(-1);
@@ -83,7 +85,7 @@ export class UiLayers {
   bindPresentation(scope: Scope, wake?: () => void): void {
     if(scope.disposed||scope.disposing||this.bindings.has(scope))return;
     this.bindings.add(scope);
-    const update=():void=>{pagePresentation.setCoverage(this.presentation);pagePresentation.refresh();wake?.();};
+    const update=():void=>{pagePresentation.setMenuAudible(this.gameMenuFront);pagePresentation.setCoverage(this.presentation);pagePresentation.refresh();wake?.();};
     this.observers.add(update);scope.onDispose(()=>{this.observers.delete(update);});update();
   }
   isTop(handle: UiHandle): boolean { return this.input().at(-1)?.handle === handle; }
