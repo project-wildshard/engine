@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.79 (2026-11-24)
+
+- Staging keeps its zone list during storage cleanup.
+- Roads into newly placed zones open from every neighbouring cell.
+
 ## v0.1.78 (2026-11-23)
 
 - Enter MMO returns you to your saved zone with one loading screen.
