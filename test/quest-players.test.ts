@@ -188,7 +188,7 @@ test('a version 3 save on the wire reads up: the lead\'s credit is the world\'s 
 test('a death\'s other flags (a boss\'s deadFlag, a shard\'s death effect) are the killers\' credit; one no death claims is everyone\'s present', () => {
   const host = createSimHost(SIM_LEVEL, { rapier }), books = questBooks(host);
   const bot = host.addPlayer('bot:1', { x: 0, y: 1, z: 0 }), idle = host.addPlayer('bot:2', { x: 0, y: 1, z: 0 });
-  host.events.on('damage.dealt', ({ killed }) => { if (killed) host.flags.set('dead:captain'); }, host.scope); // nativeWake's deadFlag
+  host.events.on('damage.dealt', ({ killed }) => { if (killed) host.flags.set('dead:captain'); }, host.scope); // the wake row's deadFlag
   host.events.on('actor.died', () => { host.flags.set('dead:sailor'); }, host.scope); // a death effect's flag
   strike(host, bot.id, 1000);
   expect(['dead:boar:1', 'dead:captain', 'dead:sailor'].map(flag => books.of(bot.id).flags.has(flag))).toEqual([true, true, true]);

@@ -37,7 +37,6 @@ import { installNativeItems, otherCombatFrame } from '../plugin/nativeItems';
 import { addBakedPieces, bindNativeLoadout, weaponRow } from '../plugin/simulation';
 import { installHostPortalRide, type PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { installPopulationEnvironment } from '../population/environment';
-import type { installMixedPopulation } from '../population/mixedRoster';
 import { installNativeCollision } from '../population/nativeBake';
 import { NativeWildEnvironment } from '../population/nativeManager';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
@@ -51,7 +50,7 @@ import { ownContractCatalogue } from '../../../shared/game/quest/contracts';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import { installNativeEliteFeature, readEliteFeature } from '../quest/eliteFeature';
 import { eliteDrops } from '../quest/eliteDrops';
-import { installQuestKillSteps, rosterKind } from '../quest/killSteps';
+import { installQuestKillSteps } from '../quest/killSteps';
 import { declaredQuestBodies } from '../quest/declaredQuestBodies';
 import { installNativeChapterDirector } from '../quest/nativeChapter';
 import { installNativeQuestComposition, readNativeQuestSpots, type NativeQuestCompositionInput } from '../quest/nativeComposition';
@@ -80,7 +79,7 @@ export interface AssemblyRun<C extends NativeAssemblyContext> {
   readonly host: SimHost; readonly context: C; input: { readonly ledger: { readonly fact: (name: string, actorId: string) => void } } | null;
   day: DayCycleClock | null; boss?: ReturnType<typeof installGroundBoss>; quest?: ReturnType<typeof installNativeQuestComposition>;
   ammunition?: ReturnType<typeof installNativeHeldAmmunition>; elites?: ReturnType<typeof installNativeEliteFeature>;
-  island?: ReturnType<typeof installMixedPopulation>; bindings?: NativeEliteBindings; roster?: ReturnType<typeof installNativeBootRoster>;
+  bindings?: NativeEliteBindings; roster?: ReturnType<typeof installNativeBootRoster>;
   weather?: { readonly wind: Wind; readonly storm: WeatherReactions }; finishPatrol?: () => void; arena?: OpenArenaRuntime;
   wild?: NativeWildEnvironment; groups?: ReturnType<typeof installNativeGroupRows>; nativeElites?: NativeEliteRoster; eliteCore?: ReturnType<typeof nativeEliteCore>; creatures?: ReturnType<typeof installNativePopulationHunt>; taming?: ReturnType<typeof installNativeTaming>;
   /** OF22c1: the declared encounters by their spawn, once the declared creature host stands (after every host). */
@@ -112,8 +111,7 @@ export function prepareSectionMelee<C extends NativeAssemblyContext>(product: Sh
 
 /** The held hosts whose families (format `primitiveOfHost`: `held.melee`, `held.ranged`) a section now stands. */
 /** ONE-FORMAT OF22c3: Driftwood's island population (its reserved Captain, item reactions, settle and poses) is declared rows
- *  since OF22b4 and OF22c2, so no writer names these hosts. Kept originals Driftwood r4 (prod's head) and r5 still do, so
- *  they stand for them (SHARD-COMPAT CP16, FORMAT-PRUNE FP21 s8); ZONE-SNAPSHOTS ZS8 dropped their kept-plan test. */
+ *  since OF22b4 and OF22c2, so no writer names these hosts; FORMAT-PRUNE FP20 and FP53 refuse all four (no live pin names one). */
 export const ISLAND_HOSTS: ReadonlySet<string> = new Set(['population.mixed', 'population.reactions', 'population.settle', 'population.poses']);
 export const HELD_HOSTS: ReadonlySet<string> = new Set(['item.swept', 'held.arms', 'item.ranged', 'loadout', 'combat.motion', 'ammunition']);
 /** The engine's sprint speed (`walkingSpeed`), the motion a held ranged kit scales its spread and sway against. */
@@ -179,9 +177,7 @@ async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<Native
   const props = row.props === undefined ? undefined : await read<unknown>(row.props);
   const trades = row.barter === true ? parseBarterEconomy(need(shard.rows.loot[0], 'Missing barter row').economy).exchange : undefined;
   const secret = content === undefined ? undefined : await readNativeQuestSecret(product);
-  // OF22e1: a plan with no `population.mixed` host guards its quest with the declared bodies alone
-  const island = at.plan.features.some(feature => feature.host === 'population.mixed');
-  return run => { registerInstalled(run.host, 'questComposition'); run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, island, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
+  return run => { registerInstalled(run.host, 'questComposition'); run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
     ...(content === undefined ? {} : { steps: content.steps, deaths: content.deaths, readings: content.readings, lead: content.lead }),
     ...(contracts === undefined ? {} : { contracts: ownContractCatalogue(contracts, run.host.scope) }), ...(trades === undefined ? {} : { trades }), ...(director === undefined ? {} : { director }),
     ...(props === undefined ? {} : { props }), ...(secret === undefined ? {} : { secret }), ...(row.restoring === true ? { restoring: run.context.restoring } : {}) }); };
@@ -375,20 +371,17 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     // FORMAT-PRUNE FP20: ONE-FORMAT OF22c3 retired Driftwood's island population (its writers declare the creatures since
     // OF22b4, OF22c2); only Driftwood r4 and r5 named it, with the species programme it needed, and neither is live (J507)
     case 'population.mixed': throw new Error('population.mixed is retired (FORMAT-PRUNE FP20): declare the creatures');
-    case 'population.reactions': return run => {
-      const island = need(run.island, 'Item reactions need the island population');
-      run.host.events.answer('item.reaction', reaction => { if (reaction.kind === 'alarm') island.alarm(); else island.staggered(reaction.actor, reaction.strength, reaction.running); return reaction; }, run.host.scope);
-    };
-    case 'population.settle': return run => { need(run.island, 'Settling needs the island population').settle(); };
-    case 'population.poses': return run => { run.host.onStep(row.step, need(run.island, 'Poses need the island population').publishPoses, undefined, 'afterBodies'); };
+    // FORMAT-PRUNE FP53: the island population's hosts ran only on `population.mixed`'s roster
+    case 'population.reactions': case 'population.settle': case 'population.poses':
+      throw new Error(`${row.host} is retired with population.mixed (FORMAT-PRUNE FP53): declare the creatures`);
     case 'quest.composition': return prepareQuest(row, at);
     case 'quest.body-scripts': return run => { installBodyScripts(run.host, run.context, { product, assets: at.assets }); };
     case 'quest.kill-steps': {
       const input = await readAssemblyInput(product, row.rows), counters = parseAchievementCounterData(await readAssemblyInput(product, row.counters));
-      // OF22e1: the island's bodies where the plan stands it, then the declared bodies (a body's kind is its species row's)
+      // OF22e1: the declared bodies (a body's kind is its species row's)
       return run => {
-        const island = run.island === undefined ? undefined : rosterKind(run.island.bodies), declared = declaredQuestBodies(run.host, shard);
-        installQuestKillSteps(run.host, input, counters.feats, actor => island?.(actor) ?? declared.kindOf(actor), need(run.input, 'Kill steps need their commands').ledger.fact);
+        const declared = declaredQuestBodies(run.host, shard);
+        installQuestKillSteps(run.host, input, counters.feats, actor => declared.kindOf(actor), need(run.input, 'Kill steps need their commands').ledger.fact);
       };
     }
     case 'quest.chapter': {

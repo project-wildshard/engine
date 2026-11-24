@@ -4,7 +4,6 @@ import { parseNativeQuestComposition, type NativeQuestCompositionRows } from '@w
 import { nativeQuestChannels } from './nativeInputs';
 import { prepareNativeQuestEntry } from './nativeEntry';
 import { nativeStageLane, type readDirectorDocument } from '../../../shared/game/plugin/director';
-import { mixedPopulation } from '../population/mixedRoster';
 import { declaredQuestBodies } from './declaredQuestBodies';
 import * as v from 'valibot';
 import { Vector3 } from 'three';
@@ -52,7 +51,6 @@ export function nativeQuestPromptRoster(host: SimHost, id: string): readonly Hea
 }
 /** Every quest's prompts on a host: what a room reads a seller from (E7.7). */
 export function nativeQuestPrompts(host: SimHost): readonly HeadlessPrompt[] { return [...promptLoans.get(host)?.values() ?? []].flat(); }
-const MAX_BODIES = 64;
 const finite = v.pipe(v.number(), v.finite()), xyz = { x: finite, y: finite, z: finite };
 const Row = v.strictObject({ id: v.string(), kind: v.string(), ...xyz, yaw: finite, prompt: v.optional(v.strictObject(xyz)),
   collider: v.optional(v.strictObject({ x: finite, z: finite, hw: finite, hd: finite, rot: finite, yTop: finite, yBottom: finite })) });
@@ -105,8 +103,6 @@ export interface NativeQuestCompositionInput {
   /** SS5: the page's quest-view secret (Pine's hollow log), asked here for each player. */
   readonly secret?: NativeQuestSecret;
   readonly director?: Awaited<ReturnType<typeof readDirectorDocument>>;
-  /** OF22e1: whether the plan stands the acquisition's mixed population; with none the declared bodies guard alone. */
-  readonly island?: boolean;
 }
 
 const SeatGearSaved = v.strictObject({ iron: v.boolean(), rewardOwned: v.boolean(), skins: v.array(v.string()) });
@@ -146,7 +142,6 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   const gearOf = (player: string): SeatGear => seatOf(player).gear;
   const state = { iron: false, pickup: false, rewardOwned: false }; let finishes = new Set(skinSave.read(ports.source.identity.slug).owned.filter(id => rows.board?.ids.includes(id)));
   const purchases = new Map<string, Map<number, number>>();
-  const population = rows.acquisition === undefined || ports.island === false ? null : mixedPopulation(host, rows.acquisition.population);
   const declared = rows.acquisition === undefined ? null : declaredQuestBodies(host, ports.source);
   const equipment = rows.acquisition === undefined ? null : nativeMeleeItem(host, rows.acquisition.equipment);
   // opus-slotsync (J293): a page may ask for any slot by its kit's order; the quest's item stays the quest's to give
@@ -198,11 +193,8 @@ export function installNativeQuestComposition(host: SimHost, ports: NativeQuestC
   };
   const guarded = (): boolean => {
     if (rows.acquisition === undefined) return false;
-    if (declared?.standing(rows.acquisition.kind) === true) return true;
-    if (population === null) return false;
-    const bodies = population.bodies();
-    for (let i = 0; i < MAX_BODIES; i++) { const body = bodies[i]; if (body === undefined) break; if (body.kind === rows.acquisition.kind && body.actor?.alive === true) return true; }
-    return false;
+    // OF22e1, FORMAT-PRUNE FP53: the declared bodies guard alone (the mixed population is retired)
+    return declared?.standing(rows.acquisition.kind) === true;
   };
   const bound = rows.bounds?.rows;
   if (bound !== undefined && (ports.counters.feats.length > bound || ports.counters.feats.some(feat => feat.count > bound))) throw new RangeError('Native quest feats exceed their finite bound');

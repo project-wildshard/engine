@@ -1345,8 +1345,6 @@
     "src/server/engine/entities/killHeight.ts": "server",
     "src/server/engine/level/context.ts": "server",
     "src/server/engine/net/chat.ts": "server",
-    "src/server/game/boss/nativeWake.ts": "server",
-    "src/server/game/population/mixedRoster.ts": "server",
     "src/server/game/population/specCatalogue.ts": "server",
     "src/shared/engine/net/chatFilter.ts": "shared",
     "src/shared/engine/net/chatWords.ts": "shared",

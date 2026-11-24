@@ -6,8 +6,6 @@ import { isJsonData } from '@wildshard/format/json';
 import { ChapterDirectorSchema, parseChapterDirector } from '@wildshard/format/chapterDirector';
 import { WakeEncounterSchema, parseWakeEncounter } from '@wildshard/format/bossEncounter';
 import type { DirectorScriptStageLane, readDirectorDocument } from '../../../shared/game/plugin/director';
-import { mixedPopulation } from '../population/mixedRoster';
-import { installWakeBoss } from '../boss/nativeWake';
 import { installNativeQuestChannels } from './nativeInputs';
 import { ChapterClock } from '../../../shared/game/quest/chapterClock';
 import { questBooks, type QuestBook } from '@wildshard/engine/quest/players';
@@ -26,7 +24,7 @@ const nativeChapter = v.strictObject({ id: chapterName, rows: ChapterDirectorSch
  * chapter, so it is read when a cue runs.
  */
 export interface DeclaredWake { readonly encounter: string; readonly entity: string; readonly summon: () => void }
-/** Renderer-free chapter entry. Closed rows borrow actual population, encounter
+/** Renderer-free chapter entry. Closed rows borrow the declared wake fight
  * and reward owners; the caller retains its existing step and save envelope. */
 export function installNativeChapterDirector(host: SimHost, director: Awaited<ReturnType<typeof readDirectorDocument>>, input: unknown, restoring = false, declared?: DeclaredWake): {
   readonly clock: DirectorScriptStageLane; readonly fast: ChapterClock['fast'];
@@ -43,11 +41,8 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     if (effect.kind === 'reward' && policy.reward === undefined) throw new Error('Missing native chapter reward owner');
     if (!['flag', 'phase', 'cue', 'reward'].includes(effect.kind)) throw new Error('Native chapter requires closed native effects');
   }
-  // A declared wake fight (OF22c1) stands no population body, so its row may name none (Driftwood from r12, FP16b)
-  const named = policy.wake === undefined || declared !== undefined ? undefined : policy.wake.population;
-  if (policy.wake !== undefined && declared === undefined && named === undefined) throw new Error('A chapter wake with no declared fight names its population');
-  const population = named === undefined ? null : mixedPopulation(host, named);
-  const encounter = policy.wake === undefined || population === null ? null : installWakeBoss(host, policy.wake.encounter, policy.wake.placement, population.retireCaptain);
+  // A wake is a declared fight (OF22c1, Driftwood from r12, FP16b); FORMAT-PRUNE FP53 retired the mixed population's wake shell
+  if (policy.wake !== undefined && declared === undefined) throw new Error('A chapter wake needs its declared fight (FORMAT-PRUNE FP53)');
   const declaredWake = policy.wake === undefined || declared === undefined ? null : bindDeclaredWake(host, policy.wake.encounter, declared);
   const reward = policy.reward === undefined ? null : installNativeQuestChannels(host, policy.reward, { started: false, completed: false });
   const leadBody = host.players.get(books.lead.player); if (leadBody === undefined) throw new Error('Native chapter requires its player');
@@ -55,13 +50,6 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     { get day() { return host.dayClock ?? null; }, player: leadBody.position, reward: rows.reward ?? null, finish: 'assign' }, effect => {
       if (effect.kind === 'reward' && reward !== null) reward[effect.state] = true;
       else if (effect.kind === 'cue' && declaredWake !== null) declaredWake(effect.id, cues);
-      else if (effect.kind === 'cue' && population !== null && encounter !== null && policy.wake !== undefined) {
-        const cue = cues.get(effect.id); if (cue === undefined) throw new Error('Unknown native chapter cue');
-        if (cue.operation !== 'effects') {
-          if (population.captain() === null) population.spawnCaptain();
-          encounter.publish(cue.operation === 'wake' ? policy.wake.encounter.events.wake : policy.wake.encounter.events.restore);
-        }
-      }
     }, restoring);
   timeline.lane.registerNative(host, policy.id);
   books.claim(Object.values(rows.actions).flatMap(effects => effects.flatMap(effect => effect.kind === 'flag' ? [effect.flag] : [])));
@@ -74,11 +62,7 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     seats.get(book.player)?.scope.dispose();
     const scope = host.scope.child(`chapter:${book.player}`);
     const clock = new ChapterClock(scope, director, rows, book.flags, { get day() { return host.dayClock === undefined ? null : seen; }, player: body.position, reward: rows.reward ?? null, finish: 'assign' }, effect => {
-      if (effect.kind === 'cue' && declaredWake !== null) { declaredWake(effect.id, cues); return; }
-      if (effect.kind !== 'cue' || population === null || encounter === null || policy.wake === undefined) return;
-      const cue = cues.get(effect.id); if (cue === undefined) throw new Error('Unknown native chapter cue');
-      // the boss is the room's: a player's chapter can wake one, and never resets a fight already running
-      if (cue.operation === 'wake' && population.captain() === null) { population.spawnCaptain(); encounter.publish(policy.wake.encounter.events.wake); }
+      if (effect.kind === 'cue' && declaredWake !== null) declaredWake(effect.id, cues);
     }, books.restoring);
     seats.set(book.player, { clock, book, scope });
     book.part(`chapter:${policy.id}`, { read: () => clock.lane.snapshot(), write: saved => { clock.lane.restore(saved); } });

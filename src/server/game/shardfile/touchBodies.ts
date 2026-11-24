@@ -90,7 +90,7 @@ export function installTouchBodies(host: SimHost, rows: readonly TouchBodyRow[],
     },
     physicsRestored: () => {
       if (pending === null) throw new Error('Missing touchable body continuation');
-      // the restore replaced host.physics: the service steps the new world's bodies (as mixedRoster does)
+      // the restore replaced host.physics: the service steps the new world's bodies (as the native roster does)
       service = new Bodies(host.physics, host.playerFocus, rows.length);
       rebind(pending); pending = null;
     },

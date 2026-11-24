@@ -126,9 +126,9 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
       if (host.bodyDt(actor.entityId) <= 0 || !actor.alive || actor.stunned || actor.harnessHold || actor.state !== 'charge') return;
       observe(); hunt.chargeContact(actor, player);
     }, undefined, 'afterBodies');
-    // ONE-FORMAT OF22b2: a swing's item reaction (a held item's sweep asks `item.reaction`) reaches a declared hunt as it
-    // reaches the island's roster (`mixedRoster.ts`): the blow staggers this body's charge, and an alarm wakes it when it is
-    // aggressive or has sensed the player. Every answerer passes the reaction on, so an island roster beside it still hears it.
+    // ONE-FORMAT OF22b2: a swing's item reaction (a held item's sweep asks `item.reaction`) reaches a declared hunt: the
+    // blow staggers this body's charge, and an alarm wakes it when it is aggressive or has sensed the player. Every answerer
+    // passes the reaction on, so another declared hunt beside it still hears it.
     host.events.answer('item.reaction', reaction => {
       if (reaction.kind === 'alarm') { if (actor.alive && (species.aggressive || hunt.sensed(actor))) cadence.wake(actor); }
       else if (reaction.actor === actor) hunt.staggered(actor, reaction.strength, reaction.running);
