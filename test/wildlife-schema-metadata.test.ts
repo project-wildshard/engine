@@ -5,7 +5,11 @@ import {ReturnProgramSchema} from '@wildshard/format/namedJsonContracts';
 import {ReturnProjectionV2Schema} from '@wildshard/format/returnProjectionV2';
 import {WildlifePopulationSchema} from '@wildshard/format/wildlifePopulation';
 import {validateNamedJsonSchema} from '../src/shared/game/shardfile/customSchema';
-import roots from './fixtures/approved-population-families.json' with {type:'json'};
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
+import {builtFolder} from '../src/test/game/builtFolder';
+
+// ZONE-SNAPSHOTS ZS10 (J507): the population is Nalati's live pin, not a frozen copy of an old revision.
+const wildlife=new TextDecoder().decode(await (await loadHeadlessFolder(builtFolder('nalati-grasslands'))).file('actors/wildlife.json'));
 
 const object=v.record(v.string(),v.unknown());
 function structure(schema:Readonly<Record<string,unknown>>):Record<string,unknown>{const {$schema:_schema,...body}=schema;return body;}
@@ -20,10 +24,10 @@ test('wildlife metadata shares whole original return grammars without dropping c
  expect(schema['$comment']).toBe('@wildshard/format/wildlifePopulation#WildlifePopulationSchema');
 });
 test('factored metadata retains the complete original population and every original wire/native refusal',()=>{
- const schema=registeredJsonSchema('actors/wildlife.json'),fixture=roots['actors/wildlife.json'];
- const original:unknown=JSON.parse(fixture.body),body=v.parse(WildlifePopulationSchema,original),before=JSON.stringify(original);
+ const schema=registeredJsonSchema('actors/wildlife.json');
+ const original:unknown=JSON.parse(wildlife),body=v.parse(WildlifePopulationSchema,original),before=JSON.stringify(original);
  expect(body).toEqual(original);
- expect(validateNamedJsonSchema(schema,new TextEncoder().encode(fixture.body))).toEqual(original);
+ expect(validateNamedJsonSchema(schema,new TextEncoder().encode(wildlife))).toEqual(original);
  for(const input of [{...body,admission:{...body.admission,bytes:4}},
   {...body,pasture:{...body.pasture,v2:{}}},{...body,foreign:true}]){
   expect(()=>v.parse(WildlifePopulationSchema,input)).toThrow();

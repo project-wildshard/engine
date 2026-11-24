@@ -44,3 +44,13 @@ and `ci21-sdk-tail-held.json` still name them, as history). Deleted by hand; git
 - `test/fixtures/approved-population-returns.json`
 - `test/fixtures/approved-quest-families.json`
 - `test/fixtures/approved-sheep-root.json`
+
+## Second part
+
+- `test/fixtures/grazer-herd-original.ts`, the pre-port grazer brain: `grazer-frame-input` keeps its bad-clock and
+  mismatch guards on today's brain; the two cases that compared frame by frame with the old brain go (the port is done).
+- `legacy-oracles/nalati-runtime-debt.json` with `runtime-performance-rekey`'s historical Nalati case (its
+  `nalati-grasslands-legacy` source is long gone); the rekey cases stay.
+- `approved-population-families.json` (+ `.d.json.ts`): `wildlife-schema-metadata` reads `actors/wildlife.json` from
+  Nalati's live pin.
+- `legacy-oracles/nalati-audio.json` and the last mover oracle (`canoe.json` names its hash as a module id only): no reader.

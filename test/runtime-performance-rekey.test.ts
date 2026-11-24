@@ -3,24 +3,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only the owned fixture trees.
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import * as v from 'valibot';
 import { runtimePerformanceSites, frozenRuntimePerformanceViolations } from '../lint/runtime-performance.mjs';
 import { comparePlatformList } from '../scripts/check-platform-ratchets.mjs';
-import frozen from './fixtures/legacy-oracles/nalati-runtime-debt.json' with { type: 'json' };
-
-test('historical Nalati runtime debt keeps exact-source refusal intact', () => {
-  const policy = v.parse(v.object({ sites: v.record(v.string(), v.object({ count: v.number(), row: v.string() })) }), JSON.parse(readFileSync('lint/runtime-performance.json', 'utf8')));
-  const historical = v.parse(v.object({ sites: v.record(v.string(), v.object({ count: v.number(), row: v.string() })) }), frozen);
-  for (const relative of ['runtime/state.ts', 'runtime/index.ts'] as const) {
-    const file = `src/shards/nalati-grasslands-legacy/${relative}`;
-    const primary = `src/shards/nalati-grasslands/${relative}`;
-    const digest = frozen.files[relative].hash;
-    const source = frozen.files[relative].source;
-    expect(Object.keys(policy.sites).some(key => key.startsWith(`${primary}:`))).toBe(false);
-    expect(frozenRuntimePerformanceViolations(source, file, primary, digest, historical.sites)).toEqual([]);
-    expect(frozenRuntimePerformanceViolations(`${source}\nchanged();`, file, primary, digest, historical.sites).length).toBeGreaterThan(0);
-  }
-});
 
 test('rekeys real edited or moved sites without new kind or row allowance', () => {
   mkdirSync('tmp', { recursive: true });

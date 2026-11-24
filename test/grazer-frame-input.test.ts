@@ -2,11 +2,9 @@ import {expect, test} from 'vitest';
 import {Vector3} from 'three';
 import {AnimalSim} from '../src/shared/engine/entities/AnimalSim';
 import {GrazerBrain, type GrazerObservation, type GrazerProfile} from '../src/server/engine/ai/grazer';
-import {GrazerBrain as OriginalGrazerBrain} from './fixtures/grazer-herd-original';
 import type {StrikeSpec} from '../src/shared/engine/ai/strikes';
 import {Rng} from '@wildshard/format/seededRng';
 import {onFault, type Fault} from '../src/shared/engine/core/faults';
-import type {SimValue} from '../src/server/engine/sim';
 
 function fixture(kind: 'wander-ram' | 'circle-challenge') {
   const actor = new AnimalSim({kind: 'grazer', label: 'Grazer', variant: 'common', rarity: 'common', hp: 30, aggressive: true,
@@ -32,20 +30,8 @@ function fixture(kind: 'wander-ram' | 'circle-challenge') {
   return {actor, profile, context, rng, events};
 }
 
-// TC-NE24c: the brain now publishes its pattern's state on the body (the original fixture never did); every other body
-// field still matches the original exactly, and the state is the one the original brain's phase and strike name:
-// a ram, or a fight's strike before its cooldown, is `attack`; a threat, notice or fight is `stalk`; else `idle`.
-function sameBody(actor: AnimalSim, original: AnimalSim, brain: SimValue): void {
-  const {state, ...body} = actor.snapshot(), {state: _before, ...was} = original.snapshot();
-  const {state: phase, strikes} = JSON.parse(String(brain)) as {state: string; strikes: {phase: string}};
-  const striking = strikes.phase !== 'idle' && strikes.phase !== 'cooldown';
-  expect(body).toEqual(was);
-  expect(state).toBe(!actor.alive ? state : phase === 'ram' || (phase === 'fight' && striking) ? 'attack' : ['threat', 'notice', 'fight'].includes(phase) ? 'stalk' : 'idle');
-}
-
 test.each(['wander-ram', 'circle-challenge'] as const)('%s skips bad clocks without state, strike or RNG changes and keeps later work alive', kind => {
-  const f = fixture(kind), reference = fixture(kind), brain = new GrazerBrain(f.actor, f.profile);
-  const old = new OriginalGrazerBrain(reference.actor, reference.profile), faults: Fault[] = [];
+  const f = fixture(kind), brain = new GrazerBrain(f.actor, f.profile), faults: Fault[] = [];
   const before = brain.snapshot(), body = f.actor.snapshot(), entropy = f.rng.snapshot(), off = onFault(fault => {faults.push(fault);});
   try {
     for (const dt of [Number.NaN, Infinity, -.1, 1.001]) {
@@ -55,9 +41,9 @@ test.each(['wander-ram', 'circle-challenge'] as const)('%s skips bad clocks with
       expect(f.rng.snapshot()).toEqual(entropy); expect(f.events).toEqual([]);
     }
     expect(faults).toHaveLength(1); expect(faults[0]).toMatchObject({system: 'ai.grazer', verdict: 'retry'});
-    f.context.dt = .1; brain.think(f.context); brain.act(f.context); old.think(reference.context); old.act(reference.context);
-    expect(brain.snapshot()).toEqual(old.snapshot()); sameBody(f.actor, reference.actor, old.snapshot());
-    expect(f.rng.snapshot()).toEqual(reference.rng.snapshot()); expect(f.events).toEqual(reference.events);
+    // ZONE-SNAPSHOTS ZS10 (J507): the port's oracle brain is gone; a good clock after the bad ones still moves the brain.
+    f.context.dt = .1; brain.think(f.context); brain.act(f.context);
+    expect(brain.snapshot()).not.toEqual(before);
   } finally {off();}
 });
 
@@ -81,21 +67,4 @@ test('a mismatched grazer observation is skipped before reading another pattern 
     expect(brain.snapshot()).toEqual(before); expect(f.actor.snapshot()).toEqual(body); expect(other.events).toEqual([]);
     expect(faults).toHaveLength(1); expect(faults[0]).toMatchObject({system: 'ai.grazer', verdict: 'retry'});
   } finally {off();}
-});
-
-test.each(['wander-ram', 'circle-challenge'] as const)('%s preserves 120 independent native decision/body frames exactly', kind => {
-  const f = fixture(kind), reference = fixture(kind), brain = new GrazerBrain(f.actor, f.profile);
-  const old = new OriginalGrazerBrain(reference.actor, reference.profile);
-  for (let frame = 0; frame < 120; frame++) {
-    for (const item of [f, reference]) {
-      item.context.dt = frame % 17 === 0 ? 0 : 1 / 60;
-      item.context.player.set(Math.sin(frame / 15) * 4, 0, frame % 11);
-      item.context.calm = frame % 23 < 2;
-      if (item.context.pattern === 'circle-challenge') item.context.t = frame / 60;
-    }
-    brain.think(f.context); brain.act(f.context); old.think(reference.context); old.act(reference.context);
-    f.actor.step(f.context.dt); reference.actor.step(reference.context.dt);
-    expect(brain.snapshot()).toEqual(old.snapshot()); sameBody(f.actor, reference.actor, old.snapshot());
-    expect(f.rng.snapshot()).toEqual(reference.rng.snapshot()); expect(f.events).toEqual(reference.events);
-  }
 });
