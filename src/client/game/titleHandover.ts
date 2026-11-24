@@ -20,6 +20,15 @@ const TICK_MS = 1000;
 export const HANDOVER_REASON = 'idle title handover';
 /** what the title holds open over the main screen: Settings, a dialog (Name, sign-in), the drop and error cards */
 const OPEN = '.ws-gmenu.show, [aria-modal="true"], #wsdrop, #wserr, .ws-fail';
+/** QA-FEEDBACK-2026-11-24 row 7: only a shown one holds the title. index.html's portrait guard (`.ws-rotate`, aria-modal, display none
+ *  in portrait) and a dismissed drop card matched OPEN on every page, so no title ever handed over and an update waited on the
+ *  player's next tap (the frozen title Jake saw after each staging release). */
+function shown(el: Element): boolean {
+  const style = getComputedStyle(el);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  return typeof el.checkVisibility === 'function' ? el.checkVisibility() : true;
+}
+const openOver = (): boolean => [...document.querySelectorAll(OPEN)].some(shown);
 
 /** Arm the hand-over on a cold title. `onMain`: the main screen shows and nothing of the menu's own is in flight. */
 export function armTitleHandover(owner: Scope, onMain: () => boolean, previous: Pick<LastEnd, 'kind' | 'reason'> = lastEnd()): void {
@@ -38,7 +47,7 @@ export function armTitleHandover(owner: Scope, onMain: () => boolean, previous: 
   let gone = false;
   owner.interval(TICK_MS, () => {
     if (gone || target === null || owner.disposed || document.visibilityState !== 'visible') return;
-    if (Date.now() - input < HANDOVER_QUIET_MS || !onMain() || document.querySelector(OPEN) !== null) return;
+    if (Date.now() - input < HANDOVER_QUIET_MS || !onMain() || openOver()) return;
     gone = true;
     // no cover to paint first (leaveAfterPaint's reason): nobody tapped, the title simply comes back as the new build
     markReload(`${HANDOVER_REASON}: new build ${target.slice(0, 7)} activated behind it`);

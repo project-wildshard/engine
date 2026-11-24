@@ -68,6 +68,18 @@ test('SB37b: an open menu is never snatched; the title goes once it is closed an
   expect(reload).toHaveBeenCalledOnce();
 });
 
+// QA-FEEDBACK-2026-11-24 row 7 (Jake, ~12:05 Cancún: "whenever theres a new update its a frozen screen for 10 seconds"): index.html's
+// portrait guard is an aria-modal dialog hidden in portrait, and it matched on every page, so no title ever handed over
+test('QA 11-24 row 7: a hidden dialog (the portrait guard) or a dismissed drop card never holds the hand-over', async () => {
+  title();
+  const rotate = document.createElement('div'); rotate.className = 'ws-rotate'; rotate.setAttribute('role', 'alertdialog'); rotate.setAttribute('aria-modal', 'true');
+  rotate.style.display = 'none'; document.body.append(rotate);
+  const drop = document.createElement('div'); drop.id = 'wsdrop'; drop.style.display = 'none'; document.body.append(drop);
+  activated();
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(reload).toHaveBeenCalledOnce();
+});
+
 test('SB37b: a dialog (the Name prompt, sign-in) holds the hand-over too', async () => {
   title();
   const dialog = document.createElement('form'); dialog.setAttribute('aria-modal', 'true'); document.body.append(dialog);
