@@ -145,7 +145,7 @@ function union(dev) {
     if (document.querySelector('.ws-touch-boost') !== null) step('dev: BOOST (a build before QA row 42)', () => show('.ws-touch-boost'));
     step('dev: alert', () => { H.devAlert('quest/fire.ts disabled: TypeError: castaway.flags is undefined'); });
     // QA-FEEDBACK 11-24 row 36: the ping chip at its widest everyday reading (a 3-digit round trip), kept fresh
-    step('dev: ping 188 ms', () => { const say = () => document.dispatchEvent(new CustomEvent('ws:rooms-ping', { detail: { rttMs: 188 } })); say(); setInterval(say, 500); return document.querySelector('.ws-perf-ping') !== null; });
+    step('dev: ping 188 ms', () => { const say = () => { document.dispatchEvent(new CustomEvent('ws:rooms-ping', { detail: { rttMs: 188 } })); }; say(); setInterval(say, 500); return document.querySelector('.ws-perf-ping') !== null; });
   }
   // play.ts rewrites the prompt, the aim line and the hit marker every frame: hold them for the shot
   const hold = document.createElement('style'); hold.id = 'hud-worst-hold';
@@ -228,21 +228,21 @@ function tidyBoxes() {
   /** @param {string} sel */
   const all = sel => [...document.querySelectorAll(sel)].filter(seen).map(el => ({ el, r: el.getBoundingClientRect() }));
   /** @param {DOMRect} a @param {DOMRect} b */
-  const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
-  const out = [];
-  if (all('.ws-icard-pop.show').length > 0) out.push('the big pickup card is up during play (HT2: a line in the slot)');
-  if (all('.ws-game-getlow.show').length > 0) out.push('GET LOW is the top-centre warning (HT1: a line in the slot)');
+  const overlaps = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  const broken = [];
+  if (all('.ws-icard-pop.show').length > 0) broken.push('the big pickup card is up during play (HT2: a line in the slot)');
+  if (all('.ws-game-getlow.show').length > 0) broken.push('GET LOW is the top-centre warning (HT1: a line in the slot)');
   const map = all('.ws-minimap')[0], badge = all('.ws-game-weather.show')[0];
   const keep = [['boss bar', '.ws-boss-bar.show'], ['kill feed', '.ws-game-feed-item'], ['quest chip', '.ws-quest-obj.show']].flatMap(([name, sel]) => all(sel).map(x => ({ name, r: x.r })));
   if (badge !== undefined && map !== undefined) {
     const cx = (badge.r.left + badge.r.right) / 2, cy = (badge.r.top + badge.r.bottom) / 2, mx = (map.r.left + map.r.right) / 2;
-    if (Math.abs(cx - mx) > 3 || Math.abs(cy - map.r.bottom) > 3) out.push(`the storm badge (${cx.toFixed(0)}, ${cy.toFixed(0)}) is not on the minimap's bottom edge (${mx.toFixed(0)}, ${map.r.bottom.toFixed(0)})`);
-    for (const k of keep) if (hit(badge.r, k.r)) out.push(`the storm badge overlaps the ${k.name}`);
+    if (Math.abs(cx - mx) > 3 || Math.abs(cy - map.r.bottom) > 3) broken.push(`the storm badge (${cx.toFixed(0)}, ${cy.toFixed(0)}) is not on the minimap's bottom edge (${mx.toFixed(0)}, ${map.r.bottom.toFixed(0)})`);
+    for (const k of keep) if (overlaps(badge.r, k.r)) broken.push(`the storm badge overlaps the ${k.name}`);
   }
   const boss = all('.ws-boss-bar.show')[0];
-  if (boss !== undefined) for (const t of all('.ws-game-toast')) if (t.r.top < boss.r.bottom) out.push(`the toast "${(t.el.firstChild?.textContent ?? '').slice(0, 30)}" is not under the boss bar`);
-  for (const t of all('.ws-game-toast')) for (const k of [...keep, ...(map === undefined ? [] : [{ name: 'minimap', r: map.r }])]) if (hit(t.r, k.r)) out.push(`the toast "${(t.el.firstChild?.textContent ?? '').slice(0, 30)}" overlaps the ${k.name}`);
-  return out;
+  if (boss !== undefined) for (const t of all('.ws-game-toast')) if (t.r.top < boss.r.bottom) broken.push(`the toast "${(t.el.firstChild?.textContent ?? '').slice(0, 30)}" is not under the boss bar`);
+  for (const t of all('.ws-game-toast')) for (const k of [...keep, ...(map === undefined ? [] : [{ name: 'minimap', r: map.r }])]) if (overlaps(t.r, k.r)) broken.push(`the toast "${(t.el.firstChild?.textContent ?? '').slice(0, 30)}" overlaps the ${k.name}`);
+  return broken;
 }
 
 /** HUD Tidy HT1 and HT2: the storm moment and the pickup moment on a phone, each shot and checked on its measured boxes.
@@ -276,14 +276,14 @@ async function tidyShots(page, name, written, problems) {
 async function mapZoomShots(page, name, written) {
   await page.evaluate(() => { /** @type {any} */ (window).__wildshard.world.hud.menu.open('map'); });
   await page.waitForTimeout(800);
-  const zooms = await page.evaluate(() => [...document.querySelectorAll('.ws-gmenu-zoom')].map(b => /** @type {HTMLElement} */ (b).dataset['z'] ?? ''));
+  const zooms = await page.evaluate(() => [...document.querySelectorAll('.ws-gmenu-zoom')].map(b => /** @type {HTMLElement} */ (b).dataset.z ?? ''));
   for (const z of zooms) {
     await page.locator(`.ws-gmenu-zoom[data-z="${z}"]`).click();
     await page.waitForTimeout(900);
     const file = join(out, `${name}-map-${z}.png`); await page.screenshot({ path: file }); written.push(file);
     console.log(`  map ${z}: ${file}`);
   }
-  await closeBag(page); await page.waitForTimeout(400);
+  await page.evaluate(() => { /** @type {any} */ (window).__wildshard.world.hud.menu.close(); }); await page.waitForTimeout(400);
 }
 
 /** QA rows 42 and 43: the calm chat corner's states and Developer boost, one shot each after the union shot.
