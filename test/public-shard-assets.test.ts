@@ -12,7 +12,6 @@ const DEBT: Readonly<Record<string, string>> = {
   'public/assets/baked/nine-dragon-stack': 'C0c: far and near from the product',
   'public/assets/baked/pine-hollow': 'C0c: far and near from the product',
   'public/assets/baked/sunscar-dunes': 'C0c: far and near from the product',
-  'public/assets/models/pine-hollow-trees': "C0d: Pine's trees from Pine's product",
   'public/assets/title/driftwood-isle-portrait.jpg': "C0c: the title screen's portraits",
   'public/assets/title/nalati-grasslands-portrait.jpg': "C0c: the title screen's portraits",
   'public/assets/title/nine-dragon-stack-portrait.jpg': "C0c: the title screen's portraits",
