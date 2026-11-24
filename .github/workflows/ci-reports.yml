@@ -240,13 +240,6 @@ jobs:
           TC39_INSTALLED_FORMAT: '1'
         run: node --test --test-timeout=10000 scripts/api-health.proof.ts
 
-      # TC7: new complete journeys report for a week before becoming gates.
-      - name: Soak full Dunes and real pin-grid journeys
-        if: steps.code.outputs.run == 'true'
-        continue-on-error: true
-        run: |
-          node scripts/pins.ts install --ring 1
-          node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test --test-reporter=tap test/ci/dunes-journey.proof.mjs test/ci/pin-grid-journey.proof.mjs
       # New coverage reports for a week before explicit blocking admission.
       # After wall accounting: report time cannot spend a blocking shard budget.
       - name: Soak named elite ownership on pinned products

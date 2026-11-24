@@ -51,6 +51,8 @@ if [ "$mode" = code ]; then
   check nightly-identity node --test --test-name-pattern='extra receipt' scripts/nightly.proof.ts
   # EG-24 (J503, AD2 row 43): a socket lost mid-fight or mid-crossing resumes; clean in ci-reports since 11-17.
   check socket-recovery bash -c 'node scripts/pins.ts install --ring 1 && node scripts/vitest-tmp.ts run test/dedicated-critical-reconnect.proof.ts'
+  # TC7 (J503, AD2): the full Dunes and real pin-grid journeys on Ring 1's pins; clean in ci-reports since 11-19.
+  check pin-grid-journeys bash -c 'node scripts/pins.ts install --ring 1 && node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/dunes-journey.proof.mjs test/ci/pin-grid-journey.proof.mjs'
 fi
 check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then
