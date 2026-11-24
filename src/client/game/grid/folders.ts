@@ -22,6 +22,8 @@ import { neighbourFolderFilesPaced, folderPostCost } from '../shardfile/folderCo
 import { outputBlobPath } from '@wildshard/format/outputAddress';
 import type { OutputIndex } from '@wildshard/format/outputIndex';
 import { FarSchema, ShardReferenceSchema } from '@wildshard/format/shardSections';
+import { LookLevelSchema } from '@wildshard/format/look-level';
+import type { LevelLookSource } from '../shardfile/declaredLook';
 import type { ShardfileFarRows, ShardfileNearRows } from './shardfileFar';
 import { NearPlaceholderSchema } from '@wildshard/format/nearPlaceholder';
 import type { Shardfile } from '@wildshard/format/shardSchema';
@@ -228,6 +230,26 @@ export function readGridShardfileFar(slug: string, anyWorld = false): Promise<Gr
   if (descriptor === undefined) return Promise.resolve(null);
   const url = new URL(descriptor, location.href);
   return readGridFolderFar(url.href, slug, browserShardfileOptions(new URL('.', url).href, true), anyWorld);
+}
+/**
+ * FORMAT-PRUNE FP47b: a grid home's level look straight from its product (the index and `look/look`, hash-verified),
+ * without admitting it: the page shell boots before its home admits, and from the next SDK on the discovery document
+ * carries no look. Null when the slug has no shardfile, or its look declares no level (an older product: its discovery
+ * still carries the look).
+ */
+export function readGridShardfileLook(slug: string): Promise<LevelLookSource | null> {
+  const manifest = findShard(slug), descriptor = manifest?.shardfile;
+  if (descriptor === undefined) return Promise.resolve(null);
+  const url = new URL(descriptor, location.href);
+  return readGridFolderIndex(url.href, slug, browserShardfileOptions(new URL('.', url).href, true))
+    .then(async at => gridLookSource(await readGridSection(at, 'look/look')));
+}
+const lookRow = v.looseObject({ look: v.looseObject({ level: v.optional(LookLevelSchema) }) });
+/** A `look/look` section's level look source (`declaredLevel`); null when the section is absent or declares no level. */
+export function gridLookSource(section: unknown): LevelLookSource | null {
+  if (section === null) return null;
+  const level = v.parse(lookRow, section).look.level;
+  return level === undefined ? null : { look: { level } };
 }
 /** A shardfile far proxy's rows and a verified reader for its declared far files. */
 export interface GridShardfileFar { readonly rows: ShardfileFarRows; readonly read: (ref: string) => Promise<Uint8Array> }

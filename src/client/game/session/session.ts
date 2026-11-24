@@ -48,6 +48,8 @@ import { absentShardFolder } from '../../../shared/game/shardfile/shardFolder';
 import { gridLevel } from '../../../shared/game/grid/pageMode';
 import type { PageResidency } from '../grid/pageResidency';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
+import { readGridShardfileLook } from '../grid/folders';
+import type { LevelLookSource } from '../shardfile/declaredLook';
 import { gridPageShell, gridPageShellLevel, selectGridPageShell, GridPageShellPlugin, useOwnedGridHome } from '../grid/pageShell';
 
 declare const __BUILD_ID__: string;
@@ -77,6 +79,10 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
     const mode = options.mode ?? bootPageMode(selected);
     session.ownedGridHome = useOwnedGridHome(mode, manifest, manifestAdmittedSource(manifest));
     const pageManifest = session.ownedGridHome ? gridPageShell(manifest, manifestAdmittedSource(manifest)) : manifest;
+    // FORMAT-PRUNE FP47b: an owned home not yet admitted reads its look from its product while the session boots; a failed
+    // read keeps the discovery's look (the home's own admission then reports the broken product)
+    const shellLook = session.ownedGridHome && manifestAdmittedSource(manifest) === undefined
+      ? readGridShardfileLook(manifest.slug).catch(() => null) : Promise.resolve(null);
     if (mode === 'grid' && options.residency === undefined) throw new Error('Grid boot requires residency admission before hydration');
     // T7: an owned data home has no data page to admit its claim; admit it at the regional charge its entry hands off
     const homeSource = manifestAdmittedSource(manifest), homeInstance = pageGridInstance();
@@ -94,13 +100,18 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
     // they leave the device save only once this session's events have reached telemetry (sp-x6's review of b28a44a5e6); the
     // session's own scope holds the listener, so a same-page re-entry (ZE10a2) does not stack one per session on the page
     app.events.on('level.loaded', () => { confirmOutcomes(); }, scope);
-    if (session.ownedGridHome) scope.onDispose(selectGridPageShell(pageManifest));
+    if (session.ownedGridHome) {
+      // FORMAT-PRUNE FP47b: the shell is selected before its product loads; `buildSession` re-reads it from the product
+      const shell = selectGridPageShell(manifest, manifestAdmittedSource(manifest));
+      session.shell = shell;
+      scope.onDispose(shell.dispose);
+    }
     // Register first: the scope's later consumer cleanup runs before the final early boot reference is released.
     if (options.residency !== undefined) scope.onDispose(() => { options.residency?.dispose(); });
     if (options.memory !== undefined) scope.onDispose(() => { options.memory?.dispose(); });
     enterOwner(scope);
     const world = await runShardLoad(manifest, (stage) => withShardHooks(manifest, stage,
-      () => buildSession(pageManifest, stage, kit, session)), {
+      () => buildSession(pageManifest, stage, kit, session, shellLook)), {
       build: __BUILD_ID__, dispose: () => {
         if (app.render !== null) app.render.hold = true;
         scope.dispose();
@@ -127,21 +138,22 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
   }
 }
 
-async function buildSession(manifest: ShardManifest, stage: LoadStage, kit: KitPorts, session: SessionState): Promise<BuiltWorld> {
+async function buildSession(entry: ShardManifest, stage: LoadStage, kit: KitPorts, session: SessionState, shellLook: Promise<LevelLookSource | null>): Promise<BuiltWorld> {
   wirePage.followBooks(); // J130: before anything this session installs reads a book
   const boot: StagedBoot = { handoff: null, items: new Map(), featTotal: undefined, skins: [],
     runtime: { world: null, step: null, play: null, interactables: [], overhead: [], objects: {}, hooks: {}, viewer: () => new THREE.Vector3(), horizonVeil: null },
     progress: { set: () => undefined, detail: () => undefined }, worldHook: (work) => work() };
-  const loadPlugin = session.ownedGridHome ? () => Promise.resolve({ default: GridPageShellPlugin }) : manifest.load;
+  const loadPlugin = session.ownedGridHome ? () => Promise.resolve({ default: GridPageShellPlugin }) : entry.load;
   if (loadPlugin === undefined) {
-    const sequence = sessionStages({ kit, manifest, slug: manifest.slug, stage, session, boot, product: absentShardFolder(manifest.slug) });
+    const sequence = sessionStages({ kit, manifest: entry, slug: entry.slug, stage, session, boot, product: absentShardFolder(entry.slug) });
     let next = await sequence.next();
     while (!next.done) next = await sequence.next();
     return next.value;
   }
   const scope = currentOwner();
   if (scope === null) throw new Error('Plugin boot needs a level scope');
-  const product = await stage('product', () => loadManifestFolder(manifest, scope));
+  const product = await stage('product', () => loadManifestFolder(entry, scope));
+  const manifest = session.shell?.look(await shellLook ?? undefined) ?? entry;
   const sequence = sessionStages({ kit, manifest, slug: manifest.slug, stage, session, boot, product });
   const { default: Plugin } = await stage('manifest.load', () => retried(loadPlugin));
   const plugin = new Plugin();

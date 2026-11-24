@@ -62,12 +62,35 @@ export function gridPageShellLevel(shell: ShardManifest, product?: LevelLookSour
   return { ...toLevelSpec(productLook(shell, product)), id: 'platform.grid', boundary: { visible: false } };
 }
 
+/** The selected shell: its page manifest and level; `dispose` restores the page's previous level. */
+export interface GridShellSelection {
+  readonly shell: ShardManifest;
+  readonly dispose: () => void;
+  /**
+   * FORMAT-PRUNE FP47b: the shell is selected before its home's product is read, from the discovery document, which
+   * carries no level look from the next SDK on. Once the home's `look/look` is read (`readGridShardfileLook`), the shell
+   * (the page manifest the session boots from) and its selected level take its `look.level`, so the road and every
+   * frame-less read (`activeLevel()`) draw the home's look, never the plain one. No look keeps the shell. Returns the shell.
+   */
+  readonly look: (product: LevelLookSource | undefined) => ShardManifest;
+}
+
 /** Select the neutral engine level before its staged boot; catalogue identity and each resident's frame stay separate. */
-export function selectGridPageShell(shell: ShardManifest): () => void {
-  const previous = selectedLevel(), level = gridPageShellLevel(shell);
+export function selectGridPageShell(home: ShardManifest, product?: LevelLookSource): GridShellSelection {
+  const previous = selectedLevel();
   if (previous === null) throw new Error('Grid shell requires a configured page level');
+  let shell = gridPageShell(home, product), level = gridPageShellLevel(shell);
   configureLevel(level);
-  return () => { if (selectedLevel() === level) configureLevel(previous); };
+  return {
+    get shell() { return shell; },
+    dispose: () => { if (selectedLevel() === level) configureLevel(previous); },
+    look: next => {
+      if (next === undefined) return shell;
+      shell = gridPageShell(home, next);
+      if (selectedLevel() === level) { level = gridPageShellLevel(shell); configureLevel(level); }
+      return shell;
+    },
+  };
 }
 
 /** Mandatory shell equipment is inert; actual shard equipment lives only in the owned region's kit scope. */

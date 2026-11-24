@@ -1,4 +1,5 @@
 import type { ShardContext } from "../plugin/context";
+import type { GridShellSelection } from '../grid/pageShell';
 import type { Audio } from '@wildshard/engine/audio/Audio';
 import type { Music } from '@wildshard/engine/audio/Music';
 import type { StepProgress } from '@wildshard/engine/boot/plan';
@@ -31,6 +32,8 @@ export interface SessionState {
   readonly crashResume?: CrashResume;
   /** G226: the page is only a platform shell; even its initial runtime home is an evictable owned region. */
   ownedGridHome?: boolean;
+  /** FORMAT-PRUNE FP47b: the owned home's selected shell level, re-read from its product once loaded. */
+  shell?: GridShellSelection;
   /** G216's native policy, including validation warnings before the ordinary HUD has been constructed. */
   readonly memory?: MemoryAdmission;
   /** Created before manifest hydration; the level disposes it after its allocated consumers. */
