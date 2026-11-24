@@ -64,6 +64,24 @@ jobs:
       - uses: ./.github/actions/ring-setup
         with:
           pins-cache-scope: full
+      # FAST-RELEASE FR-A1 (FS30, J505): ci's verified full-ledger spawn parts first (content-addressed, so staging's
+      # catalogue reuses every part main's ci already encoded); the cold build was 53 of this job's 54 minutes.
+      - name: Key the full-ledger encodes
+        id: ledger-key
+        continue-on-error: true
+        uses: ./.github/actions/full-ledger-key
+      - name: Restore spawn and phone texture encodes
+        continue-on-error: true
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/wildshard/gen/spawn-parts-br
+          key: ${{ steps.ledger-key.outputs.key || format('nightly-encodes-{0}', github.sha) }}
+          restore-keys: |
+            ${{ steps.ledger-key.outputs.prefix }}
+            ${{ steps.ledger-key.outputs.linux-key }}
+            ${{ steps.ledger-key.outputs.linux-prefix }}
+            nightly-encodes-
+            ring1-spawn-parts-br-
       # staging's catalogue cooks every pin on a cold runner (over 30 minutes, run 44939791409): an hour for the build.
       # A tag before 5ed4f16dc has heavy-lane's fixed 30 minutes in its build:game; give it the same knob, and hide that
       # one-line local edit from page-release's clean-tree check (skip-worktree), so an older release can still publish.

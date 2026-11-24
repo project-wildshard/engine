@@ -9,7 +9,9 @@ import { expect, test } from 'vitest';
 
 const DIR = '.github/workflows/';
 const SPAWN_PARTS = 'path: ~/.cache/wildshard/gen/spawn-parts-br';
-const FULL_BUILD = /pnpm build:game|scripts\/build-app\.mjs|scripts\/staging-qa\.mjs --local/u;
+// FAST-RELEASE FR-A1: page-release.mjs runs build:game and devserver-client.mjs builds the full client; preview.yml and
+// server-release.yml's devserver-client restored nothing, so neither rule above saw them and both re-encoded cold.
+const FULL_BUILD = /pnpm build:game|scripts\/build-app\.mjs|scripts\/staging-qa\.mjs --local|scripts\/page-release\.mjs|scripts\/devserver-client\.mjs/u;
 const LEDGER = /full-ledger-spawn-parts-br|steps\.ledger-(?:key|codec)\.outputs\.(?:key|prefix)/u;
 /** A nightly's own save under this commit is a full build too, so it may come first. */
 const SAME_COMMIT_FULL = 'nightly-encodes-${{ github.sha }}';
@@ -72,4 +74,23 @@ test('FS30: the full-ledger key action builds the key ci saves under', () => {
     expect(hashes(action), name).toBeDefined();
     expect(hashes(action), name).toBe(hashes(ci));
   }
+});
+
+// FAST-RELEASE FR-A1 (J505; Jake, 2026-11-24 ~18:20 Cancún: "Do the same audit & review ... of all the other release
+// processes"): preview.yml's build:game re-encoded every spawn part cold and hit the 1800 s cap (4 reds in a row), and
+// server-release's devserver client took 29 min (6 of 25 runs red), because neither job restored any spawn parts. The
+// rule above only orders restores that exist; this one makes a job that builds the full game restore ci's ledger at all.
+/** Jobs that build only a Ring 1 subset, or encode on purpose, and are allowed to start cold. */
+const COLD_OK = new Set<string>([]);
+
+test('FR-A1: every job that builds the full game restores ci\'s full-ledger spawn parts', () => {
+  const missing: string[] = [];
+  for (const file of readdirSync(DIR).filter(name => name.endsWith('.yml'))) {
+    for (const job of jobsOf(readFileSync(DIR + file, 'utf8'))) {
+      if (!FULL_BUILD.test(job.body) || COLD_OK.has(`${file} ${job.name}`)) continue;
+      const tried = restores(job.body).flat();
+      if (!tried.some(candidate => LEDGER.test(candidate))) missing.push(`${file} ${job.name}`);
+    }
+  }
+  expect(missing).toEqual([]);
 });
