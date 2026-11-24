@@ -87,3 +87,29 @@ test('a family host named in the plan beside its section, or a section holding a
   await expect(open(fixture, rewritten(fixture, fixture.plan.features, new Map([['server/riding', riding]])))).rejects.toThrow('beside the server/riding section');
   await expect(open(fixture, rewritten(fixture, [], new Map([['server/riding', [...riding, ...fixture.plan.features.filter(row => row.host === 'boss.arena')]]])))).rejects.toThrow('holds its own family');
 });
+
+/** FORMAT-PRUNE FP21: `fixture`'s product with no plan file: its settings in `server/world`, its hosts in their sections. */
+function planless(fixture: Shipped): ShardFolder {
+  const hostless_ = hostless(fixture), { kind: _kind, features: _features, ...world } = fixture.plan;
+  const product: ShardFolder = Object.create(hostless_) as ShardFolder;
+  return Object.assign(product, {
+    hasFile: (name: string): boolean => name !== NATIVE_ASSEMBLY_FILE && fixture.product.hasFile(name),
+    has: (name: string): boolean => name === 'server/world' || hostless_.has(name as never),
+    section: (name: string): unknown => name === 'server/world' ? { version: 1, ...world } : hostless_.section(name as never),
+  });
+}
+
+for (const slug of ['driftwood-isle', 'pine-hollow', 'nalati-grasslands']) test(`${slug} with no plan file, its settings in server/world, runs as the plan`, async () => {
+  const fixture = await shipped(slug), product = planless(fixture);
+  const named = await open(fixture, fixture.product), world = await open(fixture, product);
+  try {
+    expect(canonicalSimDigest(snapshotSimHost(world.host))).toBe(canonicalSimDigest(snapshotSimHost(named.host)));
+    expect(run(world, 600)).toEqual(run(named, 600));
+  } finally { world.dispose(); named.dispose(); }
+}, 600_000);
+
+test('a plan file beside server/world is refused', async () => {
+  const fixture = await shipped('pine-hollow'), planlessProduct = planless(fixture);
+  const both: ShardFolder = Object.assign(Object.create(planlessProduct) as ShardFolder, { hasFile: (name: string): boolean => fixture.product.hasFile(name) });
+  await expect(open(fixture, both)).rejects.toThrow('not both');
+});

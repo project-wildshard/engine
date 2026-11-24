@@ -293,14 +293,27 @@ async function withSectionArms(product: ShardFolder, features: readonly NativeAs
   return at === -1 ? [...features, arms] : [...features.slice(0, at), arms, ...features.slice(at)];
 }
 /** True when this product ships a native-assembly plan. */
-export function hasNativeAssembly(product: ShardFolder): boolean { return product.hasFile(NATIVE_ASSEMBLY_FILE); }
+/** FORMAT-PRUNE FP21: a native world's own settings, the section that replaces the plan file (format `server-world.ts`). */
+const WORLD_SECTION = 'server/world';
+export function hasNativeAssembly(product: ShardFolder): boolean {
+  return product.hasFile(NATIVE_ASSEMBLY_FILE) || (product as unknown as AnySectionProduct).has(WORLD_SECTION);
+}
+/** FORMAT-PRUNE FP21: the plan a product writes: its plan file (an older writer) or its `server/world` section, never both. */
+async function writtenPlan(product: ShardFolder): Promise<NativeAssemblyPlan> {
+  const any = product as unknown as AnySectionProduct, file = product.hasFile(NATIVE_ASSEMBLY_FILE);
+  if (file && any.has(WORLD_SECTION)) throw new Error(`A native world ships ${NATIVE_ASSEMBLY_FILE} or the ${WORLD_SECTION} section, not both (FORMAT-PRUNE FP21)`);
+  if (file) return parseWrittenPlan(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await product.file(NATIVE_ASSEMBLY_FILE))));
+  const { version, ...world } = any.section(WORLD_SECTION) as { readonly version?: unknown } & Readonly<Record<string, unknown>>;
+  if (version !== 1) throw new Error(`${WORLD_SECTION} needs version 1`);
+  return parseWrittenPlan({ kind: 'native-assembly', ...world, features: [] });
+}
 /**
  * Build one native world from a product's `server/native-assembly.json` (P1-E3.1b). Every read happens here, so a bad
  * plan refuses before a host exists; `install` is synchronous, in the plan's order, and restores like a typed plan.
  */
 export async function prepareNativeAssembly<C extends NativeAssemblyContext>(input: ShardFolder, assets: ReadonlyMap<string, Uint8Array>, ports: NativeAssemblyPorts<C>): Promise<NativeAssemblyRuntime<C>> {
   const preparation = { product: input, assets }, lendReturns = await prepareReturns(preparation);
-  const written = parseWrittenPlan(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await input.file(NATIVE_ASSEMBLY_FILE))));
+  const written = await writtenPlan(input);
   const plan: NativeAssemblyPlan = { ...written, features: withHostSections(input, written) };
   const patrol = ports.room === true ? plan.features.find(row => row.host === 'encounter.patrol') : undefined;
   const product = patrol === undefined ? input : await withEncounters(input, mergedIntake(await readPatrolIntake(input, patrol), await readSlotIntake(input, patrol), await readWindIntake(input, patrol.actors)));
