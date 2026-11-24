@@ -5,8 +5,11 @@ import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
+/** QA-FEEDBACK-2026-11-23-b row 41: receivers whose candidate ci.yml restores a Ring 2 author preparation made for the exact install
+ *  (their `Require matching preparation` step); the sender runs their ring-2-prepare.yml on it first. */
+export const preparedRepos: readonly string[] = ['shard-sky-reach', 'shard-open-plots'];
 export const shardRepos = ['shard-dunes', 'shard-sky-reach', 'shard-nalati', 'shard-nine-dragon', 'shard-driftwood', 'shard-pine-hollow', 'shard-open-plots'] as const;
-interface Row {repo: string; status: 'pending' | 'success' | 'failure' | 'error' | 'timeout'; runId?: number; runUrl?: string; shardSha?: string; conclusion?: string | null; issue?: string; error?: string}
+interface Row {repo: string; prepareUrl?: string; status: 'pending' | 'success' | 'failure' | 'error' | 'timeout'; runId?: number; runUrl?: string; shardSha?: string; conclusion?: string | null; issue?: string; error?: string}
 /** `packed`: the commit the receivers install, the candidate plus its npm archive's build outputs (ring3-pack.ts, QA 11-23-b row 40). */
 export interface Aggregate {version: 1; engine: string; originRun: string; ok: boolean; rows: Row[]; packed?: string}
 export type Api = (method: 'GET' | 'POST', path: string, body?: unknown) => Promise<unknown>;
@@ -20,20 +23,42 @@ export function prepare(engine: string, originRun: string, repos: readonly strin
 }
 
 export async function runRing3(report: Aggregate, options: Options): Promise<Aggregate> {
-  const {api, now = Date.now, sleep = (ms: number): Promise<void> => new Promise(resolve => {setTimeout(resolve, ms);}), deadlineMs = 20 * 60_000, pollMs = 15_000, checkpoint = () => { /* Embedded callers may omit persisted receipts. */ }} = options;
+  const {api, now = Date.now, sleep = (ms: number): Promise<void> => new Promise(resolve => {setTimeout(resolve, ms);}), deadlineMs = 40 * 60_000, pollMs = 15_000, checkpoint = () => { /* Embedded callers may omit persisted receipts. */ }} = options;
   const until = now() + deadlineMs;
   if (options.packed !== undefined) {
     if (!/^[a-f0-9]{40}$/u.test(options.packed)) throw new Error('Ring 3 sends a full packed commit hash');
     report.packed = options.packed;
   }
   const install = report.packed ?? report.engine;
+  type Run = {id: number; event: string; path: string; head_sha: string; status: string; conclusion: string | null; run_attempt: number};
+  const dispatch = async (repo: string, workflow: string): Promise<number> => {
+    const response = await api('POST', `repos/project-wildshard/${repo}/actions/workflows/${workflow}/dispatches`,
+      {ref: 'main', inputs: {engine: install}, return_run_details: true}) as {workflow_run_id?: number};
+    if (typeof response.workflow_run_id !== 'number' || !Number.isSafeInteger(response.workflow_run_id) || response.workflow_run_id <= 0) throw new Error('Dispatch returned no exact run ID; refusing to guess a run');
+    return response.workflow_run_id;
+  };
+  // row 41: the exact-install preparation, green, before the receiver that restores it
+  const prepared = async (row: Row): Promise<boolean> => {
+    const id = await dispatch(row.repo, 'ring-2-prepare.yml');
+    row.prepareUrl = `https://github.com/project-wildshard/${row.repo}/actions/runs/${String(id)}`;
+    checkpoint(report);
+    for (;;) {
+      const run = await api('GET', `repos/project-wildshard/${row.repo}/actions/runs/${String(id)}`) as Run;
+      if (run.id !== id || run.path.split('@')[0] !== '.github/workflows/ring-2-prepare.yml') throw new Error('Preparation run identity changed');
+      if (run.status === 'completed') {
+        if (run.conclusion === 'success') return true;
+        row.status = 'failure'; row.conclusion = run.conclusion; row.error = `ring-2-prepare ${row.prepareUrl} ended ${String(run.conclusion)}`;
+        return false;
+      }
+      if (now() >= until) {row.status = 'timeout'; row.error = `ring-2-prepare ${row.prepareUrl} did not finish within the Ring 3 deadline`; return false;}
+      await sleep(Math.max(0, Math.min(pollMs, until - now())));
+    }
+  };
   // All seven requests are independent; a refused shard must not hide the others.
   await Promise.all(report.rows.map(async row => {
     try {
-      const response = await api('POST', `repos/project-wildshard/${row.repo}/actions/workflows/ci.yml/dispatches`,
-        {ref: 'main', inputs: {engine: install}, return_run_details: true}) as {workflow_run_id?: number; html_url?: string};
-      if (typeof response.workflow_run_id !== 'number' || !Number.isSafeInteger(response.workflow_run_id) || response.workflow_run_id <= 0) throw new Error('Dispatch returned no exact run ID; refusing to guess a run');
-      row.runId = response.workflow_run_id;
+      if (preparedRepos.includes(row.repo) && !await prepared(row)) {checkpoint(report); return;}
+      row.runId = await dispatch(row.repo, 'ci.yml');
       row.runUrl = `https://github.com/project-wildshard/${row.repo}/actions/runs/${row.runId}`;
     } catch (error) {row.status = 'error'; row.error = errorText(error);}
     checkpoint(report);
@@ -41,7 +66,7 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
   while (report.rows.some(row => row.status === 'pending') && now() < until) {
     await Promise.all(report.rows.filter(row => row.status === 'pending').map(async row => {
       try {
-        const run = await api('GET', `repos/project-wildshard/${row.repo}/actions/runs/${row.runId}`) as {id: number; event: string; path: string; head_sha: string; status: string; conclusion: string | null; run_attempt: number};
+        const run = await api('GET', `repos/project-wildshard/${row.repo}/actions/runs/${String(row.runId)}`) as Run;
         if (run.id !== row.runId || run.event !== 'workflow_dispatch' || run.path.split('@')[0] !== '.github/workflows/ci.yml' || !/^[a-f0-9]{40}$/u.test(run.head_sha) || run.run_attempt !== 1) throw new Error('Receiver run identity changed; new qualification required');
         row.shardSha = run.head_sha;
         if (run.status === 'completed') {row.conclusion = run.conclusion; row.status = run.conclusion === 'success' ? 'success' : 'failure';}

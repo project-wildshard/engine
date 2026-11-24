@@ -5,18 +5,25 @@ import {execFileSync} from 'node:child_process';
 import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {BOOT_STAMPS} from './boot-stamps.mjs';
-import {prepare, runRing3, shardRepos, type Api} from './ring3.ts';
+import {prepare, preparedRepos, runRing3, shardRepos, type Api} from './ring3.ts';
 import {missingGenerated, packCommit, untracked} from './ring3-pack.ts';
 
 const candidate = 'a'.repeat(40), shard = 'b'.repeat(40);
 interface Call {method: string; path: string; body?: unknown}
-function fixture(options: {install?: string; red?: string; malformed?: boolean; pending?: boolean; wrongRun?: boolean; denied?: string; existing?: boolean} = {}): {api: Api; calls: Call[]} {
+function fixture(options: {install?: string; prepareRed?: string; red?: string; malformed?: boolean; pending?: boolean; wrongRun?: boolean; denied?: string; existing?: boolean} = {}): {api: Api; calls: Call[]} {
   const calls: Call[] = [];
   const api: Api = (method, path, body) => Promise.resolve().then(() => {
     calls.push({method, path, body});
     const repo = path.split('/')[2];
     if (repo === undefined || !shardRepos.includes(repo as typeof shardRepos[number])) throw new Error(`Unexpected repository: ${path}`);
     const id = shardRepos.indexOf(repo as typeof shardRepos[number]) + 100;
+    if (method === 'POST' && path.endsWith('/ring-2-prepare.yml/dispatches')) {
+      assert.equal(preparedRepos.includes(repo), true, `${repo} restores no preparation`);
+      assert.deepEqual(body, {ref: 'main', inputs: {engine: options.install ?? candidate}, return_run_details: true});
+      return {workflow_run_id: id + 1000};
+    }
+    if (method === 'GET' && path.endsWith(`/actions/runs/${String(id + 1000)}`)) return {id: id + 1000, event: 'workflow_dispatch', path: '.github/workflows/ring-2-prepare.yml',
+      head_sha: shard, run_attempt: 1, status: 'completed', conclusion: repo === options.prepareRed ? 'failure' : 'success'};
     if (method === 'POST' && path.endsWith('/dispatches')) {
       if (repo === options.denied) throw new Error('HTTP 403');
       assert.deepEqual(body, {ref: 'main', inputs: {engine: options.install ?? candidate}, return_run_details: true});
@@ -36,7 +43,7 @@ await test('all seven exact candidate dispatches must complete green on their re
   assert.equal(report.ok, true);
   assert.deepEqual(report.rows.map(row => row.repo), shardRepos);
   assert.equal(report.rows.every(row => row.shardSha === shard && row.status === 'success'), true);
-  assert.equal(calls.filter(call => call.method === 'POST').length, 7);
+  assert.equal(calls.filter(call => call.method === 'POST').length, 7 + preparedRepos.length, 'seven receivers and their exact-install preparations');
   assert.equal(calls.some(call => call.path.includes('/runs?')), false, 'Never substitutes another candidate run');
 });
 await test('one red receiver holds the aggregate and files only that shard issue', async () => {
@@ -108,4 +115,14 @@ await test('packCommit commits the ignored build outputs onto the candidate and 
     assert.match(sh('ls-tree', '-r', '--name-only', commit), /src\/audio\.generated\.ts/u);
     assert.equal(sh('rev-parse', `${commit}^`), engine, 'one commit on top of the candidate');
   } finally { process.chdir(root); rmSync(dir, {recursive: true, force: true}); }
+});
+await test('a prepared receiver runs only after its exact-install ring-2-prepare is green (QA 11-23-b row 41)', async () => {
+  const {api, calls} = fixture({install: packed, prepareRed: 'shard-open-plots'}), report = await runRing3(prepare(candidate, 'sender'), {api, packed});
+  const order = calls.filter(call => call.method === 'POST' && call.path.includes('shard-sky-reach')).map(call => call.path.split('/').at(-2));
+  assert.deepEqual(order, ['ring-2-prepare.yml', 'ci.yml'], 'the preparation first, then the receiver');
+  const plots = report.rows.find(row => row.repo === 'shard-open-plots');
+  assert.equal(plots?.status, 'failure');
+  assert.equal(plots?.runId, undefined, 'a red preparation dispatches no receiver');
+  assert.match(plots?.error ?? '', /ring-2-prepare/u);
+  assert.equal(report.rows.filter(row => row.status === 'success').length, 6);
 });
