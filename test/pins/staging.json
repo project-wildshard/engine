@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "fe1e68a4341acfe70bd13027191b6c93c3993d080fa43fe558c2774bdf8da978",
+  "catalogueHash": "a4b639e1f1286e5830371456a3369dc84616345023e6582e9b623fe83460270b",
   "releaseHash": "e4e934a568a6cee74008de4b2a76c19a6c364170dcb84fa539f974c1557c55fc",
   "catalogue": {
     "version": 0,
@@ -592,8 +592,8 @@
       {
         "slug": "driftwood-isle",
         "name": "Driftwood Isle",
-        "revision": 10,
-        "hash": "14e9668bb2c3770ef7a68c5382cd01de50d5cfe77568d93b8e9702174d0bf6df"
+        "revision": 12,
+        "hash": "6a9f721236a4daaa44e5fc200f5232e08398470063fec9656da579d8b146688e"
       },
       {
         "slug": "far-reach",
@@ -745,9 +745,9 @@
     },
     {
       "slug": "driftwood-isle",
-      "revision": 10,
-      "hash": "14e9668bb2c3770ef7a68c5382cd01de50d5cfe77568d93b8e9702174d0bf6df",
-      "bytes": 97211904
+      "revision": 12,
+      "hash": "6a9f721236a4daaa44e5fc200f5232e08398470063fec9656da579d8b146688e",
+      "bytes": 97213440
     },
     {
       "slug": "far-reach",
