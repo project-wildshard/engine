@@ -7,7 +7,7 @@ import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { tagCollider } from '../src/shared/engine/physics/surface';
 import { snapshotSimHost } from '../src/shared/engine/sim/snapshot';
-import { installHostPortalRide } from '../src/shared/game/shardfile/portalRide';
+import { installHostPortalRide, releasePortalRides } from '../src/shared/game/shardfile/portalRide';
 import portals from './fixtures/engine-lift/portals.json';
 import { builtFolder } from './fixtures/engine-lift/folder';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
@@ -45,4 +45,37 @@ test('a bot enters the admitted portal alone and resumes its fade on a fresh rea
     expect(Math.hypot(bot.position.x - road.at[0], bot.position.z - road.at[2])).toBeGreaterThan(1);
     expect(lead.position.x).toBeCloseTo(0);
   } finally { resumed?.dispose(); host.dispose(); }
+});
+
+test("a seat its player left rides anew, as the next page's ride does", async () => {
+  // v0.1.81 (opus-fp21): a guest who entered Nine Dragon by its south road went to the main menu and came back; the page's fresh
+  // ride took the square's shared pad out by the first road (north), the room's kept one by the south road
+  const source = (await loadHeadlessFolder(builtFolder('nine-dragon-stack'))).shardfile;
+  const entry = source.entryways.find(row => row.portal !== undefined), portal = entry?.portal;
+  if (entry === undefined || portal === undefined) throw new Error('Missing admitted portal');
+  const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
+  const host = createSimHost({ ...SIM_LEVEL, entities: [], quests: [] }, { rapier });
+  try {
+    for (const node of [portal.road, portal.destination]) {
+      const floor = host.physics.world.createCollider(host.physics.R.ColliderDesc.cuboid(2, .2, 2).setTranslation(node.at[0], node.at[1] - .2, node.at[2]));
+      tagCollider(floor, 'wood', node.floor);
+    }
+    const ride = installHostPortalRide(host, portals.director, source, portals, () => undefined);
+    const [[leadKey, lead] = []] = host.players;
+    if (lead === undefined || leadKey === undefined) throw new Error('Missing lead');
+    lead.resetPose({ x: portal.road.at[0], y: portal.road.at[1], z: portal.road.at[2] }, 0);
+    for (let tick = 0; tick < 120 && ride.rides().length === 0; tick++) host.step();
+    expect(ride.rides()).toEqual([expect.objectContaining({ from: portal.road.id })]);
+    expect(ride.entered()).toBe(entry.edge);
+    releasePortalRides(host, leadKey);
+    expect(ride.entered()).toBeNull();
+    expect(ride.rides()).toEqual([]);
+    // another seat's player who left is forgotten with its seat
+    host.addPlayer('bot:1', { x: portal.road.at[0], y: portal.road.at[1], z: portal.road.at[2] });
+    host.step();
+    const adapter = host.adapters.get(portals.director);
+    expect(JSON.parse(String(adapter?.snapshot()))).toHaveProperty('others.bot:1');
+    releasePortalRides(host, 'bot:1');
+    expect(JSON.parse(String(adapter?.snapshot()))).not.toHaveProperty('others');
+  } finally { host.dispose(); }
 });

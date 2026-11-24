@@ -1,5 +1,5 @@
 import type { SimHost } from '@wildshard/engine/sim';
-import { declaredPortals, installHostPortalRide, type PortalFacts, type PortalRide, type PortalRideRows, type PortalSource } from '../../../shared/game/shardfile/portalRide';
+import { declaredPortals, installHostPortalRide, releasePortalRides, type PortalFacts, type PortalRide, type PortalRideRows, type PortalSource } from '../../../shared/game/shardfile/portalRide';
 import { registerInstalled } from './installedSides';
 
 /** A `client/plan` feature row, as far as the portal reads it. */
@@ -22,3 +22,6 @@ export function installDeclaredHostPortalRide(host: SimHost, source: PortalSourc
   registerInstalled(host, 'portalRide');
   return ride;
 }
+
+/** A room's seat its player left rides its portals anew, as the next page's ride does. */
+export function releaseSeatPortals(host: SimHost, player: string): void { releasePortalRides(host, player); }

@@ -116,6 +116,13 @@ const Saved = v.strictObject({ ...SeatSavedSchema, others: v.exactOptional(v.rec
 interface Point { x: number; y: number; z: number }
 interface SeatSaved { held: Point | null; ride: PortalRideState }
 
+const releases = new WeakMap<object, Set<(player: string) => void>>();
+/** A seat a player left rides anew, as its next page does: a page's ride starts with no road entered, so a room that kept the
+ *  last occupant's road sent a player who left from the menu and came back out of Nine Dragon's shared square pad by the old
+ *  road while the page showed the first (v0.1.81, opus-fp21: the page drew the north deck, the room seated the south one). A
+ *  room calls this when a seat empties; a body it removes rides anew already. */
+export function releasePortalRides(host: object, player: string): void { for (const run of releases.get(host) ?? []) run(player); }
+
 /** The host's ride on its fixed step under `id`: `carried` holds the feet still while the fade runs, `spawn` releases the
  *  motor and clears every velocity; the hold and the ride are exact continuation. */
 export function installHostPortalRide(host: RideHost<PortalTraversalPorts['physics']>, id: string, source: PortalSource, rows: PortalRideRows, facts: PortalFacts, factsOf: (player: string) => PortalFacts = () => () => undefined): PortalRide {
@@ -144,8 +151,10 @@ export function installHostPortalRide(host: RideHost<PortalTraversalPorts['physi
     return { ride, player, step: (dt: number): void => { if (held !== null) keep(held); ride.step(dt); }, save: (): SeatSaved => ({ held, ride: ride.snapshot() }),
       load: (saved: SeatSaved): void => { ride.restore(saved.ride); held = saved.held; } };
   };
-  const [first] = host.players.values(); if (first === undefined) throw new Error('Simulation host has no player');
-  const lead = seat(first, facts), others = new Map<string, ReturnType<typeof seat>>();
+  const [[firstKey, first] = []] = host.players; if (first === undefined || firstKey === undefined) throw new Error('Simulation host has no player');
+  const lead = seat(first, facts), others = new Map<string, ReturnType<typeof seat>>(), fresh = lead.save();
+  const runs = releases.get(host) ?? new Set<(player: string) => void>(); releases.set(host, runs);
+  runs.add(player => { if (player === firstKey) lead.load(fresh); else others.delete(player); });
   /** Another player's seat: a body that left and came back rides anew. */
   const seatOf = (key: string, player: RidePlayer): ReturnType<typeof seat> => {
     const known = others.get(key);

@@ -22,6 +22,7 @@ import { ledgerFilings } from '../standalone/ledgerFilings';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { mountedPlayerOf } from '@wildshard/engine/game/riding/native';
 import { nativeTamingControls } from '@wildshard/engine/game/riding/nativeTaming';
+import { releaseSeatPortals } from '@wildshard/engine/game/shardfile/declaredPortalRide';
 import { carryDoc, exportPlayer, importPlayer, parseDoc, PLAYER_DOC_VERSION, type PlayerDoc } from './playerDoc';
 import { PlayerStore, recoverPlayer } from './playerStore';
 import { ShopGate } from './shopGate';
@@ -423,13 +424,14 @@ export class DedicatedRoom implements CrossTarget {
   /**
    * The seat goes back to how boot left it, and what it was paid goes with who earned it: the next player's bounty is their own (J105).
    * SC10 review: it goes under the leaver's own id, as any other body's stays, so a lead who bounces across an edge cannot re-farm a
-   * bounty; it is forgotten `FORGET_PAID_MS` after `left`. The seat's taming session goes too: the next lead starts wild.
+   * bounty; it is forgotten `FORGET_PAID_MS` after `left`. The seat's taming session goes too: the next lead starts wild, and rides portals anew.
    */
   private clearLead(own: string, left: number): void {
     actRoutes(this.host).identities.delete(LEAD_SEAT);
     this.movePaid(LEAD_SEAT, own);
     this.departed.set(own, left);
     nativeTamingControls(this.host)?.release(LEAD_SEAT);
+    releaseSeatPortals(this.host, LEAD_SEAT);
     importPlayer(this.host, this.lead, this.blank); this.parkLead();
   }
   /** What `from` was paid here is `to`'s now. */
