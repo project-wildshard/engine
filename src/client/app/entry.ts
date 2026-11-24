@@ -681,7 +681,7 @@ async function startSelected(): Promise<void> {
   const imports = prepareBootImports(bootAwait('app:common-service-imports', Promise.all([speciesModule, iconsModule, pickupsModule, pickupRowsModule, propsModule,
     starterModule, hoverboardModule, voicesModule, boarModule, familiesModule, sourceModule, runtimeModule,
     gridEntryModule, pathsModule, prefetchModule])));
-  const [{ sharedWeaponVoices, declaredWeaponVoices }, { BOAR_LOOK }, { declaredKitItemFamilies, declaredItemIcon },
+  const [{ sharedWeaponVoices, declaredWeaponVoices }, { boarLook }, { declaredKitItemFamilies, declaredItemIcon },
     { configuredShardfile, installShardfileFolder, installManifestShardfile, preparePageResidency, inlineRuntimeArrival, selectInlineRuntime }, { browserShardfileOptions },
     { pageGridRecovery }, { loadingPath }, { gridPrefetchStatus }] = await Promise.all([
     voicesModule, boarModule, familiesModule, sourceModule, runtimeModule, gridEntryModule, pathsModule,
@@ -746,7 +746,7 @@ async function startSelected(): Promise<void> {
       instance: page.instance ?? (source === null ? 'template-solo' : `standalone-${source.identity.slug}`), catalogue: [], items: declaredKitItemFamilies(), voices: declaredWeaponVoices,
       ...(page.residency === undefined ? {} : { residency: page.residency }),
       icon: declaredItemIcon,
-      recipes: new Map([['kit.look.boar', (row, species) => { if (row.animation.recipe !== 'kit.pose.quadruped') throw new Error('Unknown boar pose recipe'); return { ...BOAR_LOOK, id: row.id, species: species.id, kind: species.kind }; }]]),
+      recipes: new Map([['kit.look.boar', (row, species) => { if (row.animation.recipe !== 'kit.pose.quadruped') throw new Error('Unknown boar pose recipe'); return boarLook({ id: row.id, species: species.id, kind: species.kind }); }]]),
     };
     imports.check();
     // DL11: setup overlaps the download (each read waits for its own file); control waits for the whole set (finish.ts)

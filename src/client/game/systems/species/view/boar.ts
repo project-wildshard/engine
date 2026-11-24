@@ -83,7 +83,7 @@ function boarPaint(v: VariantDef): Paint {
   };
 }
 
-function buildBoar(v: VariantDef, rng: Rng): AnimalSpecies {
+function buildBoar(kind: string, v: VariantDef, rng: Rng): AnimalSpecies {
   const tuskScale = Number(v.traits?.['tuskScale'] ?? 1);
   setShag(0.016);
   const bones: BoneDef[] = [
@@ -109,7 +109,7 @@ function buildBoar(v: VariantDef, rng: Rng): AnimalSpecies {
   }
   const B = boneIndex(bones);
   const lowPoly = isLowPoly();   // a toon level: its own palette (toonPaint), crest = a row of spikes
-  const toon = lowPoly ? toonPaint('boar') : null;
+  const toon = lowPoly ? toonPaint(kind) : null;
   const paint = toon !== null ? toon(v) : boarPaint(v);
   const fur: THREE.BufferGeometry[] = [], hard: THREE.BufferGeometry[] = [], eyes: THREE.BufferGeometry[] = [];
   const body = B('body'), n1 = B('neck1'), n2 = B('neck2'), hd = B('head'), bl = B('belly');
@@ -232,9 +232,8 @@ function buildBoar(v: VariantDef, rng: Rng): AnimalSpecies {
   };
 }
 
-export const BOAR_LOOK: SpeciesLook = {
+const BOAR_LOOK_ROWS: Omit<SpeciesLook, 'id' | 'species' | 'kind' | 'build'> = {
   rigContract: { skeleton: 'boar.v1', clips: [], sockets: ['body', 'head'] },
-  id: 'kit.look.boar', species: 'kit.creature.boar', kind: 'boar',
   fur: {
     texSeed: 202, tex: { contrast: 1.0, grizzle: 0.6, normalStrength: 2.2, bristle: 0.6, strandLen: 12, root: 0.24 },
     roughness: 0.88, sheen: 0.15, sheenColor: [0.35, 0.3, 0.24], envMapIntensity: 0.9, rim: [0.9, 0.7, 0.45], shellLen: 0.065, shag: 0.016,
@@ -245,5 +244,13 @@ export const BOAR_LOOK: SpeciesLook = {
     big: { traits: { tuskScale: 1.3 } }, scarback: { tint: SCARBACK_TINT, traits: { tuskScale: 1.8, scar: 1 } },
     ironhide: { tint: IRONHIDE_TINT, traits: { tuskScale: 2.2 }, fur: { rim: [0.75, 0.78, 0.85], sheenColor: [0.4, 0.42, 0.46] } },
   },
-  build: buildBoar,
 };
+
+/** Which look row, species and kind a boar look draws for: the kind also picks a toon level's palette (FORMAT-PRUNE FP51:
+ * the engine names no creature kind; the row that declares the look does). */
+export interface BoarLookRow { readonly id: string; readonly species: string; readonly kind: string }
+
+/** The boar look for one declared row (Pine's boars draw with it, `entry.ts` recipe `kit.look.boar`). */
+export function boarLook(row: BoarLookRow): SpeciesLook {
+  return { ...BOAR_LOOK_ROWS, id: row.id, species: row.species, kind: row.kind, build: (v: VariantDef, rng: Rng): AnimalSpecies => buildBoar(row.kind, v, rng) };
+}

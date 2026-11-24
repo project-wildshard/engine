@@ -13,7 +13,7 @@ import { manager } from '@wildshard/engine/test/manager';
 import { registerSpecies } from '@wildshard/engine/entities/species/registry';
 import { speciesWithLook } from '@wildshard/engine/entities/species/look';
 import { BOAR } from '../src/test/game/species/boar';
-import { BOAR_LOOK } from '../src/client/game/systems/species/view/boar';
+import { BOAR_LOOK } from '../src/test/game/species/view/boar';
 
 beforeEach(() => { registerSpecies(speciesWithLook(BOAR, BOAR_LOOK)); });
 

@@ -9,6 +9,7 @@ import { terrainHeight as heightAt } from '@wildshard/engine/world/terrainHeight
 import { parsePracticeController, type PracticeControllerRows, type RidingPracticeLayout, type HookPracticeLayout } from '@wildshard/format/practiceCourseRows';
 import { isJsonData } from '@wildshard/format/json';
 import type { GrappleCourseRow } from '@wildshard/format/grapple';
+import type { ClientFeatureRow } from '@wildshard/format/clientPlan';
 import type { ShardContext } from '../plugin/context';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { pageRidingMount } from '../riding/client';
@@ -17,9 +18,11 @@ import { buildPracticeScene } from './scene';
 import { NumericCourse } from './numericCourse';
 
 const fill = (text:string, values:Readonly<Record<string,string|number>>):string => text.replaceAll(/\{(\w+)\}/gu,(match,key:string)=>String(values[key]??match));
+/** The course a practice card names, as the format admits it (FORMAT-PRUNE FP51: the engine names no course of its own). */
+type PracticeCourseId = Extract<ClientFeatureRow, { kind: 'practice.course' }>['course'];
 /** Data only: both actual course files carry the same native-controller contract. */
 export interface PracticeCourseRows {
-  readonly kind:'horse'|'grapple';
+  readonly kind:PracticeCourseId;
   readonly layout:RidingPracticeLayout|HookPracticeLayout;
 }
 /** One row-driven native entry and numeric/HUD controller over the original borrowed owners. */
@@ -120,7 +123,7 @@ class CourseController {
 /** Client-only common room lifetime, shared by the real riding and grapple courses.
  * The common controller consumes finite rows; native entry adapters retain body/tool authority. */
 export class PracticeCourse implements Playground {
-  readonly id:'horse'|'grapple'; readonly title:string; readonly center:{x:number;z:number};
+  readonly id:PracticeCourseId; readonly title:string; readonly center:{x:number;z:number};
   readonly root:THREE.Group; readonly map:RoomMap; readonly origin:THREE.Vector3; readonly chip:PlaygroundChip;
   private active=false;
   private readonly controller:CourseController;

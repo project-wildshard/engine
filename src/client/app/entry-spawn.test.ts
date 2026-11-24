@@ -122,7 +122,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     installPickupCatalogue: () => {events.push('kit:pickup:install');},
     installKitProps: () => {events.push('kit:props');}, default: {}, STARTER_BAG_ITEMS: [], HOVERBOARD_TOOL: {},
     sharedWeaponVoices: noop, declaredWeaponVoices: noop, sharedCombatCues: noop,
-    BOAR_LOOK: {}, declaredKitItemFamilies: () => []};
+    boarLook: () => ({}), declaredKitItemFamilies: () => []};
   const grid = {pageGridRecovery: () => null, pendingGridEntry: () => false};
   const modules: Record<string, unknown> = {
     './shardSelection': {prepareSelectedShard: resolved, completePageCatalogue: resolved},
