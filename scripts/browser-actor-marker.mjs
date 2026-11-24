@@ -3,6 +3,7 @@ import { mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { agentUserAgent } from './agent-marker.mjs';
+import { mutedLaunch, silenced } from './browser-silence.mjs';
 import markers from '../src/shared/engine/app/actorMarkers.json' with { type: 'json' };
 
 const browsers = new WeakSet();
@@ -61,8 +62,9 @@ function markedBrowser(browser) {
   const context = browser.newContext.bind(browser), page = browser.newPage.bind(browser);
   /** @param {import('playwright').BrowserContextOptions | undefined} options */
   const device = async options => options?.userAgent === undefined ? { ...options, userAgent: await defaultUserAgent(browser, context) } : options;
-  browser.newContext = async options => context(markedContext(await device(options)));
-  browser.newPage = async options => page(markedContext(await device(options)));
+  // Every page an agent opens is silent too (meta QA-FEEDBACK-2026-11-24 row 49): browser-silence.mjs.
+  browser.newContext = async options => silenced(await context(markedContext(await device(options))));
+  browser.newPage = async options => silenced(await page(markedContext(await device(options))));
   return browser;
 }
 
@@ -120,13 +122,14 @@ export function installBrowserActorMarker(playwright) {
       const started = own && method === 'launch';
       /** @param {...unknown} args */
       const launch = async (...args) => markedBrowser(await Reflect.apply(open, engine,
-        started ? [await markedStart(start, engine, /** @type {import('playwright').LaunchOptions | undefined} */ (args[0]))] : args));
+        started ? [await markedStart(start, engine, mutedLaunch(/** @type {import('playwright').LaunchOptions | undefined} */ (args[0])))] : args));
       Reflect.set(engine, method, launch);
     }
     if (typeof engine.launchPersistentContext === 'function') {
       const persistent = engine.launchPersistentContext.bind(engine);
-      engine.launchPersistentContext = async (dir, options) => markDefaultUA(await persistent(dir, markedContext(
-        own && options?.userAgent === undefined ? await markedStart(start, engine, options) : options)), options?.userAgent);
+      engine.launchPersistentContext = async (dir, options) => silenced(await markDefaultUA(await persistent(dir, markedContext(
+        own ? options?.userAgent === undefined ? await markedStart(start, engine, mutedLaunch(options)) : mutedLaunch(options) : options)),
+      options?.userAgent));
     }
   }
 }

@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { test } from 'vitest';
 import { agentHeaders, agentUrl, agentUserAgent } from '../../scripts/agent-marker.mjs';
 import { installBrowserActorMarker } from '../../scripts/browser-actor-marker.mjs';
+import { mutedLaunch, silencePage } from '../../scripts/browser-silence.mjs';
 import { chromium, devices } from '../../scripts/browser-playwright.mjs';
 import { KEYCHAIN_ARGS } from '../../scripts/chromium-keychain.mjs';
 
@@ -159,4 +160,63 @@ test('native game URL launchers import the agent marker', () => {
       assert.ok(/\b(?:agentUrl|agent_url)\(/u.test(source), `${script} opens a browser without the agent marker`);
     }
   }
+});
+
+// Meta QA-FEEDBACK-2026-11-24 row 49 (Jake: "NEVER FUCKING SOUND SOUND OFF"): every agent browser is silent.
+test('every context and page is silenced before its own script, and a Chromium start always mutes', async () => {
+  /** @type {Array<() => void>} */
+  const scripts = [];
+  const target = () => ({ addInitScript: async (/** @type {() => void} */ script) => { scripts.push(script); } });
+  const browser = { newContext: async () => target(), newPage: async () => target() };
+  /** @type {Array<string[]>} */
+  const started = [];
+  const engine = {
+    launch: async (/** @type {{args?: string[]} | undefined} */ options) => { started.push(options?.args ?? []); return browser; },
+    launchPersistentContext: async (/** @type {string} */ _dir, /** @type {{args?: string[]} | undefined} */ options) => {
+      started.push(options?.args ?? []);
+      return target();
+    },
+  };
+  installBrowserActorMarker({ webkit: engine });
+  const opened = await engine.launch();
+  await opened.newContext({ userAgent: 'Phone UA' });
+  await opened.newPage({ userAgent: 'Phone UA' });
+  await engine.launchPersistentContext('profile', { userAgent: 'Phone UA' });
+  assert.equal(scripts.length, 3);
+  assert.ok(scripts.every(script => script === silencePage));
+  // WebKit takes no Chromium switch; its pages are what keep it quiet.
+  assert.deepEqual(started, [[], []]);
+  assert.deepEqual(mutedLaunch({ args: ['--use-mock-keychain'] }).args, ['--use-mock-keychain', '--mute-audio']);
+  assert.deepEqual(mutedLaunch({ args: [...KEYCHAIN_ARGS] }).args, [...KEYCHAIN_ARGS]);
+  assert.deepEqual(mutedLaunch(undefined).args, ['--mute-audio']);
+});
+
+test.skipIf(!existsSync(executablePath))('a marked page plays Web Audio and media into silence', async () => {
+  const own = await origin((_request, response) => { response.setHeader('content-type', 'text/html'); response.end('<audio id=a></audio>'); });
+  try {
+    // A launch that forgets --mute-audio still gets it.
+    const browser = await chromium.launch({ executablePath, headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
+    try {
+      const page = await (await browser.newContext()).newPage();
+      await page.goto(own.url);
+      const heard = await page.evaluate(async () => {
+        const context = new AudioContext();
+        const tone = context.createOscillator();
+        tone.connect(context.destination);
+        const sink = /** @type {AudioNode} */ (context.destination);
+        const offline = new OfflineAudioContext(1, 128, 44100);
+        const element = /** @type {HTMLAudioElement} */ (document.getElementById('a'));
+        element.muted = false;
+        // No source: play() stays pending, but it mutes on the call.
+        void element.play().catch(() => undefined);
+        return {
+          gain: sink instanceof GainNode ? sink.gain.value : null,
+          same: context.destination === sink,
+          offline: offline.destination instanceof AudioDestinationNode,
+          muted: element.muted,
+        };
+      });
+      assert.deepEqual(heard, { gain: 0, same: true, offline: true, muted: true });
+    } finally { await browser.close(); }
+  } finally { await own.close(); }
 });
