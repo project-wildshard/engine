@@ -128,3 +128,21 @@ test('the hull book passes its existing product file capability to the packed ow
   expect(book.packed.copy('bird', 'small').hardParts).toHaveLength(1);
   expect(reads).toBe(1); expect(fetcher).not.toHaveBeenCalled();
 });
+
+test('QA 11-23-b row 34: every packed look preloads its bake, and a failed read is read again', async () => {
+  // Nalati's looks carry no hull preload: the level waited for no models, built one at Final activation and stopped on
+  // "Packed creature bodies are not loaded". Each look now preloads the bake it copies from; one shared preload.
+  const bytes = zlibSync(new Uint8Array(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer));
+  let fail = true;
+  const fetcher = vi.fn(() => Promise.resolve(fail ? new Response(null, { status: 503 }) : new Response(bytes))); vi.stubGlobal('fetch', fetcher);
+  const bodies = packedCreatureBodies(row());
+  const view = { id: 'look.finch', species: 'species.finch', kind: 'finch', family: 'bird', variants: { juvenile: 'small' }, skeleton: 'bird.v1', sockets: ['body'], clips: [] };
+  const looks = bodies.looks({ poses: {}, rows: [view, { ...view, id: 'look.wren', species: 'species.wren', kind: 'wren' }] });
+  const preloads = new Set(looks.all.map(look => look.preload));
+  expect(preloads.size).toBe(1);
+  const [preload] = preloads; if (preload === undefined) throw new Error('A packed look has no preload');
+  await expect(preload()).rejects.toThrow('503');
+  fail = false; await preload();
+  expect(looks.get('wren').build({ id: 'juvenile', label: 'Juvenile', weight: 1, rarity: 'common', scale: [1, 1] }, new Rng(1)).hardParts).toHaveLength(1);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});

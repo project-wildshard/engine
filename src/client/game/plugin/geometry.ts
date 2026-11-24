@@ -1434,13 +1434,20 @@ export function packedCreatureBodies(input: unknown, decode: (bytes: Uint8Array)
     const scope = resourceScope(); scope.cancelTimer(hold); hold = scope.timeout(DECODED_HOLD_MS, () => { decoded = null; });
     return decoded;
   };
+  // G639: the bake is inflated as it loads, by the platform's stream decoder where it can (a Nalati entry spent ~0.13 s of
+  // one frame inflating 8.7 MB in script at its first spawn); it is held until the first burst's copies are done. A failed
+  // read is not kept: the next preload reads again (QA 11-23-b row 34).
+  const preload = (): Promise<void> => {
+    loading ??= (async () => {
+      try {
+        const bytes = await load(bake.file); compressed = bytes;
+        if (decode === unzlibSync) decoded ??= await inflateStream(bytes);
+      } catch (error: unknown) { loading = null; throw error; }
+    })();
+    return loading;
+  };
   const catalogue: PackedCreatureBodies = {
-    // G639: the bake is inflated as it loads, by the platform's stream decoder where it can (a Nalati entry spent ~0.13 s of
-    // one frame inflating 8.7 MB in script at its first spawn); it is held until the first burst's copies are done
-    preload: () => {
-      loading ??= load(bake.file).then(async bytes => { compressed = bytes; if (decode === unzlibSync) decoded ??= await inflateStream(bytes); return undefined; });
-      return loading;
-    },
+    preload,
     looks: lookInput => {
       const book = parsePackedCreatureLooks(lookInput);
       if (new Set(book.rows.map(row => row.id)).size !== book.rows.length || new Set(book.rows.map(row => row.kind)).size !== book.rows.length) throw new Error('Duplicate packed creature look');
@@ -1451,7 +1458,9 @@ export function packedCreatureBodies(input: unknown, decode: (bytes: Uint8Array)
         const poseRows = row.pose === undefined ? undefined : book.poses[row.pose];
         if (row.pose !== undefined && poseRows === undefined) throw new Error('Missing packed creature joint pose');
         const pose = row.pose === undefined ? undefined : numericCreaturePoseFromBook(book, row.pose);
-        const look: SpeciesLook = { id: row.id, species: row.species, kind: row.kind, fur: NO_FUR,
+        // QA 11-23-b row 34: every packed look preloads the bake it copies from, so a level that waits for its models
+        // (`AnimalFactory.ready`) never builds one before the bytes are in (Nalati's looks carry no hull preload of their own)
+        const look: SpeciesLook = { id: row.id, species: row.species, kind: row.kind, fur: NO_FUR, preload,
           rigContract: { skeleton: row.skeleton, sockets: row.sockets, clips: row.clips },
           build: variant => {
             const source = row.variants?.[variant.id], key = row.variants === undefined ? variant.id : source === undefined ? undefined : bodyKey(source);
