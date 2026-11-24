@@ -11,7 +11,7 @@ import { afterAll, afterEach, beforeAll, expect, test, vi } from 'vitest';
 import { cellFrame, cellName, cellShard, forgetPlacedCells, keepPlacedCells, placeCell, placedCells, placedHash, placementSlots, type PlacedCell } from '../src/server/host/dedicated/gridCells';
 import { readPackFolder, type PackReaderOptions, type PackReads } from '../src/server/host/dedicated/packReader';
 import {uploadActivator} from '../src/server/host/dedicated/uploadActivation';
-import { PlacementWatch, readPlacementFile } from '../src/server/host/dedicated/placementFile';
+import { PlacementWatch, placementOpener, readPlacementFile } from '../src/server/host/dedicated/placementFile';
 import type { PlacementFile } from '../src/shared/game/grid/placementRows';
 import { cookIndexPath, serverPackBookPath, type ServerPack } from '../src/shared/game/shardfile/serverPack';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
@@ -143,6 +143,31 @@ test('MZ33: a watch hands every file to keep before it opens, and opens a cell a
   next = file(3); gone = []; await watch.look();
   expect(kept).toEqual([[PLACED.instance], [], [PLACED.instance]]);
   expect(asked, 'opened, then asked again once it came back').toEqual([[PLACED.instance], [PLACED.instance]]);
+  watch.dispose();
+});
+
+// QA-FEEDBACK-2026-11-24 row 61 (opus-lag): the staging and production doors stalled 60 to 90 ms every minute with nobody playing.
+// The placement file names a cell the release already runs (Brasscap Mesa at `blender-template`); `openCells` skipped it and answered
+// nothing, so every look re-read and re-checked its whole pack on the door thread. A running cell is read once, then never again.
+test('row 61: a cell the world already runs is read and placed once, counts as opened, and no later look reads its pack', async () => {
+  const RUNNING: PlacedCell = { instance: 'blender-template', slug: 'brasscap-mesa', cell: [-1, -1], hash: 'a'.repeat(64) };
+  const reads: string[] = [], placed: string[] = [], opened: string[][] = [], refused: string[] = [];
+  let broken = 'sa33-broken';
+  const watch = new PlacementWatch({ channel: 'staging', everyMs: 3_600_000, failed: () => undefined,
+    read: () => Promise.resolve(file(1, [RUNNING, PLACED, { instance: 'sa33-broken', slug: 'sa33-broken', cell: [1, 3] }])),
+    open: placementOpener({
+      read: row => { reads.push(row.instance); return row.instance === broken ? Promise.reject(new Error('no pack yet')) : Promise.resolve(); },
+      place: row => { placed.push(row.instance); }, running: instance => instance === RUNNING.instance,
+      open: instances => { opened.push([...instances]); return Promise.resolve(instances); },
+      refused: row => { refused.push(row.instance); } }) });
+  await watch.look(); await watch.look(); await watch.look();
+  expect(reads, 'each pack read once; only the refused one is asked again').toEqual(['blender-template', PLACED.instance, 'sa33-broken', 'sa33-broken', 'sa33-broken']);
+  expect(placed, 'the running cell is still placed, so its hash reaches the door').toEqual(['blender-template', PLACED.instance]);
+  expect(opened, 'only a cell the world lacks boots').toEqual([[PLACED.instance]]);
+  expect(refused).toEqual(['sa33-broken', 'sa33-broken', 'sa33-broken']);
+  broken = ''; await watch.look(); await watch.look();
+  expect(opened.at(-1)).toEqual(['sa33-broken']);
+  expect(reads, 'a quiet minute reads nothing').toHaveLength(6);
   watch.dispose();
 });
 

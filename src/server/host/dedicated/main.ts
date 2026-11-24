@@ -40,7 +40,7 @@ import { cloudflareTurn } from './voiceRelay';
 import { declaredCells, worldSettings, type DeclaredCells } from './workerTable';
 import { doorTrust } from './doorTrust';
 import { WHOLE_GRID, catalogueCell, cellShard, homeCell, keepPlacedCells, placeCell, placedCells, placementSlots, releasedWorldShards, worldCells } from './gridCells';
-import { PlacementWatch, fetchPlacementFile } from './placementFile';
+import { PlacementWatch, fetchPlacementFile, placementOpener } from './placementFile';
 import {uploadActivator, uploadActivationReceiver} from './uploadActivation';
 import { DEV_CONTROL_PATH, devRoute } from './devControl';
 import { rawServerPlan } from '@wildshard/engine/game/shardfile/serverPlan';
@@ -228,7 +228,14 @@ reports.watch(world);
 const metricsListening = metrics === undefined || metricsAt === undefined ? undefined : await metrics.listen(metricsAt).catch((error: unknown) => { log({ at: 'metrics.refused', port: metricsAt, error: String(error) }); return undefined; });
 log({ at: 'server.listening', ...(metricsListening === undefined ? {} : { metrics: metricsListening }), host, port: address.port, build, cells, crossing, trustProxy: trust.trustProxy, origins: trust.allowedOrigins ?? '*', serial: release.serial, epoch: release.saveEpoch, node: process.version });
 // The door keeps Rapier only to read a new build's packs, so this costs no worker a tick.
-const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 }, wasm = new URL('rapier.wasm', import.meta.url), rapier = async (): Promise<Awaited<ReturnType<typeof loadRapier>>> => loadRapier(await readFile(wasm));
+const reads: PackReads = { fetched: 0, fetchedBytes: 0, cached: 0, refused: 0 }, wasm = new URL('rapier.wasm', import.meta.url);
+// QA 11-24 row 61: the wasm is read once; Rapier is idempotent, so each later read only made garbage for the door's GC.
+const readRapier = async (): Promise<Awaited<ReturnType<typeof loadRapier>>> => loadRapier(await readFile(wasm));
+let rapierRead: ReturnType<typeof loadRapier> | undefined;
+const rapier = async (): Promise<Awaited<ReturnType<typeof loadRapier>>> => {
+  rapierRead ??= readRapier();
+  try { return await rapierRead; } catch (error) { rapierRead = undefined; throw error; }
+};
 // The bundle and its packs reach disk before anyone hears a countdown, so the move costs a restart and no download. A bad hash stops here, with
 // everyone still playing, and the next look tries again. `ExecStartPre` moves `current` (E7.2c, C21).
 const pullScript = process.env['PULL_SCRIPT'];
@@ -265,16 +272,12 @@ placements = placementAt === undefined || placementKey === undefined || listed.t
     }
     return gone;
   },
-  open: async (rows, file) => {
-    const ready: string[] = [];
-    for (const row of rows) {
-      // SA34a: the pack first, so the door's placed list holds only cells it opens; MA10k: its frame is its place in the file, so a late
-      // pack never swaps two cells' numbers between the door, the workers and the page.
-      try { await readPackFolder(row.slug, build, await rapier(), { origin, cache }, reads, row.hash, catalogue); placeCell(row, file); ready.push(row.instance); }
-      catch (error) { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); }
-    }
-    return ready.length === 0 ? [] : world.openCells(ready);
-  } });
+  // QA 11-24 row 61: a cell the world already runs counts as opened once placed, so no later look reads its pack again.
+  open: placementOpener({
+    read: async row => { await readPackFolder(row.slug, build, await rapier(), { origin, cache }, reads, row.hash, catalogue); },
+    place: (row, file) => { placeCell(row, file); }, running: instance => world.hasCell(instance), open: instances => world.openCells(instances),
+    refused: (row, error) => { log({ at: 'placement.refused', instance: row.instance, slug: row.slug, error: String(error) }); },
+  }) });
 const activationToken = setting('COOK_ACTIVATION_TOKEN');
 if (activationToken !== undefined) {
   if (placementAt === undefined || placementKey === undefined || listed.trim() !== WHOLE_GRID) throw new Error('Upload activation needs a whole-grid placement receiver');

@@ -66,3 +66,29 @@ export class PlacementWatch {
   }
   dispose(): void { this.scope.dispose(); }
 }
+
+/** What a watch's `open` needs from the door. */
+export interface PlacementOpenerOptions {
+  /** SA34a: the pack first, so the door's placed list holds only cells it opens; MA10k: its frame is its place in the file, so a late
+   *  pack never swaps two cells' numbers between the door, the workers and the page. A throw refuses the row; the next look asks again. */
+  readonly read: (row: PlacedCell) => Promise<void>;
+  readonly place: (row: PlacedCell, file: readonly PlacedCell[]) => void;
+  /** Whether the world already runs this cell: a release's own cell the file also names, or one an upload activation opened. */
+  readonly running: (instance: string) => boolean;
+  /** Open these cells on the running world; answers the ones that opened. */
+  readonly open: (instances: readonly string[]) => Promise<readonly string[]>;
+  readonly refused: (row: PlacedCell, error: unknown) => void;
+}
+/** The watch's `open`. QA-FEEDBACK-2026-11-24 row 61 (opus-lag): a cell the world already runs counts as opened once its row is
+ *  placed. Before, `World.openCells` skipped it and answered nothing, so the watch asked for it again every minute, and each look read
+ *  and checked its whole pack on the door thread: a 60 to 90 ms stall every minute on the staging and production doors. */
+export function placementOpener(options: PlacementOpenerOptions): PlacementWatchOptions['open'] {
+  return async (rows, file) => {
+    const ready: string[] = [];
+    for (const row of rows) {
+      try { await options.read(row); options.place(row, file); ready.push(row.instance); } catch (error) { options.refused(row, error); }
+    }
+    const running = ready.filter(instance => options.running(instance)), fresh = ready.filter(instance => !running.includes(instance));
+    return fresh.length === 0 ? running : [...running, ...await options.open(fresh)];
+  };
+}

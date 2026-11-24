@@ -392,6 +392,8 @@ export class World {
    * player in another cell stays where they are, and the door seats a player in a new cell only once its worker has booted. A cell this world
    * already opens is skipped. Rejects, with nothing opened, when the worker fails to boot. The next restart deals them out with the rest.
    */
+  /** Whether this world runs `cell` now (booted at start, placed or activated since). */
+  hasCell(cell: string): boolean { return this.links.has(cell); }
   async openCells(cells: readonly string[]): Promise<readonly string[]> {
     const fresh = [...new Set(cells)].filter(cell => !this.links.has(cell) && !this.booting.has(cell));
     if (fresh.length === 0 || this.draining) return [];
