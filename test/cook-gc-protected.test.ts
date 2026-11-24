@@ -21,12 +21,25 @@ test('a protected collection keeps a live head\'s index from an old build, and t
     // names any more (b)
     const current = index('current', 'c', '3'), live = index('old', 'a', '1'), gone = index('old', 'b', '2');
     for (const row of [current, live, gone]) { await put(indexKey(row.build, row.hash), encode(row)); await put(row.keys[0] ?? ''); }
-    await put('content/609da07f7448e19d/content.json');
+    const foreign = ['content/609da07f7448e19d/content.json', 'releases/staging-placements.json',
+      'releases/production-placements.json', 'releases/staging.json', 'index/catalogue.json',
+      'another-service/index/old/row.json', 'assets/telemetry/report.json'];
+    for (const key of foreign) await put(key);
 
-    const report = await reclaimPacks(store, {builds: ['current'], heads: new Set([live.hash])}, 1e12, Date.now() + 7_200_000);
+    const fresh = indexKey('retired', 'd'.repeat(64));
+    await put(fresh, encode(index('retired', 'd', '4')));
+    const runAt = Date.now() + 7_200_000;
+    const withFreshIndex = {
+      ...store,
+      list: async (prefix: string) => (await store.list(prefix)).map(row =>
+        row.key === fresh ? {...row, modified: runAt - 60_000} : row),
+    };
+
+    const report = await reclaimPacks(withFreshIndex, {builds: ['current'], heads: new Set([live.hash])}, 1e12, runAt);
     const left = (await store.list('')).map(row => row.key);
-    for (const key of [indexKey('current', current.hash), current.keys[0] ?? '', indexKey('old', live.hash), live.keys[0] ?? '', 'content/609da07f7448e19d/content.json']) expect(left, key).toContain(key);
+    for (const key of [indexKey('current', current.hash), current.keys[0] ?? '', indexKey('old', live.hash), live.keys[0] ?? '', ...foreign]) expect(left, key).toContain(key);
     for (const key of [indexKey('old', gone.hash), gone.keys[0] ?? '']) expect(left, key).not.toContain(key);
+    expect(left).toContain(fresh);
     expect(report.deleted).toBe(2);
     expect(report.freedBytes).toBeGreaterThan(0);
   } finally {rmSync(root, {recursive: true, force: true});}

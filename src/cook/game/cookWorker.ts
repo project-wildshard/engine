@@ -295,20 +295,21 @@ export const PACK_BUDGET_BYTES = 4_000_000_000;
 const GC_GRACE_MS = 3_600_000;
 /** How long a worker reuses its listing of the bucket (`createCookWorker`'s `bucket`); under GC_GRACE_MS / 2, though `current` doesn't rely on it. */
 const LISTING_MAX_AGE_MS = 20 * 60_000;
-/** PAGE-SIZE PZ2's content sets (`content/<set>/…`, page-release content.mjs). They are content-named and name no build,
- * so garbage collection never takes one; a set's own retention waits for a build-to-set record. */
-const CONTENT_SETS = 'content/';
+// R2 is shared with release documents and page content. Only these cook and
+// pack namespaces are rebuildable. Match the index shape as well as its prefix.
+const COOK_INDEX = /^index\/[\w.-]{1,64}\/([a-f0-9]{64})\.json$/u;
+const COOK_LOOSE = /^loose\/[a-f0-9]{64}\/(?:shardfiles|programs)\//u;
+const PACKS = /^assets\/spawn\/(?:(?:parts|server|code)\/|(?:server|packs|engine)-[\w.-]+\.json$)/u;
+const cookStoreKey = (key: string): boolean => COOK_INDEX.test(key) || COOK_LOOSE.test(key) || PACKS.test(key);
 
-/** The cook's usage: `objects`, `bytes` and `share` count only its own keys, never the page's content sets (`CONTENT_SETS`),
- * which it neither writes nor collects. From 2026-11-14 they filled the 4 GB budget alone (32.7 of 33.53 GB) and every
- * job failed "Over the pack budget". `byPrefix` still lists every prefix, content sets included, so a report shows them. */
+/** Budget counts only the rebuildable store. The prefix report still names every bucket owner. */
 function usageOf(rows: readonly StoredObject[], budget: number): StoreUsage {
   const byPrefix: Record<string, {count: number; bytes: number}> = {};
   let objects = 0, bytes = 0;
   for (const row of rows) {
     const path = row.key.split('/'), name = path.slice(0, path.length > 3 ? 3 : Math.min(2, path.length - 1)).join('/'), kept = byPrefix[name] ?? {count: 0, bytes: 0};
     kept.count++; kept.bytes += row.bytes; byPrefix[name] = kept;
-    if (!row.key.startsWith(CONTENT_SETS)) { objects++; bytes += row.bytes; }
+    if (cookStoreKey(row.key)) { objects++; bytes += row.bytes; }
   }
   return {objects, bytes, share: bytes / budget, byPrefix};
 }
@@ -328,7 +329,7 @@ async function keepIndex(store: PackStore, key: string, kept: Set<string>): Prom
 async function keptOf(store: PackStore, builds: readonly string[]): Promise<Set<string>> {
   const kept = new Set<string>();
   for (const build of builds) {
-    for (const row of await store.list(`index/${build}/`)) if (!await keepIndex(store, row.key, kept)) throw new Error('Index left mid-collection');
+    for (const row of await store.list(`index/${build}/`)) if (COOK_INDEX.test(row.key) && !await keepIndex(store, row.key, kept)) throw new Error('Index left mid-collection');
     const bookKey = serverPackBookPath(build), book = await store.get(bookKey);
     if (book === undefined) continue;
     kept.add(bookKey);
@@ -340,11 +341,11 @@ async function keptOf(store: PackStore, builds: readonly string[]): Promise<Set<
   return kept;
 }
 
-/** Delete what `kept` does not name, never a content set or anything younger than `grace`. */
+/** Delete unreferenced cook keys after the grace window. Other bucket owners are read-only. */
 async function sweepUnkept(store: PackStore, kept: ReadonlySet<string>, budget: number, now: number, grace: number): Promise<GcReport> {
   let deleted = 0, freedBytes = 0;
   for (const row of await store.list('')) {
-    if (kept.has(row.key) || row.key.startsWith(CONTENT_SETS) || now - row.modified < grace) continue;
+    if (!cookStoreKey(row.key) || kept.has(row.key) || now - row.modified < grace) continue;
     await store.remove(row.key); deleted++; freedBytes += row.bytes;
   }
   return {kept: kept.size, deleted, freedBytes, usage: await storeUsage(store, budget)};
@@ -377,7 +378,7 @@ export async function reclaimPacks(store: PackStore, protection: PackProtection,
   if (protection.builds.length === 0) throw new Error('A protected collection needs the builds to keep: an empty list would delete everything');
   const kept = await keptOf(store, protection.builds);
   for (const row of await store.list('index/')) {
-    const hash = /^index\/[^/]+\/([^/]+)\.json$/u.exec(row.key)?.[1];
+    const hash = COOK_INDEX.exec(row.key)?.[1];
     if (hash !== undefined && protection.heads.has(hash)) await keepIndex(store, row.key, kept);
   }
   return sweepUnkept(store, kept, budget, now, grace);
