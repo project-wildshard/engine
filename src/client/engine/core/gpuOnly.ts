@@ -43,18 +43,29 @@ export function gpuOnlyContent(): readonly string[] { return [...pageLabels, ...
  * unforced, WebKit's footprint climbed 0.98 to 2.53 GB by Sky Reach on the garbage of each world built ahead. A view of part
  * of a buffer (a channel read in place from its file), a buffer a cache holds (`heldBytes.ts`), a shared or resizable one, or
  * a browser with no `transfer` keeps the old path: the collector frees it.
+ * The detach waits for a microtask: an upload wrapper may still hold the array past three's upload callback (vertexPack.ts
+ * defers a Float32 `bufferData` to the draw's `vertexAttribPointer`, or to the microtask it queued before this callback ran),
+ * and a detached array uploads as nothing (the road, Pine's ground and every packed channel drew empty when it went at once).
  */
 let freedAtUpload = 0;
 export function gpuOnlyFreedBytes(): number { return freedAtUpload; }
 /** ES2024's ArrayBuffer members, read as optional: an older engine (or this repo's lib target) may lack them */
 interface Transferable2024 { readonly resizable?: boolean; readonly transfer?: (length: number) => ArrayBuffer }
+const freeable = (buffer: ArrayBuffer): boolean => buffer.byteLength > 0 && !bytesHeld(buffer)
+  && (buffer as ArrayBuffer & Transferable2024).resizable !== true && typeof (buffer as ArrayBuffer & Transferable2024).transfer === 'function';
+let toFree: ArrayBuffer[] = [];
+function freeQueued(): void {
+  const buffers = toFree; toFree = [];
+  for (const buffer of buffers) {
+    if (!freeable(buffer)) continue;
+    const bytes = buffer.byteLength;
+    try { (buffer as ArrayBuffer & Transferable2024).transfer?.call(buffer, 0); freedAtUpload += bytes; } catch { /* already detached: nothing held */ }
+  }
+}
 function freeNow(view: ArrayBufferView): void {
   const buffer = view.buffer;
-  if (!(buffer instanceof ArrayBuffer) || view.byteOffset !== 0 || view.byteLength !== buffer.byteLength || view.byteLength === 0 || bytesHeld(buffer)) return;
-  const modern = buffer as ArrayBuffer & Transferable2024;
-  if (modern.resizable === true || typeof modern.transfer !== 'function') return;
-  const bytes = buffer.byteLength;
-  try { modern.transfer.call(buffer, 0); freedAtUpload += bytes; } catch { /* already detached: nothing held */ }
+  if (!(buffer instanceof ArrayBuffer) || view.byteOffset !== 0 || view.byteLength !== buffer.byteLength || !freeable(buffer)) return;
+  if (toFree.push(buffer) === 1) queueMicrotask(freeQueued);
 }
 
 /** each released attribute's `<label>.<name>`, for the late-write report */
