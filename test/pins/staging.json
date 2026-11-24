@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "3b8134cd6cc18366c110f68509a9a363fb0d4b72066b067e2cd7ee6807913086",
+  "catalogueHash": "376bec5210b9780a268e5b06de095503657d51d5ab0fbdf8db3d28bad20c70e4",
   "releaseHash": null,
   "catalogue": {
     "version": 0,
@@ -598,8 +598,8 @@
       {
         "slug": "far-reach",
         "name": "Sky Reach",
-        "revision": 7,
-        "hash": "a932beacbb73dbeef36f39dba36234a20d2a359dc14fc2a9f1a5cb1aecfa67e0"
+        "revision": 8,
+        "hash": "c559908612b89fcaa9ea9aa5d5ebca8dfbdbc02e4c3982d6392966d1a62865b5"
       },
       {
         "slug": "glowfen",
@@ -640,44 +640,44 @@
       {
         "slug": "open-plot-clockwork-canyon",
         "name": "Open Plot · Clockwork Canyon",
-        "revision": 2,
-        "hash": "f9289f29a788c7f878474f1c93ef4926aebbf4869d534b972a2dda49b18f52cd"
+        "revision": 3,
+        "hash": "769fb3cf00fefe3990b2e04e51d067276454de4f7d24ba01f09a0f05180370fb"
       },
       {
         "slug": "open-plot-coral-drift",
         "name": "Open Plot · Coral Drift",
-        "revision": 3,
-        "hash": "351ec764be010d0bd091c8681aa4ebbb9a2546126c4d0aa16f8a2422a34a6d00"
+        "revision": 4,
+        "hash": "1eadc3d8eb30f92fc85bba8a32a23ec1bf1399102fb459d5feab017c1d51fc3b"
       },
       {
         "slug": "open-plot-ember-forge",
         "name": "Open Plot · Ember Forge",
-        "revision": 2,
-        "hash": "2446b25b5ce539b312362ea28710e05a62deb0f50a8bfa266caaed0690b2adf1"
+        "revision": 3,
+        "hash": "cc8578855df849f9fec4708e1cb374935d6314a328a1cc0bae44154f657d5ebd"
       },
       {
         "slug": "open-plot-fossil-badlands",
         "name": "Open Plot · Fossil Badlands",
-        "revision": 2,
-        "hash": "8e2e32c379801ad9c8b5afadbc2c492eacb40eb99ced1ee09fbac38e7120fa34"
+        "revision": 3,
+        "hash": "6bb64209a6c0961926b6fa23ccd76671453b26280d42617e8eaddfaac9d28c0c"
       },
       {
         "slug": "open-plot-frostline-peaks",
         "name": "Open Plot · Frostline Peaks",
-        "revision": 2,
-        "hash": "38ac04eff6eef167119d7ad61d530b632acd4160620768cb004c46710ac8a4ea"
+        "revision": 3,
+        "hash": "d7f8d41f00ca6e79f726823745926d64a3ee9841a3040775212a7a1a1b68137d"
       },
       {
         "slug": "open-plot-jungle-ziggurat",
         "name": "Open Plot · Jungle Ziggurat",
-        "revision": 2,
-        "hash": "6f0176f016e576db7ff56d01fde35445d23cd566473057ac5de11d197e0bd4da"
+        "revision": 3,
+        "hash": "aba4da75774ad3a6ac8e81c5dbc0eeb8fb0ea1def1869258659b761cc3f2d256"
       },
       {
         "slug": "open-plot-lantern-bayou",
         "name": "Open Plot · Lantern Bayou",
-        "revision": 2,
-        "hash": "1ca9a3bd1e08053440541bb5268e5faab0353af14c1b92237ad904cb4a621b43"
+        "revision": 3,
+        "hash": "a760942ca1260572c8b468f27a4dd00b9b503dd798a480e1c68f5265d5eb5582"
       },
       {
         "slug": "open-plot-mosslight-ruins",
@@ -730,8 +730,8 @@
       {
         "slug": "sunscar-dunes",
         "name": "Signal Dunes",
-        "revision": 7,
-        "hash": "1adcd6d4707fbdd39364811dacc6fbbdbbb391927365c0b156c225b5c3a69f4d"
+        "revision": 8,
+        "hash": "08d0da0e061fb02e0b3ec6a1d68314dde66ab80e7fd8f9292d619d2f92a4f239"
       }
     ],
     "missing": []
@@ -751,9 +751,9 @@
     },
     {
       "slug": "far-reach",
-      "revision": 7,
-      "hash": "a932beacbb73dbeef36f39dba36234a20d2a359dc14fc2a9f1a5cb1aecfa67e0",
-      "bytes": 52611072
+      "revision": 8,
+      "hash": "c559908612b89fcaa9ea9aa5d5ebca8dfbdbc02e4c3982d6392966d1a62865b5",
+      "bytes": 52610560
     },
     {
       "slug": "glowfen",
@@ -793,45 +793,45 @@
     },
     {
       "slug": "open-plot-clockwork-canyon",
-      "revision": 2,
-      "hash": "f9289f29a788c7f878474f1c93ef4926aebbf4869d534b972a2dda49b18f52cd",
-      "bytes": 12070400
+      "revision": 3,
+      "hash": "769fb3cf00fefe3990b2e04e51d067276454de4f7d24ba01f09a0f05180370fb",
+      "bytes": 12079616
     },
     {
       "slug": "open-plot-coral-drift",
-      "revision": 3,
-      "hash": "351ec764be010d0bd091c8681aa4ebbb9a2546126c4d0aa16f8a2422a34a6d00",
-      "bytes": 14665216
+      "revision": 4,
+      "hash": "1eadc3d8eb30f92fc85bba8a32a23ec1bf1399102fb459d5feab017c1d51fc3b",
+      "bytes": 14666752
     },
     {
       "slug": "open-plot-ember-forge",
-      "revision": 2,
-      "hash": "2446b25b5ce539b312362ea28710e05a62deb0f50a8bfa266caaed0690b2adf1",
-      "bytes": 11195392
+      "revision": 3,
+      "hash": "cc8578855df849f9fec4708e1cb374935d6314a328a1cc0bae44154f657d5ebd",
+      "bytes": 11204608
     },
     {
       "slug": "open-plot-fossil-badlands",
-      "revision": 2,
-      "hash": "8e2e32c379801ad9c8b5afadbc2c492eacb40eb99ced1ee09fbac38e7120fa34",
-      "bytes": 10495488
+      "revision": 3,
+      "hash": "6bb64209a6c0961926b6fa23ccd76671453b26280d42617e8eaddfaac9d28c0c",
+      "bytes": 10504704
     },
     {
       "slug": "open-plot-frostline-peaks",
-      "revision": 2,
-      "hash": "38ac04eff6eef167119d7ad61d530b632acd4160620768cb004c46710ac8a4ea",
-      "bytes": 13210112
+      "revision": 3,
+      "hash": "d7f8d41f00ca6e79f726823745926d64a3ee9841a3040775212a7a1a1b68137d",
+      "bytes": 13219328
     },
     {
       "slug": "open-plot-jungle-ziggurat",
-      "revision": 2,
-      "hash": "6f0176f016e576db7ff56d01fde35445d23cd566473057ac5de11d197e0bd4da",
-      "bytes": 13036032
+      "revision": 3,
+      "hash": "aba4da75774ad3a6ac8e81c5dbc0eeb8fb0ea1def1869258659b761cc3f2d256",
+      "bytes": 13045760
     },
     {
       "slug": "open-plot-lantern-bayou",
-      "revision": 2,
-      "hash": "1ca9a3bd1e08053440541bb5268e5faab0353af14c1b92237ad904cb4a621b43",
-      "bytes": 14462976
+      "revision": 3,
+      "hash": "a760942ca1260572c8b468f27a4dd00b9b503dd798a480e1c68f5265d5eb5582",
+      "bytes": 14472192
     },
     {
       "slug": "open-plot-mosslight-ruins",
@@ -883,9 +883,9 @@
     },
     {
       "slug": "sunscar-dunes",
-      "revision": 7,
-      "hash": "1adcd6d4707fbdd39364811dacc6fbbdbbb391927365c0b156c225b5c3a69f4d",
-      "bytes": 11425280
+      "revision": 8,
+      "hash": "08d0da0e061fb02e0b3ec6a1d68314dde66ab80e7fd8f9292d619d2f92a4f239",
+      "bytes": 11457536
     }
   ]
 }
