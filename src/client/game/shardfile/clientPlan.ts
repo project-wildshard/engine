@@ -474,7 +474,8 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
       if (product.has(name)) sections.set(name, product.section(name));
     sections.set('client/plan', read); // the format's rules read its own rows
     const errors = clientOwnershipRules(product.shardfile, sections); if (errors.length > 0) throw new Error(errors.join('; '));
-    if (plan.features.some(row => row.kind === 'light.emitters') && !plan.features.some(row => row.kind === 'world.scenes')) throw new Error('Emitters require the scene feature');
+    // FORMAT-PRUNE FP49: a scene shard (no world/scenes) hangs its emitters on the plan root instead (sceneShardEmitterHandles)
+    if (plan.features.some(row => row.kind === 'light.emitters') && product.has('world/scenes') && !plan.features.some(row => row.kind === 'world.scenes')) throw new Error('Emitters require the scene feature');
     if (plan.features.some(row => row.kind === 'motion.channels') && !plan.features.some(row => row.kind === 'world.scenes')) throw new Error('Motion requires the scene feature');
     if(plan.features.some(row=>row.kind==='held.cosmetics')&&product.section('held/finishes').cosmetics===undefined)throw new Error('Cosmetic feature requires declared finishes');
     if(plan.features.some(row=>row.kind==='held.ranged-feel')&&!product.shardfile.items.rows.some(row=>row.kind==='weapon'&&row.equipment?.rangedFeel!==undefined))throw new Error('Ranged feel requires admitted equipment feedback rows');
