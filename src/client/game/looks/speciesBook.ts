@@ -189,16 +189,15 @@ function registeredLook(def: SpeciesDef): Pick<SpeciesLook, 'rigContract' | 'fur
 }
 
 const folderBooks = new Map<string, HullLookBook>();
-/** ONE-FORMAT OF30: a species catalogue's own packed bodies (its actors presentation's `packedBodies`, the compact rows a
- *  hull book carried) under its look book's slug, for a product with no `look/hull-book`. */
+/** ONE-FORMAT OF30: a species catalogue's own packed bodies (its actors presentation's `packedBodies`) under its look
+ *  book's slug. */
 export interface CatalogueBodies { readonly slug: string; readonly packedBodies: CompactSpeciesBodiesRows }
-interface HullBookProduct { readonly section: (name: 'look/hull-book') => { readonly slug: string }; readonly file: (name: string) => Promise<Uint8Array>; readonly has?: (name: 'look/hull-book') => boolean }
-/** A product's declared hull look book (`look/hull-book`), admitted once per book slug: every entry, installer
- * and cold specimen of that product shares one book and one packed body owner. With no such section, `bodies` (the
- * catalogue's own packed bodies) make a book with no definitions, derived species or hull rows. */
-export function folderHullBook(product: HullBookProduct, bodies?: CatalogueBodies): HullLookBook {
-  const declared = bodies !== undefined && product.has?.('look/hull-book') === false;
-  const row = declared ? { slug: bodies.slug, compactBody: bodies.packedBodies, definitions: {}, derived: {}, rows: [] } : product.section('look/hull-book');
+interface HullBookProduct { readonly file: (name: string) => Promise<Uint8Array> }
+/** A catalogue's look book, admitted once per book slug: every entry, installer and cold specimen of that product shares
+ * one book and one packed body owner. Its `bodies` make a book with no definitions, derived species or hull rows
+ * (FORMAT-PRUNE FP20: the `look/hull-book` section is no longer read). */
+export function folderHullBook(product: HullBookProduct, bodies: CatalogueBodies): HullLookBook {
+  const row = { slug: bodies.slug, compactBody: bodies.packedBodies, definitions: {}, derived: {}, rows: [] };
   const cached = folderBooks.get(row.slug);
   if (cached !== undefined) return cached;
   const book = new HullLookBook(row, product); folderBooks.set(row.slug, book); return book;
@@ -210,17 +209,10 @@ const declaredOf=(product:CatalogueProduct):ReadonlyMap<string,unknown>=>declare
 /** One product catalogue: admitted behaviour controls, packed looks and the
  * original packed-body owner, shared through world and kit installation. */
 type CatalogueData=Pick<SpeciesPresentationRows,'lookBook'>&Partial<Pick<SpeciesPresentationRows,'packedBodies'>>;
-const catalogueBodies=(data:CatalogueData):CatalogueBodies|undefined=>data.packedBodies===undefined?undefined:{slug:data.lookBook.slug,packedBodies:data.packedBodies};
+const catalogueBodies=(data:CatalogueData):CatalogueBodies=>{if(data.packedBodies===undefined)throw new Error('Species catalogue requires its packed bodies');return {slug:data.lookBook.slug,packedBodies:data.packedBodies};};
 export function folderSpeciesCatalogue(product:CatalogueProduct,data:CatalogueData,lookRows:unknown):SpeciesCatalogue{
   const book=folderHullBook(product,catalogueBodies(data));
   return speciesCatalogue(book,speciesBehaviour(data.lookBook,declaredOf(product)),book.packedLooks(lookRows));
-}
-/** `folderSpeciesCatalogue` with a `pause` between its book, its behaviour rules and its packed looks: in one task they
- *  were ~102 ms of a cold Nine Dragon crossing's world step at phone 4x. Same catalogue. */
-export async function folderSpeciesCatalogueSliced(product:CatalogueProduct,data:CatalogueData,lookRows:unknown,pause:()=>Promise<void>):Promise<SpeciesCatalogue>{
-  const book=folderHullBook(product,catalogueBodies(data));await pause();
-  const rules=speciesBehaviour(data.lookBook,declaredOf(product));await pause();
-  return speciesCatalogue(book,rules,book.packedLooks(lookRows));
 }
 function speciesCatalogue(book:HullLookBook,rules:ReturnType<typeof speciesBehaviour>,packed:ReturnType<HullLookBook['packedLooks']>):SpeciesCatalogue{
   const bodies=book.packed,{rows}=rules,looks=packed.all;

@@ -1263,7 +1263,7 @@ export interface NativeHuntRow {
   readonly fight: HuntConfig['fight']; readonly tuning?: ReturnType<HuntConfig['faunaTuning']>;
   readonly player: 'host' | 'origin';
   /** Null retains an already installed built-in body scheduler. */
-  readonly bands: { readonly states: readonly string[]; readonly scripted?: boolean; readonly legacyKinds: readonly string[] } | null;
+  readonly bands: { readonly states: readonly string[]; readonly scripted?: boolean } | null;
   readonly hit: { readonly namespace: string; readonly tags: readonly CombatTag[] };
 }
 /** Keep the native manager's existing clocks, charge source, navigation and terrain cadence. */
@@ -1274,10 +1274,9 @@ export function createNativeHunt(host: SimHost, row: NativeHuntRow, ports: {
   readonly wanderGoal?: (herd: number) => { x: number; z: number; r: number } | null;
   readonly present?: (actor: AnimalSim) => boolean;
 }): { readonly hunt: StalkerBrain<HuntBody>; readonly reach: (actor: HuntBody, point: Vector3) => boolean } {
-  if (!Number.isInteger(row.limit) || row.limit < 1 || row.limit > 1024 || (row.bands !== null && (row.bands.states.length > 32 || row.bands.legacyKinds.length > 32))) throw new Error('Invalid native hunt bound');
+  if (!Number.isInteger(row.limit) || row.limit < 1 || row.limit > 1024 || (row.bands !== null && row.bands.states.length > 32)) throw new Error('Invalid native hunt bound');
   const bands = row.bands;
-  if (bands !== null) host.useBodyBands({ rate: body => body.driven || (bands.scripted === true && body.scripted) || bands.states.includes(body.state) ? 'always'
-    : bands.legacyKinds.includes(body.kind) ? 'legacy' : 'ai', ...(ports.present === undefined ? {} : { present: ports.present }) });
+  if (bands !== null) host.useBodyBands({ rate: body => body.driven || (bands.scripted === true && body.scripted) || bands.states.includes(body.state) ? 'always' : 'ai', ...(ports.present === undefined ? {} : { present: ports.present }) });
   const reach = (actor: HuntBody, point: Vector3): boolean => canReach(actor, point, host.physics);
   const hunt = new StalkerBrain<HuntBody>({ pattern: 'hunt', config: { legacyTuning: 'v0', rng: ports.rng, fight: row.fight, faunaTuning: () => row.tuning, species: kind => {
       const known = ports.species.get(kind); if (known === undefined) throw new Error(`Native hunt has no species row '${kind}'`); return known; } },

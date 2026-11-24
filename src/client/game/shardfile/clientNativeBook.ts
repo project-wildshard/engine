@@ -1,6 +1,5 @@
 import type { CueDirector } from '../audio/cueDirector';
 import type { Scope } from '@wildshard/engine/app/scope';
-import type { SpeciesLook } from '@wildshard/engine/entities/species/look';
 import type { ShardContext } from '../plugin/context';
 import type { createDeclaredHeldMelee } from '../plugin/weaponFamily';
 import type { RuntimeHomes, RuntimeCoins } from '../../../shared/game/plugin/runtimeRows';
@@ -13,7 +12,6 @@ import type { ShardFolder } from '../../../shared/game/shardfile/shardFolder';
 export interface ClientNativeBook {
   held: ReturnType<typeof createDeclaredHeldMelee> | null;
   species: boolean;
-  catalogueSkins?: readonly SpeciesLook[];
   population: RuntimeHomes | null;
   quest: (PersistedQuest & { readonly coins: RuntimeCoins }) | null;
   fight: ReturnType<typeof bindDeclaredFight> | null;

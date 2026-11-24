@@ -37,17 +37,16 @@ import { installNativeItems, otherCombatFrame } from '../plugin/nativeItems';
 import { addBakedPieces, bindNativeLoadout, weaponRow } from '../plugin/simulation';
 import { installHostPortalRide, type PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { installPopulationEnvironment } from '../population/environment';
-import { installMixedPopulation, type MixedPopulationInput } from '../population/mixedRoster';
+import type { installMixedPopulation } from '../population/mixedRoster';
 import { installNativeCollision } from '../population/nativeBake';
 import { NativeWildEnvironment } from '../population/nativeManager';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
 import { installPopulationRoster } from '../population/roster';
-import { declaredBossProgram, declaredRosterPopulation, keptSpeciesPrograms } from '../population/declaredNative';
+import { declaredBossProgram, declaredRosterPopulation } from '../population/declaredNative';
 import { parseNativePopulationRows } from '@wildshard/format/populationRoster';
 import { NativeBossBindingSchema, parseRoamingEncounter } from '@wildshard/format/bossEncounter';
 import { installNativeHerdShelter } from '../population/shelter';
 import { installNativeSpawnScript, readSpawnScript } from '../population/spawnScript';
-import { headlessSpecCatalogue } from '../population/specCatalogue';
 import { ownContractCatalogue } from '../../../shared/game/quest/contracts';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import { installNativeEliteFeature, readEliteFeature } from '../quest/eliteFeature';
@@ -186,18 +185,6 @@ async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<Native
     ...(content === undefined ? {} : { steps: content.steps, deaths: content.deaths, readings: content.readings, lead: content.lead }),
     ...(contracts === undefined ? {} : { contracts: ownContractCatalogue(contracts, run.host.scope) }), ...(trades === undefined ? {} : { trades }), ...(director === undefined ? {} : { director }),
     ...(props === undefined ? {} : { props }), ...(secret === undefined ? {} : { secret }), ...(row.restoring === true ? { restoring: run.context.restoring } : {}) }); };
-}
-async function prepareMixed<C extends NativeAssemblyContext>(row: Extract<NativeAssemblyFeature, { host: 'population.mixed' }>, at: AssemblyPrepared<C>): Promise<Step<C>> {
-  const { product, bake, nav } = at, shard = product.shardfile, species = need(keptSpeciesPrograms(product), 'The island population needs its species programme');
-  const launch = need(need(shard.items.launches, 'Missing launch rows')[row.launch], 'Native assembly requires its admitted launch'), sea = need(shard.water.find(body => body.id === row.sea && body.kind === 'sea'), 'Native assembly requires its admitted sea');
-  const actors = bake['actors'] as readonly { readonly spec: { readonly kind: string; readonly variant: string } }[], captain = bake['captain'] as { readonly spec: { readonly kind: string; readonly variant: string } };
-  const specs = headlessSpecCatalogue([...actors.map(actor => actor.spec), captain.spec]) as MixedPopulationInput['specs'];
-  const input = { perchProgram: await readAssemblyInput(product, row.perch), rows: await readAssemblyInput(product, row.rows), keeper: await readAssemblyInput(product, row.keeper),
-    placement: await readAssemblyInput<MixedPopulationInput['placement']>(product, row.placement), fauna: new Map(species.native.map(entry => [entry.kind, entry] as const)) };
-  need(species.program, 'Native assembly requires its admitted species program');
-  const waterLevel = declaredWaterBody(structuredClone(sea)).level;
-  return run => { run.island = installMixedPopulation(run.host, { ...input, reserved: bake['captain'], launch, population: species, specs, seed: shard.identity.seed, waterLevel, spawnY: shard.spawn.y, nav,
-    bake: { ground: bake.ground, actors: bake['actors'], herds: bake['herds'], habitat: bake['habitat'] } } as MixedPopulationInput, run.context.snapshot); };
 }
 /** The elite core a riding world binds: each rule's word, read through its programme from the clock and the storm. */
 export function nativeEliteCore(host: SimHost, conditions: NativeEliteConditions, program: Pick<ReturnProgram, 'project'>, day: { readonly dayPhase: string }, env: Pick<NativeWildEnvironment, 'storm'>): EliteCore<EliteCoreScript<AnimalSim>> {
@@ -369,27 +356,25 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     }
     case 'boss.ground': {
       const encounter = await readAssemblyInput<{ profile: unknown; kind?: unknown }>(product, row.encounter);
-      // OF30: a product with no species programme gives the boss its decision and body in its binding, its strikes in `actors/strikes`
-      const kept = keptSpeciesPrograms(product);
-      const program = kept !== undefined ? need(kept.program, 'Native boss needs its decision programme')
-        : declaredBossProgram(shard.rows, parseRoamingEncounter(encounter, encounter.profile).kind, parse(NativeBossBindingSchema, row.binding),
-          product.has('actors/strikes') ? product.section('actors/strikes') : []);
+      // OF30: the boss's decision and body ride its binding, its strikes `actors/strikes` (FP20: no species programme)
+      const program = declaredBossProgram(shard.rows, parseRoamingEncounter(encounter, encounter.profile).kind, parse(NativeBossBindingSchema, row.binding),
+        product.has('actors/strikes') ? product.section('actors/strikes') : []);
       return run => { run.boss = installGroundBoss(run.host, encounter, encounter.profile, program, row.binding, at.ports.grantItem(run.context), shard.creatures.spawns); };
     }
     case 'population.environment': { const input = await readAssemblyInput(product, row.rows); return run => { installPopulationEnvironment(run.host, need(at.grid, 'Population environment needs its grid'), input); }; }
     case 'population.shelter': { const input = await readAssemblyInput(product, row.rows); return run => { installNativeHerdShelter(run.host, rows['shelterTrees'] as Parameters<typeof installNativeHerdShelter>[1], input); }; }
     case 'population.roster': {
       const input = await readAssemblyInput<{ step: string }>(product, row.rows);
-      // OF30: a roster with no species programme runs its own named declared species and hunt
-      const population = keptSpeciesPrograms(product) ?? declaredRosterPopulation(shard.rows, shard.creatures, parseNativePopulationRows(input));
+      // OF30: a roster runs its own named declared species and hunt (FP20: no species programme)
+      const population = declaredRosterPopulation(shard.rows, shard.creatures, parseNativePopulationRows(input));
       return run => { installPopulationRoster(run.host, { population, bake: bake as Parameters<typeof installPopulationRoster>[1]['bake'], nav, spawnY: shard.spawn.y, saved: run.context.snapshot }, input); };
     }
     case 'population.elites': { const input = await readEliteFeature(product, row.file); return run => { run.elites = installNativeEliteFeature(run.host, dayOf(run), input, shard.creatures.spawns); }; }
     case 'population.spawn-script': { const input = await readSpawnScript(product, row.id); return run => { installNativeSpawnScript(run.host, dayOf(run), input, undefined, undefined, undefined, { spawns: shard.creatures.spawns, restoring: run.context.restoring }); }; }
     case 'population.elites-ready': return run => { need(run.elites, 'Native elites are not installed').initialize(); };
-    // SHARD-COMPAT CP16, FORMAT-PRUNE FP21 s8: ONE-FORMAT OF22c3 retired Driftwood\'s island population (its writers declare
-    // the creatures since OF22b4, OF22c2), but kept originals Driftwood r4 (prod\'s head) and r5 still name it, so it stands for them
-    case 'population.mixed': return prepareMixed(row, at);
+    // FORMAT-PRUNE FP20: ONE-FORMAT OF22c3 retired Driftwood's island population (its writers declare the creatures since
+    // OF22b4, OF22c2); only Driftwood r4 and r5 named it, with the species programme it needed, and neither is live (J507)
+    case 'population.mixed': throw new Error('population.mixed is retired (FORMAT-PRUNE FP20): declare the creatures');
     case 'population.reactions': return run => {
       const island = need(run.island, 'Item reactions need the island population');
       run.host.events.answer('item.reaction', reaction => { if (reaction.kind === 'alarm') island.alarm(); else island.staggered(reaction.actor, reaction.strength, reaction.running); return reaction; }, run.host.scope);

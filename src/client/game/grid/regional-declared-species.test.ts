@@ -11,7 +11,7 @@ import {declareNativePage, declarePageSpecies, nativeDeclaresOwnSpecies, pageDec
 import type {ShardContext} from '../plugin/context';
 import type {ShardFolder} from '../../../shared/game/shardfile/shardFolder';
 
-// K6 (v0.1.56): Sunscar Dunes r5 has no `species.program` (OF19d1: its declared bodies draw from their looks). Standalone its
+// K6 (v0.1.56): Sunscar Dunes r5's declared bodies draw from their looks (OF19d1). Standalone its
 // data client's kit registers the declared species (OF19d2); the grid's entered install never did, so `population.homes`
 // refused ("Population requires its actual catalogue and saved page") and the cell stalled at finish on every phone.
 
@@ -42,9 +42,8 @@ function kitHook(ports: {foundation: object; request: object; owner: {disposed: 
   return async (context) => { await Reflect.apply(hook, undefined, [context]); };
 }
 
-test('a declared page with no species.program declares its own species', () => {
+test('a declared page declares its own species (FORMAT-PRUNE FP20: no plan feature owns them)', () => {
   expect(pageDeclaresOwnSpecies(product(['quest.page', 'population.homes']))).toBe(true);
-  expect(pageDeclaresOwnSpecies(product(['species.program', 'population.homes']))).toBe(false);
   expect(pageDeclaresOwnSpecies(product(['population.homes'], [], {}))).toBe(false); // a runtime page owns its own stages
 });
 
@@ -72,10 +71,8 @@ test('the grid entered kit loads the declared bodies once it has spawns, on the 
   expect(given).toBe(context); expect(source).toBe(folder.shardfile); expect(read?.()).toBe(models);
 });
 
-test('a species.program page keeps its feature as the species owner, and a page without its presentation refuses', async () => {
-  const program = product(['species.program', 'population.homes']), declare = vi.fn<typeof declarePageSpecies>();
-  await kitHook({foundation: {}, request: {admitted: {source: program.shardfile}}, owner: {disposed: false}, declare})(entered(program));
-  expect(declare).not.toHaveBeenCalled();
+test('a declared page without its presentation refuses', async () => {
+  const declare = vi.fn<typeof declarePageSpecies>();
   const own = product(['population.homes']);
   await expect(kitHook({foundation: {}, request: {admitted: {source: own.shardfile}}, owner: {disposed: false}, declare})(entered(own)))
     .rejects.toThrow('Declared species page requires its regional presentation');
@@ -87,14 +84,11 @@ test('the entered kit stage runs the resident kit hook before the plan kit featu
   expect(hook).toBeGreaterThan(-1); expect(plan).toBeGreaterThan(hook);
 });
 
-// K4 (v0.1.67 local): Pine r10 is a native page with no species programme and no plan feature that registers species
-// (OF23e4). Standalone its client declares its rows; on the grid nobody did, and its deep link stopped at finish on
+// K4 (v0.1.67 local): Pine r10 is a native page whose species are its declared rows (OF23e4). Standalone its client declares its rows; on the grid nobody did, and its deep link stopped at finish on
 // "unknown animal kind 'deer' (registered: boar, bear)".
 test('a native page with declared species and no species owner declares its own', () => {
   const spawn = [{species: 's0', variant: 0}];
   expect(nativeDeclaresOwnSpecies(product(['world.forest-page'], spawn, {}, {page: false, species: 1}))).toBe(true);
-  expect(nativeDeclaresOwnSpecies(product(['species.program'], spawn, {}, {page: false, species: 1}))).toBe(false);
-  expect(nativeDeclaresOwnSpecies(product(['population.hull-book'], spawn, {}, {page: false, species: 1}))).toBe(false);
   // P1 (2026-11-22): an old programme section no feature reads (Driftwood r8's client product beside an r9 box) declares too
   expect(nativeDeclaresOwnSpecies(product([], spawn, {}, {page: false, species: 1, programs: true}))).toBe(true);
   expect(nativeDeclaresOwnSpecies(product([], [], {}, {page: false, species: 1}))).toBe(false);

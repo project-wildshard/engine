@@ -48,10 +48,10 @@ test('missing, mismatched and duplicate claims pairs refuse before allocation', 
   } finally { prepare.mockRestore(); f.scope.dispose(); }
 });
 
-test('product creatures left the client plan (ONE-FORMAT OF30)', () => {
+test('product creatures left the client plan (ONE-FORMAT OF30, FORMAT-PRUNE FP20)', () => {
   const f = fixture();
   try {
-    expect(() => admitClientPlan({ version: 1, features: [{ kind: 'population.product-creatures' }] }, f.ctx.product)).toThrow(/retired \(OF30\)/u);
+    expect(() => admitClientPlan({ version: 1, features: [{ kind: 'population.product-creatures' }] }, f.ctx.product)).toThrow('population.product-creatures, retired (FORMAT-PRUNE FP20)');
   } finally { f.scope.dispose(); }
 });
 

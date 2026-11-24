@@ -1,5 +1,9 @@
 import {fixtureFolderFile,fixtureJsonCheck} from './fixtures/folderFile';
-import { liveNight as NALATI_NIGHT, liveStrikeProfiles } from './fixtures/liveNalati';
+import { liveBalbalProjection, liveNight as NALATI_NIGHT, liveStrikeProfiles } from './fixtures/liveNalati';
+import { ReturnModulesSchema } from '@wildshard/format/scriptContract';
+import { ReturnProgram } from '../src/shared/game/population/returnProgram';
+import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
+import { builtFolder } from '../src/test/game/builtFolder';
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
 import { BoxGeometry, MeshBasicMaterial, PerspectiveCamera, Scene, Vector3, type Vector2 } from 'three';
@@ -15,10 +19,8 @@ import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardWorld } from '../src/server/game/shard/world';
 import type { ShardRuntime } from '../src/shared/game/shard/runtime';
 import type { FixedDraws } from '../src/client/game/models/fixedDraws';
-import type { SpeciesCatalogue } from '../src/client/game/looks/speciesBook';
 import type { ForestWeatherRig } from '../src/client/game/weather/forest';
 import { CueDirector } from '../src/client/game/audio/cueDirector';
-import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { clientNativeBook } from '../src/client/game/shardfile/clientNativeBook';
 import { entryOwner, publishEntryOwner } from '../src/shared/game/shardfile/entryOwners';
@@ -31,6 +33,14 @@ import { withWeatherWitness } from './fixtures/weatherInlineWitness';
 
 const input = {kind: 'timed.encounters', owner: 'quarry.watch', file: 'combat/timed-encounters.json', draws: 'quarry.draws', species: 'quarry.species', guest: 'guardian', weather: 'quarry.weather',
   figures: {rider: 'quarry.guard', captain: 'quarry.captain', storm: 'rider'}};
+/** The balbal's return modules, lent as Nalati's kit lends them before its night installs (clientReturnModules.ts). */
+async function lendGuestModules(scope: Scope): Promise<void> {
+  const nalati = await loadHeadlessFolder(builtFolder('nalati-grasslands'));
+  const rows = v.parse(ReturnModulesSchema, nalati.section('actors/return-scripts')), assets = new Map<string, Uint8Array>();
+  await ReturnProgram.prepareModules(nalati, assets, rows);
+  await ReturnProgram.admitModules(assets, rows, () => Promise.resolve());
+  ReturnProgram.lendModules(scope, assets, rows);
+}
 function fixture(retireOnRead = false) {
   const scope = new Scope('quarry.encounters'), copies: string[] = [], figure = new BoxGeometry(.2, .5, .3);
   const looks = ['nalati-spray-debris', 'nalati-spray-mist', 'nalati-tell', 'nalati-ghost', 'nalati-ghost-captain', 'nalati-ghost-storm'];
@@ -45,14 +55,16 @@ function fixture(retireOnRead = false) {
   if (script === undefined) throw new Error('Missing original watch programme');
   const night = withWeatherWitness({...admitted, program: {...admitted.program, script}});
   const bytes = new TextEncoder().encode(JSON.stringify(night)), hash = sha256(bytes);
-  const product = createShardFolder({slug: 'quarry', revision: 1, shardfile: emptyShardfile({slug: 'quarry', name: 'Quarry', author: 'Fixture', revision: 1, seed: 1}), sections: new Map(),
+  // FORMAT-PRUNE FP20: the guest's programme is its declared species row's projection (Nalati's balbal; no catalogue owner)
+  const empty = emptyShardfile({slug: 'quarry', name: 'Quarry', author: 'Fixture', revision: 1, seed: 1});
+  const shardfile = {...empty, rows: {...empty.rows, species: [Object.assign(legacyDouble<(typeof empty.rows.species)[number]>({id: 'quarry.guardian', kind: input.guest}), {projection: liveBalbalProjection})]}};
+  const product = createShardFolder({slug: 'quarry', revision: 1, shardfile, sections: new Map(),
     files: new Map([[input.file, fixtureFolderFile(input.file,{hash, url: '/watch.json'})]]), jsonCheck:fixtureJsonCheck, read: () => { if (retireOnRead) scope.dispose(); return Promise.resolve(bytes); }});
   const game = legacyDouble<Game>({app, levelScope: scope, scene: new Scene(), camera: new PerspectiveCamera(), renderer: legacyDouble<Game['renderer']>({getDrawingBufferSize: (out: Vector2) => out.set(400, 800)})});
   const world = legacyDouble<ShardWorld>({game, sky: legacyDouble<ShardWorld['sky']>({}), forest: legacyDouble<ShardWorld['forest']>({}), player: legacyDouble<Player>({position: new Vector3()})});
   const ctx = legacyDouble<ShardContext>({scope, product, game: legacyDouble<ShardContext['game']>({runtime: legacyDouble<ShardRuntime>({world})})});
   const draws: FixedDraws = {ready: true, load: () => Promise.resolve(), handle: id => legacyDouble<ReturnType<FixedDraws['handle']>>({copy() { copies.push(id); return figure.clone(); }})};
   publishEntryOwner(scope, 'fixed-draws', input.draws, draws);
-  publishEntryOwner(scope, 'species', input.species, legacyDouble<SpeciesCatalogue>({prepareMemory(id, owner) { expect(id).toBe(input.guest); expect(owner).toBe(scope); return ReturnProgram.prepareMemory(night.program, scope); }, program(id) { expect(id).toBe(input.guest); return ReturnProgram.page(night.program); }}));
   clientNativeBook(ctx).presentations.set('quarry', new CueDirector(game, cues, scope));
   const clock = legacyDouble<DayCycleClock>({dayPhase: 'day'});
   const sky = legacyDouble<NonNullable<ForestWeatherRig['sky']>>({clock});
@@ -67,6 +79,7 @@ test('finite construction rows refuse callbacks, paths and an unknown storm alia
 test('the original two figure copies publish one watch and defer the day-clock loan until update', async () => {
   const f = fixture();
   try {
+    await lendGuestModules(f.scope);
     const night = await installClientTimedEncounters(f.ctx, input);
     expect(entryOwner(f.scope, 'timed-encounters', input.owner)).toBe(night);
     expect(f.copies).toEqual([input.figures.rider, input.figures.captain]);
@@ -78,6 +91,7 @@ test('the original two figure copies publish one watch and defer the day-clock l
 test('retirement during named-file admission refuses before encounter presentation and publication', async () => {
   const f = fixture(true), before = f.game.scene.children.length;
   try {
+    await lendGuestModules(f.scope);
     await expect(installClientTimedEncounters(f.ctx, input)).rejects.toThrow('owner left during admission');
     expect(f.game.scene.children.length).toBeLessThanOrEqual(before);
     expect(() => entryOwner(f.scope, 'timed-encounters', input.owner)).toThrow('scope has ended');

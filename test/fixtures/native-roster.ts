@@ -8,7 +8,7 @@ import { BOAR } from '../../src/test/game/species/boar';
 /** Real scoped services for lifecycle tests, without structural callback admission. */
 export function fixtureNativeRoster(host: SimHost, rng: Rng) {
   flatPopulationEnvironment(host);
-  const { hunt } = createNativeHunt(host, { limit: 64, fight: {}, player: 'host', bands: { states: [], legacyKinds: [] },
+  const { hunt } = createNativeHunt(host, { limit: 64, fight: {}, player: 'host', bands: { states: [] },
     hit: { namespace: 'fixture', tags: [] } }, { rng, ground: populationEnvironment(host, 'fixture.habitat'), nav: null,
     species: new Map([[BOAR.kind, BOAR]]) });
   const services = admitNativeRosterServices(host, 'fixture.roster', hunt);

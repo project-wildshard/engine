@@ -3,7 +3,6 @@
 import type { Object3D, Vector3 } from 'three';
 import type { StealthController } from '../../../client/game/stealth/controller';
 import type { TimedEncounters } from '../../../client/game/boss/timedEncounters';
-import type { SpeciesCatalogue } from '../../../client/game/looks/speciesBook';
 import type { DeclaredEliteEntry } from '@wildshard/engine/ai/view/eliteEntry';
 import type { EliteEntryPageRows } from '@wildshard/format/eliteEntryRows';
 import type { EliteDeclaredEntryOwners } from '../../../client/game/Elite';
@@ -57,7 +56,6 @@ export interface EntryOwnerTypes {
   stealth: StealthController;
   'timed-encounters': TimedEncounters;
   adventure: AdventurePersistence;
-  species: SpeciesCatalogue;
   buildings: LivingBuildings;
   forest: ForestPage;
   cave: CaveInterior;
@@ -92,7 +90,7 @@ function check(scope: Scope, id: string): void {
 function book(scope: Scope): Owners {
   let value = books.get(scope);
   if (value === undefined) {
-    value = { 'world-groups': new Map(), 'elite-entry': new Map(), 'world-frame': new Map(), scenes: new Map(), 'world-weather': new Map(), 'world-point': new Map(), 'arena-room': new Map(), taming: new Map(), 'riding-view': new Map(), 'riding-play': new Map(), stealth: new Map(), 'timed-encounters': new Map(), adventure: new Map(), species: new Map(), buildings: new Map(), forest: new Map(), cave: new Map(), quest: new Map(), 'quest-reference': new Map(),
+    value = { 'world-groups': new Map(), 'elite-entry': new Map(), 'world-frame': new Map(), scenes: new Map(), 'world-weather': new Map(), 'world-point': new Map(), 'arena-room': new Map(), taming: new Map(), 'riding-view': new Map(), 'riding-play': new Map(), stealth: new Map(), 'timed-encounters': new Map(), adventure: new Map(), buildings: new Map(), forest: new Map(), cave: new Map(), quest: new Map(), 'quest-reference': new Map(),
       object: new Map(), placed: new Map(), site: new Map(), floor: new Map(), 'fixed-draws': new Map(), 'drawn-models': new Map(), chain: new Map(), 'rope-deck': new Map(), ambient: new Map(), 'ambient-draw': new Map(), collection: new Map(), claims: new Map(),
       animals: new Map(), sounds: new Map(), 'quest-spawns': new Map(), 'painted-world': new Map() };
     books.set(scope, value);

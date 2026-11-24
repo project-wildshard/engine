@@ -1,12 +1,12 @@
 import type { ShardRows, SpeciesRow } from '@wildshard/format/rows';
 import type { CreatureStrikes, ShardCreatures } from '@wildshard/format/creatures';
 import type { NativePopulationRows } from '@wildshard/format/populationRoster';
-import { readSpeciesPrograms, type SpeciesData, type SpeciesPrograms, type SpeciesProgramData, type SpeciesVariantData } from '@wildshard/format/speciesPrograms';
+import type { SpeciesData, SpeciesPrograms, SpeciesProgramData, SpeciesVariantData } from '@wildshard/format/speciesPrograms';
 import type { NativeBossBinding } from '@wildshard/format/bossEncounter';
 import { resolveCreatureLayers } from '../shardfile/creatureLayers';
 
 /**
- * ONE-FORMAT OF30: a native host on a product with no `actors/species-programs` reads its species from the declared
+ * ONE-FORMAT OF30: a native host reads its species from the declared
  * `actors/species` rows (the reverse of the SDK's `speciesProgramToRows`): a hunt temperament's numbers are the native
  * tuning, its motion the species' motion numbers, its presentation the calls, and each variant keeps the full hp and mods
  * the engine's `variantMods` would fill. Nothing here draws, allocates or reads a callback.
@@ -83,15 +83,4 @@ export function declaredHarvest(rows: ShardRows): Pick<SpeciesData, 'kind' | 'ha
     seen.add(row.kind);
     return [{ kind: row.kind, ...(row.harvest === undefined ? {} : { harvest: row.harvest }) }];
   });
-}
-
-/** The untyped presence check and read of a section this engine's pinned format no longer names. */
-interface AnySectionProduct { readonly has: (name: string) => boolean; readonly section: (name: string) => unknown }
-const SPECIES_PROGRAMS = 'actors/species-programs';
-/** SHARD-COMPAT CP16: a kept original's species programme. OF30 cut B dropped the programme reads, but kept originals still
- *  carry `actors/species-programs` (Pine r5, prod's head, and r6; Driftwood r4 to r8), so they read it; a product with none
- *  reads its declared rows (the kept-originals play test went with ZONE-SNAPSHOTS ZS8). */
-export function keptSpeciesPrograms(product: object): SpeciesPrograms | undefined {
-  const any = product as AnySectionProduct;
-  return any.has(SPECIES_PROGRAMS) ? readSpeciesPrograms(any.section(SPECIES_PROGRAMS)) : undefined;
 }

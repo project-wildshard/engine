@@ -212,14 +212,6 @@ export const CLIENT_FEATURES: Readonly<Record<AdmittedFeatureRow['kind'], Client
     const { prepareHeldClaimsEntry } = await import('./heldClaimsEntry');
     await prepareHeldClaimsEntry(ctx, row.id, row.source);
   } },
-  'population.hull-book': { phase: 'kit', rank: -25, lifetime: 'entered', sections: ['look/hull-book', 'explore/catalogue'], install: async ctx => {
-    const { prepareDeclaredHullBookKit } = await import('../models/socketRigCreature');
-    await prepareDeclaredHullBookKit(ctx);
-  } },
-  // ONE-FORMAT OF30: retired; admitClientPlan refuses it. The name leaves with the format's retire release.
-  'population.product-creatures': { phase: 'kit', rank: -20, lifetime: 'entered', sections: [], install: () => {
-    throw new Error('population.product-creatures is retired (OF30): declare species rows and looks');
-  } },
   'held.claims.install': { phase: 'kit', rank: -10, lifetime: 'entered', sections: [], install: async (ctx, row) => {
     if (row.kind !== 'held.claims.install') throw new Error('Invalid claims installation feature');
     const { installHeldClaimsEntry } = await import('./heldClaimsEntry');
@@ -332,8 +324,6 @@ export const CLIENT_FEATURES: Readonly<Record<AdmittedFeatureRow['kind'], Client
     play: { rank: 20, install: loadFeature(async () => (await import('./clientHeldMelee')).enterClientHeldMelee) } },
   'player.enter': { phase: 'world', rank: 50, lifetime: 'entered', sections: [], install: loadFeature(async () => (await import('./clientPlayerEnter')).installClientPlayerEnter),
     play: { rank: 25, install: loadFeature(async () => (await import('./clientPlayerEnter')).enterClientPlayer) } },
-  'species.program': { phase: 'kit', rank: 20, rankFor: row => row.kind === 'species.program' && row.catalogue !== undefined ? -40 : 20, lifetime: 'entered', needsWorldLooks: false, sections: ['actors/species-programs', 'sim/scripts', 'sim/runtime-plan'], install: loadFeature(async () => (await import('./clientSpeciesProgram')).installClientSpeciesProgram),
-    world: { rank: 10, when: row => row.kind === 'species.program' && row.catalogue !== undefined, install: loadFeature(async () => (await import('./clientSpeciesProgram')).prepareClientSpeciesCatalogue) } },
   'quest.page': { phase: 'play', rank: 10, lifetime: 'entered', sections: ['world/scenes', 'world/targets', 'look/painted'], install: loadFeature(async () => (await import('./clientQuestPage')).installClientQuestPage),
     play: { rank: 80, install: loadFeature(async () => (await import('./clientQuestPage')).finishClientQuestPage) },
     pageHomes: loadFeature<PageHomesRow>(async () => (await import('./clientPopulation')).installClientPopulation) },
@@ -389,9 +379,13 @@ export interface PageHomesRow {
 }
 /** FORMAT-PRUNE FP43: the retired format kind for a page's population; a plan that still names it is refused. */
 const RETIRED_HOMES = 'population.homes';
-/** An admitted format row: every kind but the retired page population, which is the plan's `pageHomes`. */
-export type AdmittedFeatureRow = Exclude<ClientFeatureRow, { kind: typeof RETIRED_HOMES }>;
-function admittedRow(row: ClientFeatureRow): row is AdmittedFeatureRow { return (row.kind as string) !== RETIRED_HOMES; }
+/** FORMAT-PRUNE FP20: the species-program family's kinds (ONE-FORMAT OF30), which the format names until its delete; a plan
+ *  that still names one is refused. A page's species are its declared rows and looks. */
+const RETIRED_SPECIES = ['species.program', 'population.hull-book', 'population.product-creatures'] as const;
+type RetiredKind = typeof RETIRED_HOMES | typeof RETIRED_SPECIES[number];
+/** An admitted format row: every kind but the retired ones (the page population is the plan's `pageHomes`). */
+export type AdmittedFeatureRow = Exclude<ClientFeatureRow, { kind: RetiredKind }>;
+function admittedRow(row: ClientFeatureRow): row is AdmittedFeatureRow { return (row.kind as string) !== RETIRED_HOMES && !(RETIRED_SPECIES as readonly string[]).includes(row.kind); }
 export interface AdmittedClientPlan { readonly features: readonly AdmittedFeatureRow[]; readonly pageHomes?: PageHomesRow }
 /** The page population's place among the play rows (after the boss it may keep, before the held boss) and its sections. */
 const PAGE_HOMES_STEP = { phase: 'play', rank: 60, lifetime: 'entered', sections: ['sim/runtime-plan', 'sim/scripts'] } as const;
@@ -422,7 +416,8 @@ export const HOMES_SYSTEM = 'engine.population.homes';
 export function pageHomes(features: readonly ClientFeatureRow[]): AdmittedClientPlan {
   const rows: AdmittedFeatureRow[] = [];
   for (const row of features) {
-    if (!admittedRow(row)) throw new Error(`client/plan names ${RETIRED_HOMES}, retired (FORMAT-PRUNE FP43): the engine stands a quest page's population from its declared files`);
+    if ((row.kind as string) === RETIRED_HOMES) throw new Error(`client/plan names ${RETIRED_HOMES}, retired (FORMAT-PRUNE FP43): the engine stands a quest page's population from its declared files`);
+    if (!admittedRow(row)) throw new Error(`client/plan names ${row.kind}, retired (FORMAT-PRUNE FP20): a page's species are its declared rows and looks`);
     rows.push(row);
   }
   return features.some(row => row.kind === 'quest.page') ? { features: rows, pageHomes: { kind: PAGE_HOMES, system: HOMES_SYSTEM, groups: {} } } : { features: rows };
@@ -447,18 +442,6 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
         if (!product.shardfile.items.rows.some(item => item.id === row.grapple.item && item.kind === 'tool')) throw new Error('Held play entry requires its declared tool');
       }
     }
-    if (plan.features.some(row => row.kind === 'population.product-creatures')) throw new Error('population.product-creatures is retired (OF30): declare species rows and looks');
-    if (plan.features.some(row => row.kind === 'population.hull-book')) {
-      // These existing admitted services retain their wire during entry migration.
-      for (const name of ['look/hull-book', 'held/equipment'] as const) {
-        if (!product.has(name)) throw new Error('Hull book kit requires its admitted legacy owners');
-        product.section(name);
-      }
-      const { slug: identity } = product;
-      const cards = product.section('explore/catalogue').entries.flatMap(row => row.kind === 'socket-creature' ? [row.rows] : []);
-      if (cards.length === 0 || new Set(cards.map(card => card.model.id)).size !== cards.length
-        || cards.some(card => card.product !== identity || !product.hasFile(card.sockets))) throw new Error('Hull book kit requires its unique admitted socket cards');
-    }
     const prepare = plan.features.find(row => row.kind === 'held.claims.prepare'), install = plan.features.find(row => row.kind === 'held.claims.install');
     if(install?.preparation==='world'){
       if(prepare!==undefined&&(prepare.source===undefined||prepare.id!==install.claims))throw new Error('World-prepared held claims cannot repeat kit preparation');
@@ -470,7 +453,7 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
       if (row.quest !== undefined && !plan.features.some(feature => feature.kind === 'quest.composition' && feature.id === row.quest)) throw new Error('Named-place binding requires its declared quest');
     }
     const sections = new Map(outputDescriptor(product.shardfile)?.sections);
-    for (const name of ['world/scenes', 'actors/species-programs', 'sim/runtime-plan', 'sim/scripts', 'look/painted'] as const)
+    for (const name of ['world/scenes', 'sim/runtime-plan', 'sim/scripts', 'look/painted'] as const)
       if (product.has(name)) sections.set(name, product.section(name));
     sections.set('client/plan', read); // the format's rules read its own rows
     const errors = clientOwnershipRules(product.shardfile, sections); if (errors.length > 0) throw new Error(errors.join('; '));
@@ -504,8 +487,6 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
       const ranged = row.kind === 'page.life' ? row.ranged : row.kind === 'world.forest-page' ? row.cave?.spots?.ranged : undefined;
       if (ranged !== undefined && !plan.features.some(feature => feature.kind === 'held.ranged-page')) throw new Error('Forest page ambience requires a ranged page');
     }
-    for (const row of plan.features) if (row.kind === 'species.program' && row.catalogue !== undefined
-      && (!product.hasFile(row.catalogue.actors) || !product.hasFile(row.catalogue.looks))) throw new Error('Species catalogue requires its admitted files');
     for (const row of plan.features) if ((row.kind === 'state.adventure' || row.kind === 'world.meadow') && !product.hasFile(row.file)) throw new Error('World services require their admitted data files');
     for (const row of plan.features) if (row.kind === 'riding.session' && (!product.hasFile(row.file) || !plan.features.some(feature => feature.kind === 'population.wildlife'))) throw new Error('Riding requires its admitted session file and wildlife feature');
     for (const row of plan.features) if (row.kind === 'population.wildlife' && [row.file, row.crowd.json, row.crowd.binary].some(file => !product.hasFile(file))) throw new Error('Wildlife requires its admitted population and crowd files');
@@ -535,7 +516,7 @@ export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedC
         if (!product.hasFile(row.source)) throw new Error('Quest spawns require their admitted runtime file');
         if (!plan.features.some(owner => owner.kind === 'quest.composition' && owner.id === row.quest && owner.equipment?.animals === row.animals && owner.equipment.sounds === row.sounds)) throw new Error('Quest spawns require their declared composition owners');
       }
-      const required = row.kind === 'world.updates' && !row.rows.some(update => update.kind === 'toon-look') ? [] : row.kind === 'held.claims.prepare' && row.source !== undefined ? [] : row.kind === 'species.program' && row.catalogue !== undefined ? (product.has('look/hull-book') ? ['look/hull-book'] as const : []) /* OF30: else its actors' packed bodies */ : row.kind === 'content.catalogue' && !(row.finishes || row.effects.includes('finishes')) ? [] : CLIENT_FEATURES[row.kind].sections;
+      const required = row.kind === 'world.updates' && !row.rows.some(update => update.kind === 'toon-look') ? [] : row.kind === 'held.claims.prepare' && row.source !== undefined ? [] : row.kind === 'content.catalogue' && !(row.finishes || row.effects.includes('finishes')) ? [] : CLIENT_FEATURES[row.kind].sections;
       for (const name of required) {
         if (!product.has(name)) throw new Error(`Missing feature section ${name}`);
         product.section(name); // A listed stream section is not an admitted boot dependency.

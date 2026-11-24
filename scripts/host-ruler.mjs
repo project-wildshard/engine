@@ -244,8 +244,6 @@ export function reach(roots, reader, tables = TABLES, held = new Set()) {
  * unmeasured, never as free. `when` narrows an option to some values. Each binding here is used only by its option
  * (the test checks it). */
 export const OPTIONS = Object.freeze([
-  // clientPlan.ts: species.program's `world` hook runs only `when: row.catalogue !== undefined`.
-  { kind: 'species.program', option: 'catalogue', bindings: ['src/client/game/shardfile/clientSpeciesProgram.ts#prepareClientSpeciesCatalogue'] },
   // clientPlan.ts: debug.expose imports sceneDressing only for `source.kind === 'dressing'` (HR1's open note).
   { kind: 'debug.expose', option: 'source', when: (/** @type {any} */ value) => value?.kind === 'dressing', bindings: ['src/client/game/shardfile/sceneDressing.ts#SceneDressing'] },
   // clientQuestComposition.ts: a composition's figures (Pine's and Driftwood's people) load only when `figures` is set.

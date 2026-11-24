@@ -22,28 +22,21 @@ export interface DeclaredCreatureModels {
   readonly recipes: ReadonlyMap<string, ShardViewRecipe>;
 }
 
-/** ONE-FORMAT OF19d1/OF19d2: a data page with no `species.program` feature draws its declared bodies from their looks, so
- *  the page itself registers its declared species. Standalone that is the data client's kit; on the grid it is the
- *  regional entry's kit (K6, v0.1.56: Sunscar Dunes r5 never did, and stalled at finish). */
-export function pageDeclaresOwnSpecies(product: Pick<ShardFolder, 'has' | 'section' | 'shardfile'>): boolean {
-  if (!hasDeclaredClientPage(product.shardfile) || !product.has('client/plan')) return false;
-  return !product.section('client/plan').features.some(row => row.kind === 'species.program');
+/** ONE-FORMAT OF19d1/OF19d2: a data page draws its declared bodies from their looks, so the page itself registers its
+ *  declared species (FORMAT-PRUNE FP20: no plan feature owns them any more). Standalone that is the data client's kit; on
+ *  the grid it is the regional entry's kit (K6, v0.1.56: Sunscar Dunes r5 never did, and stalled at finish). */
+export function pageDeclaresOwnSpecies(product: Pick<ShardFolder, 'has' | 'shardfile'>): boolean {
+  return hasDeclaredClientPage(product.shardfile) && product.has('client/plan');
 }
 
-/** The plan features that register a native page's species themselves: such a page never declares its own. */
-const SPECIES_OWNERS = new Set(['population.hull-book', 'species.program', 'population.product-creatures']);
-
-/** ONE-FORMAT OF23e4: a native runtime page whose species are only its declared rows (Pine r10): no plan feature that
- *  registers species. Its page registers them itself (`declarePageCreatures`), standalone (client.ts `declaredNativePage`)
- *  and on the grid (regionalRuntime.ts's entered kit), or a row's kind is unknown. An old `actors/species-programs` section
- *  no feature reads does not count (P1 2026-11-22: v0.1.72 baked Driftwood r8's client product, which still carries one,
- *  beside the box's r9, and nobody declared the crabs, monkeys, sailors or the Captain: every enemy was invisible). */
-export function nativeDeclaresOwnSpecies(product: Pick<ShardFolder, 'has' | 'section' | 'shardfile'>): boolean {
+/** ONE-FORMAT OF23e4: a native runtime page whose species are only its declared rows (Pine r10). Its page registers them
+ *  itself (`declarePageCreatures`), standalone (client.ts `declaredNativePage`) and on the grid (regionalRuntime.ts's
+ *  entered kit), or a row's kind is unknown (P1 2026-11-22: v0.1.72 baked Driftwood r8's client product beside the box's
+ *  r9, and nobody declared the crabs, monkeys, sailors or the Captain: every enemy was invisible). */
+export function nativeDeclaresOwnSpecies(product: Pick<ShardFolder, 'shardfile'>): boolean {
   const source = product.shardfile;
   if (source.runtime === null || hasDeclaredClientPage(source)) return false;
-  if (source.rows.species.length === 0 || source.creatures.spawns.length === 0) return false;
-  const features = product.has('client/plan') ? product.section('client/plan').features : [];
-  return !features.some(row => SPECIES_OWNERS.has(row.kind));
+  return source.rows.species.length > 0 && source.creatures.spawns.length > 0;
 }
 
 /** OF23e4 on the grid: a native page's declared species, and the hull book's kit it keeps (held equipment, socket cards),
@@ -94,7 +87,7 @@ export function declarePageCreatures(ctx: ShardContext, source: Shardfile, model
   };
 }
 
-/** OF19d2: with no `species.program` the page's species are its declared rows, registered in this context's kit for
+/** OF19d2: the page's species are its declared rows, registered in this context's kit for
  *  `population.homes`; the plan's keeper boss, if it keeps one (OF19c0b), gets its fight's name as that feature gave it. */
 export function declarePageSpecies(ctx: ShardContext, source: Shardfile, models: () => DeclaredCreatureModels): void {
   clientNativeBook(ctx).species = true;

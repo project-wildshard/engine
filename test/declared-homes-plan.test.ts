@@ -21,3 +21,12 @@ test('a plan naming the retired population.homes row is refused', () => {
   const retired = { kind: 'population.homes', system: 'old.system', groups: {} } as unknown as ClientFeatureRow;
   expect(() => pageHomes([retired])).toThrow('retired (FORMAT-PRUNE FP43)');
 });
+
+test('a plan naming a species-program feature is refused (FORMAT-PRUNE FP20)', () => {
+  // A page's species are its declared rows and looks; no live pin names these kinds after Nalati r9
+  for (const kind of ['species.program', 'population.hull-book', 'population.product-creatures']) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- an older pin's row, which a later format may not type
+    const retired = { kind } as unknown as ClientFeatureRow;
+    expect(() => pageHomes([retired])).toThrow(`client/plan names ${kind}, retired (FORMAT-PRUNE FP20)`);
+  }
+});

@@ -9,7 +9,7 @@ import { Vector3 } from 'three';
 import { CrowdDraw as Flock, type CrowdBody as FlockBody } from './crowdDraw';
 import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import { painterlyMaterial } from '@wildshard/engine/world/painterly';
-import { crowdRig, folderRiggedHulls, isCrowdRigFile } from '../looks/riggedHulls';
+import { crowdRig, isCrowdRigFile } from '../looks/riggedHulls';
 import type { SkyRig } from '@wildshard/engine/world/skyRig';
 import { pageAir } from '../population/pageAir';
 import { wirePage } from '../shardfile/wirePage';
@@ -70,8 +70,9 @@ export function createPageCrowds(sky: SkyRig, seed: number, body: FlockBody, inp
     if (row === undefined || policy === undefined || views.has(row.id) || row.x !== options.x || row.z !== options.z
       || row.count !== options.count || row.seed !== options.seed || row.range !== (options.range ?? 45)) throw new Error('Unbound native crowd roster');
     const view = new Flock(policy,body,painterlyMaterial(sky,data.material),data.view);
-    // OF30: a hull naming a rig file is the crowd's own rig (no `look/rigged-hulls` family)
-    if (data.hull !== null) (isCrowdRigFile(data.hull) ? crowdRig(data.hull) : folderRiggedHulls(data.slug).load(data.hull)).then(rig=>{view.useRig(rig);return null;}).catch((cause:unknown)=>{throw new Error('Crowd rig failed',{cause});});
+    // OF30, FORMAT-PRUNE FP20: a crowd's hull names its own rig file (the `look/rigged-hulls` family is gone)
+    if (data.hull !== null && !isCrowdRigFile(data.hull)) throw new Error(`Crowd hull ${data.hull} names no rig file`);
+    if (data.hull !== null) crowdRig(data.hull).then(rig=>{view.useRig(rig);return null;}).catch((cause:unknown)=>{throw new Error('Crowd rig failed',{cause});});
     views.set(row.id, view); return view;
   }, advance: (view, index, speed, player, dt, time, step) => {
     const row = rows[index], observation = row === undefined ? undefined : observations.get(row.id);

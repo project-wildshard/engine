@@ -76,9 +76,8 @@ import { loadClientRigLooks } from './clientRigLooks';
 import { declarePageCreatures, declarePageSpecies, type DeclaredCreatureModels } from './declaredCreatures';
 import { loadItemModels, loadStaticModels } from './itemModels';
 import { attachmentRefs } from './clientAttachments';
-import { loadClientSkins, skinSpeciesLook, type ClientSkin } from './clientSkins';
+import { loadClientSkins, type ClientSkin } from './clientSkins';
 import { SKIN_LOOK_RECIPE } from '@wildshard/format/skins';
-import { clientNativeBook } from './clientNativeBook';
 import { clientViews } from './clientViews';
 import { createShardfileClientScripts, captureClientScriptPosition } from './clientScripts';
 
@@ -472,14 +471,11 @@ export class ShardfileClient {
     await this.phase(ctx, 'kit');
   }
 
-  /** OF23e4: a native runtime page whose species are only its declared rows: no plan feature that registers species
-   *  (`population.hull-book`, `species.program`, `population.product-creatures`); an unread programme section does not
-   *  count (P1 2026-11-22, `nativeDeclaresOwnSpecies`). */
+  /** OF23e4: a native runtime page whose species are only its declared rows (FORMAT-PRUNE FP20: no plan feature registers
+   *  species any more; an unread programme section does not count, P1 2026-11-22, `nativeDeclaresOwnSpecies`). */
   private declaredNativePage(): boolean {
     if (this.bindings.nativeRuntime !== true || this.mode === 'empty' || this.nativeFeatures) return false;
-    if (this.source.rows.species.length === 0 || this.source.creatures.spawns.length === 0) return false;
-    const owners = new Set(['population.hull-book', 'species.program', 'population.product-creatures']);
-    return !(this.plan?.features ?? []).some(row => owners.has(row.kind));
+    return this.source.rows.species.length > 0 && this.source.creatures.spawns.length > 0;
   }
 
   /** What this page draws its declared bodies with (declaredCreatures.ts), loaded in its world stage. */
@@ -490,25 +486,11 @@ export class ShardfileClient {
   }
 
   private kitData(ctx: ShardContext): void {
-    const catalogue = this.plan?.features.find(row => row.kind === 'species.program' && row.catalogue !== undefined);
-    if (catalogue !== undefined && this.skins.size > 0) {
-      const rows = this.source.rows;
-      const looks = rows.looks.flatMap(row => {
-        const skin = this.skins.get(row.id);
-        if (skin === undefined) return [];
-        const species = rows.species.find(value => value.id === row.species);
-        if (species === undefined) throw new Error(`Missing catalogue skin species: ${row.species}`);
-        return [skinSpeciesLook(row, species, skin, true)];
-      });
-      clientNativeBook(ctx).catalogueSkins = looks;
-      return;
-    }
     if (this.mode !== 'full') return;
     // ONE-FORMAT OF19b0: a client-page shard whose creatures are declared spawns (its runtime plan keeps the quest page and
-    // held melee) draws them as an ordinary upload's page does, unless a `species.program` feature owns its species
+    // held melee) draws them as an ordinary upload's page does
     if (this.nativeFeatures) {
-      if ((this.plan?.features ?? []).some(row => row.kind === 'species.program')) return;
-      // OF19d2: with no `species.program` the page's species are its declared rows, registered here for `population.homes`
+      // OF19d2: the page's species are its declared rows, registered here for the page population
       declarePageSpecies(ctx, this.source, () => this.creatureModels());
       return;
     }

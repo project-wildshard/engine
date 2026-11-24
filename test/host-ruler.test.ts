@@ -177,13 +177,17 @@ describe('optional sub-rows (HR7, HA0 c)', () => {
   const c = folderRootModules('test/fixtures/host-ruler/option-c', { plan });
   const d = folderRootModules('test/fixtures/host-ruler/option-d', { plan });
   const modules = measure([c, d], reader);
-  const charges = optionCharges(modules, [c, d], reader);
+  // FORMAT-PRUNE FP20: species.program's catalogue was the table's one charged option; it is gone, so the charge is
+  // proved on a binding both products' module carries but only one product's option would run.
+  const charged = [{ kind: 'quest.composition', option: 'figures', bindings: ['src/client/game/shardfile/clientQuestComposition.ts#installEntryRangedPage'] }];
+  const charges = optionCharges(modules, [c, d], reader, charged);
 
-  test('two products declare species.program; the one setting catalogue alone is charged its binding', () => {
-    expect(modules.get('src/client/game/shardfile/clientSpeciesProgram.ts')?.users).toEqual(['option-c', 'option-d']);
-    expect(c.options).toEqual(['species.program.catalogue', 'quest.composition.figures']);
-    expect(charges).toEqual([{ key: 'src/client/game/shardfile/clientSpeciesProgram.ts#prepareClientSpeciesCatalogue', user: 'option-c', option: 'species.program.catalogue', lines: expect.any(Number) }]);
-    expect(charges[0]!.lines).toBeGreaterThan(5);
+  test('two products reach one module; the one setting the option alone is charged its binding', () => {
+    expect(modules.get('src/client/game/shardfile/clientQuestComposition.ts')?.users).toEqual(['option-c', 'option-d']);
+    expect(c.options).toEqual(['debug.expose.source', 'quest.composition.figures']);
+    expect(optionCharges(modules, [c, d], reader)).toEqual([]);
+    expect(charges).toEqual([{ key: 'src/client/game/shardfile/clientQuestComposition.ts#installEntryRangedPage', user: 'option-c', option: 'quest.composition.figures', lines: expect.any(Number) }]);
+    expect(charges[0]!.lines).toBeGreaterThan(2);
     const totals = shardTotals(applyRegister(modules, reader, [], { today: '2026-11-13' }), ['option-c', 'option-d'], charges);
     expect(totals.get('option-c')!.option).toBe(charges[0]!.lines);
     expect(totals.get('option-d')!.option).toBe(0);
@@ -205,7 +209,6 @@ describe('optional sub-rows (HR7, HA0 c)', () => {
     const report = rule(['test/fixtures/host-ruler/option-c', 'test/fixtures/host-ruler/option-d'], { today: '2026-11-13', register: [] });
     const out = formatTable(report);
     expect(out).toContain('unmeasured option: quest.composition.file (option-c, option-d)');
-    expect(out).toContain('option-charged: option-c src/client/game/shardfile/clientSpeciesProgram.ts#prepareClientSpeciesCatalogue');
   });
   test('each option binding is used only by its option', () => {
     const source = (path: string) => readFileSync(path, 'utf8');

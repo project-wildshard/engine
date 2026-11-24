@@ -176,7 +176,7 @@ export interface RegionalRuntimeFoundation {
     animals: RowBodies; wearSkin: (equipment: EquipmentService, skin: SkinDef) => void;
   }>;
   /** OF19d2 (K6): what a declared data page draws its own declared bodies with, loaded once for the resident. Present for
-   *  every declared data page; the entered kit asks only when the page has no `species.program` (`pageDeclaresOwnSpecies`). */
+   *  every declared data page; the entered kit asks only for a declared data page (`pageDeclaresOwnSpecies`). */
   readonly declaredCreatures?: (product: ShardFolder) => Promise<DeclaredCreatureModels>;
   /** Real runtime continuation, local purse/ownership and encounter writes; refusal keeps the source frame. */
   readonly checkpoint: () => boolean;
@@ -377,7 +377,7 @@ export function createRegionalRuntimeFactory(ports: RegionalRuntimeFactoryPorts)
               // Observe an early failure now; afterPlay still awaits the original rejection before readiness.
               void enteredWarm.catch(() => undefined);
             },
-            // OF19d2 (K6, v0.1.56): a declared data page with no `species.program` registers its own declared species in its
+            // OF19d2 (K6, v0.1.56): a declared data page registers its own declared species in its
             // entered kit, as its standalone data client does, before the plan's kit and play features read them
             kit: async entered => {
               // OF23e4 (Pine r10): a native page with no species programme registers its declared rows and keeps the hull

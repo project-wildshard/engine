@@ -2,18 +2,20 @@
  "version": 1,
  "features": [
   {
-   "kind": "species.program",
-   "catalogue": {
-    "owner": "x"
-   }
-  },
-  {
    "kind": "quest.composition",
    "file": "q.json",
    "id": "q",
    "figures": {
     "draws": "d",
     "file": "f.json"
+   }
+  },
+  {
+   "kind": "debug.expose",
+   "name": "x",
+   "source": {
+    "kind": "dressing",
+    "id": "a"
    }
   }
  ]
