@@ -9,6 +9,7 @@ import { actRoutes } from '@wildshard/engine/sim/actRoutes';
 import { questBooks } from '@wildshard/engine/quest/players';
 import { OWNED_ROW } from '../../../shared/game/loot/ownedRows';
 import { AmmoPouch } from '../../../shared/game/loadout/pouch';
+import { weaponIdOf } from '@wildshard/engine/combat/Equipment';
 
 const stack = v.pipe(v.number(), v.finite(), v.integer(), v.minValue(0));
 /** The outer continuation admits a named selection and integer stacks; the owner's rows enforce exact keys/caps. */
@@ -39,8 +40,9 @@ export class NativeHeldAmmunition {
     this.rows = v.parse(LoadoutSchema, input); this.quiver = new AmmoPouch(this.rows.pouch);
     const items = parseItems(itemRows).rows;
     const launcher = items.find(item => item.id === this.rows.launcher.item);
-    const firearm = items.find(item => item.kind === 'weapon' && item.equipment?.legacySlot === this.rows.firearm.slot);
-    const bow = items.find(item => item.kind === 'weapon' && item.equipment?.legacySlot === this.rows.bow.slot);
+    // FP22d: a loadout slot names the weapon's runtime id: its closed name while the row has one, else `declared.<item>`
+    const playsAs = (slot: string) => items.find(item => item.kind === 'weapon' && item.equipment !== undefined && weaponIdOf(item.equipment) === slot);
+    const firearm = playsAs(this.rows.firearm.slot), bow = playsAs(this.rows.bow.slot);
     if (launcher?.kind !== 'weapon' || firearm?.kind !== 'weapon' || bow?.kind !== 'weapon'
       || launcher.ranged === undefined || firearm.ranged === undefined || bow.ranged === undefined || bow.profile?.family !== 'bow')
       throw new Error('Native loadout identities need admitted ranged items');
