@@ -14,8 +14,9 @@ import { installCoinModel } from '../loot/coinModel';
 import type { ShardContext } from '../plugin/context';
 import { cellLootRow, installCellLoot } from './dataCellLoot';
 
-// the Template's built `economy/loot` row (sdk 0.4.8, `new`)
-const row = { charted: false, chime: 'cue.swap', finds: null, gear: 'purse.coins', id: 'template.loot', marks: null };
+// the Template's built `economy/loot` row (sdk 0.4.8, `new`), with the currency FP31 makes a purse need
+const row = { charted: false, chime: 'cue.swap', finds: null, gear: 'purse.coins', id: 'template.loot', marks: null,
+  economy: { currency: { id: 'coin', name: 'Coin', model: 'shared/doubloon', icon: 'coin' } } };
 const source = { identity: { slug: 'fixture-copy', revision: 1 }, rows: { loot: [row] } } as unknown as Shardfile;
 
 afterEach(() => { document.body.replaceChildren(); });
