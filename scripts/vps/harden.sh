@@ -23,9 +23,13 @@ NEEDS_ROOT='needs sudo'
 # Every listener once: "address:port" per line.
 LISTENERS=; LISTENERS_OK=0
 if has ss && LISTENERS=$(ss -ltnH 2>/dev/null | awk '{print $4}'); then LISTENERS_OK=1; fi
-listens_on() { printf '%s\n' "$LISTENERS" | grep -Eq ":$1\$"; }
+# `set -o pipefail` and `grep -q` race: grep stops reading at its first match, the writer before it can die of SIGPIPE, and
+# the pipeline then fails though the line was there (VH2's 'nothing on 11434' under a loaded CI runner, 2026-11-24). A
+# pipeline's last grep reads all its input and only its status is kept; `test/vps-harden.test.ts` refuses a `| grep -q`.
+matches() { grep "$@" >/dev/null; }
+listens_on() { printf '%s\n' "$LISTENERS" | matches -E ":$1\$"; }
 # A listener on every address, not loopback or one interface.
-wildcard_on() { printf '%s\n' "$LISTENERS" | grep -Eq "^(0\.0\.0\.0|\*|\[::\]|::):$1\$"; }
+wildcard_on() { printf '%s\n' "$LISTENERS" | matches -E "^(0\.0\.0\.0|\*|\[::\]|::):$1\$"; }
 
 info VH1 "host $(hostname 2>/dev/null || echo '?'), kernel $(uname -r 2>/dev/null || echo '?'), $([ "$ROOT" = 1 ] && echo 'as root' || echo 'not root: root-only reads say unknown')"
 
@@ -82,7 +86,7 @@ else unknown VH2 "OpenClaw token search: $NEEDS_ROOT"; fi
 # --- VH3: SSH.
 if [ "$ROOT" = 1 ] && has sshd; then
   if config=$(sshd -T 2>&1); then
-    want() { if printf '%s\n' "$config" | grep -qix "$1 $2"; then ok VH3 "sshd $1 $2"; else bad VH3 "sshd $1 is '$(printf '%s\n' "$config" | awk -v k="$1" 'tolower($1)==k {$1=""; sub(/^ /,""); print}')'; want $2"; fi; }
+    want() { if printf '%s\n' "$config" | matches -ix "$1 $2"; then ok VH3 "sshd $1 $2"; else bad VH3 "sshd $1 is '$(printf '%s\n' "$config" | awk -v k="$1" 'tolower($1)==k {$1=""; sub(/^ /,""); print}')'; want $2"; fi; }
     want passwordauthentication no; want permitrootlogin no; want kbdinteractiveauthentication no; want x11forwarding no
     want maxauthtries 3; want allowtcpforwarding no; want allowagentforwarding no; want loglevel VERBOSE; want maxsessions 2
     # sshd -T writes one `allowusers` line per name; the set must be exactly raynos and the agents' account (J266).
@@ -130,8 +134,8 @@ else bad VH16 'dccp, sctp, rds, tipc or usb-storage can load'; fi
 CF_RANGES_RE='173\.245\.48\.0/20|103\.21\.244\.0/22|103\.22\.200\.0/22|103\.31\.4\.0/22|141\.101\.64\.0/18|108\.162\.192\.0/18|190\.93\.240\.0/20|188\.114\.96\.0/20|197\.234\.240\.0/22|198\.41\.128\.0/17|162\.158\.0\.0/15|104\.16\.0\.0/13|104\.24\.0\.0/14|172\.64\.0\.0/13|131\.0\.72\.0/22|2400:cb00::/32|2606:4700::/32|2803:f800::/32|2405:b500::/32|2405:8100::/32|2a06:98c0::/29|2c0f:f248::/32'
 if [ "$ROOT" = 1 ] && has ufw; then
   status=$(ufw status verbose 2>/dev/null)
-  if printf '%s\n' "$status" | grep -q '^Status: active'; then ok VH4 'ufw is active'; else bad VH4 'ufw is not active'; fi
-  if printf '%s\n' "$status" | grep -q 'deny (incoming)'; then ok VH4 'ufw denies incoming by default'; else bad VH4 'ufw does not deny incoming by default'; fi
+  if printf '%s\n' "$status" | matches '^Status: active'; then ok VH4 'ufw is active'; else bad VH4 'ufw is not active'; fi
+  if printf '%s\n' "$status" | matches 'deny (incoming)'; then ok VH4 'ufw denies incoming by default'; else bad VH4 'ufw does not deny incoming by default'; fi
   # A rule line has an action column; keep the ones that are neither 443 nor the tailnet interface.
   # Beyond the tailnet and Tailscale's 41641/udp, only 443 from Cloudflare's ranges (J264).
   extra=$(printf '%s\n' "$status" | grep -E ' (ALLOW|DENY|REJECT|LIMIT)( IN| OUT)? ' | grep -Ev '^41641/udp( \(v6\))? |on tailscale0' \
@@ -171,11 +175,11 @@ else bad VH5 "running kernel $running; $newest is installed (reboot)"; fi
 if [ -e "$R/var/run/reboot-required" ]; then bad VH5 "a reboot has been required since $(date -r "$R/var/run/reboot-required" +%F 2>/dev/null || echo '?')"
 else ok VH5 'no reboot pending'; fi
 apt_conf=$(cat "$R"/etc/apt/apt.conf.d/* 2>/dev/null | grep -Ev '^[[:space:]]*//')
-if printf '%s\n' "$apt_conf" | grep -Eq 'Unattended-Upgrade::Automatic-Reboot[[:space:]]+"true"'; then ok VH5 'unattended-upgrades reboots by itself'
+if printf '%s\n' "$apt_conf" | matches -E 'Unattended-Upgrade::Automatic-Reboot[[:space:]]+"true"'; then ok VH5 'unattended-upgrades reboots by itself'
 else bad VH5 'unattended-upgrades never reboots (Automatic-Reboot is not "true")'; fi
 missing=
 for origin in nodesource tailscale caddy cloudflare; do
-  if ! printf '%s\n' "$apt_conf" | grep -A40 -E 'Unattended-Upgrade::(Allowed-Origins|Origins-Pattern)' | grep -qi "$origin"; then missing="$missing $origin"; fi
+  if ! printf '%s\n' "$apt_conf" | grep -A40 -E 'Unattended-Upgrade::(Allowed-Origins|Origins-Pattern)' | matches -i "$origin"; then missing="$missing $origin"; fi
 done
 if [ -z "$missing" ]; then ok VH5 'unattended-upgrades covers nodesource, Tailscale, Caddy and cloudflared'
 else bad VH5 "unattended-upgrades never updates:$missing"; fi
@@ -192,7 +196,7 @@ else info VH5 'Ubuntu Pro is not attached (D6: skipped; the daily reboot takes n
 # --- VH6: fail2ban.
 if [ "$ROOT" = 1 ] && has fail2ban-client; then
   jails=$(fail2ban-client status 2>/dev/null | sed -n 's/.*Jail list:[[:space:]]*//p')
-  if printf '%s\n' "$jails" | tr ', ' '\n\n' | grep -qx sshd; then ok VH6 'fail2ban jail sshd'; else bad VH6 "no fail2ban sshd jail (jails: ${jails:-none})"; fi
+  if printf '%s\n' "$jails" | tr ', ' '\n\n' | matches -x sshd; then ok VH6 'fail2ban jail sshd'; else bad VH6 "no fail2ban sshd jail (jails: ${jails:-none})"; fi
   # J264: behind Cloudflare a ban by source address would ban an edge; the per-player limits are the server's (VH10).
   info VH6 'no caddy jail: behind Cloudflare the server limits each player by CF-Connecting-IP'
 elif [ "$ROOT" = 1 ]; then bad VH6 'fail2ban is not installed'
@@ -211,7 +215,7 @@ else unknown VH7 'no systemd here'; fi
 
 # --- VH8: Node never root, never exposed.
 if has ps; then
-  if ps -o user= -C node 2>/dev/null | grep -qx root; then bad VH8 'a node process runs as root'; else ok VH8 'no node process runs as root'; fi
+  if ps -o user= -C node 2>/dev/null | matches -x root; then bad VH8 'a node process runs as root'; else ok VH8 'no node process runs as root'; fi
 else unknown VH8 'ps is missing'; fi
 if [ "$LISTENERS_OK" = 1 ]; then
   tails=$( { tailscale ip -4; tailscale ip -6; } 2>/dev/null | tr '\n' '|' | sed 's/|$//' | sed 's/\./\\./g')
@@ -240,15 +244,15 @@ fi
 if has caddy; then
   caddyfile=$(sed 's/#.*//' "$R/etc/caddy/Caddyfile" 2>/dev/null)
   for want in 'admin off' 'protocols h1 h2' '-CF-Connecting-IP' 'stream_close_delay' 'client_auth' 'require_and_verify' 'trusted_proxies static' 'client_ip_headers CF-Connecting-IP'; do
-    if printf '%s\n' "$caddyfile" | grep -qF -- "$want"; then ok VH9 "Caddyfile has '$want'"; else bad VH9 "Caddyfile lacks '$want'"; fi
+    if printf '%s\n' "$caddyfile" | matches -F -- "$want"; then ok VH9 "Caddyfile has '$want'"; else bad VH9 "Caddyfile lacks '$want'"; fi
   done
 else bad VH9 'Caddy is not installed'; fi
 if [ "$ROOT" = 1 ] && has nft; then
   rules443=$(nft list ruleset 2>/dev/null | grep -E 'dport 443')
   # J264: every source is a Cloudflare edge carrying many players, so these are flood floors per edge, not per player.
-  if printf '%s\n' "$rules443" | grep -Eq 'saddr ct count over 2000( |$)'; then ok VH9 'nftables floors 443 at 2000 concurrent per Cloudflare edge'
+  if printf '%s\n' "$rules443" | matches -E 'saddr ct count over 2000( |$)'; then ok VH9 'nftables floors 443 at 2000 concurrent per Cloudflare edge'
   else bad VH9 'no nftables floor of 2000 concurrent connections per source on 443'; fi
-  if printf '%s\n' "$rules443" | grep -Eq 'saddr limit rate over 600/minute'; then ok VH9 'nftables floors 443 at 600 new connections a minute per Cloudflare edge'
+  if printf '%s\n' "$rules443" | matches -E 'saddr limit rate over 600/minute'; then ok VH9 'nftables floors 443 at 600 new connections a minute per Cloudflare edge'
   else bad VH9 'no nftables floor of 600 new connections a minute per source on 443'; fi
 elif [ "$ROOT" = 1 ]; then bad VH9 'nft is not installed'
 else unknown VH9 "nftables ruleset: $NEEDS_ROOT"; fi
@@ -277,8 +281,8 @@ if has systemctl && systemctl cat wildshard-server@.service >/dev/null 2>&1; the
     elif [ "$mode" = caddy ] || { [ "$mode" = cloudflare ] && [ "$cloudflared" = 1 ]; }; then ok VH10 "$channel TRUST_PROXY=$mode"
     else bad VH10 "$channel TRUST_PROXY=$mode; want caddy behind Funnel or Caddy (cloudflare only with a tunnel)"; fi
     if [ -z "$origins" ]; then bad VH10 "$channel sets no ALLOWED_ORIGINS"
-    elif printf '%s\n' "$origins" | grep -q '\*'; then bad VH10 "$channel ALLOWED_ORIGINS lets any page in"
-    elif printf '%s\n' "$origins" | tr ', ' '\n\n' | grep -v '^$' | grep -Evq '^https://(play|staging|preview)\.wildshard\.io$'; then
+    elif printf '%s\n' "$origins" | matches '\*'; then bad VH10 "$channel ALLOWED_ORIGINS lets any page in"
+    elif printf '%s\n' "$origins" | tr ', ' '\n\n' | grep -v '^$' | matches -Ev '^https://(play|staging|preview)\.wildshard\.io$'; then
       bad VH10 "$channel ALLOWED_ORIGINS has a page outside the game's hosts: $origins"
     else ok VH10 "$channel ALLOWED_ORIGINS is the game's own hosts"; fi
   done
@@ -318,7 +322,7 @@ if [ "$ROOT" = 1 ] && [ -d "$R/etc/wildshard" ]; then
     case $name in ops|cook|cook-release) want='600 root:root' ;; *) want="640 root:wildshard-$name" ;; esac
     if [ "$have" = "$want" ]; then ok VH12 "$name.env $have"; else bad VH12 "$name.env is $have; want $want"; fi
   done
-  if find "$R/etc/wildshard" "$R/home" "$R/root" -name '*release*sign*key*' 2>/dev/null | grep -q .; then bad VH12 'a release signing key sits on the box'
+  if find "$R/etc/wildshard" "$R/home" "$R/root" -name '*release*sign*key*' 2>/dev/null | matches .; then bad VH12 'a release signing key sits on the box'
   else ok VH12 'no release signing key on the box'; fi
 elif [ "$ROOT" = 1 ]; then bad VH12 'no /etc/wildshard'
 else unknown VH12 "/etc/wildshard modes: $NEEDS_ROOT"; fi
@@ -336,7 +340,7 @@ if [ "$ROOT" = 1 ]; then
 fi
 
 # --- VH14: alert on auth.
-if [ -d "$R/var/log/journal" ] || grep -Eqs '^Storage=persistent' "$R"/etc/systemd/journald.conf "$R"/etc/systemd/journald.conf.d/*.conf; then ok VH14 'journald is persistent'
+if [ -d "$R/var/log/journal" ] || matches -Es '^Storage=persistent' "$R"/etc/systemd/journald.conf "$R"/etc/systemd/journald.conf.d/*.conf; then ok VH14 'journald is persistent'
 else bad VH14 'journald keeps no log across a reboot'; fi
 if [ "$ROOT" = 1 ]; then
   # J252: auth events go to Sentry for the agents, not to ALERT_URL.

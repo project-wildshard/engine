@@ -226,3 +226,12 @@ test('VH16: auditd is skipped only inside a container, where the proofs run (MS3
   expect(loop).toContain('[ "$service" = auditd ] && systemd-detect-virt --container --quiet');
   expect(loop.indexOf('systemd-detect-virt')).toBeLessThan(loop.indexOf('systemctl enable --now'));
 });
+
+// `set -o pipefail` with a pipeline's `grep -q` races: grep exits at its first match, the writer before it dies of SIGPIPE,
+// and the check reads a line that was there as absent (main run 45359415900: "ok VH2 nothing on 11434" on the audited box).
+// harden.sh's pipelines end in `matches`, a grep that reads all its input; no code line pipes into `grep -q`.
+test('harden.sh pipes into no grep -q (pipefail SIGPIPE race)', () => {
+  const code = readFileSync(HARDEN, 'utf8').split('\n').filter(line => !line.trimStart().startsWith('#'));
+  expect(code.filter(line => /\|\s*grep\s+-[A-Za-z]*q/u.test(line))).toEqual([]);
+  expect(readFileSync(HARDEN, 'utf8')).toContain('matches() { grep "$@" >/dev/null; }');
+});
