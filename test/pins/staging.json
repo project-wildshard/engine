@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "f533242d13abf1e98d4253429354043eed59a220074a558100cbcbc254dc8eeb",
+  "catalogueHash": "fe1e68a4341acfe70bd13027191b6c93c3993d080fa43fe558c2774bdf8da978",
   "releaseHash": "e4e934a568a6cee74008de4b2a76c19a6c364170dcb84fa539f974c1557c55fc",
   "catalogue": {
     "version": 0,
@@ -622,8 +622,8 @@
       {
         "slug": "nalati-grasslands",
         "name": "Nalati Grasslands",
-        "revision": 7,
-        "hash": "e99c258c2deef063e87ca720e149695b609de89814598fc139c0ca18e4de5dab"
+        "revision": 8,
+        "hash": "43a4c712070d777ad1ad3796be794bd20ce01b2b6e2fc070174b227ed2363fb8"
       },
       {
         "slug": "nine-dragon-stack",
@@ -775,9 +775,9 @@
     },
     {
       "slug": "nalati-grasslands",
-      "revision": 7,
-      "hash": "e99c258c2deef063e87ca720e149695b609de89814598fc139c0ca18e4de5dab",
-      "bytes": 235185152
+      "revision": 8,
+      "hash": "43a4c712070d777ad1ad3796be794bd20ce01b2b6e2fc070174b227ed2363fb8",
+      "bytes": 235188736
     },
     {
       "slug": "nine-dragon-stack",
