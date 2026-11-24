@@ -29,7 +29,7 @@ import.meta.glob(['../../../shared/engine/entities/species/*.ts', '!../../../sha
  * AnimalFactory — procedural, code-built animals from a pluggable SPECIES REGISTRY.
  *
  *   const factory = new AnimalFactory(sky);               // or new AnimalFactory(sky, { style: 'toon' })
- *   const model = factory.model('deer', 'white-stag');   // (kind, variant id) → cached AnimalModel
+ *   const model = factory.model(kind, 'white-stag');     // (kind, variant id) → cached AnimalModel
  *   const rig = factory.instantiate(model, tintSeed);    // { mesh, bones, materials }
  *
  * Style 'toon' (Driftwood Isle, `ShardManifest.style`; AnimalManager reads it from the active chunk): the SAME

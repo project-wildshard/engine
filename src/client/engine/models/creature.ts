@@ -5,7 +5,7 @@
  * the model's fields for one species, so every shard's creature is a plain `defineModel` with its own id, file and
  * pipeline:
  *
- *   export const crab = defineModel<CreatureParams>({ id: 'driftwood-isle/crab', file: FILE, pipeline: 'code', ...creature('crab') });
+ *   export const crab = defineModel<CreatureParams>({ id: 'driftwood-isle/crab', file: FILE, pipeline: 'code', ...creature(kind) });
  *
  * Its variants are the species' coats (and its spawn-by-name ones), its rig names the species (the Explorer stands it up
  * as an Animal and plays the gaits), its `build` is one rig from the shard's factory — `creatureFactory(ctx)`, which the

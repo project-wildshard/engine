@@ -31,7 +31,7 @@ import { AttachmentRig } from './creatureAttachments';
  * no physics world (dev scenes), the death is the keyframed collapse below.
  *
  * Public surface used by other systems:
- *   animal.kind: 'deer' | 'boar' | …  animal.alive      animal.position (feet, world)
+ *   animal.kind (a species kind)      animal.alive      animal.position (feet, world)
  *   animal.variant / rarity / label   the rolled VariantDef ('white-stag', 'uncommon', "White stag"); mods = its gameplay multipliers
  *   animal.aggressive                 true for species that charge (boar, bear) — the minimap paints these red
  *   animal.hp / maxHp                 animal.state       animal.yaw (heading, radians)

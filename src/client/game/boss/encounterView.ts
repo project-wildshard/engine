@@ -176,7 +176,7 @@ export class PatrolEncounterView<A extends PatrolViewActor = Animal> {
   attachActors(roster: PatrolActorRoster<A>): void { this.law.attachActors(roster); }
   /** One actor at (x, z) facing `yaw`, outside any line (drive its steering memory); `quiet` takes the quiet look. */
   spawnRider(at: { readonly x: number; readonly z: number; readonly yaw: number; readonly variant?: string; readonly quiet?: boolean }): A | null { return this.law.spawnRider(at); }
-  /** A line of `count` from `at` (m along the route; default the farthest from the player), `captain` at its head. */
+  /** A line of `count` from `at` (m along the route; default the farthest from the player), its leader at its head. */
   spawnLine(at: { readonly count?: number; readonly captain?: boolean; readonly at?: number } = {}): A[] { return this.law.spawnLine(at); }
   dissolve(actor: A): void { this.law.dissolve(actor); }
   dawn(): void { this.law.dawn(); }

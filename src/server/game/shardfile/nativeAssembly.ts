@@ -259,12 +259,16 @@ function withHostSections(product: ShardFolder, plan: NativeAssemblyPlan): Nativ
   if (plan.bake?.read === 'bake' && !has('collision', 'collision.pieces')) rows.push({ host: 'collision' });
   return rows.map((row, at) => ({ row, at })).sort((a, b) => rank(a.row.host) - rank(b.row.host) || a.at - b.at).map(({ row }) => row);
 }
-/** Put cooked taming at the same installation point as its explicit predecessor. */
-function withSectionTaming(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
+/** Put cooked taming at the same installation point as its explicit predecessor. Its pose program is the looks row of
+ *  the taming rows' first kind, the species tamed before any upgrade (FORMAT-PRUNE FP42: the engine names no kind). */
+async function withSectionTaming(product: ShardFolder, features: readonly NativeAssemblyFeature[]): Promise<readonly NativeAssemblyFeature[]> {
   if (!product.hasFile(TAMING_FILE) || !features.some(row => row.host === 'riding.mounted') ||
     features.some(row => row.host === 'riding.taming')) return features;
+  const { kinds } = await product.json(TAMING_FILE) as { kinds?: unknown };
+  const kind: unknown = Array.isArray(kinds) ? kinds[0] : undefined;
+  if (typeof kind !== 'string') throw new Error(`${TAMING_FILE} names no tamed kind, whose looks row holds its pose`);
   const taming: NativeAssemblyFeature = { host: 'riding.taming', rows: { file: TAMING_FILE },
-    poses: { file: 'sim/taming-poses.json', path: ['poses'] }, pose: { file: 'actors/species-looks.json', path: ['poses', 'horse'] } };
+    poses: { file: 'sim/taming-poses.json', path: ['poses'] }, pose: { file: 'actors/species-looks.json', path: ['poses', kind] } };
   const at = features.findIndex(row => row.host === 'riding.elites-ready');
   return at === -1 ? [...features, taming] : [...features.slice(0, at), taming, ...features.slice(at)];
 }
@@ -307,7 +311,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const declaredRoster = declaredBootSpawns(plan.features.some(row => row.host === 'riding.roster') ? boot : null, shard);
   const meadow = plan.field === undefined && plan.features.some(row => row.host === 'riding.roster') && product.hasFile(MEADOW_FILE);
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake, meadow), product, assets, ports, plan, bake, nav, boot, declaredRoster };
-  const features = await withSectionArms(product, withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, plan.features)))));
+  const features = await withSectionArms(product, await withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, plan.features)))));
   const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   // OF30: an older pending carcass restores by the declared rows' harvest
   const harvest = declaredHarvest(shard.rows);

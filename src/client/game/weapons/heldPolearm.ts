@@ -136,7 +136,7 @@ export class HeldPolearm<P extends HeldPolearmProfile = HeldPolearmProfile> exte
   private lastYaw = 0; private lastPitch = 0; private lagYaw = 0; private lagYawVel = 0; private lagPitch = 0; private lagPitchVel = 0;
   private fov = this.profile.feel.fovHip; private baseFov = 0; private jolt = 0; private sprintBlend = 0;
   private throwBlend = 0; private inHand = false; private aimFrame = 0;
-  private aimCache: AimInfo = { kind: 'deer', distance: 0 };
+  private aimCache: AimInfo = { kind: '', distance: 0 };
 
   private readonly view: HeldPolearmView;
   /** the thrust / lance / javelin decisions (renderer-free, CI12) */

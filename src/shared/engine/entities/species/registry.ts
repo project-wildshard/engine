@@ -254,7 +254,7 @@ export interface SpeciesDef {
   lockable?: boolean;
   /** Render contract: procedural generators keep their own timing and gameplay state. */
   rigContract: RigContract;
-  /** 'deer' | 'boar' | 'bear' | … — the Animal.kind string, also the HerdPlan.kind */
+  /** the species' kind as its rows name it: the Animal.kind string, also the HerdPlan.kind */
   kind: string;
   /** default display name when a variant has none */
   label: string;

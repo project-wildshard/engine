@@ -265,8 +265,8 @@ export interface ChunkForest {
   mask?: (x: number, z: number) => number;
 }
 
-/** a registered species kind (`src/engine/entities/species/<kind>.ts`): 'deer' | 'boar' built in; bear / elk… as they register */
-export type FaunaKind = 'deer' | 'boar' | (string & Record<never, never>);
+/** a species kind the shard's own rows declare; the engine names none */
+export type FaunaKind = string;
 
 /** One herd / sounder. `src/server/engine/entities/AnimalManager.ts` finds a clearing that satisfies it. */
 export interface HerdPlan {

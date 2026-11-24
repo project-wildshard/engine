@@ -7,7 +7,7 @@
  * own). A shard lists its whole roster at boot (its species list: every creature it can spawn, alive right now or not —
  * the Captain, the Antler King, the flocks), so the Model Explorer always shows each one.
  *
- *   listModel(boar, { ctx, copies: () => animals.animals.filter((a) => a.kind === 'boar').length, drawnAs: 'skinned' });
+ *   listModel(boar, { ctx, copies: () => animals.animals.filter((a) => a.kind === kind).length, drawnAs: 'skinned' });
  *   listModel(leverRifle, { ctx, copies: 1 });
  *
  * A model on the species rigs (`rig.species`) is stood up by the Explorer as an Animal of that kind, so its clip row

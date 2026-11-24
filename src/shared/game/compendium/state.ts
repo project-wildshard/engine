@@ -7,9 +7,9 @@ import type { ShardCompendium } from './types';
  * copy is the truth for the session: iOS private mode throws on write, and a corrupt save loads as empty.
  *
  *   const state = new CompendiumState(def);                  // def = compendiumFor(chunkId)
- *   state.animalNear('deer', 'stag')                         // within the tracker's hearing range → discovered
- *   state.animalSpotted('deer', 'stag')                      // one individual in view → seen, SEEN + 1
- *   state.animalKilled('deer', 'stag', 187)                  // → taken, TAKEN + 1, BEST = max(kg)
+ *   state.animalNear(kind, 'stag')                           // within the tracker's hearing range → discovered
+ *   state.animalSpotted(kind, 'stag')                        // one individual in view → seen, SEEN + 1
+ *   state.animalKilled(kind, 'stag', 187)                    // → taken, TAKEN + 1, BEST = max(kg)
  *   state.placeNear('pond') / state.placeVisited('pond')     // → discovered / seen (VISITS + 1)
  *   state.stats('red-deer') → { state, seen, taken, best }   state.onChange = (entry, from, to) => …
  *
