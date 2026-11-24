@@ -8,7 +8,7 @@ import { AssetResidencyBridge } from '../src/client/game/grid/assetResidency';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
 import { emptyShardfile } from '../src/shared/host/author';
-import { frozenAsset } from './fixtures/frozen/assets';
+import { sdkBuiltAsset } from './fixtures/sdk-built/assets';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { provideRuntimeFolder, runtimeFolder } from '../src/client/game/shardfile/runtimeFolder';
 import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
@@ -21,7 +21,7 @@ afterEach(() => { initializeTier(originalTier); vi.restoreAllMocks(); });
 function fixture(limit = 10000, transform = new Matrix4(), part = 'draw', readCold?: () => Promise<Uint8Array | null>) {
   const owner = new Scope('whole-source');
   const posed = !transform.equals(new Matrix4());
-  const bytes = frozenAsset(`whole-${part}-${posed ? 'posed' : 'plain'}.glb`);
+  const bytes = sdkBuiltAsset(`whole-${part}-${posed ? 'posed' : 'plain'}.glb`);
   const hash = hashImmutableBytes(bytes), source = emptyShardfile({ slug: 'whole-cache', name: 'Whole cache', author: 'Fixture', revision: 1, seed: 1 });
   source.files.push({ hash, kind: 'glb', compressed: bytes.length, decoded: bytes.length, gpu: 72, triangles: 1, draws: 1, dependencies: [], critical: false });
   source.library.push(hash);

@@ -20,3 +20,11 @@ follows its JSON. `arena-page.json` is a made-up orchard page, so it leaves `fro
 
 `held-arms-platform` reads the arms rigs Driftwood's and Nine Dragon's live pins mount (byte-identical); the frozen
 `driftwood-arms.glb` and `nine-arms.glb` copies and their manifest rows go.
+
+## Fourth step (lane opus-snap2)
+
+The 24 GLB and KTX2 files in `frozen/assets` that the SDK baked from made-up recipes (`staticGlb`,
+`bakeRawColourPixels`: hero, hull, the specimens, scene, the twelve whole-library parts, the product crates and the raw
+KTX2 pair) move to `test/fixtures/sdk-built/assets/` with their pins and recipes, under `sdk-built/assets.ts`
+(`sdkBuiltAsset`). `frozen/assets` keeps only its four Nalati extracts (bodies, balbal cracks, kokpar, the carried
+prop), which the zone half of the audit handles.

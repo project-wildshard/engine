@@ -5,7 +5,7 @@ import { realGc } from '@wildshard/engine/test/realGc';
 import { createRigLoader } from '@wildshard/engine/anim/rigParser';
 import { rebindGeometry } from '@wildshard/engine/app/cachedAssets';
 import { riggedHulls } from '@wildshard/engine/game/looks/riggedHulls';
-import { frozenAsset } from './fixtures/frozen/assets';
+import { sdkBuiltAsset } from './fixtures/sdk-built/assets';
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -16,7 +16,7 @@ test(name, async () => {
     let reads = 0;
     const mock = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockImplementation(async url => {
       expect(url).toBe('/hull.glb'); reads++;
-      const bytes = frozenAsset('hull.glb');
+      const bytes = sdkBuiltAsset('hull.glb');
       const file = await createRigLoader().parseBytesAsync(bytes, '');
       const source = file.scene.getObjectByName('source');
       if (!(source instanceof Mesh)) throw new Error('Missing parsed source mesh');

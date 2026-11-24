@@ -5,7 +5,7 @@ import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { Renderer } from '../src/client/engine/render/renderer';
 import { initKtx2, parseKtx2Bytes } from '../src/client/engine/core/ktx2';
 import * as gpuFiles from '../src/client/engine/boot/gpuFiles';
-import { frozenAsset } from './fixtures/frozen/assets';
+import { sdkBuiltAsset } from './fixtures/sdk-built/assets';
 
 let loader: KTX2Loader | undefined;
 beforeAll(() => {
@@ -25,7 +25,7 @@ afterAll(() => { loader?.dispose(); vi.restoreAllMocks(); });
 function isTexture(value: unknown): value is DataTexture { return value instanceof DataTexture; }
 function fixture(colourSpace: 'srgb' | 'linear' = 'srgb'): { bytes: Uint8Array; pixels: Uint8ClampedArray } {
   const pixels = Uint8ClampedArray.from({ length: 8 * 4 * 4 }, (_, index) => (index * 31 + 17) % 256);
-  return { pixels, bytes: frozenAsset(`raw-${colourSpace}.ktx2`) };
+  return { pixels, bytes: sdkBuiltAsset(`raw-${colourSpace}.ktx2`) };
 }
 
 test.each(['srgb', 'linear'] as const)('the real KTX2 decoder retains every %s pixel and owns only the selected input view', async colourSpace => {

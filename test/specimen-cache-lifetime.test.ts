@@ -1,6 +1,6 @@
 import { expect, test, vi } from 'vitest';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { frozenAsset } from './fixtures/frozen/assets';
+import { sdkBuiltAsset } from './fixtures/sdk-built/assets';
 import { loadSpecimenAsset, loadBoundSpecimen } from '../src/client/game/models/specimenCatalogue';
 import { SkyRig } from '../src/client/engine/world/skyRig';
 import { realGc } from '@wildshard/engine/test/realGc';
@@ -8,7 +8,7 @@ import { realGc } from '@wildshard/engine/test/realGc';
 const name = 'a live cached specimen does not retain the consumed loader row';
 test(name, async () => {
   await realGc('test/specimen-cache-lifetime.test.ts', name, async collect => {
-    const bytes = frozenAsset('specimen.glb');
+    const bytes = sdkBuiltAsset('specimen.glb');
     const parsed = await new GLTFLoader().parseAsync(Uint8Array.from(bytes).buffer, '');
     const load = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockResolvedValue(parsed);
     const prepare = async () => {
@@ -39,7 +39,7 @@ test(name, async () => {
 const boundName = 'a live bound specimen does not retain its consumed asset declaration';
 test(boundName, async () => {
   await realGc('test/specimen-cache-lifetime.test.ts', boundName, async collect => {
-    const bytes = frozenAsset('bound-specimen.glb');
+    const bytes = sdkBuiltAsset('bound-specimen.glb');
     const parsed = await new GLTFLoader().parseAsync(Uint8Array.from(bytes).buffer, '');
     const load = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockResolvedValue(parsed);
     const sky: unknown = Object.create(SkyRig.prototype);
@@ -65,7 +65,7 @@ test(boundName, async () => {
 });
 
 test('failed specimen acquisition keeps its error and a later request can retry', async () => {
-  const bytes = frozenAsset('retry-specimen.glb');
+  const bytes = sdkBuiltAsset('retry-specimen.glb');
   const parsed = await new GLTFLoader().parseAsync(Uint8Array.from(bytes).buffer, '');
   const error = new Error('Specimen transport refused');
   const load = vi.spyOn(GLTFLoader.prototype, 'loadAsync').mockRejectedValueOnce(error).mockResolvedValue(parsed);

@@ -4,7 +4,7 @@ import { rebindGeometry } from '@wildshard/engine/app/cachedAssets';
 import { realGc } from '@wildshard/engine/test/realGc';
 import { createRigLoader } from '@wildshard/engine/anim/rigParser';
 import { createModelLibrary } from '@wildshard/engine/game/plugin/geometry';
-import { frozenAsset } from './fixtures/frozen/assets';
+import { sdkBuiltAsset } from './fixtures/sdk-built/assets';
 
 const isMesh = (node: Object3D): node is Mesh => node instanceof Mesh;
 
@@ -15,7 +15,7 @@ test(name, async () => {
     let reads = 0;
     const read = async (url: string) => {
       expect(url).toBe('hero.glb'); reads++;
-      const bytes = frozenAsset('hero.glb');
+      const bytes = sdkBuiltAsset('hero.glb');
       const file = await createRigLoader().parseBytesAsync(bytes, '');
       const bin: unknown = await file.parser.getDependency('buffer', 0);
       if (!(bin instanceof ArrayBuffer)) throw new Error('Missing native GLB buffer');
@@ -70,7 +70,7 @@ test(retiredName, async () => {
       const context = { bytes: new Uint8Array(1024 * 1024), reads: 0 };
       const read = (url: string) => {
         expect(url).toBe('hero.glb'); context.reads++; context.bytes[0] = context.reads;
-        const bytes = frozenAsset('hero.glb');
+        const bytes = sdkBuiltAsset('hero.glb');
         return createRigLoader().parseBytesAsync(bytes, '');
       };
       const library = createModelLibrary<never, 'hero'>({ meshes: [], meshUrls: {}, hd: ['hero'],

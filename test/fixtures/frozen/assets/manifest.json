@@ -3,86 +3,6 @@
   "sourceCommit": "23d05fd147700fe5e9c929749f7d8cb63cdf7761",
   "generator": "staticGlb and bakeRawColourPixels; source recipes in regenerate-assets.mjs",
   "files": {
-    "bound-specimen.glb": {
-      "bytes": 1948,
-      "sha256": "3878780c4b81bc761a5fbfc152d33df8e73c0f89deb34d19547a58893e0db199"
-    },
-    "hero.glb": {
-      "bytes": 2264,
-      "sha256": "51b9c554ecc87d42f2e2d30c4b26445ec9d19098dc44c196022ad2a664f29713"
-    },
-    "hull.glb": {
-      "bytes": 2268,
-      "sha256": "bbcd984fd5fa9efcc4d57e6c12f75429d62e5e517ec33ef9818c06211d68370f"
-    },
-    "raw-linear.ktx2": {
-      "bytes": 333,
-      "sha256": "f7979b49fe75a4c6768e90a3fee8681fd85b075701b20b6a4c1abc6f5a623b2d"
-    },
-    "raw-srgb.ktx2": {
-      "bytes": 333,
-      "sha256": "ebabf9f60f42d7ef2108fa2f1df438acaa14fdba07158c909ff60170e57c4eab"
-    },
-    "retry-specimen.glb": {
-      "bytes": 1948,
-      "sha256": "749c01e93c7f8f885b65c69d911eb915bdc775eb002ca8474e00ecef10e949f9"
-    },
-    "scene.glb": {
-      "bytes": 1388,
-      "sha256": "0e2bf0346be5517cb2d27dd5bd0fd2658e5a199d864efaeb0748e736f015a424"
-    },
-    "specimen.glb": {
-      "bytes": 1936,
-      "sha256": "14f8b7ede88a29ca4502b261b3b36bd676908ee799e5b93ffcf112d0dec50d22"
-    },
-    "whole-draw-plain.glb": {
-      "bytes": 1456,
-      "sha256": "d452846fe15af102ff38c50d7548392a016cdca340c0786b274b4376a46c0175"
-    },
-    "whole-draw-posed.glb": {
-      "bytes": 1476,
-      "sha256": "ba320a2931da16a51d9418ab9379a763beef68b051054ab9e9cbaedc83194918"
-    },
-    "whole-other-plain.glb": {
-      "bytes": 1456,
-      "sha256": "343b79c827597c5d9f99be452c909865991144af81f9582d17c292adaeb4d2ce"
-    },
-    "whole-other-posed.glb": {
-      "bytes": 1476,
-      "sha256": "91d78bb816b090ffea995ee8fcd6c51ce657bfd58d52673c0ad4d3b9a3d1cba0"
-    },
-    "whole-phase-0-plain.glb": {
-      "bytes": 1456,
-      "sha256": "5a4068efb6407f29dff5e3f0be4bdddb9c1df7e7ad622401a574acf9ee010ce2"
-    },
-    "whole-phase-6-plain.glb": {
-      "bytes": 1456,
-      "sha256": "eb1e8716e5c43b5a9cff1edaeaf3d1e3bb8c31e10a1a2c5f35d18f9519dac226"
-    },
-    "whole-phase-1-plain.glb": {
-      "bytes": 1456,
-      "sha256": "49217fea2a3c393a6508937d1d59e1d19905e1a07ff0565e57feab8adb138c3c"
-    },
-    "whole-phase-7-plain.glb": {
-      "bytes": 1456,
-      "sha256": "3b52d6a554082545e35946e7851c140cde09ee8923db0ad11f5e0bc33168dcdb"
-    },
-    "whole-phase-2-plain.glb": {
-      "bytes": 1456,
-      "sha256": "e4bbd307472faa4068abc1508bcc9c015d51964e2fa56ec3516f8d39e2d01cd3"
-    },
-    "whole-phase-4-plain.glb": {
-      "bytes": 1456,
-      "sha256": "59eae1dc3d8d515b057bc69b104b8aba86fc23cc52bc34a6b13f76a8042c668d"
-    },
-    "whole-phase-3-plain.glb": {
-      "bytes": 1456,
-      "sha256": "63d56298aabf3e79415fe250d99df8301e3eed2e65f5a6160ea4fa4bb58d26b8"
-    },
-    "whole-phase-5-plain.glb": {
-      "bytes": 1456,
-      "sha256": "ca0c1bbb8746db4f5cbcd600872dcfeebe1a09592e39e89a9fcb881cc59011cb"
-    },
     "nalati-bodies.bin": {
       "bytes": 2584317,
       "sha256": "e726016c96012cee10c1b352bca450cccda2dc387410a11732a26edab74235b6",
@@ -98,30 +18,6 @@
       "sourceRepository": "project-wildshard/shard-nalati",
       "sourceCommit": "a0ae32bfab5e80400a20d39eb381804bcc84814f",
       "sourcePath": "src/data/spawnPackDemand.json"
-    },
-    "product-crate-2.glb": {
-      "bytes": 1920,
-      "sha256": "0bf316c08c54723164ae4a28c544c0a0531488a1f4b1e52b7a7293833c9447e8",
-      "sourceRepository": "project-wildshard/sharddev",
-      "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af"
-    },
-    "product-crate-8.glb": {
-      "bytes": 1920,
-      "sha256": "b5f8f76428d4f86ddf9dfa581cb1fc75bc6bc666a2e72c77922357bce642d2c7",
-      "sourceRepository": "project-wildshard/sharddev",
-      "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af"
-    },
-    "product-crate.ktx2": {
-      "bytes": 237,
-      "sha256": "d4ceb5d869ced6199f5f1ca51433594f06dbc027c1ce4330e5fa5d432cb15cdb",
-      "sourceRepository": "project-wildshard/sharddev",
-      "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af"
-    },
-    "product-crate-phone.ktx2": {
-      "bytes": 237,
-      "sha256": "9e69844fefab6201a96f2bb67466884c58de8264fdb1eb040b56d7902aa20e43",
-      "sourceRepository": "project-wildshard/sharddev",
-      "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af"
     },
     "kokpar.wasm": {
       "bytes": 10468,
@@ -141,9 +37,7 @@
     }
   },
   "exportRecipes": {
-    "export-assets.mjs": "import {writeFileSync,mkdirSync} from 'node:fs';\nimport {BoxGeometry,MeshStandardMaterial,MeshBasicMaterial,BufferGeometry,BufferAttribute,Matrix4} from 'three';\nimport {staticGlb} from '@wildshard/sharddev/bake/glb';\nimport {bakeRawColourPixels} from '@wildshard/sharddev/bake/rawTexture';\nconst dir='test/fixtures/frozen/assets';mkdirSync(dir,{recursive:true});\nconst put=(name,rows)=>{writeFileSync(`${dir}/${name}.glb`,staticGlb(rows));for(const row of rows){row.geometry.dispose();row.material.dispose();}};\nfor(const [file,name,native,width,height,depth,colour] of [\n ['hero','hero',true,1,2,3,0x345678],['hull','source',true,1,2,3,0x345678],\n ['specimen','specimen',false,1,1,1,0xffffff],['bound-specimen','bound-specimen',false,1,1,1,0xffffff],['retry-specimen','retry-specimen',false,1,1,1,0xffffff]])\n put(file,[{name,geometry:new BoxGeometry(width,height,depth),material:new MeshStandardMaterial({color:colour}),...(native?{nativeAttributes:true}:{})}]);\nconst triangle=()=>new BufferGeometry().setAttribute('position',new BufferAttribute(new Float32Array([0,0,0,1,0,0,0,1,0]),3));\nconst scene=triangle();scene.setAttribute('normal',new BufferAttribute(new Float32Array([0,0,1,0,0,1,0,0,1]),3));scene.setAttribute('uv',new BufferAttribute(new Float32Array(6),2));put('scene',[{geometry:scene,material:new MeshStandardMaterial(),nativeAttributes:true}]);\nfor(const part of ['draw','other'])for(const posed of [false,true]) {\n const shape=triangle();shape.setAttribute('normal',new BufferAttribute(new Float32Array([0,0,2,0,0,2,0,0,2]),3));\n put(`whole-${part}-${posed?'posed':'plain'}`,[{geometry:shape,material:new MeshBasicMaterial(),nativeAttributes:true,transform:posed?new Matrix4().makeTranslation(3,2,1):new Matrix4(),extras:{wholePartition:{id:part,vertices:{runs:[0,3]},triangles:{runs:[0,1]},vertexCount:3,indexCount:0,index:'none'}}}]);\n}\nconst pixels=Uint8ClampedArray.from({length:8*4*4},(_,index)=>(index*31+17)%256);\nfor(const colourSpace of ['srgb','linear'])writeFileSync(`${dir}/raw-${colourSpace}.ktx2`,bakeRawColourPixels({width:8,height:4,pixels},{colourSpace}));\nfor(let i=0;i<8;i++) {\n const part=`phase-${i}`,shape=triangle();shape.setAttribute('normal',new BufferAttribute(new Float32Array([0,0,2,0,0,2,0,0,2]),3));\n put(`whole-${part}-plain`,[{geometry:shape,material:new MeshBasicMaterial(),nativeAttributes:true,transform:new Matrix4(),extras:{wholePartition:{id:part,vertices:{runs:[0,3]},triangles:{runs:[0,1]},vertexCount:3,indexCount:0,index:'none'}}}]);\n}\n",
     "ci21-nalati-packed-bodies.txt": "Copy the two original content-addressed blobs from engine out/nalati-grasslands/blobs/bin/<sha256>.bin into nalati-bodies.bin and nalati-balbal-cracks.bin. Source hashes and lengths are in files. The packed body is already zlib-compressed on the wire; preserve these bytes. nalati-species-view.json (H2 frozen envelope) binds the packed body hash/length; original Nalati a0ae32b:test/fixtures/nalati-species-world.ts defines the catalogue/registration/preload setup.",
-    "ci21-product-specimen.mjs": "import {writeFileSync,readFileSync} from 'node:fs';\nimport {createHash} from 'node:crypto';\nimport {BoxGeometry,MeshStandardMaterial} from 'three';\nimport {staticGlb} from '<checkouts>/sharddev/src/sharddev/bake/glb.ts';\nimport {bakeRawColourPixels} from '<checkouts>/sharddev/src/sharddev/bake/rawTexture.ts';\nconst dir='test/fixtures/frozen/assets',manifest=JSON.parse(readFileSync(dir+'/manifest.json','utf8'));\nfunction put(name,bytes){writeFileSync(dir+'/'+name,bytes);manifest.files[name]={bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),sourceRepository:'project-wildshard/sharddev',sourceCommit:'da2a4ddb564db35b5c3bcba4ba1358de92ced1af'};}\nfor(const width of [2,8]){const geometry=new BoxGeometry(width,2,3),material=new MeshStandardMaterial();try{put(`product-crate-${width}.glb`,staticGlb([{name:'crate',geometry,material}]));}finally{geometry.dispose();material.dispose();}}\nconst pixels=Uint8ClampedArray.from({length:32},(_,index)=>(index*37+19)%256);\nput('product-crate.ktx2',bakeRawColourPixels({width:4,height:2,pixels}));\nput('product-crate-phone.ktx2',bakeRawColourPixels({width:4,height:2,pixels:Uint8ClampedArray.from(pixels,value=>255-value)}));\nmanifest.exportRecipes['ci21-product-specimen.mjs']=readFileSync('tmp/codex-tc48/export-assets.mjs','utf8').replaceAll('<checkouts>/','<checkouts>/');\nwriteFileSync(dir+'/manifest.json',JSON.stringify(manifest,null,2)+'\\n');\n",
     "ci21-engine-tail-pins.py": "import json,hashlib,subprocess\nfrom pathlib import Path\nbase=Path('test/fixtures/frozen');runtime=json.loads((base/'runtime-manifest.json').read_text());assets=json.loads((base/'assets/manifest.json').read_text())\ndef snapshot(name,value,provenance):\n b=(json.dumps(value,separators=(',',':'),ensure_ascii=False)+'\\n').encode();(base/name).write_bytes(b);runtime['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\ndef blob(name,b,provenance):\n (base/'assets'/name).write_bytes(b);assets['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\ndef named(slug,name):\n root=Path('out')/slug;d=json.loads((root/'shard.json').read_text());f=next(f for f in d['files'] if f.get('name')==name);b=(root/f['path']).read_bytes();assert hashlib.sha256(b).hexdigest()==f['hash'];return b,{'sourcePin':slug,'sourceName':name,'sourceSha256':f['hash'],'pinManifestSha256':hashlib.sha256((root/'shard.json').read_bytes()).hexdigest()}\ndef rawSnapshot(name,b,provenance):\n (base/name).write_bytes(b);runtime['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\nb,p=named('nalati-grasslands','quests/carried.json');carried=json.loads(b);rawSnapshot('carried-quest.json',b,p)\nh=carried['program']['script']['module'];wire=Path('out/nalati-grasslands',h).read_bytes();blob('kokpar.wasm',wire,{**p,'sourceName':h,'sourceSha256':hashlib.sha256(wire).hexdigest()})\nb,p=named('nalati-grasslands','models/specimens/quest-prop.bin');blob('carried-prop.bin',b,p)\nb,p=named('nalati-grasslands','world/dressing-phone.json');rawSnapshot('nalati-dressing-phone.json',b,p);runtime['files'].pop('kokpar-riders.json',None)\nsnapshot('kokpar-layout.json',{'x':-61,'z':36,'rx':34,'rz':22,'rot':.25},{'sourceRepository':'project-wildshard/shard-nalati','sourceCommit':subprocess.check_output(['git','-C','<checkouts>/shard-nalati','rev-parse','HEAD'],text=True).strip(),'sourcePath':'src/generators/layout.ts KOKPAR'})\nb,p=named('nine-dragon-stack','weapons/jian-row.json');rawSnapshot('nine-held-presentation.json',b,p)\nfor name,path in [('driftwood-arms.glb','public/assets/models/driftwood-fp/fp-arms.glb'),('nine-arms.glb','public/assets/nine-dragon/viewmodel/fp-rig.glb')]:\n slug,repo=('driftwood-isle','shard-driftwood') if name.startswith('driftwood') else ('nine-dragon-stack','shard-nine-dragon')\n root=Path('out')/slug;wire=(root/'mounts'/path.removeprefix('public/')).read_bytes();rev=subprocess.check_output(['git','-C','<checkouts>/'+repo,'rev-parse','HEAD'],text=True).strip()\n original=subprocess.check_output(['git','-C','<checkouts>/'+repo,'show',rev+':'+path]);assert wire==original\n blob(name,wire,{'sourceRepository':'project-wildshard/'+repo,'sourceCommit':rev,'sourcePath':path,'sourcePin':slug,'sourceName':'mounts/'+path.removeprefix('public/'),'sourceSha256':hashlib.sha256(wire).hexdigest(),'pinManifestSha256':hashlib.sha256((root/'shard.json').read_bytes()).hexdigest()})\nrecipe=Path('tmp/codex-tc48/export-pins.py').read_text().replace('<checkouts>/','<checkouts>/')\nruntime['exportRecipes']['ci21-engine-tail-pins.py']=recipe;assets['exportRecipes']['ci21-engine-tail-pins.py']=recipe\n(base/'runtime-manifest.json').write_text(json.dumps(runtime,indent=2)+'\\n');(base/'assets/manifest.json').write_text(json.dumps(assets,indent=2)+'\\n')\n"
   },
   "recipePathConvention": "Local checkout prefixes in recorded recipes are replaced with <checkouts>; expand this placeholder before replay. Recipes write complete provenance entries using actual git revisions."

@@ -7,7 +7,7 @@ import { CONTENT_CAPS } from '../src/shared/engine/core/config';
 import { AssetResidencyBridge } from '../src/client/game/grid/assetResidency';
 import { ResidencyAllocator } from '../src/shared/game/grid/allocator';
 import { MemoryAdmission } from '@wildshard/format/memoryAdmission';
-import { frozenAsset } from './fixtures/frozen/assets';
+import { sdkBuiltAsset } from './fixtures/sdk-built/assets';
 import { cachedWorldSceneGeometry, readWorldSceneGeometries, readWorldSceneGeometry } from '../src/client/game/shardfile/worldSceneGeometry';
 import { createOwnedGeometry } from '../src/client/engine/models/ownedGeometry';
 import { PreparationReads } from '../src/client/game/shardfile/preparationReads';
@@ -15,7 +15,7 @@ import { PreparationReads } from '../src/client/game/shardfile/preparationReads'
 const originalTier = TIER;
 afterEach(() => { initializeTier(originalTier); vi.restoreAllMocks(); });
 function fixture(limit = 10000) {
-  const bytes = frozenAsset('scene.glb');
+  const bytes = sdkBuiltAsset('scene.glb');
   const file = vi.fn((_name: string) => Promise.resolve(bytes));
   const product = { url: (name: string) => `/blobs/fixture/${name}`, file };
   const assets = new AssetService<BufferGeometry>();

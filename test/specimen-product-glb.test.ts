@@ -13,7 +13,7 @@ import {Rng} from '@wildshard/format/seededRng';
 import {modelContext} from '../src/client/engine/models/model';
 import {SkyRig} from '../src/client/engine/world/skyRig';
 import {WorldRegistry} from '../src/client/engine/world/registry';
-import {frozenAsset} from './fixtures/frozen/assets';
+import {sdkBuiltAsset} from './fixtures/sdk-built/assets';
 import {emptyShardfile} from '../src/shared/host/author';
 import {fixtureNamedBlobs as emitNamedBlobs,fixtureBlob as nameBlob} from './fixtures/namedBlobs';
 import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
@@ -26,7 +26,7 @@ const originalTier=TIER;
 afterEach(()=>{initializeTier(originalTier);vi.restoreAllMocks();});
 function glb(width: number): Uint8Array {
   if (width !== 2 && width !== 8) throw new Error('Unknown original specimen width');
-  return frozenAsset(`product-crate-${width}.glb`);
+  return sdkBuiltAsset(`product-crate-${width}.glb`);
 }
 const material={id:'product-crate',family:'painterly'}as const;
 const metadata={id:'orchard/product-crate',name:'Crate',file:'fixture.json',category:'props',pipeline:'code',defaults:{}}as const;
