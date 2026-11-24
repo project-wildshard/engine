@@ -2,8 +2,8 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "d33f3dc82050b491d6da232690d4f4f01d6e1a142bc5e31ac16dc23c39d61944",
-  "releaseHash": "bc42ec3f306db232288e9b1c45e4e9b3241de5e823a3fadae2f763f00a5c13dd",
+  "catalogueHash": "8745172a8e1cfe743c37822baedc2d78ffebd50237c62af64ebac7a16d9a0629",
+  "releaseHash": "e4e934a568a6cee74008de4b2a76c19a6c364170dcb84fa539f974c1557c55fc",
   "catalogue": {
     "version": 0,
     "stage": "live",
@@ -586,8 +586,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 16,
-        "hash": "d97bff29a60e6ba84712f2cfa6ef2aadf68b868528895162800509d1efe2161d"
+        "revision": 17,
+        "hash": "9436467d0160d9d0f57637477d954d7280c89dcf3cd8930ed817187c2832cb1c"
       },
       {
         "slug": "driftwood-isle",
@@ -724,8 +724,8 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 13,
-        "hash": "54aa3284a8347aadeeba82635faac6a63ee22f977a30ca5019a8db5152d61a9c"
+        "revision": 14,
+        "hash": "2da737401d2c119a96001e6f551a5398034efaa55021d0ba75cc7c2c5fefba42"
       },
       {
         "slug": "sunscar-dunes",
@@ -739,9 +739,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 16,
-      "hash": "d97bff29a60e6ba84712f2cfa6ef2aadf68b868528895162800509d1efe2161d",
-      "bytes": 22499840
+      "revision": 17,
+      "hash": "9436467d0160d9d0f57637477d954d7280c89dcf3cd8930ed817187c2832cb1c",
+      "bytes": 22500352
     },
     {
       "slug": "driftwood-isle",
@@ -877,9 +877,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 13,
-      "hash": "54aa3284a8347aadeeba82635faac6a63ee22f977a30ca5019a8db5152d61a9c",
-      "bytes": 310408704
+      "revision": 14,
+      "hash": "2da737401d2c119a96001e6f551a5398034efaa55021d0ba75cc7c2c5fefba42",
+      "bytes": 310409216
     },
     {
       "slug": "sunscar-dunes",
