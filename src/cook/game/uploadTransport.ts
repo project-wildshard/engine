@@ -17,9 +17,10 @@ const Pending: v.GenericSchema<PendingUpload> = v.object({...identity, revision:
 const Activation: v.GenericSchema<ActivationNotice> = v.object({...identity, channels: v.array(v.picklist(['preview', 'staging', 'production'])), place: v.optional(v.boolean())});
 export interface PendingUpload {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly revision: number; readonly formatVersion: string}
 export interface ActivationNotice {readonly uploadId: string; readonly hash: string; readonly slug: string; readonly channels: readonly ('preview' | 'staging' | 'production')[]; readonly place?: boolean | undefined}
-export interface UploadVerdict {readonly hash: string; readonly result: 'cooked' | 'refused'; readonly build?: string; readonly report: Readonly<Record<string, unknown>>}
+export interface UploadVerdict {readonly hash: string; readonly result: 'cooked' | 'refused'; readonly build?: string; readonly engine?: string; readonly report: Readonly<Record<string, unknown>>}
 export interface CookApi {
-  readonly pending: () => AsyncIterable<PendingUpload>;
+  /** QA-11-23-b row 46: `engine` (this cook's build) tells the API which engine cooks now, so it can recook an older one's refusal. */
+  readonly pending: (engine?: string) => AsyncIterable<PendingUpload>;
   readonly activations: () => AsyncIterable<ActivationNotice>;
   readonly download: (job: PendingUpload) => Promise<Uint8Array>;
   /** 202 acknowledges durable receipt; it never means that the game is live. */
@@ -48,11 +49,12 @@ export function cookApi(base: string, key: string, read: typeof fetch = fetch, n
     const response = await read(new URL(path, origin), {method, redirect: 'manual', headers: cookHeaders(key, method, path, body, now()), ...(method === 'GET' ? {} : {body}), signal: AbortSignal.timeout(300_000)});
     return response;
   };
-  const pages = async function* pages<T>(path: string, schema: v.GenericSchema<T>): AsyncIterable<T> {
+  const pages = async function* pages<T>(path: string, schema: v.GenericSchema<T>, query: Readonly<Record<string, string>> = {}): AsyncIterable<T> {
     const page = v.object({uploads: v.array(schema), cursor: v.optional(Id)});
     let cursor: string | undefined;
     do {
-      const response = await request('GET', `${path}${cursor === undefined ? '' : `?cursor=${encodeURIComponent(cursor)}`}`);
+      const search = new URLSearchParams({...query, ...(cursor === undefined ? {} : {cursor})}).toString();
+      const response = await request('GET', `${path}${search === '' ? '' : `?${search}`}`);
       if (!response.ok) throw new Error(`Cook feed answered ${response.status}`);
       const value = v.parse(page, JSON.parse(new TextDecoder().decode(await readCapped(response, 2_000_000))));
       for (const row of value.uploads) yield row;
@@ -65,7 +67,7 @@ export function cookApi(base: string, key: string, read: typeof fetch = fetch, n
     if (response.status !== 200 && response.status !== 202) throw new CookDeliveryError(response.status);
   };
   return {
-    pending: () => pages('/api/shardfiles/cook/uploads', Pending),
+    pending: engine => pages('/api/shardfiles/cook/uploads', Pending, engine === undefined ? {} : {engine}),
     activations: () => pages('/api/shardfiles/cook/activations', Activation),
     download: async job => {
       const path = `/api/shardfiles/uploads/${v.parse(Id, job.uploadId)}/source`;
@@ -171,7 +173,7 @@ export function uploadDelivery(options: UploadDeliveryOptions): {readonly sweep:
         if (row.hash !== job.hash || !new Set([job.slug]).has(row.slug)) throw new Error('The cook reported another upload');
         if (row.state === 'failed') {outbox.defer(job.uploadId, (options.now ?? Date.now)()); log(`upload ${job.uploadId}: cook failed; retry next poll`); return;}
         if (row.state !== 'refused' && !row.check?.pass) throw new Error('No successful full check for pending upload');
-        outbox.save(job.uploadId, {hash: job.hash, result: row.state === 'refused' ? 'refused' : 'cooked', ...(row.state === 'refused' ? {} : {build}), report: row.check === undefined ? {reason: row.detail ?? 'Shardfile refused'} : {...row.check}});
+        outbox.save(job.uploadId, {hash: job.hash, result: row.state === 'refused' ? 'refused' : 'cooked', ...(row.state === 'refused' ? {} : {build}), engine: build, report: row.check === undefined ? {reason: row.detail ?? 'Shardfile refused'} : {...row.check}});
       }
       await deliver(job.uploadId);
     } catch (error) {log(`upload ${job.uploadId}: ${error instanceof Error ? error.message : 'delivery failed'}`);}
@@ -185,7 +187,7 @@ export function uploadDelivery(options: UploadDeliveryOptions): {readonly sweep:
           const work = deliver(row.uploadId).catch(() => {log(`upload ${row.uploadId}: verdict delivery waiting`);}).finally(() => {pending.delete(row.uploadId);});
           pending.set(row.uploadId, work);
         }
-        for await (const job of api.pending()) {
+        for await (const job of api.pending(build)) {
           if (pending.has(job.uploadId)) continue;
           const work = settle(job).finally(() => {pending.delete(job.uploadId);});
           pending.set(job.uploadId, work);

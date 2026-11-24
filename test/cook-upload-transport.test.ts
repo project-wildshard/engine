@@ -42,6 +42,17 @@ describe('the parent-only cook API', () => {
     expect(seen).toEqual(['/api/shardfiles/cook/uploads', `/api/shardfiles/cook/uploads?cursor=${job.uploadId}`]);
   });
 
+  it('row 46 names its engine on every feed page, signed with the cursor', async () => {
+    const seen: string[] = [];
+    const read: typeof fetch = (input, options) => {
+      const url = new URL(String(input)); seen.push(url.pathname + url.search);
+      expect(options?.headers).toEqual(cookHeaders(key, 'GET', url.pathname + url.search, '', 1795000000000));
+      return Promise.resolve(Response.json({uploads: [job], ...(seen.length === 1 ? {cursor: job.uploadId} : {})}));
+    };
+    for await (const _row of cookApi('https://api.example', key, read, () => 1795000000000).pending('b1')) { /* drain */ }
+    expect(seen).toEqual(['/api/shardfiles/cook/uploads?engine=b1', `/api/shardfiles/cook/uploads?engine=b1&cursor=${job.uploadId}`]);
+  });
+
   it('drops credentials at the first redirect and verifies the final decoded hash', async () => {
     const read: typeof fetch = (input, options) => {
       if (String(input).includes('/source')) {
@@ -67,6 +78,18 @@ describe('the parent-only cook API', () => {
 });
 
 describe('durable parent verdict delivery', () => {
+  it('row 46 polls with its engine and puts it in every verdict, refused or cooked', async () => {
+    for (const state of ['refused', 'cooked'] as const) {
+      const bodies: string[] = [], engines: (string | undefined)[] = [];
+      const pending = async function* jobs(engine?: string): AsyncIterable<PendingUpload> {engines.push(engine); yield job;};
+      const row = state === 'cooked' ? await successful() : {slug: job.slug, hash: job.hash, state, detail: 'capabilities'} satisfies CookRow;
+      const delivery = uploadDelivery({api: api({pending, verdict: (_id, body) => {bodies.push(body); return Promise.resolve();}}), source: {bind: () => undefined}, worker: {cook: () => Promise.resolve(row)}, outbox: new VerdictOutbox(directory()), build: 'b7'});
+      await delivery.sweep(); await delivery.idle();
+      expect(engines).toEqual(['b7']);
+      expect(JSON.parse(bodies[0] ?? '{}')).toMatchObject({hash: job.hash, result: state, engine: 'b7'});
+    }
+  });
+
   it('replays the exact saved report after lost response and restart without remeasuring', async () => {
     const path = directory(), row = await successful(), bodies: string[] = [];
     const first = api({verdict: (_id, body) => {bodies.push(body); return Promise.reject(new Error('lost response'));}});
