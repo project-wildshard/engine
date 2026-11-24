@@ -44,8 +44,6 @@
   "frozen-path test/fixtures/frozen/cosmetic-one-channel.json",
   "frozen-path test/fixtures/frozen/cosmetic-zero-channel.json",
   "frozen-path test/fixtures/frozen/decision-worker-folder.json",
-  "frozen-path test/fixtures/frozen/dunes-r4-matriarch-decision.json",
-  "frozen-path test/fixtures/frozen/dunes-r4-matriarch-decision.wasm",
   "frozen-path test/fixtures/frozen/elite-kernels.json",
   "frozen-path test/fixtures/frozen/geography.ts",
   "frozen-path test/fixtures/frozen/grass.json",
@@ -130,8 +128,6 @@
   "frozen-path test/fixtures/frozen/titan.ts",
   "frozen-path test/fixtures/frozen/workerFolder.ts",
   "frozen-path test/fixtures/nalati-weather-original.wasm",
-  "revision-path test/fixtures/frozen/dunes-r4-matriarch-decision.json",
-  "revision-path test/fixtures/frozen/dunes-r4-matriarch-decision.wasm",
   "revision-path test/fixtures/frozen/nine-r3-held-items.json",
   "shard-folder test/fixtures/corpus/brasscap-mesa/shard.json"
  ]

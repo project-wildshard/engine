@@ -77,3 +77,4 @@ and `ci21-sdk-tail-held.json` still name them, as history). Deleted by hand; git
 today's Dunes pin. No live pin has a population home any more (Dunes and Far Reach list none), so the cases that needed
 that graft go with it: `runtime-declared-creatures.test.ts` (all three), `matriarch-borrowed-body.test.ts`, and
 `headless-population`'s herdless page case. The keeper-home path now has no zone and no test: a FORMAT-PRUNE candidate.
+- `frozen/dunes-r4-matriarch-decision.{json,wasm}`: only the keeper graft read them.
