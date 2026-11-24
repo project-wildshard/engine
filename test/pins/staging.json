@@ -2,8 +2,8 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "b429369fd94e229f53c31c15ab9446ab9cafb1d65e9d8b850ed3abd4de20b971",
-  "releaseHash": "2c8fc705676a8d4e49231a81ea4fb99169bc491285b7112ade9f6869b09ac074",
+  "catalogueHash": "d33f3dc82050b491d6da232690d4f4f01d6e1a142bc5e31ac16dc23c39d61944",
+  "releaseHash": "bc42ec3f306db232288e9b1c45e4e9b3241de5e823a3fadae2f763f00a5c13dd",
   "catalogue": {
     "version": 0,
     "stage": "live",
@@ -586,8 +586,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 15,
-        "hash": "c6dbc49b7bdccad67f638d003506e0e0f2a7b7282fc2a6ebd880b5f5b99b2f69"
+        "revision": 16,
+        "hash": "d97bff29a60e6ba84712f2cfa6ef2aadf68b868528895162800509d1efe2161d"
       },
       {
         "slug": "driftwood-isle",
@@ -739,9 +739,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 15,
-      "hash": "c6dbc49b7bdccad67f638d003506e0e0f2a7b7282fc2a6ebd880b5f5b99b2f69",
-      "bytes": 22500352
+      "revision": 16,
+      "hash": "d97bff29a60e6ba84712f2cfa6ef2aadf68b868528895162800509d1efe2161d",
+      "bytes": 22499840
     },
     {
       "slug": "driftwood-isle",
