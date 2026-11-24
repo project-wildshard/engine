@@ -1,0 +1,13 @@
+{
+ "identity": {
+  "slug": "native-world"
+ },
+ "admission": {
+  "server": []
+ },
+ "sections": [
+  { "name": "server/world", "path": "sections/server/world.json" },
+  { "name": "server/quest", "path": "sections/server/quest.json" },
+  { "name": "server/boss", "path": "sections/server/boss.json" }
+ ]
+}

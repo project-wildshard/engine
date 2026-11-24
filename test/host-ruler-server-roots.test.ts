@@ -67,6 +67,11 @@ describe('product server roots', () => {
     // Both share only the @native-assembly root.
     expect(a.roots.filter(row => row.from === NATIVE_ASSEMBLY_ROOT)).toEqual(b.roots.filter(row => row.from === NATIVE_ASSEMBLY_ROOT));
   });
+  test('a product with no plan file reads its hosts from server/world and the family sections (FP16, FP21)', () => {
+    const roots = hostRoots('native-world');
+    expect(roots.hosts).toEqual(['quest.composition', 'boss.ground', 'decisions', 'commands', 'collision']);
+    expect(roots.unmeasured).toEqual([]);
+  });
   test('a product without a native assembly reaches no server roots', () => {
     expect(hostRoots('fixture-product')).toMatchObject({ hosts: [], roots: [], unmeasured: [] });
   });

@@ -15,3 +15,5 @@ Pine r13 and Nalati r7 each run digest for digest with a plan naming no host.
 
 FP21: a product may ship `server/world` (format `40da84e`) in place of `server/native-assembly.json`, never both; the three
 pins run digest for digest with no plan file.
+
+FP21: the host ruler reads hosts from the server sections and `server/world`, so a product with no plan file is measured.

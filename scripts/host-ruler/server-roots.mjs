@@ -249,19 +249,31 @@ export function serverRootsFrom(product, table = nativeAssemblyRoots()) {
     modules: [...modules].map(([module, names]) => ({ module, bindings: [...names].sort() })).sort((a, b) => a.module.localeCompare(b.module)) };
 }
 
-/** Read a built product dir: shard.json's `admission.server` row named `server/native-assembly.json` (as the engine's
- * product readers do, `folderData.ts`), then its features' host ids.
- * A product without one reaches no server roots.
+/** FORMAT-PRUNE FP16, FP21: the sections that hold native host rows, and the world section that replaces the plan file. */
+export const HOST_SECTIONS = Object.freeze(['server/quest', 'server/riding', 'server/boss', 'server/patrol']);
+export const WORLD_SECTION = 'server/world';
+
+/** Read a built product dir's native host ids, as the engine's `prepareNativeAssembly` stands them: the rows its
+ * `server/native-assembly.json` names (shard.json's `admission.server`, as `folderData.ts` reads it), the rows its host
+ * sections hold (shard.json's `sections`), the plumbing a quest section brings and the collision a bake read whole
+ * brings. A product with neither a plan file nor `server/world` reaches no server roots.
  * @param {string} dir @param {ReturnType<typeof nativeAssemblyRoots>} [table] */
 export function folderServerRoots(dir, table = nativeAssemblyRoots()) {
   const shard = JSON.parse(readFileSync(join(dir, 'shard.json'), 'utf8'));
   const slug = typeof shard.identity?.slug === 'string' ? shard.identity.slug : basename(resolve(dir));
   const row = (Array.isArray(shard.admission?.server) ? shard.admission.server : []).find((/** @type {any} */ file) => file.name === NATIVE_ASSEMBLY_FILE);
-  if (row === undefined) return serverRootsFrom({ slug, hosts: null }, table);
-  const plan = JSON.parse(readFileSync(join(dir, row.path), 'utf8'));
+  /** @param {string} name */
+  const section = name => { const entry = (Array.isArray(shard.sections) ? shard.sections : []).find((/** @type {any} */ value) => value.name === name); return entry === undefined ? undefined : JSON.parse(readFileSync(join(dir, entry.path), 'utf8')); };
+  const world = section(WORLD_SECTION);
+  if (row === undefined && world === undefined) return serverRootsFrom({ slug, hosts: null }, table);
+  const plan = row === undefined ? { ...world, features: [] } : JSON.parse(readFileSync(join(dir, row.path), 'utf8'));
   if (!Array.isArray(plan.features)) throw new Error(`${dir}: ${NATIVE_ASSEMBLY_FILE} has no features list`);
-  plan.features.forEach((/** @type {any} */ feature, /** @type {number} */ i) => { if (typeof feature?.host !== 'string') throw new Error(`${dir}: feature ${i} has no host`); });
-  return serverRootsFrom({ slug, hosts: plan.features.map((/** @type {any} */ feature) => feature.host) }, table);
+  const rows = [...plan.features, ...HOST_SECTIONS.flatMap(name => section(name)?.hosts ?? [])];
+  rows.forEach((/** @type {any} */ feature, /** @type {number} */ i) => { if (typeof feature?.host !== 'string') throw new Error(`${dir}: feature ${i} has no host`); });
+  const hosts = rows.map((/** @type {any} */ feature) => feature.host);
+  if (section('server/quest') !== undefined) for (const host of ['decisions', 'commands']) if (!hosts.includes(host)) hosts.push(host);
+  if (plan.bake?.read === 'bake' && !hosts.some(host => host === 'collision' || host === 'collision.pieces')) hosts.push('collision');
+  return serverRootsFrom({ slug, hosts }, table);
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === import.meta.filename) {
