@@ -305,6 +305,23 @@ const cookStoreKey = (key: string): boolean => COOK_INDEX.test(key) || COOK_LOOS
 const looseCookOutput = (key: string): boolean => key.startsWith('shardfiles/') || key.startsWith('programs/');
 
 /** Authored loose mounts cannot publish to a release or catalogue publication key. */
+/** FR-A2: how many pack PUTs one publish keeps in flight. R2 takes them in parallel; a 429 or 5xx retries per object. */
+export const PUT_PARALLEL = 16;
+
+/** FR-A2: run `work` over `items`, at most `limit` at once. The first failure stops new work, waits for what is in
+ *  flight and rethrows, so a publish never reports success with a PUT missing. */
+export async function inParallel<T>(items: readonly T[], limit: number, work: (item: T) => Promise<void>): Promise<void> {
+  let next = 0, failure: {readonly error: unknown} | undefined;
+  const lane = async (): Promise<void> => {
+    while (failure === undefined && next < items.length) {
+      const item = items[next++] as T;
+      try { await work(item); } catch (error) { failure ??= {error}; }
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(limit, items.length)}, lane));
+  if (failure !== undefined) throw failure.error;
+}
+
 export const cookOutputKey = (key: string): boolean =>
   looseCookOutput(key) || (key.startsWith('assets/') && !key.startsWith('assets/catalogue/'));
 
@@ -496,10 +513,15 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     // is written again, which GC reads as new.
     const current = (key: string): boolean => clock() - (held.get(key)?.modified ?? 0) < GC_GRACE_MS / 2;
     const order = (key: string): number => (key.includes('/parts/') ? 0 : key.startsWith('assets/spawn/') ? 2 : 1);
-    for (const key of [...shared].sort((a, b) => order(a) - order(b))) {
-      if (!CONTENT_NAMED.test(key) || !current(key)) await put(key, readFileSync(join(client, key)), objectHeaders(key));
+    // FAST-RELEASE FR-A2 (J505): one PUT at a time took Pine's packs 1,100 to 4,580 s to reach R2 after its cook had
+    // finished, and the box's one cook queue waited behind each. Each order group goes PUT_PARALLEL at a time; the groups
+    // stay in order (parts, then the rest, then spawn), the loose files after them and the index last (below).
+    for (const group of [0, 1, 2]) {
+      const due = shared.filter(key => order(key) === group && (!CONTENT_NAMED.test(key) || !current(key)));
+      await inParallel(due, PUT_PARALLEL, key => put(key, readFileSync(join(client, key)), objectHeaders(key)));
     }
-    for (const key of loose) if (!current(folder + key)) await put(folder + key, readFileSync(join(client, key)), {...objectHeaders(key), cache: IMMUTABLE});
+    await inParallel(loose.filter(key => !current(folder + key)), PUT_PARALLEL,
+      key => put(folder + key, readFileSync(join(client, key)), {...objectHeaders(key), cache: IMMUTABLE}));
     const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
