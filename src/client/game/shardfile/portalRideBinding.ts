@@ -7,6 +7,7 @@ import type { PanelNode } from '@wildshard/engine/ui/panel';
 import { createPortalRide } from '../../../shared/game/shardfile/walkInPortalRide';
 import { bindPortalLane, portalRider, portalRings, type PortalFacts, type PortalRide, type PortalRideRows as RideRows, type PortalSource } from '../../../shared/game/shardfile/portalRide';
 import type { ShardContext } from '../plugin/context';
+import { wirePage } from './wirePage';
 
 /** A page's ride rows: the law's, and the veil it draws. */
 export type PortalRideRows = RideRows & { readonly veil: PanelNode };
@@ -27,6 +28,16 @@ function portalOwner(ctx: Pick<ShardContext, 'game' | 'scope'>, declared: ShardC
   };
   check();
   return { world, check };
+}
+
+/** QA-11-24 row 2: a new link's first frame starts the page's ride afresh, as the room's `rejoin` starts the seat's: a reload
+ *  that kept its seat and a blip mid-ride both ride anew on both sides, so neither keeps an entered road the other forgot.
+ *  Returns the unsubscribe. */
+export function freshOnRejoin(client: { readonly onRejoin: (listener: () => void) => () => void; readonly onFrame: (listener: () => void) => () => void }, fresh: () => void): () => void {
+  let redialled = false;
+  const offRejoin = client.onRejoin(() => { redialled = true; });
+  const offFrame = client.onFrame(() => { if (!redialled) return; redialled = false; fresh(); });
+  return () => { offRejoin(); offFrame(); };
 }
 
 /** The page's ride: its veil panel in the HUD and its step after the player's, for the level's lifetime. */
@@ -63,6 +74,8 @@ async function installPageRide(ctx: Pick<ShardContext, 'game' | 'system' | 'scop
   const ride = bindPortalLane(rider, k => { panel.style('', 'opacity', k.toFixed(3)); panel.style('', 'display', k > 0 ? 'block' : 'none'); }, lane, rows.landings, emit);
   let live = true;
   owner.onDispose(() => { if (ride.busy()) rider.hold(false); live = false; });
+  const start = ride.snapshot();
+  wirePage.whenLive(ctx.scope, client => freshOnRejoin(client, () => { if (!live) return; if (ride.busy()) rider.hold(false); ride.restore(start); }));
   ctx.system({ id: 'game.portal-ride', phase: 'update', after: ['engine.player.update'], run: dt => { if (live) ride.step(dt); } });
   return ride;
 }

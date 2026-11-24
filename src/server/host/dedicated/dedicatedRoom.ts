@@ -376,6 +376,8 @@ export class DedicatedRoom implements CrossTarget {
     const old = seat.transport;
     seat.transport = transport; seat.holdEnds = null;
     old?.close('replaced');
+    // QA-11-24 row 2: a new link rides anew, as its page does at the link's first frame (a reload that kept its seat, or a blip)
+    releaseSeatPortals(this.host, seat.body);
     this.link(seat, transport, hello);
     this.flushRefusals();
     if (this.seats.get(seat.device) === seat) this.options.post({ kind: 'seated', device: seat.device, body: seat.body, seats: this.seats.size, ...(admission === undefined ? {} : { admission }) });
