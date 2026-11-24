@@ -13,9 +13,8 @@ import {basename,dirname,join,relative,resolve} from 'node:path';
  *  list to the real import graph). */
 export const WORKTREE_TOOL=Object.freeze([
  'scripts/worktree.mjs','scripts/worktree-fresh.mjs','scripts/worktree-ignore.mjs','scripts/apfs-clone.mjs',
- 'scripts/worktree-reap.mjs','scripts/install-lag.mjs','scripts/lane-live.mjs','scripts/pin-keep-copy.mjs',
- 'scripts/tmp-reap.mjs','scripts/keep-copy.mjs','scripts/pins-reuse.mjs','scripts/pid-lock.mjs',
- 'scripts/shardfile-validation-revision.mjs','scripts/tracked-public.mjs','.agents/hooks/active-hours.mjs',
+ 'scripts/worktree-reap.mjs','scripts/install-lag.mjs','scripts/lane-live.mjs','scripts/tmp-reap.mjs',
+ '.agents/hooks/active-hours.mjs',
 ]);
 /** the folders the relaunched copy is exported from */
 export const EXPORTED=Object.freeze(['scripts','.agents/hooks']);

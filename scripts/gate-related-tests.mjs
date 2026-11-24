@@ -34,6 +34,9 @@ const STARTUP_SECONDS = 5;
 export function pushGuards(changed) {
   return [
     ...(changed.some(file => /^src\/(?:format|sdk|sharddev)\//u.test(file)) ? ['test/schema-reference.test.ts'] : []),
+    // WORKTREE_TOOL must name worktree.mjs's import closure, which any script edit can change; the test reads the
+    // sources, so `vitest related` never relates it (main red 45407099803 after b8f4671bc dropped an import)
+    ...(changed.some(file => /^(?:scripts|\.agents\/hooks)\/[^/]+\.mjs$/u.test(file)) ? ['test/tooling/worktree-fresh.test.mjs'] : []),
     'test/host-callbacks.test.ts', 'test/shardfile-boundaries.test.ts',
     'test/manifest-declarations.test.ts',
   ];
