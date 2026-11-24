@@ -10,13 +10,14 @@ import {missingGenerated, packCommit, untracked} from './ring3-pack.ts';
 
 const candidate = 'a'.repeat(40), shard = 'b'.repeat(40);
 interface Call {method: string; path: string; body?: unknown}
-function fixture(options: {install?: string; prepareRed?: string; red?: string; malformed?: boolean; pending?: boolean; wrongRun?: boolean; denied?: string; existing?: boolean} = {}): {api: Api; calls: Call[]} {
-  const calls: Call[] = [];
+function fixture(options: {install?: string; prepareRed?: string; red?: string; malformed?: boolean; pending?: boolean; wrongRun?: boolean; denied?: string; existing?: boolean; lost?: Record<string, number>} = {}): {api: Api; calls: Call[]} {
+  const calls: Call[] = [], lost = {...options.lost};
   const api: Api = (method, path, body) => Promise.resolve().then(() => {
     calls.push({method, path, body});
     const repo = path.split('/')[2];
     if (repo === undefined || !shardRepos.includes(repo as typeof shardRepos[number])) throw new Error(`Unexpected repository: ${path}`);
     const id = shardRepos.indexOf(repo as typeof shardRepos[number]) + 100;
+    if (method === 'GET' && path.includes('/actions/runs/') && (lost[repo] ?? 0) > 0) {lost[repo] = (lost[repo] ?? 0) - 1; throw new Error('HTTP 404');}
     if (method === 'POST' && path.endsWith('/ring-2-prepare.yml/dispatches')) {
       assert.equal(preparedRepos.includes(repo), true, `${repo} restores no preparation`);
       assert.deepEqual(body, {ref: 'main', inputs: {engine: options.install ?? candidate}, return_run_details: true});
@@ -125,4 +126,13 @@ await test('a prepared receiver runs only after its exact-install ring-2-prepare
   assert.equal(plots?.runId, undefined, 'a red preparation dispatches no receiver');
   assert.match(plots?.error ?? '', /ring-2-prepare/u);
   assert.equal(report.rows.filter(row => row.status === 'success').length, 6);
+});
+await test('a run read that 404s a few times is retried; one that keeps failing fails its row (QA 11-23-b row 41)', async () => {
+  const sleep = (): Promise<void> => Promise.resolve();
+  const {api} = fixture({lost: {'shard-dunes': 4, 'shard-sky-reach': 2, 'shard-driftwood': 9}}), report = await runRing3(prepare(candidate, 'sender'), {api, sleep});
+  assert.equal(report.rows.find(row => row.repo === 'shard-dunes')?.status, 'success', 'four misses are under the five allowed');
+  assert.equal(report.rows.find(row => row.repo === 'shard-sky-reach')?.status, 'success', 'a prepare read retries too');
+  const driftwood = report.rows.find(row => row.repo === 'shard-driftwood');
+  assert.equal(driftwood?.status, 'error');
+  assert.match(driftwood?.error ?? '', /404/u);
 });

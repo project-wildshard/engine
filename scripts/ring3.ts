@@ -14,7 +14,7 @@ interface Row {repo: string; prepareUrl?: string; status: 'pending' | 'success' 
 interface Run {id: number; event: string; path: string; head_sha: string; status: string; conclusion: string | null; run_attempt: number}
 export interface Aggregate {version: 1; engine: string; originRun: string; ok: boolean; rows: Row[]; packed?: string}
 export type Api = (method: 'GET' | 'POST', path: string, body?: unknown) => Promise<unknown>;
-interface Options {api: Api; packed?: string; now?: () => number; sleep?: (ms: number) => Promise<void>; deadlineMs?: number; pollMs?: number; checkpoint?: (report: Aggregate) => void; issues?: boolean}
+interface Options {api: Api; packed?: string; now?: () => number; sleep?: (ms: number) => Promise<void>; deadlineMs?: number; pollMs?: number; checkpoint?: (report: Aggregate) => void; issues?: boolean; misses?: number}
 const errorText = (error: unknown): string => String(error).replaceAll(/[\r\n]/gu, ' ').slice(0, 1000);
 
 export function prepare(engine: string, originRun: string, repos: readonly string[] = shardRepos): Aggregate {
@@ -31,6 +31,21 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
     report.packed = options.packed;
   }
   const install = report.packed ?? report.engine;
+  // row 41: run 45331290922 lost four rows to one HTTP 404 on a run it had just been handed; a read fails a row only
+  // after `misses` reads in a row fail (a refused identity still fails at once).
+  const misses = options.misses ?? 5, missed = new Map<string, number>();
+  const read = async (repo: string, id: number): Promise<Run | undefined> => {
+    try {
+      const run = await api('GET', `repos/project-wildshard/${repo}/actions/runs/${String(id)}`) as Run;
+      missed.delete(`${repo}/${String(id)}`);
+      return run;
+    } catch (error) {
+      const count = (missed.get(`${repo}/${String(id)}`) ?? 0) + 1;
+      missed.set(`${repo}/${String(id)}`, count);
+      if (count >= misses) throw error;
+      return undefined;
+    }
+  };
   const dispatch = async (repo: string, workflow: string): Promise<number> => {
     const response = await api('POST', `repos/project-wildshard/${repo}/actions/workflows/${workflow}/dispatches`,
       {ref: 'main', inputs: {engine: install}, return_run_details: true}) as {workflow_run_id?: number};
@@ -43,7 +58,8 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
     row.prepareUrl = `https://github.com/project-wildshard/${row.repo}/actions/runs/${String(id)}`;
     checkpoint(report);
     for (;;) {
-      const run = await api('GET', `repos/project-wildshard/${row.repo}/actions/runs/${String(id)}`) as Run;
+      const run = await read(row.repo, id);
+      if (run === undefined) {await sleep(Math.max(0, Math.min(pollMs, until - now()))); continue;}
       if (run.id !== id || run.path.split('@')[0] !== '.github/workflows/ring-2-prepare.yml') throw new Error('Preparation run identity changed');
       if (run.status === 'completed') {
         if (run.conclusion === 'success') return true;
@@ -66,7 +82,8 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
   while (report.rows.some(row => row.status === 'pending') && now() < until) {
     await Promise.all(report.rows.filter(row => row.status === 'pending').map(async row => {
       try {
-        const run = await api('GET', `repos/project-wildshard/${row.repo}/actions/runs/${String(row.runId)}`) as Run;
+        const run = await read(row.repo, row.runId ?? 0);
+        if (run === undefined) return;
         if (run.id !== row.runId || run.event !== 'workflow_dispatch' || run.path.split('@')[0] !== '.github/workflows/ci.yml' || !/^[a-f0-9]{40}$/u.test(run.head_sha) || run.run_attempt !== 1) throw new Error('Receiver run identity changed; new qualification required');
         row.shardSha = run.head_sha;
         if (run.status === 'completed') {row.conclusion = run.conclusion; row.status = run.conclusion === 'success' ? 'success' : 'failure';}
