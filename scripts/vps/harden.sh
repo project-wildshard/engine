@@ -222,18 +222,19 @@ if [ "$LISTENERS_OK" = 1 ]; then
   # ss writes a device suffix (`%tailscale0`) inside or after the brackets; it is dropped before the address is judged.
   exposed=$(printf '%s\n' "$LISTENERS" | grep -E ':(8790|8791|8792)$' | sed -E 's/%[^]:]+//' | grep -Ev "^(127\.0\.0\.1|\[::1\]${tails:+|\[?($tails)\]?}):" | tr '\n' ' ' | sed 's/ $//')
   if [ -z "$exposed" ]; then ok VH8 'game and cook ports listen on loopback or the tailnet only'; else bad VH8 "game or cook port on a public address: $exposed"; fi
-  # SERVER-CELLS SC2: Prometheus, the node exporter and both channels' /metrics answer on loopback alone, not even the tailnet.
-  metrics=$(printf '%s\n' "$LISTENERS" | grep -E ':(9090|9100|9790|9791)$' | sed -E 's/%[^]:]+//' | grep -Ev '^(127\.0\.0\.1|\[::1\]):' | tr '\n' ' ' | sed 's/ $//')
+  # SERVER-CELLS SC2: Prometheus, the node exporter and both channels' /metrics answer on loopback alone, not even the tailnet;
+  # MMO-OBSERVABILITY OB2/OB3: so do the process exporter (9256) and Grafana (3000), which the tailnet reaches only through Serve.
+  metrics=$(printf '%s\n' "$LISTENERS" | grep -E ':(9090|9100|9256|3000|9790|9791)$' | sed -E 's/%[^]:]+//' | grep -Ev '^(127\.0\.0\.1|\[::1\]):' | tr '\n' ' ' | sed 's/ $//')
   if [ -z "$metrics" ]; then ok SC2 'Prometheus and metrics ports listen on loopback only'; else bad SC2 "metrics port off loopback: $metrics"; fi
 fi
 # SERVER-CELLS SC2: the box's Prometheus runs, held to loopback by its drop-ins, and sends nothing off the box.
 if [ -f "$R/etc/prometheus/wildshard.yml" ]; then
   if grep -Eq '^[[:space:]]*remote_(write|read):' "$R/etc/prometheus/wildshard.yml"; then bad SC2 'wildshard.yml has a remote_write or remote_read'; else ok SC2 'wildshard.yml sends nothing off the box'; fi
-  for dropin in prometheus.service.d prometheus-node-exporter.service.d; do
-    if grep -q -- '--web.listen-address=127.0.0.1:' "$R/etc/systemd/system/$dropin/90-wildshard.conf" 2>/dev/null; then ok SC2 "$dropin holds it to loopback"; else bad SC2 "$dropin/90-wildshard.conf is missing or not loopback"; fi
+  for dropin in prometheus.service.d prometheus-node-exporter.service.d prometheus-process-exporter.service.d; do
+    if grep -q -- '-web.listen-address=127.0.0.1:' "$R/etc/systemd/system/$dropin/90-wildshard.conf" 2>/dev/null; then ok SC2 "$dropin holds it to loopback"; else bad SC2 "$dropin/90-wildshard.conf is missing or not loopback"; fi
   done
   if has systemctl; then
-    for unit in prometheus.service prometheus-node-exporter.service; do
+    for unit in prometheus.service prometheus-node-exporter.service prometheus-process-exporter.service; do
       if systemctl is-active --quiet "$unit" 2>/dev/null; then ok SC2 "$unit active"; else bad SC2 "$unit is not active"; fi
     done
   fi

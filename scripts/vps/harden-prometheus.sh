@@ -14,10 +14,14 @@ matches() { grep "$@" >/dev/null; }
 say() { printf '%-7s %-5s %s\n' "$1" "$2" "$3"; }
 # Each channel's METRICS_PORT; wildshard-config pins the same two (the engine's test holds them equal).
 PRODUCTION_METRICS=9790 STAGING_METRICS=9791
-PROMETHEUS=127.0.0.1:9090 NODE=127.0.0.1:9100
+PROMETHEUS=127.0.0.1:9090 NODE=127.0.0.1:9100 PROCESS=127.0.0.1:9256
 CONFIG=/etc/prometheus/wildshard.yml
+# MMO-OBSERVABILITY OB2 (Jake, 2026-11-24: "The cook wakes up and trashes the machine / Something else trashes the machine"):
+# CPU, memory and I/O per account, so the cook, each channel's server, Postgres and an agent's work are separate lines.
+PROCESS_CONFIG=/etc/prometheus/process-exporter.yml
 PROMETHEUS_DROPIN=/etc/systemd/system/prometheus.service.d/90-wildshard.conf
 NODE_DROPIN=/etc/systemd/system/prometheus-node-exporter.service.d/90-wildshard.conf
+PROCESS_DROPIN=/etc/systemd/system/prometheus-process-exporter.service.d/90-wildshard.conf
 # The engine's test hands it a made-up /etc/wildshard for the settings step; never as root.
 TEST=
 if [ "$(id -u)" != 0 ] && [ -n "${WILDSHARD_PROMETHEUS_TEST_ROOT:-}" ]; then TEST=$WILDSHARD_PROMETHEUS_TEST_ROOT; fi
@@ -42,6 +46,21 @@ scrape_configs:
   - job_name: node
     static_configs:
       - targets: ['$NODE']
+  - job_name: process
+    static_configs:
+      - targets: ['$PROCESS']
+EOF
+}
+# OB2: one group per account (the cook, each channel, postgres, caddy, prometheus, the agents, raynos), except the root daemons
+# and jobs worth their own line. Few, stable names: a group per short-lived command would grow the series without end.
+process_config() {
+  cat <<EOF
+# MMO-OBSERVABILITY OB2: written by harden-prometheus.sh; a hand edit is undone by the next harden.
+process_names:
+  - name: '{{.Comm}}'
+    comm: [tailscaled, sshd, fail2ban-server, unattended-upgr, apt, apt-get, dpkg, rclone, pg_dump, lynis, auditd, systemd-journal]
+  - name: '{{.Username}}'
+    cmdline: ['.+']
 EOF
 }
 # The packaged units read \$ARGS from /etc/default; these replace the whole command line, so nothing there can widen a bind.
@@ -60,6 +79,16 @@ node_dropin() {
 [Service]
 ExecStart=
 ExecStart=/usr/bin/prometheus-node-exporter --web.listen-address=$NODE
+MemoryMax=256M
+EOF
+}
+# OB2: no per-thread rows and no smaps reads (each scrape would read every process's whole memory map).
+process_dropin() {
+  cat <<EOF
+# MMO-OBSERVABILITY OB2: loopback only (harden-prometheus.sh).
+[Service]
+ExecStart=
+ExecStart=/usr/bin/prometheus-process-exporter -web.listen-address=$PROCESS -config.path=$PROCESS_CONFIG -threads=false -gather-smaps=false
 MemoryMax=256M
 EOF
 }
@@ -100,6 +129,8 @@ case "${1:-}" in
     printf '# --- %s\n' "$CONFIG"; config
     printf '# --- %s\n' "$PROMETHEUS_DROPIN"; prometheus_dropin
     printf '# --- %s\n' "$NODE_DROPIN"; node_dropin
+    printf '# --- %s\n' "$PROCESS_DROPIN"; process_dropin
+    printf '# --- %s\n' "$PROCESS_CONFIG"; process_config
     exit 0 ;;
   --settings)
     if [ -z "$TEST" ]; then say stop SC2 '--settings is the engine test'"'"'s; harden.sh runs the whole step'; exit 1; fi
@@ -129,6 +160,8 @@ put() {
 units_changed=0 config_changed=0
 if put "$PROMETHEUS_DROPIN" < <(prometheus_dropin); then units_changed=1; fi
 if put "$NODE_DROPIN" < <(node_dropin); then units_changed=1; fi
+if put "$PROCESS_DROPIN" < <(process_dropin); then units_changed=1; fi
+if put "$PROCESS_CONFIG" < <(process_config); then units_changed=1; fi
 # promtool comes with the package, so the very first config is checked after the install, before anything restarts.
 check=; if command -v promtool >/dev/null 2>&1; then check='promtool check config'; fi
 if put "$CONFIG" "$check" < <(config); then config_changed=1; fi
@@ -139,7 +172,7 @@ if [ "$units_changed" = 1 ]; then systemctl daemon-reload; fi
 
 installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | matches 'ok installed'; }
 missing=()
-for name in prometheus prometheus-node-exporter; do installed "$name" || missing+=("$name"); done
+for name in prometheus prometheus-node-exporter prometheus-process-exporter; do installed "$name" || missing+=("$name"); done
 if [ "${#missing[@]}" != 0 ]; then
   # No recommends: no Alertmanager, no Pushgateway, no textfile collectors with their own timers. needrestart only lists, so
   # an install never restarts a game server or PostgreSQL that holds an old library.
@@ -153,8 +186,8 @@ if ! promtool check config "$CONFIG" >/dev/null 2>&1; then
   say stop SC2 "$CONFIG does not check; Prometheus is stopped"; exit 1
 fi
 
-systemctl enable --quiet prometheus.service prometheus-node-exporter.service
-for unit in prometheus-node-exporter.service prometheus.service; do
+systemctl enable --quiet prometheus.service prometheus-node-exporter.service prometheus-process-exporter.service
+for unit in prometheus-node-exporter.service prometheus-process-exporter.service prometheus.service; do
   if [ "$units_changed" = 1 ] || ! systemctl is-active --quiet "$unit"; then systemctl restart "$unit"; say doing SC2 "restart $unit"
   elif [ "$unit" = prometheus.service ] && [ "$config_changed" = 1 ]; then systemctl reload "$unit"; say doing SC2 "reload $unit"
   else say ok SC2 "$unit running"; fi
@@ -167,16 +200,16 @@ metrics_setting staging "$STAGING_METRICS"
 # a game server's /metrics off loopback is reported (harden.sh --check fails it too), and the rest of harden goes on.
 listeners() { ss -ltnH | awk '{print $4}' | sed -E 's/%[^]:]+//'; }
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-  if listeners | matches -x "$PROMETHEUS" && listeners | matches -x "$NODE"; then break; fi
+  if listeners | matches -x "$PROMETHEUS" && listeners | matches -x "$NODE" && listeners | matches -x "$PROCESS"; then break; fi
   sleep 1
 done
 off_loopback() { listeners | grep -E ":($1)\$" | grep -Ev '^(127\.0\.0\.1|\[::1\]):' | tr '\n' ' ' | sed 's/ $//' || true; }
-exposed=$(off_loopback '9090|9100')
+exposed=$(off_loopback '9090|9100|9256')
 if [ -n "$exposed" ]; then
-  systemctl stop prometheus.service prometheus-node-exporter.service
+  systemctl stop prometheus.service prometheus-node-exporter.service prometheus-process-exporter.service
   say stop SC2 "Prometheus or the node exporter listens off loopback, so both are stopped: $exposed"; exit 1
 fi
 servers=$(off_loopback "$PRODUCTION_METRICS|$STAGING_METRICS")
 if [ -n "$servers" ]; then say warn SC2 "a game server's /metrics listens off loopback: $servers"; fi
-if listeners | matches -x "$PROMETHEUS" && listeners | matches -x "$NODE"; then say ok SC2 "Prometheus on $PROMETHEUS only, node metrics on $NODE only"
+if listeners | matches -x "$PROMETHEUS" && listeners | matches -x "$NODE" && listeners | matches -x "$PROCESS"; then say ok SC2 "Prometheus on $PROMETHEUS only, node metrics on $NODE only, process metrics on $PROCESS only"
 else say warn SC2 "Prometheus or the node exporter is not listening yet: journalctl -u prometheus -u prometheus-node-exporter"; fi

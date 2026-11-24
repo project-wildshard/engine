@@ -26,11 +26,13 @@ function files(): Readonly<Record<string, string>> {
 test('Prometheus and the node exporter listen on loopback alone, keep 15 days and write nothing out', () => {
   const all = files();
   expect(Object.keys(all)).toEqual(['/etc/prometheus/wildshard.yml', '/etc/systemd/system/prometheus.service.d/90-wildshard.conf',
-    '/etc/systemd/system/prometheus-node-exporter.service.d/90-wildshard.conf']);
+    '/etc/systemd/system/prometheus-node-exporter.service.d/90-wildshard.conf',
+    '/etc/systemd/system/prometheus-process-exporter.service.d/90-wildshard.conf', '/etc/prometheus/process-exporter.yml']);
   const prometheus = all['/etc/systemd/system/prometheus.service.d/90-wildshard.conf'] ?? '';
   const node = all['/etc/systemd/system/prometheus-node-exporter.service.d/90-wildshard.conf'] ?? '';
+  const processes = all['/etc/systemd/system/prometheus-process-exporter.service.d/90-wildshard.conf'] ?? '';
   // Each drop-in clears the packaged command line ($ARGS from /etc/default) and replaces it whole.
-  for (const dropin of [prometheus, node]) {
+  for (const dropin of [prometheus, node, processes]) {
     const starts = dropin.split('\n').filter(row => row.startsWith('ExecStart='));
     expect(starts[0]).toBe('ExecStart=');
     expect(starts).toHaveLength(2);
@@ -40,12 +42,14 @@ test('Prometheus and the node exporter listen on loopback alone, keep 15 days an
   expect(prometheus).toContain('--storage.tsdb.retention.time=15d');
   expect(prometheus).toContain('--config.file=/etc/prometheus/wildshard.yml');
   expect(node).toContain('--web.listen-address=127.0.0.1:9100');
+  // MMO-OBSERVABILITY OB2: the process exporter, loopback, no per-thread rows and no smaps reads.
+  expect(processes).toContain('-web.listen-address=127.0.0.1:9256 -config.path=/etc/prometheus/process-exporter.yml -threads=false -gather-smaps=false');
   const config = all['/etc/prometheus/wildshard.yml'] ?? '';
   expect(config).not.toMatch(/remote_write|remote_read|alerting:|https?:\/\//u);
   expect(config).toContain('scrape_interval: 15s');
   // Every target is on loopback: production's and staging's /metrics, and the node.
   const targets = [...config.matchAll(/targets: \['([^']+)'\]/gu)].map(match => match[1]);
-  expect(targets).toEqual(['127.0.0.1:9790', '127.0.0.1:9791', '127.0.0.1:9100']);
+  expect(targets).toEqual(['127.0.0.1:9790', '127.0.0.1:9791', '127.0.0.1:9100', '127.0.0.1:9256']);
   expect(config).toMatch(/127\.0\.0\.1:9790'\]\n\s+labels:\n\s+channel: production\n/u);
   expect(config).toMatch(/127\.0\.0\.1:9791'\]\n\s+labels:\n\s+channel: staging\n/u);
 });
@@ -57,7 +61,14 @@ test("the scraped ports are the ones wildshard-config pins for each channel, and
   expect(script).toContain('PRODUCTION_METRICS=9790 STAGING_METRICS=9791');
   expect(readFileSync('scripts/vps/harden-apply.sh', 'utf8')).toContain('\n"$HERE/harden-prometheus.sh"\n');
   // harden.sh --check fails a metrics port off loopback, the tailnet included.
-  expect(readFileSync('scripts/vps/harden.sh', 'utf8')).toContain("grep -E ':(9090|9100|9790|9791)$'");
+  expect(readFileSync('scripts/vps/harden.sh', 'utf8')).toContain("grep -E ':(9090|9100|9256|3000|9790|9791)$'");
+});
+
+test('OB2: processes group by account, with a few named root jobs, so the series stay few and stable', () => {
+  const groups = files()['/etc/prometheus/process-exporter.yml'] ?? '';
+  // The cook, each channel and the agents each have an account; every process lands in exactly one group.
+  expect(groups).toMatch(/- name: '\{\{\.Comm\}\}'\n\s+comm: \[tailscaled, [^\]]+\]\n\s+- name: '\{\{\.Username\}\}'\n\s+cmdline: \['\.\+'\]\n$/u);
+  expect(groups).not.toMatch(/PID|StartTime|Matches/u);
 });
 
 function etc(settings: Readonly<Record<string, string>>): string {
