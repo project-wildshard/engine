@@ -1,6 +1,7 @@
 // LAND-SIMPLIFY LS5 (J258): main's CI verdict, reported by a small watcher instead of by land. Jake, 2026-11-11:
 // land returns as soon as main is pushed; "a receipt line + a direct message to that agent" on red, and the
-// buddy-engine gets the red if a lander is unreachable.
+// the coordinator's pane (FALLBACK_PANE) gets the red if a lander is unreachable (build-max C1, 2026-11-23: fallback-engine was
+// retired 11-22 20:45 and its fallback failed 38 times that day).
 //
 //   node scripts/main-watch.mjs                     judge every finished main ci run not judged yet (tick or by hand)
 //   node scripts/main-watch.mjs --follow=<sha> [--lane=<name>] [--pane=<herdr pane>] [--after-push=<s>]
@@ -240,6 +241,14 @@ export function redRecipients(rows,panes,agents,fixers){
   for(const {sha,lander} of rows)if(lander!==undefined)add(lander.lane,lander.pane??paneFor(panes,lander.slug),sha);
   for(const lane of fixers)add(lane,undefined);
   return /** @type {RedRecipient[]} */([...groups.values()]);
+}
+
+/** Build-max C1 (2026-11-23): the coordinator's herdr pane takes a red no lander was reached for, and the keeper's red (J443),
+ * once per red span, by the same pane delivery landers get. `WS_MAIN_WATCH_FALLBACK_PANE` moves it. */
+export const FALLBACK_PANE=process.env.WS_MAIN_WATCH_FALLBACK_PANE??'w2:p5';
+/** @param {string} [pane] @returns {RedRecipient} */
+export function fallbackRecipient(pane=FALLBACK_PANE){
+  return {lane:'coordinator',sendPane:pane,key:`pane:${pane}`,lanes:new Set(['coordinator']),commits:new Set(),fixer:false};
 }
 
 /** @param {RedRecipient} recipient @param {{range:string,url:string,failed:string,named:string,
@@ -554,8 +563,8 @@ export function sweep(io,hint={}){
       // read leaves the run for the next sweep, and a report is never sent twice.
       /** @type {string[]} */const lines=[];
       /** @type {{recipient:RedRecipient,text:string}[]} */const messages=[];
-      /** @type {RedRecipient|undefined} */let buddy;
-      /** @type {string|undefined} */let buddyAlert;
+      /** @type {RedRecipient|undefined} */let fallback;
+      /** @type {string|undefined} */let fallbackAlert;
       /** @type {string[]} */let redCommits=[];
       let firstRed=false;
       if(run.nativeInfra!==undefined)lines.push(`main advisory ${short(run.head_sha)} ${NATIVE_FOOTPRINT}: ${run.nativeInfra} (run ${run.id})`);
@@ -585,8 +594,8 @@ export function sweep(io,hint={}){
           const changes=files.length===0?new Map():io.changes(verdict.from??null,run.head_sha);
           const suspect=redSuspect(commits,files,changes);
           const details={range,url,failed:tests.length===0?failed:`${failed} (${tests.join(', ')})`,named,suspect},agents=io.agents();
-          buddy=redRecipients([],[],agents,['buddy-engine'])[0];
-          if(buddy!==undefined)buddyAlert=redMessage({...buddy,fixer:false},details);
+          fallback=fallbackRecipient();
+          fallbackAlert=redMessage(fallback,details);
           firstRed=state.red===undefined;
           const history=firstRed?{commits:[],files:[],jobs:[]}:state.red?.history??restoreRedHistory(io,state,runs);
           const prompted=new Set(history.commits),seenFiles=new Set(history.files),seenJobs=new Set(history.jobs);
@@ -610,7 +619,7 @@ export function sweep(io,hint={}){
             }
           }
           // FS22: the keeper's clock starts at the first reported red.
-          state.red??={run:run.id,at:now,text:buddyAlert??failed,keeper:false};
+          state.red??={run:run.id,at:now,text:fallbackAlert??failed,keeper:false};
           state.red.history={commits:history.commits,files:[...seenFiles,...newFiles],jobs:[...seenJobs,...newJobs]};
           redCommits=commits;
         }
@@ -620,31 +629,29 @@ export function sweep(io,hint={}){
       state.judged.push(run.id);if(verdict.kind==='dispatch')state.dispatched.push(run.head_sha);writeState(io.state,state);
       if(verdict.kind==='dispatch')io.dispatch();
       for(const line of lines)io.receipt(line);
-      let needsBuddy=!messages.some(message=>message.recipient.commits.size>0);
-      let buddyAttempted=false;
+      let needsFallback=!messages.some(message=>message.recipient.commits.size>0);
+      let fallbackAttempted=false;
       for(const {recipient,text} of messages){
         const how=notifyRed(io,state,run.id,recipient,text,redCommits);
-        if(recipient.commits.size>0&&how==='')needsBuddy=true;
-        if(recipient.key===buddy?.key||recipient.lanes.has('buddy-engine'))buddyAttempted=true;
+        if(recipient.commits.size>0&&how==='')needsFallback=true;
+        if(recipient.key===fallback?.key||recipient.lanes.has('coordinator'))fallbackAttempted=true;
         if(how!==null)io.receipt(`MAIN RED message to ${[...recipient.lanes].join(', ')} ${how===''?'not delivered (no reachable pane or herdr agent)':how}`);
       }
-      if(firstRed&&needsBuddy&&!buddyAttempted&&buddyAlert!==undefined&&buddy!==undefined){
-        const how=notifyRed(io,state,run.id,buddy,buddyAlert,redCommits);
-        if(how!==null)io.receipt(`main red fallback to buddy-engine ${how||'not delivered (herdr agent unreachable)'}`);
-        buddyAttempted=true;
+      if(firstRed&&needsFallback&&!fallbackAttempted&&fallbackAlert!==undefined&&fallback!==undefined){
+        const how=notifyRed(io,state,run.id,fallback,fallbackAlert,redCommits);
+        if(how!==null)io.receipt(`main red fallback to coordinator ${how||'not delivered (pane unreachable)'}`);
+        fallbackAttempted=true;
       }
-      if(verdict.kind==='red'&&buddyAttempted&&state.red!==undefined&&!state.red.keeper){state.red.keeper=true;writeState(io.state,state);}
+      if(verdict.kind==='red'&&fallbackAttempted&&state.red!==undefined&&!state.red.keeper){state.red.keeper=true;writeState(io.state,state);}
     }
     // FS22 (J443): the keeper owns a red no pusher fixed. KEEPER_MS after the span's first alert with no green verdict,
-    // buddy-engine gets it, once per span; the pushers were pinged first and nobody else stops.
+    // the coordinator's pane gets it, once per span; the pushers were pinged first and nobody else stops.
     if(state.red!==undefined&&!state.red.keeper&&now-state.red.at>=KEEPER_MS){
       const minutes=Math.round((now-state.red.at)/60_000);
-      const buddy=redRecipients([],[],io.agents(),['buddy-engine'])[0];
-      if(buddy!==undefined){
-        const how=notifyRed(io,state,state.red.run,buddy,`main-watch: keeper (J443): engine main is still red ${minutes} min after this alert, with no green since. ${state.red.text}`);
-        if(how!==null)io.receipt(`main red keeper: buddy-engine ${how?'prompted':'not delivered (herdr agent unreachable)'} after ${minutes} min red with no green (run ${state.red.run})`);
-        state.red.keeper=true;writeState(io.state,state);
-      }
+      const keeper=fallbackRecipient();
+      const how=notifyRed(io,state,state.red.run,keeper,`main-watch: keeper (J443): engine main is still red ${minutes} min after this alert, with no green since. ${state.red.text}`);
+      if(how!==null)io.receipt(`main red keeper: coordinator ${how||'not delivered (pane unreachable)'} after ${minutes} min red with no green (run ${state.red.run})`);
+      state.red.keeper=true;writeState(io.state,state);
     }
     for(const run of native.filter(row=>finished(row)&&!state.judged.includes(row.id))){
       /** @type {string[]} */const lines=[];

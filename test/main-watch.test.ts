@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { attribute, blockingRun, cancelledJobs, failedNames, follow, fpsNight, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { attribute, blockingRun, cancelledJobs, FALLBACK_PANE, failedNames, follow, fpsNight, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 import '../scripts/test/main-watch-red.test.mjs';
 
@@ -369,20 +369,20 @@ test('M2: a red also prompts the forward fixer by herdr agent name; a lander wit
   expect(w.receipts).toContain('MAIN RED message to codex-pins prompted herdr agent codex-pins');
 });
 
-test.each(['missing lander', 'unrecorded lander', 'configured buddy'])('A2: a red with %s reaches buddy-engine once', mode => {
+// Build-max C1 (2026-11-23): buddy-engine was retired 11-22; the coordinator's pane takes the fallback.
+test.each(['missing lander', 'unrecorded lander'])('A2: a red with %s reaches the coordinator\'s pane once', mode => {
   const w = world(replay), io = fake(mode, w);
   sweep(io);
-  w.agents = ['buddy-engine'];
-  if (mode === 'configured buddy') w.fixers = ['buddy-engine'];
   w.runs = [...replay, run(42970000008, 'aaaa1111', 'failure', 50)];
   w.tip = sha('aaaa1111');
   const hint = mode === 'unrecorded lander' ? {} : { sha: w.tip, lane: 'gone-lander' };
   sweep(io, hint);
   sweep(io, hint);
-  expect(w.sent).toEqual([]);
-  expect(w.prompted?.map(([agent]) => agent)).toEqual(['buddy-engine']);
-  expect(w.prompted?.[0]?.[1]).toContain('fix forward now');
-  expect(w.prompted?.[0]?.[1]).toContain('tests (3)');
+  expect(w.prompted ?? []).toEqual([]);
+  expect(w.sent.map(([pane]) => pane)).toEqual([FALLBACK_PANE]);
+  expect(w.sent[0]?.[1]).toContain('fix forward now');
+  expect(w.sent[0]?.[1]).toContain('tests (3)');
+  expect(w.receipts).toContain(`main red fallback to coordinator sent to pane ${FALLBACK_PANE}`);
 });
 
 test('J431 writes each memory warning and gate-flake receipt once and queues QA with the SHA', () => {
@@ -441,38 +441,35 @@ test('FS19: main-push receipts parse with or without a pane; land wins a shared 
   expect(attribute(['c', 'b', 'a', 'z'].map(row => row.repeat(40)), who).map(row => row.lander?.lane)).toEqual(['push', 'push', 'land', undefined]);
 });
 
-// FS22 (J443): buddy-engine keeps engine main when no pusher fixed a red in 20 minutes.
+// FS22 (J443): the keeper (the coordinator's pane since build-max C1) keeps engine main when no pusher fixed a red in 20 minutes.
 test('FS22: a delivered red with no green after 20 min goes to the keeper once; a green ends the span', () => {
   let clock = Date.parse('2026-11-19T05:00:00Z');
   const log = '05:50 UTC opus-red land plan/red-plan landed aaaa111100 on main (652afa6c00..aaaa111100); push';
   const w = world(replay, log), io = { ...fake('keeper', w), now: () => clock };
-  w.agents = ['buddy-engine'];
   sweep(io);
   w.runs = [...replay, run(42970000011, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
   sweep(io);
   expect(w.sent.map(([pane]) => pane)).toEqual(['w1:p2']);
-  expect(w.prompted ?? []).toEqual([]);
   clock += 19 * 60_000;sweep(io);
-  expect(w.prompted ?? []).toEqual([]);
+  expect(w.sent).toHaveLength(1);
   clock += 2 * 60_000;sweep(io);sweep(io);
-  expect(w.prompted?.map(([agent, text]) => [agent, text.slice(0, 36)])).toEqual([['buddy-engine', 'main-watch: keeper (J443): engine ma']]);
-  expect(w.receipts).toContain('main red keeper: buddy-engine prompted after 21 min red with no green (run 42970000011)');
+  expect(w.sent.slice(1).map(([pane, text]) => [pane, text.slice(0, 36)])).toEqual([[FALLBACK_PANE, 'main-watch: keeper (J443): engine ma']]);
+  expect(w.receipts).toContain(`main red keeper: coordinator sent to pane ${FALLBACK_PANE} after 21 min red with no green (run 42970000011)`);
   // A green ends the span: the next red starts a fresh clock.
   w.runs = [...w.runs, run(42970000012, 'bbbb2222', 'success', 55)];w.tip = sha('bbbb2222');
   sweep(io);clock += 30 * 60_000;sweep(io);
-  expect(w.prompted).toHaveLength(1);
+  expect(w.sent).toHaveLength(2);
 });
 
 test('FS22: a red whose pusher has no pane reaches the keeper at once, and not again at 20 min', () => {
   let clock = Date.parse('2026-11-19T06:00:00Z');
   const w = world(replay), io = { ...fake('keeper-fallback', w), now: () => clock };
-  w.agents = ['buddy-engine'];
   sweep(io);
   w.runs = [...replay, run(42970000013, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
   sweep(io);
-  expect(w.prompted?.map(([agent]) => agent)).toEqual(['buddy-engine']);
+  expect(w.sent.map(([pane]) => pane)).toEqual([FALLBACK_PANE]);
   clock += 25 * 60_000;sweep(io);
-  expect(w.prompted).toHaveLength(1);
+  expect(w.sent).toHaveLength(1);
 });
 
 test('FM11: a red failure-mode proof is one fix-row receipt, never main red; green, cancelled and old runs are quiet', () => {
