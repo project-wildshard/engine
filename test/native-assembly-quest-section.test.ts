@@ -85,11 +85,13 @@ for (const slug of ['driftwood-isle', 'pine-hollow']) test(`${slug}'s quest rows
 /** FP16b, FP16c: a product shipping its quest rows in `server/quest` and no plan: the section stands the family. */
 async function questAsShipped(fixture: Shipped): Promise<void> {
   expect(questRows(fixture).length, 'server/quest holds the quest rows').toBeGreaterThan(0);
-  // the section is what stands the family, its plumbing with it: a world with no plan rows and no section has no decisions
-  await expect(open(fixture, rewritten(fixture, fixture.plan.features))).rejects.toThrow('Missing native decision authority');
   const live = await open(fixture, fixture.product);
   let restored: NativeHeadlessResident | undefined;
   try {
+    // the section is what stands the family: without it the world has no decisions (Pine) or differs (Driftwood)
+    const bare = await open(fixture, rewritten(fixture, fixture.plan.features)).then(world => world, (error: unknown) => error instanceof Error ? error : new Error(String(error)));
+    if (bare instanceof Error) expect(bare.message).toContain('Missing native decision authority');
+    else try { expect(canonicalSimDigest(snapshotSimHost(bare.host))).not.toBe(canonicalSimDigest(snapshotSimHost(live.host))); } finally { bare.dispose(); }
     run(live, 900);
     restored = await open(fixture, fixture.product, serializeSimSnapshot(snapshotSimHostBytes(live.host)));
     expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));

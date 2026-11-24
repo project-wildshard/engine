@@ -413,7 +413,7 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
       const fight = declaredWakeFight(product.shardfile, wake.spawn);
       return run => {
         const declared = fight === undefined ? undefined : { ...fight, summon: () => { need(run.declared?.get(fight.entity), 'A declared wake needs its encounter').summon(); } };
-        installNativeChapterDirector(run.host, director, { id: row.id, rows: input, reward: row.reward, wake: { population: row.population, encounter: wake.encounter, placement: { pool: { x: captain.pool.x, z: captain.pool.z }, arena: captain.arena }, cues: wake.cues.map(({ id, operation }) => ({ id, operation })) } }, run.context.restoring, declared);
+        installNativeChapterDirector(run.host, director, { id: row.id, rows: input, ...(row.reward === undefined ? {} : { reward: row.reward }), wake: { ...(row.population === undefined ? {} : { population: row.population }), encounter: wake.encounter, placement: { pool: { x: captain.pool.x, z: captain.pool.z }, arena: captain.arena }, cues: wake.cues.map(({ id, operation }) => ({ id, operation })) } }, run.context.restoring, declared);
       };
     }
     default: throw new Error('Unknown native assembly host');

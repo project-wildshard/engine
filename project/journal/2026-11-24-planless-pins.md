@@ -9,3 +9,4 @@
 - 11:50 UTC: main went red on `test/roster-owners.proof.ts` (Pine r15 has no plan file), one the 8 missed. Every test that
   reads `server/native-assembly.json` from a pin now goes through `shippedPlan.ts`: `standingHosts` (engine) for the hosts,
   `foldedPlan` to cut or add rows (guarded: a folded product runs as shipped), so the Driftwood and Nalati re-pins pass.
+- 12:40 UTC: Driftwood r12's shard-pin went red: its `server/quest` chapter row names no `population` (its wake is a declared fight, OF22c1), and the host passed `population: undefined`, which is not JSON. The chapter wake's population is optional where a declared fight wakes; a wake with neither refuses.

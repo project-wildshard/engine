@@ -15,7 +15,7 @@ import { questBooks, type QuestBook } from '@wildshard/engine/quest/players';
 const finite = v.pipe(v.number(), v.finite());
 const chapterName = v.pipe(v.string(), v.minLength(1), v.maxLength(256));
 const nativeChapter = v.strictObject({ id: chapterName, rows: ChapterDirectorSchema, reward: v.exactOptional(chapterName),
-  wake: v.exactOptional(v.strictObject({ population: chapterName, encounter: WakeEncounterSchema,
+  wake: v.exactOptional(v.strictObject({ population: v.exactOptional(chapterName), encounter: WakeEncounterSchema,
     placement: v.strictObject({ pool: v.object({ x: finite, z: finite }), arena: finite }),
     cues: v.pipe(v.array(v.strictObject({ id: chapterName, operation: v.picklist(['restore', 'wake', 'effects']) })), v.maxLength(64)) })) });
 
@@ -43,7 +43,10 @@ export function installNativeChapterDirector(host: SimHost, director: Awaited<Re
     if (effect.kind === 'reward' && policy.reward === undefined) throw new Error('Missing native chapter reward owner');
     if (!['flag', 'phase', 'cue', 'reward'].includes(effect.kind)) throw new Error('Native chapter requires closed native effects');
   }
-  const population = policy.wake === undefined || declared !== undefined ? null : mixedPopulation(host, policy.wake.population);
+  // A declared wake fight (OF22c1) stands no population body, so its row may name none (Driftwood from r12, FP16b)
+  const named = policy.wake === undefined || declared !== undefined ? undefined : policy.wake.population;
+  if (policy.wake !== undefined && declared === undefined && named === undefined) throw new Error('A chapter wake with no declared fight names its population');
+  const population = named === undefined ? null : mixedPopulation(host, named);
   const encounter = policy.wake === undefined || population === null ? null : installWakeBoss(host, policy.wake.encounter, policy.wake.placement, population.retireCaptain);
   const declaredWake = policy.wake === undefined || declared === undefined ? null : bindDeclaredWake(host, policy.wake.encounter, declared);
   const reward = policy.reward === undefined ? null : installNativeQuestChannels(host, policy.reward, { started: false, completed: false });
