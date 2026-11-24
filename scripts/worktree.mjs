@@ -32,7 +32,6 @@ import {clonePaths} from './apfs-clone.mjs';
 import {freeBytes,lastActivity,linkedWorktrees,onMain,parseReapArgs,processDirectories,reap} from './worktree-reap.mjs';
 import {installLag} from './install-lag.mjs';
 import {laneLive} from './lane-live.mjs';
-import {keepCopy,worktreeState} from './pin-keep-copy.mjs';
 
 export const SLUG=/^[a-z0-9][a-z0-9._-]{0,63}$/u;
 const REGULAR=/^100(?:644|755)$/u;
@@ -92,8 +91,8 @@ export function withStoreUse(env,what,fn){
 
 /** Meta REPO-DISK DK9 (DEV-SPEED Q41): at most this many live plan worktrees per repo. */
 export const MAX_WORKTREES=10;
-/** Build-max C4: how long a landed, clean worktree sits untouched before a full cap takes it. */
-export const CAP_REAP_IDLE_MS=30*60_000;
+/** J358: how long a landed, clean worktree sits untouched before a full cap lists it as ended (it never removes it). */
+export const ENDED_IDLE_MS=30*60_000;
 /** Meta REPO-DISK DK9: refuse a new worktree when the repo's volume has less free than this, in GiB. */
 export const MIN_FREE_GIB=60;
 
@@ -107,6 +106,38 @@ export function freeGib(path,env){
  }
  const volume=statfsSync(path);
  return volume.bavail*volume.bsize/2**30;
+}
+
+/**
+ * J358 (Jake, 2026-11-15: "No fucking auto delete in scripts"; coordinator 11-24 reverts the cap reaper): the plan
+ * worktrees that have clearly ended: landed (tip on origin/main), clean, idle ENDED_IDLE_MS, with no process or pidfile
+ * inside. Report only: a full cap names them with the commands that remove them, a keep-copy first, for an agent to run.
+ * Only `land` removes a worktree itself (its own, just landed).
+ * @param {string} canonical @param {NodeJS.ProcessEnv} env @param {number} [now]
+ * @returns {{slug:string,idleHours:number}[]} oldest first
+ */
+export function endedWorktrees(canonical,env,now=Date.now()){
+ const roots=new Set([join(canonical,WORKTREES),join(realpathSync(canonical),WORKTREES)]);
+ const live=linkedWorktrees(canonical).filter(tree=>roots.has(dirname(resolve(tree.path)))&&existsSync(tree.path));
+ const directories=processDirectories(),cwds=directories===undefined?null:[...directories.values()];
+ return live.flatMap(tree=>{
+  const slug=basename(tree.path);
+  if(tree.branch!==`refs/heads/plan/${slug}`||!onMain(canonical,tree.head))return [];
+  const at=lastActivity(tree.path,git(tree.path,['rev-parse','--absolute-git-dir']).trim());
+  if(now-at<ENDED_IDLE_MS)return [];
+  const dirty=spawnSync('git',['--no-optional-locks','status','--porcelain','--untracked-files=all'],{cwd:tree.path,encoding:'utf8',maxBuffer:64<<20});
+  if(dirty.status!==0||dirty.stdout.trim()!=='')return [];
+  // A process or pidfile inside keeps it off the list; an owner session that has gone quiet, or no owner file, does not.
+  if(laneLive(tree.path,{cwds,sessionLive:false,activeHours:Number.POSITIVE_INFINITY,receipts:env.WS_LANE_RECEIPTS}).state==='live')return [];
+  return [{slug,at}];
+ }).sort((a,b)=>a.at-b.at).map(({slug,at})=>({slug,idleHours:(now-at)/3_600_000}));
+}
+
+/** The refusal's list: each ended worktree and the one command that removes it, copy first. @param {{slug:string,idleHours:number}[]} ended */
+export function endedList(ended){
+ if(ended.length===0)return '';
+ const rows=ended.map(({slug,idleHours})=>`\n  node scripts/keep-copy.mjs ${WORKTREES}/${slug} && git worktree remove ${WORKTREES}/${slug} && git branch -d plan/${slug}   # ${slug}: landed, clean, idle ${idleHours.toFixed(1)} h, nothing running`);
+ return `\nended worktrees (J358: nothing removes them for you; copy first, then remove, from the canonical checkout):${rows.join('')}`;
 }
 
 /**
@@ -138,52 +169,10 @@ export function capRefusal(canonical,env){
  const oldest=parked[0];
  const hint=oldest===undefined
   ?`none of them is parked (landed on origin/main and clean): land one, or remove one by hand`
-  :`the oldest parked worktree is ${WORKTREES}/${oldest.slug} (landed, clean, idle ${((Date.now()-oldest.at)/3_600_000).toFixed(1)} h); a full cap reaps one idle ${String(CAP_REAP_IDLE_MS/60_000)} min with no process inside, or land one with --done`;
- return `${why}; ${hint}`;
+  :`the oldest parked worktree is ${WORKTREES}/${oldest.slug} (landed, clean, idle ${((Date.now()-oldest.at)/3_600_000).toFixed(1)} h)`;
+ return `${why}; ${hint}${full?endedList(endedWorktrees(canonical,env)):''}`;
 }
 
-/**
- * Build-max C4 (2026-11-21): a full cap makes room instead of refusing. Landed (tip on origin/main), clean plan
- * worktrees idle CAP_REAP_IDLE_MS with no process or pidfile inside go, oldest first, until one more fits: a keep-copy
- * first (J358: copy before removal), then the worktree and its local branch, as land's own cleanup does. Anything that
- * fails keeps that worktree and says why. Low disk is not this: it still refuses.
- * @param {string} canonical @param {NodeJS.ProcessEnv} env @param {number} [now]
- * @returns {string[]} one line per worktree it looked at
- */
-export function reapForCap(canonical,env,now=Date.now()){
- const roots=new Set([join(canonical,WORKTREES),join(realpathSync(canonical),WORKTREES)]);
- const live=linkedWorktrees(canonical).filter(tree=>roots.has(dirname(resolve(tree.path)))&&existsSync(tree.path));
- let room=MAX_WORKTREES-live.length;
- if(room>0)return [];
- const directories=processDirectories(),cwds=directories===undefined?null:[...directories.values()];
- const idle=live.flatMap(tree=>{
-  const slug=basename(tree.path);
-  if(tree.branch!==`refs/heads/plan/${slug}`||!onMain(canonical,tree.head))return [];
-  const at=lastActivity(tree.path,git(tree.path,['rev-parse','--absolute-git-dir']).trim());
-  if(now-at<CAP_REAP_IDLE_MS)return [];
-  const dirty=spawnSync('git',['--no-optional-locks','status','--porcelain','--untracked-files=all'],{cwd:tree.path,encoding:'utf8',maxBuffer:64<<20});
-  if(dirty.status!==0||dirty.stdout.trim()!=='')return [];
-  // Only a process or pidfile inside keeps it: an owner session that has gone quiet for 30 min does not.
-  if(laneLive(tree.path,{cwds,sessionLive:false,activeHours:Number.POSITIVE_INFINITY,receipts:env.WS_LANE_RECEIPTS}).state==='live')return [];
-  return [{tree,slug,at}];
- }).sort((a,b)=>a.at-b.at);
- /** @type {string[]} */const lines=[];
- for(const {tree,slug,at} of idle){
-  if(room>0)break;
-  const minutes=Math.round((now-at)/60_000);
-  try{
-   const before=worktreeState(tree.path);
-   const saved=keepCopy(tree.path,{keepRoot:env.WS_SESSION_KEEP_ROOT});
-   if(worktreeState(tree.path)!==before){lines.push(`kept ${slug}: changed during its copy`);continue;}
-   const removed=tryGit(canonical,['worktree','remove',tree.path]);
-   if(removed.status!==0){lines.push(`kept ${slug}: ${removed.stderr.trim().split('\n').at(-1)??'git worktree remove refused'}`);continue;}
-   tryGit(canonical,['update-ref','-d',`refs/heads/plan/${slug}`,tree.head]);
-   room++;
-   lines.push(`reaped ${slug} (landed, clean, idle ${String(minutes)} min) for the cap; copy at ${saved.dir}`);
-  }catch(error){lines.push(`kept ${slug}: ${error instanceof Error?error.message:String(error)}`);}
- }
- return lines;
-}
 
 /** @param {string[]} argv */
 export function parseArgs(argv){
@@ -424,11 +413,7 @@ export function worktreeNew(argv,cwd=process.cwd(),env=process.env){
   if(tryGit(canonical,['rev-parse','--verify','--quiet',`refs/heads/${branch}`]).status===0)throw new StopError(`branch ${branch} already exists; delete it or pick another slug`);
   timed('fetch',()=>{git(canonical,['fetch','--quiet','origin','main']);base=git(canonical,['rev-parse','origin/main']).trim();return `origin/main ${base.slice(0,10)}; ${followMain(canonical,base)}`;});
   // DK9: after the fetch, so "landed" reads the current origin/main; before anything is added.
-  let refused=capRefusal(canonical,env);
-  if(refused!==''){
-   for(const line of reapForCap(canonical,env))process.stdout.write(`worktree reap     ${line}\n`);
-   refused=capRefusal(canonical,env);
-  }
+  const refused=capRefusal(canonical,env);
   if(refused!=='')throw new StopError(refused);
   // Git refuses `-b` for a branch that appeared since the check, before anything here owns one.
   timed('add',()=>{git(canonical,['worktree','add','--quiet','--no-checkout','-b',branch,relative,base]);});

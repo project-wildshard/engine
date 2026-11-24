@@ -4,7 +4,7 @@ import {spawn, spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
-import {CAP_REAP_IDLE_MS, INSTALLED_LOCK, MAX_WORKTREES, SLUG, followMain, parseArgs, reapForCap, refreshCanonicalInstall, withStoreUse} from '../../scripts/worktree.mjs';
+import {ENDED_IDLE_MS, INSTALLED_LOCK, MAX_WORKTREES, SLUG, endedList, endedWorktrees, followMain, parseArgs, refreshCanonicalInstall, withStoreUse} from '../../scripts/worktree.mjs';
 
 const SCRIPT = resolve(import.meta.dirname, '../../scripts/worktree.mjs');
 /** @type {string[]} */
@@ -383,35 +383,31 @@ describe('followMain keeps the canonical install on its lockfile', () => {
   });
 });
 
-// Build-max C4 (2026-11-21): a full cap reaps a landed, clean worktree idle 30 min instead of refusing a new one.
-describe('a full cap makes room', () => {
-  test('reaps the oldest landed, clean, idle worktree with a copy first; keeps dirty and recent ones', () => {
-    const {canonical, base} = repos();
+// J358 (Jake 2026-11-15: no auto delete in scripts; replaces Build-max C4's cap reaper, 738764b36): a full cap refuses and
+// lists each ended worktree with its copy-first removal command; nothing is removed.
+describe('a full cap lists ended worktrees', () => {
+  test('lists landed, clean worktrees idle 30 min with copy-first commands; keeps every worktree and branch', () => {
+    const {canonical} = repos();
     // .owner marks each worktree, as the real .gitignore ignores it.
     writeFileSync(join(canonical, '.git/info/exclude'), '/.owner\n');
-    const keepRoot = join(base, 'keep'), receipts = join(base, 'receipts.log');
-    const env = {WS_SESSION_KEEP_ROOT: keepRoot, WS_LANE_RECEIPTS: receipts};
     const slugs = Array.from({length: MAX_WORKTREES}, (_, index) => `full-${String(index)}`);
-    for (const slug of slugs) expect(worktree(canonical, ['new', slug, '--no-install'], env).status).toBe(0);
+    for (const slug of slugs) expect(worktree(canonical, ['new', slug, '--no-install']).status).toBe(0);
     put(join(canonical, '.worktrees/full-0'), 'src/same.ts', 'export const same = "work in progress";\n');
-    // Fresh worktrees are not idle: the cap still refuses, naming the parked one.
-    const refused = worktree(canonical, ['new', 'next', '--no-install'], env);
+    // Fresh worktrees have not ended: the cap refuses with no list.
+    const refused = worktree(canonical, ['new', 'next', '--no-install']);
     expect(refused.status).toBe(1);
-    expect(refused.stderr).toMatch(new RegExp(`cap ${String(MAX_WORKTREES)}\\).*a full cap reaps one idle 30 min with no process inside`, 'u'));
-    const ENV_FULL = {...ENV, ...env};
-    expect(reapForCap(canonical, ENV_FULL)).toEqual([]);
-    // 31 min on: full-0 is dirty and stays; full-1 is the oldest clean one and goes, after its copy.
-    const lines = reapForCap(canonical, ENV_FULL, Date.now() + CAP_REAP_IDLE_MS + 60_000);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toMatch(/^reaped full-\d \(landed, clean, idle \d+ min\) for the cap; copy at /u);
-    const gone = /^reaped (full-\d)/u.exec(lines[0] ?? '')?.[1] ?? '';
-    expect(gone).not.toBe('full-0');
-    expect(existsSync(join(canonical, '.worktrees', gone))).toBe(false);
-    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/plan/${gone}`], {cwd: canonical, env: ENV}).status).not.toBe(0);
-    expect(existsSync(join(canonical, '.worktrees/full-0/src/same.ts'))).toBe(true);
-    expect(readdirSync(keepRoot).length).toBeGreaterThan(0);
-    const made = worktree(canonical, ['new', 'next', '--no-install'], env);
-    expect(made.status, made.stderr).toBe(0);
+    expect(refused.stderr).toMatch(new RegExp(`cap ${String(MAX_WORKTREES)}\\)`, 'u'));
+    expect(refused.stderr).not.toMatch(/ended worktrees/u);
+    expect(endedWorktrees(canonical, ENV)).toEqual([]);
+    // 31 min on: every clean one has ended, full-0 (dirty) has not; nothing is removed.
+    const ended = endedWorktrees(canonical, ENV, Date.now() + ENDED_IDLE_MS + 60_000).map(row => row.slug);
+    expect(ended).toHaveLength(MAX_WORKTREES - 1);
+    expect(ended).not.toContain('full-0');
+    for (const slug of slugs) {
+      expect(existsSync(join(canonical, '.worktrees', slug))).toBe(true);
+      expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', `refs/heads/plan/${slug}`], {cwd: canonical, env: ENV}).status).toBe(0);
+    }
+    expect(endedList([{slug: 'full-1', idleHours: 2}])).toMatch(/node scripts\/keep-copy\.mjs \.worktrees\/full-1 && git worktree remove \.worktrees\/full-1 && git branch -d plan\/full-1 /u);
   });
 
   test('the canonical refresh installs when pnpm\'s installed lockfile disagrees with a matching record', () => {
