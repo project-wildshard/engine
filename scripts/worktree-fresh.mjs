@@ -47,7 +47,7 @@ export function byHand(canonical,argv){
  * @returns {{run:'here', why:string}|{run:'fresh', script:string, stale:string[], sha:string}}
  */
 export function freshTool({canonical,self,env=process.env,fetch=true,log=()=>undefined}){
- if(env['WS_WORKTREE_FRESH']==='1')return {run:'here',why:'the relaunched origin/main copy'};
+ if(env.WS_WORKTREE_FRESH==='1')return {run:'here',why:'the relaunched origin/main copy'};
  const root=resolve(dirname(self),'..');
  // only this repo's own tool is judged: a script run against another repo (a test fixture) runs as it is
  let own=false;

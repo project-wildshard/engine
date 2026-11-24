@@ -25,7 +25,7 @@ import {randomBytes} from 'node:crypto';
 import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,realpathSync,rmSync,statSync,statfsSync,unlinkSync,writeFileSync} from 'node:fs';
 import {homedir} from 'node:os';
 import {basename,dirname,join,resolve} from 'node:path';
-import {fileURLToPath,pathToFileURL} from 'node:url';
+import {pathToFileURL} from 'node:url';
 import {WORKTREES} from './worktree-ignore.mjs';
 import {byHand,freshTool,relaunch} from './worktree-fresh.mjs';
 import {clonePaths} from './apfs-clone.mjs';
@@ -511,7 +511,7 @@ if(process.argv[1]!==undefined&&import.meta.url===pathToFileURL(resolve(process.
   // J505: a stale canonical checkout runs origin/main's copy of this tool, never its own (worktree-fresh.mjs)
   const canonical=canonicalRoot(process.cwd());
   let fresh;
-  try{fresh=freshTool({canonical,self:fileURLToPath(import.meta.url),log:line=>{process.stderr.write(`${line}\n`);}});}
+  try{fresh=freshTool({canonical,self:import.meta.filename,log:line=>{process.stderr.write(`${line}\n`);}});}
   catch(error){throw new StopError(`origin/main's copy of the worktree tool could not be made (${error instanceof Error?error.message.split('\n')[0]:String(error)}); run it by hand: ${byHand(canonical,argv)}`);}
   if(fresh.run==='fresh'){
    process.stderr.write(`worktree: this checkout's tool differs from origin/main ${fresh.sha.slice(0,10)} (${fresh.stale.join(', ')}); running origin/main's copy\n`);
