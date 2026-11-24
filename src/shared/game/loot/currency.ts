@@ -3,7 +3,7 @@
  * row's `currency` (format 0.67.0), not engine code. Driftwood's declares its own since r9 (OF31g3).
  *
  *   declaredCurrency(source.rows.loot)   // → { id, name, model, icon } or null when no row names one
- *   coinsDeclared(source.rows.loot)      // the purse and kill bursts are on: a declared currency, or any loot row
+ *   coinsDeclared(source.rows.loot)      // the purse and kill bursts are on: only a declared currency (FP31)
  */
 import * as v from 'valibot';
 import { LootEconomySchema } from '@wildshard/format/lootEconomy';
@@ -19,9 +19,9 @@ export function declaredCurrency(rows: readonly { readonly economy?: unknown }[]
   return null;
 }
 
-/** Whether kills pay coins into a purse here. The any-loot-row rule stays while live shards pay coins with no currency row:
- *  Brasscap, Ink-Cel, Pastel and Pine, and the SDK's `new` Template (`gear: 'purse.coins'`). OF31g4 found them; it goes once
- *  they declare theirs. */
+/** Whether kills pay coins into a purse here: only where a loot row declares the shard's currency. FORMAT-PRUNE FP31
+ *  retired OF31g4's any-loot-row rule once Brasscap and Pine declared theirs; `test/currency-pins.test.ts` holds every
+ *  pinned shard with a loot row to a declared currency. */
 export function coinsDeclared(rows: readonly { readonly economy?: unknown }[]): boolean {
-  return declaredCurrency(rows) !== null || rows.length > 0;
+  return declaredCurrency(rows) !== null;
 }

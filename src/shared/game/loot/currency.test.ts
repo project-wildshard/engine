@@ -1,4 +1,4 @@
-// ONE-FORMAT OF31g2: the coin is the shard's currency row; the old any-loot-row rule stays until OF31g4.
+// ONE-FORMAT OF31g2: the coin is the shard's currency row; FORMAT-PRUNE FP31 retired the any-loot-row rule.
 import { expect, test } from 'vitest';
 import { coinsDeclared, declaredCurrency } from './currency';
 
@@ -9,9 +9,10 @@ test('a currency row names the shard\'s own coin', () => {
   expect(coinsDeclared([{ economy: { currency: doubloon } }])).toBe(true);
 });
 
-test('no currency row: no coin named, and the old rule still turns coins on for loot rows', () => {
+test('no currency row: no coin named and no coins, loot rows or not (FP31)', () => {
   expect(declaredCurrency([{ economy: { goods: [] } }, {}])).toBeNull();
-  expect(coinsDeclared([{}])).toBe(true);
+  expect(coinsDeclared([{}])).toBe(false);
+  expect(coinsDeclared([{ economy: { goods: [] } }])).toBe(false);
   expect(coinsDeclared([])).toBe(false);
 });
 
