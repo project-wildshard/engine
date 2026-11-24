@@ -17,3 +17,7 @@ FP21: a product may ship `server/world` (format `40da84e`) in place of `server/n
 pins run digest for digest with no plan file.
 
 FP21: the host ruler reads hosts from the server sections and `server/world`, so a product with no plan file is measured.
+
+FP21 delete (branch plan/native-fp21, unpushed): one path. A world stands its hosts from `server/world` and the family
+sections only; a kept plan file (CP16) is admitted read only by migration into them, and refused if it names a host no
+section holds. `test/no-native-plan.test.ts` fails while a pin ships the plan file (Driftwood r10, Pine r13, Nalati r7).

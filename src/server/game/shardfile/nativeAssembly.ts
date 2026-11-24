@@ -246,31 +246,41 @@ function parseWrittenPlan(raw: unknown): NativeAssemblyPlan {
   return { ...parseNativeAssembly({ ...raw, features: [{ host: 'decisions' }] }), features: [] };
 }
 const rank = (host: string): number => { const at = HOST_ORDER.indexOf(host); return at === -1 ? HOST_ORDER.length : at; };
+/** Each family section's rows, from the product's sections or a migrated plan file. */
+type FamilyRows = ReadonlyMap<string, readonly NativeAssemblyFeature[]>;
+function productFamilies(product: ShardFolder): FamilyRows {
+  const any = product as unknown as AnySectionProduct;
+  return new Map(HOST_SECTIONS.filter(row => any.has(row.name)).map(({ name, owns }) => [name, sectionHostRows(name, owns, any.section(name))]));
+}
 /**
- * FORMAT-PRUNE FP16: the hosts a native plan stands. A plan with no family section keeps its own list as written. With
- * one, each section's family stands from the section (a plan naming one of its hosts as well is refused: one place
- * only); the quest family brings its plumbing (`decisions`, `commands`, FP16e) and a plan whose bake is read whole
- * (`bake.read: 'bake'`) its `collision` host (FP16d, Pine's and Nalati's; Driftwood's `solids` bake stands its own solids,
- * OF22a3), where the plan names none; and the list takes `HOST_ORDER`.
+ * FORMAT-PRUNE FP16, FP21: the hosts a native world stands, all from its family sections: each section's rows; the quest
+ * family's plumbing (`decisions`, `commands`, FP16e); the `collision` host of a bake read whole (`bake.read: 'bake'`,
+ * FP16d, Pine's and Nalati's; Driftwood's `solids` bake stands its own solids, OF22a3); in `HOST_ORDER`. The day, the
+ * weather, taming and the arsenal stand from their own files (FP16d1, OF29, OF38).
  */
-function withHostSections(product: ShardFolder, plan: NativeAssemblyPlan): NativeAssemblyFeature[] {
-  const any = product as unknown as AnySectionProduct, present = HOST_SECTIONS.filter(row => any.has(row.name));
-  if (present.length === 0) return plan.features;
-  const rows = [...plan.features];
-  for (const { name, owns } of present) {
-    const named = plan.features.find(row => owns(row.host));
-    if (named !== undefined) throw new Error(`Native plan names ${named.host} beside the ${name} section: a family stands from its section alone (FORMAT-PRUNE FP16)`);
-    rows.push(...sectionHostRows(name, owns, any.section(name)));
-  }
-  const has = (...hosts: readonly string[]): boolean => rows.some(row => hosts.includes(row.host));
-  if (present.some(row => row.name === 'server/quest') && !has('decisions', 'commands')) rows.push({ host: 'decisions' }, { host: 'commands' });
-  if (plan.bake?.read === 'bake' && !has('collision', 'collision.pieces')) rows.push({ host: 'collision' });
+function withHostSections(families: FamilyRows, plan: NativeAssemblyPlan): NativeAssemblyFeature[] {
+  const rows = [...families.values()].flat();
+  if (families.has('server/quest')) rows.push({ host: 'decisions' }, { host: 'commands' });
+  if (plan.bake?.read === 'bake') rows.push({ host: 'collision' });
   return rows.map((row, at) => ({ row, at })).sort((a, b) => rank(a.row.host) - rank(b.row.host) || a.at - b.at).map(({ row }) => row);
 }
-/** The hosts a native world stands before its population and taming steps: its plan's (or `server/world`'s, none) and each
- *  family section's, in install order (FORMAT-PRUNE FP16; what a test reads where a product ships no plan file). */
-export async function standingHosts(product: ShardFolder): Promise<readonly NativeAssemblyFeature[]> {
-  return withHostSections(product, await writtenPlan(product));
+/**
+ * FORMAT-PRUNE FP21 (CP16): a plan file, written before `server/world` and kept as an original, admitted read only: its
+ * settings stand as `server/world` would hold them and each named row moves to its family section. A host this engine
+ * stands with no row (the quest plumbing, a whole bake's collision, the declared day) is dropped where it would stand the
+ * same; a plan naming any other host is refused, since no section can hold it. Driftwood r10, Pine r13 and Nalati r7 run
+ * digest for digest so (`native-assembly-host-sections.test.ts`).
+ */
+function migratedPlanFile(raw: NativeAssemblyPlan): { readonly plan: NativeAssemblyPlan; readonly families: FamilyRows } {
+  const families = new Map<string, NativeAssemblyFeature[]>();
+  for (const row of raw.features) {
+    const family = HOST_SECTIONS.find(entry => entry.owns(row.host));
+    if (family !== undefined) { families.set(family.name, [...families.get(family.name) ?? [], row]); continue; }
+    const stands = row.host === 'day.declared' || (row.host === 'collision' && raw.bake?.read === 'bake') ||
+      ((row.host === 'decisions' || row.host === 'commands') && raw.features.some(entry => entry.host.startsWith('quest.')));
+    if (!stands) throw new Error(`${NATIVE_ASSEMBLY_FILE} names ${row.host}, which no server section holds (FORMAT-PRUNE FP21, CP16)`);
+  }
+  return { plan: { ...raw, features: [] }, families };
 }
 /** Put cooked taming at the same installation point as its explicit predecessor. Its pose program is the looks row of
  *  the taming rows' first kind, the species tamed before any upgrade (FORMAT-PRUNE FP42: the engine names no kind). */
@@ -311,14 +321,15 @@ const WORLD_SECTION = 'server/world';
 export function hasNativeAssembly(product: ShardFolder): boolean {
   return product.hasFile(NATIVE_ASSEMBLY_FILE) || (product as unknown as AnySectionProduct).has(WORLD_SECTION);
 }
-/** FORMAT-PRUNE FP21: the plan a product writes: its plan file (an older writer) or its `server/world` section, never both. */
-async function writtenPlan(product: ShardFolder): Promise<NativeAssemblyPlan> {
+/** FORMAT-PRUNE FP21: the world a product writes: its `server/world` section and family sections, or a kept plan file
+ * migrated to them (an older writer), never both. */
+async function writtenWorld(product: ShardFolder): Promise<{ readonly plan: NativeAssemblyPlan; readonly families: FamilyRows }> {
   const any = product as unknown as AnySectionProduct, file = product.hasFile(NATIVE_ASSEMBLY_FILE);
-  if (file && any.has(WORLD_SECTION)) throw new Error(`A native world ships ${NATIVE_ASSEMBLY_FILE} or the ${WORLD_SECTION} section, not both (FORMAT-PRUNE FP21)`);
-  if (file) return parseWrittenPlan(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await product.file(NATIVE_ASSEMBLY_FILE))));
+  if (file && (any.has(WORLD_SECTION) || HOST_SECTIONS.some(row => any.has(row.name)))) throw new Error(`A native world ships ${NATIVE_ASSEMBLY_FILE} or the server sections, not both (FORMAT-PRUNE FP21)`);
+  if (file) return migratedPlanFile(parseNativeAssembly(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await product.file(NATIVE_ASSEMBLY_FILE)))));
   const { version, ...world } = any.section(WORLD_SECTION) as { readonly version?: unknown } & Readonly<Record<string, unknown>>;
   if (version !== 1) throw new Error(`${WORLD_SECTION} needs version 1`);
-  return parseWrittenPlan({ kind: 'native-assembly', ...world, features: [] });
+  return { plan: parseWrittenPlan({ kind: 'native-assembly', ...world, features: [] }), families: productFamilies(product) };
 }
 /**
  * Build one native world from a product's `server/native-assembly.json` (P1-E3.1b). Every read happens here, so a bad
@@ -326,8 +337,8 @@ async function writtenPlan(product: ShardFolder): Promise<NativeAssemblyPlan> {
  */
 export async function prepareNativeAssembly<C extends NativeAssemblyContext>(input: ShardFolder, assets: ReadonlyMap<string, Uint8Array>, ports: NativeAssemblyPorts<C>): Promise<NativeAssemblyRuntime<C>> {
   const preparation = { product: input, assets }, lendReturns = await prepareReturns(preparation);
-  const written = await writtenPlan(input);
-  const plan: NativeAssemblyPlan = { ...written, features: withHostSections(input, written) };
+  const written = await writtenWorld(input);
+  const plan: NativeAssemblyPlan = { ...written.plan, features: withHostSections(written.families, written.plan) };
   const patrol = ports.room === true ? plan.features.find(row => row.host === 'encounter.patrol') : undefined;
   const product = patrol === undefined ? input : await withEncounters(input, mergedIntake(await readPatrolIntake(input, patrol), await readSlotIntake(input, patrol), await readWindIntake(input, patrol.actors)));
   const shard = product.shardfile, bake = await prepareBake(product, plan.bake), ground = await prepareGround(product, assets, plan, bake);
