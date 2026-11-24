@@ -177,7 +177,8 @@ test('a slice comes from the head it was cut from, and Ring 1 names only pinned 
   for (const row of slices) expect(heads.get(row.slug)).toBe(row.from);
 });
 
-test('a missing mirrored slice rebuilds exact pinned bytes and refuses changed descriptors', async () => {
+/** A pinned Brasscap Mesa head and its Ring 1 server slice, served by a local API whose mirror holds nothing. */
+async function sliceFixture() {
   const root = mkdtempSync(resolvePath('tmp/pin-slice-rebuild-')); folders.push(root);
   const product = formatTemplate('brasscap-mesa'), shard = openShardfile(product.bytes);
   const files = new Map(serverRows(shard).map(row => [row.path, shard.read(row.path)]));
@@ -198,6 +199,13 @@ test('a missing mirrored slice rebuilds exact pinned bytes and refuses changed d
   const address = server.address(); if (address === null || typeof address === 'string') throw new Error('No fixture port');
   const origin = `http://127.0.0.1:${address.port}`, cache = join(root, 'cache');
   const env = {...process.env, WILDSHARD_API: origin, WILDSHARD_PIN_MIRROR: `${origin}/mirror`, WILDSHARD_PIN_CACHE: cache, GIT_CEILING_DIRECTORIES: root};
+  return {root, env, row, hash, body, cache, save, shard};
+}
+
+// Split from one test (main red 45456209066: its seven tool runs passed the 30 s timeout on a loaded hosted runner,
+// 7 s alone); the same facts, each half under the limit with room (RULES 11).
+test('a missing mirrored slice rebuilds exact pinned bytes', async () => {
+  const {root, env, row, hash, body, cache, shard} = await sliceFixture();
   expect(refusals(await install(root, env))).toBe('');
   const full = join(root, 'out', row.slug, 'validation.json'), before = readFileSync(full);
   expect(existsSync(join(root, 'out/.slices', row.slug))).toBe(false);
@@ -208,6 +216,13 @@ test('a missing mirrored slice rebuilds exact pinned bytes and refuses changed d
   expect(refusals(await pinsTool(root, env, 'install', '--ring', '1'))).toBe('');
   expect(readFileSync(join(cache, `${hash}.tar`))).toEqual(Buffer.from(body));
   expect(readFileSync(join(root, 'out/.slices', row.slug, 'shard.json'))).toEqual(Buffer.from(shard.header));
+});
+
+test('a missing mirrored slice refuses changed descriptors and another head', async () => {
+  const {root, env, row, hash, cache, save} = await sliceFixture();
+  // A refusal also removes the slice a good install left.
+  expect(refusals(await pinsTool(root, env, 'install', '--ring', '1'))).toBe('');
+  expect(existsSync(join(root, 'out/.slices', row.slug))).toBe(true);
   for (const changed of [{hash: '0'.repeat(64)}, {bytes: row.bytes + 1}, {files: row.files + 1}]) {
     rmSync(join(cache, `${hash}.tar`), {force: true});
     save('slices.json', {slices: [{...row, ...changed}]});
