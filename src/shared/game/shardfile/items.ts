@@ -184,8 +184,7 @@ export function installDeclaredItems(input: unknown, ports: DeclaredItemPorts): 
       const { ui: presentationUi, ...presentation } = family.presentation ?? {};
       const row: EquipmentRow = { ...presentation, id: declaration.id, ui: { touch: 'melee', lockOn: declaration.kind === 'weapon', melee: declaration.kind === 'weapon', tracers: false,
         ...presentationUi, name: declaration.ui.name, icon, swapIcon: declaration.ui.swapIcon,
-        ...(declaration.kind === 'weapon' ? { inputContext: declaration.context } : {}) }, meta: { name: declaration.ui.name, icon, blurb: declaration.ui.blurb, category: declaration.kind },
-        ...(declaration.kind === 'weapon' ? { legacySlot: declaration.slot } : {}) };
+        ...(declaration.kind === 'weapon' ? { inputContext: declaration.context } : {}) }, meta: { name: declaration.ui.name, icon, blurb: declaration.ui.blurb, category: declaration.kind } };
       const args = { scope: itemScope, runtime, input: ports.input, aim: ports.aim, view: declaration.view,
         ...(models[index] === undefined ? {} : { model: models[index] }),
         ...(deps.hook === null ? {} : { hook: deps.hook }),

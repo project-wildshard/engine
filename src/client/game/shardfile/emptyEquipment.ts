@@ -10,7 +10,7 @@ export class EmptyEquipment extends Weapon {
   holster = 0;
   enabled = false;
   constructor() {
-    super({ id: 'weapon.empty', legacySlot: 'empty',
+    super({ id: 'weapon.empty',
       ui: { name: 'Unarmed', icon: 'you', touch: 'melee', lockOn: false, melee: false, tracers: false, swapIcon: '' },
       meta: { name: 'Unarmed', icon: 'you', blurb: 'No equipment.', category: 'weapon' } });
   }

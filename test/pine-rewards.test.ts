@@ -349,7 +349,7 @@ test('a shared-storage host preserves page discovery and worn finishes across re
     if (input.product === undefined) throw new Error('Missing product');
     return new CompendiumState(declaredFolderCompendium(input.product, input.shard.rows.compendiums[0]?.id ?? ''));
   });
-  const skins = onPage(storage, () => new SkinLocker('pine-hollow', ['scarback-furnace', 'hollow-ash', 'ghost-stag'].map(id => ({ id, weapon: 'crossbow', name: id, blurb: '', mats: {} }))));
+  const skins = onPage(storage, () => new SkinLocker('pine-hollow', ['scarback-furnace', 'hollow-ash', 'ghost-stag'].map(id => ({ id, weapon: 'declared.weapon.crossbow' as const, name: id, blurb: '', mats: {} }))));
   wire.bind(first.shell.client, () => undefined, () => undefined, () => false);
   wire.hold({ shard: 'pine-hollow', journal, finishes: skins }, scope);
   const place = journal.def.entries.find(entry => entry.kind === 'place')?.id;
@@ -357,7 +357,7 @@ test('a shared-storage host preserves page discovery and worn finishes across re
   try {
     // Real page mutations after the worker copied its boot documents.
     onPage(storage, () => {
-      skins.own('hollow-ash'); skins.wear('crossbow', 'scarback-furnace');
+      skins.own('hollow-ash'); skins.wear('declared.weapon.crossbow', 'scarback-furnace');
       for (let i = 0; i < 6; i++) journal.see('ghost-stag');
       for (let i = 0; i < 3; i++) journal.placeVisited(place);
     });

@@ -24,7 +24,7 @@ class TestWeapon extends Weapon {
 const previousDeveloper=isDev();
 beforeEach(()=>{setDev(true);});
 afterEach(()=>{setDev(previousDeveloper);});
-const weaponRow=(id:EquipmentRow['id'],slot:'bow'|'sword'):EquipmentRow=>({...SWORD_WOOD,id,legacySlot:slot});
+const weaponRow=(id:EquipmentRow['id'],_slot:'bow'|'sword'):EquipmentRow=>({...SWORD_WOOD,id});
 
 test('with Developer on, a NaN crossbow frame skips only that weapon and opens the existing error modal',()=>{
   vi.useFakeTimers();

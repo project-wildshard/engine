@@ -23,7 +23,7 @@ export async function run(browser,phone,base) {
       world.game.app.events.on('creature.notice',event=>{seen.notices.push(event.text);},world.game.levelScope);
       world.game.app.events.on('weapon.fired',()=>{seen.shots++;},world.game.levelScope);
       const equipment=world.game.app.equipment;
-      equipment?.select('bow',true);
+      equipment?.select('declared.weapon.bow',true);
       const y=Reflect.get(window,'__hf').heightAt(81,46);world.player.link?.place?.(81,y+0.4,46,0);
     });
     await page.waitForFunction(()=>Reflect.get(window,'__wildshard')?.world?.animals.animals.some(row=>row.kind==='horse'&&row.variant==='stallion'),undefined,{timeout:15000});

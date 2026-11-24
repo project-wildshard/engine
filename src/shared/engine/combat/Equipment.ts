@@ -36,12 +36,12 @@ export interface WeaponUi {
 export interface EquipmentMeta { name: string; icon: EquipmentIcon; blurb: string; category: string }
 /** a weapon's sound cues: fire, reload, impact, and the optional dry, hit, heavy and charge cues */
 export interface EquipmentCues { fire: CueId; reload: CueId; impact: CueId; dry?: CueId; hit?: CueId; heavy?: CueId; charge?: Readonly<Record<string, CueId>> }
-/** FORMAT-PRUNE FP22b: a weapon's runtime id. A row with the closed `legacySlot` keeps that name (saves, skins and ammunition
- *  key by it); a row without it is keyed by its item, `declared.<item id>`, as held melee already was. */
-export function weaponIdOf(row: Readonly<Pick<EquipmentRow, 'legacySlot'> & { id: string }>): WeaponId {
-  return row.legacySlot ?? (`declared.${row.id}` as WeaponId);
+/** FORMAT-PRUNE FP22b/FP22e: a weapon's runtime id is its item, `declared.<item id>`: saves, skins and ammunition key by
+ *  it. The closed engine-native names are gone; an old save keyed by one moves on load (FP22c's save bridge). */
+export function weaponIdOf(row: Readonly<{ id: string }>): WeaponId {
+  return `declared.${row.id}` as WeaponId;
 }
-export interface EquipmentRow { pickup?: EquipmentPickupSpec; rangedFeel?: RangedFeelProfile; cues?: EquipmentCues; hitStop?: HitStopProfile; tags?: readonly CombatTag[]; id: EquipmentId; legacySlot?: WeaponId; ui: WeaponUi; meta: EquipmentMeta }
+export interface EquipmentRow { pickup?: EquipmentPickupSpec; rangedFeel?: RangedFeelProfile; cues?: EquipmentCues; hitStop?: HitStopProfile; tags?: readonly CombatTag[]; id: EquipmentId; ui: WeaponUi; meta: EquipmentMeta }
 export interface EquipmentBlock { dispose: () => void }
 export type BlockSet = Partial<Record<'vm' | 'aim' | 'ads' | 'melee' | 'projectile' | 'hitStop' | 'ammo' | 'brass', EquipmentBlock>>;
 /** The scope is sufficient for the legacy families; block/input/combat ports expand as their migration rows land. */

@@ -8,7 +8,6 @@ import type { MeleeProfile } from '@wildshard/engine/combat/meleeProfile';
 export const WOODEN_SWORD: EquipmentRow = {
   cues: {"fire": "cue.sword.swing", "reload": "cue.reload", "impact": "cue.sword.hit"},
   "id": "weapon.sword",
-  "legacySlot": "sword",
   "ui": {
     "swapIcon": SWAP_GLYPHS.sword,
     "name": "Wooden sword",
@@ -30,7 +29,6 @@ export const WOODEN_SWORD: EquipmentRow = {
 export const IRON_SWORD: EquipmentRow = {
   cues: {"fire": "cue.sword.swing", "reload": "cue.reload", "impact": "cue.sword.hit"},
   "id": "weapon.sword-iron",
-  "legacySlot": "sword-iron",
   "ui": {
     "swapIcon": SWAP_GLYPHS.sword,
     "name": "Iron sword",

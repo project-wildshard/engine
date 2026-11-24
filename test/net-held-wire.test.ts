@@ -136,7 +136,7 @@ test('a pickup the page places tells the server its name, and Driftwood\'s sword
   const live = await resident('driftwood-isle'), scope = new Scope('net-pickup'), wire: string[] = [];
   try {
     expect(actRoutes(live.host).interactions.has('iron-sword')).toBe(true);
-    const row = (id: NonNullable<EquipmentRow['legacySlot']>, pickup?: EquipmentRow['pickup']): EquipmentRow => ({ ...SWORD_WOOD, id: `weapon.${id}`, legacySlot: id, ...(pickup === undefined ? {} : { pickup }) });
+    const row = (id: string, pickup?: EquipmentRow['pickup']): EquipmentRow => ({ ...SWORD_WOOD, id: `weapon.${id}`, ...(pickup === undefined ? {} : { pickup }) });
     let drop: EquipmentPickup | null = null;
     const made: EquipmentPickup = { interactable: legacyDouble<EquipmentPickup['interactable']>({}), update: () => undefined, dispose: () => undefined };
     const service = new EquipmentService(new HeldRow(row('sword')), { scope });

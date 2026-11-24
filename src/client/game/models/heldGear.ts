@@ -24,7 +24,7 @@ export function heldGear(input: unknown): readonly RosterEntry[] {
   const variants = rows.variantOrder.map(id => {
     const card = rows.cards.find(row => row.id === id);
     if (card === undefined) throw new Error('Held gear variant has no card');
-    return { id: card.id, name: card.name, weapon: card.icon === 'lever' ? 'rifle' as const : 'crossbow' as const };
+    return { id: card.id, name: card.name, weapon: card.icon === 'lever' ? 'declared.weapon.lever' as const : 'declared.weapon.crossbow' as const };
   });
   return rows.models.map(row => {
     const dressed = row.role === 'launcher' || row.role === 'firearm';
@@ -33,7 +33,7 @@ export function heldGear(input: unknown): readonly RosterEntry[] {
       defaults: dressed ? { skin: null } : {}, prepare,
       ...(row.surface === undefined ? {} : { surface: row.surface }),
       ...(row.yaw === undefined ? {} : { specimenYaw: row.yaw }),
-      ...(row.role === 'launcher' || row.role === 'firearm' ? { variants: skinVariants(row.role === 'launcher' ? 'crossbow' : 'rifle', variants) } : {}),
+      ...(row.role === 'launcher' || row.role === 'firearm' ? { variants: skinVariants(row.role === 'launcher' ? 'declared.weapon.crossbow' : 'declared.weapon.lever', variants) } : {}),
       build: (ctx, params) => {
         const host = catalogue();
         const skin = { skin: params.skin ?? null };

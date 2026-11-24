@@ -24,7 +24,7 @@ test('the held lever: locked, a tube on the HUD, presses on the wire, the server
   const actor = { id: 'actor.player', alive: true };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The view runtime's actor and ports are never stepped here.
   const runtime = new ItemRuntime(row, { actor, combat: { hit: () => null }, targets: () => [], hook: null, effect: () => undefined } as unknown as ConstructorParameters<typeof ItemRuntime>[1]);
-  const equipment: EquipmentRow = { id: row.id, legacySlot: row.id as NonNullable<EquipmentRow['legacySlot']>, ui: { name: row.ui.name, icon: 'lever' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'melee', lockOn: true, melee: true, tracers: false }, meta: { name: row.ui.name, icon: 'lever' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
+  const equipment: EquipmentRow = { id: row.id, ui: { name: row.ui.name, icon: 'lever' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'melee', lockOn: true, melee: true, tracers: false }, meta: { name: row.ui.name, icon: 'lever' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
   const weapon = family.create(equipment, row, { scope, runtime, input: { bind: () => undefined, held: () => false }, aim: () => aim, view: row.view, profile: row.profile });
   const lever = declaredLever(weapon);
   if (lever === null) throw new Error('kit.lever builds a DeclaredLever');
@@ -89,7 +89,7 @@ test.each([
   const family = declaredKitItemFamilies().get('kit.lever');
   if (family?.kind !== 'weapon' || row.profile?.family !== 'firearm') throw new Error('Expected a declared firearm');
   const scope = new Scope('lever-sights'), camera = new PerspectiveCamera(90, .46), player = { zoomLook: 1, sprinting: false };
-  const equipment: EquipmentRow = { id: row.id, legacySlot: row.id as NonNullable<EquipmentRow['legacySlot']>, ui: { name, icon: 'lever' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'ranged', lockOn: false, melee: false, tracers: false }, meta: { name, icon: 'lever' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
+  const equipment: EquipmentRow = { id: row.id, ui: { name, icon: 'lever' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'ranged', lockOn: false, melee: false, tracers: false }, meta: { name, icon: 'lever' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The aim view uses no item runtime.
   const runtime = new ItemRuntime(row, {} as ConstructorParameters<typeof ItemRuntime>[1]);
   let held = false;

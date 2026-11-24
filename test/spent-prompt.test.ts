@@ -54,7 +54,7 @@ test('A kit.lever rack: "Take the rifle" stays once taken, the server restocks i
   const scope = new Scope('lever');
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The view runtime's actor and ports are never stepped here.
   const runtime = new ItemRuntime(lever.row, { actor: { id: 'actor.player', alive: true }, combat: { hit: () => null }, targets: () => [], hook: null, effect: () => undefined } as unknown as ConstructorParameters<typeof ItemRuntime>[1]);
-  const equipment: EquipmentRow = { id: lever.row.id, legacySlot: lever.row.id as NonNullable<EquipmentRow['legacySlot']>, ui: { name: lever.row.ui.name, icon: 'lever' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'melee', lockOn: true, melee: true, tracers: false }, meta: { name: lever.row.ui.name, icon: 'lever' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
+  const equipment: EquipmentRow = { id: lever.row.id, ui: { name: lever.row.ui.name, icon: 'lever' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'melee', lockOn: true, melee: true, tracers: false }, meta: { name: lever.row.ui.name, icon: 'lever' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
   const held = declaredLever(family.create(equipment, lever.row, { scope, runtime, input: { bind: () => undefined, held: () => false }, aim: () => ({ origin: { x: 0, y: 1.6, z: 0 }, direction: { x: 0, y: 0, z: -1 } }), view: lever.row.view, profile: lever.row.profile }));
   if (held === null) throw new Error('kit.lever builds a DeclaredLever');
   const run = page(source([...mossgate.interactions, lever.interaction], lever.itemActions), item => item === held.row.id && held.taken);

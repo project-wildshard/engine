@@ -112,8 +112,8 @@ export function bindRuntimeEquipment(ctx: Parameters<typeof bindRuntimeItems>[0]
       const entry = entries.find(value => value.owner.id === row.id);
       if (entry === undefined || !sameRuntimeProfile(ports.profile, entry.owner.profile)) throw new Error('Unbound runtime item profile');
       const { weapon } = entry.owner;
-      if (source.items.loadout.runtime?.owners.find(owner => owner.item === entry.owner.id)?.row !== 'native') weapon.row = entry.owner.presentation === true ? { ...entry.presentation, ...row, ui: { ...row.ui, ...entry.presentation.ui }, legacySlot: weapon.id, meta: entry.native.meta }
-        : { ...row, legacySlot: weapon.id, meta: entry.native.meta };
+      if (source.items.loadout.runtime?.owners.find(owner => owner.item === entry.owner.id)?.row !== 'native') weapon.row = entry.owner.presentation === true ? { ...entry.presentation, ...row, ui: { ...row.ui, ...entry.presentation.ui }, meta: entry.native.meta }
+        : { ...row, meta: entry.native.meta };
       return weapon;
     } });
   // A sole family can lend presentation before row construction (the bow path).

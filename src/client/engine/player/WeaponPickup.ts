@@ -27,7 +27,7 @@ import type { Renderer } from '../render/renderer';
  *
  *   const drop = new WeaponPickup({ scene, item: rifle.displayModel(), position: floorPoint, tier: 'common', prompt: 'Take AR-15' });
  *   interactables.push(drop.interactable);   // the door / harvest prompt path shows "[E] Take AR-15" within `radius`
- *   drop.onPickup = () => { weapons.unlock('rifle'); … };  drop.onNear = (on) => audio.pickupHum(on);
+ *   drop.onPickup = () => { weapons.unlock('declared.weapon.lever'); … };  drop.onNear = (on) => audio.pickupHum(on);
  *   game.onUpdate((dt, t) => drop.update(dt, t, game.renderer, game.camera));
  *
  * `tier` sets the colour — the user's rule: BLUE (#8fe3ff) orb = items, PURPLE (#c38fff) orb = rare skins — the same

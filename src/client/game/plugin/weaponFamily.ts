@@ -18,7 +18,7 @@ import { worldHit } from "@wildshard/engine/combat/view/ranged";
 import { Gunfire } from "@wildshard/engine/fx/gunfire";
 import { bodyOnRay, combatFloat } from "@wildshard/engine/ui/Combat";
 import { Tool } from "@wildshard/engine/combat/Tool";
-import { weaponIdOf, type EquipmentCues, type EquipmentRow, type EquipContext } from "@wildshard/engine/combat/Equipment";
+import type { EquipmentCues, EquipmentRow, EquipContext } from "@wildshard/engine/combat/Equipment";
 import type { ItemFamily, ItemFamilyPorts } from "@wildshard/engine/combat/itemFamilies";
 import type { ItemSpec } from "@wildshard/engine/combat/items";
 import { buildSword } from "../systems/items/declaredSword";
@@ -838,8 +838,7 @@ export interface HeldMeleeScenePorts {
 export function createHeldMelee(app: App, row: EquipmentRow, phases: unknown, ports: HeldMeleeScenePorts): HeldMeleeWeapon<PageMeleeTarget, HeldPlayback> {
   const model = ports.presentation, caught = ports.caught;
   if (!row.id.startsWith('weapon.')) throw new Error('Held melee requires a weapon row');
-  const equipment: EquipmentRow = row.legacySlot === undefined ? { ...row, legacySlot: weaponIdOf(row) } : row;
-  return new HeldMeleeWeapon(app, equipment, phases, { model: model.root, parts: model, presentation: model, nodes: model.model?.parts ?? new Map(),
+  return new HeldMeleeWeapon(app, row, phases, { model: model.root, parts: model, presentation: model, nodes: model.model?.parts ?? new Map(),
     ...(ports.tip === undefined ? {} : { tip: new Vector3(...ports.tip) }),
     ...(ports.restingGroup === undefined ? {} : { restingVisible: model.model?.group(ports.restingGroup) === null }),
     ...(caught === undefined ? {} : { caughtPart: () => { const mesh = model.createPart(caught.scene).mesh(caught.part); if (mesh === null) throw new Error('Declared caught part unavailable'); return mesh; } }),

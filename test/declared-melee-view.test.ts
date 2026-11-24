@@ -44,7 +44,7 @@ test('the held kit.melee sword swings on each strike, light across and heavy dow
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The view runtime strikes at nothing here.
   const runtime = new ItemRuntime(row, { actor, combat: { hit: () => null }, targets: () => [], hook: null, effect: () => undefined } as unknown as ConstructorParameters<typeof ItemRuntime>[1]);
   const handlers = new Map<string, () => void>();
-  const equipment: EquipmentRow = { id: row.id, legacySlot: row.id as NonNullable<EquipmentRow['legacySlot']>, ui: { name: row.ui.name, icon: 'sword' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'melee', lockOn: true, melee: true, tracers: false }, meta: { name: row.ui.name, icon: 'sword' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
+  const equipment: EquipmentRow = { id: row.id, ui: { name: row.ui.name, icon: 'sword' as EquipmentRow['ui']['icon'], swapIcon: '', touch: 'melee', lockOn: true, melee: true, tracers: false }, meta: { name: row.ui.name, icon: 'sword' as EquipmentRow['ui']['icon'], blurb: '', category: 'weapon' } };
   const weapon = family.create(equipment, row, { scope, runtime, input: { bind: (action: string, run: () => void) => { handlers.set(action, run); }, held: () => false }, aim: () => aim, view: row.view, profile: row.profile });
   weapon.install({ scope: new Scope('melee.equip') });
   const sent: string[] = [];

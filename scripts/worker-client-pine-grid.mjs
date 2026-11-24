@@ -62,7 +62,7 @@ try {
     return page.evaluate(() => {
       const skins = (/** @type {WorkerWindow} */ (window)).__pineGrid.play.skins, pick = skins.pick('ghost-stag');
       if (pick !== null) skins.wear(pick.skin.weapon, pick.skin.id);
-      return { ok: skins.has('ghost-stag') && skins.wearing('crossbow')?.id === 'ghost-stag', owns: skins.has('ghost-stag'), worn: skins.wearing('crossbow')?.id, owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned };
+      return { ok: skins.has('ghost-stag') && skins.wearing('declared.weapon.crossbow')?.id === 'ghost-stag', owns: skins.has('ghost-stag'), worn: skins.wearing('declared.weapon.crossbow')?.id, owned: (/** @type {WorkerWindow} */ (window)).__workerClient().owned };
     });
   });
   await step('grid: the saved claim and ownership survive a reload', async () => {

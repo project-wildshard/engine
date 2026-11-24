@@ -382,7 +382,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   setAimTargets(aimList);
   // the AR-15 is found, not issued: a floating pickup on the floor of cabin 1 (the hollow), inside by the door wall
   // (cabin local frame: door on +X, chimney end -Z — Cabin.ts); "[E] Take AR-15" through the door / harvest prompt path
-  if (params.get('weapon') === 'rifle' || params.get('weapon') === 'lever') { weapons.unlock('rifle'); weapons.select('rifle', true); boot.runtime.hooks.disposeRifleDrop?.(); } // dev: start with it
+  if (params.get('weapon') === 'rifle' || params.get('weapon') === 'lever') { weapons.unlock('declared.weapon.lever'); weapons.select('declared.weapon.lever', true); boot.runtime.hooks.disposeRifleDrop?.(); } // dev: start with it
   if (!exploreApp) weapons.placePickups(chunk.loadout ?? {}, { prompts: boot.runtime.interactables, owned: {
     has: (id) => { if (!owned.kept.has(id)) throw new Error(`Unknown owned equipment: ${id}`); return owned.has(id); },
     grant: (id) => { if (!owned.kept.has(id)) throw new Error(`Unknown owned equipment: ${id}`); owned.grant(id); },
