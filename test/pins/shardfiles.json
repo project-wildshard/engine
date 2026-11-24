@@ -51,9 +51,9 @@
     },
     {
       "slug": "open-plot-desert-ruin",
-      "revision": 1,
-      "hash": "3b65bfef7275d5baf721b334c5ef68b3dc057f9fcd30699f89a314c46967b76d",
-      "bytes": 14441984
+      "revision": 3,
+      "hash": "1f5b42894c06f829edd374f698f33f809d151876e8ea9dddb3d4cfbb10ce1694",
+      "bytes": 14210048
     },
     {
       "slug": "open-plot-ember-forge",
@@ -129,9 +129,9 @@
     },
     {
       "slug": "open-plot-thin-ice",
-      "revision": 1,
-      "hash": "4546f70ddac2dd08771fb315cb8a9156a0e21503ea72c120af73e31f90e64ead",
-      "bytes": 6465536
+      "revision": 4,
+      "hash": "dcf56eddafd42b777d0fbdecca1439cfc0263dadbe1c74fc4bd56f84705d6744",
+      "bytes": 6245888
     },
     {
       "slug": "pine-hollow",
