@@ -3,7 +3,7 @@
   "channel": "staging",
   "api": "https://api.wildshard.io",
   "catalogueHash": "405f451e587ca119659801601e3fac7bf73ea5c7240194f8cef06e5291a722f0",
-  "releaseHash": "2c8fc705676a8d4e49231a81ea4fb99169bc491285b7112ade9f6869b09ac074",
+  "releaseHash": null,
   "catalogue": {
     "version": 0,
     "stage": "live",

@@ -87,45 +87,45 @@
     },
     {
       "slug": "open-plot-mosslight-ruins",
-      "revision": 1,
-      "hash": "19840339238bab41994463ca485a47f5ffe766bc4cf6ec33c5499151eddf74fc",
-      "bytes": 16719872
+      "revision": 3,
+      "hash": "7ae59eddb0e95917f786c02339e83fd4471ef4a19760667228612a731bcd9480",
+      "bytes": 16528896
     },
     {
       "slug": "open-plot-night-market",
-      "revision": 1,
-      "hash": "d8fe11c2db67b199111e25e5ecbb86e59e3063c46a913317ba9e71dc9cc98210",
-      "bytes": 18138112
+      "revision": 3,
+      "hash": "51162fa40b817beeeadac2b891732159ed4badce0daa875ab04e5312f48c8e6a",
+      "bytes": 17905152
     },
     {
       "slug": "open-plot-patchwork-fairground",
-      "revision": 1,
-      "hash": "e517f4814ef624fa6122ac3611d39cf59a56c54e4ecb126d2de983064ae2caa8",
-      "bytes": 9830400
+      "revision": 3,
+      "hash": "293e70f037ee399eba22f8fba8aaf3f2a896e63b87e1d435faddb995dae69f6c",
+      "bytes": 9641472
     },
     {
       "slug": "open-plot-saltwind-lighthouse",
-      "revision": 1,
-      "hash": "2e37a04b0c9e7f6c0463f12b5cfce96d7e7c2f83868bc6341948d779dcbe5207",
-      "bytes": 5573632
+      "revision": 3,
+      "hash": "f038088e7ccd7f9347c9b24a3e2f9e7c0965bce5bd3290fa37d92eb67721345c",
+      "bytes": 5296128
     },
     {
       "slug": "open-plot-sky-harbor",
-      "revision": 1,
-      "hash": "9aa4a98390153c9e63ec79d1a9ca7c3c221b03a5017664206a34001b242df112",
-      "bytes": 10700800
+      "revision": 3,
+      "hash": "58faeb5e2fa3d371f9db871af3b99b2b27e3eb83dcca99a54e4cebe6b61561af",
+      "bytes": 10497024
     },
     {
       "slug": "open-plot-sky-race",
-      "revision": 1,
-      "hash": "a5633d8eee7f7e453b459fa3d4c3db3d60bddd07ad39036ba437ccd44655058a",
-      "bytes": 11087872
+      "revision": 3,
+      "hash": "ddaf0adcd003dbb871c28b34ed9b620fcc7a4384f43ed011d6d44dee5b9a4cce",
+      "bytes": 10863104
     },
     {
       "slug": "open-plot-starfall-observatory",
-      "revision": 1,
-      "hash": "25331b613be193d8a1e67e72da521a56e431c19fa0de2fa3431df42a13941802",
-      "bytes": 11625984
+      "revision": 3,
+      "hash": "99b19a1eeaa6234a2f588428f925ccb13053780c2c993d884825ae862246cff8",
+      "bytes": 11393024
     },
     {
       "slug": "open-plot-thin-ice",
