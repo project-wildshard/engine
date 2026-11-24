@@ -121,7 +121,7 @@ test('a stopped run expects its broker to go; a broker lost on its own is still 
 // fixture's steps run bare.
 function ownEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
-  delete env.WS_CPU_ADMISSION;
+  Reflect.deleteProperty(env, 'WS_CPU_ADMISSION');
   return env;
 }
 // J505 (QA-FEEDBACK-2026-11-23-b; Jake, 2026-11-23 ~20:40 Cancún: "make it a permanent fix"): an engine-quickfix main-push
