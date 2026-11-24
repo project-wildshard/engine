@@ -149,6 +149,18 @@ async function fetched(url: string, slug: string, hash: string, options?: Reques
   return bytes;
 }
 
+/** `fetched`, tried three times with backoff (1 s, then 3 s): one API blip must not leave a pin with no source (main red
+ *  45404606407, two open-plot pins with no mirror copy). */
+async function fetchedRetrying(url: string, slug: string, hash: string): Promise<Uint8Array | undefined> {
+  for (const wait of [1000, 3000, 0]) {
+    const bytes = await fetched(url, slug, hash);
+    if (bytes !== undefined || wait === 0) return bytes;
+    console.warn(`${slug}: ${url} held no bytes; trying again in ${wait / 1000} s`);
+    await new Promise(done => setTimeout(done, wait));
+  }
+  return undefined;
+}
+
 /** The tarball's bytes, proved against the pin. fetch follows the 302 to R2 and decodes the stored Brotli. */
 async function tarball({ slug, hash }: Pick<Pin, 'slug' | 'hash'>, apiHolds = true): Promise<Uint8Array> {
   const file = join(CACHE, `${hash}.tar`);
@@ -157,7 +169,7 @@ async function tarball({ slug, hash }: Pick<Pin, 'slug' | 'hash'>, apiHolds = tr
     if (sha256(bytes) === hash) return bytes;
     rmSync(file);
   }
-  let bytes = await fetched(`${MIRROR}/${hash}.tar`, slug, hash) ?? (apiHolds ? await fetched(`${API}/api/shardfiles/${hash}`, slug, hash) : undefined);
+  let bytes = await fetched(`${MIRROR}/${hash}.tar`, slug, hash) ?? (apiHolds ? await fetchedRetrying(`${API}/api/shardfiles/${hash}`, slug, hash) : undefined);
   if (bytes === undefined && !apiHolds) {
     const row = (readJson(SLICES) as {slices: readonly Slice[]}).slices.find(candidate => candidate.slug === slug && candidate.hash === hash);
     const parent = (readJson(PINS) as PinFile).shards.find(pin => pin.slug === slug);
