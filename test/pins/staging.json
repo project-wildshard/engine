@@ -2,8 +2,8 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "376bec5210b9780a268e5b06de095503657d51d5ab0fbdf8db3d28bad20c70e4",
-  "releaseHash": null,
+  "catalogueHash": "405f451e587ca119659801601e3fac7bf73ea5c7240194f8cef06e5291a722f0",
+  "releaseHash": "2c8fc705676a8d4e49231a81ea4fb99169bc491285b7112ade9f6869b09ac074",
   "catalogue": {
     "version": 0,
     "stage": "live",
@@ -682,44 +682,44 @@
       {
         "slug": "open-plot-mosslight-ruins",
         "name": "Open Plot · Mosslight Ruins",
-        "revision": 2,
-        "hash": "672bf7dec416fb365a0b5ecb6d9c09ed2206af803e80e3776275275c5b023763"
+        "revision": 3,
+        "hash": "7ae59eddb0e95917f786c02339e83fd4471ef4a19760667228612a731bcd9480"
       },
       {
         "slug": "open-plot-night-market",
         "name": "Open Plot · Night Market",
-        "revision": 2,
-        "hash": "01bb846e3823e41cf337671718f091b092697da5b688752fc7b7219e32e188a3"
+        "revision": 3,
+        "hash": "51162fa40b817beeeadac2b891732159ed4badce0daa875ab04e5312f48c8e6a"
       },
       {
         "slug": "open-plot-patchwork-fairground",
         "name": "Open Plot · Patchwork Fairground",
-        "revision": 2,
-        "hash": "6712b4fadc5371a1bd45dd9222274f6661cc6a78301f351037a875e3a39b102d"
+        "revision": 3,
+        "hash": "293e70f037ee399eba22f8fba8aaf3f2a896e63b87e1d435faddb995dae69f6c"
       },
       {
         "slug": "open-plot-saltwind-lighthouse",
         "name": "Open Plot · Saltwind Lighthouse",
-        "revision": 2,
-        "hash": "c046746b9e6cdb307ab8d34ccc81b582453669759ee17ee5070aade591dfd8b0"
+        "revision": 3,
+        "hash": "f038088e7ccd7f9347c9b24a3e2f9e7c0965bce5bd3290fa37d92eb67721345c"
       },
       {
         "slug": "open-plot-sky-harbor",
         "name": "Open Plot · Sky Harbor",
-        "revision": 2,
-        "hash": "db8b26e4ecd2210da244b5314b5b35241b3c0df93ca67314fb3b81f72699450c"
+        "revision": 3,
+        "hash": "58faeb5e2fa3d371f9db871af3b99b2b27e3eb83dcca99a54e4cebe6b61561af"
       },
       {
         "slug": "open-plot-sky-race",
         "name": "Open Plot · Floating Island Race",
-        "revision": 2,
-        "hash": "4c3a05f77f66fa23f32d0fd36563bd4aa0a6108b8fdd6f69df9684c77302308a"
+        "revision": 3,
+        "hash": "ddaf0adcd003dbb871c28b34ed9b620fcc7a4384f43ed011d6d44dee5b9a4cce"
       },
       {
         "slug": "open-plot-starfall-observatory",
         "name": "Open Plot · Starfall Observatory",
-        "revision": 2,
-        "hash": "1cc2a9a9efdb7861627746c577ef6285b8d0ac7e8105046dc1655fe19fbed123"
+        "revision": 3,
+        "hash": "99b19a1eeaa6234a2f588428f925ccb13053780c2c993d884825ae862246cff8"
       },
       {
         "slug": "pine-hollow",
@@ -835,45 +835,45 @@
     },
     {
       "slug": "open-plot-mosslight-ruins",
-      "revision": 2,
-      "hash": "672bf7dec416fb365a0b5ecb6d9c09ed2206af803e80e3776275275c5b023763",
-      "bytes": 16520704
+      "revision": 3,
+      "hash": "7ae59eddb0e95917f786c02339e83fd4471ef4a19760667228612a731bcd9480",
+      "bytes": 16528896
     },
     {
       "slug": "open-plot-night-market",
-      "revision": 2,
-      "hash": "01bb846e3823e41cf337671718f091b092697da5b688752fc7b7219e32e188a3",
-      "bytes": 17896448
+      "revision": 3,
+      "hash": "51162fa40b817beeeadac2b891732159ed4badce0daa875ab04e5312f48c8e6a",
+      "bytes": 17905152
     },
     {
       "slug": "open-plot-patchwork-fairground",
-      "revision": 2,
-      "hash": "6712b4fadc5371a1bd45dd9222274f6661cc6a78301f351037a875e3a39b102d",
-      "bytes": 9632256
+      "revision": 3,
+      "hash": "293e70f037ee399eba22f8fba8aaf3f2a896e63b87e1d435faddb995dae69f6c",
+      "bytes": 9641472
     },
     {
       "slug": "open-plot-saltwind-lighthouse",
-      "revision": 2,
-      "hash": "c046746b9e6cdb307ab8d34ccc81b582453669759ee17ee5070aade591dfd8b0",
-      "bytes": 5286400
+      "revision": 3,
+      "hash": "f038088e7ccd7f9347c9b24a3e2f9e7c0965bce5bd3290fa37d92eb67721345c",
+      "bytes": 5296128
     },
     {
       "slug": "open-plot-sky-harbor",
-      "revision": 2,
-      "hash": "db8b26e4ecd2210da244b5314b5b35241b3c0df93ca67314fb3b81f72699450c",
-      "bytes": 10488320
+      "revision": 3,
+      "hash": "58faeb5e2fa3d371f9db871af3b99b2b27e3eb83dcca99a54e4cebe6b61561af",
+      "bytes": 10497024
     },
     {
       "slug": "open-plot-sky-race",
-      "revision": 2,
-      "hash": "4c3a05f77f66fa23f32d0fd36563bd4aa0a6108b8fdd6f69df9684c77302308a",
-      "bytes": 10854400
+      "revision": 3,
+      "hash": "ddaf0adcd003dbb871c28b34ed9b620fcc7a4384f43ed011d6d44dee5b9a4cce",
+      "bytes": 10863104
     },
     {
       "slug": "open-plot-starfall-observatory",
-      "revision": 2,
-      "hash": "1cc2a9a9efdb7861627746c577ef6285b8d0ac7e8105046dc1655fe19fbed123",
-      "bytes": 11383808
+      "revision": 3,
+      "hash": "99b19a1eeaa6234a2f588428f925ccb13053780c2c993d884825ae862246cff8",
+      "bytes": 11393024
     },
     {
       "slug": "pine-hollow",

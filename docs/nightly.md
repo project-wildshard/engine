@@ -16,9 +16,10 @@ production pins. Local selection is `node scripts/pins-staging.ts select`;
 it replaces `shardfiles.json` and `catalogue.json`, so use a disposable tree.
 
 The snapshot's `catalogueHash` detects mismatched inputs; `releaseHash`
-is explicitly null. api-server AP-26 exposes no public release-row hash
-yet. These runs prove the selected staging inputs and do not qualify a
-release against J171's signed identity. Row 23 remains open for that check.
+is the live catalogue's `x-wildshard-release-hash` (api-server AP-26: the
+sha256 of the placement file body the staging row names). A staging-pinned
+nightly runs `node scripts/pins-staging.ts verify`, which refuses when the
+live release has moved past the committed snapshot; refresh it then.
 
 Ring 2's dependencies and immutable tarballs are public. Its built-in
 read-only `GITHUB_TOKEN` reads prior Actions reports. After Ring 2 is

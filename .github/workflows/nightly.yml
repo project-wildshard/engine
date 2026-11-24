@@ -83,6 +83,9 @@ jobs:
       - run: node --test scripts/nightly.proof.ts
       - if: env.WILDSHARD_PIN_CHANNEL == 'staging'
         run: node scripts/pins-staging.ts select
+      # MACBOOK-WAITS MW1 (api-server AP-26): the reviewed snapshot must be the release staging serves.
+      - if: env.WILDSHARD_PIN_CHANNEL == 'staging'
+        run: node scripts/pins-staging.ts verify
       - id: plan
         if: ${{ !inputs.diagnostic_head && !inputs.diagnostic_drill }}
         run: |
