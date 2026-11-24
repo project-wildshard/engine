@@ -1,3 +1,4 @@
+import {weaponIdOf} from '@wildshard/engine/combat/Equipment';
 import * as v from 'valibot';
 import {EquipmentService} from '../../src/client/engine/combat/EquipmentService';
 import {Weapon,type EquipmentView,type WeaponState} from '../../src/shared/engine/combat/Weapon';
@@ -34,10 +35,10 @@ export const prepareHeadlessRuntime:PrepareHeadlessRuntime=async preparation=>{
   const base=await prepareNalati(preparation),slots=parseHeldSlots(await preparation.product.json('held/slots.json'));
   const catalogue=new ItemCatalogue(preparation.shard.items),rows=new Map(slots.slots.filter(row=>row.kind!=='tool').map(row=>[row.id,catalogue.equipment(row.item)]));
   const primary=rows.get(slots.equipment.primary),rifle=slots.equipment.rifle===undefined?undefined:rows.get(slots.equipment.rifle);
-  if(primary?.legacySlot===undefined||rifle?.legacySlot===undefined)throw new Error('Practice proof requires the admitted primary and rifle');
-  const rifleId=rifle.legacySlot;
-  const need=(id:string):EquipmentRow=>{const row=rows.get(id);if(row?.legacySlot===undefined)throw new Error('Missing declared practice slot');return row;};
-  const order=slots.equipment.order?.map(id=>{const idOf=need(id).legacySlot;if(idOf===undefined)throw new Error('Missing ordered practice slot');return idOf;});
+  if(primary===undefined||rifle===undefined)throw new Error('Practice proof requires the admitted primary and rifle');
+  const rifleId=weaponIdOf(rifle);
+  const need=(id:string):EquipmentRow=>{const row=rows.get(id);if(row===undefined)throw new Error('Missing declared practice slot');return row;};
+  const order=slots.equipment.order?.map(id=>{return weaponIdOf(need(id));});
   return {...base,install:(host,context)=>{
     base.install(host,context);
     let open=false,pitch=0;
@@ -47,8 +48,8 @@ export const prepareHeadlessRuntime:PrepareHeadlessRuntime=async preparation=>{
       const ids=[...slots.equipment.rifle===undefined?[]:[slots.equipment.rifle],...slots.equipment.extras,
         ...slots.equipment.secondary===undefined?[]:[slots.equipment.secondary]];
       for(const id of ids)service.add(new LoanInventorySlot(need(id)),{locked:true});
-      for(const id of slots.selection.unlock){const slot=need(id).legacySlot;if(slot===undefined)throw new Error('Missing initial practice slot');service.unlock(slot);}
-      if(slots.selection.initial!==undefined){const slot=need(slots.selection.initial).legacySlot;if(slot===undefined)throw new Error('Missing selected practice slot');service.select(slot,true);}
+      for(const id of slots.selection.unlock){service.unlock(weaponIdOf(need(id)));}
+      if(slots.selection.initial!==undefined){service.select(weaponIdOf(need(slots.selection.initial)),true);}
       return service;
     };
     let equipment=make();
