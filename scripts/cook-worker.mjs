@@ -9,6 +9,9 @@
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs bake <dist> <origin>   the live heads this build cooked, onto its built client
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs gc <build>...   keep those builds and every build a channel's
 //     live deploy-chunks.json names (PAGE-SIZE PZ5: 5 a channel), delete the rest, print usage
+//   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs reclaim [<build>...]   J505's protected collection: keep those builds,
+//     every build a channel carries and every live/staging/preview head's index from any build; a publish runs it under 15%
+//     headroom and the serve loop nightly
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs report    print usage against the budget (J89)
 // Environment: WILDSHARD_API_URL, WILDSHARD_BUILD; R2_ACCOUNT_ID, R2_BUCKET_PACKS, R2_PACKS_ACCESS_KEY_ID,
 // R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_NOTIFY_TOKEN; COOK_PORT (8792; 8790 and 8791 are the game's), COOK_HOST (127.0.0.1);
@@ -22,7 +25,7 @@ import { availableParallelism } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, pollCatalogue, PACK_BUDGET_BYTES, POLL_EVERY_MS, storeUsage, uncookedLiveRefusal } = await import('../src/cook/game/cookWorker.ts');
+const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, pollCatalogue, PACK_BUDGET_BYTES, POLL_EVERY_MS, reclaimPacks, storeUsage, uncookedLiveRefusal } = await import('../src/cook/game/cookWorker.ts');
 const {activationDelivery, gameActivationClient, cookApi, pendingSource, uploadDelivery, VerdictOutbox} = await import('../src/cook/game/uploadTransport.ts');
 const { MAX_SHARDFILE_BYTES } = await import('@wildshard/format/uploadCaps');
 const { cookSidecars, recordPass } = await import('../src/cook/game/recordPass.ts');
@@ -61,8 +64,22 @@ const [command, ...rest] = process.argv.slice(2);
 const sidecars = cookSidecars(env), scratch = resolve(env.COOK_SCRATCH ?? 'tmp/cook/scratch');
 /** SP1b-T: record a sidecar for every stale head before a recook cooks it, so a render change ends `prepared by cook`. */
 const record = () => recordPass(env, renderer, scratch, uploadSource, line => { console.log(line); });
+const packBudget = Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES);
+/** J505: the protected collection (reclaimPacks): this build, every build a channel carries, and every live, staging and
+ *  preview head's index from any build. A publish runs it under 15% headroom (createCookWorker's `reclaim`), and the serve
+ *  loop runs it nightly, so a full pack store never waits on a hand GC again (codex-ms ran it by hand on 2026-11-23). */
+const reclaim = async () => {
+  const channels = await liveDeployBuilds();
+  const builds = [...new Set([need('WILDSHARD_BUILD'), ...rest.filter(arg => !arg.startsWith('-')), ...channels.flatMap(row => row.builds)])];
+  /** @type {Set<string>} */ const heads = new Set();
+  for (const stage of /** @type {const} */ (['live', 'staging', 'preview'])) for (const row of await publicSource.heads(stage)) heads.add(row.hash);
+  if (privateSource !== undefined) for (const stage of /** @type {const} */ (['staging', 'preview'])) for (const row of await privateSource.heads(stage)) heads.add(row.hash);
+  const report = await reclaimPacks(store, {builds, heads}, packBudget, Date.now());
+  console.log(`pack store reclaim: freed ${report.freedBytes} B in ${report.deleted} objects; kept ${builds.length} builds and ${heads.size} heads; ${report.usage.bytes} of ${packBudget} B used`);
+  return report;
+};
 const worker = () => createCookWorker({
-  build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); },
+  build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); }, reclaim,
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch,
   ...(validator === undefined ? {} : { validator }), ...(cookRevisionId === undefined ? {} : { cook: cookRevisionId }),
   launcher: {
@@ -83,6 +100,8 @@ if (command === 'serve') {
   const everyMs = Math.min(60, Math.max(30, Number.isFinite(seconds) ? seconds : POLL_EVERY_MS / 1000)) * 1000;
   console.log(`cook worker polls the catalogue every ${everyMs / 1000} s`);
   bootCook(cook, { everyMs, log: line => { console.log(line); } });
+  // J505: the nightly protected collection (a publish also runs it under 15% headroom)
+  setInterval(() => { reclaim().catch(error => { console.warn(`pack store reclaim failed: ${error instanceof Error ? error.message : String(error)}`); }); }, 24 * 3600_000).unref();
   if (uploadApi !== undefined && privateSource !== undefined) {
     // The initial rollout is staging only; production keeps its existing upload law.
     need('COOK_STAGING_ACTIVATION_URL'); need('COOK_STAGING_ACTIVATION_TOKEN');
@@ -127,8 +146,11 @@ if (command === 'serve') {
   const required = channels.flatMap(row => row.builds);
   const builds = [...new Set([...rest, ...required])];
   console.log(JSON.stringify({ channels, ...await collectGarbage(store, builds, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES), Date.now(), undefined, required) }));
+} else if (command === 'reclaim') {
+  // J505: the protected collection by hand (the same one a publish and the nightly run make)
+  console.log(JSON.stringify(await reclaim()));
 } else if (command === 'report') {
   console.log(JSON.stringify(await storeUsage(store, Number(env.COOK_BUDGET_BYTES ?? PACK_BUDGET_BYTES))));
 } else {
-  throw new Error('usage: cook-worker serve | recook | record | bake <dist> <origin> | gc <build>... | report');
+  throw new Error('usage: cook-worker serve | recook | record | bake <dist> <origin> | gc <build>... | reclaim [<build>...] | report');
 }

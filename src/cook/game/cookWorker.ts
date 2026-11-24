@@ -315,6 +315,41 @@ function usageOf(rows: readonly StoredObject[], budget: number): StoreUsage {
 
 export async function storeUsage(store: PackStore, budget: number): Promise<StoreUsage> { return usageOf(await store.list(''), budget); }
 
+/** What one kept index names: the index itself and every key it lists. @returns false when the index vanished mid-read. */
+async function keepIndex(store: PackStore, key: string, kept: Set<string>): Promise<boolean> {
+  kept.add(key);
+  const body = await store.get(key);
+  if (body === undefined) return false;
+  for (const named of (JSON.parse(new TextDecoder().decode(body)) as CookIndex).keys) kept.add(named);
+  return true;
+}
+
+/** J83 / PZ5: every key a kept build needs: its indexes and what they name, its server book and every part the book names. */
+async function keptOf(store: PackStore, builds: readonly string[]): Promise<Set<string>> {
+  const kept = new Set<string>();
+  for (const build of builds) {
+    for (const row of await store.list(`index/${build}/`)) if (!await keepIndex(store, row.key, kept)) throw new Error('Index left mid-collection');
+    const bookKey = serverPackBookPath(build), book = await store.get(bookKey);
+    if (book === undefined) continue;
+    kept.add(bookKey);
+    const {shards, grid} = readServerPackBook(JSON.parse(new TextDecoder().decode(book)));
+    for (const pack of [...Object.values(shards), ...(grid === undefined ? [] : [grid])]) {
+      for (const part of [pack, ...pack.more ?? []]) kept.add(part.url.replace(/^\//u, ''));
+    }
+  }
+  return kept;
+}
+
+/** Delete what `kept` does not name, never a content set or anything younger than `grace`. */
+async function sweepUnkept(store: PackStore, kept: ReadonlySet<string>, budget: number, now: number, grace: number): Promise<GcReport> {
+  let deleted = 0, freedBytes = 0;
+  for (const row of await store.list('')) {
+    if (kept.has(row.key) || row.key.startsWith(CONTENT_SETS) || now - row.modified < grace) continue;
+    await store.remove(row.key); deleted++; freedBytes += row.bytes;
+  }
+  return {kept: kept.size, deleted, freedBytes, usage: await storeUsage(store, budget)};
+}
+
 /** J83: keep what a kept build's index names, and delete the rest, indexes of other builds included.
  * PAGE-SIZE PZ5: a kept build's server book (`assets/spawn/server-<build>.json`, page-release packs.mjs) and every part it
  * names are kept too, so a carried build's solo server still finds them; the content sets are never collected. */
@@ -324,29 +359,34 @@ export async function collectGarbage(store: PackStore, builds: readonly string[]
   // keep set before any delete, even if another caller forgot the union.
   const missing = requiredBuilds.filter(build => !builds.includes(build));
   if (missing.length > 0) throw new Error(`Garbage collection keep list misses channel builds: ${missing.join(', ')}`);
-  const kept = new Set<string>();
-  for (const build of builds) {
-    for (const row of await store.list(`index/${build}/`)) {
-      kept.add(row.key);
-      const body = await store.get(row.key);
-      if (body === undefined) throw new Error('Index left mid-collection');
-      for (const key of (JSON.parse(new TextDecoder().decode(body)) as CookIndex).keys) kept.add(key);
-    }
-    const bookKey = serverPackBookPath(build), book = await store.get(bookKey);
-    if (book === undefined) continue;
-    kept.add(bookKey);
-    const {shards, grid} = readServerPackBook(JSON.parse(new TextDecoder().decode(book)));
-    for (const pack of [...Object.values(shards), ...(grid === undefined ? [] : [grid])]) {
-      for (const part of [pack, ...pack.more ?? []]) kept.add(part.url.replace(/^\//u, ''));
-    }
-  }
-  let deleted = 0, freedBytes = 0;
-  for (const row of await store.list('')) {
-    if (kept.has(row.key) || row.key.startsWith(CONTENT_SETS) || now - row.modified < grace) continue;
-    await store.remove(row.key); deleted++; freedBytes += row.bytes;
-  }
-  return {kept: kept.size, deleted, freedBytes, usage: await storeUsage(store, budget)};
+  return sweepUnkept(store, await keptOf(store, builds), budget, now, grace);
 }
+
+/** J505: what a protected collection never takes: these builds whole, and every build's index of these head hashes. */
+export interface PackProtection {
+  /** The cook's own build and every build a channel carries or serves (live, carried, signed). */
+  readonly builds: readonly string[];
+  /** Every live, staging, preview, placed, pinned or production head hash. */
+  readonly heads: ReadonlySet<string>;
+}
+
+/** J505 (Jake, 2026-11-23: "make it a permanent fix"): the protected collection codex-ms ran by hand on 11-23 (3297 objects,
+ * 768 MB) when the 4 GB pack store (J89) refused a publish. Beyond `collectGarbage`'s kept builds it keeps, from any build,
+ * the index of every protected head and every key that index names, so a head an older build cooked keeps its packs. */
+export async function reclaimPacks(store: PackStore, protection: PackProtection, budget: number, now: number, grace: number = GC_GRACE_MS): Promise<GcReport> {
+  if (protection.builds.length === 0) throw new Error('A protected collection needs the builds to keep: an empty list would delete everything');
+  const kept = await keptOf(store, protection.builds);
+  for (const row of await store.list('index/')) {
+    const hash = /^index\/[^/]+\/([^/]+)\.json$/u.exec(row.key)?.[1];
+    if (hash !== undefined && protection.heads.has(hash)) await keepIndex(store, row.key, kept);
+  }
+  return sweepUnkept(store, kept, budget, now, grace);
+}
+
+/** J505: below this share of the budget free, a publish reclaims the store before it writes. */
+export const RECLAIM_HEADROOM = 0.15;
+/** J505: whether a store that would hold `after` bytes once a publish writes has under RECLAIM_HEADROOM of `budget` free. */
+export const needsReclaim = (after: number, budget: number): boolean => after > budget * (1 - RECLAIM_HEADROOM);
 
 const filesUnder = (root: string): string[] => readdirSync(root, {recursive: true, withFileTypes: true}).filter(row => row.isFile()).map(row => relative(root, join(row.parentPath, row.name)).split(sep).join('/'));
 
@@ -359,6 +399,9 @@ export interface CookWorkerOptions {
   readonly serverPacks: string;
   readonly scratch: string;
   readonly budgetBytes?: number;
+  /** J505: the host's protected collection (`reclaimPacks` with its live builds and heads); run before a publish whose write
+   *  would leave under RECLAIM_HEADROOM of the budget free, so a full store never refuses a publish a collection can fit. */
+  readonly reclaim?: () => Promise<GcReport>;
   readonly log?: (line: string) => void;
   readonly now?: () => number;
   /** SA48: this engine's shardfile validator revision (`shardfileValidationRevision`), the one each job validates with; with it an
@@ -436,6 +479,11 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     let held = await bucket(false), {fresh, used} = measure(held);
     // A kept listing still counts what GC has since taken, so it reads high: list again before refusing on it.
     if (used + fresh > budget && kept) ({fresh, used} = measure(held = await bucket(true)));
+    if (needsReclaim(used + fresh, budget) && options.reclaim !== undefined) {
+      const reclaimed = await options.reclaim();
+      log(`pack store reclaimed before ${hash}: freed ${reclaimed.freedBytes} B in ${reclaimed.deleted} objects; ${reclaimed.usage.bytes} of ${budget} B used`);
+      ({fresh, used} = measure(held = await bucket(true)));
+    }
     if (used + fresh > budget) throw new Error(`Over the pack budget: ${used} + ${fresh} of ${budget}`);
     // CF-8: skipping a PUT keeps a part's old date, so GC could take it before this index lands. A part past half the grace
     // is written again, which GC reads as new.
