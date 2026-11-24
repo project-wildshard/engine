@@ -34,12 +34,12 @@ interface Head {
   readonly hash: string;
 }
 
-const slug = v.pipe(v.string(), v.regex(/^[a-z0-9_-]+$/u));
+const GridName = v.pipe(v.string(), v.regex(/^[a-z0-9_-]+$/u));
 const coordinate = v.pipe(v.number(), v.safeInteger());
 const GridPlan = v.strictObject({ cells: v.array(v.strictObject({
-  instance: slug,
+  instance: GridName,
   cell: v.tuple([coordinate, coordinate]),
-  slug,
+  slug: GridName,
   revision: v.pipe(v.number(), v.safeInteger(), v.minValue(1)),
   hash: v.pipe(v.string(), v.regex(/^[a-f0-9]{64}$/u)),
 })) });
@@ -160,7 +160,7 @@ async function playOriginal(head: Head, bytes: Uint8Array, folder: string, rapie
 
 async function main(): Promise<void> {
   const [build, out, gridPlan, extra] = process.argv.slice(2);
-  const planFile = gridPlan?.match(/^--grid-plan=(.+)$/u)?.[1];
+  const planFile = /^--grid-plan=(.+)$/u.exec(gridPlan ?? '')?.[1];
   if (build === undefined || !/^[a-f0-9]{40}$/u.test(build)
     || extra !== undefined || (gridPlan !== undefined && planFile === undefined)
     || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== build) {
