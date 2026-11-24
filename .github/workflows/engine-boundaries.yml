@@ -120,11 +120,21 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/ring-setup
       # S12d: the app build's phone 6x6 encodes ride the spawn-part cache (a cold full-pin cook is minutes).
+      # FS30 (J505): ci's verified full-ledger parts first, so a full build never re-encodes them (the Ring 1
+      # subset alone sent the nightly's Chromium heads into an 1800 s re-encode).
+      - name: Key the full-ledger encodes
+        id: ledger-key
+        uses: ./.github/actions/full-ledger-key
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/wildshard/gen/spawn-parts-br
-          key: ring1-spawn-parts-br-${{ github.sha }}
-          restore-keys: ring1-spawn-parts-br-
+          key: ${{ steps.ledger-key.outputs.key || format('ring1-spawn-parts-br-{0}', github.sha) }}
+          restore-keys: |
+            ${{ steps.ledger-key.outputs.prefix }}
+            ${{ steps.ledger-key.outputs.linux-key }}
+            ${{ steps.ledger-key.outputs.linux-prefix }}
+            nightly-encodes-
+            ring1-spawn-parts-br-
       - name: Census all pinned title and grid heads
         run: |
           node scripts/pins.ts install

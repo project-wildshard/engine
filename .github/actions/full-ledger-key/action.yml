@@ -1,0 +1,39 @@
+name: full-ledger-key
+description: >-
+  The cache keys ci's memory-client-build saves its verified full-ledger spawn parts under (all pinned heads' parts and
+  server packs, 453 on 2026-11-24). A job that builds the full game restores these first, so it never re-encodes what
+  ci already encoded (FLOW-SIMPLE FS30, J505: the nightly's Chromium heads restored only the Ring 1 subset and
+  re-encoded spawn parts until the 1800 s cap, while ci built the same parts with 0 encodes in 67 s). The template
+  matches ci.yml's "Key the full ledger encodes" step; test/workflow-full-ledger.test.ts keeps them equal.
+outputs:
+  key:
+    description: This runner's exact full-ledger key.
+    value: ${{ steps.key.outputs.key }}
+  prefix:
+    description: This runner's full-ledger prefix (any part inputs).
+    value: ${{ steps.key.outputs.prefix }}
+  linux-key:
+    description: The exact key ci's ubuntu memory-client-build saves.
+    value: ${{ steps.key.outputs.linux-key }}
+  linux-prefix:
+    description: The prefix ci's ubuntu memory-client-build saves under.
+    value: ${{ steps.key.outputs.linux-prefix }}
+runs:
+  using: composite
+  steps:
+    - id: key
+      shell: bash
+      env:
+        CODEC_INPUTS: ${{ hashFiles('src/cook/game/spawnParts.ts', 'src/cook/game/astc6Wasm.ts') }}
+        PART_INPUTS: ${{ hashFiles('test/pins/shardfiles.json', 'test/pins/catalogue.json', 'test/pins/assets.json', 'src/cook/game/entryDownloads.ts', 'src/cook/game/entryTotals.ts', 'src/cook/game/shardCook.ts', 'scripts/app-build/appCook.ts') }}
+      # A key that cannot be read leaves the outputs empty; actions/cache skips an empty restore key, so the job falls
+      # back to the older keys and is only slower.
+      run: |
+        codec=$(node -p 'process.versions.brotli')
+        if [[ "$codec" =~ ^[0-9]+(\.[0-9]+)+$ && "$CODEC_INPUTS" =~ ^[a-f0-9]{64}$ && "$PART_INPUTS" =~ ^[a-f0-9]{64}$ ]]; then
+          for os in own linux; do
+            if [[ "$os" == own ]]; then runner="$RUNNER_OS-$RUNNER_ARCH"; out=""; else runner="Linux-X64"; out="linux-"; fi
+            prefix="full-ledger-spawn-parts-br-v2-$runner-$codec-$CODEC_INPUTS-"
+            printf '%sprefix=%s\n%skey=%s%s-parts-and-server\n' "$out" "$prefix" "$out" "$prefix" "$PART_INPUTS" >> "$GITHUB_OUTPUT"
+          done
+        fi

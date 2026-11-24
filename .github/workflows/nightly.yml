@@ -214,12 +214,20 @@ jobs:
           key: ${{ steps.pins.outputs.cache-primary-key }}
       - run: bash scripts/ci-playwright-install.sh ${{ matrix.browser }}
       # Pure input-addressed encodes are reusable; each head's cook store remains cold.
+      # FS30 (J505): ci's verified full-ledger parts first, so a full build never re-encodes them (the Ring 1
+      # subset alone sent the nightly's Chromium heads into an 1800 s re-encode).
+      - name: Key the full-ledger encodes
+        id: ledger-key
+        uses: ./.github/actions/full-ledger-key
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         id: encodes
         with:
           path: ~/.cache/wildshard/gen/spawn-parts-br
           key: nightly-encodes-${{ github.sha }}
           restore-keys: |
+            ${{ steps.ledger-key.outputs.prefix }}
+            ${{ steps.ledger-key.outputs.linux-key }}
+            ${{ steps.ledger-key.outputs.linux-prefix }}
             nightly-encodes-
             ring1-spawn-parts-br-
       - run: pnpm build:game
@@ -319,11 +327,19 @@ jobs:
           key: nightly-pins-${{ runner.os }}-${{ hashFiles('test/pins/shardfiles.json') }}
       - run: node scripts/pins.ts install
       - run: bash scripts/ci-playwright-install.sh "$NIGHTLY_BROWSER"
+      # FS30 (J505): ci's verified full-ledger parts first, so a full build never re-encodes them (the Ring 1
+      # subset alone sent the nightly's Chromium heads into an 1800 s re-encode).
+      - name: Key the full-ledger encodes
+        id: ledger-key
+        uses: ./.github/actions/full-ledger-key
       - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ~/.cache/wildshard/gen/spawn-parts-br
           key: nightly-encodes-${{ github.sha }}
           restore-keys: |
+            ${{ steps.ledger-key.outputs.prefix }}
+            ${{ steps.ledger-key.outputs.linux-key }}
+            ${{ steps.ledger-key.outputs.linux-prefix }}
             nightly-encodes-
             ring1-spawn-parts-br-
       - run: pnpm build:game
