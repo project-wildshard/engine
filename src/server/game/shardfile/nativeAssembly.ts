@@ -188,6 +188,34 @@ async function withSectionPopulation(product: ShardFolder, features: readonly Na
   if (elites) family.push({ host: 'population.elites-ready' });
   return [...features, ...family];
 }
+/** FORMAT-PRUNE FP16 (carries ONE-FORMAT OF17b3): the quest family's home, `quests/server` (format `quest-server.ts`). */
+const QUEST_SECTION = 'quests/server';
+/** The four quest hosts the section stands. */
+const QUEST_HOSTS: ReadonlySet<string> = new Set(['quest.chapter', 'quest.kill-steps', 'quest.body-scripts', 'quest.composition']);
+/** The untyped presence check and read, for a section this engine's pinned format may not name yet. */
+interface AnySectionProduct { readonly has: (name: string) => boolean; readonly section: (name: string) => unknown }
+/** The section's rows, admitted as the native plan admits its own quest rows (the section holds the same rows). */
+function questSectionRows(value: unknown): readonly NativeAssemblyFeature[] {
+  const section = value as { readonly version?: unknown; readonly hosts?: unknown };
+  if (section.version !== 1 || !Array.isArray(section.hosts) || section.hosts.length === 0) throw new Error(`${QUEST_SECTION} needs version 1 and at least one quest host`);
+  const rows = parseNativeAssembly({ kind: 'native-assembly', level: { speed: 1, ground: { size: 1, height: 0 } }, terrain: { kind: 'flat' }, navigation: 'shard', entries: {}, features: section.hosts }).features;
+  const other = rows.find(row => !QUEST_HOSTS.has(row.host));
+  if (other !== undefined) throw new Error(`${QUEST_SECTION} holds quest hosts only, not ${other.host}`);
+  if (new Set(rows.map(row => row.host)).size !== rows.length) throw new Error(`${QUEST_SECTION} names a quest host twice`);
+  return rows;
+}
+/**
+ * FORMAT-PRUNE FP16: a native plan that names no quest host stands the quest family from the product's `quests/server`
+ * section, in the section's order, after the plan's own hosts (where Pine's plan stood `quest.composition`) and before the
+ * families the engine stands from files. A plan that names a quest host beside the section is refused: one place only.
+ */
+function withSectionQuest(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
+  const any = product as unknown as AnySectionProduct;
+  if (!any.has(QUEST_SECTION)) return features;
+  const named = features.find(row => QUEST_HOSTS.has(row.host));
+  if (named !== undefined) throw new Error(`Native plan names ${named.host} beside the ${QUEST_SECTION} section: the quest family stands from the section alone (FORMAT-PRUNE FP16)`);
+  return [...features, ...questSectionRows(any.section(QUEST_SECTION))];
+}
 /** Put cooked taming at the same installation point as its explicit predecessor. */
 function withSectionTaming(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
   if (!product.hasFile(TAMING_FILE) || !features.some(row => row.host === 'riding.mounted') ||
@@ -235,7 +263,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   const declaredRoster = declaredBootSpawns(plan.features.some(row => row.host === 'riding.roster') ? boot : null, shard);
   const meadow = plan.field === undefined && plan.features.some(row => row.host === 'riding.roster') && product.hasFile(MEADOW_FILE);
   const prepared: AssemblyPrepared<C> = { ...ground, ...await prepareField(product, plan, ground.grid, bake, meadow), product, assets, ports, plan, bake, nav, boot, declaredRoster };
-  const features = await withSectionArms(product, withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, plan.features)))));
+  const features = await withSectionArms(product, withSectionTaming(product, withSectionWeather(product, withProgramWeather(shard, await withSectionPopulation(product, withSectionQuest(product, plan.features))))));
   const steps = await Promise.all(features.map(feature => prepareAssemblyFeature(feature, prepared)));
   // OF30: an older pending carcass restores by the declared rows' harvest
   const harvest = declaredHarvest(shard.rows);
@@ -251,7 +279,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
   admitRuntimeCreatures(counted, sections, keeper);
   const summoned = new Set((shard.questHost?.stages ?? []).flatMap(stage => stage.row.stages.flatMap(entry => entry.do.flatMap(action => 'spawn' in action ? [action.spawn] : []))));
   // OF22c1: a chapter wake row's declared fight waits, as a quest page's summoned one does, for its wake cue
-  for (const row of plan.features) if (row.host === 'quest.chapter') {
+  for (const row of features) if (row.host === 'quest.chapter') {
     const { spawn } = parseChapterWake(await readAssemblyInput(product, row.wake));
     if (declaredWakeFight(shard, spawn) !== undefined) summoned.add(spawn);
   }
