@@ -20,6 +20,9 @@ if(asked.length===0){
  const {unadmittedBrowserImports}=await import('./browser-imports.mjs');
  const missing=unadmittedBrowserImports();
  if(missing.length>0)throw new Error(`Browser launch imports require admission: ${missing.join(', ')}`);
+ // ZONE-SNAPSHOTS ZS1 (J507): no checked-in zone snapshots beyond the shrink-only baseline.
+ const guard=spawnSync(process.execPath,['scripts/zone-snapshot-guard.mjs'],{stdio:'inherit'});
+ if(guard.status!==0)process.exit(guard.status??1);
 }
 const threads = process.env.WS_PUSH_LINT_THREADS;
 if (threads !== undefined && !/^[1-9]\d*$/u.test(threads)) throw new Error('Invalid push lint worker limit');
