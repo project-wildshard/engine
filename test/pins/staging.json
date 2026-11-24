@@ -2,8 +2,8 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "882bca2dd7ebea5c5d44e79ef74463abee1dedf28de1ba1087890e75055d5939",
-  "releaseHash": "b32ec528bdf8d26cfb56d2e048b3387c977db7dc34357d943263b3b5e9d5d409",
+  "catalogueHash": "76e8836e0334648b10e702e7844e6bd215c5bcac8df8ba4189bb81fe82716e4f",
+  "releaseHash": "8b7d01cfa6a79bdd743b7c6c16949ffb01a551f4b3f09a616a8f742b0459c91e",
   "catalogue": {
     "version": 0,
     "stage": "live",
@@ -610,8 +610,8 @@
       {
         "slug": "mirror-salt",
         "name": "Mirror Salt",
-        "revision": 7,
-        "hash": "8729462ab98c723a355c11d0ce1520bf75b1c65ea889188f597b4dab751df3c3"
+        "revision": 8,
+        "hash": "bb9e8863589556ed2de17432dfc0b0040429fc48b91e86d6e58d8fd4768248fc"
       },
       {
         "slug": "mossgate",
@@ -622,8 +622,8 @@
       {
         "slug": "nalati-grasslands",
         "name": "Nalati Grasslands",
-        "revision": 8,
-        "hash": "43a4c712070d777ad1ad3796be794bd20ce01b2b6e2fc070174b227ed2363fb8"
+        "revision": 9,
+        "hash": "2b0cf84cc192bedb35a6327323d872bfc9fee88760f8bcdfeec9f97fc82e65f1"
       },
       {
         "slug": "nine-dragon-stack",
@@ -730,8 +730,8 @@
       {
         "slug": "sunscar-dunes",
         "name": "Signal Dunes",
-        "revision": 8,
-        "hash": "08d0da0e061fb02e0b3ec6a1d68314dde66ab80e7fd8f9292d619d2f92a4f239"
+        "revision": 9,
+        "hash": "dc182c5d6283c23514523bc32436b55803f9ddd97d680789dd587aec1f8f0aaf"
       }
     ],
     "missing": []
@@ -763,9 +763,9 @@
     },
     {
       "slug": "mirror-salt",
-      "revision": 7,
-      "hash": "8729462ab98c723a355c11d0ce1520bf75b1c65ea889188f597b4dab751df3c3",
-      "bytes": 14879232
+      "revision": 8,
+      "hash": "bb9e8863589556ed2de17432dfc0b0040429fc48b91e86d6e58d8fd4768248fc",
+      "bytes": 14926336
     },
     {
       "slug": "mossgate",
@@ -775,9 +775,9 @@
     },
     {
       "slug": "nalati-grasslands",
-      "revision": 8,
-      "hash": "43a4c712070d777ad1ad3796be794bd20ce01b2b6e2fc070174b227ed2363fb8",
-      "bytes": 235188736
+      "revision": 9,
+      "hash": "2b0cf84cc192bedb35a6327323d872bfc9fee88760f8bcdfeec9f97fc82e65f1",
+      "bytes": 235265024
     },
     {
       "slug": "nine-dragon-stack",
@@ -883,9 +883,9 @@
     },
     {
       "slug": "sunscar-dunes",
-      "revision": 8,
-      "hash": "08d0da0e061fb02e0b3ec6a1d68314dde66ab80e7fd8f9292d619d2f92a4f239",
-      "bytes": 11457536
+      "revision": 9,
+      "hash": "dc182c5d6283c23514523bc32436b55803f9ddd97d680789dd587aec1f8f0aaf",
+      "bytes": 12323328
     }
   ]
 }
