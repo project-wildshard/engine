@@ -110,7 +110,9 @@ jobs:
       - name: Install the source's own tree
         working-directory: source
         run: pnpm install --frozen-lockfile --config.ci=false
-      - name: Play every advertised production head on the candidate
+      # The source's scripts/server-release/production-grid-plan.json, when
+      # present, names the exact heads of the proposed placement and status changes.
+      - name: Play advertised and planned production heads on the candidate
         if: env.RELEASE_CHANNEL == 'production'
         id: production-play
         working-directory: source
