@@ -2,7 +2,7 @@
 import { expect, test, vi } from 'vitest';
 import { Box3, BufferAttribute, BufferGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
-import { staticGlb } from './fixtures/frozen/glb';
+import { staticGlb } from './fixtures/sdk-built/glb';
 import { emptyShardfile } from '../src/shared/host/author';
 import { clientTileViews } from '../src/client/game/shardfile/clientViews';
 

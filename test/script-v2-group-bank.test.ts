@@ -8,9 +8,9 @@ import { GroupBankV2Schema, parseGroupBankV2 } from '@wildshard/format/scriptGro
 import { layoutV2, writeV2Frame, validateV2Frame } from '@wildshard/format/scriptWireV2';
 import { prepareV2Observations } from '../src/shared/engine/script/observationsV2';
 import { ScriptModuleV2 } from '../src/shared/engine/script/moduleV2';
-import { frozenV2Guest } from './fixtures/frozen/scriptGuests';
-import { frozenV2CoreSource } from './fixtures/frozen/scriptGuests';
-import { frozenGroupBankSource } from './fixtures/frozen/scriptGuests';
+import { frozenV2Guest } from './fixtures/sdk-built/scriptGuests';
+import { frozenV2CoreSource } from './fixtures/sdk-built/scriptGuests';
+import { frozenGroupBankSource } from './fixtures/sdk-built/scriptGuests';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 

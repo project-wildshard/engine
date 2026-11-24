@@ -2,7 +2,7 @@
  * ABI-1 guest, and runs it through the real ShardDecisions host on a small shardfile, so each `Do.*` verb row can
  * have a failing test first.
  *
- * Tests load no compiler: the guest bytes are source-keyed snapshots in `frozen/script-guests` (scriptGuests.ts).
+ * Tests load no compiler: the guest bytes are source-keyed snapshots in `sdk-built/script-guests` (scriptGuests.ts).
  * A new or changed guest source is pinned once with `WS_FREEZE_GUESTS=1 WS_SHARDDEV=<sharddev checkout>`, which runs
  * `scripts/freeze-script-guest.mjs` (sharddev's real compiler and fuel metering) and writes the snapshot to commit.
  *
@@ -26,7 +26,7 @@ import { createShardfileSim, type ShardfileSimulation, type ShardfileSimPorts } 
 import { loadRapier } from '../../src/shared/engine/physics/rapier';
 import type { ShardDecisions } from '../../src/server/game/shardfile/decisions';
 import { SIM_LEVEL } from './sim-level/level';
-import { frozenLegacyGuest } from './frozen/scriptGuests';
+import { frozenLegacyGuest } from './sdk-built/scriptGuests';
 
 /** The guest's I/O base address, the one every existing ABI-1 test guest uses. */
 export const GUEST_IO = 16384;

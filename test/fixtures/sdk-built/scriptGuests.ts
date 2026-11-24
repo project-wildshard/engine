@@ -9,12 +9,12 @@ const entrySchema = object({file: optional(string()), sha256: optional(string())
 function entry(method: string, args: readonly unknown[]) {
   const wire = JSON.stringify([method, args], (_key, value: unknown) => value instanceof Map ? {map: [...value]} : value);
   const key = sha256(new TextEncoder().encode(wire));
-  return parse(entrySchema, JSON.parse(readFileSync(resolve('test/fixtures/frozen/script-guests', `${key}.json`), 'utf8')));
+  return parse(entrySchema, JSON.parse(readFileSync(resolve('test/fixtures/sdk-built/script-guests', `${key}.json`), 'utf8')));
 }
 function bytes(method: string, args: readonly unknown[]): Uint8Array<ArrayBuffer> {
   const pin = entry(method, args);
   if (pin.file === undefined || !/^[a-f0-9]{64}\.wasm$/u.test(pin.file) || pin.sha256 === undefined) throw new Error('Missing frozen script guest');
-  const value = new Uint8Array(readFileSync(resolve('test/fixtures/frozen/script-guests', pin.file)));
+  const value = new Uint8Array(readFileSync(resolve('test/fixtures/sdk-built/script-guests', pin.file)));
   if (sha256(value) !== pin.sha256) throw new Error('Frozen script guest differs');
   return value;
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // CC59h: pin one ABI-1 decision guest for the decision test harness (test/fixtures/decisionHarness.ts).
-// Tests load no compiler: they read source-keyed snapshots in test/fixtures/frozen/script-guests. This tool
+// Tests load no compiler: they read source-keyed snapshots in test/fixtures/sdk-built/script-guests. This tool
 // compiles one source with sharddev's real compiler (AssemblyScript plus structural fuel metering) and writes
 // the snapshot the harness reads, keyed exactly as scriptGuests.ts keys it.
 //
@@ -39,7 +39,7 @@ const { compileScript } = await import(pathToFileURL(resolve(sharddev, 'packages
 const bytes = await compileScript(...args);
 const key = createHash('sha256').update(JSON.stringify([method, args])).digest('hex');
 const sha256 = createHash('sha256').update(bytes).digest('hex');
-const folder = resolve(fileURLToPath(new URL('../test/fixtures/frozen/script-guests', import.meta.url)));
+const folder = resolve(fileURLToPath(new URL('../test/fixtures/sdk-built/script-guests', import.meta.url)));
 const commit = execFileSync('git', ['-C', sharddev, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
 writeFileSync(resolve(folder, `${key}.wasm`), bytes);
 writeFileSync(resolve(folder, `${key}.json`), `${JSON.stringify({ method, arguments: args, sourceRepository: 'project-wildshard/sharddev', sourceCommit: commit, file: `${key}.wasm`, sha256 })}\n`);

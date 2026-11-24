@@ -1,7 +1,7 @@
 import { beforeAll, expect, test } from 'vitest';
 import { ScriptHost } from '../src/shared/engine/script/host';
 import { ScriptWorld } from '../src/shared/engine/script/effects';
-import { frozenLegacyGuest } from './fixtures/frozen/scriptGuests';
+import { frozenLegacyGuest } from './fixtures/sdk-built/scriptGuests';
 
 // The same ABI regions as the Template's scene hooks; `witness` keeps door.as's tick counter outside them.
 const module = (witness: boolean): string => `

@@ -1,7 +1,7 @@
 import { beforeAll, expect, test } from 'vitest';
 import { ClientScriptLane, type ClientScriptObservation } from '../src/client/engine/script/client';
 import { ScriptWorld } from '../src/shared/engine/script/effects';
-import { frozenLegacyGuest } from './fixtures/frozen/scriptGuests';
+import { frozenLegacyGuest } from './fixtures/sdk-built/scriptGuests';
 
 let bytes: Uint8Array = new Uint8Array();
 beforeAll(async () => {

@@ -1,5 +1,5 @@
 import { beforeAll, expect, test } from 'vitest';
-import { frozenLegacyGuest } from './fixtures/frozen/scriptGuests';
+import { frozenLegacyGuest } from './fixtures/sdk-built/scriptGuests';
 import { createShardfileClientScripts as current, captureClientScriptPosition, type ShardfileClientScriptPorts } from '../src/client/game/shardfile/clientScripts';
 import { createShardfileClientScripts as before } from './fixtures/client-script-bridge-before';
 import { DeclaredScriptWorld } from '../src/shared/engine/script/state';

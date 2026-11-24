@@ -9,7 +9,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { GridCell } from '../src/shared/game/grid/assembly';
 import { NeighbourLife } from '../src/client/game/grid/neighbourLife';
-import { frozenLegacyGuest } from './fixtures/frozen/scriptGuests';
+import { frozenLegacyGuest } from './fixtures/sdk-built/scriptGuests';
 
 let bytes: Uint8Array = new Uint8Array();
 const moduleId = 'a'.repeat(64);

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, expect, test, vi } from 'vitest';
 import { emptyShardfile } from '../src/shared/host/author';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import {frozenLegacyGuest as compileScript} from './fixtures/frozen/scriptGuests';
+import {frozenLegacyGuest as compileScript} from './fixtures/sdk-built/scriptGuests';
 import { hashImmutableBytes } from '../src/shared/host/immutable';
 import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
 import { buildDecisionRegistries } from '@wildshard/format/decisionBindings';

@@ -1,7 +1,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { staticGlb } from './fixtures/frozen/glb';
+import { staticGlb } from './fixtures/sdk-built/glb';
 import { loadSpecimenAsset, loadBoundSpecimen, awaitSpecimenAssets } from '../src/client/game/models/specimenCatalogue';
 import { SkyRig } from '../src/client/engine/world/skyRig';
 import { realGc } from '@wildshard/engine/test/realGc';

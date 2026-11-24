@@ -3,7 +3,7 @@ import {readFileSync} from 'node:fs';
 import {beforeAll,expect,test,vi} from 'vitest';
 import {emptyShardfile} from '../src/shared/host/author';
 import type { Shardfile } from '@wildshard/format/shardSchema';
-import {frozenLegacyGuest} from './fixtures/frozen/scriptGuests';
+import {frozenLegacyGuest} from './fixtures/sdk-built/scriptGuests';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 import {createShardfileSim,bindShardfileSim,prepareShardfileSimRestore} from '../src/server/game/plugin/simulation';
 import { snapshotSimHost, onSimHostRestored, isSimHostRestoring, serializeSimSnapshot } from '../src/shared/engine/sim/snapshot';

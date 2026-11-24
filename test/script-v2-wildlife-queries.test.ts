@@ -6,7 +6,7 @@ import { groups } from '../src/shared/engine/physics/groups';
 import { resolvePhysicsQueriesV2,type V2QueryWorld } from '../src/shared/engine/physics/queryBatchV2';
 import { QueryRingV2,answerV2QueryBatch } from '../src/server/engine/script/queriesV2';
 import { SimBatchV2 } from '../src/server/engine/script/simBatchV2';
-import { frozenSimGuest } from './fixtures/frozen/scriptGuests';
+import { frozenSimGuest } from './fixtures/sdk-built/scriptGuests';
 import { layoutV2 } from '@wildshard/format/scriptWireV2';
 import { prepareV2QueryReplies,validateV2QueryRequest,type V2QueryBinding,type V2QueryOperation,type V2QueryRequest } from '@wildshard/format/scriptQueriesV2';
 import { fixtureBytes } from '@wildshard/engine/test/nativeBytes';

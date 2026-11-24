@@ -116,7 +116,7 @@ test('page actors are real native rigs, excluded from target lists and retired e
 });
 
 test.each([true, false])('compiled AS body queries require granted floor capability: %s', async allowedFloor => {
-  const { frozenDecisionGuest } = await import('./fixtures/frozen/scriptGuests');
+  const { frozenDecisionGuest } = await import('./fixtures/sdk-built/scriptGuests');
   const { decisionBindingMap } = await import('@wildshard/format/decisionBindings');
   const { DecisionHost } = await import('../src/server/engine/script/decision');
   const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));

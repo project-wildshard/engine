@@ -15,7 +15,7 @@ import { parseSpawnScript } from '@wildshard/format/spawnScripts';
 import { SpawnInputV2Schema } from '@wildshard/format/spawnScriptV2';
 import { SCRIPT_V2_REVISIONS } from '@wildshard/format/scriptAdmissionV2';
 import { layoutV2 } from '@wildshard/format/scriptWireV2';
-import { frozenLegacyGuest as compileScript, frozenSimGuest as compileSimV2 } from './fixtures/frozen/scriptGuests';
+import { frozenLegacyGuest as compileScript, frozenSimGuest as compileSimV2 } from './fixtures/sdk-built/scriptGuests';
 import { sha256 } from '../src/shared/game/plugin/moduleHash';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { Animal } from '../src/client/engine/entities/AnimalView';

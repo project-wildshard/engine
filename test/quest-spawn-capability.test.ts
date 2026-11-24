@@ -13,7 +13,7 @@ import { publishEntryOwner } from '../src/shared/game/shardfile/entryOwners';
 import { publishBoundQuest } from '../src/shared/game/quest/boundState';
 import { installDeclaredQuestSpawns, type QuestSpawnCapability } from '../src/client/game/quest/chapterDirector';
 import * as spawn from '../src/server/game/population/spawnScript';
-import {frozenDecisionGuest as compileDecisionScripts} from './fixtures/frozen/scriptGuests';
+import {frozenDecisionGuest as compileDecisionScripts} from './fixtures/sdk-built/scriptGuests';
 import { parseSpawnScript, spawnScriptRegistries, type SpawnScriptRows } from '@wildshard/format/spawnScripts';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import type { NetClient } from '../src/client/engine/net/client';

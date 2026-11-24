@@ -8,7 +8,7 @@ import type { GuardedHerdContext } from '../src/server/engine/ai/grazer';
 import { GroupStepV2 } from '../src/shared/engine/script/groupStepV2';
 import type { V2ColumnOwners } from '../src/shared/engine/script/observationColumnsV2';
 import { parseGroupStepV2, groupStepLayoutV2, GroupStepV2Schema } from '@wildshard/format/scriptGroupStepV2';
-import {frozenV2Guest as compileScriptV2, frozenV2CoreSource as v2CoreSource} from './fixtures/frozen/scriptGuests';
+import {frozenV2Guest as compileScriptV2, frozenV2CoreSource as v2CoreSource} from './fixtures/sdk-built/scriptGuests';
 import { FIXTURE_HUNT_TUNING } from './fixtures/hunt-tuning';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';

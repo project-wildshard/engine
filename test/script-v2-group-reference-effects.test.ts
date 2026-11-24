@@ -8,7 +8,7 @@ import { CrowdTargets } from '../src/shared/game/shardfile/crowdRuntime';
 import { GroupStepV2, type GroupStepReferenceV2 } from '../src/shared/engine/script/groupStepV2';
 import type { V2ColumnOwners } from '../src/shared/engine/script/observationColumnsV2';
 import { parseGroupStepV2, groupStepLayoutV2, GroupStepV2Schema } from '@wildshard/format/scriptGroupStepV2';
-import {frozenV2Guest as compileScriptV2, frozenV2CoreSource as v2CoreSource} from './fixtures/frozen/scriptGuests';
+import {frozenV2Guest as compileScriptV2, frozenV2CoreSource as v2CoreSource} from './fixtures/sdk-built/scriptGuests';
 import { namedJsonSchema } from '../src/shared/host/formatJsonSchema';
 import { validateNamedJsonSchema } from '../src/shared/game/shardfile/customSchema';
 
