@@ -510,6 +510,9 @@ fi
 # --- SERVER-CELLS SC2: a box-local Prometheus on loopback, and each channel's METRICS_PORT (Jake, 2026-11-13, grill Q9).
 "$HERE/harden-prometheus.sh"
 
+# --- MMO-OBSERVABILITY OB3: Grafana over that Prometheus, loopback only, on the tailnet through Serve (never Funnel).
+"$HERE/harden-grafana.sh"
+
 # --- VH9: the proxy (J264: Caddy behind Cloudflare, Full (strict) with an Origin CA certificate, mTLS from Cloudflare only).
 "$HERE/harden-caddy.sh"
 

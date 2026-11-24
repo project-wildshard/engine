@@ -26,9 +26,10 @@ function network(value, host, complete) {
   for (const [key, allowed] of Object.entries(funnel)) {
     if ((allowed !== true && allowed !== false) || ![`${host}:443`, `${host}:8443`].includes(key)) throw new Error('Refuse a foreign AllowFunnel host:port');
   }
-  /** @type {readonly [string, string, string][]} */
-  const routes = [['443', '8790', 'HTTPS'], ['8443', '8791', 'HTTPS'], ['8790', '8790', 'HTTP']];
-  for (const [port, target, protocol] of routes) {
+  /** @type {readonly [string, string, string, string?][]} */
+  // MMO-OBSERVABILITY OB3: harden-grafana.sh adds the dashboard's route; setup.sh never needs it, so --complete does not ask for it.
+  const routes = [['443', '8790', 'HTTPS'], ['8443', '8791', 'HTTPS'], ['8790', '8790', 'HTTP'], ['10000', '3000', 'HTTPS', 'optional']];
+  for (const [port, target, protocol, optional] of routes) {
     const key = `${host}:${port}`;
     for (const other of Object.keys(web)) if (other.endsWith(`:${port}`) && other !== key) throw new Error(`Refuse another Serve host on port ${port}`);
     if (tcp[port] !== undefined && !soleTrue(tcp[port], protocol)) throw new Error(`Refuse a foreign TCP handler on port ${port}`);
@@ -38,7 +39,7 @@ function network(value, host, complete) {
     }
     if ((tcp[port] === undefined) !== (web[key] === undefined)) throw new Error(`Refuse an incomplete Serve route on port ${port}`);
     if (funnel[key] === true) throw new Error(`Funnel drift: port ${port} is public, and the Funnel is retired (MS8); run tailscale funnel --https=${port} off, then rerun setup.sh`);
-    if (complete && web[key] === undefined) throw new Error(`Missing expected route on port ${port}`);
+    if (complete && optional === undefined && web[key] === undefined) throw new Error(`Missing expected route on port ${port}`);
     console.info(`${web[key] === undefined ? 'would' : 'ok'} tailnet-only Serve port ${port} to loopback ${target}`);
   }
 }

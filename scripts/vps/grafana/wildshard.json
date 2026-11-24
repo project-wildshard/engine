@@ -1,0 +1,2858 @@
+{
+ "uid": "wildshard-lag",
+ "title": "Wildshard: why did it lag?",
+ "tags": [
+  "wildshard"
+ ],
+ "timezone": "browser",
+ "editable": false,
+ "graphTooltip": 1,
+ "schemaVersion": 39,
+ "version": 1,
+ "time": {
+  "from": "now-24h",
+  "to": "now"
+ },
+ "refresh": "1m",
+ "timepicker": {
+  "refresh_intervals": [
+   "30s",
+   "1m",
+   "5m"
+  ],
+  "quick_ranges": [
+   {
+    "from": "now-1h",
+    "to": "now",
+    "display": "Last 1 hour"
+   },
+   {
+    "from": "now-24h",
+    "to": "now",
+    "display": "Last 24 hours"
+   },
+   {
+    "from": "now-7d",
+    "to": "now",
+    "display": "Last 7 days"
+   }
+  ]
+ },
+ "links": [
+  {
+   "title": "Last 1 h",
+   "type": "link",
+   "url": "/d/wildshard-lag?from=now-1h&to=now",
+   "keepTime": false,
+   "includeVars": true
+  },
+  {
+   "title": "Last 24 h",
+   "type": "link",
+   "url": "/d/wildshard-lag?from=now-24h&to=now",
+   "keepTime": false,
+   "includeVars": true
+  },
+  {
+   "title": "Last 7 d",
+   "type": "link",
+   "url": "/d/wildshard-lag?from=now-7d&to=now",
+   "keepTime": false,
+   "includeVars": true
+  }
+ ],
+ "templating": {
+  "list": [
+   {
+    "name": "channel",
+    "label": "Channel",
+    "type": "custom",
+    "query": "staging,production",
+    "current": {
+     "text": "staging",
+     "value": "staging"
+    },
+    "options": [
+     {
+      "text": "staging",
+      "value": "staging",
+      "selected": true
+     },
+     {
+      "text": "production",
+      "value": "production",
+      "selected": false
+     }
+    ]
+   },
+   {
+    "name": "actor",
+    "label": "Players",
+    "type": "custom",
+    "query": "human,agent",
+    "includeAll": true,
+    "allValue": "human|agent",
+    "multi": false,
+    "current": {
+     "text": "All",
+     "value": "$__all"
+    },
+    "options": [
+     {
+      "text": "All",
+      "value": "$__all",
+      "selected": true
+     },
+     {
+      "text": "human",
+      "value": "human",
+      "selected": false
+     },
+     {
+      "text": "agent",
+      "value": "agent",
+      "selected": false
+     }
+    ]
+   }
+  ]
+ },
+ "annotations": {
+  "list": [
+   {
+    "builtIn": 1,
+    "datasource": {
+     "type": "grafana",
+     "uid": "-- Grafana --"
+    },
+    "enable": true,
+    "hide": true,
+    "iconColor": "rgba(0, 211, 255, 1)",
+    "name": "Annotations & Alerts",
+    "type": "dashboard"
+   },
+   {
+    "datasource": {
+     "type": "prometheus",
+     "uid": "wildshard-prometheus"
+    },
+    "enable": true,
+    "iconColor": "orange",
+    "name": "Restart or deploy",
+    "expr": "changes(process_start_time_seconds{job=\"wildshard\",channel=\"$channel\"}[1m]) > 0",
+    "step": "60s",
+    "titleFormat": "restart",
+    "useValueForTime": false
+   },
+   {
+    "datasource": {
+     "type": "prometheus",
+     "uid": "wildshard-prometheus"
+    },
+    "enable": true,
+    "iconColor": "purple",
+    "name": "Release (new build)",
+    "expr": "wildshard_build_info{channel=\"$channel\"} unless wildshard_build_info{channel=\"$channel\"} offset 2m",
+    "step": "60s",
+    "titleFormat": "build {{build}} serial {{serial}}",
+    "useValueForTime": false
+   },
+   {
+    "datasource": {
+     "type": "prometheus",
+     "uid": "wildshard-prometheus"
+    },
+    "enable": true,
+    "iconColor": "yellow",
+    "name": "Cook busy",
+    "expr": "sum(rate(namedprocess_namegroup_cpu_seconds_total{groupname=\"wildshard-cook\"}[1m])) > 0.5",
+    "step": "60s",
+    "titleFormat": "cook",
+    "useValueForTime": false
+   },
+   {
+    "datasource": {
+     "type": "prometheus",
+     "uid": "wildshard-prometheus"
+    },
+    "enable": true,
+    "iconColor": "red",
+    "name": "Reconnect storm",
+    "expr": "(sum(increase(wildshard_client_reconnects_total{channel=\"$channel\"}[1m])) or vector(0)) + (sum(increase(wildshard_socket_closes_total{channel=\"$channel\",reason!~\"closed|replaced\"}[1m])) or vector(0)) > 3",
+    "step": "60s",
+    "titleFormat": "reconnect storm",
+    "useValueForTime": false
+   }
+  ]
+ },
+ "panels": [
+  {
+   "type": "row",
+   "id": 1,
+   "title": "Lag suspects: one time axis",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "id": 2,
+   "title": "Box CPU busy, steal, iowait",
+   "description": "All 16 cores. Steal is the host taking CPU away; iowait is the disk.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 1,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[$__rate_interval])))",
+     "legendFormat": "busy",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "100 * avg(rate(node_cpu_seconds_total{mode=\"steal\"}[$__rate_interval]))",
+     "legendFormat": "steal",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "C",
+     "expr": "100 * avg(rate(node_cpu_seconds_total{mode=\"iowait\"}[$__rate_interval]))",
+     "legendFormat": "iowait",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "D",
+     "expr": "100 * max(rate(node_cpu_seconds_total{mode!=\"idle\"}[$__rate_interval]))",
+     "legendFormat": "busiest core (all modes)",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "max": 100,
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 70
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 3,
+   "title": "Door event loop (holds every socket)",
+   "description": "The main thread: a stall here holds every client's frames and pongs.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 1,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "1000 * wildshard_eventloop_lag_seconds{channel=\"$channel\",thread=\"main\",quantile=\"0.99\"}",
+     "legendFormat": "p99",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "1000 * wildshard_eventloop_lag_seconds{channel=\"$channel\",thread=\"main\",quantile=\"1\"}",
+     "legendFormat": "max",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 50
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 4,
+   "title": "Worker event loops (hold the ticks)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 1,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "1000 * max(wildshard_eventloop_lag_seconds{channel=\"$channel\",thread=~\"worker-.*\",quantile=\"0.99\"})",
+     "legendFormat": "worst p99",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "1000 * max(wildshard_eventloop_lag_seconds{channel=\"$channel\",thread=~\"worker-.*\",quantile=\"1\"})",
+     "legendFormat": "worst max",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 50
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 5,
+   "title": "Longest GC pause, any thread",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 1,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "1000 * max by (thread) (wildshard_gc_pause_max_seconds{channel=\"$channel\"})",
+     "legendFormat": "{{thread}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 50
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 6,
+   "title": "Tick time, worst worker",
+   "description": "A 60 Hz tick has 16.7 ms.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 8,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "1000 * max(wildshard_tick_seconds{channel=\"$channel\",quantile=\"0.99\"})",
+     "legendFormat": "p99",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "1000 * max(wildshard_tick_seconds{channel=\"$channel\",quantile=\"1\"})",
+     "legendFormat": "max",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "C",
+     "expr": "sum(increase(wildshard_tick_drops_total{channel=\"$channel\"}[1m]))",
+     "legendFormat": "dropped ticks / min",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 16.7
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 7,
+   "title": "Client round trip (the network)",
+   "description": "Each ping, as the page measured it.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 8,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "1000 * histogram_quantile(0.5, sum by (le) (rate(wildshard_client_rtt_seconds_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "p50",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(wildshard_client_rtt_seconds_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "p95",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "C",
+     "expr": "1000 * histogram_quantile(0.95, sum by (le) (rate(wildshard_client_rtt_jitter_seconds_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "jitter p95",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 250
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 8,
+   "title": "Client frames (the phone)",
+   "description": "fps per 10 s word, and frames over 50 ms per minute.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 8,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "histogram_quantile(0.5, sum by (le, device) (rate(wildshard_client_fps_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "fps p50 {{device}}",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "60 * sum by (device) (rate(wildshard_client_long_frames_total{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval]))",
+     "legendFormat": "long frames/min {{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 9,
+   "title": "Reconnects and closes per minute",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 8,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (reason) (increase(wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"}[1m]))",
+     "legendFormat": "page lost link: {{reason}}",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "sum by (reason) (increase(wildshard_socket_closes_total{channel=\"$channel\",actor=~\"$actor\",reason!=\"closed\"}[1m]))",
+     "legendFormat": "door closed: {{reason}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false,
+      "thresholdsStyle": {
+       "mode": "dashed"
+      }
+     },
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "red",
+        "value": 3
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "row",
+   "id": 10,
+   "title": "The box",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 15,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "id": 11,
+   "title": "CPU by mode",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 16,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "100 * sum by (mode) (rate(node_cpu_seconds_total{mode!=\"idle\"}[$__rate_interval])) / scalar(count(count by (cpu) (node_cpu_seconds_total)))",
+     "legendFormat": "{{mode}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 30,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 12,
+   "title": "Load",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 16,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "node_load1",
+     "legendFormat": "1 min",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "node_load5",
+     "legendFormat": "5 min",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "C",
+     "expr": "count(count by (cpu) (node_cpu_seconds_total))",
+     "legendFormat": "cores",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 13,
+   "title": "Pressure (time stalled)",
+   "description": "Linux PSI: share of time some task waited on CPU, memory or I/O.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 16,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "rate(node_pressure_cpu_waiting_seconds_total[$__rate_interval])",
+     "legendFormat": "cpu",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "rate(node_pressure_memory_waiting_seconds_total[$__rate_interval])",
+     "legendFormat": "memory",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "C",
+     "expr": "rate(node_pressure_io_waiting_seconds_total[$__rate_interval])",
+     "legendFormat": "io",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 14,
+   "title": "Memory",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 16,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+     "legendFormat": "used",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "node_memory_MemAvailable_bytes",
+     "legendFormat": "available",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "C",
+     "expr": "node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes",
+     "legendFormat": "swap used",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 15,
+   "title": "Disk I/O",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 23,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum(rate(node_disk_read_bytes_total{device!~\"sr.*\"}[$__rate_interval]))",
+     "legendFormat": "read",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "sum(rate(node_disk_written_bytes_total{device!~\"sr.*\"}[$__rate_interval]))",
+     "legendFormat": "write",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "Bps",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 16,
+   "title": "Disk used",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 23,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "100 * (1 - node_filesystem_avail_bytes{mountpoint=\"/\"} / node_filesystem_size_bytes{mountpoint=\"/\"})",
+     "legendFormat": "/",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percent",
+     "max": 100,
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 17,
+   "title": "Network",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 23,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "rate(node_network_receive_bytes_total{device=~\"eth0|tailscale0\"}[$__rate_interval])",
+     "legendFormat": "in {{device}}",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "rate(node_network_transmit_bytes_total{device=~\"eth0|tailscale0\"}[$__rate_interval])",
+     "legendFormat": "out {{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "Bps",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 18,
+   "title": "TCP",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 23,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "rate(node_netstat_Tcp_RetransSegs[$__rate_interval])",
+     "legendFormat": "retransmits/s",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "node_netstat_Tcp_CurrEstab",
+     "legendFormat": "established",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "row",
+   "id": 19,
+   "title": "Processes (who is using the box)",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 30,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "id": 20,
+   "title": "CPU by account",
+   "description": "Cores in use. wildshard-cook is the cook; wildshard-staging and wildshard-production the game servers; wildshard-agent an agent's work.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 31,
+    "w": 12,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (groupname) (rate(namedprocess_namegroup_cpu_seconds_total[$__rate_interval]))",
+     "legendFormat": "{{groupname}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 30,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 21,
+   "title": "Resident memory by account",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 31,
+    "w": 12,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (groupname) (namedprocess_namegroup_memory_bytes{memtype=\"resident\"})",
+     "legendFormat": "{{groupname}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 30,
+      "showPoints": "never",
+      "spanNulls": false,
+      "stacking": {
+       "mode": "normal",
+       "group": "A"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 22,
+   "title": "Disk I/O by account",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 38,
+    "w": 12,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (groupname) (rate(namedprocess_namegroup_read_bytes_total[$__rate_interval]) + rate(namedprocess_namegroup_write_bytes_total[$__rate_interval]))",
+     "legendFormat": "{{groupname}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "Bps",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 23,
+   "title": "Processes by account",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 38,
+    "w": 12,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (groupname) (namedprocess_namegroup_num_procs)",
+     "legendFormat": "{{groupname}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "row",
+   "id": 24,
+   "title": "The Node server ($channel)",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 45,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "id": 25,
+   "title": "Process CPU",
+   "description": "Cores, door and workers together.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 46,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "rate(process_cpu_seconds_total{channel=\"$channel\"}[$__rate_interval])",
+     "legendFormat": "cores",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 26,
+   "title": "Memory",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 46,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "process_resident_memory_bytes{channel=\"$channel\"}",
+     "legendFormat": "rss",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "wildshard_thread_memory_bytes{channel=\"$channel\",kind=\"heap\"}",
+     "legendFormat": "heap {{thread}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 27,
+   "title": "Event loop p99 per thread",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 46,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "1000 * wildshard_eventloop_lag_seconds{channel=\"$channel\",quantile=\"0.99\"}",
+     "legendFormat": "{{thread}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 28,
+   "title": "GC time per second, per thread",
+   "description": "Share of each thread's time paused for GC.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 46,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (thread) (rate(wildshard_gc_pause_seconds_total{channel=\"$channel\"}[$__rate_interval]))",
+     "legendFormat": "{{thread}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 29,
+   "title": "GC pauses per minute, by kind",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 53,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "60 * sum by (kind) (rate(wildshard_gc_pauses_total{channel=\"$channel\"}[$__rate_interval]))",
+     "legendFormat": "{{kind}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 30,
+   "title": "Door GC p99 by kind",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 53,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "1000 * histogram_quantile(0.99, sum by (le, kind) (rate(nodejs_gc_duration_seconds_bucket{channel=\"$channel\"}[$__rate_interval])))",
+     "legendFormat": "{{kind}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 31,
+   "title": "Handles and file descriptors",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 53,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "nodejs_active_handles_total{channel=\"$channel\"}",
+     "legendFormat": "handles",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "process_open_fds{channel=\"$channel\"}",
+     "legendFormat": "fds",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 32,
+   "title": "Restarts",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 53,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "changes(process_start_time_seconds{channel=\"$channel\"}[1h])",
+     "legendFormat": "starts in the last hour",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "row",
+   "id": 33,
+   "title": "The MMO ($channel)",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 60,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "id": 34,
+   "title": "Players",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 61,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum(wildshard_players{channel=\"$channel\"})",
+     "legendFormat": "seated",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "sum(wildshard_players_held{channel=\"$channel\"})",
+     "legendFormat": "held (dropped, body standing)",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "C",
+     "expr": "sum by (actor, device) (wildshard_sockets_open{channel=\"$channel\"})",
+     "legendFormat": "sockets {{actor}} {{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 35,
+   "title": "Ticks per second per worker",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 61,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "wildshard_ticks_per_second{channel=\"$channel\"}",
+     "legendFormat": "worker {{worker}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 36,
+   "title": "Tick p99 per worker",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 61,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "1000 * wildshard_tick_seconds{channel=\"$channel\",quantile=\"0.99\"}",
+     "legendFormat": "worker {{worker}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "ms",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 37,
+   "title": "Send queue (backpressure)",
+   "description": "The most bytes waiting for one client; frames skip past 16 KiB and the client is closed stalled past 256 KiB.",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 61,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "wildshard_socket_buffered_bytes_max{channel=\"$channel\"}",
+     "legendFormat": "worst client",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 38,
+   "title": "Skipped frames per minute",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 68,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "60 * rate(wildshard_socket_skipped_frames_total{channel=\"$channel\"}[$__rate_interval])",
+     "legendFormat": "skipped",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 39,
+   "title": "Socket bytes",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 68,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "rate(wildshard_socket_bytes_total{channel=\"$channel\"}[$__rate_interval])",
+     "legendFormat": "{{direction}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "Bps",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 40,
+   "title": "Door refusals per minute (protocol errors, limits)",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 68,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (reason) (increase(wildshard_door_refusals_total{channel=\"$channel\"}[1m]))",
+     "legendFormat": "{{reason}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 41,
+   "title": "Crossings p95",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 68,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "histogram_quantile(0.95, sum by (le) (rate(wildshard_crossing_seconds_bucket{channel=\"$channel\"}[5m])))",
+     "legendFormat": "p95",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "row",
+   "id": 42,
+   "title": "The page ($channel, from each client's 10 s word)",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 75,
+    "w": 24,
+    "h": 1
+   },
+   "panels": []
+  },
+  {
+   "type": "timeseries",
+   "id": 43,
+   "title": "fps by device",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 76,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "histogram_quantile(0.5, sum by (le, device) (rate(wildshard_client_fps_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "p50 {{device}}",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "histogram_quantile(0.1, sum by (le, device) (rate(wildshard_client_fps_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "worst 10% {{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 44,
+   "title": "Frame times",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 76,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "histogram_quantile(0.5, sum by (le, device) (rate(wildshard_client_frame_p95_seconds_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "typical p95 {{device}}",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "histogram_quantile(0.95, sum by (le, device) (rate(wildshard_client_frame_max_seconds_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "worst frame {{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 45,
+   "title": "Share of frames over 50 ms",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 76,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (device) (rate(wildshard_client_long_frames_total{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])) / sum by (device) (rate(wildshard_client_frames_total{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval]))",
+     "legendFormat": "{{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 46,
+   "title": "Round trip by device",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 18,
+    "y": 76,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "histogram_quantile(0.5, sum by (le, device) (rate(wildshard_client_rtt_seconds_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "p50 {{device}}",
+     "range": true
+    },
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "B",
+     "expr": "histogram_quantile(0.99, sum by (le, device) (rate(wildshard_client_rtt_seconds_bucket{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval])))",
+     "legendFormat": "p99 {{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 47,
+   "title": "Pages reporting",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 83,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "10 * sum by (actor, device) (rate(wildshard_client_stats_words_total{channel=\"$channel\",actor=~\"$actor\"}[$__rate_interval]))",
+     "legendFormat": "{{actor}} {{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  },
+  {
+   "type": "timeseries",
+   "id": 48,
+   "title": "Links lost, by reason, per minute",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "wildshard-prometheus"
+   },
+   "gridPos": {
+    "x": 6,
+    "y": 83,
+    "w": 6,
+    "h": 7
+   },
+   "targets": [
+    {
+     "datasource": {
+      "type": "prometheus",
+      "uid": "wildshard-prometheus"
+     },
+     "refId": "A",
+     "expr": "sum by (reason, device) (increase(wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"}[1m]))",
+     "legendFormat": "{{reason}} {{device}}",
+     "range": true
+    }
+   ],
+   "fieldConfig": {
+    "defaults": {
+     "unit": "short",
+     "min": 0,
+     "custom": {
+      "drawStyle": "line",
+      "lineWidth": 1,
+      "fillOpacity": 8,
+      "showPoints": "never",
+      "spanNulls": false
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "legend": {
+     "displayMode": "list",
+     "placement": "bottom",
+     "showLegend": true
+    },
+    "tooltip": {
+     "mode": "multi",
+     "sort": "desc"
+    }
+   }
+  }
+ ]
+}

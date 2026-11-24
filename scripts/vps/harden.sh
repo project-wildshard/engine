@@ -241,6 +241,19 @@ if [ -f "$R/etc/prometheus/wildshard.yml" ]; then
 else info SC2 'no box Prometheus yet (harden.sh installs it)'
 fi
 
+# MMO-OBSERVABILITY OB3: Grafana runs on loopback, sends nothing out, lets nobody log in, and the tailnet reaches it only by Serve.
+if [ -f "$R/etc/wildshard-grafana/grafana.ini" ]; then
+  ini=$(sed 's/;.*//' "$R/etc/wildshard-grafana/grafana.ini")
+  for want in 'http_addr = 127.0.0.1' 'reporting_enabled = false' 'check_for_updates = false' 'disable_login_form = true' 'org_role = Viewer' 'disable_initial_admin_creation = true' 'allow_sign_up = false' 'preinstall_disabled = true'; do
+    if printf '%s\n' "$ini" | matches -Fx -- "$want"; then ok OB3 "grafana.ini has '$want'"; else bad OB3 "grafana.ini lacks '$want'"; fi
+  done
+  if has systemctl; then
+    if systemctl is-active --quiet wildshard-grafana.service 2>/dev/null; then ok OB3 'wildshard-grafana active'; else bad OB3 'wildshard-grafana is not active'; fi
+  fi
+  if has tailscale && tailscale funnel status 2>/dev/null | grep -Ei ':10000' | grep -Eqi 'funnel on|public'; then bad OB3 'the dashboard route is public (Funnel)'; else ok OB3 'the dashboard route is tailnet only'; fi
+else info OB3 'no Grafana yet (harden.sh installs it)'
+fi
+
 # --- VH9: the proxy.
 if has caddy; then
   caddyfile=$(sed 's/#.*//' "$R/etc/caddy/Caddyfile" 2>/dev/null)
