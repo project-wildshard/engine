@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { approachBudget, featuredZoneEntry, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../scripts/zone-entry-tour.mjs';
+import { approachBudget, featuredZoneEntry, proofHeading, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../scripts/zone-entry-tour.mjs';
 import { zoneEntryGap } from '../scripts/page-release/flow.mjs';
 import { TOUR_FEATURED as curated } from '../scripts/zone-entry-featured.mjs';
 
@@ -203,6 +203,17 @@ test("budgets a fresh guest's swim round Driftwood's harbour by its length, neve
   expect(approachBudget(spawn, west)).toBeGreaterThanOrEqual(200_000);
   expect(approachBudget(spawn, west)).toBeLessThanOrEqual(240_000);
   expect(approachBudget({x:0, z:-194}, [{x:0, z:-235, ride:false}])).toBe(120_000);
+});
+
+test("the arrival's walk proof turns a quarter each try, so a seat by a wall still proves walk input", (): void => {
+  // v0.1.81's train held on Nine Dragon: its menu-and-back seat by the spawn deck's wall moved 0.07 to 0.11 m per try toward
+  // the zone's centre, and the proof walked only that way for the whole entry window (opus-fp21, staging 1e4f845e)
+  const turns = [0, 1, 2, 3].map(proofHeading);
+  expect(turns[0]).toBe(0);
+  const facing = turns.map(turn => [Math.round(Math.sin(turn)), Math.round(Math.cos(turn))].join(','));
+  expect(new Set(facing).size).toBe(4);
+  expect(proofHeading(4)).toBe(0);
+  expect(proofHeading(5)).toBe(turns[1]);
 });
 
 test('steps round a pillar on the straight line: a hop, then side-steps that alternate and grow', (): void => {

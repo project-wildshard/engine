@@ -228,10 +228,10 @@ const feet = page => page.evaluate(() => {
   return {x: Number(st.feet.x), z: Number(st.feet.z), home: String(st.home)};
 });
 
-/** @param {Page} page @param {Point} from @param {Point} toward */
-const face = (page, from, toward) => page.evaluate(yaw => {
+/** @param {Page} page @param {Point} from @param {Point} toward @param {number} [turn] radians off facing `toward` */
+const face = (page, from, toward, turn = 0) => page.evaluate(yaw => {
   /** @type {any} */ (window).__wildshard.world.player.yaw = yaw;
-}, Math.atan2(from.x-toward.x, from.z-toward.z));
+}, Math.atan2(from.x-toward.x, from.z-toward.z)+turn);
 
 // A bad approach and a stalled destination both use the entry timer. Keep the last scene state.
 /** @param {Page} page */
@@ -269,6 +269,15 @@ export function approachBudget(from, points) {
   let length = 0, at = from;
   for (const point of points) { length += Math.hypot(point.x-at.x, point.z-at.z); at = point; }
   return Math.max(APPROACH_MS, Math.ceil(length/2)*1000);
+}
+
+/** The heading the arrival's walk proof tries next, as a turn from facing the zone's centre. A seat by a wall cannot walk at
+ *  the centre: Nine Dragon's spawn deck stands against a wall on its centre side, and v0.1.81's menu-and-back seat at
+ *  (0.9, 8.0) moved 0.07 to 0.11 m per 700 ms toward the centre on every try, but 2 to 3 m on the other headings
+ *  (opus-fp21, staging 1e4f845e). The proof is that walk input moves the player, so it turns a quarter each try.
+ * @param {number} attempt the tries so far @returns {number} radians added to the centre-facing yaw */
+export function proofHeading(attempt) {
+  return [0, Math.PI/2, -Math.PI/2, Math.PI][attempt%4] ?? 0;
 }
 
 /** The walker's way past a post or a pillar on its straight line (open-plot-2-0's centre pillar held it through two minutes
@@ -496,17 +505,20 @@ async function arrived(page, target, center, end) {
     if (frame !== null) await delay(500);
   } while (frame !== null && Date.now()+1500 < end);
   if (frame !== null) throw new Error(frame);
+  let tries = 0, best = 0;
   do {
     const before = await feet(page);
     if (before?.home === target) {
-      await face(page, before, center);
+      await face(page, before, center, proofHeading(tries++));
       try { await page.keyboard.down('KeyW'); await delay(700); } finally { await page.keyboard.up('KeyW'); }
       const after = await feet(page);
-      if (after?.home === target && Math.hypot(after.x-before.x, after.z-before.z) >= 0.25) return;
+      const moved = after?.home === target ? Math.hypot(after.x-before.x, after.z-before.z) : 0;
+      if (moved >= 0.25) return;
+      best = Math.max(best, moved);
     }
     await delay(250);
   } while (Date.now()+1500 < end);
-  throw new Error('Walk input did not move the player within the entry window');
+  throw new Error(`Walk input did not move the player within the entry window (${tries} tries over ${Math.min(tries, 4)} headings, best ${best.toFixed(2)} m)`);
 }
 
 /** @param {Page} page */
