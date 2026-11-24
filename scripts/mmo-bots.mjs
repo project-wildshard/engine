@@ -290,12 +290,12 @@ if (botsOnHost && hostSsh !== null) {
 }
 /** @type {{startedAt: string, ms: number, checkpointInFlight: true} | null} */
 let checkpointRestart = null;
-/** MW5: the restart workflow's dispatch, once the bots sit. @type {{ askedAt: string, error?: string } | null} */
-let restartAsked = null;
+/** MW5: the restart workflow's dispatch, once the bots sit (a holder, so the closure's write is seen). */
+const restart = { /** @type {{ askedAt: string, error?: string } | null} */ asked: null };
 const askRestart = async () => {
-  if (restartAsked !== null) return;
+  if (restart.asked !== null) return;
   const asked = { askedAt: new Date().toISOString() };
-  restartAsked = asked;
+  restart.asked = asked;
   const status = await new Promise(resolve => {
     const gh = spawn('gh', ['workflow', 'run', 'staging-room-restart.yml', '-R', 'project-wildshard/engine', '-f', 'channel=staging'], { stdio: 'ignore', timeout: 60_000 });
     gh.once('error', () => { resolve(-1); });
@@ -356,8 +356,8 @@ try {
   requireCandidate();
   if (outsideProof && (observed?.complete !== true || observed?.left !== true || observed?.signedReleaseBuild !== release.engineBuild || observed?.url !== url))
     throw new Error(typeof observed.error === 'string' ? observed.error : 'Outside child did not return its complete, released witness');
-  if (restartProof && (observed?.complete !== true || restartAsked === null || restartAsked.error !== undefined))
-    throw new Error(typeof observed.error === 'string' ? observed.error : restartAsked?.error ?? 'The bots did not all ride the restart');
+  if (restartProof && (observed?.complete !== true || restart.asked === null || restart.asked.error !== undefined))
+    throw new Error(typeof observed.error === 'string' ? observed.error : restart.asked?.error ?? 'The bots did not all ride the restart');
 } catch (error) {
   if (!outsideProof && !restartProof) throw error;
   exit = 1; failure = error instanceof Error ? error.message : String(error);
@@ -370,7 +370,7 @@ const report = { ...observed, mode, exit, ...(outsideProof ? {outsideProof: true
   ...(exit === 0 ? {} : {error: failure ?? (typeof observed.error === 'string' ? observed.error : 'Outside child did not exit successfully')})} : {}), ...(serverFrom === undefined ? {} : { serverFrom }), ...(remote === undefined ? {} : { remote, cpus: values.cpus }),
   ...(botsOnHost ? { botsOnHost, botCpus: values['bot-cpus'] } : {}),
   ...(pgRestartCheckpoint ? { checkpointRestart } : {}),
-  ...(restartProof ? { restartProof: true, candidate, restartAsked, ...(failure === null ? {} : { failure }) } : {}),
+  ...(restartProof ? { restartProof: true, candidate, restartAsked: restart.asked, ...(failure === null ? {} : { failure }) } : {}),
   ...(mode === 'staging' ? { stagingAfter: after } : {}),
   ...(full.length === 0 ? {} : { server: { windows: full.length, worstP95: Math.max(...full.map(row => row.p95)), meanP95: Number((full.reduce((sum, row) => sum + row.p95, 0) / full.length).toFixed(3)),
     max: Math.max(...full.map(row => row.max)), drops: full.reduce((sum, row) => sum + row.drops, 0), minTicksPerSecond: Math.min(...full.map(row => row.ticksPerSecond)), rssMB: Math.round(Math.max(...full.map(row => row.rss)) / 1048576) } }) };
