@@ -8,6 +8,8 @@ import type { NetIdentity } from '@wildshard/engine/net/identity';
 import { Redial, type LinkCause, type LinkProgress, type LinkState } from '@wildshard/engine/net/redial';
 import { decodeArrive, decodeCountdown, decodeEnter, decodeSavesAnswer, encodeEnter, encodeSaves, worldReadsSaves, type ArriveWord, type Countdown, type RoomSave, type SavesAsk, type WorldWord } from '@wildshard/engine/net/socketFrames';
 import { encodeDeviceWord, worldReadsDevice } from '@wildshard/engine/net/deviceWord';
+import { encodeStatsWord, STATS_EVERY_MS, worldReadsStats } from '@wildshard/engine/net/statsWord';
+import { LinkStats } from '@wildshard/engine/net/linkStats';
 import { subscribePersistence, type PersistenceWord } from '@wildshard/engine/net/persistenceWord';
 import { WebSocketTransport } from '@wildshard/engine/net/webSocketTransport';
 import {NetRecords} from '@wildshard/engine/net/netRecord';
@@ -176,6 +178,11 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const voices = new Set<(word: VoiceHeard) => void>(), encoder = new TextEncoder(), decoder = new TextDecoder();
   // row 9: the links whose door said it answers a `saves` word
   const savesDoors = new WeakSet<WebSocketTransport>();
+  // MMO-OBSERVABILITY OB6: the links whose door reads this page's 10 s stats word, and the window it is read from
+  const statsDoors = new WeakSet<WebSocketTransport>();
+  const linkStats = new LinkStats({ rtt: () => link?.stats.rttMs ?? 0, everyMs: STATS_EVERY_MS,
+    send: word => { if (link === null || down || !statsDoors.has(link)) return false; link.control('stats', encodeStatsWord(word)); return true; } });
+  let linkState: LinkState = 'live';
   const voice: VoiceLink = { send: word => { link?.control('voice', encoder.encode(JSON.stringify(word)).buffer); },
     on: listener => { voices.add(listener); return () => { voices.delete(listener); }; } };
   const hear = (transport: WebSocketTransport): WebSocketTransport => {
@@ -188,6 +195,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       // DEVICE-TELEMETRY DT3: a door whose first word says it reads the device word hears this page's snapshot, once per socket
       if (control === 'world') {
         if (worldReadsDevice(bytes)) sendDevice(transport, config.build); if (worldReadsSaves(bytes)) savesDoors.add(transport);
+        if (worldReadsStats(bytes)) statsDoors.add(transport);
         // NB2 (J494): the page runs the rooms' revision of its zone, never its own; it reloads once onto it, or entry refuses
         try { heardRooms(JSON.parse(decoder.decode(bytes)), gridCell === undefined ? config.loaded : cellSlug(gridCell), zone => { view.elsewhere(zone); }); } catch { /* a word that says no revisions changes nothing */ }
         return;
@@ -227,7 +235,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
   const records=config.record===undefined?undefined:new NetRecords(client,{...config.record,build:config.build,level:config.loaded,
     correction:(row:NetCorrection)=>{if(playtest)link?.control('playtest',new TextEncoder().encode(JSON.stringify(row)).buffer);}});
   const address = config.address ?? ((): string => config.socket);
-  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(address()));}, ...view.mayRedial === undefined ? {} : { mayDial: view.mayRedial }, onState: (state,reason)=>{records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); },
+  const redial = new Redial({ client, transport: first, dial: () => {playtest=false;return hear(new WebSocketTransport(address()));}, ...view.mayRedial === undefined ? {} : { mayDial: view.mayRedial }, onState: (state,reason)=>{if (linkState === 'live' && (state === 'reconnecting' || state === 'resuming')) linkStats.lostLink(reason ?? 'unknown'); linkState = state;records?.link(state);view.link(state,reason);}, onCause: cause => { view.link(redial.told, cause); }, onCut: reason => { view.cut?.(reason); },
     // row 56: a dial the door has spoken on gets longer to carry its first frame; every link here is a WebSocketTransport (`dial`)
     answered: (transport, heard) => (transport as WebSocketTransport).onControl(() => { heard(); }) });
   // A held seat comes straight back with no `resume`: a tab reloaded inside J114's 30 s.
@@ -307,7 +315,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
       on.control('enter', encodeEnter({ cell }));
     }),
     rehome: cell => { gridCell = cell; loaded = false; unseated = down ? null : link; },
-    dispose: () => { records?.dispose(); redial.dispose(); client.dispose(); link?.close('disposed'); } };
+    dispose: () => { linkStats.dispose(); records?.dispose(); redial.dispose(); client.dispose(); link?.close('disposed'); } };
 }
 
 /** FM3's proof (mode 23, 2026-11-15): how the page leaves this document on purpose. This bundle's saves have no storage (OF4's

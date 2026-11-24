@@ -3,6 +3,7 @@
 import { installAppIdentity } from '@wildshard/engine/app/identity';
 import { applyDev, devCellState, holdStill, type DevCellState } from './devControl';
 import { Scope } from '@wildshard/engine/app/scope';
+import type { GcReading } from './gcPauses';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { ServerClock } from '@wildshard/engine/net/serverClock';
@@ -59,6 +60,8 @@ export interface CellHostOptions {
   readonly memory: () => { readonly rss: number; readonly heapUsed: number; readonly external?: number; readonly arrayBuffers?: number };
   /** SC1: this thread's event-loop lag since the last reading (`loopLag`), for `/metrics`. */
   readonly lag?: () => { readonly p50: number; readonly p99: number; readonly max: number };
+  /** MMO-OBSERVABILITY OB4: this thread's GC pauses since the last reading (`gcPauses`), for `/metrics`. */
+  readonly gc?: () => GcReading;
   /** The worker has closed: a worker exits here. */
   readonly closed?: () => void;
   /** A proof's look at each room it opens, and at its road. */
@@ -212,7 +215,8 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
       p50: percentile(sorted, 0.5), p95: percentile(sorted, 0.95), p99: percentile(sorted, 0.99), max: sorted.at(-1) ?? 0, drops: (clock?.drops ?? 0) - dropsAt, rss: memory.rss, heap: memory.heapUsed,
       refused: sum(room => room.net.stats.refused), dropped: sum(room => room.net.stats.dropped), frameBytes: sum(room => room.net.stats.frameBytes), eventBytes: sum(room => room.net.stats.eventBytes),
       ...(spent.size === 0 ? {} : { cellMs: Object.fromEntries([...spent].map(([slug, own]) => [slug, own.ms / own.ticks])) }),
-      ...(memory.external === undefined ? {} : { external: memory.external }), ...(memory.arrayBuffers === undefined ? {} : { arrayBuffers: memory.arrayBuffers }), ...(options.lag === undefined ? {} : { lag: options.lag() }) };
+      ...(memory.external === undefined ? {} : { external: memory.external }), ...(memory.arrayBuffers === undefined ? {} : { arrayBuffers: memory.arrayBuffers }), ...(options.lag === undefined ? {} : { lag: options.lag() }),
+      ...(options.gc === undefined ? {} : { gc: options.gc() }) };
     readAt = now; dropsAt = clock?.drops ?? 0; ticks = []; spent = new Map();
     post({ kind: 'reading', reading: row });
   };

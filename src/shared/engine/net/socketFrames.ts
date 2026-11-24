@@ -6,9 +6,9 @@ import type { NetChannel } from './transport';
 // `NET_SCHEMA_HASH` does not move.
 
 /** The prefix byte of every message on a game socket. */
-export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9, SOCKET_DEVICE = 10, SOCKET_ENTER = 11, SOCKET_ARRIVE = 12, SOCKET_SAVES = 13, SOCKET_WHERE = 14;
+export const SOCKET_RELIABLE = 0, SOCKET_UNRELIABLE = 1, SOCKET_PING = 2, SOCKET_PONG = 3, SOCKET_RESUME = 4, SOCKET_READY = 5, SOCKET_COUNTDOWN = 6, SOCKET_PLAYTEST=7, SOCKET_VOICE = 8, SOCKET_WORLD = 9, SOCKET_DEVICE = 10, SOCKET_ENTER = 11, SOCKET_ARRIVE = 12, SOCKET_SAVES = 13, SOCKET_WHERE = 14, SOCKET_STATS = 15;
 /** The messages outside the game protocol: the server's word on where to load, the client's that it has, and the server's that a new build is coming (J174). */
-export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world' | 'device' | 'enter' | 'arrive' | 'saves' | 'where';
+export type SocketControl = 'resume' | 'ready' | 'countdown' | 'playtest' | 'voice' | 'world' | 'device' | 'enter' | 'arrive' | 'saves' | 'where' | 'stats';
 /** GO4: the door's first word on every socket, before any hello: how many grid cells it hosts and, since opus-route2, the shard each
  *  one runs, and nothing else (D7 keeps `/health` off the rooms address, so a page learns this here). A one-shard page joins only a
  *  world that names its shard. A build from before it ignores the prefix. */
@@ -27,6 +27,9 @@ export interface WorldWord { readonly cells: number; readonly shards: readonly s
   /** QA 11-23-b row 19: 1 when this door answers a title's `where` word before any hello (`WhereAsk`). An older door never says it, and
    *  closes `refused` on a prefix it does not know, so a page asks only after hearing this. */
   readonly where?: 1;
+  /** MMO-OBSERVABILITY OB6: 1 when this door reads a seated page's 10 s `stats` word (`statsWord.ts`). An older door never says it, and
+   *  closes `refused` on a prefix it does not know, so a page sends one only after hearing this. */
+  readonly stats?: 1;
   /** SHARD-COMPAT NB2 (J494, Jake 2026-11-22: "the page should always run the server revision"): each cell's upload hash, for a
    *  slug whose rooms run an upload (`gridCells.ts` `placedHash`), so a page that baked other bytes follows them (`roomsRevision.ts`).
    *  An older door never says it; an older page ignores it. */
@@ -61,7 +64,7 @@ export function closeReason(code: number): string {
 /** The prefix of a game message on `channel`. */
 export const channelPrefix = (channel: NetChannel): number => channel === 'reliable' ? SOCKET_RELIABLE : SOCKET_UNRELIABLE;
 /** The prefix of a control message. */
-export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : control === 'device' ? SOCKET_DEVICE : control === 'enter' ? SOCKET_ENTER : control === 'arrive' ? SOCKET_ARRIVE : control === 'saves' ? SOCKET_SAVES : control === 'where' ? SOCKET_WHERE : SOCKET_COUNTDOWN;
+export const controlPrefix = (control: SocketControl): number => control === 'resume' ? SOCKET_RESUME : control === 'ready' ? SOCKET_READY : control==='playtest'?SOCKET_PLAYTEST:control === 'voice' ? SOCKET_VOICE : control === 'world' ? SOCKET_WORLD : control === 'device' ? SOCKET_DEVICE : control === 'enter' ? SOCKET_ENTER : control === 'arrive' ? SOCKET_ARRIVE : control === 'saves' ? SOCKET_SAVES : control === 'where' ? SOCKET_WHERE : control === 'stats' ? SOCKET_STATS : SOCKET_COUNTDOWN;
 /**
  * ZONE-ENTRY ZE9a (J352): the client's word at a gate's 0, `{ cell }`, the cell it goes into. The road takes it only from a seat standing
  * in that cell's buffer, never into its own home, and freezes the body; it answers a word it won't take on the same prefix with the

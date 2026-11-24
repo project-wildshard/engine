@@ -45,6 +45,8 @@ import type { RoomSessions, RoomSessionStore } from './roomSessions';
 import type { RoomGameStore } from './roomGameMetrics';
 import { MarkerSeats, type MarkerReading } from './markerSeats';
 import type { ReadRoomMetricDay } from './saves/metricsDailyStore';
+import { deviceClass, type LinkEvents, type LinkKind, type LinkRow } from './linkEvents';
+import { readStatsWord, STATS_EVERY_MS } from '@wildshard/engine/net/statsWord';
 
 interface SocketActor {
   mark: ActorMark;
@@ -185,6 +187,8 @@ export interface WorldOptions {
   readonly reading?: (index: number, reading: WorkerReading) => void;
   /** SERVER-CELLS SC1: a cell (or a worker's road) opened in `ms`, as `cell.booted` logs it. */
   readonly booted?: (index: number, slug: string, ms: number) => void;
+  /** MMO-OBSERVABILITY OB5/OB6: each link's pings, close and stats word, for `/metrics`. Left out, the door offers no `stats` word. */
+  readonly link?: LinkEvents;
   /** SC1: a crossing's time from its source's ask to its worker's answer, and whether the seat moved. */
   readonly crossed?: (ms: number, moved: boolean) => void;
   /** METRICS MT4: a confirmed Zone Select or walking arrival. The seat id stays inside the world process. */
@@ -618,7 +622,10 @@ export class World {
     // row 9: `saves: 1` says this door answers a seated page's `saves` word (its saves here, and New Game)
     const saves = this.options.saves.reset === undefined ? {} : { saves: 1 as const };
     // QA 11-23-b row 19: `where: 1` says this door answers a title's `where` word (the cell it would seat that player in), before any hello
-    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving,...saves,where:1} satisfies WorldWord)).buffer);
+    // OB6: `stats: 1` says this door reads a page's 10 s stats word, when it has somewhere to put it (`/metrics`)
+    const stats = this.options.link === undefined ? {} : { stats: 1 as const };
+    end.control('world', new TextEncoder().encode(JSON.stringify({...this.discovery(),device:1,...moving,...saves,where:1,...stats} satisfies WorldWord)).buffer);
+    this.watchLink(end);
     let whereAsked = false;
     end.onControl((control, bytes) => {
       if (control === 'device') this.deviceWord(end, bytes);
@@ -628,6 +635,31 @@ export class World {
     const timer = this.scope.timeout(this.options.helloMs ?? HELLO_MS, () => { timedOut = true; this.refuse('hello-timeout'); end.close('refused'); });
     const off = end.onMessage((_channel, bytes) => { spoke = true; off(); this.scope.cancelTimer(timer); void this.joining(end, bytes, goto, spawn); });
     end.onClose(() => { off(); this.scope.cancelTimer(timer); });
+  }
+  /** OB5/OB6: this link's pings, close and stats words, to `/metrics`. A junk stats word is counted and dropped; the link goes on. */
+  private watchLink(end: SocketTransport): void {
+    const link = this.options.link;
+    if (link === undefined) return;
+    let statsAt = -Infinity;
+    end.onPing(ms => { link.rtt(ms, this.linkKind(end)); });
+    end.onClose(reason => { link.closed(reason, this.linkKind(end), end.stats, end.skippedFrames); });
+    end.onControl((control, bytes) => {
+      if (control !== 'stats') return;
+      // one word per window: a page that says more is heard once per half window
+      const now = this.now();
+      if (now - statsAt < STATS_EVERY_MS / 2) return;
+      const word = readStatsWord(bytes);
+      if (word === null) { this.refuse('stats-word'); return; }
+      statsAt = now; link.stats(word, this.linkKind(end));
+    });
+  }
+  /** OB5: a link's kind for `/metrics`: the door's mark, and the device word's class once said. */
+  private linkKind(end: SocketTransport): LinkKind {
+    return { actor: this.actors.get(end)?.mark.actor ?? 'human', device: deviceClass(this.devices.get(end)?.said) };
+  }
+  /** OB5: every open link at scrape time: its kind, what waits for it, what it moved. */
+  linkRows(): LinkRow[] {
+    return [...this.ends].map(end => { const { actor, device } = this.linkKind(end), { sentBytes, recvBytes } = end.stats; return { actor, device, buffered: end.buffered, sentBytes, recvBytes, skipped: end.skippedFrames }; });
   }
   /** DT4: a client's device word, untrusted: one per socket, read and bounded by `readDeviceWord`. A junk or oversized word is counted
    *  and dropped, and the connect goes on. */

@@ -19,6 +19,9 @@ const FAMILIES = [
   // The server's own.
   'wildshard_eventloop_lag_seconds', 'wildshard_thread_memory_bytes', 'wildshard_tick_seconds', 'wildshard_cell_tick_seconds', 'wildshard_ticks_per_second', 'wildshard_tick_drops_total',
   'wildshard_cells_resident', 'wildshard_cells_awake', 'wildshard_players', 'wildshard_players_held', 'wildshard_cell_boot_seconds', 'wildshard_crossing_seconds',
+  // MMO-OBSERVABILITY OB4/OB5: every thread's GC, and the door's links.
+  'wildshard_gc_pauses_total', 'wildshard_gc_pause_seconds_total', 'wildshard_gc_pause_max_seconds', 'wildshard_sockets_open', 'wildshard_socket_closes_total',
+  'wildshard_socket_bytes_total', 'wildshard_socket_buffered_bytes_max', 'wildshard_door_refusals_total', 'wildshard_client_rtt_seconds',
 ];
 let bench: RoomBench | undefined, metrics: ServerMetrics | undefined;
 const lines: Record<string, unknown>[] = [];
@@ -50,7 +53,7 @@ test('a two-cell world serves every family on 127.0.0.1 only, from boot to a cro
   const port = metricsPort({ METRICS_PORT: '0' }) ?? -1, served = new ServerMetrics(line => { lines.push(line); }, 'staging');
   metrics = served;
   bench = await roomBench({ cells: [HOME, SOUTH], workers: 1, crossing: true, readingMs: 250,
-    reading: (index, row) => { served.reading(index, row); }, booted: (_index, _slug, ms) => { served.booted(ms); }, crossed: (ms, moved) => { served.crossed(ms, moved); } });
+    reading: (index, row) => { served.reading(index, row); }, link: served.link, booted: (_index, _slug, ms) => { served.booted(ms); }, crossed: (ms, moved) => { served.crossed(ms, moved); } });
   served.watch(bench.world);
   const at = await served.listen(port);
   expect(at).toBeGreaterThan(0);
@@ -59,6 +62,9 @@ test('a two-cell world serves every family on 127.0.0.1 only, from boot to a cro
   expect(await a.arrived()).toBe(true);
   // A reading with the player in Driftwood (every 250 ms here): one cell awake.
   await vi.waitFor(async () => { const { rows } = await scrape(at); expect(value(rows, 'wildshard_players')).toBe(1); expect(value(rows, 'wildshard_cells_awake')).toBe(1); }, { timeout: loadScaledMs(10_000), interval: 100 });
+  // OB5: the door counts the open link, and hears the bot's own round trips (it pings each second); OB4: the worker's GC is read.
+  await vi.waitFor(async () => { const { rows } = await scrape(at); expect(value(rows, 'wildshard_sockets_open')).toBe(1); expect(value(rows, 'wildshard_client_rtt_seconds_count')).toBeGreaterThan(0); expect(value(rows, 'wildshard_gc_pauses_total')).toBeGreaterThan(0); }, { timeout: loadScaledMs(10_000), interval: 200 });
+  expect(value((await scrape(at)).rows, 'wildshard_socket_bytes_total')).toBeGreaterThan(0);
   // SC8: the awake cell's own tick time, by name (what the worker table's weights are read from).
   expect((await scrape(at)).rows.get(`wildshard_cell_tick_seconds{cell="${HOME}"}`)).toBeGreaterThan(0);
   // Off Driftwood's south edge onto the road: one crossing, timed by the door.
@@ -85,6 +91,8 @@ test('a two-cell world serves every family on 127.0.0.1 only, from boot to a cro
   expect((await fetch(`http://127.0.0.1:${String(at)}/metrics`, { method: 'POST' })).status).toBe(404);
   a.drop();
   await vi.waitFor(() => { expect(bench?.world.health()).toMatchObject({ players: 1, humans: 0, agents: 0 }); }, { timeout: loadScaledMs(1000) });
+  // OB5: the drop is a close with its reason
+  await vi.waitFor(async () => { expect(value((await scrape(at)).rows, 'wildshard_socket_closes_total')).toBeGreaterThan(0); }, { timeout: loadScaledMs(5000), interval: 100 });
   const back = new RoomBot(`${bench.url}?agent=metrics-proof`, 'bench', 'device:a', 'A');
   bots.push(back);
   expect(await back.arrived()).toBe(true);

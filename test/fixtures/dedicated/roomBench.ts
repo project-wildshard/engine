@@ -7,6 +7,7 @@ import { outputDescriptor } from '../../../src/shared/game/shardfile/outputDescr
 import { serverInputFiles } from '../../../src/shared/game/shardfile/serverSkinRigs';
 import { runCells } from '../../../src/server/host/dedicated/cellHost';
 import { loopLag } from '../../../src/server/host/dedicated/loopLag';
+import { gcPauses } from '../../../src/server/host/dedicated/gcPauses';
 import type { WorkerNews } from '../../../src/server/host/dedicated/cellProtocol';
 import type { DedicatedRoom } from '../../../src/server/host/dedicated/dedicatedRoom';
 import type { RoadRoom } from '../../../src/server/host/dedicated/roadRoom';
@@ -39,7 +40,7 @@ export async function roomBench(options: Partial<WorldOptions> & { readonly hold
   const { holdMs, emptyMs, newsDelayMs = 0, roomNow, readingMs, crossing, strips, load = serverInput, developerBoost, ...door } = options, roads = new Map<string, RoadRoom>(), delivery = new Scope('room bench IPC'), rooms = new Map<string, DedicatedRoom>(), lines: Record<string, unknown>[] = [], crashes: unknown[] = [], stops: (() => void)[] = [], bench: { restarts: number } = { restarts: 0 };
   const boot = (slugs: readonly string[]): WorkerLink => {
     const { port1, port2 } = new MessageChannel();
-    const held = runCells(port2 as never, { slugs, build: 'bench', ...(developerBoost === undefined ? {} : { developerBoost }), bootId: () => 'bench', load, memory: () => process.memoryUsage(), lag: loopLag(), booted: (slug, room) => { rooms.set(slug, room); }, roaded: road => { roads.set(road.name, road); }, ...(crossing === true ? { road: strips ?? bakedGridCollision } : {}), ...(holdMs === undefined ? {} : { holdMs }), ...(emptyMs === undefined ? {} : { emptyMs }), ...(roomNow === undefined ? {} : { roomNow }), ...(readingMs === undefined ? {} : { readingMs }),...(door.playtest===undefined?{}:{playtest:true}), ...(door.sessions === undefined ? {} : { metricEvents: true }) });
+    const held = runCells(port2 as never, { slugs, build: 'bench', ...(developerBoost === undefined ? {} : { developerBoost }), bootId: () => 'bench', load, memory: () => process.memoryUsage(), lag: loopLag(), gc: gcPauses(), booted: (slug, room) => { rooms.set(slug, room); }, roaded: road => { roads.set(road.name, road); }, ...(crossing === true ? { road: strips ?? bakedGridCollision } : {}), ...(holdMs === undefined ? {} : { holdMs }), ...(emptyMs === undefined ? {} : { emptyMs }), ...(roomNow === undefined ? {} : { roomNow }), ...(readingMs === undefined ? {} : { readingMs }),...(door.playtest===undefined?{}:{playtest:true}), ...(door.sessions === undefined ? {} : { metricEvents: true }) });
     const stop = (): void => { held.dispose(); port1.close(); };
     stops.push(stop);
     return { send: (order, transfer = []) => { port1.postMessage(order, transfer as Transferable[]); },

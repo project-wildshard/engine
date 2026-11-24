@@ -1,3 +1,4 @@
 # MMO observability (meta MMO-OBSERVABILITY-PLAN, lane opus-obs)
 
 - OB2: the box gets a process exporter (Ubuntu 0.7.10) on loopback 9256, grouped by account, so the cook, each channel, Postgres and agent work are separate CPU and memory lines on the dashboard. `-gather-smaps=false` and `-threads=false` keep each scrape cheap; flags checked on the box's own binary.
+- OB4 to OB6: `/metrics` gains every thread's GC (workers measured with `perf_hooks` in their 10 s reading; the metrics client only ever saw the door), the build, the door's links (open by human/agent and phone/desktop, closes by reason, refusals, bytes, the worst send queue, skipped frames, each ping's client-measured RTT) and the page's own 10 s `stats` word (fps, frame p95/max, frames over 50 ms, RTT p95 and jitter, reconnects by reason). A page sends the word only to a door whose `world` word says `stats: 1`, since an older door closes `refused` on an unknown prefix. No label names a player.

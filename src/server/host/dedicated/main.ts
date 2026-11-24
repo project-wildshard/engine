@@ -109,7 +109,7 @@ const crossing = authorProduct === undefined;
 const placementAt = setting('PLACEMENT_URL'), placementKey = setting('PLACEMENT_PUBLIC_KEY');
 if ((placementAt === undefined) !== (placementKey === undefined)) throw new Error('PLACEMENT_URL and PLACEMENT_PUBLIC_KEY go together');
 // SERVER-CELLS SC1: `/metrics` on 127.0.0.1:METRICS_PORT, unset off. Made before the world opens, so every cell's boot is counted.
-const metricsAt = metricsPort(process.env), metrics = metricsAt === undefined ? undefined : new ServerMetrics(log, release.channel);
+const metricsAt = metricsPort(process.env), metrics = metricsAt === undefined ? undefined : new ServerMetrics(log, release.channel, { build, serial: release.serial });
 const playtest=process.env['PLAYTEST']==='1'?new PlaytestFile({directory:setting('PLAYTEST_DIR')??'/var/log/wildshard',build,log,...(recordTag===undefined?{}:{tag:recordTag})}):undefined;
 
 /** One row of the table is one worker thread, started once (J182). */
@@ -147,7 +147,7 @@ const world: World = await World.open({ build, cells, declared, roads: crossing,
   ...(arrivals === undefined ? {} : { entered: (seat, slug, actor) => { if (arrivals.entered(seat, slug, actor)) metrics?.entered(slug, actor.actor); } }),
   ...(sessions === undefined ? {} : { sessions }),
   // Q77: a worker that fails ends the process. systemd starts it again, clients redial, and saves stand at the last checkpoint.
-  crashed: failed, reading: (index, row) => { reports.heard(index, row); metrics?.reading(index, row); },
+  crashed: failed, reading: (index, row) => { reports.heard(index, row); metrics?.reading(index, row); }, ...(metrics === undefined ? {} : { link: metrics.link }),
   ...(metrics === undefined ? {} : { booted: (_index: number, _slug: string, ms: number) => { metrics.booted(ms); }, crossed: (ms: number, moved: boolean) => { metrics.crossed(ms, moved); } }),
   ...(playtest===undefined?{}:{playtest:row=>{playtest.append(row);}}),
   // J218: phones on 4G need TURN to reach each other's voice. Without the key, voice falls back to public STUN.
