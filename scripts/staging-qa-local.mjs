@@ -51,6 +51,12 @@ async function tourFixture(checkout, seed) {
   return {catalogue, extras, more: [...selected].filter(slug => slug !== 'driftwood-isle')};
 }
 
+/** Build-max C4 (2026-11-23): the shards the local rig hosts when no tour picks them: its home and `more`. Every local gate
+ * leg (staging-qa.mjs `gateLeg`, the journey card) must stay inside this list; v0.1.77 held when the gate walked into Nalati. */
+export const QA_RIG_HOME = 'driftwood-isle';
+export const QA_RIG_MORE = Object.freeze(['pine-hollow', 'far-reach']);
+export const QA_RIG_SHARDS = Object.freeze([QA_RIG_HOME, ...QA_RIG_MORE]);
+
 /** @param {{root: string, build: string, out: string, tourSeed?: number}} options */
 export async function openQaRig({ root, build, out, tourSeed }) {
   const work = join(out, 'local'), dist = join(work, 'dist'), keyFile = join(work, 'fixture-key.json');
@@ -78,7 +84,7 @@ export async function openQaRig({ root, build, out, tourSeed }) {
         ...(tour === undefined ? {} : {WILDSHARD_CATALOGUE:catalogueFile}) },
       join(work, 'build.log'));
     checkLocalSource(checkout, build);
-    const rig = await openRig({ dist, work: join(work, 'rig'), keyFile, pgBin: 'pglite:', more: tour?.more ?? ['pine-hollow', 'far-reach'], cells: 'grid', isolated: true,
+    const rig = await openRig({ dist, work: join(work, 'rig'), keyFile, pgBin: 'pglite:', more: tour?.more ?? [...QA_RIG_MORE], cells: 'grid', isolated: true,
       ...(tour === undefined ? {} : {channel:'staging',placement:{url:pathToFileURL(placementFile).href,key}}) });
     return { base: String(rig.base), socket: `ws://127.0.0.1:${String(WORLD_PORT)}`, source: checkout, close: async () => {
       try { await rig.close(); } finally {

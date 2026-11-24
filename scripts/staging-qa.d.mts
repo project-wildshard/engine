@@ -28,3 +28,8 @@ export function mergeVerdict(input: {
 }): { findings: Finding[]; worst: Severity | 'none'; hold: boolean; minutesInPlay: number; full: boolean };
 
 export function holdLine(verdict: { release: string; findings: readonly Finding[] }, owner: string): string | undefined;
+
+/** Build-max C4: the journey leg's card, a shard the local rig hosts. */
+export const JOURNEY_CARD: string;
+/** Build-max C4: the zone gate leg's target for a base URL; staging crosses into Nalati and walks back in. */
+export function gateLeg(url: string): { target: string; reenter: boolean };

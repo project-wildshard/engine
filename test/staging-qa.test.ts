@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { deployFrameProblem } from '../scripts/journey-proof.mjs';
-import { holdLine, mergeVerdict } from '../scripts/staging-qa.mjs';
+import { gateLeg, holdLine, JOURNEY_CARD, mergeVerdict } from '../scripts/staging-qa.mjs';
+import { QA_RIG_SHARDS } from '../scripts/staging-qa-local.mjs';
+import { CHANNELS } from '../scripts/page-release/flow.mjs';
 import { chromiumCandidateArgs } from '../scripts/staging-qa-browser.mjs';
 import { pickPhone, qaDevice } from '../scripts/staging-qa-sim.mjs';
 import { budgetFinding, LEG_CAP_S, LEG_TARGET_S, LEGS, nominalSeconds, STEPS } from '../scripts/staging-qa-budget.mjs';
@@ -85,5 +87,19 @@ describe('the iOS Simulator step (SQ14)', () => {
     expect(pickPhone({ devices: {} })).toBeUndefined();
     expect(qaDevice(listing)).toBeUndefined();
     expect(qaDevice({ devices: { 'com.apple.CoreSimulator.SimRuntime.iOS-27-0': [row('q', 'Wildshard QA')] } })?.udid).toBe('q');
+  });
+});
+
+// Build-max C4 (2026-11-23): v0.1.77's local QA held when cbcaca71a sent every gate leg into Nalati, which the local rig never
+// hosts (f91fe592c). Every leg a loopback run takes must land in a shard openQaRig serves.
+describe('the local QA rig hosts every shard a local leg visits', () => {
+  it('the gate and the journey card stay inside the rig on loopback', () => {
+    const local = gateLeg('http://127.0.0.1:19476');
+    expect(QA_RIG_SHARDS).toContain(local.target);
+    expect(QA_RIG_SHARDS).toContain(JOURNEY_CARD);
+    expect(local.reenter).toBe(false);
+  });
+  it('staging keeps the Nalati crossing and the walk back in', () => {
+    expect(gateLeg(CHANNELS.staging.origin)).toEqual({ target: 'nalati-grasslands', reenter: true });
   });
 });

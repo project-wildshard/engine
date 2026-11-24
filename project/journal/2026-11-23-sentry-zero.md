@@ -12,3 +12,4 @@ Meta plan: `docs/plans/SENTRY-ZERO-PLAN.md`. Jake: the 5000-event Sentry quota r
 - SZ7: `scripts/sentry-funnel.mjs` (+ test) refuses a Sentry capture outside the two funnels and any warning/info level;
   `scripts/sentry-weekly.mjs` lists unresolved issues over 5 events a day (API token, or `--json` from the MCP).
 - Build-max C1: main-watch's fallback and keeper go to the coordinator's pane (w2:p5), not the retired buddy-engine.
+- Build-max C4: a test holds every local QA leg (gate target, journey card) inside the shards openQaRig hosts.

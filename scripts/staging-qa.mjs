@@ -38,6 +38,19 @@ const finding = (scenario, key, severity, text) => ({ scenario, key, severity, t
 /** `runner` holds the runner's own findings (SQ16: a leg over its cap is a P2).
  * @param {{ build: string, smoke: SmokeEvidence, proofs: Proof[], expected: readonly string[],
  * selected: readonly string[], after?: string, full: boolean, runner?: readonly Finding[] }} input */
+/** The journey leg's card: a shard the local rig hosts (QA_RIG_SHARDS) and staging places. */
+export const JOURNEY_CARD = 'driftwood-isle';
+/**
+ * The zone gate leg's target. QA 11-23-b row 21: on staging the gate crosses into Nalati (its second worker) and checks the
+ * walk back in holds; the local rig hosts only QA_RIG_SHARDS (Driftwood, Pine, Sky Reach), so a loopback leg crosses into
+ * Sky Reach (`far-reach`). test/staging-qa.test.ts holds every local leg inside the rig (build-max C4).
+ * @param {string} url @returns {{target: string, reenter: boolean}}
+ */
+export function gateLeg(url) {
+  const staging = url === STAGING;
+  return { target: staging ? 'nalati-grasslands' : 'far-reach', reenter: staging };
+}
+
 export function mergeVerdict({ build, smoke, proofs, expected, selected, after, full, runner = [] }) {
   if (smoke.build !== build || after !== build) throw new Error('Staging build changed during QA');
   const findings = [
@@ -88,14 +101,12 @@ async function journey({ id, root, url, out, build, candidate }) {
       return { id, browser, pass: false, seconds: (Date.now() - started) / 1000, playedMs: 0, reason, log };
     }
   }
-  // QA 11-23-b row 21: on staging the gate crosses into Nalati (its second worker) and checks the walk back in holds; the
-  // local rig hosts only Driftwood, Pine and Sky Reach (`openQaRig` more), so a loopback leg crosses into Sky Reach as before
-  const nalati = url === STAGING, gateTarget = nalati ? 'nalati-grasslands' : 'far-reach';
+  const { target: gateTarget, reenter: nalati } = gateLeg(url);
   const args = gate
     ? [join(import.meta.dirname, 'zone-gate-proof.mjs'), `--base=${url}`, `--out=${dir}`, '--engine=chromium', '--viewport=1280x800@1', `--target=${gateTarget}`, '--deploy', '--online', ...(nalati ? ['--reenter'] : [])]
     : doctor ? ['--import', join(import.meta.dirname, 'bake-loader.mjs'), join(import.meta.dirname, 'e7-doctor-proof.mjs'), url, build, RELEASE_PUBLIC_KEY, '--engine=chromium',
       ...(candidate === undefined ? [] : [`--candidate-entry=${candidate.deploymentUrl}`, `--candidate-id=${candidate.deploymentId}`])]
-    : [join(import.meta.dirname, 'journey-proof.mjs'), '--url', url, '--out', dir, '--browsers', browser, '--card', 'driftwood-isle', '--paths', 'mmo', '--runs', 'cold', '--deploy'];
+    : [join(import.meta.dirname, 'journey-proof.mjs'), '--url', url, '--out', dir, '--browsers', browser, '--card', JOURNEY_CARD, '--paths', 'mmo', '--runs', 'cold', '--deploy'];
   console.log(`staging-qa starting ${id}`);
   const fd = openSync(log, 'w', 0o600);
   let status;
