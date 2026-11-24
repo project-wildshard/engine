@@ -35,6 +35,14 @@
       "enters": 0
     },
     {
+      "slug": "brasscap-mesa",
+      "name": "Brasscap Mesa",
+      "status": "earlyAccess",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
       "slug": "sunscar-dunes",
       "name": "Signal Dunes",
       "status": "experimental",
@@ -80,6 +88,14 @@
       "slug": "nine-dragon-stack",
       "name": "Nine Dragon Stack",
       "status": "partial",
+      "heroHash": null,
+      "firstUploadedAt": null,
+      "enters": 0
+    },
+    {
+      "slug": "brasscap-mesa",
+      "name": "Brasscap Mesa",
+      "status": "earlyAccess",
       "heroHash": null,
       "firstUploadedAt": null,
       "enters": 0
@@ -226,7 +242,7 @@
     {
       "slug": "brasscap-mesa",
       "name": "Brasscap Mesa",
-      "status": "hidden",
+      "status": "earlyAccess",
       "heroHash": null,
       "firstUploadedAt": null,
       "enters": 0
