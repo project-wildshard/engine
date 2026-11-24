@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
-import { frozenAsset } from './fixtures/frozen/assets';
+// oxlint-disable-next-line import/no-nodejs-modules -- Read the arms rigs the live pins mount.
+import { readFileSync } from 'node:fs';
+import { builtFolder } from '../src/test/game/builtFolder';
 import * as rigLoader from '../src/client/engine/anim/rig';
 import * as lookCompiler from '../src/client/game/shardfile/runtimeFolder';
 import { ToonLook } from '../src/client/engine/render/families/toon';
@@ -17,10 +19,17 @@ import { heldArmsGear } from '../src/client/game/models/heldGear';
 import { RigArms } from '../src/client/game/systems/viewmodel/rigArms';
 import { ARM_CLIPS, armClipNames } from '../src/client/game/systems/viewmodel/armClips';
 
-/** The original SDK adapter stripped textures before using this same native parser.
- * These pinned sources have no texture declarations, so parse their exact bytes. */
+/** ZONE-SNAPSHOTS ZS9 (J507): the arms rigs Driftwood's and Nine Dragon's live pins mount (byte-identical to the frozen
+ * copies they replace). The original SDK adapter stripped textures before using this same native parser; these rigs have
+ * no texture declarations, so parse their exact bytes. */
+const RIGS: Record<string, readonly [string, string]> = {
+  'driftwood-arms.glb': ['driftwood-isle', 'mounts/assets/models/driftwood-fp/fp-arms.glb'],
+  'nine-arms.glb': ['nine-dragon-stack', 'mounts/assets/nine-dragon/viewmodel/fp-rig.glb'],
+};
 function originalRig(name: string): Uint8Array<ArrayBuffer> {
-  const bytes = frozenAsset(name), jsonLength = new DataView(bytes.buffer).getUint32(12, true);
+  const rig = RIGS[name];
+  if (rig === undefined) throw new Error(`Unknown arms rig ${name}`);
+  const bytes = new Uint8Array(readFileSync(`${builtFolder(rig[0])}/${rig[1]}`)), jsonLength = new DataView(bytes.buffer).getUint32(12, true);
   const document: unknown = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)));
   if (typeof document !== 'object' || document === null || ['textures', 'images', 'samplers'].some(key => Object.hasOwn(document, key))) throw new Error('Frozen original rig has texture resources');
   function textureFree(value: unknown): void {

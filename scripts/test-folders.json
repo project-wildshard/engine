@@ -241,7 +241,7 @@
     "sunscar-dunes"
   ],
   "test/painted-look-rows.test.ts": [],
-  "test/held-arms-platform.test.ts": [],
+  "test/held-arms-platform.test.ts": ["driftwood-isle", "nine-dragon-stack"],
   "src/server/game/population/native-actor-interface.test.ts": [],
   "test/population-platform.test.ts": ["pine-hollow", "nalati-grasslands"],
   "test/quest-step-runner.test.ts": [],

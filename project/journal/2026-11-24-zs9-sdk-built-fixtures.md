@@ -15,3 +15,8 @@ Six more SDK outputs of made-up inputs move to `test/fixtures/sdk-built/` with t
 own loader (`sdk-built/snapshots.ts`, `sdkBuiltJson`): the two cosmetic client channels, the decision worker product,
 the return group, the scene-graph page and the boar query (engine's own BOAR baked by the SDK). `workerFolder.ts`
 follows its JSON. `arena-page.json` is a made-up orchard page, so it leaves `frozen/` for `test/fixtures/`.
+
+## Third step
+
+`held-arms-platform` reads the arms rigs Driftwood's and Nine Dragon's live pins mount (byte-identical); the frozen
+`driftwood-arms.glb` and `nine-arms.glb` copies and their manifest rows go.

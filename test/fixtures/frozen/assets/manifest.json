@@ -138,28 +138,6 @@
       "sourceName": "models/specimens/quest-prop.bin",
       "sourceSha256": "ec1282219cd79471dbbdfa8d58e801ebb4b95e73d44106f7e325eb0fc9028440",
       "pinManifestSha256": "87a917080511e4d7e5f04e36dea2e54d9dc10af5624f5ce461036fa6234e65b6"
-    },
-    "driftwood-arms.glb": {
-      "bytes": 373240,
-      "sha256": "2c233b8c91c82a26c8fbfd3867095cbfec6cec81caa9bd9a12b243075236550a",
-      "sourceRepository": "project-wildshard/shard-driftwood",
-      "sourceCommit": "8ad490a25575918000d41aa698a02fcc03c14178",
-      "sourcePath": "public/assets/models/driftwood-fp/fp-arms.glb",
-      "sourcePin": "driftwood-isle",
-      "sourceName": "mounts/assets/models/driftwood-fp/fp-arms.glb",
-      "sourceSha256": "2c233b8c91c82a26c8fbfd3867095cbfec6cec81caa9bd9a12b243075236550a",
-      "pinManifestSha256": "8ea1cd38748ff98926a027c20a9cfe93d9a5dbc179d7c0bdad03e1bc4bf0c41c"
-    },
-    "nine-arms.glb": {
-      "bytes": 2478580,
-      "sha256": "def60ea43b2168097fbc3e61875d08d322740762e94d820fa8979d15a992a0f8",
-      "sourceRepository": "project-wildshard/shard-nine-dragon",
-      "sourceCommit": "92aa2be264066f87d3f0af43bf4fd3b287cd36d3",
-      "sourcePath": "public/assets/nine-dragon/viewmodel/fp-rig.glb",
-      "sourcePin": "nine-dragon-stack",
-      "sourceName": "mounts/assets/nine-dragon/viewmodel/fp-rig.glb",
-      "sourceSha256": "def60ea43b2168097fbc3e61875d08d322740762e94d820fa8979d15a992a0f8",
-      "pinManifestSha256": "69d28eb86473b67b76c3bcfbb2dbe83483ad751c3f144d1230c90b084e75cc25"
     }
   },
   "exportRecipes": {
