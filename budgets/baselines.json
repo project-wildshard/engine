@@ -40,22 +40,26 @@
   "js/grid-session/raw": {
    "value": 41896,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "declared": "engine features landed 2026-11-19..24 (4d573c835..ca4f9c1a7) while budgets.yml never reached its Judge step (Collect failed on retired test shards' size rows, fixed a38fc9ecd): +11% title, +11% grid-session over five days of title/zone-select/map/drop work; record from the first green budgets run (J444)"
   },
   "js/grid-session/gzip": {
    "value": 14354,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "declared": "engine features landed 2026-11-19..24 (4d573c835..ca4f9c1a7) while budgets.yml never reached its Judge step (Collect failed on retired test shards' size rows, fixed a38fc9ecd): +11% title, +11% grid-session over five days of title/zone-select/map/drop work; record from the first green budgets run (J444)"
   },
   "js/title/raw": {
    "value": 368338,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "declared": "engine features landed 2026-11-19..24 (4d573c835..ca4f9c1a7) while budgets.yml never reached its Judge step (Collect failed on retired test shards' size rows, fixed a38fc9ecd): +11% title, +11% grid-session over five days of title/zone-select/map/drop work; record from the first green budgets run (J444)"
   },
   "js/title/gzip": {
    "value": 126790,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "declared": "engine features landed 2026-11-19..24 (4d573c835..ca4f9c1a7) while budgets.yml never reached its Judge step (Collect failed on retired test shards' size rows, fixed a38fc9ecd): +11% title, +11% grid-session over five days of title/zone-select/map/drop work; record from the first green budgets run (J444)"
   },
   "js/session/raw": {
    "value": 4413316,
