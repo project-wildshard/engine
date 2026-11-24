@@ -181,7 +181,8 @@ const CAPTURE_BYTES = 2_000_000;
 const COOK_PHASE = /^phase (validation|proof|textures|client-packs|server-packs|server-files) (\d{1,8})ms$/gmu;
 
 /** One child. Its stdout is a report or a refusal; anything else, a crash or a limit, is `killed`. */
-export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string, reportPhases?: (phases: string) => void, sidecar?: string): Promise<JobOutcome> {
+/** FORMAT-PRUNE FP27c: `armed` is the catalogue's word for the shard, which the job passes to validation (`COOK_ARMED`). */
+export function runJob(launcher: JobLauncher, tarball: string, out: string, expectedSlug?: string, reportPhases?: (phases: string) => void, sidecar?: string, armed?: boolean): Promise<JobOutcome> {
   const {root, execPath, loader, script, wrap, limits} = launcher, work = dirname(out);
   const granted = process.env['WS_CPU_SLOTS'];
   const slots = [limits.cpuSlots, granted === undefined ? undefined : Number(granted)].filter((value): value is number => value !== undefined);
@@ -197,7 +198,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
     // No credentials, no home: the cook's only inputs are its arguments. The encoder's cache survives jobs, and each entry
     // is decoded against its hash before use, so one job can't poison the next.
     const child = spawn(command, args, {cwd: work, env: {PATH: process.env['PATH'] ?? '', WILDSHARD_SPAWN_PART_CACHE: cache, NODE_ENV: 'production', COOK_MAX_SHARDFILE_BYTES: String(limits.maxBytes ?? MAX_SHARDFILE_BYTES),
-      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer}), ...(sidecar === undefined ? {} : {COOK_SIDECAR: sidecar})}, stdio: ['ignore', 'pipe', 'pipe']});
+      ...(cpuSlots === undefined ? {} : {COOK_CPU_SLOTS: String(cpuSlots)}), ...(launcher.renderer === undefined ? {} : {COOK_RENDERER: launcher.renderer}), ...(sidecar === undefined ? {} : {COOK_SIDECAR: sidecar}), ...(armed === undefined ? {} : {COOK_ARMED: String(armed)})}, stdio: ['ignore', 'pipe', 'pipe']});
     let stdout = '', stderr = '', peak = 0, why: string | undefined;
     const take = (text: string, kept: string): string => (kept + text).slice(-CAPTURE_BYTES);
     child.stdout.setEncoding('utf8').on('data', (text: string) => { stdout = take(text, stdout); });
@@ -433,7 +434,7 @@ const FINAL = /^(?:past |Over the pack budget)/u;
 
 export interface CookWorker {
   /** Cook one head unless this build already has it. Never throws: the row says what happened. */
-  readonly cook: (head: {readonly slug: string; readonly hash: string}) => Promise<CookRow>;
+  readonly cook: (head: {readonly slug: string; readonly hash: string; readonly armed?: boolean}) => Promise<CookRow>;
   /** J29, and J30's list: every head of the catalogue at the stages asked for. */
   readonly recook: (stages: readonly CookStage[]) => Promise<readonly CookRow[]>;
   readonly enqueue: (notice: CookNotice) => void;
@@ -510,12 +511,15 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   /** CP2b2b: the API's copy digest for each head it listed (`source.heads`), checked after the job, before publishing. */
   const expectations = new Map<string, ExpectedCopy>();
+  /** FORMAT-PRUNE FP27c: the catalogue's armed word per hash, from the upload feed. A head without one (a recook) leaves the
+   *  format to decide; a stored file's memory policy only reports there (CP10). */
+  const armedWords = new Map<string, boolean>();
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
     const file = join(work, 'shard.tar'), out = join(work, 'out');
     writeFileSync(file, tarball);
     const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug), phases => {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: phases ${phases}`);
-    }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer));
+    }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer), armedWords.get(head.hash));
     if (outcome.kind === 'refused') return {...head, state: 'refused', detail: outcome.reason, ...(outcome.check === undefined ? {} : {check: outcome.check})};
     if (outcome.kind === 'killed') return {...head, state: 'failed', detail: outcome.reason};
     if (!outcome.report.check?.pass) return {...head, state: 'failed', detail: 'The job supplied no successful full check'};
@@ -642,7 +646,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const started = clock();
   return {
-    cook: head => schedule(head, true),
+    cook: ({armed, ...head}) => { if (armed !== undefined) armedWords.set(head.hash, armed); return schedule(head, true); },
     recook: async stages => {
       const heads = await headsOf(stages), cooked = await indexed();
       const rows = await Promise.all(heads.map(head => schedule(head, !cooked.has(head.hash))));

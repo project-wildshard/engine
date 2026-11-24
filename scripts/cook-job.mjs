@@ -25,6 +25,8 @@ try {
     warn: line => { console.warn(`warning: ${line}`); },
     // J262: the worker computed its renderer fingerprint; this child may not run git.
     ...(process.env.COOK_RENDERER === undefined || process.env.COOK_RENDERER === '' ? {} : { renderer: process.env.COOK_RENDERER }),
+    // FORMAT-PRUNE FP27c: the catalogue's armed word, from the upload feed.
+    ...(process.env.COOK_ARMED === 'true' || process.env.COOK_ARMED === 'false' ? { armed: process.env.COOK_ARMED === 'true' } : {}),
     // SHARD-COMPAT SP1b4: the worker's cook preparation sidecar for this shard on its renderer, when it holds one.
     ...(process.env.COOK_SIDECAR === undefined || process.env.COOK_SIDECAR === '' ? {} : { sidecar: readSidecarTar(readFileSync(process.env.COOK_SIDECAR)) }),
   });
