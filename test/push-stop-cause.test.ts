@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
-import { parallelChecks } from '../.githooks/push-checks.mjs';
+import { parallelChecks, STUCK_STEP_SECONDS, STUCK_VITEST_SECONDS, stuckLimitMs } from '../.githooks/push-checks.mjs';
 import { prePushCause } from '../scripts/land.mjs';
 import { gateReport, printGateReport } from '../scripts/gate-report.mjs';
 
@@ -115,3 +115,35 @@ test('a stopped run expects its broker to go; a broker lost on its own is still 
     expect(lost.code).toBe(3);
   } finally { rmSync(work, { recursive: true, force: true }); }
 }, 60_000);
+
+// J505 (QA-FEEDBACK-2026-11-23-b; Jake, 2026-11-23 ~20:40 Cancún: "make it a permanent fix"): an engine-quickfix main-push
+// sat 35 min in run-checks until it was killed by hand. A step past ~3x its normal time is now stopped by its watchdog,
+// says STUCK with the step and the minutes, logs a STUCK receipt and fails, so the push is refused and the commit kept.
+test('J505: a stuck step is stopped by its watchdog, named STUCK, and logged as a receipt', async () => {
+  mkdirSync('tmp', { recursive: true });
+  const work = mkdtempSync(resolve('tmp/push-stuck-'));
+  const receipts = join(work, 'receipts.log');
+  const lines: string[] = [];
+  vi.spyOn(console, 'error').mockImplementation((line: string) => { lines.push(line); });
+  vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  try {
+    const result = await parallelChecks([
+      { name: 'lint (kit + game)', commands: [[process.execPath, '-e', 'setInterval(() => {}, 1000)']], stuckSeconds: 0.5 },
+      { name: 'format:check', commands: [[process.execPath, '-e', 'setInterval(() => {}, 1000)']], stuckSeconds: 60 },
+    ], { graceMs: 500, env: { ...process.env, WS_LANE_RECEIPTS: receipts, WS_LANE_NAME: 'fixture-lane', GITHUB_ACTIONS: '' } });
+    expect(result.ok).toBe(false);
+    expect(result.results.find(row => row.name === 'lint (kit + game)')).toMatchObject({ stuck: true });
+    expect(result.results.find(row => row.name === 'format:check')?.stoppedBy).toMatch(/^STUCK in lint \(kit \+ game\) after [\d.]+ min$/u);
+    expect(lines).toContainEqual(expect.stringMatching(/^ {2}X push gate: STUCK in lint \(kit \+ game\) after [\d.]+ min \(limit 1 s/u));
+    expect(lines).toContainEqual(expect.stringMatching(/^ {2}- lint \(kit \+ game\) STUCK in [\d.]+ s$/u));
+    expect(readFileSync(receipts, 'utf8')).toMatch(/^\d\d:\d\d UTC fixture-lane STUCK push gate: STUCK in lint \(kit \+ game\) after .+ the commit is kept/u);
+  } finally { rmSync(work, { recursive: true, force: true }); }
+});
+
+test('J505: the stuck limit is ~3x a step\'s normal time, more for Vitest, scaled by load over cores', () => {
+  expect(stuckLimitMs({ name: 'lint (kit + game)' }, {}, 1, 8)).toBe(STUCK_STEP_SECONDS * 1000);
+  expect(stuckLimitMs({ name: 'vitest (related)' }, {}, 1, 8)).toBe(STUCK_VITEST_SECONDS * 1000);
+  expect(stuckLimitMs({ name: 'lint (kit + game)' }, { WS_PUSH_STUCK_S: '30' }, 1, 8)).toBe(30_000);
+  expect(stuckLimitMs({ name: 'lint (kit + game)' }, {}, 32, 8)).toBe(STUCK_STEP_SECONDS * 4 * 1000);
+  expect(stuckLimitMs({ name: 'check:wire', stuckSeconds: 5 }, {}, 0, 8)).toBe(5000);
+});

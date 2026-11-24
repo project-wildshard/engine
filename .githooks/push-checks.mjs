@@ -1,7 +1,7 @@
 import {execFileSync,spawn} from 'node:child_process';
 import {availableParallelism,constants,getPriority,homedir,loadavg} from 'node:os';
-import {mkdirSync,rmSync} from 'node:fs';
-import {dirname,resolve,delimiter} from 'node:path';
+import {appendFileSync,mkdirSync,rmSync} from 'node:fs';
+import {dirname,join,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
 import {gateSlot} from '../scripts/push-gate-slot.mjs';
@@ -50,9 +50,30 @@ export function pushEnvironment(environment=process.env){
   Reflect.deleteProperty(env,'WILDSHARD_RING');Reflect.deleteProperty(env,'WS_TEST_QUARANTINE');return env;
 }
 
+/** J505 (Jake, 2026-11-23: "make it a permanent fix"): a push gate step that runs past ~3x its normal time is stuck, not
+ * slow. On 11-23 an engine-quickfix main-push sat 35 min in run-checks until it was killed by hand. The whole gate runs
+ * in ~74 s, so a step gets 240 s (`WS_PUSH_STUCK_S`), a Vitest step 900 s, each scaled up when the machine's 1-minute
+ * load is over its cores; then the gate stops it, says "STUCK in <step> after N min", logs a STUCK receipt and fails,
+ * which refuses the push and keeps the commit. */
+export const STUCK_STEP_SECONDS=240,STUCK_VITEST_SECONDS=900;
+
+/** The stuck limit for one gate step, in ms. @param {{name:string,stuckSeconds?:number}} task @param {NodeJS.ProcessEnv} [env] @param {number} [load] @param {number} [cores] */
+export function stuckLimitMs(task,env=process.env,load=loadavg()[0]??0,cores=availableParallelism()){
+  const override=Number(env.WS_PUSH_STUCK_S);
+  const base=task.stuckSeconds??(Number.isFinite(override)&&override>0?override:task.name.startsWith('vitest')?STUCK_VITEST_SECONDS:STUCK_STEP_SECONDS);
+  return Math.round(base*Math.max(1,load/Math.max(1,cores))*1000);
+}
+
+/** Append one STUCK receipt line (lane-receipts.log, or `WS_LANE_RECEIPTS`); never on a hosted runner, never fatal. @param {string} line @param {NodeJS.ProcessEnv} [env] */
+function stuckReceipt(line,env=process.env){
+  if(env.GITHUB_ACTIONS==='true')return;
+  const at=new Date().toISOString().slice(11,16);
+  try{appendFileSync(env.WS_LANE_RECEIPTS??join(homedir(),'.cache/wildshard/lane-receipts.log'),`${at} UTC ${env.WS_LANE_NAME||'push-gate'} STUCK ${line}\n`);}catch{ /* the gate's own line stands */ }
+}
+
 /** Run actual process groups, drain each one, and never start a later step after failure.
- * @param {{name:string,commands:string[][]}[]} tasks
- * @param {{cwd?:string,env?:NodeJS.ProcessEnv,graceMs?:number,timeoutMs?:number}} [options] */
+ * @param {{name:string,commands:string[][],stuckSeconds?:number}[]} tasks
+ * @param {{cwd?:string,env?:NodeJS.ProcessEnv,graceMs?:number,timeoutMs?:number,stuck?:boolean}} [options] */
 export async function parallelChecks(tasks,options={}) {
   if(options.timeoutMs!==undefined&&(!Number.isFinite(options.timeoutMs)||options.timeoutMs<=0))throw new Error('Invalid owned command deadline');
   if(options.env?.WS_CPU_ADMISSION==='1')tasks=tasks.map(task=>({...task,commands:task.commands.map(command=>{
@@ -82,7 +103,17 @@ export async function parallelChecks(tasks,options={}) {
   const deadline=options.timeoutMs===undefined?undefined:setTimeout(()=>{timedOut=true;stop('the deadline');},options.timeoutMs);
   try {
     await Promise.all(tasks.map(async task=>{
-      const at=Date.now();let output='',code=0,own=false;
+      const at=Date.now();let output='',code=0,own=false,stuck=false;
+      // J505: the step's watchdog. Stuck is this step's own red; the others it stops name it.
+      const limit=options.stuck===false?undefined:stuckLimitMs(task,options.env??process.env);
+      const watchdog=limit===undefined?undefined:setTimeout(()=>{
+        if(refused)return;
+        const minutes=((Date.now()-at)/60_000).toFixed(1);stuck=true;
+        const line=`push gate: STUCK in ${task.name} after ${minutes} min (limit ${(limit/1000).toFixed(0)} s, ~3x its normal time); stopped it, the push is refused and the commit is kept; rerun the push`;
+        console.error(`  X ${line}`);stuckReceipt(line,options.env??process.env);
+        stop(`STUCK in ${task.name} after ${minutes} min`);
+      },limit);
+      watchdog?.unref?.();
       for(const command of task.commands){
         if(refused){code=1;break;}
         const child=spawn(command[0],command.slice(1),{cwd:options.cwd,env:options.env,detached:true,stdio:['ignore','pipe','pipe']});
@@ -94,12 +125,13 @@ export async function parallelChecks(tasks,options={}) {
         active.delete(child);clearTimeout(child.escalation);
         // Drain grandchildren even if their immediate parent exits first.
         for(const group of child.groups??[child.pid])signal(group,'SIGKILL');
-        if(code!==0){own=!refused;stop(`${task.name} failed`);break;}
+        if(code!==0){own=!refused||stuck;stop(`${task.name} failed`);break;}
       }
-      const seconds=(Date.now()-at)/1000,stopped=code!==0&&!own;results.push({name:task.name,code,seconds,...(stopped?{stoppedBy:cause}:{})});
+      clearTimeout(watchdog);
+      const seconds=(Date.now()-at)/1000,stopped=code!==0&&!own;results.push({name:task.name,code,seconds,...(stopped?{stoppedBy:cause}:{}),...(stuck?{stuck:true}:{})});
       if(process.env.GITHUB_ACTIONS)console.log(`::group::${task.name}`);
       if(output.trim())console.log(output.trim());
-      console.error(`  - ${task.name} ${code===0?'green':stopped?'stopped':'RED'} in ${seconds.toFixed(1)} s${stopped?`: ${cause}`:''}`);
+      console.error(`  - ${task.name} ${code===0?'green':stopped?'stopped':stuck?'STUCK':'RED'} in ${seconds.toFixed(1)} s${stopped?`: ${cause}`:''}`);
       if(process.env.GITHUB_ACTIONS)console.log('::endgroup::');
     }));
   } finally {clearTimeout(deadline);process.off('SIGINT',interrupted);process.off('SIGTERM',interrupted);}
