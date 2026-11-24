@@ -56,6 +56,10 @@ test('a placed cell is laid out on every road: no void floor on its square, stri
   if (placed === undefined) throw new Error('Thin Ice opens');
   // Nalati's worker hears it too, on its own time.
   await vi.waitFor(() => { expect(north(other.host)).not.toBeNull(); }, { timeout: 30_000 });
+  // QA 11-23-b row 38: and its road may hand a seat into it, as into a cell booted with the world (v0.1.78's loopback tours were refused at
+  // Mossgate's gate from Pine's and open-plot-4-3's sides: the road on the other worker never opened the placed cell)
+  await vi.waitFor(() => { expect(other.opens(PLACED.instance), 'the other worker\'s road crosses into it').toBe(true); }, { timeout: 30_000 });
+  expect(mine.opens(PLACED.instance), 'its own worker hands over in place').toBe(false);
   for (const road of [mine, other]) {
     expect(down(road.host, 0, NORTH), 'no void floor over its square').toBeNull();
     expect(down(road.host, 0, NORTH + P / 2), 'the strip north of it').toBeCloseTo(0, 1);

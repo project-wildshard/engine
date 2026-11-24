@@ -472,6 +472,12 @@ export class World {
     else if (news.kind === 'placed') {
       const link = this.workers[index];
       if (news.resident !== undefined && link !== undefined) this.resident.set(link, news.resident);
+      // QA 11-23-b row 38: a cell opened on a running world tells every other worker's road it can be crossed into, as a booted cell
+      // does; without it a seat on another worker's road was refused at the placed cell's gate (the road's `handOut` never opened it)
+      if (news.stands !== undefined && news.stands.length > 0 && link !== undefined) {
+        this.stands.set(link, [...new Set([...this.stands.get(link) ?? [], ...news.stands])]);
+        this.openRoads();
+      }
       const answer = this.placings.get(news.id);
       if (answer !== undefined) { this.placings.delete(news.id); answer(news); }
       if (news.error !== undefined) this.options.log({ at: 'cells.place-refused', index, error: news.error });
