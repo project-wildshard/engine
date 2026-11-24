@@ -16,6 +16,8 @@
 #   wildshard-config saves list [--production]                      QA 11-15 row 24: every player's id, name and created_at
 #   wildshard-config saves delete-test <id>... [--production] [--yes]
 #                                                                   a test or bot player's rows, a dry run unless --yes
+#   wildshard-config saves worn                                     FORMAT-PRUNE FP22c: staging's worn-skin keys, counted per
+#                                                                   shard, revision, slot and skin; no player id, read-only
 # Settings live in /etc/wildshard/<channel>.settings (640 root:wildshard-<channel>), which the units read after <channel>.env.
 # Secrets stay in the root-only .env. The dedicated async-upload staging verb writes only its two fixed credentials
 # from stdin; it never prints them. Other verbs never write secrets (they read only the placement rows there, for
@@ -325,6 +327,30 @@ def journal(line):
         subprocess.run([logger, '-t', 'wildshard-saves', '-p', 'auth.notice', '--', line], cwd='/', env=helper_env())
 
 
+# FORMAT-PRUNE FP22c: a worn-skin save is keyed by a weapon's slot (`bow`) until the shard drops `legacySlot`, then by its
+# item (`declared.weapon.longbow`). Before a shard re-ships, this says which keys staging players really wear: one line per
+# shard, revision, slot and skin with its count, read with a plain select and no player id. A worn map sits in a save doc
+# either as JSON or inside a JSON string, so both spellings are matched. Staging only: production is never read this way.
+SAVES_WORN = r"""with worn as (
+  select shard, revision, (regexp_matches(doc::text, '\\?"worn\\?": ?[{]([^{}]*)[}]', 'g'))[1] as body from player_save
+), pairs as (
+  select shard, revision, m[1] as slot, m[2] as skin
+  from worn, regexp_matches(body, '\\?"([^"\\]+)\\?": ?\\?"([^"\\]+)\\?"', 'g') as m
+)
+select shard, revision, slot, skin, count(*) from pairs group by 1, 2, 3, 4 order by 1, 2, 3, 4;"""
+
+
+def saves_worn(production):
+    if production:
+        stop('saves worn reads staging only')
+    total = psql('staging', 'select count(*) from player_save;')
+    rows = psql('staging', SAVES_WORN)
+    print(f'saves_staging: {total[0][0] if total else 0} save rows; worn keys (shard revision slot skin count):')
+    for row in rows:
+        print('  ' + '  '.join(row))
+    return 0
+
+
 def saves(args, production):
     channel = 'production' if production else 'staging'
     if args[1:2] == ['list'] and len(args) == 2:
@@ -332,8 +358,10 @@ def saves(args, production):
                                  'from player order by created_at, id;'):
             print('  '.join(row))
         return 0
+    if args[1:2] == ['worn'] and len(args) == 2:
+        return saves_worn(production)
     if args[1:2] != ['delete-test']:
-        stop('usage: wildshard-config saves list [--production] | saves delete-test <id>... [--production] [--yes]')
+        stop('usage: wildshard-config saves list [--production] | saves worn | saves delete-test <id>... [--production] [--yes]')
     sure = '--yes' in args
     ids = [arg for arg in args[2:] if arg != '--yes']
     if not ids or len(ids) > SAVES_MAX or len(set(ids)) != len(ids):

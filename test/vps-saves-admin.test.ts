@@ -37,9 +37,10 @@ async function box() {
       WILDSHARD_CONFIG_TEST_PSQL: `psql ${url.href}`, WILDSHARD_CONFIG_TEST_LOGGER: '/bin/echo', SUDO_USER: 'wildshard-agent' } },
     (error, stdout, stderr) => { done({ status: typeof error?.code === 'number' ? error.code : 0, out: stdout + stderr }); });
   });
+  const save = async (id: string, revision: number, doc: unknown) => await held.query('update player_save set revision = $2, doc = $3 where player_id = $1', [id, revision, JSON.stringify(doc)]);
   const ids = async () => (await held.pglite.query<{ id: string }>('select id from player order by id')).rows.map(row => row.id);
   const rows = async (table: string) => (await held.pglite.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0]?.n;
-  return { run, ids, rows };
+  return { run, ids, rows, save };
 }
 
 test.skipIf(!psqlThere)('saves list prints each player\'s id, name and created_at, oldest first', async () => {
@@ -82,6 +83,20 @@ test.skipIf(!psqlThere)('delete-test --yes deletes every player_id row and the p
   expect(await ids()).toEqual(['device:guest', 'device:jake', 'device:jimmy']);
   expect([await rows('player_save'), await rows('player_place'), await rows('ledger_receipt')]).toEqual([3, 3, 0]);
   expect((await run('delete-test', 'device:r13', '--yes')).out).toContain('no player device:r13');
+});
+
+test.skipIf(!psqlThere)('saves worn counts staging worn-skin keys per shard, revision, slot and skin, with no player id', async () => {
+  const { run, save } = await box();
+  // FORMAT-PRUNE FP22c: one map as JSON, one inside a JSON string (a page's storage copy), and one already on a declared key
+  await save('device:r13', 13, { keys: { skins: { v: 1, data: { owned: ['warden', 'ironhide'], worn: { crossbow: 'warden', rifle: 'ironhide' } } } } });
+  await save('device:jake', 13, { 'pine-hollow': JSON.stringify({ keys: { skins: { v: 1, data: { owned: ['warden'], worn: { crossbow: 'warden' } } } } }) });
+  await save('device:bot', 17, { keys: { skins: { v: 1, data: { owned: ['warden'], worn: { 'declared.weapon.crossbow': 'warden' } } } } });
+  const worn = await run('worn');
+  expect(worn.status).toBe(0);
+  expect(worn.out.trim().split('\n')).toEqual(['saves_staging: 6 save rows; worn keys (shard revision slot skin count):',
+    '  driftwood-isle  13  crossbow  warden  2', '  driftwood-isle  13  rifle  ironhide  1', '  driftwood-isle  17  declared.weapon.crossbow  warden  1']);
+  expect(worn.out).not.toContain('device:');
+  expect((await run('worn', '--production')).out).toContain('saves worn reads staging only');
 });
 
 test('saves refuses a verb it does not know', async () => {

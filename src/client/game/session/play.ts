@@ -272,6 +272,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
   game.levelScope.onDispose(bindTravelInventory({ shard: chunk.slug, inventory, rows: boot.items }));
   const skins = new SkinLocker(chunk.slug, boot.skins, ctx.product.has('state/migrations') ? ctx.product.section('state/migrations').migrations : []);                          // legendary skins owned / worn (persisted; wired below)
   wirePage.hold({ shard: chunk.slug, finishes: skins }, game.levelScope);
+  game.levelScope.onDispose(app.debug.scopedExpose('skins', skins)); // FP22c: dev probes record the worn-skin saves it writes
   const menu = new GameMenu({
     levelName: chunk.name,
     fullMap,

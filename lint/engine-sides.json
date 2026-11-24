@@ -2010,6 +2010,7 @@
     "src/shared/game/riding/physics.ts": "shared",
     "src/shared/game/riding/presentation.ts": "shared",
     "src/shared/game/riding/taming.ts": "shared",
+    "src/shared/game/legacySlotMigration.ts": "shared",
     "src/shared/game/saves.ts": "shared",
     "src/shared/game/shard/api.ts": "shared",
     "src/shared/game/shard/declaredRows.ts": "shared",

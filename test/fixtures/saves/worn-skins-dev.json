@@ -1,0 +1,241 @@
+{
+ "source": "engine dev world (pnpm dev --saves memory), each skinned weapon held and each skin worn, saved by SkinLocker (project-wildshard-meta project/evidence/format-prune/fp22c/)",
+ "shards": [
+  {
+   "shard": "driftwood-isle",
+   "locker": "skins",
+   "weapons": [
+    {
+     "id": "sword",
+     "item": "weapon.sword"
+    },
+    {
+     "id": "sword-iron",
+     "item": "weapon.sword-iron"
+    }
+   ],
+   "skins": [],
+   "saves": [
+    {
+     "step": "start",
+     "save": {
+      "owned": [],
+      "worn": {}
+     }
+    }
+   ]
+  },
+  {
+   "shard": "nalati-grasslands",
+   "locker": "skins",
+   "weapons": [
+    {
+     "id": "sabre",
+     "item": "weapon.sabre"
+    },
+    {
+     "id": "rifle",
+     "item": "weapon.rifle"
+    },
+    {
+     "id": "bow",
+     "item": "weapon.bow"
+    },
+    {
+     "id": "spear",
+     "item": "weapon.spear"
+    }
+   ],
+   "skins": [],
+   "saves": [
+    {
+     "step": "start",
+     "save": {
+      "owned": [],
+      "worn": {}
+     }
+    }
+   ]
+  },
+  {
+   "shard": "nine-dragon-stack",
+   "locker": "skins",
+   "weapons": [
+    {
+     "id": "declared.weapon.jian",
+     "item": "weapon.jian"
+    }
+   ],
+   "skins": [],
+   "saves": [
+    {
+     "step": "start",
+     "save": {
+      "owned": [],
+      "worn": {}
+     }
+    }
+   ]
+  },
+  {
+   "shard": "pine-hollow",
+   "locker": "skins",
+   "weapons": [
+    {
+     "id": "crossbow",
+     "item": "weapon.crossbow"
+    },
+    {
+     "id": "rifle",
+     "item": "weapon.lever"
+    },
+    {
+     "id": "bow",
+     "item": "weapon.longbow"
+    }
+   ],
+   "skins": [
+    {
+     "id": "ghost-stag",
+     "weapon": "crossbow"
+    },
+    {
+     "id": "hollow-ash",
+     "weapon": "crossbow"
+    },
+    {
+     "id": "ironhide",
+     "weapon": "rifle"
+    },
+    {
+     "id": "blackpaw",
+     "weapon": "crossbow"
+    },
+    {
+     "id": "imperial",
+     "weapon": "crossbow"
+    },
+    {
+     "id": "warden",
+     "weapon": "crossbow"
+    },
+    {
+     "id": "scarback-furnace",
+     "weapon": "rifle"
+    }
+   ],
+   "saves": [
+    {
+     "step": "start",
+     "save": {
+      "owned": [],
+      "worn": {}
+     }
+    },
+    {
+     "step": "hold crossbow, wear ghost-stag",
+     "save": {
+      "owned": [
+       "ghost-stag"
+      ],
+      "worn": {
+       "crossbow": "ghost-stag"
+      }
+     }
+    },
+    {
+     "step": "hold crossbow, wear hollow-ash",
+     "save": {
+      "owned": [
+       "ghost-stag",
+       "hollow-ash"
+      ],
+      "worn": {
+       "crossbow": "hollow-ash"
+      }
+     }
+    },
+    {
+     "step": "hold rifle, wear ironhide",
+     "save": {
+      "owned": [
+       "ghost-stag",
+       "hollow-ash",
+       "ironhide"
+      ],
+      "worn": {
+       "crossbow": "hollow-ash",
+       "rifle": "ironhide"
+      }
+     }
+    },
+    {
+     "step": "hold crossbow, wear blackpaw",
+     "save": {
+      "owned": [
+       "ghost-stag",
+       "hollow-ash",
+       "ironhide",
+       "blackpaw"
+      ],
+      "worn": {
+       "crossbow": "blackpaw",
+       "rifle": "ironhide"
+      }
+     }
+    },
+    {
+     "step": "hold crossbow, wear imperial",
+     "save": {
+      "owned": [
+       "ghost-stag",
+       "hollow-ash",
+       "ironhide",
+       "blackpaw",
+       "imperial"
+      ],
+      "worn": {
+       "crossbow": "imperial",
+       "rifle": "ironhide"
+      }
+     }
+    },
+    {
+     "step": "hold crossbow, wear warden",
+     "save": {
+      "owned": [
+       "ghost-stag",
+       "hollow-ash",
+       "ironhide",
+       "blackpaw",
+       "imperial",
+       "warden"
+      ],
+      "worn": {
+       "crossbow": "warden",
+       "rifle": "ironhide"
+      }
+     }
+    },
+    {
+     "step": "hold rifle, wear scarback-furnace",
+     "save": {
+      "owned": [
+       "ghost-stag",
+       "hollow-ash",
+       "ironhide",
+       "blackpaw",
+       "imperial",
+       "warden",
+       "scarback-furnace"
+      ],
+      "worn": {
+       "crossbow": "warden",
+       "rifle": "scarback-furnace"
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
