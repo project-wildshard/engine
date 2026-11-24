@@ -152,6 +152,13 @@
    "decision": null,
    "why": "J444: phone Low programs in the fixed headless spawn views, compared with the zone's own pinned revision."
   },
+  "render/phone-high/programs/*": {
+   "hard": null,
+   "unit": "programs",
+   "kind": "exact",
+   "decision": null,
+   "why": "J444, meta QA-FEEDBACK-2026-11-24 row 57: phone High programs in the fixed headless spawn views, compared with the zone's own pinned revision (High linked 39 programs after control at Driftwood's dock until 2cac25df5)."
+  },
   "fps/phone-low/driftwood-isle": {
    "hard": 60,
    "unit": "fps",

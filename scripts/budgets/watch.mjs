@@ -40,7 +40,7 @@ export function budgetReport(run, results, pushers) {
   const sha = run.head_sha.slice(0, 10);
   if (results.length === 0) return { lines: [`main BUDGETS ${sha} failed with no budget result (run ${run.id}; see the run; pushed by ${pusher})`], qa: null };
   const lines = results.map(result => {
-    const unit = /^render\/phone-low\/(triangles|draws|programs)\//u.exec(result.key)?.[1] ?? 'B';
+    const unit = /^render\/phone-(?:low|high)\/(triangles|draws|programs)\//u.exec(result.key)?.[1] ?? 'B';
     return `main BUDGET ${result.kind} ${sha} ${result.key} ${result.measured} ${unit}, line ${result.line ?? '-'} ${unit} (run ${run.id}; J444: a fix row for ${pusher}, never a red main)`;
   });
   return { lines, qa: { id: run.id, sha: run.head_sha, created: run.created_at, pusher, results } };

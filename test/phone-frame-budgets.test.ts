@@ -65,6 +65,37 @@ describe('phone Low frame budgets', () => {
     expect(next.baselines.baselines[key]).toEqual({ value: 110, contentKey: 'driftwood-isle@6' });
   });
 
+  // Meta QA-FEEDBACK-2026-11-24 row 57: phone High linked 39 programs after control at Driftwood's dock, and no budget saw it.
+  const high = (programs = 100) => ({ ...reading(), graphics: 'high' as const, low: false, renderDpr: 2,
+    views: reading().views.map(view => view.map(frame => ({ ...frame, programs: programs + frame.frame }))) });
+
+  test('phone High records its programs beside Low, and Low alone still measures', () => {
+    const highKey = `render/phone-high/programs/${slug}`;
+    const both = phoneFrameMeasures(pin(5), [reading(), high()]);
+    expect(both.measures[highKey]).toEqual({ value: 108, contentKey: 'driftwood-isle@5' });
+    expect(Object.keys(both.measures).filter(name => name.startsWith('render/phone-high/'))).toEqual([highKey]);
+    expect(both.measures[key]).toEqual({ value: 121, contentKey: 'driftwood-isle@5' });
+    expect(phoneFrameMeasures(pin(5), [reading()]).measures[highKey]).toBeUndefined();
+  });
+
+  test('refuses a High reading that is Low, or a High sweep missing a pinned zone', () => {
+    expect(() => phoneFrameMeasures(pin(5), [reading(), { ...high(), low: true }])).toThrow('expected phone High');
+    expect(() => phoneFrameMeasures(pin(5), [reading(), { ...high(), renderDpr: 0 }])).toThrow('expected phone High');
+    const pins = { ...pin(5), 'pine-hollow': 'pine-hollow@6' };
+    expect(() => phoneFrameMeasures(pins, [reading(), { ...reading(), slug: 'pine-hollow' }, high()])).toThrow('every pinned zone');
+  });
+
+  test('J444 judges phone High programs against its own revision', () => {
+    const caps = readCaps();
+    const highKey = `render/phone-high/programs/${slug}`;
+    const first = recordAll(caps, { schema: 1, about: 'Phone High test baselines', baselines: {} }, phoneFrameMeasures(pin(5), [reading(), high(92)]));
+    expect(first.errors).toEqual([]);
+    expect(first.baselines.baselines[highKey]).toEqual({ value: 100, contentKey: 'driftwood-isle@5' });
+    const judge = (programs: number) => judgeAll(caps, first.baselines, phoneFrameMeasures(pin(5), [reading(), high(programs)])).find(row => row.key === highKey);
+    expect(judge(101)?.status).toBe('ok');
+    expect(judge(102)).toMatchObject({ status: 'regressed', value: 110, line: 110, hard: null });
+  });
+
   test('gives a pinned zone with no cell a measuring cell in the page catalogue (meta MZ26)', () => {
     const catalogue = { placements: [{ instance: 'driftwood-isle', slug: 'driftwood-isle', cell: [0, 0] }],
       grid: { cells: [{ instance: 'driftwood-isle', slug: 'driftwood-isle', cell: [0, 0] }, { instance: 'x', slug: '_pine-hollow', cell: [3, -1] }] } };

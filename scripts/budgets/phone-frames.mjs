@@ -1,4 +1,6 @@
-// J444: the same headless phone-Low spawn workload for every pinned revision.
+// J444: the same headless phone-Low spawn workload for every pinned revision, and phone High's programs beside it
+// (meta QA-FEEDBACK-2026-11-24 row 57: High linked 39 programs after control at Driftwood's dock until 2cac25df5 gave it
+// the pixel-neutral DF cuts, and nothing measured High).
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -15,9 +17,16 @@ const SAMPLE_COUNT = 3;
 const READY_MS = 235_000;
 const FRAME_MS = 30_000;
 const METRICS = /** @type {const} */ (['triangles', 'draws', 'programs']);
+/** What each phone graphics setting records: Low every counter, High its programs (row 57). */
+export const PHONE_GRAPHICS = Object.freeze({
+  low: Object.freeze({ low: true, name: 'phone Low', metrics: METRICS }),
+  high: Object.freeze({ low: false, name: 'phone High', metrics: /** @type {readonly Metric[]} */ (['programs']) }),
+});
+/** @typedef {(typeof METRICS)[number]} Metric */
+/** @typedef {keyof typeof PHONE_GRAPHICS} Graphics */
 
 /** @typedef {{frame:number, triangles:number, draws:number, programs:number}} Frame */
-/** @typedef {{slug:string, tier:string, low:boolean, deviceDpr:number, renderDpr:number, views:Frame[][]}} ZoneFrames */
+/** @typedef {{slug:string, graphics?:Graphics, tier:string, low:boolean, deviceDpr:number, renderDpr:number, views:Frame[][]}} ZoneFrames */
 
 /** Full builds must expose the exact catalogue pinned by the source checkout.
  * @param {Record<string,string>} pins @param {readonly string[]} built */
@@ -46,27 +55,34 @@ export function measuringCatalogue(html, slug) {
   });
 }
 
-/** Median frames at each fixed view, then the heaviest view for each counter.
+/** Median frames at each fixed view, then the heaviest view for each counter. Low readings must cover every pin; High
+ * readings, when there are any, must too.
  * @param {Record<string,string>} pins @param {readonly ZoneFrames[]} readings @param {string} [commit] */
 export function phoneFrameMeasures(pins, readings, commit) {
-  const expected = expectPinnedZones(pins, readings.map(row => row.slug));
-  const bySlug = new Map(readings.map(row => [row.slug, row]));
   /** @type {import('./cli.mjs').BudgetMeasures['measures']} */
   const measures = {};
-  for (const slug of expected) {
-    const row = bySlug.get(slug);
-    if (row?.tier !== 'phone' || !row.low || row.deviceDpr !== PHONE_LOW.deviceDpr || row.renderDpr !== PHONE_LOW.renderDpr) {
-      throw new Error(`${slug}: expected phone Low at 1 drawing pixel per CSS pixel`);
-    }
-    const frames = row.views.flat();
-    if (row.views.length !== VIEWS.length || row.views.some(view => view.length !== SAMPLE_COUNT)
-        || frames.some((frame, index) => !Number.isSafeInteger(frame.frame) || frame.frame <= (frames[index - 1]?.frame ?? 0)
-          || METRICS.some(metric => !Number.isSafeInteger(frame[metric]) || frame[metric] <= 0))) {
-      throw new Error(`${slug}: incomplete renderer frame samples`);
-    }
-    for (const metric of METRICS) {
-      const medians = row.views.map(view => view.map(frame => frame[metric]).sort((a, b) => a - b)[1]);
-      measures[`render/phone-low/${metric}/${slug}`] = { value: Math.max(...medians), contentKey: pins[slug] };
+  for (const graphics of /** @type {Graphics[]} */ (Object.keys(PHONE_GRAPHICS))) {
+    const setting = PHONE_GRAPHICS[graphics];
+    const rows = readings.filter(row => (row.graphics ?? 'low') === graphics);
+    if (graphics !== 'low' && rows.length === 0) continue;
+    const expected = expectPinnedZones(pins, rows.map(row => row.slug));
+    const bySlug = new Map(rows.map(row => [row.slug, row]));
+    for (const slug of expected) {
+      const row = bySlug.get(slug);
+      if (row?.tier !== 'phone' || row.low !== setting.low || row.deviceDpr !== PHONE_LOW.deviceDpr
+          || (setting.low ? row.renderDpr !== PHONE_LOW.renderDpr : !(row.renderDpr > 0))) {
+        throw new Error(setting.low ? `${slug}: expected phone Low at 1 drawing pixel per CSS pixel` : `${slug}: expected ${setting.name}`);
+      }
+      const frames = row.views.flat();
+      if (row.views.length !== VIEWS.length || row.views.some(view => view.length !== SAMPLE_COUNT)
+          || frames.some((frame, index) => !Number.isSafeInteger(frame.frame) || frame.frame <= (frames[index - 1]?.frame ?? 0)
+            || setting.metrics.some(metric => !Number.isSafeInteger(frame[metric]) || frame[metric] <= 0))) {
+        throw new Error(`${slug}: incomplete renderer frame samples`);
+      }
+      for (const metric of setting.metrics) {
+        const medians = row.views.map(view => view.map(frame => frame[metric]).sort((a, b) => a - b)[1]);
+        measures[`render/phone-${graphics}/${metric}/${slug}`] = { value: Math.max(...medians), contentKey: pins[slug] };
+      }
     }
   }
   return { ...(commit === undefined ? {} : { commit }), measures };
@@ -79,16 +95,17 @@ function renderedPhone() {
   return { tier: game.tier, low: Reflect.get(game, 'qualityLow') === true, deviceDpr: devicePixelRatio, renderDpr: game.renderer.getPixelRatio() };
 }
 
-/** @param {import('playwright').Browser} browser @param {string} base @param {string} slug @returns {Promise<ZoneFrames>} */
-export async function readPhoneFrames(browser, base, slug) {
+/** @param {import('playwright').Browser} browser @param {string} base @param {string} slug @param {Graphics} [graphics]
+ * @returns {Promise<ZoneFrames>} */
+export async function readPhoneFrames(browser, base, slug, graphics = 'low') {
   const viewport = { width: PHONE_LOW.width, height: PHONE_LOW.height };
   const context = await browser.newContext({ ...devices['iPhone 16 Pro'], viewport, screen: viewport, deviceScaleFactor: PHONE_LOW.deviceDpr });
   try {
     await developerSettings(context, { tier: 'phone', volume: 0 });
     await saveFixture(context, NAME_ASKED);
     await saveFixture(context, { scope: 'device', key: 'firstPlayDone', data: true });
-    await saveFixture(context, { scope: 'device', key: 'graphics', data: 'low' });
-    // Hold the phone Low density against the software renderer's adaptive scale.
+    await saveFixture(context, { scope: 'device', key: 'graphics', data: graphics });
+    // Hold the phone density against the software renderer's adaptive scale.
     await saveFixture(context, { scope: 'device', key: 'devPixels', data: { screen: 1, density: 2 } });
     await harnessPins(context, { seed: 357 });
     const page = await context.newPage();
@@ -113,14 +130,14 @@ export async function readPhoneFrames(browser, base, slug) {
     const result = await ready.jsonValue();
     await ready.dispose();
     if (typeof result === 'string') throw new Error(result);
-    await page.evaluate(() => {
+    await page.evaluate(low => {
       const game = window.__wildshard?.world?.game;
       if (game === undefined) throw new Error('Missing live renderer');
-      if (Reflect.get(game, 'qualityLow') !== true) game.applyQuality();
+      if ((Reflect.get(game, 'qualityLow') === true) !== low) game.applyQuality();
       game.app.clock.setCapture(30);
-    });
+    }, PHONE_GRAPHICS[graphics].low);
     const proof = await page.evaluate(renderedPhone);
-    console.log(`${slug} control`, JSON.stringify(proof));
+    console.log(`${slug} ${graphics} control`, JSON.stringify(proof));
     /** @type {Frame[][]} */
     const views = [];
     for (const offset of VIEWS) {
@@ -150,7 +167,7 @@ export async function readPhoneFrames(browser, base, slug) {
     const final = await page.evaluate(renderedPhone);
     if (JSON.stringify(final) !== JSON.stringify(proof)) throw new Error(`Renderer settings changed: ${JSON.stringify(proof)} -> ${JSON.stringify(final)}`);
     if (faults.length > 0) throw new Error(faults.join('\n'));
-    return { slug, ...proof, views };
+    return { slug, graphics, ...proof, views };
   } finally {
     await context.close();
   }
@@ -181,18 +198,23 @@ async function main([previewRoot, output, commit, only]) {
   try {
     const browser = await pool.browser(0);
     for (const slug of selected) {
-      try {
-        const reading = await readPhoneFrames(browser, preview.url, slug);
-        const point = phoneFrameMeasures({ [slug]: pins[slug] }, [reading], commit);
-        readings.push(reading);
-        writeFileSync(`${output}.frames.json`, `${JSON.stringify(readings, null, 2)}\n`);
-        console.log(slug, pins[slug], JSON.stringify(Object.fromEntries(Object.entries(point.measures).map(([key, row]) => [key.split('/')[2], row.value]))));
-      } catch (error) {
-        failures.push(new Error(`${slug}: phone Low workload capture failed`, { cause: error }));
-        console.error(failures.at(-1));
+      /** @type {ZoneFrames[]} */
+      const zone = [];
+      for (const graphics of /** @type {Graphics[]} */ (Object.keys(PHONE_GRAPHICS))) {
+        try {
+          zone.push(await readPhoneFrames(browser, preview.url, slug, graphics));
+        } catch (error) {
+          failures.push(new Error(`${slug}: ${PHONE_GRAPHICS[graphics].name} workload capture failed`, { cause: error }));
+          console.error(failures.at(-1));
+        }
       }
+      if (zone.length !== Object.keys(PHONE_GRAPHICS).length) continue;
+      const point = phoneFrameMeasures({ [slug]: pins[slug] }, zone, commit);
+      readings.push(...zone);
+      writeFileSync(`${output}.frames.json`, `${JSON.stringify(readings, null, 2)}\n`);
+      console.log(slug, pins[slug], JSON.stringify(Object.fromEntries(Object.entries(point.measures).map(([key, row]) => [key.split('/').slice(1, 3).join('/'), row.value]))));
     }
-    if (failures.length > 0) throw new AggregateError(failures, 'Incomplete phone Low workload sweep');
+    if (failures.length > 0) throw new AggregateError(failures, 'Incomplete phone workload sweep');
     const content = Object.fromEntries(selected.map(slug => [slug, pins[slug]]));
     writeFileSync(output, `${JSON.stringify(phoneFrameMeasures(content, readings, commit), null, 2)}\n`);
   } finally {
