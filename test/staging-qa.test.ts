@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { deployFrameProblem } from '../scripts/journey-proof.mjs';
 import { gateLeg, holdLine, JOURNEY_CARD, mergeVerdict } from '../scripts/staging-qa.mjs';
-import { QA_RIG_SHARDS } from '../scripts/staging-qa-local.mjs';
+import { QA_RIG_SHARDS, tourFixture } from '../scripts/staging-qa-local.mjs';
+import { TOUR_FEATURED } from '../scripts/zone-entry-featured.mjs';
 import { CHANNELS } from '../scripts/page-release/flow.mjs';
 import { chromiumCandidateArgs } from '../scripts/staging-qa-browser.mjs';
 import { pickPhone, qaDevice } from '../scripts/staging-qa-sim.mjs';
@@ -101,5 +102,20 @@ describe('the local QA rig hosts every shard a local leg visits', () => {
   });
   it('staging keeps the Nalati crossing and the walk back in', () => {
     expect(gateLeg(CHANNELS.staging.origin)).toEqual({ target: 'nalati-grasslands', reenter: true });
+  });
+});
+
+// QA 11-23-b row 37 (J505): v0.1.78's local fixed-route probe never reached Nalati, because the default rig hosted only
+// Driftwood, Pine and Sky Reach and the page stayed in Driftwood with no error. The default rig now hosts the J451 roster.
+describe('the default local rig hosts every zone the J451 tour features', () => {
+  it('its shard list is the whole roster', () => {
+    expect([...QA_RIG_SHARDS].sort()).toEqual([...TOUR_FEATURED].sort());
+  });
+  it('with no seed the fixture hosts and places every featured zone', async () => {
+    const fixture = await tourFixture(process.cwd());
+    expect([...fixture.more].sort()).toEqual(TOUR_FEATURED.filter(slug => slug !== 'driftwood-isle').sort());
+    const placed = new Set([...(fixture.catalogue as { grid: { cells: { instance: string; slug?: string }[] } }).grid.cells]
+      .map(cell => cell.slug ?? cell.instance));
+    expect(TOUR_FEATURED.filter(slug => !placed.has(slug))).toEqual([]);
   });
 });

@@ -5,6 +5,7 @@ import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } f
 import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { makeGateCopy } from './push-gate-copy.mjs';
+import { TOUR_FEATURED } from './zone-entry-featured.mjs';
 
 /** @param {string} root @param {string} file @param {string[]} args @param {NodeJS.ProcessEnv} env @param {string} log */
 async function run(root, file, args, env, log) {
@@ -27,9 +28,10 @@ export function checkLocalSource(root, build) {
   if (dirty !== '') throw new Error('Local QA needs clean tracked source');
 }
 
-/** Build the seeded tour's fixture from its pinned products and the reviewed positions of any missing featured cells.
- * @param {string} checkout @param {number} seed */
-async function tourFixture(checkout, seed) {
+/** Build the tour's fixture from its pinned products and the reviewed positions of any missing featured cells: the seeded
+ * draw's shards, or with no seed every zone the J451 tour features (QA 11-23-b row 37: the default rig hosts the roster).
+ * @param {string} checkout @param {number} [seed] */
+export async function tourFixture(checkout, seed) {
   const home = (/** @type {string} */ path) => JSON.parse(readFileSync(join(checkout, path), 'utf8'));
   const catalogue = home('test/pins/catalogue.json');
   const snapshot = home('test/pins/staging.json').catalogue;
@@ -43,8 +45,8 @@ async function tourFixture(checkout, seed) {
   // Import from this exact source so both the fixture selection and the browser use the same featured list.
   const {featuredZoneEntry} = await import(pathToFileURL(join(checkout, 'scripts/zone-entry-tour.mjs')).href);
   /** @type {ReturnType<typeof import('./zone-entry-tour.mjs').featuredZoneEntry>} */
-  const route = featuredZoneEntry(cells, seed);
-  const selected = new Set(route.flatMap(({from,to}) => [from.slug ?? from.instance,to.slug ?? to.instance]));
+  const route = seed === undefined ? [] : featuredZoneEntry(cells, seed);
+  const selected = new Set(seed === undefined ? featured : route.flatMap(({from,to}) => [from.slug ?? from.instance,to.slug ?? to.instance]));
   const base = /** @type {import('./zone-entry-tour.mjs').Cell[]} */ (home('test/pins/catalogue.json').grid.cells);
   const builtIn = new Set(base.map(cell => cell.instance));
   const extras = cells.filter(cell => !builtIn.has(cell.instance) && selected.has(cell.slug ?? cell.instance));
@@ -52,9 +54,11 @@ async function tourFixture(checkout, seed) {
 }
 
 /** Build-max C4 (2026-11-23): the shards the local rig hosts when no tour picks them: its home and `more`. Every local gate
- * leg (staging-qa.mjs `gateLeg`, the journey card) must stay inside this list; v0.1.77 held when the gate walked into Nalati. */
+ * leg (staging-qa.mjs `gateLeg`, the journey card) must stay inside this list; v0.1.77 held when the gate walked into Nalati.
+ * QA 11-23-b row 37 (J505): it is every zone the J451 tour features, so a local probe of any featured crossing has its far
+ * side (v0.1.78's fixed-route probe never reached Nalati on the old three-shard rig and reported no error). */
 export const QA_RIG_HOME = 'driftwood-isle';
-export const QA_RIG_MORE = Object.freeze(['pine-hollow', 'far-reach']);
+export const QA_RIG_MORE = Object.freeze(TOUR_FEATURED.filter(slug => slug !== QA_RIG_HOME));
 export const QA_RIG_SHARDS = Object.freeze([QA_RIG_HOME, ...QA_RIG_MORE]);
 
 /** @param {{root: string, build: string, out: string, tourSeed?: number}} options */
@@ -71,9 +75,9 @@ export async function openQaRig({ root, build, out, tourSeed }) {
     // Both the app and server are built using this source checkout's tools.
     process.env.WS_RIG_PORTS ??= '19476';
     const { RELEASE_PORT, WORLD_PORT, openRig } = await import(pathToFileURL(join(checkout, 'scripts', 'online-rig.mjs')).href);
-    const tour = tourSeed === undefined ? undefined : await tourFixture(checkout, tourSeed);
+    const tour = await tourFixture(checkout, tourSeed);
     const catalogueFile = join(work, 'fixture-catalogue.json');
-    if (tour !== undefined) {
+    {
       writeFileSync(catalogueFile, JSON.stringify(tour.catalogue), {mode:0o600});
       const body = JSON.stringify({kind:'placement',channel:'staging',serial:1,cells:tour.extras});
       writeFileSync(placementFile, JSON.stringify({body,signature:sign(null, Buffer.from(body), pair.privateKey).toString('hex')}), {mode:0o600,flag:'wx'});
@@ -81,11 +85,11 @@ export async function openQaRig({ root, build, out, tourSeed }) {
     await run(checkout, 'pnpm', ['pins'], process.env, join(work, 'pins.log'));
     await run(checkout, 'python3', ['scripts/heavy-lane.py', 'build', '--', process.execPath, 'scripts/build-app.mjs', '--outDir', dist],
       { ...process.env, WS_BUILD_ID: build, WILDSHARD_RELEASE_URL: `http://127.0.0.1:${String(RELEASE_PORT)}/release.json`, WILDSHARD_RELEASE_KEY: key,
-        ...(tour === undefined ? {} : {WILDSHARD_CATALOGUE:catalogueFile}) },
+        WILDSHARD_CATALOGUE: catalogueFile },
       join(work, 'build.log'));
     checkLocalSource(checkout, build);
-    const rig = await openRig({ dist, work: join(work, 'rig'), keyFile, pgBin: 'pglite:', more: tour?.more ?? [...QA_RIG_MORE], cells: 'grid', isolated: true,
-      ...(tour === undefined ? {} : {channel:'staging',placement:{url:pathToFileURL(placementFile).href,key}}) });
+    const rig = await openRig({ dist, work: join(work, 'rig'), keyFile, pgBin: 'pglite:', more: tour.more, cells: 'grid', isolated: true,
+      channel: 'staging', placement: {url: pathToFileURL(placementFile).href, key} });
     return { base: String(rig.base), socket: `ws://127.0.0.1:${String(WORLD_PORT)}`, source: checkout, close: async () => {
       try { await rig.close(); } finally {
         rmSync(placementFile, { force: true });
