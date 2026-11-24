@@ -400,7 +400,7 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     page.on('pageerror', (error) => { errors.push(error.message); });
     // a small same-origin file first, so WebContent exists (and a cross-origin swap cannot move the page) before the boot
     await page.goto(new URL('/version.json', url).href);
-    const inspector = instrument === 'minimal' ? await minimiseInspector(page) : null;
+    let inspector = instrument === 'minimal' ? await minimiseInspector(page) : null;
     const build = await page.evaluate(() => { try { return JSON.parse(document.body.textContent ?? '').build ?? null; } catch { return null; } });
     /** @type {Map<number, BrowserProcess>} */
     const procs = new Map(webkitProcesses().map((p) => [p.pid, p]));
@@ -412,6 +412,10 @@ export async function webkitBoot({ url, chunk, settleMs = 2000, timeoutMs = 240_
     const started = Date.now();
     try {
       await page.goto(bootURL(url, chunk), { waitUntil: 'commit' });
+      // QA 11-23-b row 25: the game document sends COOP and /version.json does not, so WebKit swaps the page into a new
+      // WebContent at this navigation, and its new inspector session has the Network domain on again (every run read
+      // `minimal-lost`). Turn the new session down at commit, before the boot's fetches; `kept` below checks this one.
+      if (inspector !== null && !sameInspectorSession(page, inspector)) inspector = await minimiseInspector(page);
       // an online page asks for the player's Name before it joins: answer it as a player would
       const named = world === null ? null : answerName(page);
       try { failure = await untilControl(page, timeoutMs); } finally { await named?.stop(); }
