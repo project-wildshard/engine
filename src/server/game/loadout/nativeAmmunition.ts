@@ -41,7 +41,9 @@ export class NativeHeldAmmunition {
     const items = parseItems(itemRows).rows;
     const launcher = items.find(item => item.id === this.rows.launcher.item);
     // FP22d: a loadout slot names the weapon's runtime id: its closed name while the row has one, else `declared.<item>`
-    const playsAs = (slot: string) => items.find(item => item.kind === 'weapon' && item.equipment !== undefined && weaponIdOf(item.equipment) === slot);
+    // A weapon without one plays under its item's id, which need not be its equipment's (Driftwood's swords)
+    const playsAs = (slot: string) => items.find(item => item.kind === 'weapon' && item.equipment !== undefined
+      && (weaponIdOf(item.equipment) === slot || (item.equipment.legacySlot === undefined && weaponIdOf({ id: item.id }) === slot)));
     const firearm = playsAs(this.rows.firearm.slot), bow = playsAs(this.rows.bow.slot);
     if (launcher?.kind !== 'weapon' || firearm?.kind !== 'weapon' || bow?.kind !== 'weapon'
       || launcher.ranged === undefined || firearm.ranged === undefined || bow.ranged === undefined || bow.profile?.family !== 'bow')

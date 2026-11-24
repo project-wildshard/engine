@@ -39,7 +39,7 @@ export function installOwnedEffects(host: SimHost, owned: Owned, source: Shardfi
   };
   const weapon=(id:string)=>row.weapons.find(entry=>entry.items.some(item=>{
     const equipment=source.items.rows.find(value=>value.id===item)?.equipment;
-    return item===id||equipment?.id===id||(equipment!==undefined&&weaponIdOf(equipment)===id);
+    return item===id||equipment?.id===id||weaponIdOf({id:item})===id||(equipment!==undefined&&weaponIdOf(equipment)===id);
   }));
   const read=(id:string,attr:string,base:number):number=>fold(select(weapon(id)?.grants??[]),attr,base);
   const readers=weaponEffects.get(host)??new Map<PlayerSim, typeof read>();readers.set(player,read);weaponEffects.set(host,readers);

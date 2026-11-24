@@ -29,7 +29,8 @@ export function legacySlotRenames(rows: readonly SlottedItemRow[]): SlotRename[]
     const owner = seen.get(slot);
     if (owner !== undefined) throw new Error(`Weapons ${owner} and ${row.id} both name legacySlot ${slot}`);
     seen.set(slot, row.id);
-    renames.push({ from: slot, to: weaponIdOf({ id: row.equipment.id }) });
+    // the id the weapon plays under once the slot goes is its item's (the kit keys it by the row's `slot`, `declared.<item>`)
+    renames.push({ from: slot, to: weaponIdOf({ id: row.id }) });
   }
   return renames;
 }

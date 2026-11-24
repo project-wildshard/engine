@@ -77,4 +77,8 @@ describe('legacy slot to declared item', () => {
     expect(() => legacySlotRenames([...rows, { kind: 'weapon', id: 'weapon.heavy', equipment: { id: 'weapon.heavy', legacySlot: 'crossbow' } }]))
       .toThrow('Weapons weapon.crossbow and weapon.heavy both name legacySlot crossbow');
   });
+  test('a slot moves to its item\'s id, not its equipment\'s: the kit keys a weapon by its item (Driftwood\'s swords)', () => {
+    const rows: SlottedItemRow[] = [{ kind: 'weapon', id: 'weapon.driftwood-isle.wood', equipment: { id: 'weapon.sword', legacySlot: 'sword' } }];
+    expect(legacySlotRenames(rows)).toEqual([{ from: 'sword', to: 'declared.weapon.driftwood-isle.wood' }]);
+  });
 });
