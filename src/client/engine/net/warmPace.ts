@@ -9,7 +9,6 @@
  */
 import { jsonSlot } from '../saves/slots';
 import { TIER } from '../core/tier';
-import { graphicsMode } from '../core/graphicsMode';
 
 export const WARM_PACE_SLOT = 'debug.warmPace';
 export const WARM_PACE_DEFAULT = false;
@@ -45,14 +44,14 @@ export function warmSettle(saved: unknown, phoneLow = false): boolean {
 export function warmSettleOn(): boolean {
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(WARM_SETTLE_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  phoneLow = TIER === 'phone'; // QA 11-24 row 31: every phone, Low or High (nothing drawn changes)
   return warmSettle(saved, phoneLow);
 }
 /** Whether this page paces its warm body (read once, when the body is made). */
 export function warmPaceOn(): boolean {
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(WARM_PACE_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  phoneLow = TIER === 'phone'; // QA 11-24 row 31: every phone, Low or High (nothing drawn changes)
   return warmPace(saved, phoneLow);
 }
 /** Whether the warm body draws on this frame: `since` frames after its hand filled (-1: not yet filled). `settle`: the frames

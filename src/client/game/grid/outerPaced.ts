@@ -8,7 +8,6 @@
  */
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { TIER } from '@wildshard/engine/core/tier';
-import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 
 export const OUTER_START_PACED_SLOT = 'debug.outerStartPaced';
 export const OUTER_START_PACED_DEFAULT = false;
@@ -28,7 +27,7 @@ export function outerStartPacedOn(): boolean {
   if (picked !== undefined) return picked;
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(OUTER_START_PACED_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  phoneLow = TIER === 'phone'; // QA 11-24 row 31: every phone, Low or High (nothing drawn changes)
   picked = outerStartPaced(saved, phoneLow);
   return picked;
 }

@@ -16,7 +16,7 @@ const coalescedStillSlot = jsonSlot('debug.interactStillCoalesce', 'device');
 /** DW3: apply a tick's poses before publishing the lit still mesh. On at phone Low unless saved false (mini-dw3,
  *  2026-11-23: iPhone 13 pairs with the two road slots, the road crossing's frames over 50 ms 8 on against 12 off). */
 export function coalescedStillBakesOn(): boolean {
-  try { return TIER === 'phone' && graphicsMode() === 'low' && coalescedStillSlot.read() !== false; }
+  try { return TIER === 'phone' && coalescedStillSlot.read() !== false; }
   catch { return false; }
 }
 export const LIT_REST_MERGE_DEFAULT = false;

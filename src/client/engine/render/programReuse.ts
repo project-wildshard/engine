@@ -11,7 +11,6 @@
  */
 import { jsonSlot } from '../saves/slots';
 import { TIER } from '../core/tier';
-import { graphicsMode } from '../core/graphicsMode';
 
 export const PROGRAM_REUSE_SLOT = 'debug.programReuse';
 export const PROGRAM_REUSE_DEFAULT = false;
@@ -37,7 +36,7 @@ export function programReuseOn(): boolean {
   if (picked !== undefined) return picked;
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(PROGRAM_REUSE_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  phoneLow = TIER === 'phone'; // QA 11-24 row 31: every phone, Low or High (nothing drawn changes)
   picked = programReuse(saved, phoneLow, TIER === 'desktop');
   return picked;
 }

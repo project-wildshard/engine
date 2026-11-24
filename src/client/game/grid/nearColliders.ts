@@ -11,7 +11,6 @@
  */
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { TIER } from '@wildshard/engine/core/tier';
-import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 import type { StripMesh } from '@wildshard/engine/sim/strips';
 
 export const OUTER_COLLIDERS_NEAR_SLOT = 'debug.outerCollidersNear';
@@ -37,7 +36,7 @@ export function outerCollidersNearOn(): boolean {
   if (picked !== undefined) return picked;
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(OUTER_COLLIDERS_NEAR_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  phoneLow = TIER === 'phone'; // QA 11-24 row 31: every phone, Low or High (nothing drawn changes)
   picked = outerCollidersNear(saved, phoneLow);
   return picked;
 }

@@ -31,7 +31,6 @@ import { buildHeld, buildUrgent, heldBudget, nativeBudgetSpent, presenting } fro
 import { countedWait, waitFor } from '../../../shared/engine/boot/waits';
 import { jsonSlot } from '../saves/slots';
 import { TIER } from '../core/tier';
-import { graphicsMode } from '../core/graphicsMode';
 import { isDev } from '../core/devMode';
 
 // meta IPHONE13-DRIFTWOOD DW3 / DRIFTWOOD-FPS DF8 (mini-driftwood13, 2026-11-19): link the zone's whole program inventory
@@ -59,7 +58,7 @@ export function bootRoadPrograms(): boolean {
   if (picked !== undefined) return picked;
   let saved: unknown = null, phoneLow = false;
   try { saved = jsonSlot(BOOT_ROAD_PROGRAMS_SLOT, 'device').read(); } catch { /* storage blocked: the default */ }
-  try { phoneLow = TIER === 'phone' && graphicsMode() === 'low'; } catch { /* no settings: not phone Low */ }
+  phoneLow = TIER === 'phone'; // QA 11-24 row 31: every phone, Low or High (nothing drawn changes)
   picked = typeof saved === 'boolean' ? saved : phoneLow ? BOOT_ROAD_PROGRAMS_PHONE_LOW : TIER === 'desktop' ? BOOT_ROAD_PROGRAMS_DESKTOP : BOOT_ROAD_PROGRAMS_DEFAULT;
   return picked;
 }

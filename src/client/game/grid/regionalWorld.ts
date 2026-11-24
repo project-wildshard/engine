@@ -76,7 +76,6 @@ import { heightAt } from '@wildshard/engine/world/Heightfield';
 import { loadBakedTerrain } from '@wildshard/engine/world/BakedTerrain';
 import { bakedTerrainSource } from '@wildshard/engine/world/bakedTerrainField';
 import { TIER, TIER_CONFIG } from '@wildshard/engine/core/tier';
-import { graphicsMode } from '@wildshard/engine/core/graphicsMode';
 import { jsonSlot } from '@wildshard/engine/saves/slots';
 import { prepareManifestScalarBlocks,type ShardManifest } from '../shard/manifest';
 import { prepareShardAssets } from '../shard/load';
@@ -113,7 +112,7 @@ const roadWarmCardSlot = jsonSlot('debug.roadWarmCards', 'device');
 /** DW3 (mini-dw3, 2026-11-23): on at phone Low unless saved false (iPhone 13 pairs with the other two road slots: the road
  *  crossing's frames over 50 ms 8, 8, 8, 8, 6 on against 7, 14, 16, 11 off). */
 function quickRoadCardWarm(): boolean {
-  try { return TIER === 'phone' && graphicsMode() === 'low' && roadWarmCardSlot.read() !== false; }
+  try { return TIER === 'phone' && roadWarmCardSlot.read() !== false; }
   catch { return false; }
 }
 
