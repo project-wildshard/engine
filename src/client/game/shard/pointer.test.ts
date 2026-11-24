@@ -1,11 +1,10 @@
 // @vitest-environment happy-dom
-// ONE-FORMAT OF8/OF9b: one pointer, `shardfile`, for every shard; an older product's key is lifted as it enters.
+// ONE-FORMAT OF8/OF9b: one pointer, `shardfile`, for every shard (FORMAT-PRUNE FP8: the old key is migrated, never read).
 import { expect, test } from 'vitest';
 import type { RuntimeCost } from '@wildshard/format/runtimeCost';
 import { parseShardSlug } from '../../../shared/game/shard/slug';
 import { dataPointer, runtimePagePointer } from './pointer';
-import { listedArrival, titleMetadata } from './titleList';
-import { liftLegacyPointer } from './legacyPointer';
+import { listedArrival } from './titleList';
 import { useOwnedGridHome } from '../grid/pageShell';
 import { preparePageResidency } from '../shardfile/clientSource';
 
@@ -20,23 +19,7 @@ test('a client-plan shard names its runtime descriptor as shardfile', () => {
   expect(runtimePagePointer({})).toBeUndefined();
 });
 
-// OF9b: products built before it (Driftwood, Pine, Nine Dragon and Nalati up to their M8 moves) name the runtime page's
-// descriptor under the old key; it enters as `shardfile`, so old uploads still load.
-const OLD = { slug: 'pine-hollow', name: 'Pine Hollow', biome: 'forest', status: 'live', card: {}, gridShardfile: PATH } as const;
-
-test("an old product's pointer is lifted to shardfile as it enters", () => {
-  expect(liftLegacyPointer(OLD)).toEqual({ slug: 'pine-hollow', name: 'Pine Hollow', biome: 'forest', status: 'live', card: {}, shardfile: PATH });
-  expect(liftLegacyPointer({ ...OLD, shardfile: PATH })).toMatchObject({ shardfile: PATH });
-  expect(liftLegacyPointer({ ...OLD, gridShardfile: undefined })).not.toHaveProperty('shardfile');
-  expect(titleMetadata(OLD as unknown as Parameters<typeof titleMetadata>[0])).toMatchObject({ shardfile: PATH });
-  expect('gridShardfile' in titleMetadata(OLD as unknown as Parameters<typeof titleMetadata>[0])).toBe(false);
-  const plain = { slug: 'mossgate', shardfile: '/shardfiles/mossgate/shard.json' };
-  expect(liftLegacyPointer(plain)).toBe(plain);
-  // naming two different files would let the page and the grid admit different descriptors
-  expect(() => liftLegacyPointer({ ...OLD, shardfile: '/shardfiles/other/shard.json' })).toThrow('names its shardfile once');
-});
-
-test('a manifest with only shardfile and a runtime declaration owns its grid home, as gridShardfile did', () => {
+test('a manifest with only shardfile and a runtime declaration owns its grid home', () => {
   expect(useOwnedGridHome('grid', { slug: 'pine-hollow', clientPlanRuntime: true, shardfile: PATH })).toBe(true);
   expect(() => useOwnedGridHome('grid', { slug: 'pine-hollow', shardfile: PATH })).toThrow('cannot be an owned region');
 });

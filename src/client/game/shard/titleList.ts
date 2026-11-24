@@ -2,7 +2,6 @@ import type { ShardManifest } from './manifest';
 import { shards } from './list';
 import { bareSlug, installedCatalogue } from '../../../shared/game/grid/catalogueSlot';
 import { contentBase, contentURL } from '@wildshard/engine/boot/contentBase';
-import { liftLegacyPointer } from './legacyPointer';
 
 /** Cold-title metadata contains no executable shard bindings. */
 export type TitleManifest = Pick<ShardManifest, 'slug' | 'name' | 'biome' | 'status' | 'card' | 'shardSelect' | 'shardfile'> & Pick<Partial<ShardManifest>, 'order' | 'bag'> & {
@@ -12,7 +11,7 @@ export type TitleManifest = Pick<ShardManifest, 'slug' | 'name' | 'biome' | 'sta
 type TitleSource = TitleManifest & { readonly load?: unknown };
 /** Copy the scalar title fields, never executable bindings. */
 export function titleMetadata(row: TitleSource): TitleManifest {
-  const { slug, name, biome, status, card, shardSelect, shardfile, order, bag, discovery } = liftLegacyPointer(row);
+  const { slug, name, biome, status, card, shardSelect, shardfile, order, bag, discovery } = row;
   return { slug, name, biome, status, card, ...(order === undefined ? {} : {order}), ...(bag === undefined ? {} : {bag}), ...(discovery === undefined ? {} : {discovery}),
     ...(shardSelect === undefined ? {} : { shardSelect }), ...(shardfile === undefined ? {} : { shardfile }) };
 }
@@ -27,9 +26,8 @@ export function readTitleRows(page: Pick<Document, 'getElementById'>): readonly 
   if (text === undefined || text === null || text === '') return [];
   const rows: unknown = JSON.parse(text);
   if (!isRows(rows)) throw new Error('Invalid title rows');
-  const lifted = rows.map(liftLegacyPointer);
   // PZ3: card art is shard content, read from the content base when the boot bank names one
-  return contentBase() === '' ? lifted : lifted.map(cardOnContent);
+  return contentBase() === '' ? rows : rows.map(cardOnContent);
 }
 function cardOnContent(row: TitleManifest): TitleManifest {
   const card = Object.fromEntries(Object.entries(row.card).map(([key, url]) => [key, typeof url === 'string' ? contentURL(url) : url])) as TitleManifest['card'];

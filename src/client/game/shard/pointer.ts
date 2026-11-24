@@ -2,7 +2,7 @@ import type { ShardManifest } from './manifest';
 
 /**
  * ONE-FORMAT OF8/OF9b: the one descriptor pointer of a runtime shard (a shard whose built-in client-plan page owns its runtime).
- * The pointer is `shardfile`, as for every other shard; an older product's key is lifted as it enters (`liftLegacyPointer`).
+ * The pointer is `shardfile`, as for every other shard (FORMAT-PRUNE FP8: format migrates the old key; the page never reads it).
  * A shard with no client-plan runtime has no runtime pointer: its `shardfile` is plain data admission.
  */
 export function runtimePagePointer(manifest: Pick<ShardManifest, 'shardfile' | 'clientPlanRuntime'>): string | undefined {

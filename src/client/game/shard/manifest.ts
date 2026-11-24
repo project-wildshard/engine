@@ -2,7 +2,6 @@ import type { Scope } from '@wildshard/engine/app/scope';
 import type { TerrainLattice } from '@wildshard/engine/physics/terrain';
 import { inflateScalarBlocks,readScalarChannel,readScalarLattice,ScalarLatticeBindings } from '@wildshard/engine/world/scalarChannel';
 import { readFileInputs } from '../../../shared/game/shardfile/fileInputs';
-import { liftLegacyPointer } from './legacyPointer';
 import { ScalarLatticeSchema,ScalarTripletSchema,type ScalarLatticeRows,type ScalarTripletRows } from '@wildshard/format/scalarChannel';
 import { bakedSamplers } from '@wildshard/format/bakedTerrainSampling';
 import { basinBody,type WaterBody } from '@wildshard/engine/world/water/body';
@@ -830,7 +829,7 @@ export const UNSET_LEVEL_SPAWN: Readonly<SpawnPose> = Object.freeze({ x: 0, z: 0
  * the unchanged native boot owners. Missing source images refuse admission. */
 export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: AuthoredShardBindings,
   native: Parameters<typeof defineShard>[1], images: Readonly<Record<string, string>>): ShardManifest {
-  const {bindings: _declaredBindings, boot: bootData, fight: authoredFight, ...data} = parseManifestMetadata(liftLegacyPointer(input), slug);
+  const {bindings: _declaredBindings, boot: bootData, fight: authoredFight, ...data} = parseManifestMetadata(input, slug);
   const image = (path: string): string => {
     const url = images[path];
     if (url !== undefined) return url;
