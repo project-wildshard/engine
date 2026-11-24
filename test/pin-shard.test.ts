@@ -94,6 +94,20 @@ test('shard-pin commits its pin branch with no local hooks after ring-setup', ()
   expect(commit).toBeGreaterThan(unset);
 });
 
+// Driftwood r12 (2026-11-24, the fifth time): the pin job records only linux-x64's Ring 1 digest, and the MacBook's push gate
+// refused the pin on darwin-arm64's stale row until a lane recorded it by hand. A macos-15 job records it on the pin branch.
+test('shard-pin records the darwin-arm64 Ring 1 digest on the pin branch', () => {
+  const flow = readFileSync('.github/workflows/shard-pin.yml', 'utf8');
+  const job = flow.slice(flow.indexOf('  darwin-digest:'));
+  expect(flow.indexOf('  darwin-digest:')).toBeGreaterThan(-1);
+  expect(job).toContain('runs-on: macos-15');
+  expect(job).toContain("needs.pin.outputs.record == 'true'");
+  expect(job).toContain('ref: ${{ needs.pin.outputs.branch }}');
+  expect(job).toContain('ring-step.ts --update --only "$SLUG"');
+  expect(job.indexOf('git config --unset core.hooksPath')).toBeLessThan(job.indexOf('git commit'));
+  expect(job).toContain('"HEAD:refs/heads/$BRANCH"');
+});
+
 // Meta SHARD-COMPAT NB10 (audit B16): Driftwood r8 published from ubuntu hashed its island stems differently, so engine's
 // piano manifest named files no pin mounted (main red, 9166106aa). The pin commit now renames them to the new product's.
 test('a re-pin renames the piano stems the product mounts, everywhere the manifest names them', () => {

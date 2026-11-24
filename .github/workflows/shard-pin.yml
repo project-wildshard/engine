@@ -49,6 +49,9 @@ jobs:
   pin:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      record: ${{ steps.ring1.outputs.record }}
+      branch: ${{ steps.branch.outputs.branch }}
     env:
       SLUG: ${{ inputs.slug || github.event.client_payload.slug }}
       REVISION: ${{ inputs.revision || github.event.client_payload.revision }}
@@ -155,3 +158,44 @@ jobs:
             echo 'WS_LANE_NAME=<lane> node scripts/land.mjs'
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
+  # Ring 1 digests are kept per platform (J97) and the MacBook's push gate checks darwin-arm64's. The pin job records
+  # only the Linux runner's, so every Ring 1 pin needed a hand-recorded darwin row before it could land (Driftwood r8,
+  # Pine r10, Sky Reach r7, Driftwood r12). This job records it on an Apple Silicon runner onto the same branch.
+  darwin-digest:
+    needs: pin
+    if: needs.pin.outputs.record == 'true' && needs.pin.outputs.branch != ''
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      SLUG: ${{ inputs.slug || github.event.client_payload.slug }}
+      BRANCH: ${{ needs.pin.outputs.branch }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.pin.outputs.branch }}
+          persist-credentials: false
+      - uses: ./.github/actions/ring-setup
+      - name: Record the moved shard's Ring 1 digest on darwin-arm64
+        run: |
+          node scripts/pins.ts install --ring 1
+          node --experimental-transform-types --no-warnings scripts/ring-step.ts --update --only "$SLUG"
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.NIGHTLY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.NIGHTLY_APP_PRIVATE_KEY }}
+          owner: project-wildshard
+          repositories: engine
+          permission-contents: write
+      - name: Commit the darwin row on the pin branch and push
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          if git diff --quiet -- test/pins/ring-digests.json; then echo "darwin-arm64 row already current"; exit 0; fi
+          git config --unset core.hooksPath || true
+          git config user.name 'shard-pin'
+          git config user.email 'shard-pin@users.noreply.github.com'
+          git commit -q -m "test(pins): $SLUG darwin Ring 1 digest" -m "Recorded on macos-15 (darwin-arm64) by shard-pin's darwin-digest job, so
+          the MacBook's push gate lands the pin with no hand-recorded row." \
+            -m 'Assisted-by: shard-pin:workflow' -- test/pins/ring-digests.json
+          git push "https://x-access-token:${TOKEN}@github.com/project-wildshard/engine.git" "HEAD:refs/heads/$BRANCH"
