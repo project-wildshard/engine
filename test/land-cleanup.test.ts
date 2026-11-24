@@ -138,7 +138,7 @@ describe('land (J422): main-watch, the canonical checkout and cleanup after the 
       const before = f.git(f.repo, ['rev-parse', 'HEAD']);
       const result = f.land(wt);
       expect(result.status, `${kind}\n${result.stdout}`).toBe(0);
-      expect(result.stdout, kind).toMatch(kind === 'dirty' ? /canonical +WARNING canonical main 1 behind; tracked edits; left alone/u : /canonical +WARNING CANONICAL MAIN DIVERGED: 1 ahead, 1 behind/u);
+      expect(result.stdout, kind).toMatch(kind === 'dirty' ? /canonical +WARNING canonical main 1 behind; tracked edits \(src\/a\.ts\); their owner commits or discards them; left alone/u : /canonical +WARNING CANONICAL MAIN DIVERGED: 1 ahead, 1 behind/u);
       expect(f.git(f.repo, ['rev-parse', 'HEAD']), kind).toBe(before);
       if (kind === 'dirty') expect(readFileSync(join(f.repo, 'src/a.ts'), 'utf8')).toBe('export const a = 2;\n');
       expect(f.read(f.files.receipts), kind).toMatch(/land plan\/foo canonical checkout not fast-forwarded after landing: /u);
