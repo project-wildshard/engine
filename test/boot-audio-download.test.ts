@@ -73,7 +73,7 @@ for (const [shard, pageAudio] of [['driftwood-isle', 91], ['pine-hollow', 1], ['
     const fence = mounts.map(url => url.split('?')[0] ?? url).filter(url => audioPath.test(url));
     const listed = shardBootAudio(half.shard.sections, common, mounts, shard);
     const cook = half.shard.cook;
-    if (cook?.version === 2 || cook?.version === 3) {
+    if (cook?.version === 3) {
       const recorded = new Set(cook.fence);
       const recordedAudio = cook.mounts.filter(mount => recorded.has(mount.hash) && audioPath.test(mount.url));
       expect(fence).toEqual(expect.arrayContaining(recordedAudio.map(mount => mount.url)));

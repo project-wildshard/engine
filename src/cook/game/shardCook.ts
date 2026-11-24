@@ -17,6 +17,7 @@ import {requireCookPreparation} from '@wildshard/format/cookPreparation';
 import {cookPreparedLine, judgeSidecar, sidecarRefusedLine, type CookSidecar} from './cookSidecar';
 import {rendererRevision} from '../../../scripts/renderer-revision.mjs';
 import {assembleOutputShardfile, parseOutputIndex, type OutputIndex} from '@wildshard/format/outputIndex';
+import {checkEngineFloor} from './engineFloor';
 import {SPAWN_PART_ALIGN, readSpawnManifest, type SpawnFile, type SpawnManifest, type SpawnPart} from '../../shared/game/shardfile/spawnManifest';
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import {readTar} from '@wildshard/format/tar';
@@ -83,6 +84,7 @@ export function openShardfile(tarball: Uint8Array, options: Readonly<{preparatio
   const files = new Map(readTar(tarball));
   const read = (path: string): Uint8Array => { const bytes = files.get(path); if (bytes === undefined) throw new Error(`No ${path} in the shardfile`); return bytes; };
   const header = read('shard.json'), raw: unknown = JSON.parse(new TextDecoder().decode(header)), index = parseOutputIndex(raw);
+  checkEngineFloor(index);
   const sections = new Map<string, unknown>();
   for (const row of index.sections) {
     const bytes = read(row.path);

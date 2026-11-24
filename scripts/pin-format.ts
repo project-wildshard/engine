@@ -9,6 +9,7 @@ import {existsSync, readFileSync, readdirSync} from 'node:fs';
 import {dirname, join, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {parseOutputIndex} from '@wildshard/format/outputIndex';
+import {checkEngineFloor} from '../src/cook/game/engineFloor';
 import {writeTar} from '@wildshard/format/tar';
 import { saveRevision } from '../src/shared/game/shardfile/saveRevision';
 
@@ -49,6 +50,7 @@ export function formatTemplate(slug: string): FormatTemplate {
   if (indexBytes === undefined) throw new Error(`Format dependency has no ${slug} index`);
   const index = parseOutputIndex(JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(indexBytes)));
   if (index.identity.slug !== slug) throw new Error('Format dependency contains another product');
+  checkEngineFloor(index);
   const bytes = writeTar(files), hash = createHash('sha256').update(bytes).digest('hex');
   return {pin: {slug, revision: saveRevision(index.identity), hash, bytes: bytes.length}, bytes,
     source: {kind: 'format-dependency', path: `@wildshard/format/${folder}`, indexHash: createHash('sha256').update(indexBytes).digest('hex')}};
