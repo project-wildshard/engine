@@ -116,6 +116,14 @@ test('a stopped run expects its broker to go; a broker lost on its own is still 
   } finally { rmSync(work, { recursive: true, force: true }); }
 }, 60_000);
 
+// QA-FEEDBACK-2026-11-23-b: run inside the full push hook, this test inherited WS_CPU_ADMISSION=1, so parallelChecks wrapped the
+// fixture steps in cpu-admission.py and the watchdog timed the broker, not the step (red in the hook, green alone). The
+// fixture's steps run bare.
+function ownEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env.WS_CPU_ADMISSION;
+  return env;
+}
 // J505 (QA-FEEDBACK-2026-11-23-b; Jake, 2026-11-23 ~20:40 Cancún: "make it a permanent fix"): an engine-quickfix main-push
 // sat 35 min in run-checks until it was killed by hand. A step past ~3x its normal time is now stopped by its watchdog,
 // says STUCK with the step and the minutes, logs a STUCK receipt and fails, so the push is refused and the commit kept.
@@ -130,7 +138,7 @@ test('J505: a stuck step is stopped by its watchdog, named STUCK, and logged as 
     const result = await parallelChecks([
       { name: 'lint (kit + game)', commands: [[process.execPath, '-e', 'setInterval(() => {}, 1000)']], stuckSeconds: 0.5 },
       { name: 'format:check', commands: [[process.execPath, '-e', 'setInterval(() => {}, 1000)']], stuckSeconds: 60 },
-    ], { graceMs: 500, env: { ...process.env, WS_LANE_RECEIPTS: receipts, WS_LANE_NAME: 'fixture-lane', GITHUB_ACTIONS: '' } });
+    ], { graceMs: 500, env: { ...ownEnv(), WS_LANE_RECEIPTS: receipts, WS_LANE_NAME: 'fixture-lane', GITHUB_ACTIONS: '' } });
     expect(result.ok).toBe(false);
     expect(result.results.find(row => row.name === 'lint (kit + game)')).toMatchObject({ stuck: true });
     expect(result.results.find(row => row.name === 'format:check')?.stoppedBy).toMatch(/^STUCK in lint \(kit \+ game\) after [\d.]+ min$/u);

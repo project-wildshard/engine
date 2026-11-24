@@ -1,7 +1,8 @@
 // AUDIO AU1 (J299): the cook lists in a shard's spawn manifests exactly the recordings its LOAD reads (the client's own
 // selection, through shared/engine/audio/bootAudio.ts), plus the audio its recorded fence names.
 // oxlint-disable-next-line import/no-nodejs-modules -- Read the pinned Driftwood product when this checkout has it.
-import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { expect, test, vi } from 'vitest';
 import type { AudioData } from '@wildshard/format/audio';
 import { createCatalogueAudio } from '../src/client/engine/audio/levelAudio';
@@ -52,15 +53,23 @@ test('a player reads only what the download listed (one music style, AU16)', asy
   } finally { set.mockRestore(); }
 });
 
-// The pinned products (`node scripts/pins.ts install`) and this build's boot table, when the checkout has them.
-const bootTables = 'out/.app/boot-tables.json';
+// The pinned products (`node scripts/pins.ts install`), when the checkout has them, against this checkout's own boot tables.
+// QA-FEEDBACK-2026-11-23-b: it read the app build's `out/.app/boot-tables.json`, which a checkout keeps from its last app
+// build; a stale one (days old in the canonical checkout) listed a manifest as a recording and turned four cases red in a
+// push gate. The tables are serialized fresh from the generators instead, as the app build does (0.2 s).
+function bootTables(): AssetTables {
+  const run = spawnSync(process.execPath, ['--import', './scripts/bake-loader.mjs', 'scripts/serialize-asset-tables.mjs'], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  if (run.status !== 0) throw new Error(`scripts/serialize-asset-tables.mjs failed (${String(run.status)}): ${run.stderr}`);
+  return JSON.parse((JSON.parse(run.stdout) as { common: string }).common) as AssetTables;
+}
 for (const [shard, pageAudio] of [['driftwood-isle', 91], ['pine-hollow', 1], ['nalati-grasslands', 1], ['nine-dragon-stack', 1]] as const) {
   const product = `out/${shard}`;
-  test.skipIf(!existsSync(`${product}/shard.json`) || !existsSync(bootTables))(`${shard}: its fence audio and its default boot set are on the download`, async () => {
-    const common = JSON.parse((JSON.parse(readFileSync(bootTables, 'utf8')) as { common: string }).common) as AssetTables;
+  test.skipIf(!existsSync(`${product}/shard.json`))(`${shard}: its fence audio and its default boot set are on the download`, async () => {
+    const common = bootTables();
     const half = shardHalf(openShardfile(folderTarball(product)), (_url, bytes) => bytes.length);
     const mounts = half.mountRows('phone', 'entry').map(row => row.url);
-    const audioPath = /^\/assets\/(?:music|sfx)\//u;
+    // A recording, not a set's `music.json` / `sfx.json` manifest that mounts beside them (QA-FEEDBACK-2026-11-23-b).
+    const audioPath = /^\/assets\/(?:music|sfx)\/.+\.(?!json$)[a-z0-9]+$/u;
     const fence = mounts.map(url => url.split('?')[0] ?? url).filter(url => audioPath.test(url));
     const listed = shardBootAudio(half.shard.sections, common, mounts, shard);
     const cook = half.shard.cook;
