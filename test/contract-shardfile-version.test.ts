@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native cook owns its output.
 import {mkdtempSync,readFileSync,rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch stays below the lane's folder.
-import {resolve,join} from 'node:path';
+import {join} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Vitest redirects its temp root into owned repository scratch.
 import {tmpdir} from 'node:os';
 import {expect,test} from 'vitest';
@@ -14,9 +14,10 @@ import {runCookJob} from '../src/cook/game/cookJob';
 import {checkShardfile} from '../src/server/host/checkShardfile';
 import {admitFolder,type FolderOptions} from '../src/client/game/shardfile/folder';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
+import {wholeBrasscapExport} from './fixtures/brasscapExport';
 
 // Brasscap Mesa's export, since J434 retired the handwritten Template 2 (TEMPLATE-E2E TR-10).
-const fixture=resolve('node_modules/@wildshard/format/corpus/exports/brasscap-mesa');
+const fixture=wholeBrasscapExport();
 const base='https://example.test/shardfiles/brasscap-mesa/';
 
 test('the preceding additive product admits and cooks without rewriting its original',async()=>{

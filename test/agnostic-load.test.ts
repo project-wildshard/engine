@@ -18,12 +18,13 @@ import {runCookJob} from '../src/cook/game/cookJob';
 import {checkShardfile} from '../src/server/host/checkShardfile';
 import {admitFolder,type FolderOptions} from '../src/client/game/shardfile/folder';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
+import {wholeBrasscapExport} from './fixtures/brasscapExport';
 
 // PR7b: a release candidate loads pinned products the last releases prepared; the CI tests unit installs the pins first.
 const release=(process.env['GITHUB_REF']??'').startsWith('refs/heads/release/');
 const pins=(process.env['WS_AGNOSTIC_PINS']??(release?'brasscap-mesa,mirror-salt':'')).split(',').filter(Boolean);
 const products=[
- resolve('node_modules/@wildshard/format/corpus/exports/brasscap-mesa'),
+ wholeBrasscapExport(),
  ...pins.map(slug=>resolve('out',slug)),
  ...(process.env['WS_AGNOSTIC_PRODUCT']===undefined?[]:[resolve(process.env['WS_AGNOSTIC_PRODUCT'])]),
 ];
