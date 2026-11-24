@@ -273,8 +273,9 @@ installed binding/reader counterpart. The original duplicate stays.
 After the ordinary Pine and Nalati pin installs, run
 `node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs`.
 Explicit CI-only cases map all seven original waiting-file laws. The
-legacy file runs in its own native-math process: all 19,200 historical
-Pine outputs, old v1 saves and exact recorded tails remain unchanged.
+legacy file runs in its own native-math process: old v1 saves and exact
+recorded tails remain unchanged (the 19,200-output port oracle left with
+ZONE-SNAPSHOTS ZS10).
 The separate portable native realm accepts the same saves, repeats its
 complete future wind/phase continuation and preserves atomic refusal
 and publication identity. Its intentional existing portable-sine rounding

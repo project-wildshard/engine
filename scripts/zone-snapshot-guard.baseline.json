@@ -129,8 +129,6 @@
   "frozen-path test/fixtures/frozen/stealthRows.ts",
   "frozen-path test/fixtures/frozen/titan.ts",
   "frozen-path test/fixtures/frozen/workerFolder.ts",
-  "frozen-path test/fixtures/legacy-oracles/pine-weather.json",
-  "frozen-path test/fixtures/nalati-audio-original.json",
   "frozen-path test/fixtures/nalati-balbal-original.json",
   "frozen-path test/fixtures/nalati-weather-original.wasm",
   "revision-path test/fixtures/dunes-r3-keeper.json",

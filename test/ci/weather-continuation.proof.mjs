@@ -83,7 +83,7 @@ timed(
           current.step(((i % 5) + 1) / 60, (i / 13) % 1);
           const state = current.captureContinuation();
           // Existing portable-math policy deliberately differs from old native sin by an ulp.
-          // The old native-math tail remains bit-exact in weather-legacy.proof.mjs.
+          // The old native-math saves resume bit-exact in weather-legacy.proof.mjs.
           const historical = entry.tail[i];
           assert.deepEqual(state.weather, historical.weather);
           assert.equal(state.cadence, historical.cadence);

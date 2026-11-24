@@ -61,3 +61,11 @@ and `ci21-sdk-tail-held.json` still name them, as history). Deleted by hand; git
   Hollow 3cdd93f and Driftwood): `host-ruler-roots`, `host-ruler`, `host-ruler-server-roots` and `host-primitives` read
   the two live pins instead; the counts of the old revisions (14 kinds, 58 sections, 17 and 14 hosts) become shape checks,
   and Driftwood's live hosts now join collision, plumbing and quest only.
+
+## Fourth part, and a correction
+
+- Correction: the first part's `nalati-balbal-original-{0,1}.bin` were not unread; `specimen-selection` read them by a
+  computed name. It now reads `models/specimens/balbal-{0,1}.bin` from Nalati's live pin (byte-identical).
+- `nalati-audio-original.json`: the two audio phrase replays read the live `audio/audio` section, whose synth rows equal it.
+- `legacy-oracles/pine-weather.json`: `weather-legacy.proof.mjs` drops its 2400-output oracle of pine-hollow-legacy's
+  weather (a finished port); its old v1 saves still resume on the live Pine pin.
