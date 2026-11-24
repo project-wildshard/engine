@@ -21,3 +21,9 @@ FP21: the host ruler reads hosts from the server sections and `server/world`, so
 FP21 delete (branch plan/native-fp21, unpushed): one path. A world stands its hosts from `server/world` and the family
 sections only; a kept plan file (CP16) is admitted read only by migration into them, and refused if it names a host no
 section holds. `test/no-native-plan.test.ts` fails while a pin ships the plan file (Driftwood r10, Pine r13, Nalati r7).
+
+FP21 s1 to s8 (opus-fp21): a kept plan file no longer migrates into the family sections, where 11 of the 20 kept originals
+named a host no section held. It runs as stored, in its own order, and `keptHostHome` names each host's home: a family
+section, a host the engine stands with no row, or the kept home of the chain step that moved it (s1 population, s2 day,
+s3 water, s4 weather, s5 held, s6 collision, s7 traversal, s8 the island population). `test/kept-native-plans.test.ts`
+holds every host of the 20 to a home.

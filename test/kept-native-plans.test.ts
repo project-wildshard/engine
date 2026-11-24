@@ -7,7 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
 import { parseNativeAssembly } from '@wildshard/format/nativeAssembly';
-import { withSectionPopulation } from '../src/server/game/shardfile/nativeAssembly';
+import { keptHostHome, withSectionPopulation } from '../src/server/game/shardfile/nativeAssembly';
 import { ISLAND_HOSTS } from '../src/server/game/shardfile/nativeAssemblyHosts';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 
@@ -38,4 +38,18 @@ test('Pine r5, r6 and r10 keep their population rows as written (CP16)', async (
       ['population.environment', 'population.shelter', 'population.roster', 'population.elites', 'population.spawn-script', 'population.elites-ready']);
     expect(await withSectionPopulation(bare, plan.features), name).toEqual(plan.features);
   }
+});
+
+test('every host a kept plan file names has its home: a family section, a host the engine stands, or a chain step (FP21)', () => {
+  const steps = new Set<string>();
+  for (const original of kept) {
+    const plan = parseNativeAssembly(original.plan);
+    for (const row of plan.features) {
+      const home = keptHostHome(row.host, plan);
+      expect(home, `${original.revisions.join(', ')} ${row.host}`).toBeDefined();
+      const step = /\((s\d)\)/u.exec(home ?? '')?.[1];
+      if (step !== undefined) steps.add(step);
+    }
+  }
+  expect([...steps].sort()).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8']);
 });
