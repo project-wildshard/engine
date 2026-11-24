@@ -13,6 +13,14 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.77 (2026-11-23)
+
+- Enter MMO opens your saved zone with one loading screen.
+- Nearby zones prepare their ground as you approach on the road.
+- Updates reuse shader and home geometry caches when those assets are unchanged.
+- The map draws tiles for every pinned zone.
+- Mossgate opens in its own room, and test shards stay off the player tabs.
+
 ## v0.1.67 (2026-11-21)
 
 - Mirror Salt shows the dock prompt at seat height and lets drivers get back into their buggies.
