@@ -3,7 +3,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync
 // oxlint-disable-next-line import/no-nodejs-modules -- Resolve only the owned fixture trees.
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { runtimePerformanceSites, frozenRuntimePerformanceViolations } from '../lint/runtime-performance.mjs';
+import { runtimePerformanceSites } from '../lint/runtime-performance.mjs';
 import { comparePlatformList } from '../scripts/check-platform-ratchets.mjs';
 
 test('rekeys real edited or moved sites without new kind or row allowance', () => {
