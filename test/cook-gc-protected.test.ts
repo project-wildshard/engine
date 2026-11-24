@@ -3,7 +3,7 @@ import {mkdirSync, mkdtempSync, rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- The store lives under ./tmp.
 import {join, resolve as resolvePath} from 'node:path';
 import {expect, test} from 'vitest';
-import {indexKey, needsReclaim, reclaimPacks, type CookIndex} from '../src/cook/game/cookWorker';
+import {cookOutputKey, indexKey, needsReclaim, reclaimPacks, type CookIndex} from '../src/cook/game/cookWorker';
 import {folderStore} from '../src/cook/game/packStore';
 
 // J505 (QA-FEEDBACK-2026-11-23-b; Jake, 2026-11-23 ~20:40 Cancún: "make it a permanent fix"): the 4 GB pack store (J89)
@@ -47,6 +47,14 @@ test('a protected collection keeps a live head\'s index from an old build, and t
 
 test('a protected collection refuses an empty keep list', async () => {
   await expect(reclaimPacks(folderStore('tmp/never-written'), {builds: [], heads: new Set()}, 1, 0)).rejects.toThrow(/empty list/u);
+});
+
+test('cook publication reserves signed release and catalogue keys', () => {
+  expect(cookOutputKey('assets/spawn/parts/a.pack.br')).toBe(true);
+  expect(cookOutputKey('shardfiles/pine-hollow/discovery.json')).toBe(true);
+  expect(cookOutputKey('releases/staging-placements.json')).toBe(false);
+  expect(cookOutputKey('releases/production.json')).toBe(false);
+  expect(cookOutputKey('assets/catalogue/items-digest.json')).toBe(false);
 });
 
 test('a publish reclaims once the store would hold over 85% of its budget', () => {

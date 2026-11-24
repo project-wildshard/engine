@@ -299,8 +299,13 @@ const LISTING_MAX_AGE_MS = 20 * 60_000;
 // pack namespaces are rebuildable. Match the index shape as well as its prefix.
 const COOK_INDEX = /^index\/[\w.-]{1,64}\/([a-f0-9]{64})\.json$/u;
 const COOK_LOOSE = /^loose\/[a-f0-9]{64}\/(?:shardfiles|programs)\//u;
-const PACKS = /^assets\/spawn\/(?:(?:parts|server|code)\/|(?:server|packs|engine)-[\w.-]+\.json$)/u;
-const cookStoreKey = (key: string): boolean => COOK_INDEX.test(key) || COOK_LOOSE.test(key) || PACKS.test(key);
+const PACKS = 'assets/spawn/';
+const cookStoreKey = (key: string): boolean => COOK_INDEX.test(key) || COOK_LOOSE.test(key) || key.startsWith(PACKS);
+const looseCookOutput = (key: string): boolean => key.startsWith('shardfiles/') || key.startsWith('programs/');
+
+/** Authored loose mounts cannot publish to a release or catalogue publication key. */
+export const cookOutputKey = (key: string): boolean =>
+  looseCookOutput(key) || (key.startsWith('assets/') && !key.startsWith('assets/catalogue/'));
 
 /** Budget counts only the rebuildable store. The prefix report still names every bucket owner. */
 function usageOf(rows: readonly StoredObject[], budget: number): StoreUsage {
@@ -467,10 +472,10 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   };
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);
+    if (keys.some(key => !cookOutputKey(key))) throw new Error('Cook output names a key outside its publication paths');
     // A recook can visit an older catalogue head after a staging upload. Only the upload owns these mutable names.
     const folder = looseFolder(hash);
-    const byUpload = (key: string): boolean => key.startsWith('shardfiles/') || key.startsWith('programs/');
-    const loose = keys.filter(byUpload), shared = keys.filter(key => !byUpload(key));
+    const loose = keys.filter(looseCookOutput), shared = keys.filter(key => !looseCookOutput(key));
     const measure = (rows: ReadonlyMap<string, StoredObject>): {readonly fresh: number; readonly used: number} => ({
       fresh: shared.reduce((sum, key) => sum + (rows.has(key) ? 0 : statSync(join(client, key)).size), 0)
         + loose.reduce((sum, key) => sum + (rows.has(folder + key) ? 0 : statSync(join(client, key)).size), 0),
