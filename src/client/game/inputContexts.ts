@@ -39,6 +39,11 @@ export const INPUT_CONTEXTS: readonly InputContextDef[] = [
   // J473 (Jake, 2026-11-19 grill wave 1: controls stay live in a talk): an NPC's dialogue box takes E, Enter and Escape and blocks
   // nothing, so FIRE, AIM, DODGE and JUMP keep working and the stick walks off (firing or walking off closes the box)
   { id: 'dialog', actions: ['use', 'confirm', 'back'], keys: { use: ['KeyE'], confirm: ['Enter'], back: ['Escape'] } },
+  // QA 11-24 row 37 (Jake, ~15:10 Cancún: "talking to the sherfiff in brasscap shoot the gun instead"; staging, desktop: E opened
+  // Sheriff Brass's talk and the click that should read on fired the lever-action and closed the box): in a person's talk reach, and
+  // while the talk is open, the fire buttons talk (`use`: open it, then read on; the left mouse button and F) and fire nothing. On a
+  // touch HUD nothing changes (J473: FIRE stays live in a talk; the USE band talks). Pushed by src/client/game/session/talkReach.ts
+  { id: 'talk', actions: ['use'], blocks: ['attack', 'heavy'], keys: { use: ['Mouse0', 'KeyF'] }, enabled: () => document.getElementById('hud')?.classList.contains('touch') !== true },
   { id: 'explore', actions: [...movement, 'fly.up', 'fly.down', 'fly.boost', 'pane.1', 'pane.2', 'pane.3', 'map', 'back', 'quickNote', 'focus'], blocks: 'below',
     keys: { ...moveKeys, 'fly.up': ['KeyE', 'Space'], 'fly.down': ['KeyQ', 'KeyC'], 'fly.boost': ['ShiftLeft', 'ShiftRight'], 'pane.1': ['Digit1'], 'pane.2': ['Digit2'], 'pane.3': ['Digit3'], map: ['KeyM'], quickNote: ['F8'], focus: ['KeyF'], back: ['Escape'] } },
 ];

@@ -1,4 +1,5 @@
 import { compileIncomingCapPolicy } from '@wildshard/format/incomingCapPolicy';
+import { syncTalkReach } from './talkReach';
 
 import { readOnlySave, wirePage } from '../shardfile/wirePage';
 import { ownedSave } from '../../../shared/game/saves';
@@ -795,6 +796,8 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     const homeActive = grid === null || gridLive === null;
     nearest = gridLive === null ? pickInteractable(boot.runtime.interactables, game.camera.position, physics)
       : gridLive.pickPrompt(homeActive ? boot.runtime.interactables : gridLive.interactables(), game.camera.position, physics);
+    // QA 11-24 row 37: beside a person (Sheriff Brass) the left mouse button talks, not fires
+    syncTalkReach(app.input, game.levelScope, hud.entered && ((nearest?.talk === true && !app.ui.blocking) || app.ui.talkOpen));
     carcass = undefined;
     if (!nearest && homeActive) for (const a of animals.animals) {
       if (a.alive || harvested.has(a) || a.position.distanceTo(player.position) >= 2.6) continue;

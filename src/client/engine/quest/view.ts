@@ -78,6 +78,7 @@ export class NpcTalk {
       get radius() { return o.dialogue.isOpen ? 0 : r; },   // hidden while talking: the box has its own NEXT (E / a tap)
       label: o.label,
       wireId: `${o.npc.id}.talk`,
+      talk: true,
       onInteract: () => { this.talk(); },
     };
   }

@@ -3,7 +3,8 @@ import type { ModelDef } from '../../../../client/engine/models/model';
 
 /** Weak actions yield to another reachable prompt. */
 /** `wireId`, when a server knows this prompt: what a client's press of it sends. */
-export interface Interactable { position: Vector3; radius: number; label: string; onInteract: () => void; weak?: boolean; wireId?: string }
+/** `talk`: a person's talk (QA 11-24 row 37: in its reach a mouse click talks instead of firing, src/client/game/session/talkReach.ts) */
+export interface Interactable { position: Vector3; radius: number; label: string; onInteract: () => void; weak?: boolean; wireId?: string; talk?: boolean }
 
 /** A pickup's look (E405: content registers its own — the game's specimen catalogue): its batched model, and the
  *  parts drawn up close, each on the lit or the glow batch, bobbing and spinning (`bob`: rest height, amplitude, spin) */

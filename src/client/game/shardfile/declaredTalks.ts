@@ -99,6 +99,7 @@ export function installDeclaredTalks(source: Pick<Shardfile, 'targets' | 'quests
     const node = (): ReturnType<typeof talkNode> => talkNode(tree, lineOf(tree));
     const prompt: Interactable = {
       position: new Vector3(talk.at[0], talk.at[1] + TALK_HEIGHT, talk.at[2]), label: talk.label,
+      talk: true,
       // Hidden while a conversation is open or waiting, and before the server has said any state.
       get radius() { const current = node(); return open !== null || pending !== null || ports.box().isOpen || current === undefined ? 0 : talk.radius; },
       onInteract: () => {

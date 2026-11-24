@@ -42,6 +42,7 @@ test('the talk: the server\'s node, its choices, an answer by position, the next
   const [prompt] = interactables; if (prompt === undefined) throw new Error('The talk adds its prompt');
   expect(root.children).toHaveLength(1); // the stand-in figure, since the row names none
   expect(prompt.position.y).toBeGreaterThan(talk.at[1]);
+  expect(prompt.talk, 'QA 11-24 row 37: a person\'s talk, so a click in its reach talks (talkReach.ts)').toBe(true);
   expect(prompt.radius).toBe(0); // the server has not said a node yet
   lines.set(LINE, node('offer'));
   expect(prompt.radius).toBe(talk.radius);
