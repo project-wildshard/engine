@@ -4,7 +4,7 @@ import {closeSync,existsSync,ftruncateSync,mkdirSync,mkdtempSync,openSync,readFi
 import {dirname,join,resolve} from 'node:path';
 import {afterEach,expect,test} from 'vitest';
 import {keepCopy,worktreeState} from '../../scripts/pin-keep-copy.mjs';
-import {keepCopy as genericCopy} from '../../scripts/keep-copy.mjs';
+import {pinMounts} from '../../scripts/keep-copy.mjs';
 import {pinsKey,writeManifest} from '../../scripts/pins-reuse.mjs';
 import {shardfileValidationRevision} from '../../scripts/shardfile-validation-revision.mjs';
 
@@ -34,7 +34,8 @@ function restore(dir,base){const target=join(base,'restored');mkdirSync(target);
 
 test('verified large pin bytes leave a true-work copy and a removable landed tree',()=>{
  const {base,canonical,tree,keep}=fixture();
- expect(()=>genericCopy(tree,{keepRoot:keep})).toThrow(/50 MiB/u);
+ // 94d3aa6d0 (QA 11-24 row 48): the generic keep-copy reads the same ledger, so the unchanged pin mount is build output there too.
+ expect([...pinMounts(tree)]).toEqual([mount]);
  const before=worktreeState(tree);const {dir,manifest}=keepCopy(tree,{keepRoot:keep});
  expect(manifest.untracked.files).toBe(2);expect(worktreeState(tree)).toBe(before);
  const saved=restore(dir,base);expect(readFileSync(join(saved,'public/programs/notes.txt'),'utf8')).toBe('true work');

@@ -170,18 +170,19 @@ test('every context and page is silenced before its own script, and a Chromium s
   const browser = { newContext: async () => target(), newPage: async () => target() };
   /** @type {Array<string[]>} */
   const started = [];
-  const engine = {
+  // A WebKit stand-in (the keychain check exempts webkit.launch: it takes no Chromium switch).
+  const webkit = {
     launch: async (/** @type {{args?: string[]} | undefined} */ options) => { started.push(options?.args ?? []); return browser; },
     launchPersistentContext: async (/** @type {string} */ _dir, /** @type {{args?: string[]} | undefined} */ options) => {
       started.push(options?.args ?? []);
       return target();
     },
   };
-  installBrowserActorMarker({ webkit: engine });
-  const opened = await engine.launch();
+  installBrowserActorMarker({ webkit });
+  const opened = await webkit.launch();
   await opened.newContext({ userAgent: 'Phone UA' });
   await opened.newPage({ userAgent: 'Phone UA' });
-  await engine.launchPersistentContext('profile', { userAgent: 'Phone UA' });
+  await webkit.launchPersistentContext('profile', { userAgent: 'Phone UA' });
   assert.equal(scripts.length, 3);
   assert.ok(scripts.every(script => script === silencePage));
   // WebKit takes no Chromium switch; its pages are what keep it quiet.
@@ -195,7 +196,7 @@ test.skipIf(!existsSync(executablePath))('a marked page plays Web Audio and medi
   const own = await origin((_request, response) => { response.setHeader('content-type', 'text/html'); response.end('<audio id=a></audio>'); });
   try {
     // A launch that forgets --mute-audio still gets it.
-    const browser = await chromium.launch({ executablePath, headless: true, args: ['--use-mock-keychain', '--password-store=basic'] });
+    const browser = await chromium.launch({ executablePath, headless: true, args: [...KEYCHAIN_ARGS].filter(flag => flag !== '--mute-audio') });
     try {
       const page = await (await browser.newContext()).newPage();
       await page.goto(own.url);

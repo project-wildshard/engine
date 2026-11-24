@@ -250,7 +250,7 @@ if [ -f "$R/etc/wildshard-grafana/grafana.ini" ]; then
   if has systemctl; then
     if systemctl is-active --quiet wildshard-grafana.service 2>/dev/null; then ok OB3 'wildshard-grafana active'; else bad OB3 'wildshard-grafana is not active'; fi
   fi
-  if has tailscale && tailscale funnel status 2>/dev/null | grep -Ei ':10000' | grep -Eqi 'funnel on|public'; then bad OB3 'the dashboard route is public (Funnel)'; else ok OB3 'the dashboard route is tailnet only'; fi
+  if has tailscale && [ -n "$(tailscale funnel status 2>/dev/null | grep -Ei ':10000' | grep -Ei 'funnel on|public')" ]; then bad OB3 'the dashboard route is public (Funnel)'; else ok OB3 'the dashboard route is tailnet only'; fi
 else info OB3 'no Grafana yet (harden.sh installs it)'
 fi
 

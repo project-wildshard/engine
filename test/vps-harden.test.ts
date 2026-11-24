@@ -198,7 +198,9 @@ test("a Hetzner firewall on another server, or one that lets in more, is not thi
 test('SC2: a metrics port off loopback, a remote_write or a missing drop-in fails; the loopback install passes', () => {
   const loopback = '--web.listen-address=127.0.0.1:9090\n', node = '--web.listen-address=127.0.0.1:9100\n';
   const good = { 'etc/prometheus/wildshard.yml': 'global:\n  scrape_interval: 15s\n', 'etc/systemd/system/prometheus.service.d/90-wildshard.conf': loopback,
-    'etc/systemd/system/prometheus-node-exporter.service.d/90-wildshard.conf': node };
+    'etc/systemd/system/prometheus-node-exporter.service.d/90-wildshard.conf': node,
+    // OB2: the process exporter is the third drop-in harden.sh holds to loopback.
+    'etc/systemd/system/prometheus-process-exporter.service.d/90-wildshard.conf': '-web.listen-address=127.0.0.1:9256\n' };
   const listening = { ...HARDENED, ss: `printf 'LISTEN 0 4096 127.0.0.1:9090 0.0.0.0:*\\nLISTEN 0 4096 127.0.0.1%%lo:9100 0.0.0.0:*\\nLISTEN 0 511 127.0.0.1:9791 0.0.0.0:*\\n'` };
   const fine = check(listening, {}, ['--check'], good);
   expect(fine.failed('SC2')).toEqual([]);
