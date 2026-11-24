@@ -7,9 +7,10 @@ import {pathToFileURL} from 'node:url';
 
 export const shardRepos = ['shard-dunes', 'shard-sky-reach', 'shard-nalati', 'shard-nine-dragon', 'shard-driftwood', 'shard-pine-hollow', 'shard-open-plots'] as const;
 interface Row {repo: string; status: 'pending' | 'success' | 'failure' | 'error' | 'timeout'; runId?: number; runUrl?: string; shardSha?: string; conclusion?: string | null; issue?: string; error?: string}
-export interface Aggregate {version: 1; engine: string; originRun: string; ok: boolean; rows: Row[]}
+/** `packed`: the commit the receivers install, the candidate plus its npm archive's build outputs (ring3-pack.ts, QA 11-23-b row 40). */
+export interface Aggregate {version: 1; engine: string; originRun: string; ok: boolean; rows: Row[]; packed?: string}
 export type Api = (method: 'GET' | 'POST', path: string, body?: unknown) => Promise<unknown>;
-interface Options {api: Api; now?: () => number; sleep?: (ms: number) => Promise<void>; deadlineMs?: number; pollMs?: number; checkpoint?: (report: Aggregate) => void; issues?: boolean}
+interface Options {api: Api; packed?: string; now?: () => number; sleep?: (ms: number) => Promise<void>; deadlineMs?: number; pollMs?: number; checkpoint?: (report: Aggregate) => void; issues?: boolean}
 const errorText = (error: unknown): string => String(error).replaceAll(/[\r\n]/gu, ' ').slice(0, 1000);
 
 export function prepare(engine: string, originRun: string, repos: readonly string[] = shardRepos): Aggregate {
@@ -21,11 +22,16 @@ export function prepare(engine: string, originRun: string, repos: readonly strin
 export async function runRing3(report: Aggregate, options: Options): Promise<Aggregate> {
   const {api, now = Date.now, sleep = (ms: number): Promise<void> => new Promise(resolve => {setTimeout(resolve, ms);}), deadlineMs = 20 * 60_000, pollMs = 15_000, checkpoint = () => { /* Embedded callers may omit persisted receipts. */ }} = options;
   const until = now() + deadlineMs;
+  if (options.packed !== undefined) {
+    if (!/^[a-f0-9]{40}$/u.test(options.packed)) throw new Error('Ring 3 sends a full packed commit hash');
+    report.packed = options.packed;
+  }
+  const install = report.packed ?? report.engine;
   // All seven requests are independent; a refused shard must not hide the others.
   await Promise.all(report.rows.map(async row => {
     try {
       const response = await api('POST', `repos/project-wildshard/${row.repo}/actions/workflows/ci.yml/dispatches`,
-        {ref: 'main', inputs: {engine: report.engine}, return_run_details: true}) as {workflow_run_id?: number; html_url?: string};
+        {ref: 'main', inputs: {engine: install}, return_run_details: true}) as {workflow_run_id?: number; html_url?: string};
       if (typeof response.workflow_run_id !== 'number' || !Number.isSafeInteger(response.workflow_run_id) || response.workflow_run_id <= 0) throw new Error('Dispatch returned no exact run ID; refusing to guess a run');
       row.runId = response.workflow_run_id;
       row.runUrl = `https://github.com/project-wildshard/${row.repo}/actions/runs/${row.runId}`;
@@ -67,6 +73,7 @@ export async function runRing3(report: Aggregate, options: Options): Promise<Agg
 
 export function markdown(report: Aggregate): string {
   return [`# Ring 3: ${report.ok ? 'GREEN' : 'RED — RELEASE HELD'}`, '', `Engine: \`${report.engine}\``, '',
+    ...(report.packed === undefined ? [] : [`Installed as: \`${report.packed}\` (the candidate with its npm archive's build outputs)`, '']),
     '| Shard | Candidate run | Shard commit | Verdict | Issue |', '| --- | --- | --- | --- | --- |',
     ...report.rows.map(row => `| ${row.repo} | ${row.runUrl === undefined ? 'not dispatched' : `[${row.runId}](${row.runUrl})`} | ${row.shardSha?.slice(0, 12) ?? 'unknown'} | ${row.status} | ${row.issue === undefined ? '' : `[issue](${row.issue})`} |`),
     '', ...report.rows.filter(row => row.error !== undefined).map(row => `- ${row.repo}: ${row.error?.replaceAll(/[|<>]/gu, ' ')}`),
@@ -74,7 +81,7 @@ export function markdown(report: Aggregate): string {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const {RING3_ENGINE, RING3_ORIGIN_RUN, GH_TOKEN} = process.env;
+  const {RING3_ENGINE, RING3_ORIGIN_RUN, RING3_PACKED, GH_TOKEN} = process.env;
   const [command, directory = 'tmp/ring3'] = process.argv.slice(2);
   const save = (report: Aggregate): void => {mkdirSync(directory, {recursive: true}); writeFileSync(join(directory, 'verdict.json'), `${JSON.stringify(report, null, 2)}\n`); writeFileSync(join(directory, 'summary.md'), markdown(report));};
   if (command === 'prepare') save(prepare(RING3_ENGINE ?? '', RING3_ORIGIN_RUN ?? 'local'));
@@ -91,7 +98,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       if (!response.ok) throw new Error(`GitHub ${method} ${path}: HTTP ${response.status}; check nightly App installation and Actions/Issues permissions`);
       return response.json();
     };
-    await runRing3(report, {api, checkpoint: save});
+    await runRing3(report, {api, checkpoint: save, ...(RING3_PACKED === undefined || RING3_PACKED === '' ? {} : {packed: RING3_PACKED})});
     console.log(markdown(report));
     if (!report.ok) process.exitCode = 1;
   } else if (command === 'report') {

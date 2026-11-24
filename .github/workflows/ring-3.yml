@@ -25,7 +25,10 @@ concurrency:
 jobs:
   candidates:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 45
+    # QA-FEEDBACK-2026-11-23-b row 40: the job pushes the packed candidate as ring3/<engine>, the commit the receivers install
+    permissions:
+      contents: write
     env:
       RING3_ENGINE: ${{ inputs.engine || github.sha }}
       RING3_ORIGIN_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -39,6 +42,39 @@ jobs:
           node-version-file: package.json
       - run: node --test scripts/ring3.proof.ts
       - run: node scripts/ring3.ts prepare
+      # QA-FEEDBACK-2026-11-23-b row 40 (J505): a Git source archive lacks the ignored *.generated.* build outputs (Dunes and
+      # Nalati failed on game/boot/audio.generated). Build the npm archive exactly as npm-publish.yml does, commit each file it
+      # holds that Git does not track onto the candidate (ring3-pack.ts refuses if any *.generated.* is still missing), and send
+      # that commit: the receivers install what npm ships.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: package.json
+      - uses: ./.github/actions/org-deps
+      - name: Install the pinned build dependencies
+        run: pnpm install --frozen-lockfile --config.ci=false
+      - name: Build the npm archive, as npm-publish.yml does
+        run: |
+          if ! node scripts/pins.ts install; then
+            echo 'Pinned input install failed. Retrying once.' >&2
+            node scripts/pins.ts install
+          fi
+          node scripts/gen.mjs --inputs-only
+          node scripts/build-server.mjs --dev --out dist/dev-server
+          node scripts/npm-artifact.mjs "$RUNNER_TEMP/engine-npm" > tmp/ring3/npm.json
+      - name: Send the packed candidate as ring3/<engine>
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          packed=$(node scripts/ring3-pack.ts "$RING3_ENGINE" tmp/ring3/npm.json)
+          git push --force --quiet "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "${packed}:refs/heads/ring3/${RING3_ENGINE}"
+          echo "RING3_PACKED=${packed}" >> "$GITHUB_ENV"
+          echo "Ring 3 installs ${packed} (ring3/${RING3_ENGINE})"
+          # keep two weeks of packed candidates
+          cutoff=$(date -u -d '14 days ago' +%s)
+          gh api "repos/${GITHUB_REPOSITORY}/git/matching-refs/heads/ring3/" --jq '.[].ref' | while read -r ref; do
+            when=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${ref#refs/heads/}" --jq '.commit.committer.date' || echo '')
+            if [ -n "$when" ] && [ "$(date -u -d "$when" +%s)" -lt "$cutoff" ]; then gh api -X DELETE "repos/${GITHUB_REPOSITORY}/git/${ref}" || true; fi
+          done
       - name: Mint the dedicated nightly App token for the seven receivers
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token

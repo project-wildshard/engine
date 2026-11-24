@@ -57,6 +57,10 @@ jobs:
   ring3:
     if: always() && !inputs.cook_cache_only && !inputs.api_health_only && !inputs.diagnostic_head && !inputs.diagnostic_drill && (needs.report.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.ring3_only))
     needs: report
+    # QA-FEEDBACK-2026-11-23-b row 40: ring-3 pushes the packed candidate it sends (ring3/<engine>)
+    permissions:
+      contents: write
+      actions: read
     uses: ./.github/workflows/ring-3.yml
     with:
       engine: ${{ github.sha }}

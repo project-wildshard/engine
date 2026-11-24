@@ -1,11 +1,16 @@
 // Standalone integration checks of the sender against a controlled GitHub API.
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {join} from 'node:path';
+import {BOOT_STAMPS} from './boot-stamps.mjs';
 import {prepare, runRing3, shardRepos, type Api} from './ring3.ts';
+import {missingGenerated, packCommit, untracked} from './ring3-pack.ts';
 
 const candidate = 'a'.repeat(40), shard = 'b'.repeat(40);
 interface Call {method: string; path: string; body?: unknown}
-function fixture(options: {red?: string; malformed?: boolean; pending?: boolean; wrongRun?: boolean; denied?: string; existing?: boolean} = {}): {api: Api; calls: Call[]} {
+function fixture(options: {install?: string; red?: string; malformed?: boolean; pending?: boolean; wrongRun?: boolean; denied?: string; existing?: boolean} = {}): {api: Api; calls: Call[]} {
   const calls: Call[] = [];
   const api: Api = (method, path, body) => Promise.resolve().then(() => {
     calls.push({method, path, body});
@@ -14,7 +19,7 @@ function fixture(options: {red?: string; malformed?: boolean; pending?: boolean;
     const id = shardRepos.indexOf(repo as typeof shardRepos[number]) + 100;
     if (method === 'POST' && path.endsWith('/dispatches')) {
       if (repo === options.denied) throw new Error('HTTP 403');
-      assert.deepEqual(body, {ref: 'main', inputs: {engine: candidate}, return_run_details: true});
+      assert.deepEqual(body, {ref: 'main', inputs: {engine: options.install ?? candidate}, return_run_details: true});
       return options.malformed ? {} : {workflow_run_id: id};
     }
     if (method === 'GET' && path.endsWith(`/actions/runs/${id}`)) return {id: options.wrongRun ? id + 1 : id, event: 'workflow_dispatch', path: '.github/workflows/ci.yml', head_sha: shard, run_attempt: 1,
@@ -68,4 +73,39 @@ await test('queued receivers hit a bounded deadline and remain red with their ru
 });
 await test('moving refs and shell text refuse before a dispatch can be prepared', () => {
   for (const ref of ['main', 'a'.repeat(39), '$(echo injected)', 'A'.repeat(40)]) assert.throws(() => prepare(ref, 'sender'), /full engine commit/u);
+});
+
+// QA-FEEDBACK-2026-11-23-b row 40 (J505): the receivers install the packed commit, which carries every generated file npm ships.
+const packed = 'c'.repeat(40);
+await test('the receivers install the packed commit; the verdict still names the candidate', async () => {
+  const {api} = fixture({install: packed}), report = await runRing3(prepare(candidate, 'sender'), {api, packed});
+  assert.equal(report.ok, true);
+  assert.equal(report.engine, candidate);
+  assert.equal(report.packed, packed);
+  await assert.rejects(runRing3(prepare(candidate, 'sender'), {api, packed: 'main'}), /full packed commit/u);
+});
+await test('the guard names each generated file the npm archive has and the Ring 3 tree lacks', () => {
+  const archive = ['package/package.json', 'package/src/a.ts', ...BOOT_STAMPS.map(path => `package/${path}`), 'package/node_modules/@wildshard/format/x.generated.js'];
+  assert.deepEqual(missingGenerated(archive, new Set(['package.json', 'src/a.ts'])), [...BOOT_STAMPS], 'a raw Git archive lacks the boot stamps');
+  assert.deepEqual(missingGenerated(archive, new Set(['src/a.ts', ...BOOT_STAMPS])), []);
+  assert.deepEqual(untracked(archive, new Set(['package.json', 'src/a.ts'])), [...BOOT_STAMPS], 'the bundled format and package.json are not added');
+});
+await test('packCommit commits the ignored build outputs onto the candidate and passes the guard', () => {
+  const root = process.cwd(), dir = mkdtempSync(join(root, 'tmp', 'ring3-pack-'));
+  const sh = (...args: string[]): string => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {cwd: join(dir, 'repo'), encoding: 'utf8'}).trim();
+  try {
+    mkdirSync(join(dir, 'repo', 'src'), {recursive: true});
+    writeFileSync(join(dir, 'repo', '.gitignore'), '*.generated.ts\n');
+    writeFileSync(join(dir, 'repo', 'src', 'a.ts'), 'export {};\n');
+    sh('init', '-q'); sh('add', '.'); sh('commit', '-qm', 'candidate');
+    const engine = sh('rev-parse', 'HEAD');
+    writeFileSync(join(dir, 'repo', 'src', 'audio.generated.ts'), 'export {};\n');
+    mkdirSync(join(dir, 'pkg', 'package', 'src'), {recursive: true});
+    for (const file of ['src/a.ts', 'src/audio.generated.ts']) writeFileSync(join(dir, 'pkg', 'package', file), 'export {};\n');
+    execFileSync('tar', ['-czf', join(dir, 'engine.tgz'), '-C', join(dir, 'pkg'), 'package']);
+    process.chdir(join(dir, 'repo'));
+    const commit = packCommit(engine, join(dir, 'engine.tgz'));
+    assert.match(sh('ls-tree', '-r', '--name-only', commit), /src\/audio\.generated\.ts/u);
+    assert.equal(sh('rev-parse', `${commit}^`), engine, 'one commit on top of the candidate');
+  } finally { process.chdir(root); rmSync(dir, {recursive: true, force: true}); }
 });
