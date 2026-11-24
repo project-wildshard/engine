@@ -15,10 +15,12 @@ import { loadCookedFolder } from '../src/server/host/headlessFolder.ts';
 import { openCellWorld } from '../src/server/host/standalone/cellWorld.ts';
 import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier.ts';
 import { SaveStore } from '../src/shared/engine/saves/store.ts';
+import { readPlatformItemCatalogue, type PlatformItemCatalogue } from '../src/shared/game/loot/platformCatalogue.ts';
 import { agentFetch } from './agent-requests.mjs';
 import { admitPin } from './pin-admit.ts';
 import { restorePacks, type PackedIndex } from './pin-packs.ts';
 import { openReleaseRun } from './release-run.mjs';
+import { fetchItemCatalogue } from './server-release/items.mjs';
 
 const API = 'https://api.wildshard.io';
 export const PRODUCTION_PLAY_TICKS = 600;
@@ -64,7 +66,7 @@ async function productionHeads(): Promise<readonly Head[]> {
     .sort((a, b) => a.slug.localeCompare(b.slug));
 }
 
-async function playOriginal(head: Head, bytes: Uint8Array, folder: string, rapier: Rapier): Promise<number> {
+async function playOriginal(head: Head, bytes: Uint8Array, folder: string, rapier: Rapier, catalogue: PlatformItemCatalogue['items']): Promise<number> {
   const { files } = admitPin(readTar(bytes), sha256, members => validateShardfileFolder({
     read: (path, maximum) => {
       const body = members.get(path);
@@ -85,7 +87,7 @@ async function playOriginal(head: Head, bytes: Uint8Array, folder: string, rapie
     await writeFile(file, body);
   }
   const input = await loadCookedFolder(folder, rapier, head.slug);
-  const room = await openCellWorld({ instance: head.slug }, input, undefined, {
+  const room = await openCellWorld({ instance: head.slug }, { ...input, catalogue }, undefined, {
     saves: new SaveStore({ local: null, session: null }), lone: false, wholeSolids: true, pageless: true,
   });
   try {
@@ -101,7 +103,9 @@ async function main(): Promise<void> {
     || execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim() !== build) {
     throw new Error('Usage: release-prod-play.ts <exact checkout SHA> [verdict.json]');
   }
-  const heads = await productionHeads(), source = apiSource(API, agentFetch);
+  const [heads, itemBytes] = await Promise.all([productionHeads(), fetchItemCatalogue(agentFetch)]);
+  const catalogue = readPlatformItemCatalogue(JSON.parse(new TextDecoder().decode(itemBytes))).items;
+  const source = apiSource(API, agentFetch);
   await prepareAssetDecoders();
   const wasm = createRequire(import.meta.url).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm');
   const rapier = await loadRapier(await readFile(wasm));
@@ -109,16 +113,18 @@ async function main(): Promise<void> {
   try {
     const outcomes = await replayProductionHeads(heads, async head => {
       const folder = await mkdtemp(join(run.work, 'head-'));
-      try { return await playOriginal(head, await source.download(head.hash), folder, rapier); }
+      try { return await playOriginal(head, await source.download(head.hash), folder, rapier, catalogue); }
       finally { await rm(folder, { recursive: true, force: true }); }
     });
-    const current = await productionHeads();
+    const [current, currentItemBytes] = await Promise.all([productionHeads(), fetchItemCatalogue(agentFetch)]);
     const unchanged = JSON.stringify(heads) === JSON.stringify(current);
+    const itemsUnchanged = sha256(itemBytes) === sha256(currentItemBytes);
     const failures = outcomes.filter(row => !row.pass);
-    const verdict = { build, pass: unchanged && failures.length === 0, heads: outcomes, unchanged };
+    const verdict = { build, pass: unchanged && itemsUnchanged && failures.length === 0, heads: outcomes, unchanged, itemsUnchanged };
     if (out !== undefined) await writeFile(out, `${JSON.stringify(verdict, null, 2)}\n`, { mode: 0o600 });
     for (const row of failures) console.error(`${row.slug} r${row.revision}: ${row.reason}`);
     if (!unchanged) console.error('Production heads changed during the play preflight');
+    if (!itemsUnchanged) console.error('The platform item catalogue changed during the play preflight');
     console.log(`${build.slice(0, 10)} production play: ${heads.length - failures.length}/${heads.length} advanced ${PRODUCTION_PLAY_TICKS} room ticks`);
     if (!verdict.pass) process.exitCode = 1;
   } finally { run.close(); }

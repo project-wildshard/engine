@@ -12,3 +12,6 @@ staging artifact and npm next workflows continue independently.
 
 The replay tests use the existing tooling suite. This keeps the new
 check out of the shared test configuration and its broad push selection.
+
+Use the same platform item catalogue as the signer. A room validates its
+ledger rewards against that catalogue, so the play check needs those rows.
