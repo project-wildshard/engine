@@ -49,6 +49,8 @@ if [ "$mode" = code ]; then
   check release-nightly node --test --test-timeout=10000 scripts/release-nightly.proof.ts
   # XR-3 (J186, AD2): an extra nightly receipt cannot hide behind a green table; 414 clean soak runs, 11-17 to 11-23.
   check nightly-identity node --test --test-name-pattern='extra receipt' scripts/nightly.proof.ts
+  # EG-24 (J503, AD2 row 43): a socket lost mid-fight or mid-crossing resumes; clean in ci-reports since 11-17.
+  check socket-recovery bash -c 'node scripts/pins.ts install --ring 1 && node scripts/vitest-tmp.ts run test/dedicated-critical-reconnect.proof.ts'
 fi
 check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then

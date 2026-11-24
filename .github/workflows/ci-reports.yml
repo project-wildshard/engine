@@ -268,19 +268,6 @@ jobs:
           name: coverage-edges-soak
           path: tmp/ci-coverage-edges
           retention-days: 14
-      # EG-24: a new regression reports for one week before explicit admission.
-      - name: Soak socket loss during combat and crossing
-        if: steps.code.outputs.run == 'true'
-        continue-on-error: true
-        run: node scripts/vitest-tmp.ts run test/dedicated-critical-reconnect.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-socket-soak/recovery.json
-      - name: Keep socket recovery soak observations
-        if: ${{ !cancelled() && steps.code.outputs.run == 'true' }}
-        continue-on-error: true
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: socket-recovery-soak
-          path: tmp/ci-socket-soak
-          retention-days: 14
 
       - name: Observe active quarantine with ordinary results
         continue-on-error: true
