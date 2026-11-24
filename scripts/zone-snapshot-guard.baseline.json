@@ -1,22 +1,14 @@
 {
  "about": "ZONE-SNAPSHOTS ZS1: today's zone snapshots; shrink only (node scripts/zone-snapshot-guard.mjs --prune)",
  "offenders": [
-  "frozen-path test/fixtures/frozen/contract-catalogue.json",
-  "frozen-path test/fixtures/frozen/contract-manifest.json",
-  "frozen-path test/fixtures/frozen/contracts.ts",
-  "frozen-path test/fixtures/frozen/marsh-returns.json",
   "frozen-path test/fixtures/frozen/melee-sword-items.json",
-  "frozen-path test/fixtures/frozen/mixed-inputs.json",
   "frozen-path test/fixtures/frozen/nalati-brains.json",
   "frozen-path test/fixtures/frozen/nine-grapple-source.json",
   "frozen-path test/fixtures/frozen/nine-held-presentation.json",
   "frozen-path test/fixtures/frozen/nine-r3-held-items.json",
   "frozen-path test/fixtures/frozen/pickup-tables.json",
   "frozen-path test/fixtures/frozen/pine-creature-world.json",
-  "frozen-path test/fixtures/frozen/returns.json",
-  "frozen-path test/fixtures/frozen/returns.ts",
   "frozen-path test/fixtures/frozen/runtime-manifest.json",
-  "frozen-path test/fixtures/frozen/saltmarsh-returns.json",
   "frozen-path test/fixtures/frozen/snapshots.ts",
   "revision-path test/fixtures/frozen/nine-r3-held-items.json",
   "shard-folder test/fixtures/corpus/brasscap-mesa/shard.json"

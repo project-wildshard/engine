@@ -1,12 +1,12 @@
-import { parse, object } from 'valibot';
+import { parse, object, unknown, looseObject } from 'valibot';
 import { CreaturesSchema } from '@wildshard/format/creatures';
-import { MixedPopulationSchema } from '@wildshard/format/mixedPopulation';
-import { PopulationKeeperRowsSchema } from '@wildshard/format/populationKeeper';
 import { groundFixture } from './plain-ground';
-import { frozenReturnInline } from './frozen/returns';
-import { frozenRuntimeJson } from './frozen/snapshots';
+import { liveReturnInline } from './returnPrograms';
+import { liveJson } from './livePin';
 
-const original = parse(object({ rows: MixedPopulationSchema, keeper: PopulationKeeperRowsSchema }), frozenRuntimeJson('mixed-inputs.json'));
+// ZONE-SNAPSHOTS ZS9 (J507): Driftwood's live monkey perch policy and enemy volley pool.
+const perch = parse(object({ perch: unknown() }), liveJson('driftwood-isle', 'poses/monkey.json')).perch;
+const volley = parse(object({ volley: unknown() }), liveJson('driftwood-isle', 'sim/enemy-placement.json')).volley;
 /** Original native root/action and real admitted VM bytes in an unrelated plain body. */
 export function perchFixture() {
   const base = groundFixture();
@@ -15,8 +15,8 @@ export function perchFixture() {
   const rows = { ...base.rows, strikes: [...base.rows.strikes, { ...bite, id: 'fixture.throw', damage: 5 }] };
   const creatures = parse(CreaturesSchema, {
     perchBodies: [{ id: 'fixture.perch', sites: [{ at: [0, 5, 7], base: [0, 0, 7] }],
-      program: structuredClone(frozenReturnInline), policy: { ...original.rows.perch, kind: 'fixture.creature', strike: 'fixture.bite' },
-      projectile: { strike: 'fixture.throw', pool: original.keeper.volley,
+      program: structuredClone(liveReturnInline), policy: { ...parse(looseObject({}), perch), kind: 'fixture.creature', strike: 'fixture.bite' },
+      projectile: { strike: 'fixture.throw', pool: volley,
         launch: { kind: 'target', speed: 8, time: [0.3, 2], gravity: 9.8, rotation: [0, 0, 0] } } }],
     brains: [{ id: 'fixture.brain', kind: 'perch-hunter', thinkDivisor: 3,
       throwRadius: 18, throwDuration: 0.8, biteRadius: 2, biteDuration: 0.8, underRadius: 2, underSeconds: 0.5,

@@ -5,13 +5,13 @@ import { Rng } from '@wildshard/format/seededRng';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { createSimHost } from '../src/server/engine/sim';
 import { createNativeCreatureRoster } from '../src/server/game/shardfile/homeKeeper';
-import { frozenMarsh } from './fixtures/frozen/returns';
+import { madeUpMarsh } from './fixtures/returnPrograms';
 import { fixtureNativeRoster } from './fixtures/native-roster';
 import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 
 test('salt-marsh native returns retain predecessor identities, queue order and quiet restore', async () => {
-  const program = frozenMarsh, sample = SIM_LEVEL.entities[0];
+  const program = madeUpMarsh, sample = SIM_LEVEL.entities[0];
   if (sample === undefined) throw new Error('Missing marsh fixture');
   const rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm')));
   const host = createSimHost({ ...SIM_LEVEL, entities: [] }, { rapier }), rng = new Rng(9);

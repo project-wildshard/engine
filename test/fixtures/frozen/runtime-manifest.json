@@ -9,22 +9,6 @@
       "bytes": 5612,
       "sha256": "1d215a4e809d246103e9f5ad000c4487f4ff18f6e6dd0a2ddb7c34a8d72f01c9"
     },
-    "returns.json": {
-      "bytes": 10374,
-      "sha256": "3835c5a41bcefcf704171dac0715c34aba58cb61880990eb4f7e4cbe85ed71b9"
-    },
-    "marsh-returns.json": {
-      "bytes": 7728,
-      "sha256": "2cb52707cdcaadcebbe3b3395f49a1ab69736fe90ecd1097e9602935e547a247"
-    },
-    "saltmarsh-returns.json": {
-      "bytes": 7036,
-      "sha256": "e951027e986888726d22a4af57d2f74fda9fb3785629ba69fb8d4025b3af67d3"
-    },
-    "mixed-inputs.json": {
-      "bytes": 30294,
-      "sha256": "2347097af1972ce82d973b7162e97efd8b76f6cb016aa32b8614ef311c3400f3"
-    },
     "pine-creature-world.json": {
       "bytes": 126490,
       "sha256": "67941097975ee9df3a65b3b99c4c2f2f1b2cf69a377706dd46d592d35a7fd5d4",

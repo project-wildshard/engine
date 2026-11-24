@@ -1,9 +1,9 @@
 import {Scope} from '../src/shared/engine/app/scope';
-import { lendFrozenReturns as lendDriftwoodReturns, frozenSaltmarsh } from './fixtures/frozen/returns';
+import { lendLiveReturns as lendDriftwoodReturns, madeUpSaltmarsh } from './fixtures/returnPrograms';
 import { afterEach, expect, test } from 'vitest';
 import { RespawnQueue } from '../src/shared/game/population/respawn';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { frozenReturnProgram as RETURN_PROGRAM } from './fixtures/frozen/returns';
+import { liveReturnProgram as RETURN_PROGRAM } from './fixtures/returnPrograms';
 import { Rng } from '@wildshard/format/seededRng';
 import { setTerrainHeight } from '../src/shared/engine/world/terrainHeight';
 
@@ -88,7 +88,7 @@ test('v1 placement retries preserve spawn-stream order and saved queue objects',
 });
 
 test('independent salt-marsh projection refuses atomically after borrowing a draw', async () => {
-  const {script} = frozenSaltmarsh, blob = {bytes: Uint8Array.from(Buffer.from(frozenSaltmarsh.bytes, 'base64'))};
+  const {script} = madeUpSaltmarsh, blob = {bytes: Uint8Array.from(Buffer.from(madeUpSaltmarsh.bytes, 'base64'))};
   expect(() => ReturnProgram.page({ script: { ...script, module: `blobs/wasm/${'0'.repeat(64)}.wasm` }, bytes: btoa(String.fromCodePoint(...blob.bytes)) })).toThrow('Return module hash mismatch');
   const program = ReturnProgram.page({ script, bytes: btoa(String.fromCodePoint(...blob.bytes)) }), rng = new Rng(13), control = new Rng(13);
   expect(program.project('schedule', {}, rng)).toEqual({ due: 7 + control.next() });

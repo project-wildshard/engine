@@ -72,3 +72,17 @@ files in Nalati r8 (`riding/mounted-figure.json`, `models/shape-book.json`, `mod
 pigment, surface and map palette are the product's discovery rows, and its population field is `world/meadow.json`:
 `liveGeography.ts` reads those and writes only the map channels' lattice rows by hand. `frozen/nalati/` and its loader
 are gone.
+
+## Tenth step: contracts, returns, the perch and the boar world
+
+The contract tests read Pine r16's live `quests/contracts.json` with its guest inline (`liveContracts.ts`). Driftwood's
+return program reads its live `sim/returns.json`; the marsh and saltmarsh guests were the SDK's compiles of made-up
+sources on Driftwood's return contract, so they move to `sdk-built/` (`returnPrograms.ts`). The perch fixture's monkey
+policy and volley pool are Driftwood's live `poses/monkey.json` and `sim/enemy-placement.json`. The boar world is the
+engine's own kit boar: Pine's live roster declares its species and ships no hull book, so the frozen Pine boar, elk,
+looks and clips it laid on top go (animal-model-preparation's retirement case asks for the kit bear instead of the
+frozen elk).
+
+Still on `pine-creature-world.json`: species-health-fallback. On Pine r16's declared rows the page computes Old
+Ironhide at 75 health where the native server spawns it at 300, so moving that test to the live rows turns it red on a
+real page/server gap; it waits on that fix.

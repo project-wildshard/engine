@@ -50,10 +50,10 @@ test('retiring the owner during a pending slice refuses further model constructi
   const prepared = factory(), owner = new Scope('retired-model-preparation'); owners.push(owner);
   const build = vi.spyOn(prepared, 'model');
   let at = 0; vi.spyOn(performance, 'now').mockImplementation(() => { at += 10; return at; });
-  const pending = owner.run(() => prepared.prepareModels([{ kind: 'elk' }])); owner.dispose();
+  const pending = owner.run(() => prepared.prepareModels([{ kind: 'bear' }])); owner.dispose();
   await expect(pending).rejects.toThrow('owner closed');
   expect(build).not.toHaveBeenCalled();
-  await expect(prepared.prepareModels(Array.from({ length: 1025 }, () => ({ kind: 'elk' })))).rejects.toThrow('Excessive');
+  await expect(prepared.prepareModels(Array.from({ length: 1025 }, () => ({ kind: 'bear' })))).rejects.toThrow('Excessive');
 });
 
 test.each(['bear', 'horse', 'wolf'])('one bind inversion preserves every native %s joint and posed vertex', kind => {

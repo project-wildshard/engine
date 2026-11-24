@@ -18,9 +18,9 @@ import { sha256 } from '../src/shared/game/plugin/moduleHash'
 import { ReturnProgram } from '../src/shared/game/population/returnProgram'
 import { createShardFolder } from '../src/shared/game/shardfile/shardFolder'
 import {
-  lendFrozenReturns,
-  frozenReturnInline,
-} from './fixtures/frozen/returns'
+  lendLiveReturns,
+  liveReturnInline,
+} from './fixtures/returnPrograms'
 import { liveTitanInline as frozenTitanInline } from './fixtures/liveNalati';
 import { perchFixture } from './fixtures/plain-perch'
 import { groundFixture } from './fixtures/plain-ground'
@@ -146,7 +146,7 @@ test('fresh ABI-2 forgery reaches actual projection hash admission before alloca
 })
 
 test('a valid parent loan survives partial local assets and unrelated unloaded return rows', () => {
-  const scope = lendFrozenReturns(new Scope('perch.parent.partial'))
+  const scope = lendLiveReturns(new Scope('perch.parent.partial'))
   const shard = perchFixture(),
     body = shard.creatures.perchBodies?.[0]
   if (body === undefined) throw new Error('Missing fixture body')
@@ -164,12 +164,12 @@ test('a valid parent loan survives partial local assets and unrelated unloaded r
     admissionRevision: artifact.admissionRevision,
   }
   const sections = new Map([
-    ['actors/return-scripts', [frozenReturnInline.script, unrelated]],
+    ['actors/return-scripts', [liveReturnInline.script, unrelated]],
   ])
   const local = new Map([
     [
       body.program.script.module.slice('blobs/wasm/'.length, -'.wasm'.length),
-      Uint8Array.from(Buffer.from(frozenReturnInline.bytes, 'base64')),
+      Uint8Array.from(Buffer.from(liveReturnInline.bytes, 'base64')),
     ],
   ])
   const before = scope.census
@@ -188,12 +188,12 @@ test('a valid parent loan survives partial local assets and unrelated unloaded r
 
 test('the real whole-host module cap includes decision modules beside the perch VM', () => {
   const shard = perchFixture()
-  const bytes = Uint8Array.from(Buffer.from(frozenReturnInline.bytes, 'base64'))
+  const bytes = Uint8Array.from(Buffer.from(liveReturnInline.bytes, 'base64'))
   const scripts = parseDecisionScripts(
     Array.from({ length: 9 }, (_, index) => {
       const binary = new Uint8Array([...bytes, 0, 2, 1, 65 + index])
       return {
-        ...frozenReturnInline.script,
+        ...liveReturnInline.script,
         id: `other.${index}`,
         module: `blobs/wasm/${sha256(binary)}.wasm`,
       }
@@ -207,7 +207,7 @@ test('the real whole-host module cap includes decision modules beside the perch 
 })
 
 test('raw native bytes use the real parent loan and leave its scope census unchanged', () => {
-  const scope = lendFrozenReturns(new Scope('perch.raw.preflight'))
+  const scope = lendLiveReturns(new Scope('perch.raw.preflight'))
   const shard = perchFixture(),
     body = shard.creatures.perchBodies?.[0]
   if (body === undefined) throw new Error('Missing fixture body')

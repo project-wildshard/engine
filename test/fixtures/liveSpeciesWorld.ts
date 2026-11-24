@@ -6,14 +6,12 @@ import {folderSpeciesCatalogue} from '../../src/client/game/looks/speciesBook';
 import {registerSpecies} from '../../src/shared/engine/entities/species/registry';
 import {speciesWithLook} from '../../src/client/engine/entities/species/look';
 import {installKitWorldFixture} from './kit-world';
-import {installFrozenElkFixture} from './boar-world';
 import {liveBytes,liveJson} from './livePin';
 const NALATI='nalati-grasslands';
 let installed:Promise<void>|undefined;
 export function installLiveSpeciesWorld():Promise<void>{return installed??=prepare();}
 async function prepare():Promise<void>{
  await installKitWorldFixture();
- installFrozenElkFixture();
  const presentation=parse(object({species:SpeciesPresentationSchema}),liveJson(NALATI,'actors/sheep.json')).species;
  const catalogue=folderSpeciesCatalogue({section:()=>{throw new Error('Nalati declares no hull book');},has:()=>false,file:name=>Promise.resolve(liveBytes(NALATI,name))},
   presentation,liveJson(NALATI,'actors/species-looks.json'));

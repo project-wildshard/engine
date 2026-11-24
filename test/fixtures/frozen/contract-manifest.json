@@ -1,8 +1,0 @@
-{
-  "sourceRepository": "project-wildshard/shard-pine-hollow",
-  "sourceCommit": "baa380be5b04bdc6139d56cf19b1f0c3bfe9167f",
-  "sdkCommit": "23d05fd147700fe5e9c929749f7d8cb63cdf7761",
-  "bytes": 22444,
-  "sha256": "5cc25419356a812a7b42560bc325f2d0c57699a2c6a58b4405ca585582ab20e2",
-  "exportRecipe": "import { readFileSync,writeFileSync } from 'node:fs';\nimport {compileDecisionScripts} from '@wildshard/sharddev/buildDecisionScripts';\nimport {CONTRACT_PROGRAM_SCRIPT,contractProgramRegistries} from '<checkouts>/shard-pine-hollow/src/generators/contractProgram.ts';\nconst source='<checkouts>/shard-pine-hollow';\nconst sources=new Map(['contracts','contractsRandom','contractsRules'].map(name=>[`behaviour/${name}.as`,readFileSync(`${source}/src/behaviour/${name}.as`,'utf8')]));\nconst built=await compileDecisionScripts([CONTRACT_PROGRAM_SCRIPT],contractProgramRegistries(),sources,{asLineCeiling:256,singleSignal:true});\nconst script=built.rows[0],bytes=built.blobs[0].bytes;\nwriteFileSync('test/fixtures/frozen/contract-catalogue.json',JSON.stringify({...JSON.parse(readFileSync(source+'/src/data/contracts.json','utf8')),program:{script,bytes:Buffer.from(bytes).toString('base64')}})+'\\n');\n"
-}
