@@ -18,6 +18,7 @@ import type { ContractCatalogue } from '@wildshard/format/contracts';
 import { installQuestHintFile } from './hints';
 import { questPageWorld } from '../../../shared/game/quest/pageResources';
 import type { Scope } from '@wildshard/engine/app/scope';
+import type { Animal } from '@wildshard/engine/entities/AnimalView';
 import { installWorldScenes } from '../shardfile/worldScenes';
 import { residentWorldScope } from '../shardfile/runtimePagePresentation';
 import type { cableModes } from '@wildshard/engine/player/modes';
@@ -54,7 +55,7 @@ import { installQuestFigures } from './figures';
 import { startQuestPageReads } from '../../../shared/game/quest/pageReads';
 
 /** The page borrows the actual native boss and its baked reward pose. */
-interface PageFinale { readonly rewardAt: THREE.Vector3; readonly rewardPose: { yaw: number; pitch: number; phase: number } }
+interface PageFinale { readonly actor: Animal | null; readonly rewardAt: THREE.Vector3; readonly rewardPose: { yaw: number; pitch: number; phase: number } }
 interface PageCable { group: THREE.Object3D; placed: Placed; a: THREE.Vector3; b: THREE.Vector3; prompt: Interactable; cables: ReturnType<typeof cableModes>; mode: string }
 /** Presentation handles share existing quest, shop and native continuation owners. */
 export interface QuestPageComposition {
@@ -291,9 +292,10 @@ export async function installQuestPageComposition(ctx: ShardContext, input: Ques
   }
   if (rows.chapter.completion) adventure.complete = installCompletion(ctx, flags, h.progress, adventure.spine.objective.root, anchors);   // before the finale: its reward hands over to the card
   if (rows.boss !== undefined && rows.files.encounter !== undefined) {
-    const finale = await installChapterWakeEncounter(ctx, await ctx.product.json(rows.files.encounter));
+    const pool = place(rows.boss.pool);
+    const finale = await installChapterWakeEncounter(ctx, await ctx.product.json(rows.files.encounter), pool);
     setAnchor(rows.boss.reward, finale.rewardAt);
-    adventure.finale = finale;
+    adventure.finale = { get actor() { return finale.actor; }, rewardAt: finale.rewardAt, rewardPose: finale.rewardPose };
   }
   scope.onDispose(flags.onChange((flag, on) => { ironDrop?.bindGuardFlags(flags.all); if (on && !flag.startsWith('plate:')) guide?.progressed(); }));
   if (rows.files.returns !== undefined) adventure.ecology = installPageReturns(ctx, JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(await ctx.product.file(rows.files.returns))));

@@ -31,8 +31,6 @@ const CACHE = join(homedir(), '.cache/wildshard/pins');
 const tarOf = (hash: string): string => join(CACHE, `${hash}.tar`);
 const cached = kept.every(row => existsSync(tarOf(row.hash)));
 const TICKS = 600;
-/** ONE-FORMAT OF22c3 retired the island population hosts these two still name (FORMAT-PRUNE FP21 s8 brings them back). */
-const KNOWN_REFUSED = ['driftwood-isle r4', 'driftwood-isle r5'];
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
 /** The original as the cook admits it, written as a product folder (as `pins.ts install` writes `out/<folder>`). */
@@ -79,6 +77,6 @@ test.skipIf(!cached)('every kept original with a native plan file admits and pla
     if (out !== undefined) writeFileSync(out, `${JSON.stringify(results, null, 1)}\n`);
   }
   const refused = Object.entries(results).flatMap(([label, row]) => 'refused' in row ? [label] : []);
-  expect(refused, JSON.stringify(Object.fromEntries(Object.entries(results).filter(([, row]) => 'refused' in row)))).toEqual(KNOWN_REFUSED);
+  expect(refused, JSON.stringify(Object.fromEntries(Object.entries(results).filter(([, row]) => 'refused' in row)))).toEqual([]);
   for (const [label, row] of Object.entries(results)) if (!('refused' in row)) expect(row.digests, label).toHaveLength(TICKS / 60);
 }, 1_800_000);

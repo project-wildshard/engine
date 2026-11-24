@@ -2,7 +2,10 @@ import { QuestRuntimeDocumentSchema } from '@wildshard/format/questRuntime';
 import { Vector3 } from 'three';
 import { RewardCaption } from '@wildshard/engine/quest/view/ui';
 import { parseChapterDirector, parseChapterWake, type ChapterDirectorRows } from '@wildshard/format/chapterDirector';
+import { bindRuntimeBoss } from '../../../shared/game/plugin/runtimeRows';
 import { BossBar } from '@wildshard/engine/ui/BossBar';
+import { WakeBossEncounter } from '../../../shared/game/boss/wake';
+import { presentWakeBoss } from '../boss/presentation';
 import { BossRowBar } from '../boss/barFeed';
 import { wirePage } from '../shardfile/wirePage';
 import type { ShardContext } from '../plugin/context';
@@ -23,20 +26,24 @@ import { ChapterClock } from '../../../shared/game/quest/chapterClock';
 import { leadActors } from '../../../shared/game/quest/chapterLeads';
 import { prepareScriptMemoryLease } from '@wildshard/engine/script/host';
 
-/** Client-only chapter/boss binding over the existing AS director. ONE-FORMAT OF22c1, OF22c3: the wake row names a declared
- * spawn with a `boss` encounter, which the server wakes on the wake cue (Driftwood's Captain, OF22c2); its body and bar come
- * off the wire, so the page spawns no wake body and runs no wake shell. The host keeps the bar/director update order. */
-export async function installChapterWakeEncounter(ctx: ShardContext, input: unknown): Promise<{
-  readonly rewardAt: Vector3; readonly rewardPose: NonNullable<ChapterDirectorRows['reward']>;
+/** Client-only chapter/boss binding over the existing AS director and native
+ * spawn owner. Content supplies rows, ids and the resolved arena position;
+ * the host preserves the original bar/director update order and flag phase. */
+export async function installChapterWakeEncounter(ctx: ShardContext, input: unknown, pool: { readonly x: number; readonly z: number }): Promise<{
+  readonly actor: Animal | null; readonly rewardAt: Vector3; readonly rewardPose: NonNullable<ChapterDirectorRows['reward']>;
 }> {
   const rows = parseChapterWake(input), source = ctx.product.shardfile;
-  if (!source.encounters.some(row => row.entity === rows.spawn && row.kind === 'boss')) throw new Error('A chapter wake needs a declared boss encounter on its spawn');
   const flags = boundQuestState(ctx.scope, rows.quest).flags;
+  // K6b, OF22c1's page half: a wake row naming a declared spawn with a `boss` encounter wakes that fight on the server (Driftwood's
+  // Captain, OF22c2); its body and bar come off the wire, so the page binds no runtime boss row (it has none)
+  const declaredFight = source.encounters.some(row => row.entity === rows.spawn && row.kind === 'boss');
+  const spawnOwner = declaredFight ? null : bindRuntimeBoss(ctx, source, rows.spawn, undefined, { identity: 'runtime' });
   const director = await readChapterDirector(ctx, rows.director);
   const world = ctx.game.runtime?.world, play = ctx.game.runtime?.play;
   if (ctx.scope.disposed || world === undefined || world === null || play === undefined || play === null
     || director.rewardAt === null || director.rewardPose === undefined) throw new Error('Chapter encounter requires its entered world and reward');
-  const bar = ctx.scope.run(() => new BossBar());
+  const encounter = new WakeBossEncounter(rows.encounter, pool), bar = ctx.scope.run(() => new BossBar());
+  let actor: Animal | null = null;
   // J130: a bar has one driver. On the wire the row draws it, and the body under it is the server's.
   // A wake fight tells no start, and a fall ends it as a walk away does: only the page knows its player died.
   let fell = false;
@@ -44,20 +51,35 @@ export async function installChapterWakeEncounter(ctx: ShardContext, input: unkn
     if (outcome !== 'started') ctx.app.events.emit('boss.attempt', { boss: rows.encounter.id, level: rows.encounter.level, outcome: outcome === 'left' && fell ? 'lost' : outcome === 'died' ? 'lost' : outcome });
     fell = false;
   } });
+  const spawn = (): void => {
+    if (actor !== null || rowBar !== null || spawnOwner === null) return;
+    try {
+      actor = spawnOwner.spawn(); if (actor === null) throw new Error('Declared chapter body unavailable');
+      actor.herd = -1; actor.mem[rows.encounter.fields.poolX] = pool.x; actor.mem[rows.encounter.fields.poolZ] = pool.z;
+      actor.mem[rows.encounter.fields.arena] = rows.encounter.arena.radius;
+    } catch (error) { console.error('Chapter encounter failed to spawn', error); flags.set(rows.encounter.deadFlag); }
+  };
+  const observation = () => ({ player: world.player.position, animal: actor,
+    wake: flags.has(rows.encounter.wakeFlag), dead: flags.has(rows.encounter.deadFlag) });
+  const present = (): void => { presentWakeBoss(encounter, bar, ctx.app.events); };
   const cues = (): void => {
     for (const id of director.takeCues()) {
       const row = rows.cues.find(cue => cue.id === id); if (row === undefined) throw new Error('Unknown chapter encounter cue');
+      if (row.operation !== 'effects') spawn();
+      if (row.operation === 'wake') { encounter.wake(observation()); present(); }
       commitQuestEffects(ctx, rows.quest, row.effects);
       if (row.combat !== undefined) play.music.combat(row.combat);
     }
   };
   ctx.scope.onDispose(flags.onChange(cues));
   ctx.app.encounters.register({ id: rows.encounter.id, displayName: rows.encounter.name }, ctx.scope);
-  ctx.on('player.died', () => { fell = true; rowBar.playerDied(); });
+  ctx.app.encounters.boss(rows.encounter.id, encounter, ctx.scope);
+  ctx.on('player.died', () => { if (rowBar !== null) { fell = true; rowBar.playerDied(); return; } encounter.onPlayerDeath(world.player.position); present(); });
   cues();
-  ctx.system({ id: rows.systems.encounter, phase: 'update', before: rows.systems.before, run: dt => { rowBar.draw(wirePage.encounters(), dt); } });
+  ctx.system({ id: rows.systems.encounter, phase: 'update', before: rows.systems.before,
+    run: dt => { if (rowBar !== null) { rowBar.draw(wirePage.encounters(), dt); return; } bar.update(dt); encounter.update(observation()); present(); } });
   ctx.system({ id: rows.systems.director, phase: 'update', before: rows.systems.before, run: dt => { director.update(dt); cues(); } });
-  return { rewardAt: director.rewardAt, rewardPose: director.rewardPose };
+  return { get actor() { return actor; }, rewardAt: director.rewardAt, rewardPose: director.rewardPose };
 }
 
 /** Client-only chapter presentation on the caller's existing update phase.

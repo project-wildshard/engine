@@ -65,10 +65,10 @@ function wakeContext(encounters: readonly object[]): ShardContext {
 
 test("a chapter wake naming a declared boss spawn binds no runtime boss on the page", async () => {
   const fight = { id: "boss.captain", entity: "driftwood.captain", kind: "boss" };
-  await expect(installChapterWakeEncounter(wakeContext([fight]), WAKE)).rejects.toThrow("K6b director read");
+  await expect(installChapterWakeEncounter(wakeContext([fight]), WAKE, { x: 0, z: 0 })).rejects.toThrow("K6b director read");
 });
 
-// OF22c3: the page's wake body spawn and wake shell are gone, so a wake with no declared fight is refused
-test("a chapter wake naming no declared fight is refused", async () => {
-  await expect(installChapterWakeEncounter(wakeContext([]), WAKE)).rejects.toThrow("A chapter wake needs a declared boss encounter on its spawn");
+// SHARD-COMPAT CP16, FORMAT-PRUNE FP21 s8: kept originals Driftwood r4 and r5 wake the island's reserved Captain, which the page binds
+test("a chapter wake naming no declared fight still needs its runtime boss row", async () => {
+  await expect(installChapterWakeEncounter(wakeContext([]), WAKE, { x: 0, z: 0 })).rejects.toThrow("Undeclared runtime boss driftwood.captain");
 });

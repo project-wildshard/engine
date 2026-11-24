@@ -37,6 +37,7 @@ import { installNativeItems, otherCombatFrame } from '../plugin/nativeItems';
 import { addBakedPieces, bindNativeLoadout, weaponRow } from '../plugin/simulation';
 import { installHostPortalRide, type PortalRideRows } from '../../../shared/game/shardfile/portalRide';
 import { installPopulationEnvironment } from '../population/environment';
+import { installMixedPopulation, type MixedPopulationInput } from '../population/mixedRoster';
 import { installNativeCollision } from '../population/nativeBake';
 import { NativeWildEnvironment } from '../population/nativeManager';
 import { ReturnProgram } from '../../../shared/game/population/returnProgram';
@@ -46,11 +47,12 @@ import { parseNativePopulationRows } from '@wildshard/format/populationRoster';
 import { NativeBossBindingSchema, parseRoamingEncounter } from '@wildshard/format/bossEncounter';
 import { installNativeHerdShelter } from '../population/shelter';
 import { installNativeSpawnScript, readSpawnScript } from '../population/spawnScript';
+import { headlessSpecCatalogue } from '../population/specCatalogue';
 import { ownContractCatalogue } from '../../../shared/game/quest/contracts';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
 import { installNativeEliteFeature, readEliteFeature } from '../quest/eliteFeature';
 import { eliteDrops } from '../quest/eliteDrops';
-import { installQuestKillSteps } from '../quest/killSteps';
+import { installQuestKillSteps, rosterKind } from '../quest/killSteps';
 import { declaredQuestBodies } from '../quest/declaredQuestBodies';
 import { installNativeChapterDirector } from '../quest/nativeChapter';
 import { installNativeQuestComposition, readNativeQuestSpots, type NativeQuestCompositionInput } from '../quest/nativeComposition';
@@ -79,7 +81,7 @@ export interface AssemblyRun<C extends NativeAssemblyContext> {
   readonly host: SimHost; readonly context: C; input: { readonly ledger: { readonly fact: (name: string, actorId: string) => void } } | null;
   day: DayCycleClock | null; boss?: ReturnType<typeof installGroundBoss>; quest?: ReturnType<typeof installNativeQuestComposition>;
   ammunition?: ReturnType<typeof installNativeHeldAmmunition>; elites?: ReturnType<typeof installNativeEliteFeature>;
-  bindings?: NativeEliteBindings; roster?: ReturnType<typeof installNativeBootRoster>;
+  island?: ReturnType<typeof installMixedPopulation>; bindings?: NativeEliteBindings; roster?: ReturnType<typeof installNativeBootRoster>;
   weather?: { readonly wind: Wind; readonly storm: WeatherReactions }; finishPatrol?: () => void; arena?: OpenArenaRuntime;
   wild?: NativeWildEnvironment; groups?: ReturnType<typeof installNativeGroupRows>; nativeElites?: NativeEliteRoster; eliteCore?: ReturnType<typeof nativeEliteCore>; creatures?: ReturnType<typeof installNativePopulationHunt>; taming?: ReturnType<typeof installNativeTaming>;
   /** OF22c1: the declared encounters by their spawn, once the declared creature host stands (after every host). */
@@ -111,9 +113,9 @@ export function prepareSectionMelee<C extends NativeAssemblyContext>(product: Sh
 
 /** The held hosts whose families (format `primitiveOfHost`: `held.melee`, `held.ranged`) a section now stands. */
 /** ONE-FORMAT OF22c3: Driftwood's island population (its reserved Captain, item reactions, settle and poses) is declared rows
- *  now (OF22b4, OF22c2); no shard stands these hosts, so a plan naming one is refused. Kept originals Driftwood r4 and r5
- *  still name them (`test/kept-native-plans.test.ts`). */
-export const RETIRED_HOSTS: ReadonlySet<string> = new Set(['population.mixed', 'population.reactions', 'population.settle', 'population.poses']);
+ *  since OF22b4 and OF22c2, so no writer names these hosts. Kept originals Driftwood r4 (prod's head) and r5 still do, so
+ *  they stand for them (SHARD-COMPAT CP16, FORMAT-PRUNE FP21 s8; `test/kept-native-plans.test.ts`). */
+export const ISLAND_HOSTS: ReadonlySet<string> = new Set(['population.mixed', 'population.reactions', 'population.settle', 'population.poses']);
 export const HELD_HOSTS: ReadonlySet<string> = new Set(['item.swept', 'held.arms', 'item.ranged', 'loadout', 'combat.motion', 'ammunition']);
 /** The engine's sprint speed (`walkingSpeed`), the motion a held ranged kit scales its spread and sway against. */
 export const SPRINT_SPEED = 7.2;
@@ -178,10 +180,24 @@ async function prepareQuest<C extends NativeAssemblyContext>(row: Extract<Native
   const props = row.props === undefined ? undefined : await read<unknown>(row.props);
   const trades = row.barter === true ? parseBarterEconomy(need(shard.rows.loot[0], 'Missing barter row').economy).exchange : undefined;
   const secret = content === undefined ? undefined : await readNativeQuestSecret(product);
-  return run => { registerInstalled(run.host, 'questComposition'); run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
+  // OF22e1: a plan with no `population.mixed` host guards its quest with the declared bodies alone
+  const island = at.plan.features.some(feature => feature.host === 'population.mixed');
+  return run => { registerInstalled(run.host, 'questComposition'); run.quest = installNativeQuestComposition(run.host, { source: shard, table, rows, island, spots: row.readSpots === true ? readNativeQuestSpots(spots) : spots, counters: native,
     ...(content === undefined ? {} : { steps: content.steps, deaths: content.deaths, readings: content.readings, lead: content.lead }),
     ...(contracts === undefined ? {} : { contracts: ownContractCatalogue(contracts, run.host.scope) }), ...(trades === undefined ? {} : { trades }), ...(director === undefined ? {} : { director }),
     ...(props === undefined ? {} : { props }), ...(secret === undefined ? {} : { secret }), ...(row.restoring === true ? { restoring: run.context.restoring } : {}) }); };
+}
+async function prepareMixed<C extends NativeAssemblyContext>(row: Extract<NativeAssemblyFeature, { host: 'population.mixed' }>, at: AssemblyPrepared<C>): Promise<Step<C>> {
+  const { product, bake, nav } = at, shard = product.shardfile, species = need(keptSpeciesPrograms(product), 'The island population needs its species programme');
+  const launch = need(need(shard.items.launches, 'Missing launch rows')[row.launch], 'Native assembly requires its admitted launch'), sea = need(shard.water.find(body => body.id === row.sea && body.kind === 'sea'), 'Native assembly requires its admitted sea');
+  const actors = bake['actors'] as readonly { readonly spec: { readonly kind: string; readonly variant: string } }[], captain = bake['captain'] as { readonly spec: { readonly kind: string; readonly variant: string } };
+  const specs = headlessSpecCatalogue([...actors.map(actor => actor.spec), captain.spec]) as MixedPopulationInput['specs'];
+  const input = { perchProgram: await readAssemblyInput(product, row.perch), rows: await readAssemblyInput(product, row.rows), keeper: await readAssemblyInput(product, row.keeper),
+    placement: await readAssemblyInput<MixedPopulationInput['placement']>(product, row.placement), fauna: new Map(species.native.map(entry => [entry.kind, entry] as const)) };
+  need(species.program, 'Native assembly requires its admitted species program');
+  const waterLevel = declaredWaterBody(structuredClone(sea)).level;
+  return run => { run.island = installMixedPopulation(run.host, { ...input, reserved: bake['captain'], launch, population: species, specs, seed: shard.identity.seed, waterLevel, spawnY: shard.spawn.y, nav,
+    bake: { ground: bake.ground, actors: bake['actors'], herds: bake['herds'], habitat: bake['habitat'] } } as MixedPopulationInput, run.context.snapshot); };
 }
 /** The elite core a riding world binds: each rule's word, read through its programme from the clock and the storm. */
 export function nativeEliteCore(host: SimHost, conditions: NativeEliteConditions, program: Pick<ReturnProgram, 'project'>, day: { readonly dayPhase: string }, env: Pick<NativeWildEnvironment, 'storm'>): EliteCore<EliteCoreScript<AnimalSim>> {
@@ -371,26 +387,33 @@ export async function prepareAssemblyFeature<C extends NativeAssemblyContext>(ro
     case 'population.elites': { const input = await readEliteFeature(product, row.file); return run => { run.elites = installNativeEliteFeature(run.host, dayOf(run), input, shard.creatures.spawns); }; }
     case 'population.spawn-script': { const input = await readSpawnScript(product, row.id); return run => { installNativeSpawnScript(run.host, dayOf(run), input, undefined, undefined, undefined, { spawns: shard.creatures.spawns, restoring: run.context.restoring }); }; }
     case 'population.elites-ready': return run => { need(run.elites, 'Native elites are not installed').initialize(); };
-    case 'population.mixed': case 'population.reactions': case 'population.settle': case 'population.poses':
-      throw new Error(`Native assembly host ${row.host} is retired (ONE-FORMAT OF22c3): declare the creatures instead`);
+    // SHARD-COMPAT CP16, FORMAT-PRUNE FP21 s8: ONE-FORMAT OF22c3 retired Driftwood\'s island population (its writers declare
+    // the creatures since OF22b4, OF22c2), but kept originals Driftwood r4 (prod\'s head) and r5 still name it, so it stands for them
+    case 'population.mixed': return prepareMixed(row, at);
+    case 'population.reactions': return run => {
+      const island = need(run.island, 'Item reactions need the island population');
+      run.host.events.answer('item.reaction', reaction => { if (reaction.kind === 'alarm') island.alarm(); else island.staggered(reaction.actor, reaction.strength, reaction.running); return reaction; }, run.host.scope);
+    };
+    case 'population.settle': return run => { need(run.island, 'Settling needs the island population').settle(); };
+    case 'population.poses': return run => { run.host.onStep(row.step, need(run.island, 'Poses need the island population').publishPoses, undefined, 'afterBodies'); };
     case 'quest.composition': return prepareQuest(row, at);
     case 'quest.body-scripts': return run => { installBodyScripts(run.host, run.context, { product, assets: at.assets }); };
     case 'quest.kill-steps': {
       const input = await readAssemblyInput(product, row.rows), counters = parseAchievementCounterData(await readAssemblyInput(product, row.counters));
-      // OF22e1, OF22c3: the declared bodies (a body's kind is its species row's)
+      // OF22e1: the island's bodies where the plan stands it, then the declared bodies (a body's kind is its species row's)
       return run => {
-        const declared = declaredQuestBodies(run.host, shard);
-        installQuestKillSteps(run.host, input, counters.feats, actor => declared.kindOf(actor), need(run.input, 'Kill steps need their commands').ledger.fact);
+        const island = run.island === undefined ? undefined : rosterKind(run.island.bodies), declared = declaredQuestBodies(run.host, shard);
+        installQuestKillSteps(run.host, input, counters.feats, actor => island?.(actor) ?? declared.kindOf(actor), need(run.input, 'Kill steps need their commands').ledger.fact);
       };
     }
     case 'quest.chapter': {
       const director = await readDirectorDocument(product), input = parseChapterDirector(await readAssemblyInput(product, row.rows)), wake = parseChapterWake(await readAssemblyInput(product, row.wake));
-      // OF22c1, OF22c3: a wake row names a declared spawn with a boss encounter, and its wake cue wakes that fight. The row's
-      // `population` and the bake's `captain` row are an older writer's; nothing reads them
-      const fight = need(declaredWakeFight(product.shardfile, wake.spawn), 'A chapter wake needs a declared boss encounter on its spawn');
+      const captain = rows['captain'] as { pool: { x: number; z: number }; arena: unknown };
+      // OF22c1: a wake row naming a declared spawn with a boss encounter wakes that fight, not the population's reserved body
+      const fight = declaredWakeFight(product.shardfile, wake.spawn);
       return run => {
-        const declared = { ...fight, summon: () => { need(run.declared?.get(fight.entity), 'A declared wake needs its encounter').summon(); } };
-        installNativeChapterDirector(run.host, director, { id: row.id, rows: input, reward: row.reward, wake: { encounter: wake.encounter, cues: wake.cues.map(({ id, operation }) => ({ id, operation })) } }, run.context.restoring, declared);
+        const declared = fight === undefined ? undefined : { ...fight, summon: () => { need(run.declared?.get(fight.entity), 'A declared wake needs its encounter').summon(); } };
+        installNativeChapterDirector(run.host, director, { id: row.id, rows: input, reward: row.reward, wake: { population: row.population, encounter: wake.encounter, placement: { pool: { x: captain.pool.x, z: captain.pool.z }, arena: captain.arena }, cues: wake.cues.map(({ id, operation }) => ({ id, operation })) } }, run.context.restoring, declared);
       };
     }
     default: throw new Error('Unknown native assembly host');
