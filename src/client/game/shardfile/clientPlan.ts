@@ -377,8 +377,7 @@ export const CLIENT_FEATURES: Readonly<Record<AdmittedFeatureRow['kind'], Client
   } },
 };
 /** ONE-FORMAT OF29e8: the engine's own page population row. A quest page always binds its population from the declared
- *  files under the engine's system; an older pin's format `population.homes` row (Far Reach r4, Dunes r5) becomes this row
- *  with its own system, held bodies, holds and groups, so the format can retire the kind once no pin names one. */
+ *  files under the engine's system (FORMAT-PRUNE FP43: the format's `population.homes` kind is retired, no pin names it). */
 export interface PageHomesRow {
   readonly kind: typeof PAGE_HOMES;
   readonly system: string;
@@ -386,9 +385,11 @@ export interface PageHomesRow {
   readonly holds?: { readonly system: string; readonly rows: readonly { readonly home: number; readonly field: string; readonly until: string }[] };
   readonly groups: Readonly<Record<string, readonly string[]>>;
 }
-type FormatHomesRow = Extract<ClientFeatureRow, { kind: 'population.homes' }>;
-/** An admitted format row: every kind but the page population, which is the plan's `pageHomes`. */
-export type AdmittedFeatureRow = Exclude<ClientFeatureRow, FormatHomesRow>;
+/** FORMAT-PRUNE FP43: the retired format kind for a page's population; a plan that still names it is refused. */
+const RETIRED_HOMES = 'population.homes';
+/** An admitted format row: every kind but the retired page population, which is the plan's `pageHomes`. */
+export type AdmittedFeatureRow = Exclude<ClientFeatureRow, { kind: typeof RETIRED_HOMES }>;
+function admittedRow(row: ClientFeatureRow): row is AdmittedFeatureRow { return (row.kind as string) !== RETIRED_HOMES; }
 export interface AdmittedClientPlan { readonly features: readonly AdmittedFeatureRow[]; readonly pageHomes?: PageHomesRow }
 /** The page population's place among the play rows (after the boss it may keep, before the held boss) and its sections. */
 const PAGE_HOMES_STEP = { phase: 'play', rank: 60, lifetime: 'entered', sections: ['sim/runtime-plan', 'sim/scripts'] } as const;
@@ -413,20 +414,16 @@ function withDeclaredWildlife<P extends { readonly features: readonly ClientFeat
 }
 /** The engine's own system for a page population no plan row names. */
 export const HOMES_SYSTEM = 'engine.population.homes';
-/** An older pin's format row as the engine's: its witness (read by nothing) and body homes (passed to nothing) drop. */
-function pageHomesRow(row: FormatHomesRow): PageHomesRow {
-  return { kind: PAGE_HOMES, system: row.system, groups: row.groups,
-    ...(row.held === undefined ? {} : { held: row.held }), ...(row.holds === undefined ? {} : { holds: row.holds }) };
-}
 /** ONE-FORMAT OF29e4/OF29e8: a quest page binds its population from the declared files (`sim/runtime-plan`'s homes and the
- *  product's declared spawns) under the engine's system, as OF29e1 stands the server's family; a plan naming the format row
- *  keeps its own facts (J486) in the engine's row. */
+ *  product's declared spawns) under the engine's system, as OF29e1 stands the server's family. FORMAT-PRUNE FP43: a plan
+ *  naming the retired format row is refused, not converted. */
 export function pageHomes(features: readonly ClientFeatureRow[]): AdmittedClientPlan {
   const rows: AdmittedFeatureRow[] = [];
-  let homes: PageHomesRow | undefined;
-  for (const row of features) if (row.kind === 'population.homes') homes = pageHomesRow(row); else rows.push(row);
-  if (homes === undefined && features.some(row => row.kind === 'quest.page')) homes = { kind: PAGE_HOMES, system: HOMES_SYSTEM, groups: {} };
-  return homes === undefined ? { features: rows } : { features: rows, pageHomes: homes };
+  for (const row of features) {
+    if (!admittedRow(row)) throw new Error(`client/plan names ${RETIRED_HOMES}, retired (FORMAT-PRUNE FP43): the engine stands a quest page's population from its declared files`);
+    rows.push(row);
+  }
+  return features.some(row => row.kind === 'quest.page') ? { features: rows, pageHomes: { kind: PAGE_HOMES, system: HOMES_SYSTEM, groups: {} } } : { features: rows };
 }
 /** Validate the whole plan and all required sections before the first feature can mutate the page. */
 export function admitClientPlan(input: unknown, product: ShardFolder): AdmittedClientPlan {

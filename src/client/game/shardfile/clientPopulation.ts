@@ -40,14 +40,6 @@ export function clientPopulationActor(ctx: ShardContext, id: string): ReturnType
 /** A group member's body as a presentation feature draws on it: the keeper's where this page spawns its own, else the server's
  *  row of the same name (J130). A row arrives after entry and may come back as another body, so a caller asks each frame. */
 export type ClientPopulationBody = () => Animal | null;
-/** Every member of a declared group, by address. Group rows contain addresses only; the keeper or the rows own every body
- *  (a declared spawn's body is always its row's). */
-export function clientPopulationBodies(ctx: ShardContext, group: string): readonly ClientPopulationBody[] {
-  const population = ctx.product.section('client/plan').features.find(row => row.kind === 'population.homes');
-  const ids = population?.kind === 'population.homes' ? population.groups[group] : undefined;
-  if (ids === undefined || clientNativeBook(ctx).population === null) throw new Error(`Missing entered native population group: ${group}`);
-  return clientMemberBodies(ctx, ids);
-}
 /** ONE-FORMAT OF29e7b: the bodies of the declared spawns a row names itself (a trail's `members`), by address, as a group's. */
 export function clientMemberBodies(ctx: ShardContext, ids: readonly string[]): readonly ClientPopulationBody[] {
   if (clientNativeBook(ctx).population === null) throw new Error('Missing entered native population');

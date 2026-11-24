@@ -3,14 +3,14 @@ import { parse } from 'valibot';
 import { SlashTrail } from '@wildshard/engine/combat/view/slashTrail';
 import { ClientTrailsSchema } from '@wildshard/format/clientTrails';
 import type { ShardContext } from '../plugin/context';
-import { clientMemberBodies, clientPopulationBodies, type ClientPopulationBody } from './clientPopulation';
+import { clientMemberBodies, type ClientPopulationBody } from './clientPopulation';
 import { sceneModelSource } from './sceneSources';
 
-/** A trail's bodies: the declared spawns it names (`members`, ONE-FORMAT OF29e7a) or its page population group's. */
-export function trailBodies(ctx: ShardContext, row: Readonly<{ group?: string; members?: readonly string[] }>): readonly ClientPopulationBody[] {
-  if (row.members !== undefined) return clientMemberBodies(ctx, row.members);
-  if (row.group === undefined) throw new Error('A trail names its group or its members');
-  return clientPopulationBodies(ctx, row.group);
+/** A trail's bodies: the declared spawns it names (`members`, ONE-FORMAT OF29e7a). A page population group went with the
+ *  retired `population.homes` row (FORMAT-PRUNE FP43), so a trail names its members. */
+export function trailBodies(ctx: ShardContext, row: Readonly<{ members?: readonly string[] }>): readonly ClientPopulationBody[] {
+  if (row.members === undefined) throw new Error('A trail names its members (FORMAT-PRUNE FP43: population groups are retired)');
+  return clientMemberBodies(ctx, row.members);
 }
 /** Client-only point trails on the actual population: the keeper's bodies, or on a server's page its rows' (C12). A row's body
  * arrives late and may be replaced, so each frame asks for it, and a new body starts a fresh wake. The look owns materials; the

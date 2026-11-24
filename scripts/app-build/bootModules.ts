@@ -188,13 +188,6 @@ function optionalModuleRoots(root: string): Record<string, string[]> {
     }
     featureRoots[kind] = paths;
   }
-  // ONE-FORMAT OF29e8: an older pin's format `population.homes` row runs as the engine's page homes row, whose code the
-  // `quest.page` entry roots; its plan still names the group, so the group keeps that code until the format retires the kind
-  if (featureRoots['population.homes'] === undefined && existsSync(planFile)) {
-    const population = resolveImport('./clientPopulation', planFile);
-    if (population === null) throw new Error('Missing page population module');
-    featureRoots['population.homes'] = [population.id];
-  }
   for (const [kind, request] of [['presentation', '../plugin/ui'], ['loot', '../loot/runtime'], ['compendium', '../compendium/install']] as const) {
     featureRoots[kind] = [];
     if (!sourceImports(client.id).includes(request)) continue;
