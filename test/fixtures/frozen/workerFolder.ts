@@ -8,7 +8,11 @@ export function frozenDecisionWorkerFolder(input:Shardfile,moduleBytes:Uint8Arra
  // FP26 (format 0.1.0.4): the pin hashed the source as format 0.1.0.3 parsed it, `identity` in the order slug, name, author,
  // revision, seed; a newer parse spells the lineage saveRevision, after seed
  const identity:Record<string,unknown>={...input.identity},{saveRevision,seed,...head}=identity;
- const written=saveRevision===undefined?input:{...input,identity:{...head,revision:saveRevision,seed}};
+ const lineage=saveRevision===undefined?input:{...input,identity:{...head,revision:saveRevision,seed}};
+ // FP4 (format 0.74.0): requires.capabilities is optional and today's parse leaves it out; the pin hashed it as an empty
+ // list after sdk
+ const {sdk,...rest}=lineage.requires as Record<string,unknown>;
+ const written='capabilities' in lineage.requires?lineage:{...lineage,requires:{sdk,capabilities:[],...rest}};
  if(sha256(new TextEncoder().encode(JSON.stringify(written)))!==pin.inputSha256)throw new Error('Frozen worker fixture source differs');
  const assets=new Map(pin.assets.map(([hash,encoded])=>{
   const bytes=Uint8Array.from(Buffer.from(encoded,'base64'));

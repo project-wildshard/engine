@@ -77,7 +77,7 @@ describe('the cook worker', () => {
 
   it('still refuses when its own keys are over the default budget', async () => {
     const store = join(h.scratch, 'full');
-    sparse(store, 'assets/spawn/old-part.bin', 5_000_000_000);
+    sparse(store, 'assets/spawn/parts/old-part.bin', 5_000_000_000);
     const hash = hashOf(h.real);
     const row = await h.worker(new Map([[hash, h.real]]), 'b6', 'full').cook({slug, hash});
     expect(row).toMatchObject({state: 'failed'});

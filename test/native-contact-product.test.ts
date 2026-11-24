@@ -56,10 +56,11 @@ test('native contact targets pass real Node and client product admission with th
   await validateCheckedFolderAssets(source, new Map(), hash, undefined, undefined, fixture.payloads, false);
   expect(source.items).toEqual(fixture.shard.items);
 });
-test('worker context retains defining species values and refuses malformed metadata', () => {
+// Format 0.74.0 (ONE-FORMAT OF30 cut B, format cf6ef9f) retired actors/species-programs to plain JSON nothing is typed
+// against, so the worker forwards it untouched and no longer refuses its shape; a product's bytes still refuse below.
+test('worker context retains defining species values', () => {
   const fixture = product();
   expect(headlessSections(fixture.payloads).get('actors/species-programs')).toEqual(fixture.payloads.get('actors/species-programs'));
-  expect(() => headlessSections(new Map([['actors/species-programs', {page: [], native: [{...native, variants: []}]}]]))).toThrow();
 });
 test('unknown rehashed targets and changed native bytes refuse actual Node product admission', async () => {
   const unknown = product({page: [], native: [{...native, id: native.kind}]});
