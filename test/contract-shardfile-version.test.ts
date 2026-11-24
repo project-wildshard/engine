@@ -24,7 +24,7 @@ test('the preceding additive product admits and cooks without rewriting its orig
  const tar=folderTarball(fixture),files=readTar(tar);
  const header=files.get('shard.json');if(header===undefined)throw new Error('Missing fixture header');
  const input:unknown=JSON.parse(new TextDecoder().decode(header)),index=parseOutputIndex(input);
- expect(SHARDFILE_VERSION).toBe('0.1.0.4');
+ expect(SHARDFILE_VERSION).toBe('0.1.0.6');
  expect(index.version).toBe('0.1');
  const originalHash=hashImmutableBytes(tar);
  const options:FolderOptions={base,offline:false,
