@@ -4,7 +4,6 @@ import {resolve} from 'node:path';
 import {homedir} from 'node:os';
 import {pathToFileURL} from 'node:url';
 import {readBuildKey,shardfileCacheRoot} from './shardfile-cache.mjs';
-import {trimGenerationCache} from './generation-cache-prune.mjs';
 
 const keyPattern=/^[a-f0-9]{64}$/u;
 /** Only a complete current output and its matching cache entry authorize pruning
@@ -49,6 +48,9 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
       throw new Error('Generation history trim requires the isolated hosted Linux workspace');
     const fallback=process.env.PREPARATION_FALLBACK_KEY,output=process.env.GITHUB_OUTPUT;
     if(fallback===undefined||output===undefined)throw new Error('Generation history trim requires save identity and output');
+    // Loaded only here: its module graph (valibot, gen programs, input hashes) is the slow part of this CLI's start, and a
+    // refusal or a plain product trim needs none of it (release CI 45458806208: the refusal test passed 20 s under load).
+    const {trimGenerationCache}=await import('./generation-cache-prune.mjs');
     const report=trimGenerationCache(root,cache,resolve(homedir(),'.cache/wildshard/gen'),fallback,{dryRun:false});
     console.info(`CI generation cache: ${JSON.stringify(report)}`);
     appendFileSync(output,`status=${report.qualified?'complete':'unknown'}\n`);

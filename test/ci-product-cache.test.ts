@@ -103,3 +103,11 @@ it('refuses generation-history apply outside the isolated hosted Linux workspace
   const result=await runCli(['--prune-generation'],{...process.env,GITHUB_ACTIONS:'true',CI:'true',RUNNER_ENVIRONMENT:'self-hosted'});
   expect(result.stderr).toContain('requires the isolated hosted Linux workspace');expect(result.status).toBe(1);
 },TEST_DEADLINE_MS);
+
+// Release CI 45458806208: the refusal above passed its 20 s deadline under load while the CLI loaded the generation
+// prune's module graph it never used. Only --prune-generation may load it, so a refusal or plain trim starts light.
+it('loads the generation prune only for --prune-generation',()=>{
+  const source=readFileSync(resolve('scripts/ci-folder-cache.mjs'),'utf8');
+  expect(source).not.toMatch(/^import[^\n]*generation-cache-prune/mu);
+  expect(source).toContain("await import('./generation-cache-prune.mjs')");
+});
