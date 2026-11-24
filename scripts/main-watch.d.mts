@@ -40,6 +40,9 @@ export function attribute<L extends {lane:string;count?:number}>(commits:readonl
 export function paneFor(panes:readonly Pane[],slug:string):string|undefined;
 export function failurePaths(logs:readonly string[]):string[];
 export function redSuspect(commits:readonly string[],files:readonly string[],changes:ReadonlyMap<string,readonly string[]>):RedSuspect|undefined;
+/** Build-max C1: the coordinator's pane, which takes a red no lander was reached for and the keeper's red. */
+export const FALLBACK_PANE:string;
+export function fallbackRecipient(pane?:string):RedRecipient;
 export function redRecipients(rows:readonly {sha:string;lander?:RedLander}[],panes:readonly Pane[],agents:ReadonlyMap<string,string>,fixers:readonly string[]):RedRecipient[];
 export function redMessage(recipient:RedRecipient,details:{range:string;url:string;failed:string;named:string;suspect?:RedSuspect}):string;
 export function readState(file:string):State|null;
