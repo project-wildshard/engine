@@ -21,7 +21,7 @@ export function installCellQuests(source: Pick<Shardfile, 'quests' | 'identity'>
   return installDeclaredQuests(source.quests, book, ports.events, stay, (quest, options) => {
     const chip = options.chip ?? (() => wirePage.quest(quest.def).chip());
     ports.present(quest, { ...options, chip: () => (here() ? chip() : BLANK_CHIP()) });
-  });
+  }, source.identity.slug);
 }
 
 /** The page's install: each quest's chip, pins, card and reward on the page's context, bound to the stay. */

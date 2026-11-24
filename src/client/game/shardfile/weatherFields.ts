@@ -1,6 +1,6 @@
 import { EasedFields } from '@wildshard/engine/world/easedFields';
 import { parseEasedFields } from '@wildshard/format/easedFields';
-import { boundQuestState } from '../../../shared/game/quest/boundState';
+import { readableQuestState } from '../../../shared/game/quest/boundState';
 import { sceneScalar } from './sceneInputs';
 import { installEnteredRuntimeService } from '../shard/retainedHooks';
 import type { ShardContext } from '../plugin/context';
@@ -12,16 +12,24 @@ export function installWeatherFields(ctx: ShardContext, input: unknown, quest: s
   if (fields.rows.fields.some(row => !ctx.product.shardfile.state.shared.some(field => field.name === row.field && field.privacy === 'host' && field.type === 'f64')))
     throw new Error('Weather presentation requires declared host fields');
   if (ctx.scope.disposed) throw new Error('Weather presentation left during admission');
-  const flags = boundQuestState(ctx.scope, quest).flags;
+  // FORMAT-PRUNE FP49: the entry's bound quest (a quest page), else the shard's declared one (a scene shard, whose quests a
+  // grid stay may install after this plan): until it is installed the fields hold their else values, and its first read snaps
+  const flags = (): readonly string[] | undefined => readableQuestState(ctx.scope, ctx.product.slug, quest)?.flags.all;
+  let snapped = false;
   const publish = (): void => { for (const row of fields.rows.fields) sceneScalar(ctx.product.slug, row.field).value = fields.value(row.field); };
-  const snap = (): void => { fields.step(0, flags.all, true); publish(); };
+  const snap = (): void => { const all = flags(); snapped = all !== undefined; fields.step(0, all ?? [], true); publish(); };
   weatherFields.set(ctx.product.slug, fields);
   ctx.debug.expose('weatherFields', fields);
   ctx.scope.onDispose(() => { if (weatherFields.get(ctx.product.slug) === fields) weatherFields.delete(ctx.product.slug); });
   installEnteredRuntimeService(ctx, scope => { snap(); scope.onDispose(() => {
     for (const row of fields.rows.fields) sceneScalar(ctx.product.slug, row.field).value = row.else;
   }); });
-  ctx.system({ id: 'game.weather.fields', phase: 'update', run: dt => { fields.step(dt, flags.all); publish(); } });
+  ctx.system({ id: 'game.weather.fields', phase: 'update', run: dt => {
+    const all = flags();
+    if (all === undefined) return;
+    if (snapped) fields.step(dt, all); else { snapped = true; fields.step(0, all, true); }
+    publish();
+  } });
 }
 /** Capture tooling settles the admitted table against real quest facts; no field or target is supplied by a shard. */
 export function settleWeatherFields(slug: string, flags: readonly string[]): void {

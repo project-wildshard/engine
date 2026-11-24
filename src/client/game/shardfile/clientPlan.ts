@@ -306,12 +306,14 @@ export const CLIENT_FEATURES: Readonly<Record<AdmittedFeatureRow['kind'], Client
         if (follow !== null) ctx.system({ id: 'client.world.scene-tiles', phase: 'update', run: () => { follow(); } });
       };
     }) },
-  'light.emitters': { phase: 'world', rank: 30, lifetime: 'resident', sections: ['world/scenes'],
+  // FORMAT-PRUNE FP49: a scene shard (no world/scenes) hangs its lights, draws-free, on the plan's root; looks are the scene's
+  'light.emitters': { phase: 'world', rank: 30, lifetime: 'resident', needsWorldLooks: false, sections: [],
     install: loadFeature(async () => {
-      const { installLightEmitters } = await import('./lightEmitters');
+      const { installLightEmitters, sceneShardEmitterHandles } = await import('./lightEmitters');
       return async (ctx, row, resident) => {
         if (row.kind !== 'light.emitters') throw new Error('Invalid emitter feature');
-        await installLightEmitters(ctx, row.rows, clientSceneHandles(ctx.product, resident), resident);
+        const handles = ctx.product.has('world/scenes') ? clientSceneHandles(ctx.product, resident) : sceneShardEmitterHandles(ctx.root, resident);
+        await installLightEmitters(ctx, row.rows, handles, resident);
       };
     }) },
   'motion.channels': { phase: 'world', rank: 40, lifetime: 'entered', sections: ['world/scenes'],

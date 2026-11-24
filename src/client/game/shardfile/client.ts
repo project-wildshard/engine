@@ -796,7 +796,7 @@ export class ShardfileClient {
         // a retained (grid) runtime's chip, pins and card are its entered cell's only
         if (ui === null) throw new Error('Missing quest presentation module');
         if (retainsRuntimeServices(ctx)) ui.installEnteredQuestPresentation(at, quest, options); else ui.installQuestPresentation(at, quest, options);
-      });
+      }, ctx.product.slug);
       // meta MOSSGATE-ZONE MZ31: each declared step and payoff lands where it happened
       const ports = enteredLandingPorts(at, ctx.manifest.slug);
       if (ports !== null) installQuestLandings(states, ports, at.scope);

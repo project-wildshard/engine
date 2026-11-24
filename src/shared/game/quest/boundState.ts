@@ -21,6 +21,21 @@ export function publishBoundQuest(scope: Scope, state: QuestState): void {
   entered(scope).states.set(state.def.id, state);
 }
 
+/** FORMAT-PRUNE FP49: a shard's declared quests (`quests.quests`), by slug and id, while the scope that built them lives:
+ * a one-shard page's and a grid cell's stay alike, so a client feature reads a scene shard's quest flags. */
+const declared = new Map<string, QuestState>();
+const declaredKey = (slug: string, id: string): string => JSON.stringify([slug, id]);
+export function publishDeclaredQuest(slug: string, scope: Scope, state: QuestState): void {
+  if (scope.disposed) throw new Error('Declared quests require a live scope');
+  const key = declaredKey(slug, state.def.id);
+  declared.set(key, state);
+  scope.onDispose(() => { if (declared.get(key) === state) declared.delete(key); });
+}
+/** FP49: the quest a client feature reads: the entry's bound quest, else the shard's declared one; undefined while neither is installed. */
+export function readableQuestState(scope: Scope, slug: string, id: string): QuestState | undefined {
+  return (scope.disposed ? undefined : owners.get(scope)?.states.get(id)) ?? declared.get(declaredKey(slug, id));
+}
+
 /** Borrow the original entered quest and its flags by id; disposed entries cannot be read. */
 export function boundQuestState(scope: Scope, id: string): QuestState {
   const state = owners.get(scope)?.states.get(id);
