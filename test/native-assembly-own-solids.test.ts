@@ -6,7 +6,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -17,6 +16,7 @@ import { tagOf } from '../src/shared/engine/physics/surface';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { shippedPlan } from '../src/test/game/shippedPlan';
 
 
 async function shipped() {
@@ -47,7 +47,7 @@ function probe(live: NativeHeadlessResident, rapier: Shipped['rapier']): string[
 test('Driftwood with no collision host stands its ground and solids from its prop rows, and saves and restores', async () => {
   const fixture = await shipped();
   // Driftwood rev 7 (OF22e2) ships the move: its plan names no collision host and its solids are prop rows
-  const plan = JSON.parse(new TextDecoder().decode(await fixture.product.file(NATIVE_ASSEMBLY_FILE))) as { features: { host: string }[] };
+  const plan = await shippedPlan(fixture.product); // FP16b: no plan file from the SDK 0.4.30 pin on, so no host named
   expect(plan.features.map(row => row.host)).not.toContain('collision');
   expect(fixture.shard.props?.colliders.length ?? 0).toBeGreaterThan(10);
   const live = await open(fixture);

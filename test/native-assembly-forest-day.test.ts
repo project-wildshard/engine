@@ -4,7 +4,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { NATIVE_ASSEMBLY_FILE, type NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
@@ -14,6 +13,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { foldedPlan, withPlanFile } from '../src/test/game/shippedPlan';
 
 function run(live: NativeHeadlessResident, ticks: number): string[] {
   const digests: string[] = [];
@@ -31,10 +31,11 @@ test('Nalati with no day host stands its day from the forest weather clock, and 
   const assets = new Map(serverInputFiles(descriptor.index.files, shard)
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const plan = JSON.parse(new TextDecoder().decode(await product.file(NATIVE_ASSEMBLY_FILE))) as NativeAssemblyPlan;
-  expect(plan.features.map(row => row.host), 'the r7 pin names its day').toContain('day.declared');
-  const bytes = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.filter(row => row.host !== 'day.declared') }));
-  const dayless: ShardFolder = Object.assign(Object.create(product) as ShardFolder, { file: (name: string) => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : product.file(name) });
+  const { product: folded, plan } = await foldedPlan(product); // FP16f: a planless pin, its sections folded into one plan
+  // r7 names its day; from the SDK 0.4.30 pin on (FP16f) it names no day host, so the shipped product is the dayless world
+  const declared = plan.features.some(row => row.host === 'day.declared');
+  expect(plan.features.filter(row => row.host.startsWith('day.') && row.host !== 'day.declared')).toEqual([]);
+  const dayless: ShardFolder = declared ? withPlanFile(folded, { ...plan, features: plan.features.filter(row => row.host !== 'day.declared') }) : product;
   const open = (folder: ShardFolder, snapshot?: string): Promise<NativeHeadlessResident> =>
     createNativeHeadlessResident({ shard: folder.shardfile, assets, rapier, product: folder }, snapshot);
   const named = await open(product), derived = await open(dayless);

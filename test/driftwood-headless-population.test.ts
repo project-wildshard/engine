@@ -113,7 +113,9 @@ test("Driftwood's server files stay off every client path", async () => {
   const { descriptor, directory } = await shipped(), { admission, files, packs } = descriptor.index;
   const server = admission.server ?? [], names = server.map(row => row.name).sort();
   // Driftwood rev 7 (OF22e2): the keeper, the mixed population and the swords left with their hosts
-  expect(names).toEqual(['server/kill-steps.json', 'server/native-assembly.json', 'server/physics.json', 'server/quest-policy.json', 'server/quest-props.json',
+  // FP16b: from the SDK 0.4.30 pin on, no plan file; its settings and hosts are sections
+  const plan = server.some(row => row.name === 'server/native-assembly.json') ? ['server/native-assembly.json'] : [];
+  expect(names).toEqual(['server/kill-steps.json', ...plan, 'server/physics.json', 'server/quest-policy.json', 'server/quest-props.json',
     'server/quest-spots.json']);
   const shard: unknown = JSON.parse(readFileSync(`${directory}/shard.json`, 'utf8'));
   const hashes = new Set(server.map(row => row.hash)), listed = JSON.stringify([shard, packs], (key, value: unknown) => key === 'server' ? undefined : value);

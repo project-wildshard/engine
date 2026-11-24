@@ -10,7 +10,7 @@ import { createNativeHeadlessResident, type NativeHeadlessResident } from '../sr
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { populationCensus, type PopulationCensus } from '../src/shared/game/population/census';
-import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
+import { hasNativeAssembly } from '../src/server/game/shardfile/nativeAssembly';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { jumpOwnerClock } from './fixtures/ownerClock';
@@ -45,7 +45,7 @@ const kill = (resident: NativeHeadlessResident, id: string): void => {
 
 test('Nalati runs its whole population headless from the product: roster, wolves, night, a raid and a snapshot', async () => {
   const { product, resident } = await shipped();
-  expect(product.hasFile(NATIVE_ASSEMBLY_FILE)).toBe(true);
+  expect(hasNativeAssembly(product), 'a native world: its plan file, or server/world from FP16f on').toBe(true);
   const roster = v.parse(Roster, await product.json('server/boot.json')).roster.adoption;
   const live = await resident();
   let restored: NativeHeadlessResident | undefined;

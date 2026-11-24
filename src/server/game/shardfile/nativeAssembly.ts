@@ -267,6 +267,11 @@ function withHostSections(product: ShardFolder, plan: NativeAssemblyPlan): Nativ
   if (plan.bake?.read === 'bake' && !has('collision', 'collision.pieces')) rows.push({ host: 'collision' });
   return rows.map((row, at) => ({ row, at })).sort((a, b) => rank(a.row.host) - rank(b.row.host) || a.at - b.at).map(({ row }) => row);
 }
+/** The hosts a native world stands before its population and taming steps: its plan's (or `server/world`'s, none) and each
+ *  family section's, in install order (FORMAT-PRUNE FP16; what a test reads where a product ships no plan file). */
+export async function standingHosts(product: ShardFolder): Promise<readonly NativeAssemblyFeature[]> {
+  return withHostSections(product, await writtenPlan(product));
+}
 /** Put cooked taming at the same installation point as its explicit predecessor. Its pose program is the looks row of
  *  the taming rows' first kind, the species tamed before any upgrade (FORMAT-PRUNE FP42: the engine names no kind). */
 async function withSectionTaming(product: ShardFolder, features: readonly NativeAssemblyFeature[]): Promise<readonly NativeAssemblyFeature[]> {

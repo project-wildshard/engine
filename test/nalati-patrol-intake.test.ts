@@ -7,6 +7,7 @@ import {loadRapier} from '../src/shared/engine/physics/rapier';
 import {snapshotSimHost} from '../src/shared/engine/sim/snapshot';
 import {nativePopulationOf} from '../src/server/game/riding/nativePopulation';
 import {builtFolder} from '../src/test/game/builtFolder';
+import { foldedPlan, withPlanFile } from '../src/test/game/shippedPlan';
 import {createNativeProofResident,prepareFolderPlan as prepareHeadlessRuntime} from '../src/test/game/headlessNative';
 import {prepareNalatiWorld} from './fixtures/nalati-world';
 import {readPatrolIntake,readPatrolPoses} from '../src/server/game/boss/patrolNative';
@@ -17,7 +18,6 @@ import {Vector3} from 'three';
 import * as v from 'valibot';
 import {TimedEncountersSchema} from '@wildshard/format/encounterRows';
 
-import { NATIVE_ASSEMBLY_FILE, parseNativeAssembly } from '@wildshard/format/nativeAssembly';
 import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { admittedResidents, step } from './fixtures/engine-lift/residents';
@@ -96,16 +96,13 @@ test('patrol contact seats use admitted moving joints and preserve their quiet c
 test('Nalati installs the patrol and its elite owners in a room without an open arena', async () => {
   const preparation = residentInput('nalati-grasslands'), product = preparation.product;
   if (product === undefined) throw new Error('Missing admitted Nalati product');
-  const plan = parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE));
+  const { product: folded, plan } = await foldedPlan(product); // FP16f: a planless pin, its sections folded into one plan
   const patrol = plan.features.find(row => row.host === 'encounter.patrol');
   expect(patrol).toBeDefined();
   if (patrol === undefined) throw new Error('Missing admitted Nalati patrol');
   expect(plan.features.some(row => row.host === 'boss.open-arena')).toBe(true);
   const features = plan.features.filter(row => row.host !== 'boss.open-arena');
-  const bytes = new TextEncoder().encode(JSON.stringify({ ...plan, features }));
-  const withoutArena: ShardFolder = {
-    ...product, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : product.file(name),
-  };
+  const withoutArena: ShardFolder = withPlanFile(folded, { ...plan, features });
   const live = await createNativeHeadlessResident({ ...preparation, product: withoutArena }, undefined, { room: true });
   try {
     step(live, 5);

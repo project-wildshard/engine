@@ -7,7 +7,6 @@
 import { readFileSync } from 'node:fs';
 import { Vector3 } from 'three';
 import { expect, test } from 'vitest';
-import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import type { AnimalSim } from '../src/shared/engine/entities/AnimalSim';
 import { nativeMeleeItem } from '../src/server/game/plugin/nativeItems';
@@ -18,6 +17,7 @@ import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { shippedPlan } from '../src/test/game/shippedPlan';
 
 const STEP = 'item.driftwood-isle.swords';
 
@@ -57,7 +57,7 @@ function swings(live: NativeHeadlessResident): { readonly crab: string; readonly
 test('a native plan with no item.swept host swings its held/melee section\'s sword', async () => {
   const fixture = await shipped(), { product } = fixture;
   // Driftwood rev 7 (OF22e2) ships the move: its plan names no item.swept host and its policy is the held/melee section
-  const plan = JSON.parse(new TextDecoder().decode(await product.file(NATIVE_ASSEMBLY_FILE))) as { features: { host: string }[] };
+  const plan = await shippedPlan(product); // FP16b: no plan file from the SDK 0.4.30 pin on, so no host named
   expect(plan.features.map(row => row.host)).not.toContain('item.swept');
   expect(product.has('held/melee')).toBe(true);
   const live = await resident(fixture, product);

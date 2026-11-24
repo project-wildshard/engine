@@ -16,7 +16,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
-import { shippedPlan, shipsPlanFile, withPlanFile } from '../src/test/game/shippedPlan';
+import { foldedPlan, shippedPlan, shipsPlanFile, withPlanFile } from '../src/test/game/shippedPlan';
 
 /** Where each moved host's row goes; a host not here (plumbing, collision, the day) stands with no row. */
 const FAMILY: readonly (readonly [string, (host: string) => boolean])[] = [
@@ -143,3 +143,14 @@ test('a plan file beside server/world is refused', async () => {
   });
   await expect(open(fixture, both)).rejects.toThrow('not both');
 });
+
+// The fold the plan-editing proofs use (nalati-patrol-intake, forest-day, world-sections, held-arms): a product's sections
+// folded back into one plan file naming every host runs digest for digest as the product shipped.
+for (const slug of ['driftwood-isle', 'pine-hollow', 'nalati-grasslands']) test(`${slug} folded into one plan file runs as shipped`, async () => {
+  const fixture = await shipped(slug), { product } = await foldedPlan(fixture.product);
+  const asShipped = await open(fixture, fixture.product), folded = await open(fixture, product);
+  try {
+    expect(canonicalSimDigest(snapshotSimHost(folded.host))).toBe(canonicalSimDigest(snapshotSimHost(asShipped.host)));
+    expect(run(folded, 600)).toEqual(run(asShipped, 600));
+  } finally { folded.dispose(); asShipped.dispose(); }
+}, 600_000);

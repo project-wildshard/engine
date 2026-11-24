@@ -1,9 +1,9 @@
 import { expect, test } from 'vitest';
 import * as v from 'valibot';
-import { NATIVE_ASSEMBLY_FILE, parseNativeAssembly } from '@wildshard/format/nativeAssembly';
 import { parseEliteFeature } from '@wildshard/format/eliteFeature';
 import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { readAssemblyInput } from '../src/server/game/shardfile/nativeAssemblyInput';
+import { standingHosts } from '../src/server/game/shardfile/nativeAssembly';
 import { encounterRows } from '../src/shared/engine/sim/encounterRows';
 import type { ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { admittedResidents, step } from './fixtures/engine-lift/residents';
@@ -23,9 +23,9 @@ const ELITES_FILE = 'actors/elites.json';
 
 /** The product names the encounters; the public room wire must have an owner for each. */
 async function namedElites(product: ShardFolder): Promise<string[]> {
-  const plan = parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE)), ids = new Set<string>();
+  const ids = new Set<string>();
   if (product.hasFile(ELITES_FILE)) for (const fight of parseEliteFeature(await product.json(ELITES_FILE)).fights) ids.add(fight.def.id);
-  for (const feature of plan.features) {
+  for (const feature of await standingHosts(product)) { // FP16b/c/f: a planless pin's hosts stand from its sections
     if (feature.host === 'riding.elites') {
       const rows = await readAssemblyInput<unknown>(product, feature.rows);
       for (const row of v.parse(definitions, rows).rows) ids.add(row.def.id);

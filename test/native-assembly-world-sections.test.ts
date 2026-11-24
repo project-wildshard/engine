@@ -7,7 +7,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { leadPlayer } from '@wildshard/engine/sim/leadPlayer';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
@@ -18,6 +17,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { foldedPlan, withPlanFile } from '../src/test/game/shippedPlan';
 
 async function shipped() {
   const directory = builtFolder('driftwood-isle'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
@@ -32,9 +32,8 @@ async function shipped() {
 type Shipped = Awaited<ReturnType<typeof shipped>>;
 /** The product with these hosts cut from its native plan. */
 async function cut(fixture: Shipped, hosts: readonly string[]): Promise<ShardFolder> {
-  const plan = JSON.parse(new TextDecoder().decode(await fixture.product.file(NATIVE_ASSEMBLY_FILE))) as { features: { host: string }[] };
-  const bytes = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.filter(row => !hosts.includes(row.host)) }));
-  return { ...fixture.product, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : fixture.product.file(name) };
+  const { product, plan } = await foldedPlan(fixture.product); // FP16b: a planless pin, its sections folded into one plan
+  return withPlanFile(product, { ...plan, features: plan.features.filter(row => !hosts.includes(row.host)) });
 }
 const open = (fixture: Shipped, product: ShardFolder, snapshot?: string): Promise<NativeHeadlessResident> =>
   createNativeHeadlessResident({ shard: fixture.shard, assets: fixture.assets, rapier: fixture.rapier, product }, snapshot);
