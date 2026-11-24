@@ -8,3 +8,7 @@ to say which would need a wire minor. So both sides start fresh on every new lin
 portal ride (`releaseSeatPortals`), and the page restores its install-time ride state at the first frame after `NetClient.rejoin`
 (`freshOnRejoin` in `portalRideBinding.ts`). A blip mid-ride resets both; a player still on the pad simply rides again.
 Tests: `test/portal-ride-rejoin.test.ts` (the page hook); the seat release is `test/portal-ride-room.test.ts`'s.
+
+Follow-up: the room proof, `test/portal-ride-rejoin-room.test.ts`, on a real `DedicatedRoom` over the built Nine Dragon Stack. A
+reload that kept its seat takes the fresh ride; a blip mid-fade starts it afresh, and a player still on the pad rides again and
+lands, never left held. Test only.
