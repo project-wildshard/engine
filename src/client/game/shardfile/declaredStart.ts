@@ -1,4 +1,4 @@
-import { levelStart } from '@wildshard/format/level-start';
+import { DEFAULT_SPAWN, levelStart } from '@wildshard/format/level-start';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { ShardManifest } from '../shard/manifest';
 
@@ -11,14 +11,21 @@ export type StartSource = Pick<Shardfile, 'spawn' | 'audio' | 'items' | 'manifes
  * keeps them in its sections (`world/spawn`, `items.loadout.level`, `audio.level`) and its `ui/level` manifest has none;
  * an older product's manifest still carries them and they are read at the door (format `levelStart`). The start is the
  * product's own, as the level look is (`declaredLevel`), so a page stands where its product says even when the discovery
- * document is older or newer, or (since OF9b5) carries none. A product with no level manifest keeps the discovery's start.
+ * document is older or newer, or (since OF9b5) carries none. FORMAT-PRUNE FP35: a product with no level manifest (the
+ * open plots, Mirror Salt, Mossgate) stands where its `world/spawn` says too, the discovery's spawn only when the product
+ * never declared one; its loadout and audio are its sections' when it has them, else the discovery's.
  * A spawn on terrain has no height: the page stands the player on the ground (`manifest.ground.structures` keeps it).
  */
 export function declaredStart(manifest: StartManifest, source: StartSource): Pick<ShardManifest, 'spawn'> & Pick<Partial<ShardManifest>, 'loadout' | 'audio'> {
-  if (source.manifest === undefined) return { spawn: manifest.spawn, ...(manifest.loadout === undefined ? {} : { loadout: manifest.loadout }), ...(manifest.audio === undefined ? {} : { audio: manifest.audio }) };
-  const start = levelStart({ spawn: source.spawn, audio: source.audio, items: source.items, manifest: source.manifest }, manifest.ground.structures === undefined);
+  const undeclared = source.manifest === undefined && sameSpawn(source.spawn, DEFAULT_SPAWN);
+  const level = undeclared ? { spawn: manifest.spawn } : source.manifest;
+  const start = levelStart({ spawn: source.spawn, audio: source.audio, items: source.items, ...(level === undefined ? {} : { manifest: level }) }, manifest.ground.structures === undefined);
   const loadout = start.loadout ?? manifest.loadout;
   // the discovery's audio bindings (cues, preload) stay; the product's own words lie over them
   const audio = start.audio === undefined ? manifest.audio : { ...manifest.audio, ...start.audio };
   return { spawn: start.spawn, ...(loadout === undefined ? {} : { loadout }), ...(audio === undefined ? {} : { audio }) };
+}
+
+function sameSpawn(a: StartSource['spawn'], b: StartSource['spawn']): boolean {
+  return a.x === b.x && a.y === b.y && a.z === b.z && a.yaw === b.yaw;
 }

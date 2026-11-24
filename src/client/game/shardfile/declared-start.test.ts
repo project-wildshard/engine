@@ -40,4 +40,13 @@ describe('declaredStart (OF9b3)', () => {
     const bare = { ...OLDER, manifest: undefined } as unknown as StartSource;
     expect(declaredStart(DISCOVERY, bare)).toEqual({ spawn: DISCOVERY.spawn, loadout: DISCOVERY.loadout, audio: DISCOVERY.audio });
   });
+
+  it('stands a product with no level manifest where its world/spawn says, its sections over the discovery (FP35)', () => {
+    const plot = { ...OLDER, manifest: undefined, spawn: { x: 0, y: 0.1, z: -45, yaw: 3 } } as unknown as StartSource;
+    const structures = { ...DISCOVERY, ground: { structures: true as const } };
+    expect(declaredStart(structures, plot)).toEqual({ spawn: { x: 0, y: 0.1, z: -45, yaw: 3 }, loadout: DISCOVERY.loadout, audio: DISCOVERY.audio });
+    expect(declaredStart(DISCOVERY, plot).spawn).toEqual({ x: 0, z: -45, yaw: 3 });
+    const sections = { ...plot, items: { ...OLDER.items, loadout: { ...OLDER.items.loadout, level: LOADOUT } }, audio: { ...OLDER.audio, level: AUDIO } } as unknown as StartSource;
+    expect(declaredStart(structures, sections)).toEqual({ spawn: { x: 0, y: 0.1, z: -45, yaw: 3 }, loadout: LOADOUT, audio: { ...DISCOVERY.audio, ...AUDIO } });
+  });
 });
