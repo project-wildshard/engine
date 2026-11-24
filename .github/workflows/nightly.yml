@@ -352,12 +352,11 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  # TC28/J186: a real week of reports before explicit admission. The
-  # artifact's complete:true, never this report-only job's green, is proof.
+  # TC28 (J503, AD2): blocking. The quick proof also runs in ci-static on
+  # every push; this job adds the real hosted cold, reuse and cold cooks.
   cook-cache:
     if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.cook_cache_only)
     runs-on: ubuntu-24.04
-    continue-on-error: true
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
