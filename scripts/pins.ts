@@ -137,26 +137,33 @@ async function refresh(drop: readonly string[]): Promise<void> {
 
 /** One source's bytes for a hash, or undefined if it doesn't hold them. Bytes that aren't the pin stop the build. */
 async function fetched(url: string, slug: string, hash: string, options?: RequestInit): Promise<Uint8Array | undefined> {
+  return (await fetchedOnce(url, slug, hash, options)).bytes;
+}
+
+/** `fetched`, saying whether a miss may pass: no response, a 5xx, or a body cut short. A 4xx is a definite miss. */
+async function fetchedOnce(url: string, slug: string, hash: string, options?: RequestInit): Promise<{ readonly bytes?: Uint8Array; readonly transient: boolean }> {
   const response = await fetch(url, options).catch(() => undefined);
-  if (response?.ok !== true) return undefined;
+  if (response === undefined) return { transient: true };
+  if (!response.ok) return { transient: response.status >= 500 };
   // A connection can close after headers, before the immutable body is complete.
   const body = await response.arrayBuffer().catch(() => {
     console.warn(`${slug}: could not finish reading a pin source`);
     return undefined;
   });
-  if (body === undefined) return undefined;
+  if (body === undefined) return { transient: true };
   const bytes = new Uint8Array(body);
   if (sha256(bytes) !== hash) throw new Error(`${slug}: ${url} is not the pin`);
-  return bytes;
+  return { bytes, transient: false };
 }
 
-/** `fetched`, tried three times with backoff (1 s, then 3 s): one API blip must not leave a pin with no source (main red
- *  45404606407, two open-plot pins with no mirror copy). */
+/** `fetched`, tried again after 1 s and 3 s when the miss may pass (no response, a 5xx, a cut body): one API blip must not
+ *  leave a pin with no source (main red 45404606407). A 404 is a definite miss and returns at once (main red 45415377451,
+ *  the slice-rebuild test waited out the backoff). */
 async function fetchedRetrying(url: string, slug: string, hash: string): Promise<Uint8Array | undefined> {
   for (const wait of [1000, 3000, 0]) {
-    const bytes = await fetched(url, slug, hash);
-    if (bytes !== undefined || wait === 0) return bytes;
-    console.warn(`${slug}: ${url} held no bytes; trying again in ${wait / 1000} s`);
+    const { bytes, transient } = await fetchedOnce(url, slug, hash);
+    if (bytes !== undefined || !transient || wait === 0) return bytes;
+    console.warn(`${slug}: ${url} held no bytes for now; trying again in ${wait / 1000} s`);
     await sleep(wait);
   }
   return undefined;
