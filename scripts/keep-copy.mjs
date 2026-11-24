@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url';
 const MAX_UNTRACKED_BYTES = 50 * 1024 * 1024;
 const DEFAULT_KEEP_ROOT = join(homedir(), '.cache/wildshard/session-keep');
 const RETENTION_DAYS = 14;
+const PINS_LEDGER = 'out/.pins.json';
 const RAW_PATCH = ['--binary', '--no-color', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/'];
 // Declared build/install outputs are regenerable. Other ignored files, including
 // tmp captures and owner metadata, must be copied or make removal fail closed.
@@ -64,9 +65,35 @@ function bytes(path, files) {
   return files.reduce((total, file) => total + lstatSync(join(path, file)).size, 0);
 }
 
+/** Pin mounts a worktree's own pins install published (engine scripts/pins.ts records them in out/.pins.json) are
+ * declared build output: the install puts them back from the content-addressed pins. A mount changed after that install
+ * (newer than the ledger) is work, and is kept. Meta QA-FEEDBACK-2026-11-24 row 48: an ended release worktree's
+ * mounts under public/assets/ (music, sfx, models ...) passed 50 MiB, so keep-copy refused every one of them.
+ * @param {string} root @returns {Set<string>} */
+export function pinMounts(root) {
+  const mounts = new Set();
+  let published, installed;
+  try {
+    const ledger = join(root, PINS_LEDGER), info = lstatSync(ledger);
+    if (!info.isFile()) return mounts;
+    installed = info.mtimeMs;
+    published = JSON.parse(readFileSync(ledger, 'utf8')).published;
+  } catch { return mounts; }
+  if (!Array.isArray(published)) return mounts;
+  for (const path of published) {
+    if (typeof path !== 'string' || !path.startsWith('public/') || path.split('/').some(part => part === '..' || part === '')) continue;
+    try {
+      const info = lstatSync(join(root, path));
+      if (info.isFile() && info.mtimeMs <= installed) mounts.add(path);
+    } catch { /* not published here: nothing to omit */ }
+  }
+  return mounts;
+}
+
 /** Include ignored evidence without walking known generated outputs or symlinks.
- * @param {string} root @param {ReadonlySet<string>} regenerableFiles */
-function recoverableFiles(root, regenerableFiles) {
+ * @param {string} root @param {ReadonlySet<string>} callerFiles */
+function recoverableFiles(root, callerFiles) {
+  const regenerableFiles = new Set([...callerFiles, ...pinMounts(root)]);
   const files = new Set(text(root, ['ls-files', '--others', '--exclude-standard', '-z']).split('\0').filter(file => file && !regenerableFiles.has(file)));
   const visit = (/** @type {string} */ file) => {
     const info = lstatSync(join(root, file));
