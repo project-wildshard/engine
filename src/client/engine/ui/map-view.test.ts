@@ -9,7 +9,7 @@ import { withOwner } from '../../../shared/engine/app/ownership';
 import { legacyDouble } from '../../../test/engine/FakeGame';
 import { FullMap } from './Map';
 import type { MapExtras, Minimap } from './Minimap';
-import { OPEN_ZONE_FILL, SHARD_STOPS, cellAt, clampView, gridPpm, gridStops, namesPlaces, nearestStop, openZoom, wholeCellsIn, type MapGrid } from './mapView';
+import { OPEN_ZONE_FILL, SHARD_STOPS, cellAt, clampView, gridPpm, gridStops, namesPlaces, namesZones, nearestStop, openZoom, wholeCellsIn, type MapGrid } from './mapView';
 
 afterEach(() => { vi.restoreAllMocks(); });
 
@@ -92,14 +92,14 @@ function fixture(extras: MapExtras | null) {
   const frames: FrameRequestCallback[] = [];
   vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((frame: FrameRequestCallback) => { frames.push(frame); return frames.length; });
   vi.spyOn(globalThis, 'cancelAnimationFrame').mockImplementation(() => undefined);
-  const strokeRect = vi.fn<CanvasRenderingContext2D['strokeRect']>(), fillText = vi.fn<(text: string, x: number, y: number) => void>();
+  const strokeRect = vi.fn<CanvasRenderingContext2D['strokeRect']>(), fillText = vi.fn<(text: string, x: number, y: number) => void>(), rotate = vi.fn<(angle: number) => void>();
   const ctx = legacyDouble<CanvasRenderingContext2D>({
     setTransform: () => undefined, clearRect: () => undefined, fillRect: () => undefined,
     drawImage: () => undefined, strokeRect, strokeText: () => undefined, fillText,
     measureText: text => legacyDouble<TextMetrics>({ width: text.length * 7 }),
     beginPath: () => undefined, moveTo: () => undefined, lineTo: () => undefined,
     closePath: () => undefined, save: () => undefined, restore: () => undefined,
-    translate: () => undefined, rotate: () => undefined, fill: () => undefined,
+    translate: () => undefined, rotate, fill: () => undefined,
     stroke: () => undefined, arc: () => undefined, setLineDash: () => undefined,
   });
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(function canvasContext(this: HTMLCanvasElement) { return Object.assign(ctx, { canvas: this }); });
@@ -109,7 +109,7 @@ function fixture(extras: MapExtras | null) {
   map.mount(document.body);
   map.setPois(() => []);
   map.setExtras(() => extras);
-  return { map, scope, frames, strokeRect, fillText };
+  return { map, scope, frames, strokeRect, fillText, rotate };
 }
 const gridExtras: MapExtras = { rects: [], images: [], labels: [], grid: GRID };
 const cellsAcross = (box: { x0: number; x1: number; z0: number; z1: number }): number => Math.min(box.x1 - box.x0, box.z1 - box.z0) / PITCH;
@@ -264,17 +264,31 @@ test('MN13: the grid map names its places at 1x and 2x, and only marks them at 0
   } finally { scope.dispose(); }
 });
 
-test('MN9: at 0.25x a zone\'s name too long for the strip by its cell\'s edge fills its whole cell', () => {
-  const name = { x: PITCH, z: 250 - 90, text: 'Coral Drift', short: 'Coral Drift', color: '#eaf6ff', width: 468, height: 160 };
-  for (const fill of [undefined, { x: PITCH, z: 0, width: 468, height: 468 }]) {
-    const { map, scope, frames, fillText } = fixture({ ...gridExtras, labels: [fill === undefined ? name : { ...name, fill }] });
-    try {
-      Object.defineProperty(map.root, 'clientWidth', { value: 386 });
-      Object.defineProperty(map.root, 'clientHeight', { value: 540 });
-      map.update({ x: 0, z: 0 }, 0); map.show(); map.setZoom(1);
+// QA-FEEDBACK 11-24 row 19 (Jake, 13:40 Cancún: "at fit and at 0.25 we just don't render any of these labels ... We only do it at
+// like 0.5, 1 and 2"): fit and 0.25x draw no zone name; 0.5x, 1x and 2x do, upright, every line inside its own tile
+test('row 19: the grid map names its zones at 0.5x, 1x and 2x only, never turned and never past their own tile', () => {
+  expect(gridStops(GRID).map(stop => namesZones(GRID, stop.zoom))).toEqual([false, false, true, true, true]);
+  expect(namesZones(undefined, 1)).toBe(true); // a one-shard map always names them
+  const tile = { x: PITCH, z: 0, width: 468, height: 468 };
+  const name = { x: PITCH, z: 250 - 90, text: 'Coral Drift', short: 'Coral Drift', color: '#eaf6ff', width: 468, height: 160, fill: tile };
+  const { map, scope, frames, fillText, rotate } = fixture({ ...gridExtras, labels: [name] });
+  try {
+    Object.defineProperty(map.root, 'clientWidth', { value: 386 });
+    Object.defineProperty(map.root, 'clientHeight', { value: 540 });
+    map.update({ x: PITCH, z: 0 }, 0); map.show();
+    for (const stop of gridStops(GRID)) {
+      map.setZoom(stop.zoom); fillText.mockClear(); rotate.mockClear();
       for (const frame of frames.splice(0)) frame(16);
-      const drawn = new Set(fillText.mock.calls.map(([text]) => text));
-      expect(drawn.has('CORAL') && drawn.has('DRIFT')).toBe(fill !== undefined);
-    } finally { scope.dispose(); }
-  }
+      const drawn = fillText.mock.calls.filter(([text]) => /CORAL|DRIFT/u.test(text));
+      expect(drawn.length > 0, `${String(stop.label)}x`).toBe(stop.label !== 'fit' && stop.label >= 0.5);
+      // the arrow turns with you; a name never turns a quarter (the old Rims A sideways name)
+      expect(rotate.mock.calls.filter(([angle]) => Math.abs(Math.abs(angle) - Math.PI / 2) < 1e-6), `${String(stop.label)}x`).toEqual([]);
+      // every line's anchor sits inside its own tile on screen (the fit keeps each line no wider than the tile)
+      const box = map.viewBox(), ppm = 386 / (box.x1 - box.x0);
+      for (const [, x] of drawn) {
+        const metres = box.x0 + x / ppm;
+        expect(metres, `${String(stop.label)}x`).toBeGreaterThanOrEqual(tile.x - tile.width / 2); expect(metres).toBeLessThanOrEqual(tile.x + tile.width / 2);
+      }
+    }
+  } finally { scope.dispose(); }
 });

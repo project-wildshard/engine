@@ -3,7 +3,7 @@ import { engineString } from '../../../shared/engine/strings';
 import { LAYER_PPM, type MapExtras, type Minimap } from './Minimap';
 import { ROOM_BG, fitRoom, paintRoom } from './roomMap';
 import { fitMapLabel, placeInside } from './mapLabel';
-import { cellAt, namesPlaces } from './mapView';
+import { cellAt, namesPlaces, namesZones } from './mapView';
 import type { MapPoi, MapZone } from './Map';
 
 type Pin = MapPoi & { color?: string };
@@ -157,7 +157,8 @@ export class MapPainter {
 
     // the extras' labels (the grid: each cell's shard name), under the pins
     const held: Box[] = [];
-    if (extras !== null && extras.labels.length > 0) {
+    // QA-FEEDBACK 11-24 row 19: on the grid, the zones' names show at 0.5x, 1x and 2x only, never at 0.25x or fit
+    if (extras !== null && extras.labels.length > 0 && namesZones(extras.grid, this.view._zoom())) {
       ctx.font = `700 ${Math.max(12 * this.view.dpr(), 0.05 * CHUNK_SIZE * ppm)}px Rajdhani, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.lineJoin = 'round'; ctx.lineWidth = 3 * this.view.dpr(); ctx.strokeStyle = 'rgba(6, 10, 18, 0.85)';
       const lh = Math.max(12 * this.view.dpr(), 0.05 * CHUNK_SIZE * ppm);
@@ -175,21 +176,13 @@ export class MapPainter {
           const width = box.width * ppm - 4 * this.view.dpr(), height = box.height * ppm, lineHeight = label.font * 1.15;
           ctx.font = `700 ${label.font}px Rajdhani, sans-serif`; ctx.fillStyle = l.color;
           if (label.lines.length === 0) continue;
-          // QA 11-23-b row 16 (Names A, Rims A): a name stays whole inside the frame, sliding along its cell to what shows,
-          // turned along a thin rim at the frame's side; a corner sliver too small for it goes unnamed
+          // QA 11-23-b row 16 (Names A): a name stays whole inside the frame, sliding along its cell to what shows; a rim or a
+          // corner sliver too small for it upright goes unnamed (QA-FEEDBACK 11-24 row 19: never turned sideways)
           const cell = l.fill ?? box, half = { w: cell.width * ppm / 2, h: cell.height * ppm / 2 }, cx = sx(cell.x), cy = sz(cell.z);
           const textW = Math.max(...label.lines.map((line) => ctx.measureText(line).width)), textH = label.lines.length * lineHeight;
           const spot = placeInside({ x, y }, { x0: cx - half.w, x1: cx + half.w, y0: cy - half.h, y1: cy + half.h }, { x0: 0, y0: 0, x1: W, y1: H },
             textW, textH, 4 * this.view.dpr());
           if (spot === null) continue;
-          if (spot.vertical) {
-            const one = label.lines.join(' ');
-            ctx.save(); ctx.translate(spot.x, spot.y); ctx.rotate(spot.x < W / 2 ? -Math.PI / 2 : Math.PI / 2);
-            ctx.strokeText(one, 0, 0); ctx.fillText(one, 0, 0); ctx.restore();
-            const w = ctx.measureText(one).width;
-            held.push({ x0: spot.x - lineHeight / 2, x1: spot.x + lineHeight / 2, y0: spot.y - w / 2, y1: spot.y + w / 2 });
-            continue;
-          }
           const moved = spot.x !== x || spot.y !== y;
           x = spot.x; y = spot.y;
           for (const [i, line] of label.lines.entries()) {
