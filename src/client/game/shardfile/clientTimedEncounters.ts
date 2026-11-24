@@ -5,6 +5,27 @@ import { TimedEncounters } from '../boss/timedEncounters';
 import { SceneDressing } from './sceneDressing';
 import { entryOwner, lateEntryOwner, presentEntryOwner, publishEntryOwner } from '../../../shared/game/shardfile/entryOwners';
 import { buildYield } from '@wildshard/engine/core/workSlice';
+import { app } from '@wildshard/engine/app/runtime';
+import type { Scope } from '@wildshard/engine/app/scope';
+import { parseActorProjectionV2 } from '@wildshard/format/actorProjectionV2';
+import { ReturnProgram } from '../../../shared/game/population/returnProgram';
+import { declaredProjections } from '../../../shared/game/shardfile/declaredProjections';
+import type { SpeciesCatalogue } from '../looks/speciesBook';
+
+/** FORMAT-PRUNE FP15: the guest's view programme. A page with a species catalogue (the deprecated `species.program`
+ *  feature) reads it from that catalogue; a page whose creatures are declared rows reads the guest's declared projection
+ *  (ONE-FORMAT OF30: the balbal row carries its guest view), and the row's `species` names no owner. */
+export function guestPrograms(scope: Scope, owner: string, species: readonly object[], level: Scope | undefined = app.levelScope ?? undefined): Pick<SpeciesCatalogue, 'program' | 'prepareMemory'> {
+  const catalogue = presentEntryOwner(scope, 'species', owner);
+  if (catalogue !== null) return catalogue;
+  const declared = declaredProjections(species);
+  const program = (kind: string): unknown => {
+    const projection = declared.get(kind);
+    if (projection === undefined) throw new Error(`Timed encounter guest ${kind} has no species catalogue and no declared projection`);
+    return parseActorProjectionV2(projection).program;
+  };
+  return { program: kind => ReturnProgram.page(program(kind), level), prepareMemory: (kind, memory) => ReturnProgram.prepareMemory(program(kind), memory) };
+}
 
 /** Keep two original figure copies, their shared storm alias, the existing
  * species programme and the late day clock; publish no replacement authority. */
@@ -15,7 +36,8 @@ export async function installClientTimedEncounters(ctx: ShardContext, input: unk
   if (runtime === undefined || world === undefined || world === null || scope.disposed || scope.disposing)
     throw new Error('Timed encounters require their live original world');
   const {game} = world, construction = game.levelScope;
-  const draws = entryOwner(scope, 'fixed-draws', row.draws), species = entryOwner(scope, 'species', row.species);
+  const draws = entryOwner(scope, 'fixed-draws', row.draws), catalogue = presentEntryOwner(scope, 'species', row.species);
+  const species = guestPrograms(scope, row.species, product.shardfile.rows.species);
   const weather = lateEntryOwner(scope, 'world-weather', row.weather);
   const resolveClock = () => { const rig = weather(), sky = rig.sky, storm = rig.storm;
     if (sky === null || storm === null) throw new Error('Timed encounters require their original sky and storm');
@@ -24,7 +46,7 @@ export async function installClientTimedEncounters(ctx: ShardContext, input: unk
   const live = (): void => {
     if (scope.disposed || scope.disposing || construction.disposed || construction.disposing || ctx.scope !== scope || ctx.product !== product
       || ctx.game.runtime !== runtime || runtime.world !== world || world.game !== game || game.levelScope !== construction
-      || entryOwner(scope, 'fixed-draws', row.draws) !== draws || entryOwner(scope, 'species', row.species) !== species)
+      || entryOwner(scope, 'fixed-draws', row.draws) !== draws || presentEntryOwner(scope, 'species', row.species) !== catalogue)
       throw new Error('Timed encounter construction owner left or changed');
   };
   live();
