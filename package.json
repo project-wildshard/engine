@@ -611,6 +611,7 @@
     "./net/wireMessages": "./src/shared/engine/net/wireMessages.ts",
     "./net/netPlayer": "./src/client/engine/net/netPlayer.ts",
     "./net/voiceNear": "./src/client/engine/net/voiceNear.ts",
+    "./net/roomsPing": "./src/client/engine/net/roomsPing.ts",
     "./net/predictionWorld": "./src/client/engine/net/predictionWorld.ts",
     "./net/netSchemas": "./src/shared/engine/net/netSchemas.ts",
     "./net/acts": "./src/shared/engine/net/acts.ts",

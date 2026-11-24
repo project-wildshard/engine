@@ -19,6 +19,12 @@
 .ws-perf[hidden] { display: none; }
 /* QA11 (Jake, 2026-10-29: "don't show the FPS counter on the loading screen"): in play only, never on the title or a loading screen */
 :root:has(.ws-load, #hud.intro) .ws-perf-dock, :root:has(.ws-load, #hud.intro) .ws-perf-panel { display: none; }
+/* QA-FEEDBACK 11-24 row 36 (Jake: "fps, memory and server latency"): the rooms ping chip (pingChip.ts), last on the dock's row,
+   "48 ms" in the memory card's glass; "--" with no live link. Read-only: it takes no touch */
+.ws-perf-ping { display: flex; flex: none; align-items: center; height: 18px; box-sizing: border-box; padding: 0 5px; border: 1px solid var(--ws-cyan-line, rgba(143, 227, 255, 0.4)); background: var(--ws-glass-deep, rgba(6, 10, 18, 0.86)); font-family: var(--ws-mono); line-height: 1; white-space: nowrap; font-variant-numeric: tabular-nums; pointer-events: none; }
+.ws-perf-ping[hidden] { display: none; }
+.ws-perf-ping b { font-weight: 500; font-size: 11px; color: rgba(255, 255, 255, 0.92); }
+.ws-perf-ping b::after { content: ' ms'; font-size: 8px; font-weight: 400; color: rgba(196, 220, 232, 0.55); }
 .ws-perf .ws-perf-ms { display: none; }
 /* A14: the other Developer readouts (perfDock.ts sections) open with the panel, under its header: an alert first, then the
    worker client's net block (clientWorker.ts) */
@@ -44,6 +50,8 @@
   .ws-perf b { font-size: 10px; line-height: 1; color: rgba(255, 255, 255, 0.85); }
   .ws-perf b::after { font-size: 8px; color: rgba(196, 220, 232, 0.55); }
   .ws-perf.open { border-color: var(--ws-cyan); background: rgba(13, 27, 38, 0.92); }
+  .ws-perf-ping { height: 24px; padding: 0 6px; }
+  .ws-perf-ping b { font-size: 10px; }
   /* the details: dropped over the minimap (top-right), above everything; a tap on it or anywhere else closes it */
   .ws-perf-panel.open { position: fixed; right: 12px; top: var(--ws-top); z-index: calc(var(--ws-layer-hud) + 56); display: block; box-sizing: border-box; width: max(38vw, 176px); padding: 8px 10px 6px; background: rgba(6, 10, 18, 0.92); border: 1px solid var(--ws-cyan); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45), 0 0 18px rgba(143, 227, 255, 0.18); font-family: var(--ws-mono); font-size: 9.5px; line-height: 1.2; color: var(--ws-text); font-variant-numeric: tabular-nums; pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
   .ws-perf-panel .ws-perf-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; border-bottom: 1px solid rgba(143, 227, 255, 0.12); }

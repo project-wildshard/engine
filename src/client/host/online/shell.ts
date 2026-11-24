@@ -37,6 +37,7 @@ import { installBrowserScopeEnvironment } from '@wildshard/engine/app/view/scope
 import { devControls, type DevControls } from './devControl';
 import { replaceFresh } from '@wildshard/engine/boot/freshPage';
 import { leftByPlayer } from '@wildshard/engine/boot/dropNotice';
+import { ROOMS_PING_EVENT, ROOMS_PING_EVERY_MS, roomsPingMs, type RoomsPing } from '@wildshard/engine/net/roomsPing';
 import { heardRooms } from '@wildshard/engine/game/grid/roomsRevision';
 import { installedCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 /** NB2: the slug a grid cell runs, by the page's catalogue (the instance itself when it names none). */
@@ -573,6 +574,12 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     changed: view => { tooOld.retention(view); if (!seated && tooOld.refuse('boot')) void shellNow?.leave(); } });
   void retention.check();
   scope.listen(window, 'ws-live-build', () => { void retention.check(); });
+  // QA-FEEDBACK 11-24 row 36: the live link's round trip, once a second, for the page's Developer ping chip (ui/pingChip.ts)
+  let linkLive = false;
+  scope.interval(ROOMS_PING_EVERY_MS, () => {
+    const detail: RoomsPing = { rttMs: roomsPingMs(shellNow?.client.stats.rttMs, linkLive) };
+    document.dispatchEvent(new CustomEvent(ROOMS_PING_EVENT, { detail }));
+  });
   // `reload` is the one ending a screen doesn't answer: the page reloads into the world's build, once (J174)
   const ended = async (): Promise<void> => { if (!await stale()) newBuildPanel(scope, stale, () => { entering(loadedNow); void leaving.reloadByHand(); }); };
   const telemetry=onlineTelemetry(),tag=recordTag??release.channel;
@@ -588,6 +595,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
         void session?.renew().then(said => { if (said === 'ok') { entering(loadedNow); void leaving.reloadByHand(); } return undefined; });
       } else if (state !== 'live' && !wasDown) void session?.renew();
       wasDown = state !== 'live';
+      linkLive = state === 'live';
       // FM5b3: a refused reconnect (mayRedial, before its dial: a quick one shows no banner) ends the link; the body leaves, so nobody
       // stands in the world behind the page
       if (state === 'ended' && reason === 'retired') void shellNow?.leave();

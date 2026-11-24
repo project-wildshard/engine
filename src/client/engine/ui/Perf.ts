@@ -1,5 +1,6 @@
 import { uiScope, mountUi } from './ownership';
 import { perfDockChip, perfDockSections } from './perfDock';
+import { installPingChip } from './pingChip';
 import { activeDevPixels, drawingBuffer } from '../core/devPixels';
 import { viewportHeight } from '../core/viewport';
 import { engineString } from '../../../shared/engine/strings';
@@ -63,6 +64,8 @@ export class Perf {
   private rows: { p50: HTMLElement; p95: HTMLElement; calls: HTMLElement; tris: HTMLElement; tier: HTMLElement; gl: HTMLElement };
 
   private game: Game;
+  /** the dock's ping chip (pingChip.ts), on the row while the pill is */
+  private readonly ping: HTMLElement;
   private readonly frameWindow: FrameWindow;
   constructor(game: Game) {
     this.game = game;
@@ -89,6 +92,8 @@ export class Perf {
     // A14: the pill is the Developer dock's first chip (the memory card sits beside it); the other readouts' sections open
     // with the panel, right under its header
     perfDockChip(root, this.scope, 0); mountUi(panel, this.scope, document.body);
+    // QA-FEEDBACK 11-24 row 36: the rooms ping chip follows the pill on the row (fps, memory, ping), shown and hidden with it
+    this.ping = installPingChip(this.scope);
     panel.querySelector('.ws-perf-head')?.after(perfDockSections());
     // the pill is a button on phones: toggle on the lift; cancel its touches (iOS double-tap zoom / callout / selection)
     // and never let them reach the look layer. The panel closes on a tap on it or anywhere else (not cancelled, so a
@@ -138,7 +143,7 @@ export class Perf {
     // tap on the pill closes the panel; moving, looking and shooting leave it up
     const param = new URLSearchParams(location.search).get('perf');
     const hide = (): boolean => (param === '0' ? true : param === '1' ? false : !isDev());
-    this.userHidden = hide(); this.root.hidden = this.userHidden;
+    this.userHidden = hide(); this.root.hidden = this.userHidden; this.ping.hidden = this.root.hidden;
     this.scope.onDispose(onDev(() => { this.userHidden = hide(); if (this.active) this.setActive(true); }));
     if (this.budgetOn) this.scope.expose(window, '__perfBudget', this.budget);
     game.onUpdate(() => this.update(performance.now()), 'hud.perf');
@@ -167,7 +172,7 @@ export class Perf {
   setActive(on: boolean): void {
     if (!on) this.lap?.cancel('the menu opened');
     if (on !== this.active) { this.frameWindow.reset(performance.now(), this.game.frameCount); this.lastPaint = -Infinity; }
-    this.active = on; this.root.hidden = on ? this.userHidden : true;
+    this.active = on; this.root.hidden = on ? this.userHidden : true; this.ping.hidden = this.root.hidden;
     // A14: the Developer sections are one host per page; the level in front holds it in its panel (a resident shard's
     // meter may have taken it, and its disposal takes the host out of the page with its panel)
     if (on) this.panel.querySelector('.ws-perf-head')?.after(perfDockSections());

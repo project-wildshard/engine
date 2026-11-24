@@ -33,7 +33,7 @@ test('G628 M1/M3: one line, the page headline in its danger band; the shard limi
   const card = document.querySelector<HTMLElement>('.ws-perf-dock .ws-grid-budget');
   const chip = card?.querySelector<HTMLButtonElement>('button.ws-grid-budget-chip');
   expect(chip?.querySelector('.ws-grid-budget-icon')?.getAttribute('aria-hidden')).toBe('true');
-  expect(chip?.textContent).toBe((contentCost(input).playing / 1e9).toFixed(2));
+  expect(chip?.textContent).toBe((contentCost(input).playing / 1e9).toFixed(1)); // QA-FEEDBACK 11-24 row 36: one decimal on the chip
   expect(chip?.getAttribute('aria-label')).toBe(`Memory ${chip?.textContent} GB`);
   expect(card?.querySelector<HTMLElement>('.ws-grid-budget-gb')?.dataset['tone']).toBe('green');
   expect(chip?.dataset['overLimit']).toBeUndefined();
@@ -129,7 +129,7 @@ test('the chip shows EM11 central, while the panel shows the peak, upper and sub
     const range = phoneFromLedger(playing, phoneModel), peak = phoneFromLedger(loading, phoneModel).central;
     const chip = document.querySelector<HTMLElement>('.ws-grid-budget');
     expect(chip?.dataset).toMatchObject({ source: 'predicted', playingBytes: String(range.central), loadingPeakBytes: String(peak), peakBytes: String(peak) });
-    expect(chip?.querySelector('button')?.textContent).toBe((range.central / 1e9).toFixed(2));
+    expect(chip?.querySelector('button')?.textContent).toBe((range.central / 1e9).toFixed(1)); // row 36: one decimal; the panel keeps two
     expect(overlay.headline()).toMatchObject({ source: 'predicted', bytes: range.central, loadingPeak: peak, peak });
     overlay.toggle();
     expect(document.querySelector('.ws-grid-budget-x')?.textContent).toContain('EM11');

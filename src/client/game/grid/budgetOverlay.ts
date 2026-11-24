@@ -154,7 +154,8 @@ export function installBudgetOverlay(host: BudgetOverlayHost): BudgetOverlay {
       data(node, 'tone', 'red'); data(node, 'owner', owner); data(node, 'over-bytes', overBytes); return node;
     });
     bar.replaceChildren(line, ...lines);
-    gb.textContent = GB(headline.bytes); data(gb, 'tone', headline.tone);
+    // QA-FEEDBACK 11-24 row 36 (Jake: "Memory can be two figures like `1.1` instead of `1.18`"): the chip shows one decimal; the panel keeps two
+    gb.textContent = (headline.bytes / 1e9).toFixed(1); data(gb, 'tone', headline.tone);
     data(chip, 'tone', headline.tone);
     chip.toggleAttribute('data-over-limit', over.length > 0);
     data(root, 'source', headline.source); data(root, 'playing-bytes', headline.bytes); data(root, 'peak-bytes', headline.peak);
