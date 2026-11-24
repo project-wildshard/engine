@@ -232,12 +232,6 @@ jobs:
       - run: pnpm pins && pnpm gen:inputs
       # New coverage reports for a week before explicit blocking admission.
       # After wall accounting: report time cannot spend a blocking shard budget.
-      - name: Soak named elite ownership on pinned products
-        if: steps.code.outputs.run == 'true'
-        continue-on-error: true
-        run: |
-          node scripts/pins.ts install --ring 1
-          WILDSHARD_RING=1 node scripts/vitest-tmp.ts run test/roster-owners.proof.ts --reporter=default --reporter=json --outputFile.json=tmp/ci-coverage-edges/roster.json
       # TC8: exercise rejected live-clock admission without consuming a tap.
       - name: Soak hover presses across rejected network ticks
         if: steps.code.outputs.run == 'true'

@@ -55,6 +55,8 @@ if [ "$mode" = code ]; then
   check pin-grid-journeys bash -c 'node scripts/pins.ts install --ring 1 && node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/dunes-journey.proof.mjs test/ci/pin-grid-journey.proof.mjs'
   # TC39 (J503, AD2): the API health version reader over real HTTP; clean in ci-reports since 11-21.
   check api-health env TC39_INSTALLED_FORMAT=1 node --test --test-timeout=10000 scripts/api-health.proof.ts
+  # EG-12 (J503, AD2 row 30): every elite a Ring 1 product declares has a live server owner; green since 5599f5323.
+  check roster-owners bash -c 'node scripts/pins.ts install --ring 1 && WILDSHARD_RING=1 node scripts/vitest-tmp.ts run test/roster-owners.proof.ts'
 fi
 check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then
