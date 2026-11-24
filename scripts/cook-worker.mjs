@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 
 const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, pollCatalogue, PACK_BUDGET_BYTES, POLL_EVERY_MS, storeUsage, uncookedLiveRefusal } = await import('../src/cook/game/cookWorker.ts');
 const {activationDelivery, gameActivationClient, cookApi, pendingSource, uploadDelivery, VerdictOutbox} = await import('../src/cook/game/uploadTransport.ts');
-const { MAX_SHARDFILE_BYTES } = await import('../src/cook/game/cookJob.ts');
+const { MAX_SHARDFILE_BYTES } = await import('@wildshard/format/uploadCaps');
 const { cookSidecars, recordPass } = await import('../src/cook/game/recordPass.ts');
 const { addStoredShards } = await import('./app-build/catalogue.ts');
 const { refreshServiceWorker } = await import('./app-build/serviceWorker.ts');

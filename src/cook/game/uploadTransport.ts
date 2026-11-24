@@ -8,7 +8,7 @@ import {join} from 'node:path';
 import * as v from 'valibot';
 import {UploadActivationAckSchema} from '@wildshard/engine/game/shardfile/uploadActivation';
 import {ShardfileHashSchema, ShardSlugSchema} from '@wildshard/format/uploadWire';
-import {MAX_SHARDFILE_BYTES} from './cookJob';
+import {MAX_SHARDFILE_BYTES} from '@wildshard/format/uploadCaps';
 import {readCapped, type CookRow, type CookWorker, type ShardfileSource} from './cookWorker';
 
 const Id = v.pipe(v.string(), v.regex(/^[a-f0-9-]{36}$/u));

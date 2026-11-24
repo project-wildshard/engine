@@ -17,13 +17,13 @@ import type {Shardfile} from '@wildshard/format/shardSchema';
 import type {ShardfileCheckReport, ShardfileEntryProof} from '@wildshard/engine/game/shardfile/checkReport';
 import {migrateShardfile, validateMigrated} from '@wildshard/format/migrate';
 import {readTar, writeTar} from '@wildshard/format/tar';
+// D31 (J137), EG-8: the largest shardfile, stored or decoded; shard-format owns it so the API and the cook share it.
+import {MAX_SHARDFILE_BYTES} from '@wildshard/format/uploadCaps';
 import {cookShard, openShardfile, serverRows, type CookReport, type CookShardPhase, type OpenShardfile, type WireBytes} from './shardCook';
 import type {PartEncoder} from './spawnParts';
 import type {CookSidecar} from './cookSidecar';
 import {cookProvenance, provenanceRefusal, type CookProvenance, type ExpectedCopy} from './cookProvenance';
 
-/** D31: the largest shardfile, stored or decoded: `api-server`'s cap, which Pine's head needs (J137). */
-export const MAX_SHARDFILE_BYTES = 450_000_000;
 /** A shardfile the cook refuses for what it is. A retry can't change it, unlike a killed child or a lost network. */
 export class ShardfileRefusedError extends Error {
   override readonly name = 'ShardfileRefusedError';

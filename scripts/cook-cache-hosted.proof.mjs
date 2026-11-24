@@ -12,6 +12,7 @@ if(process.env.GITHUB_ACTIONS!=='true')throw new Error('TC28 real cook proof run
 const root=process.cwd();
 await import('./bake-loader.mjs');
 const {createCookWorker,indexKey}=await import('../src/cook/game/cookWorker.ts');
+const {MAX_SHARDFILE_BYTES}=await import('@wildshard/format/uploadCaps');
 const {folderStore}=await import('../src/cook/game/packStore.ts');
 const {formatTemplate}=await import('./pin-format.ts');
 const {cookRevision}=await import('./cook-revision.ts');
@@ -27,7 +28,7 @@ const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
  * @param {string} folder */
 function cacheEntries(folder){
  return readdirSync(folder).filter(name=>/^[a-f0-9]{64}\.br$/u.test(name)).sort((a,b)=>a.localeCompare(b)).map(name=>{
-  const file=join(folder,name),stat=statSync(file,{bigint:true}),body=readFileSync(file),raw=brotliDecompressSync(body,{maxOutputLength:450_000_000});
+  const file=join(folder,name),stat=statSync(file,{bigint:true}),body=readFileSync(file),raw=brotliDecompressSync(body,{maxOutputLength:MAX_SHARDFILE_BYTES});
   assert.equal(digest(raw),name.slice(0,-3));
   return {name,hash:digest(body),rawBytes:raw.length,wireBytes:body.length,ino:String(stat.ino),mtimeNs:String(stat.mtimeNs)};
  });
