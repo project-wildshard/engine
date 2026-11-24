@@ -47,13 +47,52 @@ export class KeptItems {
   }
 }
 const NONE = new KeptItems([]);
+/**
+ * SHARD-COMPAT CP16: the kept rows a shard written before items carried `kept` (OF31f3) kept: the old engine table OF31f5
+ * deleted. Kept originals Driftwood r4 (prod's head) to r8 and Pine r5 to r10 declare no kept rows yet name these ids (their
+ * loadout effects, shop, progression rewards and trophies), so a room refused Driftwood r4 ("Unknown progression reward
+ * charm-1"). A shard with no kept rows whose items section names one of its goods (not a trophy) keeps the whole table, as it did when
+ * stored; one naming none keeps nothing (`test/kept-originals-play.test.ts`).
+ */
+const gauge = (name: KeptGauge, level: number) => ({ gauge: { name, level } });
+const STORED_KEPT = new KeptItems([
+  { id: 'whetstone-1', kind: 'upgrade', label: 'Whetstone I', ...gauge('sharpen', 1) },
+  { id: 'whetstone-2', kind: 'upgrade', label: 'Whetstone II', ...gauge('sharpen', 2) },
+  { id: 'heart-1', kind: 'upgrade', label: 'Sturdy heart I', ...gauge('hearts', 1) },
+  { id: 'heart-2', kind: 'upgrade', label: 'Sturdy heart II', ...gauge('hearts', 2) },
+  { id: 'sea-chart', kind: 'upgrade', label: 'Sea chart' },
+  { id: 'cape', kind: 'cosmetic', label: 'Sailcloth cape' },
+  { id: 'captain-hat', kind: 'cosmetic', label: "Captain's hat" },
+  { id: 'charm-1', kind: 'charm', label: 'Sea glass charm I', ...gauge('charms', 1) },
+  { id: 'charm-2', kind: 'charm', label: 'Sea glass charm II', ...gauge('charms', 2) },
+  { id: 'charm-3', kind: 'charm', label: 'Sea glass charm III', ...gauge('charms', 3) },
+  { id: 'bear-claw', kind: 'trophy', label: 'Bear claw' },
+  { id: 'boar-tusk', kind: 'trophy', label: 'Boar tusk' },
+  { id: 'iron-sword', kind: 'gear', label: 'Iron sword' },
+  { id: 'warden-longbow', kind: 'gear', label: "The Warden's Longbow" },
+  { id: 'lever-rifle', kind: 'gear', label: 'Lever-action' },
+]);
+/** The trophies are ordinary drop ids too (Mossgate's boar tusk), so only the table's own goods mark a stored shard. */
+const TROPHIES = new Set(['bear-claw', 'boar-tusk']);
+/** Whether `value` holds, anywhere, a string that is one of the stored table's goods. */
+function namesStoredKept(value: unknown, depth = 0): boolean {
+  if (typeof value === 'string') return STORED_KEPT.has(value) && !TROPHIES.has(value);
+  if (depth > 32 || typeof value !== 'object' || value === null) return false;
+  return (Array.isArray(value) ? value : Object.values(value)).some(entry => namesStoredKept(entry, depth + 1));
+}
+const storedKeptOf = new WeakMap<object, KeptItems>();
 /** Where kept rows come from: a shard's items section (its `version` makes this no weak type, so a format from before
  *  `kept` still type-checks, P1 11-21), or bare rows. */
 export type KeptSource = { readonly version: 1; readonly kept?: readonly KeptRow[] } | { readonly kept: readonly KeptRow[] };
-/** A shard's kept items from its items section's `kept` rows; none when it declares none (OF31f5). */
+/** A shard's kept items from its items section's `kept` rows; none when it declares none (OF31f5), but a kept original's
+ *  stored table when its items name those ids (CP16). */
 export function keptItems(items?: KeptSource | null): KeptItems {
   const kept = items?.kept;
-  return kept === undefined ? NONE : new KeptItems(kept);
+  if (kept !== undefined) return new KeptItems(kept);
+  if (items === undefined || items === null) return NONE;
+  let held = storedKeptOf.get(items);
+  if (held === undefined) { held = namesStoredKept(items) ? STORED_KEPT : NONE; storedKeptOf.set(items, held); }
+  return held;
 }
 
 export class Owned {

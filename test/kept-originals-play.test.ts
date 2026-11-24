@@ -1,6 +1,6 @@
 // FORMAT-PRUNE FP21 (SHARD-COMPAT CP16): every kept original that ships `server/native-assembly.json` admits as the cook
-// admits it (`admitPin`: the original, else the format chain's validated copy), stands its native world and plays 600 server
-// ticks. It reads each original's tarball from the pin cache (`~/.cache/wildshard/pins/<hash>.tar`, filled by `pins.ts` or
+// admits it (`admitPin`: the original, else the format chain's validated copy), boots as a room does (`openCellWorld`: its
+// native world, owned goods and keepsakes) and plays 600 server ticks. It reads each original's tarball from the pin cache (`~/.cache/wildshard/pins/<hash>.tar`, filled by `pins.ts` or
 // the API) and skips when the cache lacks one, so CI without the corpus stays green; a lane proving FP21 runs it with the
 // cache full. `WS_KEPT_PLAY_OUT=<file>` writes each original's digests, to compare one engine against another.
 // oxlint-disable-next-line import/no-nodejs-modules -- The proof reads the kept originals' tarballs and writes their products.
@@ -18,7 +18,8 @@ import { readTar } from '@wildshard/format/tar';
 import { admitPin } from '../scripts/pin-admit.ts';
 import { restorePacks, type PackedIndex } from '../scripts/pin-packs.ts';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
-import { createNativeHeadlessResident } from '../src/server/host/headlessRuntime';
+import { openCellWorld } from '../src/server/host/standalone/cellWorld';
+import { SaveStore } from '../src/shared/engine/saves/store';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
 import { serverInputFiles } from '../src/shared/game/shardfile/serverSkinRigs';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
@@ -62,7 +63,9 @@ test.skipIf(!cached)('every kept original with a native plan file admits and pla
         if (descriptor === undefined) throw new Error('no admitted output');
         const assets = new Map(serverInputFiles(descriptor.index.files, shard)
           .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(join(folder, file.path)))]));
-        const live = await createNativeHeadlessResident({ shard, assets, rapier, product });
+        // a room's boot (codex-ms's production preflight): the cell world with every solid, its owned goods and keepsakes
+        const live = await openCellWorld({ instance: shard.identity.slug }, { shard, assets, rapier, product }, undefined,
+          { saves: new SaveStore({ local: null, session: null }), lone: false, wholeSolids: true });
         try {
           const digests: string[] = [];
           for (let tick = 0; tick < TICKS; tick++) { live.step([]); if (tick % 60 === 59) digests.push(canonicalSimDigest(snapshotSimHost(live.host))); }
