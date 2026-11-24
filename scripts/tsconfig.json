@@ -173,7 +173,6 @@
     "../test/fixtures/species-barrel-author-observation.ts",
     "../test/fixtures/species-oracle/goldenKingControl.ts",
     "../test/fixtures/spruce-author-observation.ts",
-    "../test/fixtures/titanFightOwners.ts",
     "../test/fixtures/titanInlineWitness.ts",
     "../test/fixtures/view-author-observation.ts",
     "../test/fixtures/weapon-oracle/crossbowProfile.ts",

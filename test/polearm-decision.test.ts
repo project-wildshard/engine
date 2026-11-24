@@ -6,8 +6,8 @@ import { MathUtils, Vector3 } from 'three';
 import { Scope } from '../src/shared/engine/app/scope';
 import { HeldDecision } from '../src/shared/game/weapons/heldDecision';
 import { PolearmDecision, type PolearmTarget } from '../src/shared/game/weapons/polearmDecision';
-import {lendFrozenPasture as lendNalatiHeld} from './fixtures/frozen/runtimePrograms';
-import {frozenHeldMetadata as originalHeldMetadata} from './fixtures/frozen/runtimeBehavior';
+import { lendLiveNalati as lendNalatiHeld } from './fixtures/liveNalati';
+import { liveHeldMetadata as originalHeldMetadata } from './fixtures/liveNalati';
 
 const { held: rows } = originalHeldMetadata();
 let scope: Scope;

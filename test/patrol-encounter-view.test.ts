@@ -14,7 +14,7 @@ import { lendLooks } from '../src/client/game/shardfile/lentLooks';
 import { PatrolEncounterView } from '../src/client/game/boss/encounterView';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { Rng } from '@wildshard/format/seededRng';
-import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
+import { liveNight as nightInput } from './fixtures/liveNalati';
 import {withWeatherWitness} from './fixtures/weatherInlineWitness';
 
 const night=withWeatherWitness(nightInput);

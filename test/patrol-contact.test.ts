@@ -4,11 +4,11 @@ import * as reachQueries from '../src/shared/engine/ai/reach';
 import { StrikeRunner } from '../src/shared/engine/ai/strikes';
 import { strikeFromData } from '../src/shared/engine/ai/strikeRows';
 import { patrolContactLands } from '../src/server/game/boss/patrolNative';
-import { frozenNalatiJson } from './fixtures/frozen/nalati';
+import { liveStrikeProfiles } from './fixtures/liveNalati';
 import { parse, object } from 'valibot';
 import { CreatureStrikeSchema } from '@wildshard/format/creatures';
 
-const strikes = parse(object({arrow: CreatureStrikeSchema}), frozenNalatiJson('nalati-strikeProfiles-original.json'));
+const strikes = parse(object({arrow: CreatureStrikeSchema}), liveStrikeProfiles);
 const arrow = strikes['arrow'];
 if (arrow === undefined) throw new Error('Missing frozen arrow strike');
 

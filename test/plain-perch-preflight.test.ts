@@ -21,7 +21,7 @@ import {
   lendFrozenReturns,
   frozenReturnInline,
 } from './fixtures/frozen/returns'
-import { frozenTitanInline } from './fixtures/frozen/runtimePrograms'
+import { liveTitanInline as frozenTitanInline } from './fixtures/liveNalati';
 import { perchFixture } from './fixtures/plain-perch'
 import { groundFixture } from './fixtures/plain-ground'
 

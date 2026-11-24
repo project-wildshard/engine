@@ -4,13 +4,13 @@
 import { readFileSync } from 'node:fs';
 import { builtFolder } from '../../src/test/game/builtFolder';
 
-type Entry = { name: string; path: string };
-const products = new Map<string, { root: string; files: Map<string, string>; sections: Map<string, string> }>();
+type Entry = { name: string; path: string; hash: string };
+const products = new Map<string, { root: string; files: Map<string, string>; hashes: Map<string, string>; sections: Map<string, string> }>();
 function product(slug: string) {
   let row = products.get(slug);
   if (row === undefined) {
     const root = builtFolder(slug), shard = JSON.parse(readFileSync(`${root}/shard.json`, 'utf8')) as { files: Entry[]; sections: Entry[] };
-    row = { root, files: new Map(shard.files.map(file => [file.name, file.path])), sections: new Map(shard.sections.map(section => [section.name, section.path])) };
+    row = { root, files: new Map(shard.files.map(file => [file.name, file.path])), hashes: new Map(shard.files.map(file => [file.hash, file.path])), sections: new Map(shard.sections.map(section => [section.name, section.path])) };
     products.set(slug, row);
   }
   return row;
@@ -32,8 +32,9 @@ export function liveSection(slug: string, name: string): unknown {
 }
 /** Every named file of a live pin. */
 export function liveNames(slug: string): string[] { return [...product(slug).files.keys()]; }
-/** A live pin's content-addressed file by its product path (`blobs/wasm/<hash>.wasm`, as a script row names it). */
+/** A live pin's content-addressed file as a script row names it (`blobs/wasm/<hash>.wasm`), found by its hash. */
 export function livePath(slug: string, path: string): Uint8Array<ArrayBuffer> {
-  if (!/^blobs\/[a-z0-9]+\/[0-9a-f]{64}\.[a-z0-9]+$/u.test(path)) throw new Error(`Not a live product blob path: ${path}`);
-  return new Uint8Array(readFileSync(`${product(slug).root}/${path}`));
+  const hash = /^blobs\/[a-z0-9]+\/([0-9a-f]{64})\.[a-z0-9]+$/u.exec(path)?.[1], row = product(slug), file = hash === undefined ? undefined : row.hashes.get(hash);
+  if (file === undefined) throw new Error(`Live pin ${slug} has no file ${path}`);
+  return new Uint8Array(readFileSync(`${row.root}/${file}`));
 }

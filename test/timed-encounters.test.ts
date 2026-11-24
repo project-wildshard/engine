@@ -14,11 +14,11 @@ import { TimedEncounters } from '../src/client/game/boss/timedEncounters';
 import { setTerrainHeight, setTerrainPlacement } from '../src/shared/engine/world/terrainHeight';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import { lendLooks } from '../src/client/game/shardfile/lentLooks';
-import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
+import { liveNight as nightInput } from './fixtures/liveNalati';
 import {withWeatherWitness} from './fixtures/weatherInlineWitness';
-import {frozenNalatiJson} from './fixtures/frozen/nalati';
+import { liveStrikeProfiles } from './fixtures/liveNalati';
 
-const strikes=parse(object({arrow:unknown()}),frozenNalatiJson('nalati-strikeProfiles-original.json'));
+const strikes=parse(object({arrow:unknown()}),liveStrikeProfiles);
 
 // Match the emitted combat wire; CueDirector borrows the separate presentation cues.
 const {cues, ...night}=withWeatherWitness(nightInput);

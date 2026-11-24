@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { speciesBehaviour } from '../src/client/game/looks/speciesBook';
 import { declaredProjections } from '../src/shared/game/shardfile/declaredProjections';
 import { parseActorProjectionV2 } from '@wildshard/format/actorProjectionV2';
-import { titanPrograms as programme } from './fixtures/frozen/titan';
+import { liveTitanInline as programme } from './fixtures/liveNalati';
 
 // ONE-FORMAT OF30 (Nalati): the timed guest's projection comes from its declared species row, the look book's is the fallback.
 type Book = Parameters<typeof speciesBehaviour>[0];

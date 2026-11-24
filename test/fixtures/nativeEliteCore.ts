@@ -1,4 +1,4 @@
-import { frozenAdmissionNative as admissionNative } from './frozen/nalati';
+import { liveAdmissionNative as admissionNative } from './liveNalati';
 import { EliteCore, memoryElitePersistence, type EliteCoreScript } from '../../src/shared/game/eliteSystem';
 import type { AnimalSim } from '../../src/shared/engine/entities/AnimalSim';
 import type { SimHost } from '../../src/server/engine/sim';

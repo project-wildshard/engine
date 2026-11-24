@@ -4,9 +4,9 @@ import {Rng} from '@wildshard/format/seededRng';
 import {parseBossProfile} from '@wildshard/format/bossProfiles';
 import {bossFight,type PhasedBossBody} from '../src/server/game/plugin/bossPhase';
 import {parse,object,unknown} from 'valibot';
-import {frozenNalatiJson} from './fixtures/frozen/nalati';
+import { liveGoldenKing } from './fixtures/liveNalati';
 
-const king=parse(object({page:object({profile:unknown()})}),frozenNalatiJson('nalati-goldenKing-original.json'));
+const king=parse(object({page:object({profile:unknown()})}),liveGoldenKing);
 
 const profile=(()=>{const value=parseBossProfile(king.page.profile);if(value.pattern!=='arena')throw new Error('Missing original fixed arena');return value;})();
 const row=profile.fight;

@@ -6,7 +6,7 @@ import { Vector3 } from 'three';
 import { ArenaRoomGround } from '../src/shared/game/boss/arenaGround';
 import { ArenaPortalLaw, type ArenaPortalFrame } from '../src/shared/game/boss/arenaPortal';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import { titanPrograms as titan } from './fixtures/frozen/titan';
+import { liveTitanInline as titan } from './fixtures/liveNalati';
 import marsh from './fixtures/boss-owner/marsh-room.json' with { type: 'json' };
 
 // the marsh room's ground rows, with two fallen beams across the chamber

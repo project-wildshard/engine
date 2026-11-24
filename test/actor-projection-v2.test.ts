@@ -10,7 +10,7 @@ import {SIM_LEVEL} from './fixtures/sim-level/level';
 import {namedJsonSchema} from '../src/shared/host/formatJsonSchema';
 import {validateNamedJsonSchema} from '../src/shared/game/shardfile/customSchema';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
-import {titanPrograms as programme} from './fixtures/frozen/titan';
+import { liveTitanInline as programme } from './fixtures/liveNalati';
 
 function rows(){return {program:programme.attack,step:{signal:'bossClamp',clock:'sampleAt',every:.2,
   columns:[{name:'fullHp',id:1,source:{kind:'memory',key:'capacity',default:{value:100}}},

@@ -1,4 +1,4 @@
-import {frozenAdmissionNative as admissionNative} from './fixtures/frozen/nalati';
+import { liveAdmissionNative as admissionNative } from './fixtures/liveNalati';
 
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the actual native simulation owners.
 import { readFileSync } from 'node:fs';

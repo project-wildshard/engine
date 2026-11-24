@@ -6,7 +6,7 @@ import {Scope} from '../src/shared/engine/app/scope';
 import {ReturnProgram} from '../src/shared/game/population/returnProgram';
 import {ReturnProjectionV2} from '../src/shared/game/population/returnProjectionV2';
 import type {ReturnModuleRow} from '@wildshard/format/scriptContract';
-import {titanPrograms as programs} from './fixtures/frozen/titan';
+import { liveTitanInline as programs } from './fixtures/liveNalati';
 
 function fixture(){
   const row=structuredClone(programs.attack),artifact=parseReturnProjectionV2(row.v2).artifact;

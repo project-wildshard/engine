@@ -19,8 +19,8 @@ import { createShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
-import { lendFrozenNalatiAdmission } from './fixtures/frozen/nalati';
-import { frozenStealthRows } from './fixtures/frozen/stealthRows';
+import { lendLiveNalati as lendFrozenNalatiAdmission } from './fixtures/liveNalati';
+import { frozenStealthRows } from './fixtures/stealthRows';
 
 const row: Extract<ClientFeatureRow, {kind: 'stealth.entry'}> = {
   kind: 'stealth.entry', owner: 'orchard.stealth', claims: 'orchard.claims', riding: 'orchard.mount', night: 'orchard.night',

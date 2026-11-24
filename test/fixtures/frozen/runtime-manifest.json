@@ -5,10 +5,6 @@
     "sharddev": "23d05fd147700fe5e9c929749f7d8cb63cdf7761"
   },
   "files": {
-    "elite-kernels.json": {
-      "bytes": 4643,
-      "sha256": "8a0257f0e8a88d50588aff16ef39393917c4c798e44e1cb7badc7a9f30014684"
-    },
     "melee-sword-items.json": {
       "bytes": 5612,
       "sha256": "1d215a4e809d246103e9f5ad000c4487f4ff18f6e6dd0a2ddb7c34a8d72f01c9"
@@ -40,14 +36,6 @@
     "grass.json": {
       "bytes": 4886,
       "sha256": "9041d2f03d2b0e4f20299d9a6d032fb875fe76566584b3fafed77019b399f9d9"
-    },
-    "balbal-guest.json": {
-      "bytes": 7563,
-      "sha256": "13ac0349244c6c7279a25364a7409bffbf4043950e60ef9a3425482df50adc13"
-    },
-    "balbal-projection.json": {
-      "bytes": 13315,
-      "sha256": "913d4d2ced18605ba1c691b8baf864eed698660cf5bfb0fec60de1c525155c9e"
     },
     "pine-creature-world.json": {
       "bytes": 126490,

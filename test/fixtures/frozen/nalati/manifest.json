@@ -3,21 +3,6 @@
   "exporter": "scripts/export-ci21-frozen.mjs",
   "files": [
     {
-      "name": "nalati-admission-original.json",
-      "bytes": 7540,
-      "sha256": "04884b225dda9a0d0a4a0510b95ecbd0c508f67d6cff8f75327a74ea929ae900"
-    },
-    {
-      "name": "nalati-admission-original.wasm",
-      "bytes": 15747,
-      "sha256": "b05ee4ff6fe77d8e269a40f23ac3d53bec85ec197a3d7af87beba1c17a65faaf"
-    },
-    {
-      "name": "nalati-admission-witness-original.bin",
-      "bytes": 21529,
-      "sha256": "60c94c58be1c785e9fbaed7692fa8b849b924c9cb48cbe83696ec31d7ad00bc8"
-    },
-    {
       "name": "nalati-geography-files.json",
       "bytes": 2711,
       "sha256": "4a23b3b55a97b8fb830502d5390807abe60747c77713851d218bbf955121e1db"
@@ -33,26 +18,6 @@
       "sha256": "8d54903f9051f16dba04cb154315bb24f2a277e3d26f7ae4650f9b0d071bcdec"
     },
     {
-      "name": "nalati-goldenKing-original.json",
-      "bytes": 35065,
-      "sha256": "575e9b2f3d3516dbac4cb988f27b407515f21ff73b3fa906f979d234a9aa4a70"
-    },
-    {
-      "name": "nalati-held-files.json",
-      "bytes": 371,
-      "sha256": "c04bda777c060d0d13e4d04d560603015046e3bf42de0764f0d0b488407290fc"
-    },
-    {
-      "name": "nalati-poi-paint-original.d.json.ts",
-      "bytes": 1267,
-      "sha256": "ca577266dcf6a4534cffaccaee8bd46635cbae20d0c564ad2bed92c69da075cc"
-    },
-    {
-      "name": "nalati-poi-paint-original.json",
-      "bytes": 376938,
-      "sha256": "ad66e963c8117875db1cb0e106bc24290cf2835395a16e34ca1bcd6667c4fd8a"
-    },
-    {
       "name": "nalati-poi-shapes-original.bin",
       "bytes": 377900,
       "sha256": "e67e42940efa9b80bff7d41e1dfc3038b6166bde4c6d9beaaf039ec82f9021fe"
@@ -66,96 +31,6 @@
       "name": "nalati-shape-book-original.json",
       "bytes": 33591,
       "sha256": "623745bcdad1020c991d0c9293d0f0acd5b78509d3f98fa3acf847e25c38ad7a"
-    },
-    {
-      "name": "nalati-strikeProfiles-original.json",
-      "bytes": 7498,
-      "sha256": "941b63a9bedffb46d651ed07fa34012f8006625e197e23f9991d6626aefb7150"
-    },
-    {
-      "name": "nalati-weather-original.json",
-      "bytes": 6943,
-      "sha256": "8a48b3361c08bee51e08348dcbe1a3b6f0698b888d6e16a3182787a6bbec0233"
-    },
-    {
-      "name": "nalati-night.json",
-      "bytes": 17480,
-      "sha256": "4e12c384e7b30f3bdb9fdcb9d381a0b3d28deb54c7fb7a7537611e9675bba3c8"
-    },
-    {
-      "name": "nalati-weather-original.wasm",
-      "bytes": 29379,
-      "sha256": "c8bc0a34e42bd416a8dd8d6d76b08a4d80cb3d548579b4d2cd651b02eab3fced"
-    },
-    {
-      "name": "nalati-titan-programs.json",
-      "bytes": 91064,
-      "sha256": "b536504c4c17af9a7c50110dc9ecc61985ded456681650b2d69e1afdc549a320"
-    },
-    {
-      "name": "nalati-wildlife.json",
-      "bytes": 114111,
-      "sha256": "b8ed7049282d906632ed266b80d235ec8f7083934c11b85bbfc533e4d7468e2a"
-    },
-    {
-      "name": "nalati-titan-wasm.wasm",
-      "bytes": 33384,
-      "sha256": "459dfc9d9f511f4722e23e97079a5f44722a5cdf5734985c535ec8383b396054"
-    },
-    {
-      "name": "nalati-titan-witness.bin",
-      "bytes": 47060,
-      "sha256": "ba56b0de486d84b2dcf05695844f5ad61579d1eb4f3530d5211b85b2568f1e3b"
-    },
-    {
-      "name": "nalati-pasture-wasm.wasm",
-      "bytes": 93118,
-      "sha256": "aeebb64806452eeaea55931aa2e10066ddba8736bb92b32dd062f49d4de3eb96"
-    },
-    {
-      "name": "nalati-pasture-witness.bin",
-      "bytes": 19763,
-      "sha256": "17a68c74224d7e331d3d53dbb217d44b433254df0897e2b2a064651870d94327"
-    },
-    {
-      "name": "nalati-riding-programs.json",
-      "bytes": 34980,
-      "sha256": "a3f025b25c2f1c1030f359547ee23b57a2a9ccd6d4b7d6564a437c717e406ebe"
-    },
-    {
-      "name": "nalati-riding-wasm.wasm",
-      "bytes": 47229,
-      "sha256": "09463dfbd52f3bf943c9f1203ad1bab3febca73ad0da10a8e242aaf418fb0b09"
-    },
-    {
-      "name": "nalati-riding-witness.bin",
-      "bytes": 26795,
-      "sha256": "84bd39abf54a633b3946e0e1dea7c1816565609c034799f5310db55a7b65d4ca"
-    },
-    {
-      "name": "nalati-charge.json",
-      "bytes": 2860,
-      "sha256": "0be2eae65953b7ca551e831dd320be0580bc758bdd28f22281b7a3b2f8188619"
-    },
-    {
-      "name": "nalati-charge.wasm",
-      "bytes": 11878,
-      "sha256": "a1a7812164e869892d97f600ff29ae7bcc9906c1529cbac0f541cb46793d76c0"
-    },
-    {
-      "name": "nalati-held.json",
-      "bytes": 36163,
-      "sha256": "11ad4eacf44a4488bf886637df0430cd60a26463bd1595d69e8e6f316dce508e"
-    },
-    {
-      "name": "nalati-held-wasm.wasm",
-      "bytes": 19976,
-      "sha256": "a35c2e6a3527a6e3509d7df83b76c203878bba6b806eb92ef03de1b963d316d5"
-    },
-    {
-      "name": "nalati-held-witness.bin",
-      "bytes": 39814,
-      "sha256": "87e51e95e14a28cbc1d98828d8cec1864bccef8237e4cf941bb6b208b5fcb5e9"
     }
   ],
   "supplement": {

@@ -1,4 +1,4 @@
-import {lendFrozenRiding as lendNalatiRiding, frozenRidingWitness as ridingWitnessBytes, frozenRiding as programs} from './frozen/runtimePrograms';
+import { lendLiveNalati as lendNalatiRiding, liveRidingWitness as ridingWitnessBytes, liveRiding as programs } from './liveNalati';
 import {TamingBinding as LegacyTamingBinding} from './tamingLegacyBinding';
 import { Vector3 } from 'three';
 import { TamingSession as TamingBinding } from '../../src/shared/game/riding/taming';

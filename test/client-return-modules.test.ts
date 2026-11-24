@@ -12,7 +12,7 @@ import {createShardFolder} from '../src/shared/game/shardfile/shardFolder';
 import {emptyShardfile} from '../src/shared/host/author';
 import type {ShardContext} from '../src/client/game/plugin/context';
 import {legacyDouble} from '@wildshard/engine/test/FakeGame';
-import {titanPrograms as programs} from './fixtures/frozen/titan';
+import { liveTitanInline as programs } from './fixtures/liveNalati';
 
 test('page preparation lends the same verified book to sibling construction and actual level scopes',async()=>{
   const root=new Scope('page'),scope=root.child('construction'),level=root.child('entered');

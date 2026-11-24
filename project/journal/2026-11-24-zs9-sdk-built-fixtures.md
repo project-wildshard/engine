@@ -43,3 +43,22 @@ The carried-quest host and the Kokpar rider oval read Nalati r8's `quests/carrie
 guest (`liveCarriedQuest.ts`, by the script row's own blob path); the oval's centre, radii and turn are written in the
 fixture by hand as the independent oracle. Schema-code-memory and the riders read the live `world/dressing-phone.json`.
 `frozen/assets` is empty and goes, with the dead `carriedPropFiles.ts` (it read a file deleted in ZS10).
+
+## Seventh step: Nalati's guests and population rows read the live pin
+
+`liveNalati.ts` takes over from the frozen `runtimePrograms.ts`, `runtimeBehavior.ts`, `titan.ts` and the admission half
+of `nalati.ts`: admission, riding, titan, pasture, held (the spear's polearm guest), wildlife, stealth and the night
+encounter all come from Nalati r8 through `engine-lift/pins.ts`, and every guest is lent from the pin's own return
+scripts. 40 test files moved with no assertion changed. One went: `taming-guest-legacy`'s historical-wire replay
+compared the live v2 riding guest with the ABI1 witness through the finished port's oracle, and the live guest now
+reports its own cue (-1 at rest) where the witness still says 0, so that oracle proves nothing players run.
+`nativeRoster.ts` and `stealthRows.ts` were engine-shaped and leave `frozen/`.
+
+## Eighth step: strikes, the Golden King, the night and the weather
+
+Every creature strike profile the CI21 extract named is in Nalati r8's live files (wildlife contacts, the balbal guest,
+the night's contact, the elite constructs' plan rows, the titan fight's cuts, hazards and arena contacts), so
+`liveStrikeProfiles` reads them there; the Golden King, the elite kernels, the balbal guest and projection, the night
+encounter's parameters and the weather reactions and guest follow. The charge spawn script reads engine-lift's live
+`charge`. `livePath` finds a script row's module by its hash (a witness ships under `blobs/bin`). The frozen loader's
+own self-test and the dead `titanFightOwners.ts` go.

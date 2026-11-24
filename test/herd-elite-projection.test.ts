@@ -1,4 +1,4 @@
-import {frozenAdmissionPage as admissionPage} from './fixtures/frozen/runtimeBehavior';
+import { liveAdmissionPage as admissionPage } from './fixtures/liveNalati';
 import {expect,test} from 'vitest';
 import {Scope} from '../src/shared/engine/app/scope';
 import {NativeEliteProjection,type NativeEliteFrame} from '../src/server/engine/ai/eliteRoster';

@@ -1,4 +1,4 @@
-import { lendFrozenNalatiAdmission as lendNalatiAdmission } from './frozen/nalati';
+import { lendLiveNalati as lendNalatiAdmission } from './liveNalati';
 import { vi, type Mock } from 'vitest';
 import { Vector3 } from 'three';
 import { Scope } from '../../src/shared/engine/app/scope';
@@ -11,11 +11,10 @@ import type { AnimalSim } from '../../src/shared/engine/entities/AnimalSim';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 import { CreatureStrikeSchema } from '@wildshard/format/creatures';
 import { strikeFromData } from '../../src/shared/engine/ai/strikeRows';
-import { frozenNalatiJson } from './frozen/nalati';
+import { liveEliteKernels, liveStrikeProfiles } from './liveNalati';
 import { object, parse, unknown, array, string, number, picklist } from 'valibot';
-import { frozenRuntimeJson } from './frozen/snapshots';
-const kernelRows = frozenRuntimeJson('elite-kernels.json');
-const strikes = parse(object({swipe: CreatureStrikeSchema, pounce: CreatureStrikeSchema, bite: CreatureStrikeSchema}), frozenNalatiJson('nalati-strikeProfiles-original.json'));
+const kernelRows = liveEliteKernels;
+const strikes = parse(object({swipe: CreatureStrikeSchema, pounce: CreatureStrikeSchema, bite: CreatureStrikeSchema}), liveStrikeProfiles);
 const NALATI_STRIKES = {swipe: strikeFromData(strikes.swipe), pounce: strikeFromData(strikes.pounce), bite: strikeFromData(strikes.bite)};
 const ecology = {keeperElites: parse(array(object({pattern: picklist(['pouncer', 'howler', 'wind']), spec: unknown(), def: object({id: string(), lair: object({x: number(), z: number()}), awareR: number()})})), kernelRows)};
 

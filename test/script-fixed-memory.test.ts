@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
 import { FixedMemory, fixedMemoryCensus, prewarmFixedMemories, freshScriptMemory } from '../src/shared/engine/script/fixedMemory';
 import { ScriptModuleV2, prepareScriptMemory } from '../src/shared/engine/script/moduleV2';
-import { titanModuleBytes, titanPrograms } from './fixtures/frozen/titan';
+import { liveTitanModule as titanModuleBytes, liveTitanInline as titanPrograms } from './fixtures/liveNalati';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 
 const options = { seed: [0, 0] as const, initFuel: 400000, output: [] };

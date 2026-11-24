@@ -21,7 +21,7 @@ import { legacyDouble } from '../../../src/test/engine/FakeGame';
 import { bindFlatTerrain } from '../../../src/test/engine/terrain';
 import { Mount } from '../../../src/client/game/riding/mount';
 import { courseHeightAt, DECK, HILL_X, HostSide, LEDGE, loadCourseRapier, PageSide, POOL_X, RAMP_Z, terrainHeight, type MotionIntent, type MotionScenario } from './parity';
-import {lendFrozenPasture as lendNalatiRiding} from '../frozen/runtimePrograms';
+import { lendLiveNalati as lendNalatiRiding } from '../liveNalati';
 
 // E4.1's evidence, rebuilt: seeded traces of 40,000 ticks, so a refactor can say "bit-identical" and be checked. Two page traces
 // (state, every callback in order, the camera; and a real Mount carrying the real Player through `stepPlayerMotion`) and six host

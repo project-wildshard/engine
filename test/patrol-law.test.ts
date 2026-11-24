@@ -15,7 +15,7 @@ import { lendLooks } from '../src/client/game/shardfile/lentLooks';
 import { PatrolEncounterView } from '../src/client/game/boss/encounterView';
 import { PatrolLaw } from '../src/shared/game/boss/patrolLaw';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
-import {frozenNight as nightInput} from './fixtures/frozen/runtimeBehavior';
+import { liveNight as nightInput } from './fixtures/liveNalati';
 import { withWeatherWitness } from './fixtures/weatherInlineWitness';
 
 // The patrol's law (patrolLaw.ts) run bare, as a Node simulation runs it, beside the drawn PatrolEncounterView over twin

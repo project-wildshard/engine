@@ -1,4 +1,4 @@
-import {admissionPage,lendNalatiPasture,pasture} from './fixtures/frozen/nativeRoster';
+import {admissionPage,lendNalatiPasture,pasture} from './fixtures/nativeRoster';
 import {Scope} from '../src/shared/engine/app/scope';
 import { fixtureNativeRoster } from './fixtures/native-roster';
 // oxlint-disable-next-line import/no-nodejs-modules -- Native ownership tests use the actual shipped Rapier binary.

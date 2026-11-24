@@ -1,6 +1,6 @@
-import { frozenHeld } from './fixtures/frozen/runtimePrograms';
-const originalHeldMetadata = () => ({held: frozenHeld});
-import { frozenRiding as NALATI_RIDING_PROGRAMS } from './fixtures/frozen/runtimePrograms';
+import { liveHeld } from './fixtures/liveNalati';
+const originalHeldMetadata = () => ({held: liveHeld});
+import { liveRiding as NALATI_RIDING_PROGRAMS } from './fixtures/liveNalati';
 import { expect, test, vi } from 'vitest';
 import * as v from 'valibot';
 import { Scope } from '../src/shared/engine/app/scope';
@@ -9,9 +9,9 @@ import { ScriptModuleV2, prepareScriptMemory, scriptMemoryCensus } from '../src/
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { ReturnProgramSchema } from '@wildshard/format/namedJsonContracts';
 import { Rng } from '@wildshard/format/seededRng';
-import { frozenAdmissionProgram as admission } from './fixtures/frozen/nalati';
-import { lendFrozenPasture as lendNalatiTitan } from './fixtures/frozen/runtimePrograms';
-import { frozenTitanPrograms as titanRawPrograms, frozenTitanInline as titanPrograms, frozenTitanModule as titanModuleBytes } from './fixtures/frozen/runtimePrograms';
+import { liveAdmissionProgram as admission } from './fixtures/liveNalati';
+import { lendLiveNalati as lendNalatiTitan } from './fixtures/liveNalati';
+import { liveTitanPrograms as titanRawPrograms, liveTitanInline as titanPrograms, liveTitanModule as titanModuleBytes } from './fixtures/liveNalati';
 
 const held = v.parse(v.object({program: ReturnProgramSchema}), originalHeldMetadata().held).program;
 const riding = v.parse(v.object({approach: ReturnProgramSchema}), structuredClone(NALATI_RIDING_PROGRAMS)).approach;

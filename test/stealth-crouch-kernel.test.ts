@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { Scope } from '../src/shared/engine/app/scope';
-import {lendFrozenPasture as lendNalatiHeld} from './fixtures/frozen/runtimePrograms';
+import { lendLiveNalati as lendNalatiHeld } from './fixtures/liveNalati';
 import { StealthCrouch, StealthDetection, type StealthObservation, type StealthPose } from '../src/shared/game/stealth/stealthLaw';
-import {frozenHeldMetadata as originalHeldMetadata} from './fixtures/frozen/runtimeBehavior';
+import { liveHeldMetadata as originalHeldMetadata } from './fixtures/liveNalati';
 import { parse } from 'valibot';
 import { StealthRowsSchema } from '@wildshard/format/stealth';
 

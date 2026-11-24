@@ -1,8 +1,8 @@
-import { frozenAdmissionProgram } from './nalati';
+import { liveAdmissionProgram } from './liveNalati';
 
-/** Engine-owned row for admission-only stealth preparation tests. */
+/** Engine-owned row for admission-only stealth preparation tests, on Nalati's live admission guest. */
 export const frozenStealthRows = {
-  program: frozenAdmissionProgram,
+  program: liveAdmissionProgram,
   tuning: {},
   states: ['visible'],
   labels: {},

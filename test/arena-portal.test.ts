@@ -4,7 +4,7 @@
 import { expect, test } from 'vitest';
 import { ReturnProgram } from '../src/shared/game/population/returnProgram';
 import { ArenaPortalLaw, type ArenaPortalFrame } from '../src/shared/game/boss/arenaPortal';
-import { titanPrograms as titan } from './fixtures/frozen/titan';
+import { liveTitanInline as titan } from './fixtures/liveNalati';
 
 const rows = { signal: 'kingDoor', end: 12, fade: { hold: .2 } };
 const entrance = { x: 200, y: 2, z: 200, facing: 0 };

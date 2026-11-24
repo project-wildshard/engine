@@ -1,13 +1,14 @@
-import { frozenNalatiBytes, frozenNalatiJson } from './frozen/nalati';
-const NALATI_NIGHT = frozenNalatiJson('nalati-night.json');
+// ZONE-SNAPSHOTS ZS9 (J507): Nalati's live weather reactions, their guest and the night's parameters, from the live pin.
+import { liveJson, livePath } from './livePin';
+import { liveNight as NALATI_NIGHT } from './liveNalati';
 import * as v from 'valibot';
 import {WeatherReactionsSchema} from '@wildshard/format/weatherProgram';
 import {DecisionScriptsSchema} from '@wildshard/format/decisionScripts';
 import {sha256} from '../../src/shared/game/plugin/moduleHash';
 
 const raw=v.parse(v.object({...WeatherReactionsSchema.entries,script:DecisionScriptsSchema.pipe[2].item}),
-  frozenNalatiJson('nalati-weather-original.json'));
-export const weatherModuleBytes=frozenNalatiBytes('nalati-weather-original.wasm');
+  v.parse(v.object({reactions:v.unknown()}),liveJson('nalati-grasslands','world/weather.json')).reactions);
+export const weatherModuleBytes=livePath('nalati-grasslands',raw.script.module);
 if(raw.script.module!==`blobs/wasm/${sha256(weatherModuleBytes)}.wasm`)throw new Error('Weather witness hash mismatch');
 export const weatherRaw=raw;
 export const weatherWitness={...raw,bytes:Buffer.from(weatherModuleBytes).toString('base64')};

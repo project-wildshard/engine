@@ -1,24 +1,9 @@
 import {expect,test} from 'vitest';
-import {Scope} from '../src/shared/engine/app/scope';
 import {tamingRig} from './fixtures/tamingServices';
 
-test.each([[null,[.25]],[null,[.65,.8,.1]],[null,[.9,.3,.8]],['bond',[.25]]] as const)('guest/native taming preserves historical wire and native order from %s', (saved,draws)=>{
-  const next=tamingRig(saved,'wild',null,'ordinary',1,false,new Scope('next'),draws),old=tamingRig(saved,'wild',null,'ordinary',1,true,new Scope('old'),draws);
-  expect(next.binding.snapshot()).toBe(old.binding.snapshot());
-  next.allowMount();old.allowMount();next.binding.startBreaking();old.binding.startBreaking();
-  expect(next.events).toStrictEqual(old.events);expect(next.binding.snapshot()).toBe(old.binding.snapshot());
-  let previous=0;
-  for(let i=0;i<400&&old.binding.phase==='breaking';i++){
-    const balance=old.binding.view.balance,lean=Math.max(-1,Math.min(1,balance*8+(balance-previous)*20));previous=balance;
-    next.hud.lean=lean;old.hud.lean=lean;next.events.length=0;old.events.length=0;
-    const dt=[.016,.017,.067,.1,.2,.03,.07][i%7]??.1;
-    next.binding.update(dt);old.binding.update(dt);
-    expect(next.events).toStrictEqual(old.events);expect(next.binding.snapshot()).toBe(old.binding.snapshot());
-    expect(next.binding.view).toStrictEqual(old.binding.view);expect(next.herd.stallion?.mem).toStrictEqual(old.herd.stallion?.mem);
-  }
-  expect(next.binding.phase).toBe(old.binding.phase);
-});
-
+// ZONE-SNAPSHOTS ZS9 (J507): the historical-wire replay of the finished port went with the frozen riding guest: Nalati's
+// live v2 riding guest steers its cue on its own (-1 at rest) where the ABI1 witness still reports 0, so that oracle
+// proves nothing players run. The checkpoint case below still holds on the live guest.
 test('eligible queries are read only and an original mid-round checkpoint continues byte exactly',()=>{
   const next=tamingRig(),old=tamingRig(null,'wild',null,'ordinary',1,true);next.allowMount();old.allowMount();
   next.binding.startBreaking();old.binding.startBreaking();next.binding.update(.03);old.binding.update(.03);

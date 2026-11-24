@@ -1,6 +1,6 @@
 import {expect,test,vi} from 'vitest';
 import {SkinnedMesh} from 'three';
-import { frozenCharge as charge, frozenChargeModule as chargeModule } from './fixtures/frozen/spawnScript';
+import { charge, chargeModule } from './fixtures/engine-lift/pins';
 const chargeModuleSize = chargeModule.length;
 import {SpawnScript,readSpawnScript} from '../src/server/game/population/spawnScript';
 import {Scope} from '../src/shared/engine/app/scope';

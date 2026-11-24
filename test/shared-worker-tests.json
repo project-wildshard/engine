@@ -670,7 +670,6 @@
  "src/client/engine/render/uniform-scalar-buffer.test.ts",
  "src/client/engine/render/uniform-caches.test.ts",
  "test/actor-projection-native.test.ts",
- "test/frozen-nalati-fixtures.test.ts",
  "test/grid-page-url.test.ts",
  "test/neighbour-script-particles-hidden.test.ts",
  "test/sim-lane.test.ts",

@@ -1,7 +1,7 @@
 import type { RayTargets } from '../src/shared/engine/combat/targets';
 import {fixtureFolderFile,fixtureJsonCheck} from './fixtures/folderFile';
 import {nalatiWetBlock} from './fixtures/nalati-wet';
-import { lendFrozenPasture as lendNalatiPasture } from './fixtures/frozen/runtimePrograms';
+import { lendLiveNalati as lendNalatiPasture } from './fixtures/liveNalati';
 import { createShardFolder, type ShardFolder } from '../src/shared/game/shardfile/shardFolder';
 import { emptyShardfile } from '../src/shared/host/author';
 import { expect, test, vi } from 'vitest';
@@ -19,7 +19,7 @@ import type { ShardRuntime } from '../src/shared/game/shard/runtime';
 import { PageWildlifeView, installClientWildlife } from '../src/client/game/population/wildlifeFeature';
 import { clientWildlife } from '../src/shared/game/population/wildlifeOwner';
 import { parseClientPlan } from '@wildshard/format/clientPlan';
-import { frozenWildlife } from './fixtures/frozen/runtimePrograms';
+import { liveWildlife as frozenWildlife } from './fixtures/liveNalati';
 const headlessAssembly = { constants: { pageWildlife: frozenWildlife } };
 import { admittedSheepFolder } from './fake/admittedSheep';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';

@@ -5,7 +5,7 @@ import {V2_ACTION_OPS,type V2ActionBinding} from '@wildshard/format/scriptAction
 import {parseReturnProjectionV2} from '@wildshard/format/returnProjectionV2';
 import {ProjectedState,ReturnProgram} from '../src/shared/game/population/returnProgram';
 import {prepareV2WorldActions,type V2WorldActionLoan} from '../src/shared/game/shardfile/worldActionsV2';
-import {titanPrograms as programs} from './fixtures/frozen/titan';
+import { liveTitanInline as programs } from './fixtures/liveNalati';
 
 function binding(kind:'cell-field'|'mount'):ReadonlyMap<number,V2ActionBinding>{
   return new Map([[1,{identity:'arena',handle:1,targets:new Map([[1,{identity:kind,kind}]]),operations:new Set([kind==='cell-field'?V2_ACTION_OPS.ignite:V2_ACTION_OPS.dismount]),maxCommands:1,bounds:{coordinate:Number.MAX_VALUE,velocity:0}}]]);
