@@ -8,6 +8,8 @@ import { Object3D, BufferGeometry, Group, Mesh, BoxGeometry, ConeGeometry, Cylin
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { RangedAction, stepActionClock } from "@wildshard/engine/combat/Firearm";
 import { leverProfile, type LeverProfile } from "../../../shared/game/shardfile/items";
+import * as v from "valibot";
+import { CatalogueIconSchema, type CatalogueIconName } from "@wildshard/format/items";
 import { blocks } from "@wildshard/engine/blocks";
 import type { WorldContactDispatcher } from "@wildshard/engine/combat/contactWeapon";
 import { Weapon, type WeaponState, type AimInfo, type OwnHit } from "@wildshard/engine/combat/Weapon";
@@ -573,11 +575,11 @@ export function registerWeaponFamily(registry: Map<string, ItemFamily>, id: stri
   registry.set(id, family);
 }
 
-/** The icons a declared item row may name (`ui.icon`), as the page's catalogue draws them. */
-export const DECLARED_ITEM_ICONS = ['lock', 'check', 'poi', 'you', 'map', 'pack', 'star', 'book', 'heart', 'pin', 'laurel', 'sword', 'glyph', 'coin', 'purse', 'crossbow', 'rifle', 'lever', 'longbow', 'grapple', 'horse'] as const;
-/** A declared item row's icon, refused when the catalogue draws no such icon. */
-export function declaredItemIcon(name: string): (typeof DECLARED_ITEM_ICONS)[number] {
-  const id = DECLARED_ITEM_ICONS.find((entry) => entry === name); if (id === undefined) throw new Error(`Unknown catalogue item icon ${name}`); return id;
+/** A declared item row's icon (`ui.icon`): one of the format's catalogue icons, every one of which the page's catalogue
+ *  draws (`icons.ts`); refused otherwise. FORMAT-PRUNE FP51: the names live in the format, not as engine literals. */
+export function declaredItemIcon(name: string): CatalogueIconName {
+  if (!v.is(CatalogueIconSchema, name)) throw new Error(`Unknown catalogue item icon ${name}`);
+  return name;
 }
 /** Explicit built-in item family registry, injected into the full loader; importing does not install content. */
 export function declaredKitItemFamilies(): ReadonlyMap<string, ItemFamily> {
