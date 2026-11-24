@@ -36,7 +36,10 @@ test('OB3: Grafana listens on loopback, phones nowhere, has no admin or login, a
   expect(script).not.toMatch(/tailscale funnel/u);
   expect(script).toMatch(/^VERSION=\d+\.\d+\.\d+\nSHA256=[0-9a-f]{64}$/mu);
   expect(script).toContain('sha256sum -c --status');
-  expect(readFileSync('scripts/vps/harden-apply.sh', 'utf8')).toContain('\n"$HERE/harden-grafana.sh"\n');
+  // Last in harden-apply and never fatal: a dashboard that can't install never holds back the box's own hardening.
+  const apply = readFileSync('scripts/vps/harden-apply.sh', 'utf8');
+  expect(apply).toContain('if ! "$HERE/harden-grafana.sh"; then say warn OB3');
+  expect(apply.indexOf('"$HERE/harden-caddy.sh"')).toBeLessThan(apply.indexOf('"$HERE/harden-grafana.sh"'));
 });
 
 test('OB3: setup-state takes the dashboard route as tailnet-only Serve, never asks for it, and refuses it as Funnel', () => {

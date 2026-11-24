@@ -510,11 +510,12 @@ fi
 # --- SERVER-CELLS SC2: a box-local Prometheus on loopback, and each channel's METRICS_PORT (Jake, 2026-11-13, grill Q9).
 "$HERE/harden-prometheus.sh"
 
-# --- MMO-OBSERVABILITY OB3: Grafana over that Prometheus, loopback only, on the tailnet through Serve (never Funnel).
-"$HERE/harden-grafana.sh"
-
 # --- VH9: the proxy (J264: Caddy behind Cloudflare, Full (strict) with an Origin CA certificate, mTLS from Cloudflare only).
 "$HERE/harden-caddy.sh"
+
+# --- MMO-OBSERVABILITY OB3: Grafana over that Prometheus, loopback only, on the tailnet through Serve (never Funnel). Last, and never
+# fatal: a dashboard that can't install (a download refused, a bad checksum) must not hold back the box's own hardening.
+if ! "$HERE/harden-grafana.sh"; then say warn OB3 'the Grafana step failed; everything above is applied (rerun harden after fixing it)'; fi
 
 say 'done' '' "harden.sh applied$([ "$CHANGED" = 0 ] && printf ' (no change)'); now run: harden.sh --check"
 if [ "$deadman_armed" = 1 ]; then say next VH3 "from a NEW ssh session check you still get in, then: systemctl stop $DEADMAN.timer"; fi
