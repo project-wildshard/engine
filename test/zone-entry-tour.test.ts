@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import { approachBudget, featuredZoneEntry, proofHeading, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../scripts/zone-entry-tour.mjs';
+import { approachBudget, featuredZoneEntry, proofHeading, settledDeck, rejoinLegs, spawnApproach, portalExitPlan, unstick, resumeZoneEntry, retrySmokeEntries, retryZoneEntry, roadApproach, smokeBatches, smokeGap, stagedTourProof, walkZoneEntryTour, zoneEntryCorridor, zoneEntryTour, type Tour } from '../scripts/zone-entry-tour.mjs';
 import { zoneEntryGap } from '../scripts/page-release/flow.mjs';
 import { TOUR_FEATURED as curated } from '../scripts/zone-entry-featured.mjs';
 
@@ -203,6 +203,22 @@ test("budgets a fresh guest's swim round Driftwood's harbour by its length, neve
   expect(approachBudget(spawn, west)).toBeGreaterThanOrEqual(200_000);
   expect(approachBudget(spawn, west)).toBeLessThanOrEqual(240_000);
   expect(approachBudget({x:0, z:-194}, [{x:0, z:-235, ride:false}])).toBe(120_000);
+});
+
+test('a portal landing counts once the walker has stood on one deck, not on its first frame', async (): Promise<void> => {
+  // v0.1.81's Nine Dragon retry: the page put the walker on the north deck, the pad, north again, then the room seated it on
+  // the south deck; the first read sent it along the north road from the south deck into the cell wall (opus-fp21)
+  const run = async (reads: readonly number[]): Promise<number> => {
+    let clock = 0, at = 0;
+    return settledDeck(async () => reads[Math.min(at++, reads.length-1)] ?? 0,
+      {hold:1500, deadline:10_000, now:() => clock, pause:async () => { clock += 150; }});
+  };
+  const north = 1, south = 3;
+  expect(await run([north, 0, north, south, ...Array<number>(20).fill(south)])).toBe(south);
+  expect(await run(Array<number>(20).fill(north))).toBe(north);
+  // a walker that slides off the deck's edge keeps the deck it last stood on; one that never landed gets none
+  expect(await run([south, south, 0])).toBe(south);
+  expect(await run([0])).toBe(0);
 });
 
 test("the arrival's walk proof turns a quarter each try, so a seat by a wall still proves walk input", (): void => {

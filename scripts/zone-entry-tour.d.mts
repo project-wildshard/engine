@@ -41,6 +41,7 @@ export function portalExitPlan(entries: readonly {road: {at: PortalPoint}; route
   {walk: Point[]; decks: (Point & {dx: number; dz: number})[]} | null;
 export function approachBudget(from: Point, points: readonly (Point & {ride?: boolean})[]): number;
 export function proofHeading(attempt: number): number;
+export function settledDeck(read: () => Promise<number>, options: {hold: number; deadline: number; now: () => number; pause: () => Promise<unknown>}): Promise<number>;
 export function unstick(attempt: number): {key: 'Space' | 'KeyD' | 'KeyA'; ms: number};
 export function spawnApproach(slug: string, at: Point, center: Point, dx: number, dz: number): (Point & {ride: boolean})[];
 export function walkZoneEntryTour(page: Page, origin: Point, result: Tour, save: () => void,

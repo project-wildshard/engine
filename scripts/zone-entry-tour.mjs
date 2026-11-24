@@ -394,17 +394,32 @@ async function walkPortalExit(page, from, plan, end, noteWaypoint) {
     noteWaypoint('portal', point);
     await walk(page, point, end, {landed: onDeck});
   }
-  const landing = await page.waitForFunction(decks => {
+  const read = () => page.evaluate(decks => {
     const st = /** @type {any} */ (window).__wildshard?.shard?.grid?.state?.();
     return st === undefined ? 0 : decks.findIndex(deck => Math.hypot(st.feet.x-deck.x, st.feet.z-deck.z) < 5) + 1;
-  }, plan.decks, {timeout: Math.min(10_000, Math.max(1, end-Date.now())), polling: 150});
-  // Keep the matching deck from the same frame. A new browser turn can sample the first movement off its edge.
-  try {
-    const deck = plan.decks[(await landing.jsonValue()) - 1];
-    if (deck === undefined) throw new Error('The portal did not leave the walker on a declared deck');
-    return {instance:from.instance, cell:[from.cell[0]+deck.dx, from.cell[1]+deck.dz]};
-  } finally {
-    await landing.dispose();
+  }, plan.decks).catch(() => 0);
+  const index = await settledDeck(read, {hold:1500, deadline:Math.min(Date.now()+10_000, end), now:Date.now, pause:() => delay(150)});
+  const deck = plan.decks[index-1];
+  if (deck === undefined) throw new Error('The portal did not leave the walker on a declared deck');
+  return {instance:from.instance, cell:[from.cell[0]+deck.dx, from.cell[1]+deck.dz]};
+}
+
+/** The deck a portal leaves the walker on, once the room agrees. Nine Dragon's square has one exit pad for all four of its
+ *  road portals: the page predicts one deck (north) and the room can seat the walker on another (south) a moment later.
+ *  v0.1.81's retry read the first landing, took the north road from the south deck and walked into the cell wall
+ *  (opus-fp21, staging 1e4f845e: feet north at 21.38 s, back on the pad at 21.41 s, north again at 21.58 s). A deck counts
+ *  once the walker has stood on it for `hold` ms; at the deadline the last deck it stood on stands.
+ * @param {() => Promise<number>} read the 1-based deck under the feet, 0 off every deck
+ * @param {{hold:number, deadline:number, now:() => number, pause:() => Promise<unknown>}} options @returns {Promise<number>} */
+export async function settledDeck(read, {hold, deadline, now, pause}) {
+  let held = 0, since = now(), last = 0;
+  for (;;) {
+    const at = await read(), time = now();
+    if (at !== held) { held = at; since = time; }
+    if (held > 0) last = held;
+    if (held > 0 && time-since >= hold) return held;
+    if (time >= deadline) return last;
+    await pause();
   }
 }
 
