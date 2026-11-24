@@ -143,7 +143,7 @@ describe('worktree new', () => {
     git(pusher, ['push', '-q', 'origin', 'main']);
     put(clean, 'src/same.ts', 'export const same = 2;\n');
     const edited = worktree(clean, ['new', 'c', '--no-install']);
-    expect(edited.stdout).toMatch(/canonical main 1 behind; tracked edits; left alone/u);
+    expect(edited.stdout).toMatch(/canonical main 1 behind; tracked edits \(src\/same\.ts\); their owner commits or discards them; left alone/u);
   });
 
   test('J206 review: never fast-forwards over an ignored file or a git operation in progress; a process inside does not block it', async () => {

@@ -332,7 +332,11 @@ function followMainRef(canonical,base){
  const [ahead='0',behind='0']=git(canonical,['rev-list','--left-right','--count',`${head}...${base}`]).trim().split(/\s+/u);
  if(ahead!=='0')return `CANONICAL MAIN DIVERGED: ${ahead} ahead, ${behind} behind origin/main; left alone, tell the coordinator`;
  const leave=(/** @type {string} */ why)=>`canonical main ${behind} behind; ${why}; left alone`;
- if(git(canonical,['status','--porcelain','--untracked-files=no']).trim()!=='')return leave('tracked edits');
+ // QA-11-23-b row 51 (J505): name the edits, so the line says what holds the canonical tool and install back (11-24:
+ // three boot *.generated.ts from 11-20 held it 598 commits behind, still capping worktrees at its old 6).
+ const edits=git(canonical,['status','--porcelain','--untracked-files=no']).split('\n').map(line=>line.slice(3).trim()).filter(Boolean);
+ const more=edits.length>3?` and ${String(edits.length-3)} more`:'';
+ if(edits.length>0)return leave(`tracked edits (${edits.slice(0,3).join(', ')}${more}); their owner commits or discards them`);
  const busy=BUSY_GIT.find(name=>existsSync(resolve(canonical,git(canonical,['rev-parse','--git-path',name]).trim())));
  if(busy!==undefined)return leave(`git ${busy} in progress`);
  // Last look right before the merge (J206 review): merge --ff-only would happily move another branch's HEAD.
