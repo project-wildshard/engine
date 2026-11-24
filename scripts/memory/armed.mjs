@@ -1,4 +1,4 @@
-// J424/J426. The format list is the sole source of arming. A release
+// J424/J426. armed-zones.json (FORMAT-PRUNE FP27c) is the sole source of which zones this CI arms. A release
 // measures the products in its reviewed engine pin set.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -10,7 +10,9 @@ import { zoneOverRuns } from './phoneModel.mjs';
 const require = createRequire(import.meta.url);
 /** The control zone every memory run measures first (J434: Brasscap replaced the legacy Template). */
 export const CONTROL_ZONE = 'brasscap-mesa';
-const LIST = '@wildshard/memory-policy/memory-armed.json';
+/** FORMAT-PRUNE FP27c: the J410 lines are the pinned format's; the zones this CI ledgers, with their golden readings,
+ * are engine's own (`armed-zones.json`), since the format keeps no zone list and admission's armed word is the API's. */
+const LINES = '@wildshard/format/memory-armed.json';
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 /** @param {unknown} value */
 const bytes = value => Number.isSafeInteger(value) && value > 0;
@@ -34,7 +36,9 @@ export function parseArmedMemory(value) {
 }
 
 export function armedMemory() {
-  const policy = parseArmedMemory(JSON.parse(readFileSync(require.resolve(LIST), 'utf8')));
+  const { lines } = JSON.parse(readFileSync(require.resolve(LINES), 'utf8'));
+  const { zones } = JSON.parse(readFileSync(new URL('./armed-zones.json', import.meta.url), 'utf8'));
+  const policy = parseArmedMemory({ lines, zones });
   const manifest = new URL('../../test/pins/shardfiles.json', import.meta.url);
   const shipped = new Set(pinnedSlugs(JSON.parse(readFileSync(manifest, 'utf8'))));
   return { ...policy, zones: new Set([...policy.zones].filter(zone => shipped.has(zone))) };

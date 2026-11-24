@@ -1,0 +1,213 @@
+{
+  "$doc": "FORMAT-PRUNE FP27c: engine memory CI's own per-zone readings, which zones its ledger measures and at what golden bytes. Moved here unchanged from shard-format 0.38.1 memory-armed.json zones (the @wildshard/memory-policy alias), since the format keeps no zone list (FP27c) and which zones are armed for admission is the API catalogue's word (FP27). The lines come from the pinned format (memory-armed.json lines).",
+  "zones": {
+    "brasscap-mesa": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 679221837,
+      "loadingBytes": 984731013,
+      "evidence": "engine-pinned product revision 6 (tar f42fe0449a93), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "driftwood-isle": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 820905616,
+      "loadingBytes": 1157545785,
+      "evidence": "shard-driftwood e736730 built with format 0.37 (epoch 8); codex-nalati locked pairs on the EM11 upper read 990.5 / 1,344.7 MB (meta MEMORY-GATES)"
+    },
+    "far-reach": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 999952196,
+      "loadingBytes": 1415754105,
+      "evidence": "engine-pinned product revision 4 (tar 5bc5adcf764a), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "ink-cel-valley": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 636979847,
+      "loadingBytes": 925290035,
+      "evidence": "engine-pinned product revision 1 (tar 5764c86a258a), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "nalati-grasslands": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 945736154,
+      "loadingBytes": 1328901899,
+      "evidence": "shard-nalati 1d5014e8 built with format 0.37 (epoch 8); mini-resweep EM11 upper on the J420 stand-in: playing 0.940 GB less the worker, loading 1.470 GB (meta MEMORY-GATES)"
+    },
+    "nine-dragon-stack": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 1023504847,
+      "loadingBytes": 1434692360,
+      "evidence": "shard-nine-dragon 8779b872 built with format 0.37 (epoch 8); mini-pinemem6 prepared online boot on engine d0fd6e62, 9 pairs: playing upper 0.938 GB, loading upper 1.435 GB (meta 1677f091). The estimate's playing (1,023.5 MB) is over the 1.0 GB line, so it locks at that reading"
+    },
+    "open-plot-alien-plain": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 665173554,
+      "loadingBytes": 967392441,
+      "evidence": "engine-pinned product revision 1 (tar c32cd9fb9229), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-clockwork-canyon": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 675751489,
+      "loadingBytes": 982935896,
+      "evidence": "engine-pinned product revision 1 (tar 3b322eccd99e), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-coral-drift": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 681768940,
+      "loadingBytes": 992453778,
+      "evidence": "engine-pinned product revision 1 (tar 87841749dc3f), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-desert-ruin": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 686478807,
+      "loadingBytes": 997958716,
+      "evidence": "engine-pinned product revision 1 (tar 3b65bfef7275), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-ember-forge": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 679682616,
+      "loadingBytes": 987005255,
+      "evidence": "engine-pinned product revision 1 (tar e1a3a9325e8e), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-fossil-badlands": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 671308241,
+      "loadingBytes": 976533532,
+      "evidence": "engine-pinned product revision 1 (tar 5bbdd51b8db9), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-frostline-peaks": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 694731191,
+      "loadingBytes": 1007041500,
+      "evidence": "engine-pinned product revision 1 (tar ec7b8879a343), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-jungle-ziggurat": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 683128342,
+      "loadingBytes": 992540003,
+      "evidence": "engine-pinned product revision 1 (tar 62fdb3cc7e41), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-lantern-bayou": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 679945285,
+      "loadingBytes": 989938627,
+      "evidence": "engine-pinned product revision 1 (tar 1f9fb1cba098), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-mosslight-ruins": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 693006386,
+      "loadingBytes": 1006944516,
+      "evidence": "engine-pinned product revision 1 (tar 19840339238b), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-night-market": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 709180040,
+      "loadingBytes": 1028237840,
+      "evidence": "engine-pinned product revision 1 (tar d8fe11c2db67), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-patchwork-fairground": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 670516626,
+      "loadingBytes": 974863462,
+      "evidence": "engine-pinned product revision 1 (tar e517f4814ef6), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-saltwind-lighthouse": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 657567209,
+      "loadingBytes": 956173411,
+      "evidence": "engine-pinned product revision 1 (tar 2e37a04b0c9e), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-sky-harbor": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 671985118,
+      "loadingBytes": 977835231,
+      "evidence": "engine-pinned product revision 1 (tar 9aa4a9839015), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-sky-race": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 671490214,
+      "loadingBytes": 977159704,
+      "evidence": "engine-pinned product revision 1 (tar a5633d8eee7f), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-starfall-observatory": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 674717033,
+      "loadingBytes": 981241332,
+      "evidence": "engine-pinned product revision 1 (tar 25331b613be1), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "open-plot-thin-ice": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 657896658,
+      "loadingBytes": 957357794,
+      "evidence": "engine-pinned product revision 1 (tar 4546f70ddac2), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "pastel-plain": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 636958876,
+      "loadingBytes": 925256481,
+      "evidence": "engine-pinned product revision 1 (tar e42e2f5f5793), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    },
+    "pine-hollow": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 920666659,
+      "loadingBytes": 1298769921,
+      "evidence": "shard-pine-hollow 400ed4b7 built with format 0.37 (epoch 8); mini-pinemem6 prepared online boot on engine f0a96518, 9 pairs: playing upper 0.969 GB, loading upper 1.407 GB (meta 118a2b13)"
+    },
+    "sunscar-dunes": {
+      "armed": "2026-11-18",
+      "by": "mini-pinemem5",
+      "epoch": 8,
+      "playingBytes": 772000529,
+      "loadingBytes": 1108011593,
+      "evidence": "engine-pinned product revision 2 (tar f4a1d611cccc), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
+    }
+  }
+}

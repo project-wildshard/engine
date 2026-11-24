@@ -120,7 +120,6 @@
     "@types/ws": "8.18.2",
     "@typescript/typescript6": "6.0.2",
     "@wildshard/engine": "link:.",
-    "@wildshard/memory-policy": "npm:@wildshard/shard-format@0.38.1",
     "@wildshard/wire-released": "npm:@wildshard/wire@1.4.0",
     "assemblyscript": "0.28.20",
     "happy-dom": "20.14.5",
