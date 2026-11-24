@@ -2,6 +2,7 @@ import { reportPageFeatures } from '../../../shared/game/shardfile/pageFeatureTi
 import { reportRuntimeTier } from '../../../shared/game/shardfile/runtimeTier';
 
 import { waitFor } from '@wildshard/engine/boot/waits';
+import { holdBytes } from '@wildshard/engine/core/heldBytes';
 import type { TextureTranscodeSupport } from '@wildshard/format/contentBounds';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import type { Scope } from '@wildshard/engine/app/scope';
@@ -439,7 +440,7 @@ async function readBuiltFolder(input:unknown,options:FolderOptions,read:NonNulla
     const result=results[at];if(result===undefined)throw new Error('Missing built file result');if(!result.ok)throw result.error;
     wires.set(row.ref.replace(/^commons:/u,''),result.bytes);
   }
-  for(const row of refs){const bytes=wires.get(row.ref.replace(/^commons:/u,''));if(bytes===undefined)throw new Error('Missing built file bytes');assets.set(row.ref,bytes);}
+  for(const row of refs){const bytes=wires.get(row.ref.replace(/^commons:/u,''));if(bytes===undefined)throw new Error('Missing built file bytes');holdBytes(bytes);assets.set(row.ref,bytes);}
   const unread=deferred===undefined?[]:control.filter(file=>deferred.has(file.hash));
   // GC9: the files left unread are fetched once more in the background, low priority and unhashed, so the entry's own
   // verified reads of them find the HTTP cache warm (Pine's scene libraries read them one by one at entry); only after a read
@@ -633,6 +634,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
     }
     if (!transported.has(hash) && fromCache) verifiedCached.add(hash);
     filesDone++; progress('assets', `Verified ${role} · ${filesDone} / ${addresses.length} files`, url);
+    holdBytes(owned); // the folder keeps these bytes: never detached at a GPU upload (heldBytes.ts)
     return owned;
   };
   type ReadResult = { readonly ok: true; readonly bytes: Uint8Array } | { readonly ok: false; readonly error: unknown };
@@ -658,7 +660,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   for (const { ref } of refs) {
     const bytes = transport.get(ref.replace(/^commons:/u, ''));
     if (bytes === undefined) throw new Error('Asset was not admitted');
-    assets.set(ref, bytes);
+    holdBytes(bytes); assets.set(ref, bytes);
   }
   trace?.mark('files');
   progress('validation', `${receipt === null ? 'Validating assets, simulation and entries' : 'Verified exact product validation receipt'} · ${reference}`);

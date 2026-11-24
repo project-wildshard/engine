@@ -449,6 +449,7 @@
     "./core/errorReport": "./src/client/engine/core/errorReport.ts",
     "./core/frameCost": "./src/shared/engine/core/frameCost.ts",
     "./core/gpuOnly": "./src/client/engine/core/gpuOnly.ts",
+    "./core/heldBytes": "./src/client/engine/core/heldBytes.ts",
     "./core/harnessTap": "./src/shared/engine/core/harnessTap.ts",
     "./core/ktx2": "./src/client/engine/core/ktx2.ts",
     "./core/perfLap": "./src/shared/engine/core/perfLap.ts",

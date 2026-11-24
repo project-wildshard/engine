@@ -163,6 +163,7 @@
     "src/client/engine/core/errorReport.ts": "client",
     "src/client/engine/core/Game.ts": "client",
     "src/client/engine/core/gpuOnly.ts": "client",
+    "src/client/engine/core/heldBytes.ts": "client",
     "src/client/engine/core/GpuRecovery.ts": "client",
     "src/client/engine/core/worldWatch.ts": "client",
     "src/client/engine/core/watchPixels.ts": "client",

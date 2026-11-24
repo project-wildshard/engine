@@ -11,6 +11,7 @@ import { geometryBoundsSteps } from '../world/geometryBounds';
 import { onceTextureUploaded } from '../render/textureUploadEvents';
 import { registerCompressedMipmaps } from '../render/compressedMipmaps';
 import { markByteTriples } from '../render/byteTriples';
+import { bytesHeld } from './heldBytes';
 
 const labels = new Set<string>();
 /** marks made outside any shard (at module load: KTX2 mode drops every texture's mips once uploaded) — the page's, never reset */
@@ -36,6 +37,26 @@ export function rebakeGpuContent(): void { for (const f of rebakes) f(); }
 /** what was marked (empty: an in-place restore brings the whole scene back) */
 export function gpuOnlyContent(): readonly string[] { return [...pageLabels, ...labels]; }
 
+/**
+ * QA 11-23-b row 17 (coordinator's default, "free at upload"): a released CPU copy that is the whole of its own ArrayBuffer
+ * is detached at once (`ArrayBuffer.prototype.transfer(0)`), so its bytes leave now rather than when JSC next collects:
+ * unforced, WebKit's footprint climbed 0.98 to 2.53 GB by Sky Reach on the garbage of each world built ahead. A view of part
+ * of a buffer (a channel read in place from its file), a buffer a cache holds (`heldBytes.ts`), a shared or resizable one, or
+ * a browser with no `transfer` keeps the old path: the collector frees it.
+ */
+let freedAtUpload = 0;
+export function gpuOnlyFreedBytes(): number { return freedAtUpload; }
+/** ES2024's ArrayBuffer members, read as optional: an older engine (or this repo's lib target) may lack them */
+interface Transferable2024 { readonly resizable?: boolean; readonly transfer?: (length: number) => ArrayBuffer }
+function freeNow(view: ArrayBufferView): void {
+  const buffer = view.buffer;
+  if (!(buffer instanceof ArrayBuffer) || view.byteOffset !== 0 || view.byteLength !== buffer.byteLength || view.byteLength === 0 || bytesHeld(buffer)) return;
+  const modern = buffer as ArrayBuffer & Transferable2024;
+  if (modern.resizable === true || typeof modern.transfer !== 'function') return;
+  const bytes = buffer.byteLength;
+  try { modern.transfer.call(buffer, 0); freedAtUpload += bytes; } catch { /* already detached: nothing held */ }
+}
+
 /** each released attribute's `<label>.<name>`, for the late-write report */
 const releasedAs = new WeakMap<BufferAttribute, string>();
 const lateWriters = new Set<string>();
@@ -46,7 +67,9 @@ const lateWriters = new Set<string>();
  * an empty array, so it has nothing to upload: the bump is dropped and the writer named once, in the console.
  */
 function releaseCpuCopy(this: BufferAttribute): void {
-  this.array = this.array.slice(0, 0);
+  const uploaded = this.array;
+  this.array = uploaded.slice(0, 0);
+  freeNow(uploaded);
   Object.defineProperty(this, 'needsUpdate', { configurable: true, get: () => false, set: (value: boolean) => { if (value) lateWrite(this); } });
 }
 /**
@@ -140,7 +163,7 @@ function releaseSource(t: Texture): void {
   else if (typeof HTMLImageElement !== 'undefined' && im instanceof HTMLImageElement) t.image = { width: im.width, height: im.height };
   else if (t instanceof DataTexture || t instanceof DataArrayTexture || t instanceof Data3DTexture) {
     // Preserve the element type; a subarray would retain the original backing.
-    if (ArrayBuffer.isView(t.image.data)) t.image.data = t.image.data.slice(0, 0);
+    if (ArrayBuffer.isView(t.image.data)) { const uploaded = t.image.data; t.image.data = uploaded.slice(0, 0); freeNow(uploaded); }
     // Raw KTX2 may alias level zero through both image.data and mipmaps.
     t.mipmaps = [];
   }
