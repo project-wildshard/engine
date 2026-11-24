@@ -43,7 +43,10 @@ export function preparedReleaseFollows(older, newer, cwd = process.cwd()) {
         if (cut === null || git(['merge-base', '--is-ancestor', cut, 'refs/remotes/origin/main']) === null) return null;
       }
       const paths = pathsBetween(cut, stamp);
-      if (!paths.includes('package.json') || paths.some(path => !['package.json', 'CHANGELOG.md'].includes(path))) return null;
+      // A stamp may also carry a test-only fix (v0.1.83 took main's dedicated-saves fixture fix): tests, browser proofs and
+      // journal notes ship in no bundle, so no release-only code is lost when a later cut supersedes it.
+      const testOnly = (/** @type {string} */ path) => ['test/', 'src/e2e/', 'project/journal/'].some(prefix => path.startsWith(prefix));
+      if (!paths.includes('package.json') || paths.some(path => !['package.json', 'CHANGELOG.md'].includes(path) && !testOnly(path))) return null;
       // The manifest may change only its version. A code/dependency/config change on the release branch must be retained by real ancestry.
       const parent = JSON.parse(git(['show', `${cut}:package.json`]) ?? 'null');
       if (parent === null || JSON.stringify({ ...pkg, version: parent.version }) !== JSON.stringify(parent)) return null;

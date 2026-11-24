@@ -78,3 +78,21 @@ test('a prepared release with a browser-test follow-up may supersede an untagged
     expect(preparedReleaseFollows(abandoned, changed, repo.dir)).toBe(false);
   } finally { repo.cleanup(); }
 });
+
+test('a stamp carrying a test-only fix may supersede, and be superseded by, an untagged staging cut', () => {
+  const repo = createTempRepo();
+  try {
+    const cut = repo.commit({ 'package.json': manifest('0.1.81'), 'runtime.ts': 'old source' }, 'Main source');
+    repo.git(['update-ref', 'refs/remotes/origin/main', cut]);
+    const abandoned = prepare(repo, cut, '0.1.82');
+    // v0.1.83 shape: the stamp applies main's test-only fixture fix and its journal note.
+    const testFix = prepare(repo, cut, '0.1.83', { 'test/dedicated-saves.test.ts': 'accept ECONNRESET', 'project/journal/save-disconnect.md': 'why' });
+    const clean = prepare(repo, cut, '0.1.84');
+    expect(preparedReleaseFollows(abandoned, testFix, repo.dir)).toBe(true);
+    expect(preparedReleaseFollows(testFix, clean, repo.dir)).toBe(true);
+    const mixed = prepare(repo, cut, '0.1.85', { 'test/dedicated-saves.test.ts': 'accept ECONNRESET', 'src/server/saves.ts': 'release-only code' });
+    expect(preparedReleaseFollows(abandoned, mixed, repo.dir)).toBe(false);
+    const lookalike = prepare(repo, cut, '0.1.86', { 'src/test/engine/realGc.ts': 'helper code under a test-like name' });
+    expect(preparedReleaseFollows(abandoned, lookalike, repo.dir)).toBe(false);
+  } finally { repo.cleanup(); }
+});
