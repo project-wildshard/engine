@@ -6,6 +6,8 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { emptyShardfile } from '../src/shared/host/author';
 import { createShardfileSim } from '../src/server/game/plugin/simulation';
 import { primitivesOf, productPrimitives } from '../src/server/game/shardfile/hostPrimitives';
+import { builtFolder } from '../src/test/game/builtFolder';
+import { folderServerRoots, nativeAssemblyRoots } from '../scripts/host-ruler/server-roots.mjs';
 
 // ONE-FORMAT OF17b1: the server works its primitive list out from the product's sections; no host list ships.
 const base = () => emptyShardfile({ slug: 'primitives-fixture', name: 'Primitives fixture', author: 'Test', revision: 1, seed: 5 });
@@ -41,9 +43,10 @@ test('OF17b1: a mount row adds riding, and taking it out removes it', () => {
 });
 
 test('OF17b1: a native-assembly product names the families its native features join', () => {
-  const plan = JSON.parse(readFileSync('test/fixtures/host-ruler/native-driftwood-isle/server/native-assembly.json', 'utf8')) as { features: { host: string }[] };
+  // ZONE-SNAPSHOTS ZS10 (J507): the host ids Driftwood's live pin declares, not a trimmed copy of an old revision.
+  const hosts = folderServerRoots(builtFolder('driftwood-isle'), nativeAssemblyRoots()).hosts;
   // Format 0.74.1 (FP16): Driftwood's quest.* hosts join the quest family.
-  expect(productPrimitives(base(), plan.features.map(row => row.host))).toEqual(['collision', 'plumbing', 'population', 'held.melee', 'sky', 'water.sea', 'quest']);
+  expect(productPrimitives(base(), hosts)).toEqual(['collision', 'plumbing', 'quest']);
   expect(productPrimitives(base(), ['no.such.host'])).toEqual(['collision', 'plumbing']);
 });
 

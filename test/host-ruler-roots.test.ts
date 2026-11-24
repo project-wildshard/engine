@@ -2,6 +2,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Reads the pinned format package's section index.
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
+import { builtFolder } from '../src/test/game/builtFolder';
 import { clientPlanRoots, modulePath, folderRoots, folderRootsFrom, SECTION_HOSTS, sectionHostRows, unresolvedRoots } from '../scripts/host-ruler/roots.mjs';
 
 const plan = clientPlanRoots();
@@ -77,26 +78,12 @@ describe('product roots', () => {
       .toEqual([['member'], ['destructure'], ['all'], ['destructure']]);
     expect(unresolvedRoots(roots.modules)).toEqual([]);
   });
-  test('a copied real product (Pine Hollow: 14 kinds, 58 sections) lists every root, zero unresolved', () => {
-    const roots = folderRoots('test/fixtures/host-ruler/pine-hollow', plan);
-    expect([roots.slug, roots.kinds.length, roots.sections.length]).toEqual(['pine-hollow', 14, 58]);
-    expect(rows(roots.roots).filter(([from]) => (from as string).startsWith('kind:'))).toEqual([
-      ['kind:held.ranged-page', 'src/client/game/loadout/rangedPage.ts', ['prepareRangedPage']],
-      ['kind:held.ranged-page', 'src/client/game/shardfile/clientQuestComposition.ts', ['installEntryRangedPage']],
-      ['kind:held.ranged-feel', 'src/client/game/plugin/heldEquipment.ts', ['installHeldRangedFeel']],
-      ['kind:debug.expose', 'src/client/game/shardfile/sceneDressing.ts', ['SceneDressing']],
-      ['kind:content.catalogue', 'src/client/game/shardfile/clientCatalogue.ts', ['installClientCatalogue']],
-      ['kind:quest.composition', 'src/client/game/shardfile/clientQuestComposition.ts', ['installEntryQuestComposition']],
-      ['kind:quest.spawns', 'src/client/game/quest/chapterDirector.ts', ['installDeclaredQuestSpawns']],
-      ['kind:quest.spawns', 'src/shared/game/shardfile/entryOwners.ts', ['publishEntryOwner']],
-      ['kind:world.forest-page', 'src/client/game/shardfile/clientForestPage.ts', ['enterClientForestPage', 'installClientForestPage']],
-      ['kind:weather.forest', 'src/client/game/shardfile/clientForestPage.ts', ['installClientForestWeather']],
-      ['kind:page.life', 'src/client/game/shardfile/clientForestPage.ts', ['installClientPageLife']],
-      ['kind:quest.views', 'src/client/game/shardfile/clientQuestComposition.ts', ['installEntryQuestViews']],
-      ['kind:population.hull-book', 'src/client/game/models/socketRigCreature.ts', ['prepareDeclaredHullBookKit']],
-      ['kind:audio.cues', 'src/client/game/shardfile/clientCues.ts', ['installClientCues']],
-      ['kind:world.sets', 'src/client/game/shardfile/clientPlaceSets.ts', ['installClientPlaceSets']],
-    ]);
+  // ZONE-SNAPSHOTS ZS10 (J507): Pine Hollow's live pin, not a trimmed copy of an old revision.
+  test('a real product (Pine Hollow\'s live pin) lists every root, zero unresolved', () => {
+    const roots = folderRoots(builtFolder('pine-hollow'), plan);
+    expect(roots.slug).toBe('pine-hollow');
+    expect(roots.kinds.length).toBeGreaterThan(0);
+    expect(rows(roots.roots).some(([from]) => (from as string).startsWith('kind:'))).toBe(true);
     // Every declared section with an executable host appears; metadata-only sections root nothing.
     const listed = new Set(roots.roots.map(root => root.from));
     for (const name of roots.sections) expect(listed.has(`section:${name}`) || name === 'client/plan' || SECTION_HOSTS[name]?.length === 0).toBe(true);

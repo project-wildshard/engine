@@ -1,6 +1,7 @@
 // HOST-RULER HR2: a built product's server roots, from the host ids its native-assembly.json declares.
 import { describe, expect, test } from 'vitest';
 import { unresolvedRoots } from '../scripts/host-ruler/roots.mjs';
+import { builtFolder } from '../src/test/game/builtFolder';
 import { NATIVE_ASSEMBLY_ROOT, nativeAssemblyRoots, folderServerRoots, serverRootsFrom } from '../scripts/host-ruler/server-roots.mjs';
 
 const table = nativeAssemblyRoots();
@@ -75,9 +76,11 @@ describe('product server roots', () => {
   test('a product without a native assembly reaches no server roots', () => {
     expect(hostRoots('fixture-product')).toMatchObject({ hosts: [], roots: [], unmeasured: [] });
   });
-  test.each([['native-pine-hollow', 'pine-hollow', 17], ['native-driftwood-isle', 'driftwood-isle', 14]])('copied real product %s: every host id resolves', (dir, slug, hosts) => {
-    const roots = hostRoots(dir);
-    expect([roots.slug, roots.hosts.length]).toEqual([slug, hosts]);
+  // ZONE-SNAPSHOTS ZS10 (J507): the live pins, not trimmed copies of old revisions.
+  test.each(['pine-hollow', 'driftwood-isle'])('real product %s: every host id resolves', slug => {
+    const roots = folderServerRoots(builtFolder(slug), table);
+    expect(roots.slug).toBe(slug);
+    expect(roots.hosts.length).toBeGreaterThan(0);
     expect(roots.unmeasured).toEqual([]);
     for (const id of roots.hosts) expect(table.hosts.has(id)).toBe(true);
     expect(unresolvedRoots(roots.modules)).toEqual([]);

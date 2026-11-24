@@ -54,3 +54,10 @@ and `ci21-sdk-tail-held.json` still name them, as history). Deleted by hand; git
 - `approved-population-families.json` (+ `.d.json.ts`): `wildlife-schema-metadata` reads `actors/wildlife.json` from
   Nalati's live pin.
 - `legacy-oracles/nalati-audio.json` and the last mover oracle (`canoe.json` names its hash as a module id only): no reader.
+
+## Third part
+
+- `test/fixtures/host-ruler/{pine-hollow,native-pine-hollow,native-driftwood-isle}` (trimmed shard.json copies of Pine
+  Hollow 3cdd93f and Driftwood): `host-ruler-roots`, `host-ruler`, `host-ruler-server-roots` and `host-primitives` read
+  the two live pins instead; the counts of the old revisions (14 kinds, 58 sections, 17 and 14 hosts) become shape checks,
+  and Driftwood's live hosts now join collision, plumbing and quest only.

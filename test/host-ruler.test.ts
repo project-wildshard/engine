@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, test } from 'vitest';
 import { applyRegister, codeLines, createTreeReader, formatInventory, formatTable, inventory, layerOf, OPTIONS, optionCharges, shardTotals, measure, oneUserLines, folderRootModules, reach, rule, SHELL, SHELL_CONTROL, SHELL_ROOTS, TABLES } from '../scripts/host-ruler.mjs';
+import { builtFolder } from '../src/test/game/builtFolder';
 import { CLIENT_PLAN, clientPlanRoots } from '../scripts/host-ruler/roots.mjs';
 import { NATIVE_ASSEMBLY, NATIVE_HOSTS } from '../scripts/host-ruler/server-roots.mjs';
 
@@ -166,7 +167,7 @@ describe('the platform rule and the register\'s gates (HR6, HA0 f)', () => {
     expect(() => applyRegister(modules, tree, [{ key: 'src/client/game/feature/a.ts', verdict: 'game', decision: '', users: [] }], { today })).toThrow(/without a decision id/u);
   });
   test('the real register reads and every product run prints both readings', () => {
-    const report = rule(['test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/pine-hollow'], { today });
+    const report = rule(['test/fixtures/host-ruler/closure-a', builtFolder('pine-hollow')], { today });
     expect(report.totals.get('pine-hollow')!.lines).toBe(report.oneUser.get('pine-hollow')!.lines);
     expect(formatTable(report)).toMatch(/\| pine-hollow +\|/u);
   });
@@ -221,7 +222,7 @@ describe('optional sub-rows (HR7, HA0 c)', () => {
 });
 
 describe('the inventory (HR8, HA1)', () => {
-  const report = rule(['test/fixtures/host-ruler/closure-a', 'test/fixtures/host-ruler/pine-hollow'], { today: '2026-11-13' });
+  const report = rule(['test/fixtures/host-ruler/closure-a', builtFolder('pine-hollow')], { today: '2026-11-13' });
   const rows = inventory(report, { sharddev: 'test/fixtures/host-ruler/tree' });
   const byModule = new Map(rows.map(row => [row.module, row]));
 

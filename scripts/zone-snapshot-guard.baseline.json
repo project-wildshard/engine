@@ -138,9 +138,6 @@
   "revision-path test/fixtures/frozen/dunes-r4-matriarch-decision.json",
   "revision-path test/fixtures/frozen/dunes-r4-matriarch-decision.wasm",
   "revision-path test/fixtures/frozen/nine-r3-held-items.json",
-  "shard-folder test/fixtures/corpus/brasscap-mesa/shard.json",
-  "shard-folder test/fixtures/host-ruler/native-driftwood-isle/shard.json",
-  "shard-folder test/fixtures/host-ruler/native-pine-hollow/shard.json",
-  "shard-folder test/fixtures/host-ruler/pine-hollow/shard.json"
+  "shard-folder test/fixtures/corpus/brasscap-mesa/shard.json"
  ]
 }
