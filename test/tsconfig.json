@@ -56,7 +56,6 @@
     "../src/sharddev/dist",
     "../src/server/host/dist",
     "fixtures/host-ruler/**",
-    "fixtures/legacy-oracles/nalati-ambience.json",
     "fixtures/legacy-oracles/nalati-people.json",
     "fixtures/nalati-herdChannels-original.json",
     "fixtures/nalati-physics-original.json",
