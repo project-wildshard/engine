@@ -32,6 +32,13 @@ export const SECTION_HOSTS = Object.freeze({
   'client/plan': [CLIENT_PLAN_ROOT],
   // SHARD-COMPAT HS6 (format 0.71.0): the server's own plan, read by the one server seam before client/plan.
   'server/plan': ['src/server/game/shardfile/serverPlan.ts#serverPlan'],
+  // FORMAT-PRUNE FP16/FP21 (format 0.74.1): each primitive family's server hosts and a native world's own settings, read
+  // by the native assembly (nativeAssembly.ts HOST_SECTIONS and WORLD_SECTION).
+  'server/quest': ['src/server/game/shardfile/nativeAssembly.ts#prepareNativeAssembly'],
+  'server/riding': ['src/server/game/shardfile/nativeAssembly.ts#prepareNativeAssembly'],
+  'server/boss': ['src/server/game/shardfile/nativeAssembly.ts#prepareNativeAssembly'],
+  'server/patrol': ['src/server/game/shardfile/nativeAssembly.ts#prepareNativeAssembly'],
+  'server/world': ['src/server/game/shardfile/nativeAssembly.ts#prepareNativeAssembly'],
   'world/tiles': ['src/client/game/shardfile/clientViews.ts#clientTileViews'],
   'world/terrain': ['src/shared/game/shardfile/clientGround.ts#clientGround'],
   'world/edge': ['src/shared/game/shardfile/portalTraversal.ts#createPortalTraversal'],

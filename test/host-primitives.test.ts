@@ -42,7 +42,8 @@ test('OF17b1: a mount row adds riding, and taking it out removes it', () => {
 
 test('OF17b1: a native-assembly product names the families its native features join', () => {
   const plan = JSON.parse(readFileSync('test/fixtures/host-ruler/native-driftwood-isle/server/native-assembly.json', 'utf8')) as { features: { host: string }[] };
-  expect(productPrimitives(base(), plan.features.map(row => row.host))).toEqual(['collision', 'plumbing', 'population', 'held.melee', 'sky', 'water.sea']);
+  // Format 0.74.1 (FP16): Driftwood's quest.* hosts join the quest family.
+  expect(productPrimitives(base(), plan.features.map(row => row.host))).toEqual(['collision', 'plumbing', 'population', 'held.melee', 'sky', 'water.sea', 'quest']);
   expect(productPrimitives(base(), ['no.such.host'])).toEqual(['collision', 'plumbing']);
 });
 
