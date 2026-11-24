@@ -3,14 +3,27 @@ import {existsSync,mkdirSync,mkdtempSync,readFileSync,writeFileSync,rmSync,symli
 // oxlint-disable-next-line import/no-nodejs-modules -- Confine fixture paths below tmp.
 import {resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- Exercise the local-run refusal in the real CLI process.
-import {spawnSync} from 'node:child_process';
+import {spawn} from 'node:child_process';
+import type {ChildProcess} from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Launch the same Node runtime.
 import process from 'node:process';
-import {afterEach,expect,it} from 'vitest';
+import {afterAll,afterEach,expect,it} from 'vitest';
 import {trimFolderCache} from '../scripts/ci-folder-cache.mjs';
 
 const owned:string[]=[];
 afterEach(()=>{for(const root of owned.splice(0))rmSync(root,{recursive:true,force:true});});
+// A sync spawn froze the worker past vitest's timeout and hung CI shard 20 for 259 s (run 45430448538). The CLI runs
+// async with its own deadline, so a stalled child fails its test, and teardown kills any child still running.
+const CLI_DEADLINE_MS=20_000,TEST_DEADLINE_MS=30_000;
+const children=new Set<ChildProcess>();
+afterAll(()=>{for(const child of children)child.kill('SIGKILL');children.clear();});
+async function runCli(args:readonly string[],env:NodeJS.ProcessEnv):Promise<{status:number|null;stderr:string}> {
+  const child=spawn(process.execPath,['scripts/ci-folder-cache.mjs',...args],{env,stdio:['ignore','ignore','pipe']});
+  children.add(child);let stderr='';child.stderr?.setEncoding('utf8').on('data',(chunk:string)=>{stderr+=chunk;});
+  const timer=setTimeout(()=>{stderr+=`\nci-folder-cache.mjs passed its ${CLI_DEADLINE_MS} ms deadline; killed`;child.kill('SIGKILL');},CLI_DEADLINE_MS);
+  try {return await new Promise((done,fail)=>{child.once('error',fail);child.once('close',(status:number|null)=>{done({status,stderr});});});}
+  finally {clearTimeout(timer);children.delete(child);}
+}
 function fixture():{root:string;cache:string;put:(path:string,text:string)=>void} {
   mkdirSync('tmp',{recursive:true});const root=mkdtempSync(resolve('tmp/ci-folder-cache-'));owned.push(root);
   const put=(path:string,text:string):void=>{const target=resolve(root,path);mkdirSync(resolve(target,'..'),{recursive:true});writeFileSync(target,text);};
@@ -67,10 +80,10 @@ it('never follows linked cache products or linked historical entries',()=>{
   symlinkSync(resolve(cache,'alpha'),resolve(cache,'beta'),'dir');
   expect(trimFolderCache(root,cache)).toEqual({products:1,removed:0});
 });
-it('refuses the actual CLI outside GitHub Actions without touching local caches',()=>{
-  const result=spawnSync(process.execPath,['scripts/ci-folder-cache.mjs'],{encoding:'utf8',env:{...process.env,GITHUB_ACTIONS:'false',CI:'true'}});
-  expect(result.status).toBe(1);expect(result.stderr).toContain('only on an isolated GitHub Actions runner');
-});
+it('refuses the actual CLI outside GitHub Actions without touching local caches',async()=>{
+  const result=await runCli([],{...process.env,GITHUB_ACTIONS:'false',CI:'true'});
+  expect(result.stderr).toContain('only on an isolated GitHub Actions runner');expect(result.status).toBe(1);
+},TEST_DEADLINE_MS);
 
 it('does not prune through a linked root or a linked current manifest',()=>{
   const {root,cache,put}=fixture(),old='a'.repeat(64),current='b'.repeat(64);
@@ -86,8 +99,7 @@ it('does not prune through a linked root or a linked current manifest',()=>{
 });
 
 
-it('refuses generation-history apply outside the isolated hosted Linux workspace',()=>{
-  const result=spawnSync(process.execPath,['scripts/ci-folder-cache.mjs','--prune-generation'],{
-    encoding:'utf8',env:{...process.env,GITHUB_ACTIONS:'true',CI:'true',RUNNER_ENVIRONMENT:'self-hosted'}});
-  expect(result.status).toBe(1);expect(result.stderr).toContain('requires the isolated hosted Linux workspace');
-});
+it('refuses generation-history apply outside the isolated hosted Linux workspace',async()=>{
+  const result=await runCli(['--prune-generation'],{...process.env,GITHUB_ACTIONS:'true',CI:'true',RUNNER_ENVIRONMENT:'self-hosted'});
+  expect(result.stderr).toContain('requires the isolated hosted Linux workspace');expect(result.status).toBe(1);
+},TEST_DEADLINE_MS);
