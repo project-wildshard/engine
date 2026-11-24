@@ -675,11 +675,6 @@
     "why": "Left with sharddev or a shard at P3"
   },
   {
-    "path": "test/matriarch-borrowed-body.test.ts",
-    "file": "scripts/test-folders.json",
-    "why": "Left with sharddev or a shard at P3"
-  },
-  {
     "path": "test/nalati-strike-assembly.test.ts",
     "file": "scripts/test-folders.json",
     "why": "Left with sharddev or a shard at P3"

@@ -9,23 +9,17 @@ import { loadRapier, type Rapier } from '../src/shared/engine/physics/rapier';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { runHeadlessJourney } from '../src/shared/host/headlessJourney';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
-import { FIXED_STEP } from '../src/shared/engine/core/fixedStep';
 import { parseNativeRuntimePlan } from '@wildshard/format/nativeRuntimePlan';
-import { parseDecisionScripts } from '@wildshard/format/decisionScripts';
-import { HOMES_SYSTEM } from '../src/client/game/shardfile/clientPlan';
 import { pagePopulationRows } from '../src/shared/game/population/pageRows';
-import { bindPageHomes } from '../src/shared/game/population/pageHomes';
 import { installPageReturns } from '../src/client/game/population/pageReturns';
 import { populationCensus } from '../src/shared/game/population/census';
 import { Scope } from '../src/shared/engine/app/scope';
 import { legacyDouble } from '../src/test/engine/FakeGame';
 import type { ShardContext } from '../src/client/game/plugin/context';
 import type { ShardPlayHost, ShardRuntime } from '../src/shared/game/shard/runtime';
-import { RowBodies } from '../src/client/engine/entities/RowBodies';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
 import { DATA_RESPAWN_STEP } from '../src/server/game/shardfile/dataRespawn';
-import { dunesKeeper } from './fixtures/dunes-r3-keeper';
 
 // P1-E3.1: population and creature spawning on the shipped headless host (`createNativeHeadlessResident`, the tick
 // worker's own composition) for a real shard. Sunscar Dunes' declared roster moves and refills
@@ -101,42 +95,6 @@ test('Sunscar spawns, moves, kills and refills its creatures headless, and its c
     expect(respawnWait(live, target)).toBeUndefined();
     expect(refilled.bodies.find(body => body.id === target)).toMatchObject({ kind: 'sandSkitterer', alive: true });
   } finally { restored?.dispose(); live.dispose(); }
-}, 120_000);
-
-test('the browser page population is the server\'s: a herdless page holds no home body and never listens for a death', async () => {
-  // SR12: the page's RowBodies is herdless, so its homes spawn nothing and match no death.
-  // The legacy keeper fixture owns these homes, even when the shipped product uses declared spawns.
-  const fixture = await dunesKeeper();
-  const declared = pagePopulationRows(fixture.plan);
-  const subscribed: string[] = [], systems: Parameters<ShardContext['system']>[0][] = [], spawned: string[] = [], prepared: string[] = [];
-  // The page's own manager, RowBodies: its draw reduced to the factory a herdless page prepares models through.
-  const rowBodies = new RowBodies(legacyDouble<ConstructorParameters<typeof RowBodies>[0]>({
-    factory: legacyDouble<RowBodies['factory']>({ prepareSteps: function* (rows: readonly { kind: string }[]) { for (const entry of rows) { prepared.push(entry.kind); yield prepared.length; } } }) }),
-    legacyDouble<ConstructorParameters<typeof RowBodies>[1]>({ levelScope: null }));
-  rowBodies.spawn = kind => { spawned.push(kind); throw new Error('A herdless page spawns no body'); };
-  const scope = new Scope('sr12.page.homes');
-  const ctx = legacyDouble<ShardContext>({ scope,
-    game: legacyDouble<ShardContext['game']>({ runtime: legacyDouble<ShardRuntime>({ play: legacyDouble<ShardPlayHost>({ animals: rowBodies }) }) }),
-    on: name => { subscribed.push(name); },
-    system: spec => { systems.push(spec); } });
-  const decisions = parseDecisionScripts(fixture.sections.get('sim/scripts'));
-  const page = bindPageHomes(ctx, declared, { system: HOMES_SYSTEM,
-    decisionActors: decisions.filter(script => 'spawnGroup' in script.binding).flatMap(script => Object.values(script.actors)) });
-  const live = await createNativeHeadlessResident(fixture);
-  try {
-    live.step([]);
-    // The page knows the server's homes by id and kind, and the server's keeper stands a body in each of them.
-    const server = populationCensus(live.host);
-    const byId = (rows: readonly { id: string; kind: string }[]): string[][] => rows.map(entry => [entry.id, entry.kind]).sort(([a = ''], [b = '']) => a < b ? -1 : a > b ? 1 : 0);
-    expect(byId(page.homes)).toEqual(byId(server.homes));
-    expect(server.homes.every(entry => entry.body !== null)).toBe(true);
-    expect(rowBodies.herdless).toBe(true);
-    expect(prepared.length).toBeGreaterThan(0);
-    expect({ spawned, bodies: page.all().length, standing: page.homes.filter(entry => entry.animal !== null).length }).toEqual({ spawned: [], bodies: 0, standing: 0 });
-    expect(subscribed).not.toContain('actor.died');
-    for (let tick = 0; tick < 600; tick++) for (const system of systems) system.run(FIXED_STEP, 0);
-    expect(page.homes.every(entry => entry.animal === null && entry.wait === 0)).toBe(true);
-  } finally { live.dispose(); scope.dispose(); }
 }, 120_000);
 
 test('page actor returns refuse a page that makes its own bodies: the server returns them', () => {

@@ -70,3 +70,10 @@ and `ci21-sdk-tail-held.json` still name them, as history). Deleted by hand; git
 - `legacy-oracles/pine-weather.json`: `weather-legacy.proof.mjs` drops its 2400-output oracle of pine-hollow-legacy's
   weather (a finished port); its old v1 saves still resume on the live Pine pin.
 - `nalati-balbal-original.json`: `encounter-sites` and `specimen-selection` use a made-up stele (engine-shaped rows) whose carved variants are the live pin's two blocks.
+
+## Fifth part: the r3 Dunes keeper
+
+`dunes-r3-keeper.{json,ts}` grafted Sunscar r3's keeper population (ray and strider homes, the Matriarch keeper) onto
+today's Dunes pin. No live pin has a population home any more (Dunes and Far Reach list none), so the cases that needed
+that graft go with it: `runtime-declared-creatures.test.ts` (all three), `matriarch-borrowed-body.test.ts`, and
+`headless-population`'s herdless page case. The keeper-home path now has no zone and no test: a FORMAT-PRUNE candidate.

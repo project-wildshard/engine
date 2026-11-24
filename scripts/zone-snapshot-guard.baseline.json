@@ -130,8 +130,6 @@
   "frozen-path test/fixtures/frozen/titan.ts",
   "frozen-path test/fixtures/frozen/workerFolder.ts",
   "frozen-path test/fixtures/nalati-weather-original.wasm",
-  "revision-path test/fixtures/dunes-r3-keeper.json",
-  "revision-path test/fixtures/dunes-r3-keeper.ts",
   "revision-path test/fixtures/frozen/dunes-r4-matriarch-decision.json",
   "revision-path test/fixtures/frozen/dunes-r4-matriarch-decision.wasm",
   "revision-path test/fixtures/frozen/nine-r3-held-items.json",

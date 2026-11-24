@@ -193,7 +193,6 @@
     "driftwood-isle",
     "pine-hollow"
   ],
-  "test/matriarch-borrowed-body.test.ts": ["sunscar-dunes"],
   "test/roc-borrowed-body.test.ts": [
     "far-reach"
   ],

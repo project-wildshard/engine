@@ -5,12 +5,12 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
 test.each([
-  'ground-borrowed-body', 'matriarch-borrowed-body', 'roc-borrowed-body',
+  'ground-borrowed-body', 'roc-borrowed-body',
   'template-strikes-hurt',
   'mover-carry',
 ])('%s consumes an existing product without building an app or starting a server', name => {
   const source = readFileSync(`test/${name}.test.ts`, 'utf8');
-  expect(source).toMatch(/builtFolder\(|dunesKeeper\(/u); // dunesKeeper reads the built Dunes folder with a frozen keeper
+  expect(source).toMatch(/builtFolder\(/u);
   expect(source).not.toMatch(/node:child_process|scripts\/build-shardfiles|createServer\(|localhost:3000/u);
 });
 
