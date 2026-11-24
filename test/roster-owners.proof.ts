@@ -17,14 +17,16 @@ function folderOf(slug: typeof slugs[number]): ShardFolder {
   return product;
 }
 const external = v.array(v.object({ def: v.object({ id: v.string() }) }));
+/** ONE-FORMAT OF29e1/e3: no plan names a `population.*` host any more; the engine stands `population.elites` from this
+ *  declared file (engine `nativeAssembly.ts` POPULATION_FILES), so the test reads the same file. */
+const ELITES_FILE = 'actors/elites.json';
 
 /** The product names the encounters; the public room wire must have an owner for each. */
 async function namedElites(product: ShardFolder): Promise<string[]> {
   const plan = parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE)), ids = new Set<string>();
+  if (product.hasFile(ELITES_FILE)) for (const fight of parseEliteFeature(await product.json(ELITES_FILE)).fights) ids.add(fight.def.id);
   for (const feature of plan.features) {
-    if (feature.host === 'population.elites') {
-      for (const fight of parseEliteFeature(await product.json(feature.file)).fights) ids.add(fight.def.id);
-    } else if (feature.host === 'riding.elites') {
+    if (feature.host === 'riding.elites') {
       const rows = await readAssemblyInput<unknown>(product, feature.rows);
       for (const row of v.parse(definitions, rows).rows) ids.add(row.def.id);
     } else if (feature.host === 'encounter.patrol') {
@@ -50,12 +52,12 @@ for (const slug of slugs) test(`${slug}: every declared elite has a live server 
   } finally { live.dispose(); }
 }, 10_000);
 
-test('removing the Pine elite host leaves its declared lairs unowned on the real room wire', async () => {
+test('removing the Pine elite file leaves its declared lairs unowned on the real room wire', async () => {
   const preparation = input('pine-hollow'), product = folderOf('pine-hollow');
-  const expected = await namedElites(product), plan = parseNativeAssembly(await product.json(NATIVE_ASSEMBLY_FILE));
-  const broken = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.filter(row => row.host !== 'population.elites' && row.host !== 'population.elites-ready') }));
-  // In-memory fault on admitted plan bytes only; no shard pin/source file changes.
-  const damaged: ShardFolder = { ...product, file: name => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(broken) : product.file(name) };
+  const expected = await namedElites(product);
+  expect(expected.length).toBeGreaterThan(0);
+  // In-memory fault on the admitted product only (the engine stands population.elites from this file); no pin changes.
+  const damaged: ShardFolder = { ...product, hasFile: name => name !== ELITES_FILE && product.hasFile(name) };
   const live = await createNativeHeadlessResident({ ...preparation, product: damaged }, undefined, { room: true });
   try {
     step(live);
