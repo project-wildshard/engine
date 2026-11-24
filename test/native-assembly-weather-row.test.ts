@@ -4,7 +4,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
@@ -14,6 +13,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { shippedPlan } from '../src/test/game/shippedPlan';
 
 async function shipped() {
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
@@ -26,7 +26,6 @@ async function shipped() {
   return { product, shard, assets, rapier };
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
-type Plan = { features: { host: string }[] };
 /** The product with its weather row cut. */
 function cut(fixture: Shipped): ShardFolder {
   const shardfile = { ...fixture.shard, rows: { ...fixture.shard.rows, weather: [] } };
@@ -45,8 +44,8 @@ function run(live: NativeHeadlessResident, ticks: number): string[] {
 
 test('Pine with its weather program as a row and no weather host runs its weather, and saves and restores', async () => {
   const fixture = await shipped();
-  const plan = JSON.parse(new TextDecoder().decode(await fixture.product.file(NATIVE_ASSEMBLY_FILE))) as Plan;
-  expect(plan.features.filter(feature => feature.host.startsWith('weather.')), 'Pine r9 names no weather host').toEqual([]);
+  const plan = await shippedPlan(fixture.product);
+  expect(plan.features.filter(feature => feature.host.startsWith('weather.')), 'Pine (r9 on) names no weather host').toEqual([]);
   expect(fixture.shard.rows.weather.length, 'Pine r9 declares its weather row').toBeGreaterThan(0);
   const live = await open(fixture, fixture.product);
   let restored: NativeHeadlessResident | undefined;

@@ -6,7 +6,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { NATIVE_ASSEMBLY_FILE, type NativeAssemblyFeature, type NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';
+import { NATIVE_ASSEMBLY_FILE, type NativeAssemblyFeature } from '@wildshard/format/nativeAssembly';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
@@ -16,6 +16,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { shippedPlan, shipsPlanFile, withPlanFile } from '../src/test/game/shippedPlan';
 
 /** Where each moved host's row goes; a host not here (plumbing, collision, the day) stands with no row. */
 const FAMILY: readonly (readonly [string, (host: string) => boolean])[] = [
@@ -33,20 +34,36 @@ async function shipped(slug: string) {
   const assets = new Map(serverInputFiles(descriptor.index.files, shard)
     .map(file => [file.commons === true ? `commons:${file.hash}` : file.hash, Uint8Array.from(readFileSync(`${directory}/${file.path}`))]));
   const rapier = await loadRapier(readFileSync('public/assets/physics/rapier.wasm'));
-  const plan = JSON.parse(new TextDecoder().decode(await product.file(NATIVE_ASSEMBLY_FILE))) as NativeAssemblyPlan;
-  return { product, assets, rapier, plan };
+  return { product, assets, rapier, plan: await shippedPlan(product) };
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
 
 /** `fixture`'s product with its plan naming `features` and the given family sections. */
 function rewritten(fixture: Shipped, features: readonly NativeAssemblyFeature[], sections: ReadonlyMap<string, readonly unknown[]>): ShardFolder {
-  const bytes = new TextEncoder().encode(JSON.stringify({ ...fixture.plan, features }));
-  const product: ShardFolder = Object.create(fixture.product) as ShardFolder;
-  return Object.assign(product, {
-    file: (name: string) => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : fixture.product.file(name),
-    has: (name: string): boolean => sections.has(name) || fixture.product.has(name as never),
-    section: (name: string): unknown => { const hosts = sections.get(name); return hosts === undefined ? fixture.product.section(name as never) : { version: 1, hosts }; },
+  const planned = withPlanFile(fixture.product, { ...fixture.plan, features: [...features] });
+  return Object.assign(Object.create(planned) as ShardFolder, {
+    has: (name: string): boolean => sections.has(name) || planned.has(name as never),
+    section: (name: string): unknown => { const hosts = sections.get(name); return hosts === undefined ? planned.section(name as never) : { version: 1, hosts }; },
   });
+}
+/** Every host row the product writes: its plan's, or (FP16b, FP16c, FP16f) its family sections' when it ships no plan. */
+function hostRows(fixture: Shipped): readonly NativeAssemblyFeature[] {
+  if (shipsPlanFile(fixture.product)) return fixture.plan.features;
+  const product = fixture.product as unknown as { has(name: string): boolean; section(name: string): { hosts: NativeAssemblyFeature[] } };
+  return FAMILY.flatMap(([name]) => product.has(name) ? product.section(name).hosts : []);
+}
+/** A product that ships no plan file is already the hostless world: it runs, saves and restores tick for tick. */
+async function runsAsShipped(fixture: Shipped): Promise<void> {
+  expect(fixture.plan.features, 'a product with no plan file names no host').toEqual([]);
+  expect(hostRows(fixture).length, 'its hosts stand from family sections').toBeGreaterThan(0);
+  const live = await open(fixture, fixture.product);
+  let restored: NativeHeadlessResident | undefined;
+  try {
+    run(live, 900);
+    restored = await open(fixture, fixture.product, serializeSimSnapshot(snapshotSimHostBytes(live.host)));
+    expect(canonicalSimDigest(snapshotSimHost(restored.host))).toBe(canonicalSimDigest(snapshotSimHost(live.host)));
+    expect(run(restored, 300)).toEqual(run(live, 300));
+  } finally { restored?.dispose(); live.dispose(); }
 }
 /** The plan with every host moved: rows into their family sections, the rest left to stand with no row. */
 function hostless(fixture: Shipped): ShardFolder {
@@ -70,7 +87,9 @@ function run(live: NativeHeadlessResident, ticks: number): string[] {
 }
 
 for (const slug of ['driftwood-isle', 'pine-hollow', 'nalati-grasslands']) test(`${slug}'s plan naming no host runs as the plan that names them, and saves and restores`, async () => {
-  const fixture = await shipped(slug), product = hostless(fixture);
+  const fixture = await shipped(slug);
+  if (!shipsPlanFile(fixture.product)) { await runsAsShipped(fixture); return; }
+  const product = hostless(fixture);
   const named = await open(fixture, fixture.product), derived = await open(fixture, product);
   let restored: NativeHeadlessResident | undefined;
   try {
@@ -83,9 +102,10 @@ for (const slug of ['driftwood-isle', 'pine-hollow', 'nalati-grasslands']) test(
 }, 600_000);
 
 test('a family host named in the plan beside its section, or a section holding another family, is refused', async () => {
-  const fixture = await shipped('nalati-grasslands'), riding = fixture.plan.features.filter(row => row.host.startsWith('riding.'));
-  await expect(open(fixture, rewritten(fixture, fixture.plan.features, new Map([['server/riding', riding]])))).rejects.toThrow('beside the server/riding section');
-  await expect(open(fixture, rewritten(fixture, [], new Map([['server/riding', [...riding, ...fixture.plan.features.filter(row => row.host === 'boss.arena')]]])))).rejects.toThrow('holds its own family');
+  const fixture = await shipped('nalati-grasslands'), rows = hostRows(fixture), riding = rows.filter(row => row.host.startsWith('riding.'));
+  const named = shipsPlanFile(fixture.product) ? fixture.plan.features : riding;
+  await expect(open(fixture, rewritten(fixture, named, new Map([['server/riding', riding]])))).rejects.toThrow('beside the server/riding section');
+  await expect(open(fixture, rewritten(fixture, [], new Map([['server/riding', [...riding, ...rows.filter(row => row.host === 'boss.arena')]]])))).rejects.toThrow('holds its own family');
 });
 
 /** FORMAT-PRUNE FP21: `fixture`'s product with no plan file: its settings in `server/world`, its hosts in their sections. */
@@ -100,7 +120,13 @@ function planless(fixture: Shipped): ShardFolder {
 }
 
 for (const slug of ['driftwood-isle', 'pine-hollow', 'nalati-grasslands']) test(`${slug} with no plan file, its settings in server/world, runs as the plan`, async () => {
-  const fixture = await shipped(slug), product = planless(fixture);
+  const fixture = await shipped(slug);
+  if (!shipsPlanFile(fixture.product)) {
+    // FP16b, FP16c, FP16f: the pinned product is this world as shipped (runsAsShipped runs it)
+    expect((fixture.product as unknown as { has(name: string): boolean }).has('server/world')).toBe(true);
+    return;
+  }
+  const product = planless(fixture);
   const named = await open(fixture, fixture.product), world = await open(fixture, product);
   try {
     expect(canonicalSimDigest(snapshotSimHost(world.host))).toBe(canonicalSimDigest(snapshotSimHost(named.host)));
@@ -109,7 +135,11 @@ for (const slug of ['driftwood-isle', 'pine-hollow', 'nalati-grasslands']) test(
 }, 600_000);
 
 test('a plan file beside server/world is refused', async () => {
-  const fixture = await shipped('pine-hollow'), planlessProduct = planless(fixture);
-  const both: ShardFolder = Object.assign(Object.create(planlessProduct) as ShardFolder, { hasFile: (name: string): boolean => fixture.product.hasFile(name) });
+  const fixture = await shipped('pine-hollow'), world = shipsPlanFile(fixture.product) ? planless(fixture) : fixture.product;
+  const bytes = new TextEncoder().encode(JSON.stringify(fixture.plan));
+  const both: ShardFolder = Object.assign(Object.create(world) as ShardFolder, {
+    hasFile: (name: string): boolean => name === NATIVE_ASSEMBLY_FILE || world.hasFile(name),
+    file: (name: string) => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : world.file(name),
+  });
   await expect(open(fixture, both)).rejects.toThrow('not both');
 });

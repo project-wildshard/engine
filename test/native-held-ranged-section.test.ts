@@ -20,6 +20,7 @@ import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../
 import type { HeadlessCommand } from '../src/shared/host/tickProtocol';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { shippedPlan, shipsPlanFile } from '../src/test/game/shippedPlan';
 
 const HELD = new Set(['loadout', 'combat.motion', 'item.ranged', 'ammunition']);
 
@@ -33,9 +34,10 @@ async function shipped() {
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
 type Plan = { features: { host: string }[] };
-const planOf = async (product: ShardFolder): Promise<Plan> => JSON.parse(new TextDecoder().decode(await product.file(NATIVE_ASSEMBLY_FILE))) as Plan;
+const planOf = async (product: ShardFolder): Promise<Plan> => await shippedPlan(product);
 /** The product with every held host cut from its plan: the move OF38d lets Pine make. */
 async function cut(product: ShardFolder): Promise<ShardFolder> {
+  if (!shipsPlanFile(product)) return product; // FP16c: Pine r15 on ships no plan, so no held host to cut
   const plan = await planOf(product), bytes = new TextEncoder().encode(JSON.stringify({ ...plan, features: plan.features.filter(row => !HELD.has(row.host)) }));
   return { ...product, file: async (name: string) => name === NATIVE_ASSEMBLY_FILE ? bytes : product.file(name) };
 }

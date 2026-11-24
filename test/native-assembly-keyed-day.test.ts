@@ -4,7 +4,6 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { NATIVE_ASSEMBLY_FILE } from '@wildshard/format/nativeAssembly';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
@@ -13,6 +12,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { shippedPlan } from '../src/test/game/shippedPlan';
 
 async function shipped() {
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
@@ -40,8 +40,8 @@ function run(live: NativeHeadlessResident, ticks: number): Frame[] {
 
 test('Pine with no day host keeps its keyed sky clock from its section, and saves and restores', async () => {
   const fixture = await shipped();
-  const plan = JSON.parse(new TextDecoder().decode(await fixture.product.file(NATIVE_ASSEMBLY_FILE))) as { features: { host: string }[] };
-  expect(plan.features.filter(row => row.host.startsWith('day.')), 'Pine r9 names no day host').toEqual([]);
+  const plan = await shippedPlan(fixture.product);
+  expect(plan.features.filter(row => row.host.startsWith('day.')), 'Pine (r9 on) names no day host').toEqual([]);
   const live = await open(fixture);
   let restored: NativeHeadlessResident | undefined;
   try {

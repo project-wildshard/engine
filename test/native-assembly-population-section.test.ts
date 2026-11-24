@@ -4,7 +4,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- The native proof reads the shipped product bytes and physics module.
 import { readFileSync } from 'node:fs';
 import { expect, test } from 'vitest';
-import { NATIVE_ASSEMBLY_FILE, type NativeAssemblyFeature, type NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';
+import type { NativeAssemblyFeature, NativeAssemblyPlan } from '@wildshard/format/nativeAssembly';
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { createNativeHeadlessResident, type NativeHeadlessResident } from '../src/server/host/headlessRuntime';
 import { outputDescriptor } from '../src/shared/game/shardfile/outputDescriptor';
@@ -14,6 +14,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
+import { shippedPlan, withPlanFile } from '../src/test/game/shippedPlan';
 
 async function shipped() {
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
@@ -25,8 +26,7 @@ async function shipped() {
   return { product, shard, assets, rapier };
 }
 type Shipped = Awaited<ReturnType<typeof shipped>>;
-const plan = async (product: ShardFolder): Promise<NativeAssemblyPlan> =>
-  JSON.parse(new TextDecoder().decode(await product.file(NATIVE_ASSEMBLY_FILE))) as NativeAssemblyPlan;
+const plan = async (product: ShardFolder): Promise<NativeAssemblyPlan> => await shippedPlan(product);
 /** The final six features from Pine r10's native assembly plan (pin 0022c95d). */
 const legacyPopulation: readonly NativeAssemblyFeature[] = [
   {host: 'population.environment', rows: {file: 'server/habitat.json'}},
@@ -38,9 +38,7 @@ const legacyPopulation: readonly NativeAssemblyFeature[] = [
 ];
 async function withLegacyPopulation(fixture: Shipped): Promise<ShardFolder> {
   const own = await plan(fixture.product);
-  const bytes = new TextEncoder().encode(JSON.stringify({ ...own, features: [...own.features, ...legacyPopulation] }));
-  const product: ShardFolder = Object.create(fixture.product) as ShardFolder;
-  return Object.assign(product, { file: (name: string) => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : fixture.product.file(name) });
+  return withPlanFile(fixture.product, { ...own, features: [...own.features, ...legacyPopulation] });
 }
 const open = (fixture: Shipped, product: ShardFolder, snapshot?: string): Promise<NativeHeadlessResident> =>
   createNativeHeadlessResident({ shard: product.shardfile, assets: fixture.assets, rapier: fixture.rapier, product }, snapshot);
