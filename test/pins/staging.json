@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "b7ac7ad5c28f91576475f97399e213860ed8ec6e892a4d449766c959a90cf18e",
+  "catalogueHash": "c026f5b9f76d18e9a176d00a7f0c426bdcb06f10b25c426d9ae8d7d17a56a5b6",
   "releaseHash": "b32ec528bdf8d26cfb56d2e048b3387c977db7dc34357d943263b3b5e9d5d409",
   "catalogue": {
     "version": 0,
@@ -724,8 +724,8 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 15,
-        "hash": "9408889892702c727ec35c647ca5cd2b1df805f444198e60170f40ad8e16fc99"
+        "revision": 16,
+        "hash": "7b6ccb7e8d6ed580fa752e842c4ef61599ecff8903ba3a5055d1b3b0789b680c"
       },
       {
         "slug": "sunscar-dunes",
@@ -877,9 +877,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 15,
-      "hash": "9408889892702c727ec35c647ca5cd2b1df805f444198e60170f40ad8e16fc99",
-      "bytes": 310410752
+      "revision": 16,
+      "hash": "7b6ccb7e8d6ed580fa752e842c4ef61599ecff8903ba3a5055d1b3b0789b680c",
+      "bytes": 314980352
     },
     {
       "slug": "sunscar-dunes",
