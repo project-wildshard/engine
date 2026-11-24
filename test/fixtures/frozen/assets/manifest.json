@@ -3,22 +3,6 @@
   "sourceCommit": "23d05fd147700fe5e9c929749f7d8cb63cdf7761",
   "generator": "staticGlb and bakeRawColourPixels; source recipes in regenerate-assets.mjs",
   "files": {
-    "nalati-bodies.bin": {
-      "bytes": 2584317,
-      "sha256": "e726016c96012cee10c1b352bca450cccda2dc387410a11732a26edab74235b6",
-      "source": "immutable pinned nalati-grasslands blobs/bin/e726016c96012cee10c1b352bca450cccda2dc387410a11732a26edab74235b6.bin",
-      "sourceRepository": "project-wildshard/shard-nalati",
-      "sourceCommit": "a0ae32bfab5e80400a20d39eb381804bcc84814f",
-      "sourcePath": "test/fixtures/nalati-species-files.json"
-    },
-    "nalati-balbal-cracks.bin": {
-      "bytes": 161760,
-      "sha256": "c233e91bcaa736ac3a6d0fda48923c263769cc18f8e7afc1d59c83b66568ec67",
-      "source": "immutable pinned nalati-grasslands blobs/bin/c233e91bcaa736ac3a6d0fda48923c263769cc18f8e7afc1d59c83b66568ec67.bin",
-      "sourceRepository": "project-wildshard/shard-nalati",
-      "sourceCommit": "a0ae32bfab5e80400a20d39eb381804bcc84814f",
-      "sourcePath": "src/data/spawnPackDemand.json"
-    },
     "kokpar.wasm": {
       "bytes": 10468,
       "sha256": "9b537d68433363e0ab4e432ef35f73fcd799638b31be7c83d0a499042ef3557f",
@@ -37,7 +21,6 @@
     }
   },
   "exportRecipes": {
-    "ci21-nalati-packed-bodies.txt": "Copy the two original content-addressed blobs from engine out/nalati-grasslands/blobs/bin/<sha256>.bin into nalati-bodies.bin and nalati-balbal-cracks.bin. Source hashes and lengths are in files. The packed body is already zlib-compressed on the wire; preserve these bytes. nalati-species-view.json (H2 frozen envelope) binds the packed body hash/length; original Nalati a0ae32b:test/fixtures/nalati-species-world.ts defines the catalogue/registration/preload setup.",
     "ci21-engine-tail-pins.py": "import json,hashlib,subprocess\nfrom pathlib import Path\nbase=Path('test/fixtures/frozen');runtime=json.loads((base/'runtime-manifest.json').read_text());assets=json.loads((base/'assets/manifest.json').read_text())\ndef snapshot(name,value,provenance):\n b=(json.dumps(value,separators=(',',':'),ensure_ascii=False)+'\\n').encode();(base/name).write_bytes(b);runtime['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\ndef blob(name,b,provenance):\n (base/'assets'/name).write_bytes(b);assets['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\ndef named(slug,name):\n root=Path('out')/slug;d=json.loads((root/'shard.json').read_text());f=next(f for f in d['files'] if f.get('name')==name);b=(root/f['path']).read_bytes();assert hashlib.sha256(b).hexdigest()==f['hash'];return b,{'sourcePin':slug,'sourceName':name,'sourceSha256':f['hash'],'pinManifestSha256':hashlib.sha256((root/'shard.json').read_bytes()).hexdigest()}\ndef rawSnapshot(name,b,provenance):\n (base/name).write_bytes(b);runtime['files'][name]={'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest(),**provenance}\nb,p=named('nalati-grasslands','quests/carried.json');carried=json.loads(b);rawSnapshot('carried-quest.json',b,p)\nh=carried['program']['script']['module'];wire=Path('out/nalati-grasslands',h).read_bytes();blob('kokpar.wasm',wire,{**p,'sourceName':h,'sourceSha256':hashlib.sha256(wire).hexdigest()})\nb,p=named('nalati-grasslands','models/specimens/quest-prop.bin');blob('carried-prop.bin',b,p)\nb,p=named('nalati-grasslands','world/dressing-phone.json');rawSnapshot('nalati-dressing-phone.json',b,p);runtime['files'].pop('kokpar-riders.json',None)\nsnapshot('kokpar-layout.json',{'x':-61,'z':36,'rx':34,'rz':22,'rot':.25},{'sourceRepository':'project-wildshard/shard-nalati','sourceCommit':subprocess.check_output(['git','-C','<checkouts>/shard-nalati','rev-parse','HEAD'],text=True).strip(),'sourcePath':'src/generators/layout.ts KOKPAR'})\nb,p=named('nine-dragon-stack','weapons/jian-row.json');rawSnapshot('nine-held-presentation.json',b,p)\nfor name,path in [('driftwood-arms.glb','public/assets/models/driftwood-fp/fp-arms.glb'),('nine-arms.glb','public/assets/nine-dragon/viewmodel/fp-rig.glb')]:\n slug,repo=('driftwood-isle','shard-driftwood') if name.startswith('driftwood') else ('nine-dragon-stack','shard-nine-dragon')\n root=Path('out')/slug;wire=(root/'mounts'/path.removeprefix('public/')).read_bytes();rev=subprocess.check_output(['git','-C','<checkouts>/'+repo,'rev-parse','HEAD'],text=True).strip()\n original=subprocess.check_output(['git','-C','<checkouts>/'+repo,'show',rev+':'+path]);assert wire==original\n blob(name,wire,{'sourceRepository':'project-wildshard/'+repo,'sourceCommit':rev,'sourcePath':path,'sourcePin':slug,'sourceName':'mounts/'+path.removeprefix('public/'),'sourceSha256':hashlib.sha256(wire).hexdigest(),'pinManifestSha256':hashlib.sha256((root/'shard.json').read_bytes()).hexdigest()})\nrecipe=Path('tmp/codex-tc48/export-pins.py').read_text().replace('<checkouts>/','<checkouts>/')\nruntime['exportRecipes']['ci21-engine-tail-pins.py']=recipe;assets['exportRecipes']['ci21-engine-tail-pins.py']=recipe\n(base/'runtime-manifest.json').write_text(json.dumps(runtime,indent=2)+'\\n');(base/'assets/manifest.json').write_text(json.dumps(assets,indent=2)+'\\n')\n"
   },
   "recipePathConvention": "Local checkout prefixes in recorded recipes are replaced with <checkouts>; expand this placeholder before replay. Recipes write complete provenance entries using actual git revisions."

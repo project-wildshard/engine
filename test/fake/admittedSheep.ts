@@ -1,28 +1,24 @@
-import { frozenNalatiJson, frozenNalatiBytes } from '../fixtures/frozen/nalati';
-import { array, tuple, number, string, object, looseObject, parse, unknown } from 'valibot';
+import { liveBytes, liveJson } from '../fixtures/livePin';
+import { parse } from 'valibot';
 import { SpeciesActorsFileSchema, type SpeciesActorsFileRows } from '@wildshard/format/speciesActorsFile';
 import { registeredJsonSchema } from '@wildshard/engine/host/formatJsonSchema';
 import { sha256 } from '../../src/shared/game/plugin/moduleHash';
 import { fixtureFolderFile } from '../fixtures/folderFile';
-import { SceneBakedGeometrySchema } from '@wildshard/format/sceneDressing';
 import { emptyShardfile } from '@wildshard/engine/host/author';
 import { createShardFolder, type ShardFolder } from '../../src/shared/game/shardfile/shardFolder';
 import { fixedDraws } from '../../src/client/game/models/fixedDraws';
 import type { CrowdBody } from '../../src/client/game/ambient/crowdDraw';
 import { fixtureJsonCheck } from '../fixtures/folderFile';
 
-const crowdView = frozenNalatiJson('nalati-crowd-view.json');
-const bakedInput = parse(object({ row: unknown(), pivots: array(tuple([number(), number(), number()])), parts: array(string()), radius: number() }), frozenNalatiJson('nalati-sheep-body.json'));
-const bakedBody = { ...bakedInput, row: parse(SceneBakedGeometrySchema, { ...parse(looseObject({}), bakedInput.row), expand: false }) };
 
-const species=parse(object({presentation:unknown()}),
-  frozenNalatiJson('nalati-species-view.json'));
+/** ZONE-SNAPSHOTS ZS9 (J507): Nalati's live sheep (its actors file and baked body), as players load it. */
+const live = parse(SpeciesActorsFileSchema, liveJson('nalati-grasslands', 'actors/sheep.json'));
 
 type SheepMetadata = SpeciesActorsFileRows;
 /** The real baked sheep channels, admitted through the same named-file grammar as play. */
 export function admittedSheepFolder(body: { readonly parts?: readonly string[]; readonly radius?: number } = {}): ReturnType<typeof createShardFolder> & { readonly bytes: Uint8Array; readonly metadata: SheepMetadata } {
-  const bytes = frozenNalatiBytes('nalati-sheep-body.bin'), { row, ...baked } = bakedBody;
-  const metadata = parse(SpeciesActorsFileSchema,{ species: species.presentation, page: { world: { slug: 'nalati-grasslands', hull: 'sheep', bounds: [-250,250,-250,250], rows: [], view: crowdView, material: {rim:.8,bands:.85} }, specimen: { slug: 'nalati-grasslands', hull: 'sheep', bounds: [-250,250,-250,250], rows: [], view: crowdView, material: {rim:.8,bands:.85} } }, draws:[{slot:'actors/sheep.bin',file:'actors/sheep.bin',channels:[],baked:{...row,expand:false}}], ...baked, ...body });
+  const bytes = liveBytes('nalati-grasslands', 'actors/sheep.bin');
+  const metadata = parse(SpeciesActorsFileSchema, { ...live, ...body });
   const encoded = new TextEncoder().encode(JSON.stringify(metadata));
   const json = { file: fixtureFolderFile('actors/sheep.json', {hash: sha256(encoded), url: 'https://example.test/sheep.json', jsonSchema: registeredJsonSchema('actors/sheep.json')}) };
   const binary = { file: {hash: sha256(bytes), url: 'https://example.test/sheep.bin'} };

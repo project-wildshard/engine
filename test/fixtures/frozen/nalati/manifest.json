@@ -118,26 +118,6 @@
       "sha256": "17a68c74224d7e331d3d53dbb217d44b433254df0897e2b2a064651870d94327"
     },
     {
-      "name": "nalati-species-view.json",
-      "bytes": 488309,
-      "sha256": "49b8e546e6c3b845f935272c4f666c776141eed267b5252dd2a2a661df06fd27"
-    },
-    {
-      "name": "nalati-sheep-body.json",
-      "bytes": 374,
-      "sha256": "dc6c07b50215dd2730e6c5ad20bfbf62e0c622d780b8e68f13d84303a37207cc"
-    },
-    {
-      "name": "nalati-sheep-body.bin",
-      "bytes": 101520,
-      "sha256": "dabc1feca4eaa375485410aa1b9bd4adeb25fb6aef07bc4a0ecdac1299d75fd9"
-    },
-    {
-      "name": "nalati-crowd-view.json",
-      "bytes": 1561,
-      "sha256": "df983bd9c45d53a166735caa2e7ace95839e02fd10d8e5fa315a9420b2eab6b7"
-    },
-    {
       "name": "nalati-riding-programs.json",
       "bytes": 34980,
       "sha256": "a3f025b25c2f1c1030f359547ee23b57a2a9ccd6d4b7d6564a437c717e406ebe"

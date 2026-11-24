@@ -1,8 +1,8 @@
-import { frozenNalatiJson } from './fixtures/frozen/nalati';
+import { liveJson } from './fixtures/livePin';
 import { expect, test, vi } from 'vitest';
 import { object, parse } from 'valibot';
 import { ClientSpeciesProgramSchema } from '@wildshard/format/clientNative';
-import { HullLookBookSchema, PackedCreatureLooksSchema } from '@wildshard/format/speciesLooks';
+import { PackedCreatureLooksSchema } from '@wildshard/format/speciesLooks';
 import { SpeciesPresentationSchema } from '@wildshard/format/speciesBookRows';
 import { Scope } from '../src/shared/engine/app/scope';
 import { emptyShardfile } from '../src/shared/host/author';
@@ -15,8 +15,9 @@ import type { ShardRuntime } from '../src/shared/game/shard/runtime';
 import type { ShardWorld } from '../src/server/game/shard/world';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
-const source = parse(object({hullBook: HullLookBookSchema, looks: PackedCreatureLooksSchema, presentation: SpeciesPresentationSchema}),
-  frozenNalatiJson('nalati-species-view.json'));
+// ZONE-SNAPSHOTS ZS9 (J507): Nalati's live species catalogue (no hull book: its packed bodies ride the presentation).
+const source = {presentation: parse(object({species: SpeciesPresentationSchema}), liveJson('nalati-grasslands', 'actors/sheep.json')).species,
+  looks: parse(PackedCreatureLooksSchema, liveJson('nalati-grasslands', 'actors/species-looks.json'))};
 const row = {kind: 'species.program', catalogue: {owner: 'orchard.species', actors: 'actors/catalogue.json', looks: 'actors/looks.json'}} as const;
 
 function fixture() {
@@ -25,7 +26,7 @@ function fixture() {
   const files = new Map([[row.catalogue.actors, {hash: 'actors', url: '/actors'}], [row.catalogue.looks, {hash: 'looks', url: '/looks'}]]);
   let onRead: (hash: string) => void = () => undefined;
   const product = createShardFolder({slug: shardfile.identity.slug, revision: 1, shardfile, files,
-    sections: new Map([['look/hull-book', {...source.hullBook, slug: shardfile.identity.slug}]]), read: hash => {
+    sections: new Map(), read: hash => {
       trace.push(hash); onRead(hash);
       return Promise.resolve(new TextEncoder().encode(JSON.stringify(hash === 'actors' ? {species: source.presentation} : source.looks)));
     }});

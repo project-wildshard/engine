@@ -28,3 +28,11 @@ The 24 GLB and KTX2 files in `frozen/assets` that the SDK baked from made-up rec
 KTX2 pair) move to `test/fixtures/sdk-built/assets/` with their pins and recipes, under `sdk-built/assets.ts`
 (`sdkBuiltAsset`). `frozen/assets` keeps only its four Nalati extracts (bodies, balbal cracks, kokpar, the carried
 prop), which the zone half of the audit handles.
+
+## Fifth step: the species world reads Nalati's live pin
+
+`test/fixtures/livePin.ts` reads a live pin's files by logical name (`liveBytes`, `liveJson`, `liveSection`) from the
+product `pnpm pins` installed. The species world (`liveSpeciesWorld.ts`), the admitted sheep and the species catalogue
+entry test now build from Nalati r8's `actors/sheep.json`, `actors/species-looks.json`, `actors/bodies.bin` and
+`actors/sheep.bin`, as the client's species.program does. The frozen species view, crowd view, sheep body and the
+r4-era packed bodies and balbal cracks go.
