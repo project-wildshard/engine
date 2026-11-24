@@ -50,9 +50,30 @@ test('a swipe on the hero, on the zone name and on the mini heroes each steps th
   expect(lit(d), 'over the mini heroes, back one').toBe(1);
 });
 
-test('a press that starts on ENTER ZONE or a tab is that control\'s, never a swipe', () => {
-  const d = deck();
+// QA-FEEDBACK-2026-11-24 row 8 (Jake, ~12:15 Cancún: "it should be a full screen swipe"; the iOS Simulator showed a swipe on the
+// zone's name, a button, refused): the name card and ENTER ZONE take a swipe too, once the finger has gone sideways; a tap stays theirs
+test('a swipe that starts on the zone\'s name or on ENTER ZONE steps the deck; a tap on ENTER ZONE still enters', () => {
+  let entered = 0;
+  const cards = titleCards(false, () => null, () => null, () => true).filter(card => ROWS.some(row => row.slug === card.slug));
+  const d = buildTitleDeck({ cards, active: null, onEnter: () => { entered++; }, mode: () => PLAYER, strip: 4,
+    tabs: [{ id: 'featured', label: 'Featured', cards }, { id: 'all', label: 'All', cards, list: true }], tab: 'featured' });
+  document.body.append(d.root); decks.push(d);
+  swipe(d.root.querySelector('.ws-menu-card.selected b') ?? d.root, 330, 70);
+  expect(lit(d), 'from the name text, which the old surface refused (a button)').toBe(1);
   swipe(d.root.querySelector('.ws-menu-play') ?? d.root, 330, 70);
+  expect(lit(d), 'from ENTER ZONE').toBe(2);
+  expect(entered, 'a swipe from ENTER ZONE enters nothing').toBe(0);
+  const play = d.root.querySelector('.ws-menu-play');
+  // a tap that wobbles a few pixels is still a tap
+  swipe(play ?? d.root, 200, 206);
+  expect(lit(d)).toBe(2);
+});
+
+test('a press that starts on a tab is that control\'s, never a swipe', () => {
+  const d = deck();
+  const tab = d.tabBar?.querySelector('.ws-menu-tab');
+  expect(tab).toBeTruthy();
+  swipe(tab ?? d.root, 330, 70);
   expect(lit(d)).toBe(0);
 });
 

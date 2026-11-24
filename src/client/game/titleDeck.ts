@@ -463,28 +463,44 @@ export function buildTitleDeck(opts: TitleDeckOptions): TitleDeck {
   // cards lol swipe should work"): J468's swipe look puts the zone's hero full-bleed and its name card in a thin band, so a swipe
   // anywhere on the screen (the hero, the name, the mini heroes) steps the deck, not only one over the name band. A press on a
   // control (BACK, a tab, ENTER ZONE) is the control's. The old carousel keeps its card row as the surface.
+  // QA 11-24 row 8 (Jake, ~12:15 Cancún: "you cant fucking swipe on the fucking image on zone select, only on the text, it should be
+  // a full screen swipe"; the iOS Simulator showed the zone's name card, a button, refusing every swipe): a swipe may start on any
+  // part of the screen below the top bar, the name card, the mini heroes and ENTER ZONE included. A press that starts on a control
+  // stays that control's until the finger has travelled SWIPE_SLOP_PX sideways; only then does the deck take the pointer (its lift
+  // then lands on the deck, so the control never fires). BACK and the tabs stay theirs.
   const surface = strip === undefined ? list : root;
-  let drag: { id: number; x0: number; y0: number; t0: number; dx: number } | null = null;
+  const SWIPE_SLOP_PX = 16;
+  let drag: { id: number; x0: number; y0: number; t0: number; dx: number; held: boolean } | null = null;
   listenDom(scope, surface, 'pointerdown', (e) => {
-    if (drag || listMode() || e.button > 0) return;
-    if (surface === root && e.target instanceof Element && e.target.closest('button, a, input, .ws-menu-tabs') !== null) return;
-    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), dx: 0 };
-    capturePointer(surface, e.pointerId);
+    if (listMode() || e.button > 0) return;
+    if (drag && drag.id !== e.pointerId && !drag.held) drag = null; // a control's tap kept its lift: that press is over
+    if (drag) return;
+    const target = e.target instanceof Element ? e.target : null;
+    if (surface === root && (target?.closest('.ws-menu-tabs, .ws-menu-back, a, input') ?? null) !== null) return;
+    const control = surface === root && (target?.closest('button') ?? null) !== null;
+    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(), dx: 0, held: !control };
+    if (!control) capturePointer(surface, e.pointerId);
   });
   listenDom(scope, surface, 'pointermove', (e) => {
     if (!drag || e.pointerId !== drag.id) return;
     drag.dx = e.clientX - drag.x0;
+    if (!drag.held) {
+      if (Math.abs(drag.dx) < SWIPE_SLOP_PX || Math.abs(drag.dx) < Math.abs(e.clientY - drag.y0)) return;
+      drag.held = true; capturePointer(surface, e.pointerId);
+    }
     const atEnd = (drag.dx > 0 && index === 0) || (drag.dx < 0 && index === entries.length - 1);
     place(index, atEnd ? drag.dx * 0.3 : drag.dx, false);
   });
   const endDrag = (e: PointerEvent): void => {
     if (!drag || e.pointerId !== drag.id) return;
-    const { dx, t0 } = drag; drag = null;
+    const { dx, t0, held } = drag; drag = null;
+    if (!held) return; // a control's own tap
     const v = dx / Math.max(1, performance.now() - t0); // px/ms
     if (Math.abs(dx) > 36 || (Math.abs(v) > 0.35 && Math.abs(dx) > 14)) { swipedAt = performance.now(); select(index + (dx < 0 ? 1 : -1)); }
     else place(index);
   };
-  listenDom(scope, surface, 'pointerup', endDrag); listenDom(scope, surface, 'pointercancel', endDrag);
+  // capture phase: a control's tap stops its own lift (listenTap), and the deck must still see that press end
+  listenDom(scope, surface, 'pointerup', endDrag, true); listenDom(scope, surface, 'pointercancel', endDrag, true);
   // a draft opens its tab in the tap's own turn (a popup blocker drops a late one); a gated entry enters the card tapped, even if the
   // deck moved while the gate asked, and ENTER WORLD stays busy meanwhile
   const playButton = required(root, '.ws-menu-play');
