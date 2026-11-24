@@ -14,7 +14,7 @@ import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { serializeSimSnapshot, snapshotSimHost, snapshotSimHostBytes } from '../src/shared/engine/sim/snapshot';
 import { canonicalSimDigest } from '../src/test/engine/simState';
 import { builtFolder } from '../src/test/game/builtFolder';
-import { shippedPlan, withPlanFile } from '../src/test/game/shippedPlan';
+import { foldedPlan, shippedPlan, withPlanFile } from '../src/test/game/shippedPlan';
 
 async function shipped() {
   const directory = builtFolder('pine-hollow'), product = await loadHeadlessFolder(directory), shard = product.shardfile;
@@ -37,8 +37,8 @@ const legacyPopulation: readonly NativeAssemblyFeature[] = [
   {host: 'population.elites-ready'},
 ];
 async function withLegacyPopulation(fixture: Shipped): Promise<ShardFolder> {
-  const own = await plan(fixture.product);
-  return withPlanFile(fixture.product, { ...own, features: [...own.features, ...legacyPopulation] });
+  const { product, plan: own } = await foldedPlan(fixture.product); // FP16c, FP21: a planless pin's sections folded into one plan
+  return withPlanFile(product, { ...own, features: [...own.features, ...legacyPopulation] });
 }
 const open = (fixture: Shipped, product: ShardFolder, snapshot?: string): Promise<NativeHeadlessResident> =>
   createNativeHeadlessResident({ shard: product.shardfile, assets: fixture.assets, rapier: fixture.rapier, product }, snapshot);

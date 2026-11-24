@@ -21,14 +21,15 @@ export async function shippedPlan(product: ShardFolder): Promise<NativeAssemblyP
   return { kind: 'native-assembly', ...world, features: [] } as unknown as NativeAssemblyPlan;
 }
 
-/** `product` with `plan` as its plan file in place of what it ships: `server/world` is hidden so the two never meet. Its
+/** `product` with `plan` as its plan file in place of what it ships: `server/world` and the family sections are hidden, as
+ *  a plan file stands for them all (FP21: never both). Its
  *  own fields are the product's (the runtime spreads a product), so `product` must carry its own, as a loaded one does. */
 export function withPlanFile(product: ShardFolder, plan: NativeAssemblyPlan): ShardFolder {
   const bytes = new TextEncoder().encode(JSON.stringify(plan));
   return { ...product,
     hasFile: (name: string): boolean => name === NATIVE_ASSEMBLY_FILE || product.hasFile(name),
     file: (name: string) => name === NATIVE_ASSEMBLY_FILE ? Promise.resolve(bytes) : product.file(name),
-    has: ((name: string): boolean => name !== WORLD && sections(product).has(name)) as ShardFolder['has'],
+    has: ((name: string): boolean => name !== WORLD && !FAMILIES.has(name) && sections(product).has(name)) as ShardFolder['has'],
   };
 }
 
@@ -41,6 +42,5 @@ export async function foldedPlan(product: ShardFolder): Promise<{ readonly produ
   const folds = [...FAMILIES].some(name => sections(product).has(name));
   if (shipsPlanFile(product) && !folds) return { product, plan: await shippedPlan(product) };
   const plan: NativeAssemblyPlan = { ...await shippedPlan(product), features: [...await standingHosts(product)] };
-  const planned = withPlanFile(product, plan);
-  return { plan, product: { ...planned, has: ((name: string): boolean => !FAMILIES.has(name) && planned.has(name as never)) as ShardFolder['has'] } };
+  return { plan, product: withPlanFile(product, plan) };
 }

@@ -101,11 +101,12 @@ for (const slug of ['driftwood-isle', 'pine-hollow', 'nalati-grasslands']) test(
   } finally { restored?.dispose(); derived.dispose(); named.dispose(); }
 }, 600_000);
 
-test('a family host named in the plan beside its section, or a section holding another family, is refused', async () => {
+test('a plan file beside the server sections, or a section holding another family, is refused (FP21)', async () => {
   const fixture = await shipped('nalati-grasslands'), rows = hostRows(fixture), riding = rows.filter(row => row.host.startsWith('riding.'));
-  const named = shipsPlanFile(fixture.product) ? fixture.plan.features : riding;
-  await expect(open(fixture, rewritten(fixture, named, new Map([['server/riding', riding]])))).rejects.toThrow('beside the server/riding section');
-  await expect(open(fixture, rewritten(fixture, [], new Map([['server/riding', [...riding, ...rows.filter(row => row.host === 'boss.arena')]]])))).rejects.toThrow('holds its own family');
+  await expect(open(fixture, rewritten(fixture, riding, new Map([['server/riding', riding]])))).rejects.toThrow('not both');
+  const { product: written } = shipsPlanFile(fixture.product) ? { product: planless(fixture) } : fixture;
+  const mixed = { ...written, section: (name: string): unknown => name === 'server/riding' ? { version: 1, hosts: [...riding, ...rows.filter(row => row.host === 'boss.arena')] } : written.section(name as never) } as ShardFolder;
+  await expect(open(fixture, mixed)).rejects.toThrow('holds its own family');
 });
 
 /** FORMAT-PRUNE FP21: `fixture`'s product with no plan file: its settings in `server/world`, its hosts in their sections. */

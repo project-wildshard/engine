@@ -342,6 +342,11 @@ async function writtenWorld(product: ShardFolder): Promise<NativeAssemblyPlan> {
   const plan = parseWrittenPlan({ kind: 'native-assembly', ...world, features: [] });
   return { ...plan, features: withHostSections(productFamilies(product), plan) };
 }
+/** The hosts a native world stands before its population and taming steps: a kept plan file's as stored, else each family
+ *  section's, in install order (FORMAT-PRUNE FP16, FP21; what a test reads where a product ships no plan file). */
+export async function standingHosts(product: ShardFolder): Promise<readonly NativeAssemblyFeature[]> {
+  return (await writtenWorld(product)).features;
+}
 /**
  * Build one native world from a product's `server/native-assembly.json` (P1-E3.1b). Every read happens here, so a bad
  * plan refuses before a host exists; `install` is synchronous, in the plan's order, and restores like a typed plan.
