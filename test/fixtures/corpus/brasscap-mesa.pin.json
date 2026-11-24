@@ -1,10 +1,10 @@
 {
   "about": "J506: test/fixtures/corpus/brasscap-mesa/ is `wildshard build` of this shard-brasscap commit less blobs/glb/ (engine's blob and push caps), written by node scripts/brasscap-export.mjs. files and tree are the whole build's, as shard-format's corpus/exports/brasscap-mesa.pin.json gives them; kept is what engine holds. Do not edit it by hand: change shard-brasscap, then re-export.",
   "repo": "https://github.com/project-wildshard/shard-brasscap",
-  "commit": "4a6ff4ee9cc3081c7d5c3c71f9b5c65f1698427d",
+  "commit": "9d885aac94f98aa6d6d5298da75aa5e077c3d70c",
   "folder": "test/fixtures/corpus/brasscap-mesa",
   "files": 223,
-  "tree": "fbbd1acf79e10ac4791b93eb78bc7474f6238dfc062d1bb4432e4ad0fe4103da",
+  "tree": "88d5b10998eddd96285f39d3a8d4ebc580f69c160c3fa4857df112e7af6fc9ba",
   "omitted": {
     "prefix": "blobs/glb/",
     "files": 83,
@@ -12,6 +12,6 @@
   },
   "kept": {
     "files": 140,
-    "tree": "e51ff4a4ad639fafe639493c566730e3077e7c309c68449f0a9050d36024d42d"
+    "tree": "a5b456b540cb25e1e00d0396b0afc177518a0949091e5bbdd9de748aef72db2e"
   }
 }

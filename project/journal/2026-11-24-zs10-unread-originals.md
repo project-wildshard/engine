@@ -78,3 +78,9 @@ today's Dunes pin. No live pin has a population home any more (Dunes and Far Rea
 that graft go with it: `runtime-declared-creatures.test.ts` (all three), `matriarch-borrowed-body.test.ts`, and
 `headless-population`'s herdless page case. The keeper-home path now has no zone and no test: a FORMAT-PRUNE candidate.
 - `frozen/dunes-r4-matriarch-decision.{json,wasm}`: only the keeper graft read them.
+
+## Brasscap at 0.1.0.6 (opus-prune2, 11-24 evening)
+
+Brasscap's J506 export is rebuilt from shard-brasscap `9d885aa` (SDK 0.4.31), so it reads at format 0.1.0.6 (tree
+`88d5b109`, the same as shard-format `8486bbb`). The guard now keeps that one zone copy only at the current format
+(`KEPT_EXPORTS`); its baseline is empty.

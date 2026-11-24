@@ -24,6 +24,13 @@ describe('zone-snapshot guard', () => {
     expect(scan({ 'test/fixtures/made-up/shard.json': JSON.stringify({ formatVersion: CURRENT, identity: { slug: 'closure-a' } }) })).toEqual([]);
   });
 
+  it('keeps J506\'s Brasscap export only at the current format', () => {
+    const at = (formatVersion: string) => ({ 'test/fixtures/corpus/brasscap-mesa/shard.json': JSON.stringify({ formatVersion, identity: { slug: 'brasscap-mesa' } }) });
+    expect(zoneSnapshotOffenders({ paths: Object.keys(at(CURRENT)), read: () => JSON.stringify({ formatVersion: CURRENT, identity: { slug: 'brasscap-mesa' } }), current: CURRENT, zones: [...ZONES, 'brasscap-mesa'] })).toEqual([]);
+    expect(zoneSnapshotOffenders({ paths: Object.keys(at('0.1.0.4')), read: () => JSON.stringify({ formatVersion: '0.1.0.4', identity: { slug: 'brasscap-mesa' } }), current: CURRENT, zones: [...ZONES, 'brasscap-mesa'] })).toEqual(['shard-folder test/fixtures/corpus/brasscap-mesa/shard.json']);
+    expect(zoneSnapshotOffenders({ paths: ['test/fixtures/corpus/other/shard.json'], read: () => JSON.stringify({ formatVersion: CURRENT, identity: { slug: 'brasscap-mesa' } }), current: CURRENT, zones: [...ZONES, 'brasscap-mesa'] })).toEqual(['shard-folder test/fixtures/corpus/other/shard.json']);
+  });
+
   it('refuses a fixture naming a zone revision', () => {
     expect(scan({ 'test/fixtures/pine-hollow-r7.json': '{}' })).toEqual(['revision-path test/fixtures/pine-hollow-r7.json']);
     expect(scan({ 'test/fixtures/dunes-r3-keeper.ts': '' })).toEqual(['revision-path test/fixtures/dunes-r3-keeper.ts']);

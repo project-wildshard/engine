@@ -21,6 +21,9 @@ const SELF=new Set(['scripts/zone-snapshot-guard.mjs','scripts/zone-snapshot-gua
 const TEXT=/\.(?:json|ts|mts|mjs|js|cjs|tsx)$/u;
 /** Zones that left the grid but whose names still mark a snapshot. */
 const RETIRED=['ink-cel-valley','pastel-plain'];
+// J506 (Jake, 2026-11-23): Brasscap Mesa's export is the one zone copy kept on purpose (scripts/brasscap-export.mjs rebuilds
+// it from a shard-brasscap commit). It passes only at the current format: an older export is a snapshot like any other.
+const KEPT_EXPORTS=new Set(['test/fixtures/corpus/brasscap-mesa/shard.json']);
 /** Short names the tree uses for zones beside their slugs. */
 const ALIASES=['dunes','nine','nine-dragon','pine','nalati','sunscar','brasscap','driftwood','mossgate','glowfen'];
 const PIN_RECORD=/["']?slug["']?\s*:\s*["'][a-z0-9-]+["'][^{}]{0,400}?["']?(?:hash|sha256)["']?\s*:\s*["'][0-9a-f]{64}["']|["']?(?:hash|sha256)["']?\s*:\s*["'][0-9a-f]{64}["'][^{}]{0,400}?["']?slug["']?\s*:\s*["'][a-z0-9-]+["']/u;
@@ -78,7 +81,7 @@ export function zoneSnapshotOffenders({paths,read,current,zones}){
       // ZS8: a made-up product (no zone slug) under test/fixtures/ may sit at an old format: the chain's old original.
       const madeUp=!zone&&path.startsWith('test/fixtures/');
       if(!madeUp&&version!==undefined&&/^[0-9.]+$/u.test(version)&&compareVersions(version,current)<0)found.add(`shard-folder ${path}`);
-      else if(zone)found.add(`shard-folder ${path}`);
+      else if(zone&&!(KEPT_EXPORTS.has(path)&&version===current))found.add(`shard-folder ${path}`);
     }
   }
   return [...found].sort();
