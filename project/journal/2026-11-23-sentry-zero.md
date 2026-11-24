@@ -13,3 +13,4 @@ Meta plan: `docs/plans/SENTRY-ZERO-PLAN.md`. Jake: the 5000-event Sentry quota r
   `scripts/sentry-weekly.mjs` lists unresolved issues over 5 events a day (API token, or `--json` from the MCP).
 - Build-max C1: main-watch's fallback and keeper go to the coordinator's pane (w2:p5), not the retired buddy-engine.
 - Build-max C4: a test holds every local QA leg (gate target, journey card) inside the shards openQaRig hosts.
+- Amber 63e7e5ac3c: dedicated-keep reads each shard once and its bag visits leave cleanly (MP3.3 6.2 s to 3.5 s locally).

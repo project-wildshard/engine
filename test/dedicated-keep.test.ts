@@ -13,6 +13,7 @@ import { Rng } from '@wildshard/format/seededRng';
 import { personalCoinTable, personalItemTable } from '../src/server/game/loot/personal';
 import { directLoopback, type DirectLoopback } from '../src/test/engine/netLoopback';
 import { roomBench, serverInput, type RoomBench } from './fixtures/dedicated/roomBench';
+import type { HeadlessRuntimeInput } from '../src/server/host/headlessRuntime';
 import { RoomBot } from './fixtures/dedicated/roomBot';
 import { openPglite } from './fixtures/pgliteDatabase';
 
@@ -50,9 +51,17 @@ function savesOf(db: Database, faults: Faults = { dead: false, next: 'none' }): 
   closers.push(() => { saves.queue.dispose(); saves.reports.dispose(); });
   return saves;
 }
+/** Amber 2026-11-23 (run 45292230028, 60.8 s of 60 s): every boot reread its shard folder, assets and Rapier; the file now
+ * reads each shard once. A room reads its input and never changes it. */
+const inputs = new Map<string, Promise<HeadlessRuntimeInput>>();
+function inputOf(slug: string): Promise<HeadlessRuntimeInput> {
+  let input = inputs.get(slug);
+  if (input === undefined) { input = serverInput(slug); inputs.set(slug, input); }
+  return input;
+}
 async function boot(slug: string, bootId: string, saves: Saves | null): Promise<Room> {
   const writes: SaveWrite[] = [];
-  const room = await DedicatedRoom.boot({ slug, build: '', bootId, input: await serverInput(slug), now: () => clock, post: row => {
+  const room = await DedicatedRoom.boot({ slug, build: '', bootId, input: await inputOf(slug), now: () => clock, post: row => {
     if (row.kind === 'save') { writes.push(row.write); saves?.write(row.write); } else if (row.kind === 'refused') throw new Error(row.reason);
   } });
   let open = true;
@@ -123,7 +132,7 @@ test('J202: a restart through the drain and the database gives a fresh world, an
 
 test('MP3.3: two players\' bags in two shards, through the door\'s where(): each is there on return and absent everywhere else', { timeout: 120_000 }, async () => {
   const db = await database(), saves = savesOf(db);
-  const bench: RoomBench = await roomBench({ cells: [DRIFTWOOD, NALATI], saves, holdMs: 50 }); closers.push(bench.close);
+  const bench: RoomBench = await roomBench({ cells: [DRIFTWOOD, NALATI], saves, holdMs: 50, load: inputOf }); closers.push(bench.close);
   const bots: RoomBot[] = []; closers.push(() => { for (const bot of bots) bot.drop(); });
   /** One visit through the door: where() picks the cell, the bag that loads is checked, `earn` is paid into it, and the player leaves. */
   const visit = async (device: string, cell: string, has: number, earn = 0): Promise<void> => {
@@ -135,7 +144,9 @@ test('MP3.3: two players\' bags in two shards, through the door\'s where(): each
     expect(room.cell.owned.of(body.id).purse.coins, `${device}'s bag in ${cell}`).toBe(has);
     if (earn > 0) room.cell.owned.of(body.id).file({ grant: 'coins', name: 'coins', amount: earn });
     await vi.waitFor(() => { expect(bot.coins(OWNED_ROW.coins)).toBe(has + earn); }, { timeout: 5000 });
-    bot.drop();
+    // The page's clean Leave: the body goes at once. A dropped socket waits out its hold on the room's 30-tick check, half a
+    // second a visit (amber 2026-11-23, run 45292230028: this file ran 60.8 s of its 60 s); this test is about the bags.
+    bot.quit(); await bot.ended(5000); bot.drop();
     await vi.waitFor(() => { expect(room.bodyOf(device)).toBeUndefined(); }, { timeout: 5000 });
     expect(await saves.drain(5000)).toBe(true);
     await vi.waitFor(() => { expect(bench.world.health().players).toBe(0); }, { timeout: 5000 });
@@ -181,7 +192,7 @@ test('MP3.1: 100 random kills, with drains, crashes, lost answers and replays am
   // The oracle, apart from grant emission: for each death the test causes, the shard's own loot tables are rolled on a copy of the
   // room's loot stream, so the expected coins and items are known before the room pays anything. Items already paid this boot are
   // owned, as the room counts them.
-  const input = await serverInput(DRIFTWOOD), economy = input.product?.has('economy/loot') === true ? input.product.section('economy/loot') : undefined;
+  const input = await inputOf(DRIFTWOOD), economy = input.product?.has('economy/loot') === true ? input.product.section('economy/loot') : undefined;
   const coinRoll = personalCoinTable(economy), itemRoll = personalItemTable(economy), owned = new Map<string, Set<string>>();
   if (coinRoll === null) throw new Error('Driftwood\'s kills pay coins');
   let died: Parameters<Parameters<DedicatedRoom['host']['events']['on']>[1]>[0] | null = null;
