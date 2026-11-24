@@ -33,7 +33,7 @@ const errors = /** @type {string[]} */ ([]), cells = /** @type {string[][]} */ (
 try {
   const page = await (await browser.newContext({ viewport: { width: SIZE.width, height: SIZE.height } })).newPage();
   page.on('pageerror', error => { errors.push(error.message); console.log('page error', error.message); });
-  await page.route('http://far.shots/**', async route => {
+  await page.route('http://far.shots/**', route => {
     const path = new URL(route.request().url()).pathname.slice(1);
     if (path === '') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><script type="module" src="/far-shots.js"></script>' });
     if (path.startsWith('assets/')) return route.fulfill({ contentType: TYPES[/** @type {keyof typeof TYPES} */ (extname(path))] ?? 'application/octet-stream', body: readFileSync(resolve('public', path)) });
@@ -56,12 +56,15 @@ try {
   }
   // the board: one row a zone; columns 2.3 km with / without, 3.5 km with / without
   const heads = DISTANCES.flatMap(d => [`${String(d / 1000)} km, impostor (today)`, `${String(d / 1000)} km, GLB only (cap kept)`]);
-  const data = file => `data:image/png;base64,${readFileSync(join(out, file)).toString('base64')}`;
-  const img = name => `<img src="${data(`${name}.png`)}"><img class="crop" src="${data(`${name}-crop.png`)}">`;
+  const img = name => `<img src="/${name}.png"><img class="crop" src="/${name}-crop.png">`;
   const html = `<!doctype html><style>body{margin:0;background:#111;color:#eee;font:15px system-ui}table{border-collapse:collapse}td,th{padding:4px}img{width:420px;display:block}img.crop{width:420px;height:158px;image-rendering:pixelated;margin-top:2px}th{text-align:left}</style>
 <h2 style="margin:8px">FP40: legacy far views with and without the G539 impostor (J439: the 1.6 MB far cap)</h2><p style="margin:8px">Each cell: the traveller's frame (40° lens, on a neighbour's road), then the same pixels round the zone at ×4.</p>
 <table><tr><th></th>${heads.map(h => `<th>${h}</th>`).join('')}</tr>${cells.map((row, i) => `<tr><th>${SLUGS[i]}</th>${row.map(n => `<td>${img(n)}</td>`).join('')}</tr>`).join('')}</table>`;
   const board = await (await browser.newContext({ viewport: { width: 1900, height: 1200 } })).newPage();
-  await board.setContent(html); await board.screenshot({ path: join(out, 'board.png'), fullPage: true });
+  await board.route('http://far.board/**', route => {
+    const path = new URL(route.request().url()).pathname.slice(1);
+    return route.fulfill(path === '' ? { contentType: 'text/html', body: html } : { contentType: 'image/png', body: readFileSync(join(out, path)) });
+  });
+  await board.goto('http://far.board/'); await board.screenshot({ path: join(out, 'board.png'), fullPage: true });
 } finally { await browser.close(); }
 if (errors.length > 0) { console.error(errors.join('\n')); process.exitCode = 1; }

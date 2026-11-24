@@ -1,6 +1,6 @@
 // FORMAT-PRUNE FP40 (J439 board): one legacy zone's far view as the grid draws it (`installFarProxy`, its own far.json look),
 // with its G539 impostor and without it, from a neighbour's road at a far-ring distance. Driven by far-impostor-shots.mjs.
-import { BufferGeometry, Color, DirectionalLight, Group, HemisphereLight, Mesh, PerspectiveCamera, Scene, WebGLRenderer } from 'three';
+import { Color, DirectionalLight, Group, HemisphereLight, Mesh, PerspectiveCamera, Scene, WebGLRenderer, type BufferGeometry } from 'three';
 import { prepareRigLoader } from '@wildshard/engine/anim/rig';
 import { CHUNK_HALF } from '@wildshard/engine/core/config';
 import { installFarProxy } from '../src/client/game/grid/farView';
@@ -8,7 +8,7 @@ import { decodeFarImpostor, farBandShare } from '../src/client/game/grid/farImpo
 import type { FarLookRuntime } from '../src/shared/game/grid/farProxy';
 
 interface View { readonly slug: string; readonly impostor: boolean; readonly distance: number; readonly width: number; readonly height: number; readonly fov: number }
-type Row = { far: { impostor?: Parameters<typeof decodeFarImpostor>[0] }; look: FarLookRuntime };
+interface Row { readonly far: { readonly impostor?: Parameters<typeof decodeFarImpostor>[0] }; readonly look: FarLookRuntime }
 
 const renderer = new WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 document.body.style.margin = '0';
