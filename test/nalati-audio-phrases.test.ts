@@ -2,8 +2,12 @@ import {expect,it} from 'vitest';
 import {Synth} from '../src/client/engine/audio/synth';
 import {parseAudioData} from '@wildshard/format/audio';
 import {requireAudioProfile} from '@wildshard/engine/audio/audioProfiles';
-import audio from './fixtures/nalati-audio-original.json' with {type:'json'};
+import {loadHeadlessFolder} from '../src/server/host/headlessFolder';
+import {builtFolder} from '../src/test/game/builtFolder';
 import replay from './fixtures/nalati-call-phrases.json' with {type:'json'};
+
+// ZONE-SNAPSHOTS ZS10 (J507): Nalati's live pin, whose synth rows are the ones the replay recorded.
+const audio=(await loadHeadlessFolder(builtFolder('nalati-grasslands'))).section('audio/audio');
 
 /** Native argument recorder. Burst consumes the same noise-offset draw as Synth.burst. */
 class Recorder extends Synth {
