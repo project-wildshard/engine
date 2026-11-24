@@ -1253,11 +1253,6 @@
    "commit": "c5b5031275838f265f827b1c7bfa7fe605f1da4b",
    "why": "new shard revisions pinned on main (budgets run 45143442332): Pine r11, Driftwood r9, Nalati r6, Nine Dragon, Brasscap r13, Mossgate r23, Mirror Salt r6"
   },
-  "download/phone/ink-cel-valley": {
-   "value": 3670722,
-   "contentKey": "ink-cel-valley@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
-  },
   "download/phone/open-plot-alien-plain": {
    "value": 7437567,
    "contentKey": "open-plot-alien-plain@1",
@@ -1341,11 +1336,6 @@
   "download/phone/open-plot-thin-ice": {
    "value": 6663130,
    "contentKey": "open-plot-thin-ice@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
-  },
-  "download/phone/pastel-plain": {
-   "value": 3670677,
-   "contentKey": "pastel-plain@1",
    "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
   },
   "render/phone-low/triangles/brasscap-mesa": {
