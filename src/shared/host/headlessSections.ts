@@ -10,7 +10,11 @@ const SERVER_PLAN = 'server/plan';
 /** Format's headless context plus the server's own plan, as the worker and its host read them. */
 export function engineHeadlessSections(input?: ReadonlyMap<string, unknown>): Map<string, unknown> {
   const sections = headlessSections(input);
-  if (input?.has(SERVER_PLAN) === true) sections.set(SERVER_PLAN, input.get(SERVER_PLAN));
+  // QA-FEEDBACK-2026-11-23-b row 41: SDK 0.4.29's `wildshard check` narrows its sections by format's list before the engine
+  // sees them, so `server/plan` never arrives there (Nine's TS21 check, Ring 3 run 45335242015). The SDK writes
+  // `server/plan` as the same bytes as `client/plan` (HS6d), so the page's copy stands in until the format names it.
+  const plan = input?.get(SERVER_PLAN) ?? input?.get('client/plan');
+  if (plan !== undefined) sections.set(SERVER_PLAN, plan);
   return sections;
 }
 

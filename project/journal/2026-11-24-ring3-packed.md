@@ -5,3 +5,5 @@
 - opus-popin (row 41): Sky Reach and Open Plots restore a Ring 2 author preparation keyed by the exact engine they install, and nobody made one for a Ring 3 candidate. scripts/ring3.ts now dispatches their ring-2-prepare.yml with the packed commit, waits for it green, then dispatches ci.yml; a red preparation holds only its row. Deadline 40 min, job timeout 65.
 
 - opus-popin (row 41): run 45331290922 lost Dunes, Driftwood, Sky Reach and Open Plots to single HTTP 404s on run reads (Dunes was green). A run read now fails its row only after five reads in a row fail; a changed run identity still fails at once.
+
+- opus-popin (row 41): on top of opus-fmt074's 4c9c6ebda: SDK 0.4.29's check narrows its sections by format's list, so server/plan never reaches the engine there (my local probe: only client/plan arrived). engineHeadlessSections now lets client/plan (HS6d writes the same bytes) stand in. Nine's TS21 check passed with this on a linked engine.
