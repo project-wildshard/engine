@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.80 (2026-11-24)
+
+- Newly placed zones are reachable by road from neighboring zones.
+- Thin Ice and Desert Ruin use their updated versions.
+- Clearing old packs preserves the files a live release needs to boot.
+
 ## v0.1.67 (2026-11-21)
 
 - Mirror Salt shows the dock prompt at seat height and lets drivers get back into their buggies.
