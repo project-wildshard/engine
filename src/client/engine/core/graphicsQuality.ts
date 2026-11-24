@@ -1,4 +1,4 @@
-import { graphicsMode, PIXELS_EVENT, saveGraphicsMode, type GraphicsMode } from './graphicsMode';
+import { graphicsMode, lowPowerHolds, PIXELS_EVENT, saveGraphicsMode, type GraphicsMode } from './graphicsMode';
 import { jsonSlot } from '../saves/slots';
 /**
  * MOBILE-GRAPHICS MG8. Jake, 2026-11-10 ~22:45 Cancún: "I don't need a high setting to be even more expensive than what it was
@@ -110,6 +110,11 @@ export function applyPreset(mode: GraphicsMode): boolean {
  * frameCapFps), never the sim step or a server tick.
  */
 export function frameCapFor(label: PresetLabel, lowPower: boolean): 30 | 60 { return label === 'low' && !lowPower ? 60 : 30; }
+/** QA 2026-11-24 row 31 (Jake: *"Driftwood FPS is still dogshit"*): the cap in force on a phone. Low Power Mode counts only while
+ *  its reading holds (lowPowerHolds, off since QA 11-23-b row 8), never on the title's guess: a busy title or a flagship that
+ *  reads "likely" kept exactly-Low at 30 for the whole tab (the reading clears only when the page comes back into view). A
+ *  phone truly in Low Power Mode loses nothing: Safari delivers its animation frames at 30 Hz there, so a 60 cap draws 30. */
+export function phoneFrameCap(): 30 | 60 { return frameCapFor(presetLabel(), lowPowerHolds()); }
 
 /** The frame readout under the controls (Game provides it: fps, frame time, draws); empty before a world draws. */
 let readout: () => string = () => '';

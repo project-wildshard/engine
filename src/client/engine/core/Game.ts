@@ -56,8 +56,8 @@ import { buildHeld, heldDrawDeferred, noteFrameDrawn } from '../../../shared/eng
 import { isDev, onDev } from './devMode';
 import { activeDevPixels, drawingPixelRatio } from './devPixels';
 import { RenderBudget, budgetCeiling } from './renderBudget';
-import { graphicsMode, lowPowerOn, noteFastFrames, PIXELS_EVENT } from './graphicsMode';
-import { flagOn, frameCapFor, noteShipped, presetLabel, setFrameReadout, type ShippedLook } from './graphicsQuality';
+import { graphicsMode, noteFastFrames, PIXELS_EVENT } from './graphicsMode';
+import { flagOn, noteShipped, phoneFrameCap, setFrameReadout, type ShippedLook } from './graphicsQuality';
 import { classifyFrames } from '../boot/lowPower';
 import { boundEntryWarmup } from '../render/entryWarmupBound';
 import { installFarLod } from '../render/farLod';
@@ -607,7 +607,7 @@ export class Game {
     });
     let mode = graphicsMode();
     this.engineScope.interval(2000, () => {
-      this.qualityCap = this.phoneGraphics ? frameCapFor(presetLabel(), lowPowerOn()) : 30;
+      this.qualityCap = this.phoneGraphics ? phoneFrameCap() : 30;
       const now = graphicsMode();
       if (now !== mode) { mode = now; document.dispatchEvent(new CustomEvent(PIXELS_EVENT)); }
     });
@@ -897,7 +897,7 @@ export class Game {
     this.applyQuality();
   }
 
-  /** MG12 prototype: the phone's frame cap in force (frameCapFor), cached for the loop */
+  /** MG12 prototype: the phone's frame cap in force (phoneFrameCap), cached for the loop */
   private qualityCap: 30 | 60 = 30;
   /** MG8 prototype: the shadows-off state (the shadow pass wrapper) and the cascade maps it has cleared */
   private qualityShadowsOff = false;
@@ -923,7 +923,7 @@ export class Game {
    */
   applyQuality(): void {
     if (!this.phoneGraphics) return;
-    this.qualityCap = frameCapFor(presetLabel(), lowPowerOn());
+    this.qualityCap = phoneFrameCap();
     const mode = graphicsMode();
     this.qualityLow = mode === 'low';
     // cleared again on every apply: the boot's own shadow draws (the loading card's parted map, the warm turns) fill the maps

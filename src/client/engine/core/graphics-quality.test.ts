@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, test } from 'vitest';
 import { drawingPixelRatio } from './devPixels';
-import { PIXELS_EVENT, saveGraphicsMode } from './graphicsMode';
-import { applyPreset, DENSITIES, densityIn, flagOn, frameCapFor, LOW, presetLabel, resetKnobs, saveDensity, saveFlag } from './graphicsQuality';
+import { PIXELS_EVENT, resetFastFrames, saveGraphicsMode } from './graphicsMode';
+import { saveStorage } from '../saves/slots';
+import { applyPreset, DENSITIES, densityIn, flagOn, frameCapFor, LOW, phoneFrameCap, presetLabel, resetKnobs, saveDensity, saveFlag } from './graphicsQuality';
 
 afterEach(() => { resetKnobs(); saveGraphicsMode('high'); });
 
@@ -54,4 +55,17 @@ test('cap rule 4: exactly Low with Low Power Mode off unlocks 60, and it follows
   expect(frameCapFor(presetLabel(), false)).toBe(60);
   applyPreset('high');
   expect(frameCapFor(presetLabel(), false)).toBe(30);
+});
+
+// QA 2026-11-24 row 31: the title's Low Power guess no longer caps exactly-Low at 30 (a flagship or a busy title reads
+// "likely"; a phone truly in Low Power Mode gets 30 Hz animation frames from Safari, so a 60 cap draws 30 there anyway).
+test('row 31: a guessed Low Power reading leaves exactly-Low at 60 and High at 30', () => {
+  const session = saveStorage('session');
+  session.setItem('boot.lowPower', JSON.stringify({ likely: true, rate: 30, at: Date.now() }));
+  try {
+    applyPreset('low');
+    expect(phoneFrameCap()).toBe(60);
+    applyPreset('high');
+    expect(phoneFrameCap()).toBe(30);
+  } finally { session.removeItem('boot.lowPower'); resetFastFrames(); }
 });
