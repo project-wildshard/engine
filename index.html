@@ -767,17 +767,42 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
 </div>
 <div class="ws-load-foot"><span data-el="foot"></span><button type="button" class="ws-load-retry" data-el="retry" hidden>Retry</button></div></div></template>
     <!-- data-loading-first-paint: buildIdentity.mjs keeps Vite's hoisted sheet non-blocking for this shell -->
+    <script data-boot-fail>
+      // J501 (QA 11-23-b row 22): the one retry spent and still no game code: the first-paint watchdog below calls this, and
+      // the card says so with a code and a Retry; the Sentry report waits in the device's screen outbox (telemetry/browserErrors.ts
+      // screen.reports, screen boot-fail) for the next page that boots to send it, as self-reload's does; this page has no Sentry.
+      // Before this the card sat at START with its clock running, saying nothing. Its own script keeps the watchdog small (RL3).
+      globalThis.__wsBootFail = (card, failed, reload) => {
+        const file = (failed || '').split('/').pop() || 'the game code', code = 'BOOT-FAIL';
+        const why = failed ? file : 'nothing arrived for 12 s';
+        document.documentElement.dataset.bootFail = code;
+        try {
+          const key = 'wildshard.save.v2@2.device', doc = JSON.parse(localStorage.getItem(key) || '{"keys":{}}'), keys = doc.keys ??= {};
+          const outbox = Array.isArray(keys['screen.reports']?.data) ? keys['screen.reports'].data : [];
+          const id = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+          outbox.push({ id, at: Date.now(), message: code + ': the game code didn\'t load (' + why + ')', stack: '',
+            tags: { system: 'boot', build: String(globalThis.__WS_BUILD_ID__ || ''), shard: '', bootStage: 'loading', fatal: true, screen: 'boot-fail',
+              exit: { code, zone: new URLSearchParams(location.search).get('chunk') || '', revision: '', room: '', step: card.dataset.step || '' } } });
+          keys['screen.reports'] = { v: 1, data: outbox.slice(-8) }; localStorage.setItem(key, JSON.stringify(doc));
+        } catch { /* storage off: the card still says it */ }
+        const kicker = card.querySelector('[data-el="kicker"]'); if (kicker) kicker.textContent = 'Couldn\'t start';
+        const box = document.createElement('div'); box.className = 'ws-load-fail'; box.setAttribute('role', 'alert');
+        box.style.cssText = 'margin-top:14px;padding:12px;border:1px solid rgba(255,170,90,.6);color:#ffc890;font:13px/1.4 ui-monospace,monospace';
+        const line = document.createElement('div'); line.textContent = 'The game code didn\'t load (' + why + '). Code ' + code + '.';
+        const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Retry'; retry.className = 'ws-load-retry';
+        retry.style.cssText = 'margin-top:10px;padding:8px 18px;background:transparent;border:1px solid currentColor;color:inherit;font:inherit;letter-spacing:.1em';
+        retry.onclick = () => { try { const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') || '{"keys":{}}'); delete doc.keys?.['boot.selfReload']; sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify(doc)); } catch { /* reload anyway */ } reload(); };
+        box.append(line, retry); (card.querySelector('.ws-load-panel') || card).append(box);
+        console.error('[boot] ' + code + ': ' + why);
+      };
+    </script>
     <script data-loading-first-paint>
-      // RL3 (Jake: "reload should just reload the page"): one self-reload. A page whose entry modules have not arrived 12 s
-      // after it started (no data-booted: a hung module fetch) reloads once a session; a slow boot that runs is left alone.
-      // QA 11-19 row 19 (Jake's phone on 4G, the title at ~26 s): a slow line is not a hung fetch. While some response
-      // finished in the last 4 s the page is still arriving, so the check looks again a second later; only 4 s with nothing
-      // arriving reloads (a reload drops the worker and starts every fetch over: the slowest thing a slow line can do).
+      // RL3: a page whose entry modules have not arrived 12 s after it started (no data-booted) reloads once a session; QA 11-19
+      // row 19: a slow line is not a hung fetch, so only 4 s with no response arriving counts (a reload starts every fetch over).
       (() => {
-        // SB53: a page offline before its entry graph ran never boots (a failed module stays failed in this document), and
-        // the one retry may be spent on a reload made offline: when the network returns, it reloads, retry spent or not.
-        let arrived = 0, away = navigator.onLine === false, failed = '';
-        // J501 (QA 11-23-b row 22): a module this document names that fails to load (a 404, a refused fetch) is known at once
+        // SB53: a page offline before its entry graph ran never boots; when the network returns it reloads, retry spent or not.
+        // J501: a module this document names that fails to load (a 404) is known at once; a spent retry shows data-boot-fail's card
+        let arrived = 0, away = navigator.onLine === false, failed = '', decided = false;
         addEventListener('error', e => { const el = e.target; if (el instanceof HTMLScriptElement && el.type === 'module' && el.src) { failed = el.src; setTimeout(check, 1500); } }, true);
         try { new PerformanceObserver(list => { for (const row of list.getEntries()) arrived = Math.max(arrived, row.responseEnd); }).observe({ type: 'resource', buffered: true }); } catch { /* no observer: the 12 s rule alone */ }
         const waiting = () => {
@@ -785,38 +810,9 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           return !document.documentElement.hasAttribute('data-booted') && !!document.querySelector('[data-title-shell]') && !!(document.querySelector('.ws-load[data-shell]') || pending instanceof HTMLTemplateElement && pending.content.querySelector('.ws-load[data-shell]'));
         };
         const reload = () => (globalThis.__wsShellReload || location.reload.bind(location))();
+        const stuck = () => { const card = document.querySelector('.ws-load[data-shell]'); if (card && !card.querySelector('.ws-load-fail')) globalThis.__wsBootFail?.(card, failed, reload); };
         addEventListener('offline', () => { away = true; });
         addEventListener('online', () => { if (away && waiting()) reload(); });
-        // J501 (QA 11-23-b row 22): the one retry spent and still no game code: the card says so with a code and a Retry, and
-        // the Sentry report waits in the device's screen outbox (telemetry/browserErrors.ts screen.reports, screen boot-fail)
-        // for the next page that boots to send it, as self-reload's does; this page has no Sentry.
-        // Before this the card sat at START with its clock running, saying nothing, for as long as the player waited.
-        const stuck = () => {
-          const card = document.querySelector('.ws-load[data-shell]');
-          if (!card || card.querySelector('.ws-load-fail')) return;
-          const file = (failed || '').split('/').pop() || 'the game code', code = 'BOOT-FAIL';
-          const why = failed ? file : 'nothing arrived for 12 s';
-          document.documentElement.dataset.bootFail = code;
-          try {
-            const key = 'wildshard.save.v2@2.device', doc = JSON.parse(localStorage.getItem(key) || '{"keys":{}}'), keys = doc.keys ??= {};
-            const outbox = Array.isArray(keys['screen.reports']?.data) ? keys['screen.reports'].data : [];
-            const id = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
-            outbox.push({ id, at: Date.now(), message: code + ': the game code didn\'t load (' + why + ')', stack: '',
-              tags: { system: 'boot', build: String(globalThis.__WS_BUILD_ID__ || ''), shard: '', bootStage: 'loading', fatal: true, screen: 'boot-fail',
-                exit: { code, zone: new URLSearchParams(location.search).get('chunk') || '', revision: '', room: '', step: card.dataset.step || '' } } });
-            keys['screen.reports'] = { v: 1, data: outbox.slice(-8) }; localStorage.setItem(key, JSON.stringify(doc));
-          } catch { /* storage off: the card still says it */ }
-          const kicker = card.querySelector('[data-el="kicker"]'); if (kicker) kicker.textContent = 'Couldn\'t start';
-          const box = document.createElement('div'); box.className = 'ws-load-fail'; box.setAttribute('role', 'alert');
-          box.style.cssText = 'margin-top:14px;padding:12px;border:1px solid rgba(255,170,90,.6);color:#ffc890;font:13px/1.4 ui-monospace,monospace';
-          const line = document.createElement('div'); line.textContent = 'The game code didn\'t load (' + why + '). Code ' + code + '.';
-          const retry = document.createElement('button'); retry.type = 'button'; retry.textContent = 'Retry'; retry.className = 'ws-load-retry';
-          retry.style.cssText = 'margin-top:10px;padding:8px 18px;background:transparent;border:1px solid currentColor;color:inherit;font:inherit;letter-spacing:.1em';
-          retry.onclick = () => { try { const doc = JSON.parse(sessionStorage.getItem('wildshard.save.v2@2.session') || '{"keys":{}}'); delete doc.keys?.['boot.selfReload']; sessionStorage.setItem('wildshard.save.v2@2.session', JSON.stringify(doc)); } catch { /* reload anyway */ } reload(); };
-          box.append(line, retry); (card.querySelector('.ws-load-panel') || card).append(box);
-          console.error('[boot] ' + code + ': ' + why);
-        };
-        let decided = false;
         const check = () => {
           if (!waiting() || decided) return;
           if (!failed && arrived > 0 && performance.now() - arrived < 4000) { setTimeout(check, 1000); return; }

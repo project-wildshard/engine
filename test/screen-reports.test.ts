@@ -265,8 +265,11 @@ walk('release-unsigned', 'a release file that fails its signature puts up its pa
 walk('boot-fail', "index.html's card says BOOT-FAIL with a Retry when the game code never loads, and the next page sends it (J501)", async () => {
   // the inline watchdog as index.html has it, run against a world page whose main module answered 404 and whose one retry is spent
   const html = readFileSync('index.html', 'utf8');
-  const code = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gu)].map((m) => m[1] ?? '').find((text) => text.includes("screen: 'boot-fail'"));
-  expect(code).toBeDefined();
+  // the BOOT-FAIL card (its own inline script, so the RL3 watchdog stays small) and the watchdog that calls it
+  const inline = (attribute: string): string | undefined => new RegExp(`<script ${attribute}>([\\s\\S]*?)<\\/script>`, 'u').exec(html)?.[1];
+  const bootFail = inline('data-boot-fail'), watchdog = inline('data-loading-first-paint');
+  expect(bootFail).toContain("screen: 'boot-fail'");
+  const code = `${bootFail ?? ''}\n${watchdog ?? ''}`;
   vi.useFakeTimers();
   try {
     document.body.innerHTML = '<div data-title-shell></div><div class="ws-load" data-shell data-step="start.app:main-import"><b data-el="kicker">Loading</b><div class="ws-load-panel"></div></div>';
