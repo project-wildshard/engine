@@ -158,6 +158,8 @@ export class RoadRoom implements CrossTarget {
    * sent: the door moves the socket.
    * False when nothing went (no live link here).
    */
+  /** QA 11-23-b row 38: whether a seat here can be handed out into `to`, a cell on another worker (`open` has opened it). */
+  opens(to: string): boolean { return this.opened.has(to); }
   handOut(device: string, to: string): boolean {
     const seat = this.seats.get(device), transport = seat?.transport ?? null, player = seat === undefined ? undefined : this.host.players.get(seat.body);
     if (seat === undefined || !(transport instanceof SeatTransport) || seat.client === null || player === undefined || !this.opened.has(to)) return false;

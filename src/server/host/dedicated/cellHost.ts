@@ -315,7 +315,7 @@ export function runCells(port: CellPort, options: CellHostOptions): { dispose: (
         if (disposed) { room.dispose(); post({ kind: 'placed', id: order.id, opened, error: 'The worker closed' }); return; }
         cells.set(slug, { slug, room, emptySince: diagnosticNow(), used: false, waking: null }); opened.push(slug);
       }
-      post({ kind: 'placed', id: order.id, opened, resident: resident() });
+      post({ kind: 'placed', id: order.id, opened, resident: resident(), ...(road === undefined ? {} : { stands: opened.filter(enterable) }) });
     // RR2: a place that failed partway still opened `opened` and grew the road's strips, so its answer says what is resident too
     } catch (error) { post({ kind: 'placed', id: order.id, opened, error: error instanceof Error ? error.message : String(error), resident: resident() }); }
     finally { if (!disposed) laid?.(); }

@@ -108,7 +108,8 @@ export type WorkerNews =
   | { readonly kind: 'devAnswer'; readonly id: number; readonly answer: DevAnswer }
   | { readonly kind: 'drained' }
   /** SA34a: a `place` order's end: the cells this worker opened, or why it opened none. Its other cells and its road play on either way. */
-  | { readonly kind: 'placed'; readonly id: number; readonly opened: readonly string[]; readonly error?: string; readonly resident?: WorkerResident }
+  | { readonly kind: 'placed'; readonly id: number; readonly opened: readonly string[]; readonly error?: string; readonly resident?: WorkerResident;
+    /** QA 11-23-b row 38: the cells it opened whose entryways stand, for the other workers' roads (as `booted` says at boot). */ readonly stands?: readonly string[] }
   /** GC15: a `cross` order's end. Moved, the seat and its link are in `to` (as `body`) and `from` has let it go; else it `stays` in `from`, or neither holds it. */
   | { readonly kind: 'crossed'; readonly device: string; readonly name: string; readonly body: string; readonly from: string; readonly to: string; readonly moved: boolean; readonly stays: boolean }
   | (RoomNews & { readonly slug: string });
