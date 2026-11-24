@@ -120,10 +120,11 @@ function declaredBossScripts(plan: NativeAssemblyPlan): ReadonlySet<string> {
 /**
  * OF22a1: the day and the sea a native assembly's plan names no host for, from its sections: the look's toon sky clock
  * (`look/toon` `sky.day` over `sky.cycleSeconds`, as the page's toon sky runs it), else the keyed sky's clock (`look/keyed-sky`, as
- * the `day.keyed-sky` host, OF23e2), else the first `world/days` row; the declared sea row's water
+ * the `day.keyed-sky` host, OF23e2), else the first `world/days` row, else (FORMAT-PRUNE FP16d) the forest weather's sky clock
+ * (`world/forest-weather.json` `sky.clock`, as Nalati's `day.declared` host read it); the declared sea row's water
  * (as the `water.sea` host, its swell when the row has `waves`). A plan that still names a `day.*` or `water.*` host keeps it.
  */
-function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan, field: NativePopulationField | null): (host: SimHost) => DayCycleClock | null {
+function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan, field: NativePopulationField | null, forest: DayCycleSpec | undefined): (host: SimHost) => DayCycleClock | null {
   const shard = product.shardfile, families = new Set(plan.features.map(row => row.host.split('.')[0]));
   const toon = families.has('day') || !product.has('look/toon') ? undefined : product.section('look/toon').sky;
   const keyed = families.has('day') || toon !== undefined || !product.has('look/keyed-sky') ? undefined : keyedSkyDaySpec(product.section('look/keyed-sky'));
@@ -136,8 +137,17 @@ function sectionWorld(product: ShardFolder, plan: NativeAssemblyPlan, field: Nat
     else if (body !== undefined) host.useWater({ surfaceAt: body.restAt, ...(sea?.waves === true ? { bob: (x: number, z: number) => waveHeight(x, z, host.clock.now) } : {}) });
     if (toon !== undefined) { const clock = new DayCycle(dayClock(TOON_DAY_PRESET, toon.day, { dusk: 'dusk' }).spec); clock.cycle = toon.cycleSeconds; return host.useDayClock(clock); }
     if (keyed !== undefined) return host.useDayClock(new DayCycle(keyed));
-    return days === undefined ? null : host.useDayClock(declaredDay(days));
+    if (days !== undefined) return host.useDayClock(declaredDay(days));
+    return forest === undefined || families.has('day') ? null : host.useDayClock(new DayCycle(forest));
   };
+}
+type DayCycleSpec = ConstructorParameters<typeof DayCycle>[0];
+/** FORMAT-PRUNE FP16d: the forest weather's sky clock, the day a plan with no `day.*` host stands when no look or day row names one. */
+const FOREST_WEATHER = 'world/forest-weather.json';
+async function forestClock(product: ShardFolder): Promise<DayCycleSpec | undefined> {
+  if (!product.hasFile(FOREST_WEATHER)) return undefined;
+  const weather = await readAssemblyInput<{ readonly sky?: { readonly clock?: DayCycleSpec } }>(product, { file: FOREST_WEATHER });
+  return weather.sky?.clock;
 }
 /** The cooked weather files choose the storm owner after its native environment exists. */
 function withSectionWeather(product: ShardFolder, features: readonly NativeAssemblyFeature[]): readonly NativeAssemblyFeature[] {
@@ -284,7 +294,7 @@ export async function prepareNativeAssembly<C extends NativeAssemblyContext>(inp
     if (declaredWakeFight(shard, spawn) !== undefined) summoned.add(spawn);
   }
   const declaredLevel: SimLevel = { ...level, entities: declaredSpawnEntities(counted) };
-  const world = sectionWorld(product, plan, meadow ? prepared.field : null);
+  const world = sectionWorld(product, plan, meadow ? prepared.field : null, await forestClock(product));
   // OF22a3: with no collision host the bake lends its ground alone and the shard's prop solids stand beside it
   const ownSolids = standsOwnSolids(plan.features.map(row => row.host)), melee = prepareSectionMelee<C>(product, features.map(row => row.host));
   // OF38d4a: a held host the engine stood from the product's files counts as named
