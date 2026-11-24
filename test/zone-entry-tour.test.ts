@@ -248,6 +248,18 @@ test("a fresh Fossil Badlands guest goes round the centre block to the north gat
     {x:-437.5, z:-1125, ride:false}, {x:-327.5, z:-1125, ride:false}]);
 });
 
+test("a fresh Mossgate guest goes north round the wall west of the spawn to the west gate", (): void => {
+  // v0.1.76's smokes (seeds 2943271062, 1436109927) held at (553.3, 567.9) on the straight line west of the spawn
+  const center = {x:562.5, z:562.5}, spawn = {x:562.8, z:564.3};
+  expect(spawnApproach('mossgate', spawn, center, -1, 0)).toEqual([
+    {x:562.5, z:602.5, ride:false},
+    {x:437.5, z:602.5, ride:false},
+    {x:437.5, z:562.5, ride:false},
+    {x:327.5, z:562.5, ride:false}]);
+  // its other gates keep the shared rule
+  expect(spawnApproach('mossgate', spawn, center, 1, 0)).toEqual([{x:797.5, z:562.5, ride:false}]);
+});
+
 test("a fresh Brasscap guest leaves town around the canyon wall before taking the east gate", (): void => {
   const center = {x:-562.5, z:-562.5}, depot = {x:-564.1, z:-559.9};
   expect(spawnApproach('brasscap-mesa', depot, center, 1, 0)).toEqual([

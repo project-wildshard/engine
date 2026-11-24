@@ -466,6 +466,10 @@ export function spawnApproach(slug, at, center, dx, dz) {
     // The spawn faces the centre block (x -31..31, z -30..34) with posts at its south corners: v0.1.60's smoke held at
     // (4.4, -29.1) on the north line. Back off south of the posts, take the clear x 62.5 column north, then join the line.
     lead = [[0,-60],[62.5,-60],[62.5,125],[0,125]];
+  } else if (slug === 'mossgate' && dx < 0) {
+    // The spawn stands on the west gate's line, 1.8 m off it, with a wall and a boulder 9 m west of it: v0.1.76's smokes held at
+    // (553.3, 567.9) twice. Go 40 m north of the line first, west to the gate's half, then join the line.
+    lead = [[0,40],[-125,40],[-125,0]];
   } else if (slug === 'brasscap-mesa' && dx > 0) {
     // From the depot, go south of the canyon wall before turning east onto the gate's line.
     lead = [[4,2.6],[4,45],[75,45],[125,0]];
