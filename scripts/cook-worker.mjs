@@ -101,7 +101,10 @@ if (command === 'serve') {
   console.log(`cook worker polls the catalogue every ${everyMs / 1000} s`);
   bootCook(cook, { everyMs, log: line => { console.log(line); } });
   // J505: the nightly protected collection (a publish also runs it under 15% headroom)
-  setInterval(() => { reclaim().catch(error => { console.warn(`pack store reclaim failed: ${error instanceof Error ? error.message : String(error)}`); }); }, 24 * 3600_000).unref();
+  const nightly = async () => {
+    try { await reclaim(); } catch (/** @type {unknown} */ error) { console.warn(`pack store reclaim failed: ${error instanceof Error ? error.message : String(error)}`); }
+  };
+  setInterval(() => { void nightly(); }, 24 * 3600_000).unref();
   if (uploadApi !== undefined && privateSource !== undefined) {
     // The initial rollout is staging only; production keeps its existing upload law.
     need('COOK_STAGING_ACTIVATION_URL'); need('COOK_STAGING_ACTIVATION_TOKEN');
