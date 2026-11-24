@@ -327,6 +327,7 @@ export class HUD {
       this.weather = { chip, title: q(chip, '.ws-game-wt'), sub: q(chip, '.ws-game-ws'), low, last: '' };
     }
     const W = this.weather;
+    this.seatWeather(W.chip);
     const key = `${w.chip?.title ?? ''}|${w.chip?.sub ?? ''}|${w.chip?.tone ?? ''}|${String(w.getLow)}`;
     if (key === W.last) return;
     W.last = key;
@@ -335,8 +336,24 @@ export class HUD {
       W.title.textContent = w.chip.title; W.sub.textContent = w.chip.sub;
       W.chip.classList.toggle('storm', w.chip.tone === 'storm');
     }
-    W.low.classList.toggle('show', w.getLow);
+    // HUD Tidy HT1 (Jake 11-24 ~14:35, approved): on a touch HUD GET LOW is a line in the toast slot, the quest messages' spot
+    // under the boss bar; it jumps the queue and holds while the lightning is near. The chip is the badge on the minimap's
+    // bottom edge (game.css). A keyboard page keeps its top-centre warning.
+    const slot = this.touchSlot();
+    W.low.classList.toggle('show', w.getLow && !slot);
+    this.toasts.pin(w.getLow && slot ? (W.low.textContent ?? '').trim() : null);
   }
+
+  /** HUD Tidy HT1: on a touch HUD the storm chip rides the minimap, a badge on its bottom edge (game.css `.ws-minimap >
+   *  .ws-game-weather`), whatever size the minimap is; a level that has no minimap, or a keyboard page, keeps it under the map.
+   *  Checked at each weather word (the timer ticks once a second), so a minimap made anew takes the badge back. */
+  private seatWeather(chip: HTMLElement): void {
+    const map = this.touchSlot() ? this.root.querySelector<HTMLElement>('.ws-minimap') : null, home = map ?? this.root;
+    if (chip.parentElement !== home) home.append(chip);
+  }
+
+  /** the toasts are one slot on a touch HUD (ToastStack, J473 row 5): HT1 and HT2 put GET LOW and pickups in it */
+  private touchSlot(): boolean { return this.root.classList.contains('touch'); }
 
   private buildPips(n: number): void {
     this.pipBox.replaceChildren(); this.pips.length = 0;
@@ -598,6 +615,14 @@ export class HUD {
   /** SF28 (G87; the only pickup look since Jake's G181 pick, E450): a platform pickup (equipment, harvest drops) as the big
    *  item card under the top bar, in the level's accent */
   pickupCard(spec: ItemCardSpec): void {
+    // HUD Tidy HT2 (Jake picked A, 11-24 ~14:55: "no big card, it becomes a line under the boss bar. and it can take turns"):
+    // on a touch HUD a pickup is one line in the toast slot ("PICKED UP · SEA GLASS · CHARM · 5"), taking turns with the quest
+    // messages, 2.5 s each, with a "+N" for those waiting. A keyboard page keeps the big card.
+    if (this.touchSlot()) {
+      this.placeToasts();
+      this.toasts.push([engineString('s_item_card_picked'), spec.name, ...(spec.detail === undefined ? [] : [spec.detail])].join(' · '), 'pickup');
+      return;
+    }
     this.cardPop ??= new ItemCardPop(this.root, this.scope);
     this.cardPop.show(spec, engineString('s_item_card_picked'), this.cardAccent);
   }

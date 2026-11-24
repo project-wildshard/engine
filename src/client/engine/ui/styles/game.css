@@ -151,6 +151,11 @@
    under the status column, the tracker and the map), above the crosshair keep-out; one toast at a time, up to two lines */
 #hud.touch .ws-game-toasts { left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100vw - 48px); align-items: center; }
 #hud.touch .ws-game-toasts .ws-game-toast { text-align: center; white-space: normal; line-height: 1.4; }
+/* HUD Tidy HT2 (Jake picked A, 11-24): a pickup is a line in the slot, not the big card; "+N" counts the lines waiting their turn */
+#hud.touch .ws-game-toasts .ws-game-toast-pickup { border-color: rgba(127, 214, 162, 0.7); }
+#hud.touch .ws-game-toasts .ws-game-toast-more { margin-left: 8px; color: var(--ws-amber); font-variant-numeric: tabular-nums; }
+/* HT1: GET LOW (and a shard's warning) in the slot is as wide as the slot, not the keyboard column's 190 px */
+#hud.touch .ws-game-toasts .ws-game-toast-warn { max-width: none; }
 
 /* ── damage flash + vignette ── */
 .ws-game-flash { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(255, 40, 20, 0.55) 100%); opacity: 0; visibility: hidden; }
@@ -277,13 +282,20 @@
 
 @media (max-width: 700px) {
   /* under the phone minimap (34vw wide at the safe top, heading tab below it) */
-  .ws-game-weather { right: calc(14px + 17vw); top: calc(var(--ws-top) + 34vw + 30px); padding: 3px 9px 4px 6px; gap: 6px; border-radius: 7px; }
-  .ws-game-weather .ws-game-wicon { width: 18px; height: 18px; }
-  .ws-game-weather .ws-game-wt { font-size: 12px; letter-spacing: 0.16em; }
-  .ws-game-weather .ws-game-ws { font-size: 8px; letter-spacing: 0.12em; }
+  /* HUD Tidy HT1 (Jake 11-24 ~14:35, approved): the storm timer is a small badge, one line, no wind; on a touch HUD it rides
+     the minimap (below), and GET LOW is a line in the toast slot (HUD.setWeather) */
+  .ws-game-weather { padding: 2px 7px 2px 5px; gap: 4px; border-radius: 6px; }
+  .ws-game-weather .ws-game-wicon { width: 14px; height: 14px; }
+  .ws-game-weather .ws-game-wt { font-size: 11px; letter-spacing: 0.14em; }
+  .ws-game-weather .ws-game-ws { display: none; }
   .ws-game-getlow { top: calc(var(--ws-top) + 34vw + 70px); font-size: 13px; letter-spacing: 0.16em; padding: 5px 12px 5px 9px; }
   .ws-game-getlow i { width: 16px; height: 16px; }
 }
+
+/* HUD Tidy HT1: the storm badge on the minimap's bottom edge, centred, over the rim (HUD.seatWeather mounts it in the minimap on
+   a touch HUD), the way the BAG button sits on its top corner */
+.ws-minimap > .ws-game-weather { left: 50%; right: auto; top: auto; bottom: 0; z-index: calc(var(--ws-layer-hud) + 2); transform: translate(-50%, 50%); }
+.ws-minimap > .ws-game-weather.show { animation: none; }
 
 /* E373: hidden-level notice. A14: a line in the frame meter's panel (perfDock.ts), never over the world. */
 .ws-game-developer { padding: 4px 8px; border: 1px solid var(--ws-cyan); background: rgba(13, 27, 38, 0.8); color: var(--ws-cyan); font-family: var(--ws-mono); font-size: 9px; line-height: 1.3; letter-spacing: 0.09em; white-space: normal; pointer-events: none; }

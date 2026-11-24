@@ -16,6 +16,12 @@
 //   --states (QA rows 42, 43) adds a shot per state after the union one (itself the fresh-lines shot): -chat-faded (6 s on: the
 //   lines have faded), -chat-open (the input focused: the open chat), -chat-closed (a tap outside), and in Developer mode -boost-off
 //   (riding) and -boost-on (a double tap of HOVER / H; on an older build, its BOOST button).
+//   --tidy (meta HUD-TIDY HT1, HT2) adds, on phones, -tidy-storm (a storm with the boss bar up: GET LOW in the toast slot, the
+//   storm badge on the minimap's bottom edge) and -tidy-pickup (a pickup and a quest step in the same moment: the pickup's line
+//   under the boss bar with "+1"), and checks them: no big pickup card, no top-centre GET LOW, the badge centred on the
+//   minimap's bottom edge, and no toast or badge over the boss bar, the kill feed, the quest chip or the minimap.
+//   --map (QA-FEEDBACK 11-24 row 19) adds, on phones, a Bag map shot per zoom chip (-map-fit, -map-0.25, ...).
+//   In Developer mode the dock's ping chip (QA-FEEDBACK 11-24 row 36) is fed a 3-digit round trip, its widest everyday reading.
 //
 // The layout check (exit 1 with --check): no Developer surface (the dock's chips, a panel that shows unasked, BOOST, an alert)
 // overlaps the quest chip, PAUSE, the minimap, the crosshair, the chat or a touch control, or leaves the window (8 px clear of each edge, QA row 13); the chat (its row, lines, voice tip and
@@ -41,6 +47,7 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//u.test(base)) throw new Error(
 const label = arg('label', 'shot'), out = resolve(arg('out', join(homedir(), '.cache/wildshard/hud-worst')));
 const browsers = arg('browsers', 'chromium,webkit').split(','), sizes = arg('sizes', '402x874,402x654,874x402,1440x900').split(',');
 const modes = arg('dev', 'off,on').split(','), check = process.argv.includes('--check'), menu = process.argv.includes('--menu'), states = process.argv.includes('--states');
+const tidy = process.argv.includes('--tidy'), mapShots = process.argv.includes('--map');
 const chatRev = arg('chat-rev', '');
 /** QA row 43's calm corner is in the chat modules drawn: this tree's, or a --chat-rev that has chatCorner.ts */
 let calmChat = chatRev === '';
@@ -137,6 +144,8 @@ function union(dev) {
   if (dev) {
     if (document.querySelector('.ws-touch-boost') !== null) step('dev: BOOST (a build before QA row 42)', () => show('.ws-touch-boost'));
     step('dev: alert', () => { H.devAlert('quest/fire.ts disabled: TypeError: castaway.flags is undefined'); });
+    // QA-FEEDBACK 11-24 row 36: the ping chip at its widest everyday reading (a 3-digit round trip), kept fresh
+    step('dev: ping 188 ms', () => { const say = () => document.dispatchEvent(new CustomEvent('ws:rooms-ping', { detail: { rttMs: 188 } })); say(); setInterval(say, 500); return document.querySelector('.ws-perf-ping') !== null; });
   }
   // play.ts rewrites the prompt, the aim line and the hit marker every frame: hold them for the shot
   const hold = document.createElement('style'); hold.id = 'hud-worst-hold';
@@ -165,7 +174,7 @@ function boxes() {
   const clipped = b => clip === undefined ? b : { ...b, top: Math.max(b.top, clip.top), bottom: Math.min(b.bottom, clip.bottom) };
   const chat = [...all('#ws-chat form', 'chat row'), ...all('#ws-chat > [data-lines] > *', 'chat line'), ...all('#ws-voice-peers', 'voice players'), ...all('#ws-voice-tip', 'voice tip')]
     .map(clipped).filter(b => b.bottom - b.top > 1);
-  const developer = [...all('.ws-perf-dock > .ws-perf', 'fps pill'), ...all('.ws-perf-dock > .ws-grid-budget', 'memory card'), ...all('.ws-perf-dock > :not(.ws-perf):not(.ws-grid-budget)', 'dock chip'), ...all('.ws-touch-boost', 'BOOST'), ...all('.ws-perf-panel', 'Developer panel'),
+  const developer = [...all('.ws-perf-dock > .ws-perf', 'fps pill'), ...all('.ws-perf-dock > .ws-grid-budget', 'memory card'), ...all('.ws-perf-dock > .ws-perf-ping', 'ping chip'), ...all('.ws-perf-dock > :not(.ws-perf):not(.ws-grid-budget):not(.ws-perf-ping)', 'dock chip'), ...all('.ws-touch-boost', 'BOOST'), ...all('.ws-perf-panel', 'Developer panel'),
     ...all('.ws-grid-budget-detail', 'memory panel'), ...all('.ws-game-dev-alert, .ws-game-developer, .ws-memory-warning, .ws-game-boundary.show', 'Developer alert')];
   const rest = ['.ws-touch-status > *', '.ws-loot-chip', '.ws-game-toast', '.ws-game-feed-item', '.ws-icard-pop', '.ws-game-weather', '.ws-game-getlow', '.ws-elite-banner', '.ws-game-aim', '.ws-touch-use.show', '.ws-hint-tag.show', '.ws-touch-sprint']
     .flatMap(sel => all(sel));
@@ -210,6 +219,71 @@ async function enter(page, dev) {
   } else await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.world?.player !== undefined, undefined, { timeout: 180_000 });
   await page.evaluate('(window.__wildshard.world.hud.enterNow(), true)');
   return true;
+}
+
+/** In the page: HUD Tidy's measured boxes (HT1, HT2). @returns {string[]} what breaks the rows */
+function tidyBoxes() {
+  /** @param {Element} el */
+  const seen = el => { const r = el.getBoundingClientRect(), s = getComputedStyle(el); return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && s.display !== 'none' && Number(s.opacity) > 0.05; };
+  /** @param {string} sel */
+  const all = sel => [...document.querySelectorAll(sel)].filter(seen).map(el => ({ el, r: el.getBoundingClientRect() }));
+  /** @param {DOMRect} a @param {DOMRect} b */
+  const hit = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  const out = [];
+  if (all('.ws-icard-pop.show').length > 0) out.push('the big pickup card is up during play (HT2: a line in the slot)');
+  if (all('.ws-game-getlow.show').length > 0) out.push('GET LOW is the top-centre warning (HT1: a line in the slot)');
+  const map = all('.ws-minimap')[0], badge = all('.ws-game-weather.show')[0];
+  const keep = [['boss bar', '.ws-boss-bar.show'], ['kill feed', '.ws-game-feed-item'], ['quest chip', '.ws-quest-obj.show']].flatMap(([name, sel]) => all(sel).map(x => ({ name, r: x.r })));
+  if (badge !== undefined && map !== undefined) {
+    const cx = (badge.r.left + badge.r.right) / 2, cy = (badge.r.top + badge.r.bottom) / 2, mx = (map.r.left + map.r.right) / 2;
+    if (Math.abs(cx - mx) > 3 || Math.abs(cy - map.r.bottom) > 3) out.push(`the storm badge (${cx.toFixed(0)}, ${cy.toFixed(0)}) is not on the minimap's bottom edge (${mx.toFixed(0)}, ${map.r.bottom.toFixed(0)})`);
+    for (const k of keep) if (hit(badge.r, k.r)) out.push(`the storm badge overlaps the ${k.name}`);
+  }
+  const boss = all('.ws-boss-bar.show')[0];
+  if (boss !== undefined) for (const t of all('.ws-game-toast')) if (t.r.top < boss.r.bottom) out.push(`the toast "${(t.el.firstChild?.textContent ?? '').slice(0, 30)}" is not under the boss bar`);
+  for (const t of all('.ws-game-toast')) for (const k of [...keep, ...(map === undefined ? [] : [{ name: 'minimap', r: map.r }])]) if (hit(t.r, k.r)) out.push(`the toast "${(t.el.firstChild?.textContent ?? '').slice(0, 30)}" overlaps the ${k.name}`);
+  return out;
+}
+
+/** HUD Tidy HT1 and HT2: the storm moment and the pickup moment on a phone, each shot and checked on its measured boxes.
+ * @param {import('playwright').Page} page @param {string} name @param {string[]} written @param {string[]} problems */
+async function tidyShots(page, name, written, problems) {
+  /** @param {string} moment */
+  const shot = async moment => {
+    const file = join(out, `${name}-tidy-${moment}.png`); await page.screenshot({ path: file }); written.push(file);
+    const said = await page.evaluate(tidyBoxes);
+    const slot = await page.evaluate(() => [...document.querySelectorAll('.ws-game-toast')].map(el => el.textContent ?? ''));
+    console.log(`  tidy-${moment}: slot ${JSON.stringify(slot)}  ${file}`);
+    for (const p of said) problems.push(`tidy-${moment}: ${p}`);
+    return slot;
+  };
+  const H = 'window.__wildshard.world.hud';
+  await page.evaluate(`${H}.setWeather({ chip: { title: 'Storm 2:10', sub: 'Wind 22 m/s', tone: 'storm' }, getLow: true })`);
+  await page.waitForTimeout(600);
+  const storm = await shot('storm');
+  if (!storm.some(t => /get low/iu.test(t))) problems.push('tidy-storm: GET LOW is not in the toast slot');
+  // the lightning passes, the slot drains; then a drop and a quest step in the same moment
+  await page.evaluate(`${H}.setWeather({ chip: { title: 'Storm 1:40', sub: 'Wind 18 m/s', tone: 'storm' }, getLow: false })`);
+  await page.waitForTimeout(9000);
+  await page.evaluate(`(${H}.pickupCard({ name: 'Sea glass', detail: 'Charm · 5', icon: 'item.charm' }), ${H}.toast('Glyph shard recovered · 1 / 3'))`);
+  await page.waitForTimeout(600);
+  const pickup = await shot('pickup');
+  if (!pickup.some(t => /picked up/iu.test(t) && t.includes('+1'))) problems.push('tidy-pickup: the pickup line with "+1" is not in the slot');
+}
+
+/** QA-FEEDBACK 11-24 row 19: the Bag map at each zoom chip, on a phone.
+ * @param {import('playwright').Page} page @param {string} name @param {string[]} written */
+async function mapZoomShots(page, name, written) {
+  await page.evaluate(() => { /** @type {any} */ (window).__wildshard.world.hud.menu.open('map'); });
+  await page.waitForTimeout(800);
+  const zooms = await page.evaluate(() => [...document.querySelectorAll('.ws-gmenu-zoom')].map(b => /** @type {HTMLElement} */ (b).dataset['z'] ?? ''));
+  for (const z of zooms) {
+    await page.locator(`.ws-gmenu-zoom[data-z="${z}"]`).click();
+    await page.waitForTimeout(900);
+    const file = join(out, `${name}-map-${z}.png`); await page.screenshot({ path: file }); written.push(file);
+    console.log(`  map ${z}: ${file}`);
+  }
+  await closeBag(page); await page.waitForTimeout(400);
 }
 
 /** QA rows 42 and 43: the calm chat corner's states and Developer boost, one shot each after the union shot.
@@ -317,11 +391,13 @@ for (const kind of browsers) {
           const problems = [...pairs(b.developer, [...b.guarded, ...b.chat]), ...pairs(b.chat, b.guarded), ...outside(b.developer)];
           // a check over nothing passes nothing: what it guards and what it moved must be on screen
           const named = new Set([...b.guarded, ...b.chat, ...b.developer].map(x => x.name.replace(/#\d+$/u, '')));
-          for (const need of [...(phone ? ['PAUSE', 'touch bar'] : []), 'quest chip', 'minimap', 'chat row', ...(dev ? ['fps pill', 'memory card'] : [])])
+          for (const need of [...(phone ? ['PAUSE', 'touch bar'] : []), 'quest chip', 'minimap', 'chat row', ...(dev ? ['fps pill', 'memory card', 'ping chip'] : [])])
             if (!named.has(need)) problems.push(`the ${need} is not on screen: nothing to check it against`);
           if (b.mic === null) problems.push('the mic is not on screen');
           else if (!b.mic.ok) problems.push(`the mic's centre is covered by ${String(b.mic.at)}`);
           if (states) await stateShots(page, name, phone, dev, written, problems);
+          if (tidy && phone) await tidyShots(page, name, written, problems);
+          if (mapShots && phone) await mapZoomShots(page, name, written);
           if (menu && phone) {
             await openBag(page); await page.waitForTimeout(500);
             const open = await page.evaluate(boxes), shot = join(out, `${name}-bag-open.png`);

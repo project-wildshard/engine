@@ -152,6 +152,7 @@ export const ENGINE_STRINGS = {
   "s_ping_none": "--",
   "s_ping_label": "Server ping ⟦0⟧ ms",
   "s_ping_label_none": "Server ping unknown",
+  "s_toast_more": "+⟦0⟧",
   "s_script_failure": "⟦0⟧: ⟦1⟧: ⟦2⟧⟦3⟧",
   "s_script_disabled": " (disabled)",
   "s_out_of_world": "Out of world",
