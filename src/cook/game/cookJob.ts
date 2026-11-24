@@ -16,6 +16,7 @@ import {validateShardfileFolder, type ValidatedShardfile} from '@wildshard/forma
 import type {Shardfile} from '@wildshard/format/shardSchema';
 import type {ShardfileCheckReport, ShardfileEntryProof} from '@wildshard/engine/game/shardfile/checkReport';
 import {migrateShardfile, validateMigrated} from '@wildshard/format/migrate';
+import type {FormatMigration} from '@wildshard/format/formatMigrations';
 import {readTar, writeTar} from '@wildshard/format/tar';
 // D31 (J137), EG-8: the largest shardfile, stored or decoded; shard-format owns it so the API and the cook share it.
 import {MAX_SHARDFILE_BYTES} from '@wildshard/format/uploadCaps';
@@ -53,6 +54,8 @@ export interface CookJobPorts {
   readonly expected?: ExpectedCopy;
   /** SP1b4: a cook preparation sidecar on this renderer, taken when the author's preparation is stale. */
   readonly sidecar?: CookSidecar;
+  /** FE9d: the chain's steps; the format's registry when unset (a test runs a seeded step through the cook's own admission). */
+  readonly migrations?: readonly FormatMigration[];
 }
 export interface ServerPackReport {readonly files: number; readonly bytes: number}
 export interface CookJobReport {
@@ -88,8 +91,8 @@ const folderOf = (files: ReadonlyMap<string, Uint8Array>): Parameters<typeof val
 });
 
 /** CP1: the chain's copy of an original this validator refuses, validated as the API validates a migrated copy. */
-function chainedCopy(files: ReadonlyMap<string, Uint8Array>, refusal: unknown): Admitted {
-  const chained = migrateShardfile(files, {hash: sha256});
+function chainedCopy(files: ReadonlyMap<string, Uint8Array>, refusal: unknown, migrations?: readonly FormatMigration[]): Admitted {
+  const chained = migrateShardfile(files, {hash: sha256, ...(migrations === undefined ? {} : {migrations})});
   if (chained.applied.length === 0) throw refusal;
   const preparation = chained.preparation === 'author' ? {preparation: 'author' as const} : {};
   const product = validateMigrated(chained.files, {hash: sha256, ...STORED, ...preparation});
@@ -104,14 +107,14 @@ function chainedCopy(files: ReadonlyMap<string, Uint8Array>, refusal: unknown): 
  * predate `journal-glyph-images`, and v0.1.65/.66 refused it). An original that validates cooks as it is, as before, so no
  * working head pays for a copy. A refusal the chain can't repair is the original's refusal.
  */
-function admit(tarball: Uint8Array, cap: number): Admitted {
+function admit(tarball: Uint8Array, cap: number, migrations?: readonly FormatMigration[]): Admitted {
   if (tarball.length > cap) throw new ShardfileRefusedError(`Shardfile is ${tarball.length} bytes, past the ${cap} cap`);
   try {
     const files = readTar(tarball);
     let product: ValidatedShardfile;
     try {
       product = validateShardfileFolder(folderOf(files), {hash: sha256, ...STORED});
-    } catch (refusal) { return chainedCopy(files, refusal); }
+    } catch (refusal) { return chainedCopy(files, refusal, migrations); }
     const receipt = cookReceipt(files);
     return {product, cooked: tarball, applied: [], ...(receipt === undefined ? {} : {receipt})};
   } catch (error) { throw new ShardfileRefusedError(error instanceof Error ? error.message : 'Shardfile refused', {cause: error}); }
@@ -159,13 +162,13 @@ export async function runCookJob(tarball: Uint8Array, out: string, ports: CookJo
   const phase = (stage: CookJobPhase): void => { ports.onPhase?.(stage, Math.round(ports.now() - started)); };
   phase('validation');
   await prepareAssetDecoders();
-  const {product, receipt, cooked, applied} = admit(tarball, ports.maxBytes ?? MAX_SHARDFILE_BYTES);
+  const {product, receipt, cooked, applied} = admit(tarball, ports.maxBytes ?? MAX_SHARDFILE_BYTES, ports.migrations);
   if (applied.length > 0) ports.warn?.(`cooking the migrated copy (${applied.join(', ')}); the original is unchanged`);
   // Match the transport's generic identity allowlist, without shard behavior branches.
   if (ports.expectedSlug !== undefined && !new Set([ports.expectedSlug]).has(product.index.identity.slug)) {
     throw new ShardfileRefusedError(`A shardfile for ${product.index.identity.slug} under ${ports.expectedSlug}`);
   }
-  const provenance = cookProvenance(tarball, sha256), refused = provenanceRefusal(product.index.identity.slug, provenance, ports.expected);
+  const provenance = cookProvenance(tarball, sha256, ports.migrations), refused = provenanceRefusal(product.index.identity.slug, provenance, ports.expected);
   if (refused !== undefined) throw new ShardfileRefusedError(refused);
   phase('proof');
   const check = await checked(product, ports);

@@ -3,6 +3,7 @@
  * (the original's own SHA-256 when no step applies). A host that knows the API's digest under the same chain refuses a copy
  * whose digest differs, by slug: the two hosts ran the same code on the same bytes and must agree. */
 import {migrateShardfile} from '@wildshard/format/migrate';
+import type {FormatMigration} from '@wildshard/format/formatMigrations';
 import {readTar, writeTar} from '@wildshard/format/tar';
 
 export interface CookProvenance {readonly formatIn: string; readonly chainId: string; readonly digest: string; readonly applied: readonly string[]}
@@ -10,9 +11,9 @@ export interface CookProvenance {readonly formatIn: string; readonly chainId: st
 export interface ExpectedCopy {readonly chainId: string; readonly digest: string}
 
 /** The chain's provenance for `tarball`, or undefined when the chain can't read it (the validator's refusal then stands). */
-export function cookProvenance(tarball: Uint8Array, hash: (bytes: Uint8Array) => string): CookProvenance | undefined {
+export function cookProvenance(tarball: Uint8Array, hash: (bytes: Uint8Array) => string, migrations?: readonly FormatMigration[]): CookProvenance | undefined {
   try {
-    const chained = migrateShardfile(readTar(tarball), {hash});
+    const chained = migrateShardfile(readTar(tarball), {hash, ...(migrations === undefined ? {} : {migrations})});
     const digest = chained.applied.length === 0 ? hash(tarball) : hash(writeTar(chained.files));
     return {formatIn: chained.from, chainId: chained.chainId, digest, applied: chained.applied};
   } catch { return undefined; }
