@@ -29,6 +29,7 @@ import { Scope } from '@wildshard/engine/app/scope';
 import { markBootHandledError } from '@wildshard/engine/boot/bootTrace';
 import { setBootCatalog } from '@wildshard/engine/boot/catalog';
 import { setAliveSource, type AliveInfo } from '@wildshard/engine/boot/lastEnd';
+import { isLeavingPlay } from '@wildshard/engine/boot/endPlay';
 import { PLAYING, markDropStep, noteDropError } from '@wildshard/engine/boot/dropNotice';
 import { consumeTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { reportError } from '@wildshard/engine/core/errorReport';
@@ -132,6 +133,7 @@ export async function startSession(manifest: ShardManifest, kit: KitPorts, optio
   } catch (error) {
     options.residency?.dispose(); // Pre-bootstrap failures have no consumers; runShardLoad disposes allocated ones first.
     if (options.recovery !== undefined) throw error; // the root returns a consumed recovery to the renderer-free title
+    if (isLeavingPlay(error)) return; // J501: the step already left through endPlay / reloadPlay (QA 11-24 row 20)
     markBootHandledError();
     noteDropError(error);
     if (!session.fatalShown) showError(error instanceof Error ? `${error.name}: ${error.message}` : String(error), error instanceof Error ? error.stack ?? '' : '');

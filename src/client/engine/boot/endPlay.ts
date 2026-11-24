@@ -72,5 +72,22 @@ export function reloadPlay(reason: EndReason, nav: EndNavigation = BROWSER): voi
   nav.reload();
 }
 
+/**
+ * What a boot step throws once it has called endPlay or reloadPlay: the page is already leaving, with its drop recorded. The boot's
+ * catch (src/client/app/entry.ts, the session's) reads it with `isLeavingPlay` and shows no error card and files no report: the
+ * modal the next page shows is the one the player sees (QA-FEEDBACK-2026-11-24 row 20, Sentry WILDSHARD-GAME-BX and BP).
+ */
+export class LeavingPlayError extends Error {
+  override readonly name = 'LeavingPlayError';
+  readonly leavingPlay = true;
+}
+/** Whether `error` (or one it wraps as its `cause`) says the page is already leaving play through this funnel. */
+export function isLeavingPlay(error: unknown): boolean {
+  for (let at = error, depth = 0; typeof at === 'object' && at !== null && depth < 4; at = Reflect.get(at, 'cause'), depth++) {
+    if (Reflect.get(at, 'leavingPlay') === true) return true;
+  }
+  return false;
+}
+
 /** A title already on screen (the boot chose it): record the drop; the title's drop notice shows it once, with its code. */
 export function showEnd(reason: EndReason): void { record(reason); }

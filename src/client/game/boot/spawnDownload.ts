@@ -15,6 +15,7 @@ import { CACHE_BYTE_LIMITS, ResidentByteCache } from '@wildshard/engine/core/mem
 import { memoryAttribution } from '@wildshard/engine/core/memoryAttribution';
 import {bareSlug} from '../../../shared/game/grid/catalogueSlot';
 import {behindRooms, looseSlug, placedLoose, placedSpawn} from './placedSpawn';
+import {leaveForRoomsRevision} from './roomsAhead';
 
 /** This leaf statically imports no engine, renderer or worker. The title can start it on
  * the tap; Loading later adopts the same progress rather than recounting IO. */
@@ -998,7 +999,8 @@ function spawnSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | '
   const text = document.getElementById('boot-module-files')?.textContent; if (!text) return null;
   // NB2 (J494, Jake 2026-11-22): the page never plays other bytes than the rooms run; one it could not load refuses with Reload
   const rooms = behindRooms(slug);
-  if (rooms !== undefined) throw new Error(`${bareSlug(slug)}: the world runs a newer revision (${rooms.slice(0, 12)}) than this page has. Reload to play it.`);
+  // QA 11-24 row 20 (J501): no plain error; one marked reload onto the rooms' revision, then the title's REV-BEHIND modal with Retry
+  if (rooms !== undefined) throw leaveForRoomsRevision(slug, rooms).error;
   const manifests = get(JSON.parse(text), 'spawnManifests');
   // SA48: a slug placed after the build reads the cook's entry rows from the store, on either flow (no build has its grid manifest;
   // the grid's own code and seams are this page's and load as they always do). NB2: so does a build's own slug whose rooms run

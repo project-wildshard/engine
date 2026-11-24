@@ -84,6 +84,28 @@ export function silentExits(file: string, text: string): string[] {
   return found;
 }
 
+/** QA-FEEDBACK-2026-11-24 row 20 (Sentry WILDSHARD-GAME-BX and BP): a boot that finds the world on a newer revision than the page
+ *  threw a plain Error, so the player read "the game failed to start". Such a throw must be the funnel's (`leaveForRoomsRevision`,
+ *  a LeavingPlayError), never `throw new Error(… newer revision …)`. */
+export function plainRevisionThrows(file: string, text: string): string[] {
+  const found: string[] = [];
+  for (const match of text.matchAll(/\bthrow\s+(?:new\s+)?Error\s*\(/gu)) {
+    const end = text.indexOf(';', match.index), statement = text.slice(match.index, end < 0 ? text.length : end);
+    if (/newer (?:revision|version)/iu.test(statement)) found.push(`${file}:${String(lineOf(text, match.index))} throws a plain "newer revision" error`);
+  }
+  return found;
+}
+
+test('a page behind its world\'s revision reloads or shows the modal, never a plain boot error (QA 11-24 row 20)', () => {
+  const found = sources(SCAN).flatMap((path) => plainRevisionThrows(path, readFileSync(join(ROOT, path), 'utf8')));
+  expect(found, `${found.join('\n')}\n\nA page older than its zone's world leaves through leaveForRoomsRevision() (src/client/game/boot/roomsAhead.ts): `
+    + 'reloadPlay REV-RELOAD once, then endPlay REV-BEHIND with Retry.').toEqual([]);
+  // the line Sentry filed as WILDSHARD-GAME-BX fails; the funnel's throw passes
+  expect(plainRevisionThrows('a.ts', '  if (rooms !== undefined) throw new Error(`${bareSlug(slug)}: the world runs a newer revision (${rooms.slice(0, 12)}) than this page has. Reload to play it.`);\n'))
+    .toEqual(['a.ts:1 throws a plain "newer revision" error']);
+  expect(plainRevisionThrows('a.ts', '  if (rooms !== undefined) throw leaveForRoomsRevision(slug, rooms).error;\n')).toEqual([]);
+});
+
 test('no page leaves play without saying why first (J501)', () => {
   const found = sources(SCAN).flatMap((path) => silentExits(relative(ROOT, join(ROOT, path)).replaceAll('\\', '/'), readFileSync(join(ROOT, path), 'utf8')));
   expect(found, `${found.join('\n')}\n\nA page that leaves play by itself goes through endPlay() (src/client/engine/boot/endPlay.ts, J501); the game's own reload that `

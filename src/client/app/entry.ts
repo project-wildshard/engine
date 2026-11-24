@@ -44,7 +44,7 @@ import { bootRoute, exploreBootParams, onlineTitleFirst } from './bootRoute';
 import { arrivalTier, consumeTitleArrival, pendingTitleArrival, setTitleArrival } from '@wildshard/engine/boot/titleArrival';
 import { lastEnd, markUnload, settleLastEnd } from '@wildshard/engine/boot/lastEnd';
 import { installDropNotes, markDropStep, takeDrop, type Drop } from '@wildshard/engine/boot/dropNotice';
-import { showEnd } from '@wildshard/engine/boot/endPlay';
+import { isLeavingPlay, showEnd } from '@wildshard/engine/boot/endPlay';
 import { consumeCrashResume, type CrashResume } from '@wildshard/engine/game/session/crashResume';
 import { bootAwait, bootMark, bootTask, bootTiming, endBootOperation } from '@wildshard/engine/boot/timing';
 import { currentSlug, exploreSlugOfPath, retiredSlugs, slugOfPath, slugPathOf } from './slugPath';
@@ -507,6 +507,8 @@ async function startPage(): Promise<void> {
   });
   try { await started; await installInPageEntry(); }
   catch (error) {
+    // J501: a boot step that already left through endPlay / reloadPlay (row 20's newer revision) shows nothing more
+    if (isLeavingPlay(error)) return;
     const { pageGridRecovery, clearGridRecovery } = await import('@wildshard/engine/game/grid/pageEntry');
     if (pageGridRecovery() === null) {
       // Admission can refuse before startSession installs its fatal-load boundary. main starts asynchronously;
