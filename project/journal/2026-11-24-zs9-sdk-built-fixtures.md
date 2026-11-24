@@ -36,3 +36,10 @@ product `pnpm pins` installed. The species world (`liveSpeciesWorld.ts`), the ad
 entry test now build from Nalati r8's `actors/sheep.json`, `actors/species-looks.json`, `actors/bodies.bin` and
 `actors/sheep.bin`, as the client's species.program does. The frozen species view, crowd view, sheep body and the
 r4-era packed bodies and balbal cracks go.
+
+## Sixth step: Kokpar and the dressing read the live pin
+
+The carried-quest host and the Kokpar rider oval read Nalati r8's `quests/carried.json`, its quest prop and its decision
+guest (`liveCarriedQuest.ts`, by the script row's own blob path); the oval's centre, radii and turn are written in the
+fixture by hand as the independent oracle. Schema-code-memory and the riders read the live `world/dressing-phone.json`.
+`frozen/assets` is empty and goes, with the dead `carriedPropFiles.ts` (it read a file deleted in ZS10).

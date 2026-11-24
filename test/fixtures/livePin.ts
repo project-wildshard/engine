@@ -32,3 +32,8 @@ export function liveSection(slug: string, name: string): unknown {
 }
 /** Every named file of a live pin. */
 export function liveNames(slug: string): string[] { return [...product(slug).files.keys()]; }
+/** A live pin's content-addressed file by its product path (`blobs/wasm/<hash>.wasm`, as a script row names it). */
+export function livePath(slug: string, path: string): Uint8Array<ArrayBuffer> {
+  if (!/^blobs\/[a-z0-9]+\/[0-9a-f]{64}\.[a-z0-9]+$/u.test(path)) throw new Error(`Not a live product blob path: ${path}`);
+  return new Uint8Array(readFileSync(`${product(slug).root}/${path}`));
+}

@@ -1,5 +1,5 @@
 import { parse } from 'valibot';
-import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
+import { liveJson } from './fixtures/livePin';
 import { expect, test } from 'vitest';
 import conditionalSchema from './fixtures/schema-conditionals.json' with { type: 'json' };
 import { schemaReferences } from '../src/shared/game/shardfile/schemaReferences';
@@ -13,7 +13,7 @@ const accepts = (work: () => unknown): boolean => { try { work(); return true; }
 
 test('real dressing retains author/runtime acceptance and nested refusal without schema mutation', () => {
   const schema = namedJsonSchema(SceneDressingSchema), original = encodeCanonicalJson(schema);
-  const captured = frozenRuntimeJson('nalati-dressing-phone.json');
+  const captured = liveJson('nalati-grasslands', 'world/dressing-phone.json');
   const rows = parse(SceneDressingSchema, captured), layer = rows.layers[0], first = rows.statics[0];
   expect(encodeCanonicalJson(rows)).toBe(encodeCanonicalJson(captured));
   if (layer === undefined || first === undefined) throw new Error('Missing actual dressing rows');

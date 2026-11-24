@@ -70,21 +70,6 @@
       "sourcePath": "src/data/brains.json",
       "sourceCommit": "a0ae32bfab5e80400a20d39eb381804bcc84814f"
     },
-    "carried-quest.json": {
-      "bytes": 4718,
-      "sha256": "793707b1f09380d5eb349dcaa5c061cf3f7f8a29c4efea886f8c7a71ced5491e",
-      "sourcePin": "nalati-grasslands",
-      "sourceName": "quests/carried.json",
-      "sourceSha256": "793707b1f09380d5eb349dcaa5c061cf3f7f8a29c4efea886f8c7a71ced5491e",
-      "pinManifestSha256": "87a917080511e4d7e5f04e36dea2e54d9dc10af5624f5ce461036fa6234e65b6"
-    },
-    "kokpar-layout.json": {
-      "bytes": 44,
-      "sha256": "d5917c0562ac15850789e1fe1798fcde19061f071691c167455ac57eea4186cc",
-      "sourceRepository": "project-wildshard/shard-nalati",
-      "sourceCommit": "a0ae32bfab5e80400a20d39eb381804bcc84814f",
-      "sourcePath": "src/generators/layout.ts KOKPAR"
-    },
     "nine-held-presentation.json": {
       "bytes": 391097,
       "sha256": "0cf2237c7099cc69324e2077bb52e4ae32db17548ddd9e6ebb025f7cc3123d4a",
@@ -113,14 +98,6 @@
         "shard-driftwood src/generators/interactables.ts",
         "shard-pine-hollow src/generators/questTable.ts + spots.ts"
       ]
-    },
-    "nalati-dressing-phone.json": {
-      "bytes": 872977,
-      "sha256": "60b838e0074e4045c786f067a7ceecf8df0b16adc1f429de693ca6a54a7b1c6c",
-      "sourcePin": "nalati-grasslands",
-      "sourceName": "world/dressing-phone.json",
-      "sourceSha256": "60b838e0074e4045c786f067a7ceecf8df0b16adc1f429de693ca6a54a7b1c6c",
-      "pinManifestSha256": "87a917080511e4d7e5f04e36dea2e54d9dc10af5624f5ce461036fa6234e65b6"
     },
     "nine-r3-held-items.json": {
       "bytes": 3883,

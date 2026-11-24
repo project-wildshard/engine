@@ -1,5 +1,5 @@
-import { kokparOval } from './fixtures/frozen/carriedQuest';
-import { frozenRuntimeJson } from './fixtures/frozen/snapshots';
+import { kokparOval } from './fixtures/liveCarriedQuest';
+import { liveJson } from './fixtures/livePin';
 import { expect,test } from 'vitest';
 import * as v from 'valibot';
 import { BoxGeometry,BufferAttribute,Group,InstancedMesh,Matrix4,MeshBasicMaterial,Vector3 } from 'three';
@@ -34,7 +34,7 @@ test('an orchard fixture projects copied numeric rows on the declared cadence an
 
 test('declared Kokpar poses keep the original oval and gallop height',()=>{
   setTerrainHeight(()=>10);
-  const row=v.parse(v.object({instances:SceneInstancesSchema}),frozenRuntimeJson('nalati-dressing-phone.json')).instances.find(candidate=>candidate.id==='nalati-kokpar-riders');if(row===undefined)throw new Error('Missing declared riders');
+  const row=v.parse(v.object({instances:SceneInstancesSchema}),liveJson('nalati-grasslands', 'world/dressing-phone.json')).instances.find(candidate=>candidate.id==='nalati-kokpar-riders');if(row===undefined)throw new Error('Missing declared riders');
   const rows=structuredClone([row]);delete rows[0]?.uniform;
   const root=new Group(),shape=new BoxGeometry(),paint=new MeshBasicMaterial();
   const host=new SceneInstanceFields(rows,new Map([[row.geometry,shape]]),new Map([[row.material,paint]]),new Map([[row.group,root]]));

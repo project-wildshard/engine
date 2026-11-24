@@ -1,4 +1,4 @@
-import {carriedPropFiles,carriedQuestRows,lendFrozenKokpar as lendNalatiKokpar} from './fixtures/frozen/carriedQuest';
+import {carriedPropFiles,carriedQuestRows,lendLiveKokpar as lendNalatiKokpar} from './fixtures/liveCarriedQuest';
 import {expect,it,vi} from 'vitest';
 import * as THREE from 'three';
 import {Scope} from '../src/shared/engine/app/scope';

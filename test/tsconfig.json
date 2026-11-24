@@ -226,7 +226,6 @@
     "test-domain.test.ts",
     "vitest-module-cache.test.ts",
     "declared-entry-targets-debug.test.ts",
-    "fixtures/frozen/nalati-dressing-phone.json",
     "fixtures/frozen/nalati/nalati-poi-paint-original.json",
     "fixtures/native-book-derived.json",
     "fixtures/kit-wildlife/deer.skin.json",
