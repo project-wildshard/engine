@@ -118,7 +118,7 @@ export function installDeclaredRiding(host: SimHost, shard: Pick<Shardfile, 'row
   const rideOf = (seat: Seat): SimRide => ({
     motionSample: (): SimPlayerMotionSample => { motion.velocityX = seat.rider.velocity.x; motion.velocityZ = seat.rider.velocity.z; motion.grounded = seat.rider.onGround; return motion; },
     mount: () => seat.horse?.entityId ?? '',
-    // OF25b: no page has a law for this ride (a data shard's page has no Mount), so it says no ride words: the server leads
+    // OF25b: no page has a law for this ride (a shard whose page declares no Mount), so it says no ride words: the server leads
     // the seated body (`host.leading` below) and the page follows it, sending the reins as it would its walk.
     capture: () => 0,
     read: (command, dt) => {
