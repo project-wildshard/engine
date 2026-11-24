@@ -657,6 +657,7 @@
     "src/client/game/boot/placedSpawn.ts": "client",
     "src/client/game/boot/roomsAhead.ts": "client",
     "src/client/game/session/talkReach.ts": "client",
+    "src/client/game/session/harvestBodies.ts": "client",
     "src/client/game/boot/spawnDownload.ts": "client",
     "src/client/game/boot/versions.generated.ts": "client",
     "src/client/game/Boss.ts": "client",

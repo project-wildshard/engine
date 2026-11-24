@@ -1,5 +1,6 @@
 import { compileIncomingCapPolicy } from '@wildshard/format/incomingCapPolicy';
 import { syncTalkReach } from './talkReach';
+import { harvestBodies } from './harvestBodies';
 
 import { readOnlySave, wirePage } from '../shardfile/wirePage';
 import { ownedSave } from '../../../shared/game/saves';
@@ -799,7 +800,7 @@ async function buildPlay(ctx: Awaited<ReturnType<typeof loadoutStage>>) : Promis
     // QA 11-24 row 37: beside a person (Sheriff Brass) the left mouse button talks, not fires
     syncTalkReach(app.input, game.levelScope, hud.entered && ((nearest?.talk === true && !app.ui.blocking) || app.ui.talkOpen));
     carcass = undefined;
-    if (!nearest && homeActive) for (const a of animals.animals) {
+    if (!nearest) for (const a of harvestBodies(homeActive, animals.animals, () => gridLive?.enteredAnimals() ?? null)) {
       if (a.alive || harvested.has(a) || a.position.distanceTo(player.position) >= 2.6) continue;
       if (inventory.harvest(a.kind, a.variant, a.harvest).length === 0) continue;
       if (physics && !lineOfSight(physics, game.camera.position, carcassAt.copy(a.position).setY(a.position.y + 0.4), 0.6)) continue; // not through a wall (animals aren't physics yet: their body blocks nothing)
