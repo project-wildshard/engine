@@ -10,13 +10,14 @@ import { Rng } from '@wildshard/format/seededRng';
 import { modelContext, paramsOf } from '../src/client/engine/models/model';
 import { SkyRig } from '../src/client/engine/world/skyRig';
 import { defineSpecimenCatalogue, prepareSpecimenCatalogue, loadBoundSpecimen, awaitSpecimenAssets } from '../src/client/game/models/specimenCatalogue';
-import rows from './fixtures/nalati-balbal-original.json' with {type:'json'};
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { builtFolder } from '../src/test/game/builtFolder';
 
 installWorldRegistry();
 // ZONE-SNAPSHOTS ZS10 (J507): the carved steles' blocks are Nalati's live pin's own (byte-identical to the copies they replace).
 const nalati=await loadHeadlessFolder(builtFolder('nalati-grasslands'));
+// A made-up stele whose two carved variants are those blocks; the rows are engine-shaped, not Nalati's frozen balbal rows.
+const rows={catalogue:[{"key":"balbal","model":{"id":"made-up/stele","name":"Stele","file":"test/specimen-selection.test.ts","category":"props","pipeline":["trellis","code"],"surface":"stone","defaults":{"carved":null},"variants":[{"id":"generated","label":"TRELLIS.2","params":{}},{"id":"bare","label":"Carved","params":{"carved":"bare"}},{"id":"capped","label":"Carved · cap","params":{"carved":"capped"}}]},"source":{"kind":"selection","variants":[{"params":{"carved":null},"source":{"kind":"asset","asset":{"url":"/assets/made-up/stele.glb","phoneUrl":"/assets/made-up/stele.phone.glb","material":{"id":"made-up:stele","family":"painterly","rim":0.35,"bands":0.8,"floor":0.2},"geometrySlot":0,"materialSlot":0,"retainedAttribute":"_paint_clone","transform":{"yaw":3.141592653589793,"scale":1.25}}}},{"params":{"carved":"bare"},"source":{"kind":"file","file":"models/specimens/balbal-0.bin","representation":"parts","geometry":{"attrs":[["position","f32",3,false],["normal","f32",3,false],["color","f32",3,false]],"count":3570,"index":"u32","indexCount":10776,"box":true,"expand":true},"material":{"id":"made-up-poi","family":"painterly","rim":0.35,"bands":0.8}}},{"params":{"carved":"capped"},"source":{"kind":"file","file":"models/specimens/balbal-1.bin","representation":"parts","geometry":{"attrs":[["position","f32",3,false],["normal","f32",3,false],["color","f32",3,false]],"count":3685,"index":"u32","indexCount":11028,"box":true,"expand":true},"material":{"id":"made-up-poi","family":"painterly","rim":0.35,"bands":0.8}}}]}}],sources:[{"name":"models/specimens/balbal-0.bin"},{"name":"models/specimens/balbal-1.bin"}],generated:{url:'/assets/made-up/stele.glb',phoneUrl:'/assets/made-up/stele.phone.glb',material:{id:'made-up:stele',family:'painterly',rim:0.35,bands:0.8,floor:0.2},geometrySlot:0,materialSlot:0,retainedAttribute:'_paint_clone',transform:{yaw:Math.PI,scale:1.25}}} as const;
 
 /** Nalati's baked balbal rows: the generated model and both carved steles as one selection. */
 const files=await prepareSpecimenCatalogue({file:name=>{if(!rows.sources.some(source=>source.name===name))throw new Error('Missing carving fixture');return nalati.file(name);}},rows.catalogue);

@@ -5,15 +5,16 @@ import { bindFlatTerrain } from '@wildshard/engine/test/terrain';
 import { WorldRegistry } from '../src/client/engine/world/registry';
 import type { SkyRig } from '../src/client/engine/world/skyRig';
 import { EncounterSites } from '../src/client/game/boss/encounterView';
-import balbal from './fixtures/nalati-balbal-original.json' with { type: 'json' };
 
+// ZONE-SNAPSHOTS ZS10 (J507): a made-up generated model, not Nalati's frozen balbal row.
+const GENERATED = { url: '/assets/made-up/stele.glb', phoneUrl: '/assets/made-up/stele.phone.glb', geometrySlot: 0, materialSlot: 0, retainedAttribute: '_paint_clone', material: { id: 'made-up:stele', family: 'painterly', rim: 0.35, bands: 0.8, floor: 0.2 }, transform: { yaw: Math.PI, scale: 1.25 } };
 // A made-up orchard (the sites' fixture second user): guard statues on their plinths, every second one crowned.
 const material = new MeshStandardMaterial();
 const guard = defineModel<{ crowned: boolean }>({ id: 'orchard/guard', name: 'Guard', category: 'props', pipeline: 'code', file: 'test/encounter-sites.test.ts', defaults: { crowned: false },
   variants: [{ id: 'plain', label: 'Plain', params: { crowned: false } }, { id: 'crowned', label: 'Crowned', params: { crowned: true } }],
   build: () => [{ geometry: new BoxGeometry(1, 2, 1), material }] });
 const orchard = { name: 'orchard-guard', label: 'Guard', file: 'test/encounter-sites.test.ts', surface: 'stone', variants: ['plain', 'crowned'], variantCycle: [0, 1],
-  sink: 0.5, collider: { hw: 0.5, hd: 0.4, top: 2, bottom: 1 }, generated: balbal.generated,
+  sink: 0.5, collider: { hw: 0.5, hd: 0.4, top: 2, bottom: 1 }, generated: GENERATED,
   sites: [{ x: 1, z: 2, yaw: 0, scale: 1 }, { x: 4, z: 2, yaw: 1, scale: 2, tilt: 0.1 }, { x: 7, z: 2, yaw: 0, scale: 1 }] };
 
 let restore = (): void => undefined;

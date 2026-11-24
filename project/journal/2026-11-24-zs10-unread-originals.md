@@ -69,3 +69,4 @@ and `ci21-sdk-tail-held.json` still name them, as history). Deleted by hand; git
 - `nalati-audio-original.json`: the two audio phrase replays read the live `audio/audio` section, whose synth rows equal it.
 - `legacy-oracles/pine-weather.json`: `weather-legacy.proof.mjs` drops its 2400-output oracle of pine-hollow-legacy's
   weather (a finished port); its old v1 saves still resume on the live Pine pin.
+- `nalati-balbal-original.json`: `encounter-sites` and `specimen-selection` use a made-up stele (engine-shaped rows) whose carved variants are the live pin's two blocks.
