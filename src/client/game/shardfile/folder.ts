@@ -11,7 +11,7 @@ import { folderCacheCompletion } from './folderCacheCompletion';
 import { builtValidationReceipt, readValidationReceipt, validationRevision, validationSourceBytes, type ValidationReceipt } from "@wildshard/format/validationReceipt";
 import { assertStateCompatibility, parseOutputLineageIndex, parseStateLineage } from '@wildshard/format/stateLineage';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
-import { compatibleShardfileVersion, parseShardfileVersion } from '@wildshard/format/version';
+import { compareShardfileVersions, compatibleShardfileVersion, parseShardfileVersion, SHARDFILE_FLOOR, SHARDFILE_VERSION } from '@wildshard/format/version';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { builtIndexHash } from '@wildshard/format/builtIndexes';
 
@@ -206,6 +206,14 @@ function version(input: unknown): string {
   parseShardfileVersion(declared);
   if (typeof declared !== 'string') throw new Error('Shardfile needs a format version');
   return declared;
+}
+/** FORMAT-PRUNE FP7 (J486 replaces WR11's N and N-1): the format window this client reads is shard-format's floor up to
+ * its own version, not the current and previous additive counters. A refusal names the file's version and the window,
+ * so a newer file says to update the client and an older one is the chain's to migrate. @returns the declared version */
+export function admittedFormat(input: unknown): string {
+  const declared = version(input);
+  if (compatibleShardfileVersion(declared)) return declared;
+  throw new Error(`Shardfile format ${declared} is outside this client's ${SHARDFILE_FLOOR} to ${SHARDFILE_VERSION}: ${compareShardfileVersions(declared, SHARDFILE_VERSION) > 0 ? 'newer than this client, update it' : 'migrate it to this client\'s format first'}`);
 }
 /** Stream bounded wire bytes, including responses without a trustworthy Content-Length header. */
 export function boundedResponse(response: Response, maximum: number, read?: (bytes: number) => void): Promise<Uint8Array> {
@@ -496,7 +504,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
   trace?.mark('sections');
   await options.pause?.();
   if (!isBuildValidatedOutput(raw)) await preflightFolder(raw, options.pause);
-  if (!compatibleShardfileVersion(version(raw))) throw new Error('Shardfile needs the current or previous additive format');
+  admittedFormat(raw);
   const source = isBuildValidatedOutput(raw) ? raw : await parseCheckedFolder(raw, outputDescriptor(raw)?.sections), assets = new Map<string, Uint8Array>(), hashes = new Map<Uint8Array, string>();
   carryOutputDescriptor(raw, source);
   assertShardSlug(source.identity.slug);
