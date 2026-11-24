@@ -291,7 +291,7 @@ if (botsOnHost && hostSsh !== null) {
 /** @type {{startedAt: string, ms: number, checkpointInFlight: true} | null} */
 let checkpointRestart = null;
 /** MW5: the restart workflow's dispatch, once the bots sit (a holder, so the closure's write is seen). */
-const stagingRestart = { /** @type {{ askedAt: string, error?: string } | null} */ asked: null };
+const stagingRestart = { asked: /** @type {{ askedAt: string, error?: string } | null} */ (null) };
 const askRestart = async () => {
   if (stagingRestart.asked !== null) return;
   const asked = { askedAt: new Date().toISOString() };
