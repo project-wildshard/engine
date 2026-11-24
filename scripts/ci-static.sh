@@ -57,6 +57,9 @@ if [ "$mode" = code ]; then
   check api-health env TC39_INSTALLED_FORMAT=1 node --test --test-timeout=10000 scripts/api-health.proof.ts
   # EG-12 (J503, AD2 row 30): every elite a Ring 1 product declares has a live server owner; green since 5599f5323.
   check roster-owners bash -c 'node scripts/pins.ts install --ring 1 && WILDSHARD_RING=1 node scripts/vitest-tmp.ts run test/roster-owners.proof.ts'
+  # TC28 (J503, AD2): cook-cache input closure, persistent hit, revision isolation and GC race (no real cook; the
+  # nightly's hosted companion cooks for real). Red in nightly 45246927061 until 9a18860d0 drew the double's maps.
+  check cook-cache proof bake-loader.mjs scripts/cook-cache.proof.ts
 fi
 check asks node kit/scripts/asks.mjs check --all
 if [ "$mode" = docs ]; then
