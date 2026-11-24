@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.81 (2026-11-24)
+
+- Older published revisions of Driftwood, Pine Hollow and Nalati Grasslands load in online play.
+- Clients from before the wire upgrade prompt players to update before joining.
+
 ## v0.1.67 (2026-11-21)
 
 - Mirror Salt shows the dock prompt at seat height and lets drivers get back into their buggies.
