@@ -42,7 +42,7 @@ import { createHash, createPublicKey, generateKeyPairSync, randomBytes, sign, ve
 import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve as absolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { parseArgs, promisify } from 'node:util';
+import { parseArgs } from 'node:util';
 
 const ROOT = absolute(import.meta.dirname, '..');
 const ORIGIN = 'https://packs.wildshard.io', BUNDLES = 'https://github.com/project-wildshard/engine/releases/download';
@@ -296,11 +296,12 @@ const askRestart = async () => {
   if (restartAsked !== null) return;
   const asked = { askedAt: new Date().toISOString() };
   restartAsked = asked;
-  try {
-    await promisify(execFile)('gh', ['workflow', 'run', 'staging-room-restart.yml', '-R', 'project-wildshard/engine', '-f', 'channel=staging'], { timeout: 60_000 });
-  } catch (error) {
-    Object.assign(asked, { error: error instanceof Error ? error.message : String(error) });
-  }
+  const status = await new Promise(resolve => {
+    const gh = spawn('gh', ['workflow', 'run', 'staging-room-restart.yml', '-R', 'project-wildshard/engine', '-f', 'channel=staging'], { stdio: 'ignore', timeout: 60_000 });
+    gh.once('error', () => { resolve(-1); });
+    gh.once('exit', code => { resolve(code); });
+  });
+  if (status !== 0) Object.assign(asked, { error: `gh workflow run staging-room-restart.yml exited ${String(status)}` });
   note({ step: 'restart-asked', ...asked });
 };
 const code = await new Promise(resolve => {
