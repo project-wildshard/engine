@@ -37,7 +37,7 @@ export function parseArmedMemory(value) {
 
 export function armedMemory() {
   const { lines } = JSON.parse(readFileSync(require.resolve(LINES), 'utf8'));
-  const { zones } = JSON.parse(readFileSync(new URL('./armed-zones.json', import.meta.url), 'utf8'));
+  const { zones } = JSON.parse(readFileSync(new URL('armed-zones.json', import.meta.url), 'utf8'));
   const policy = parseArmedMemory({ lines, zones });
   const manifest = new URL('../../test/pins/shardfiles.json', import.meta.url);
   const shipped = new Set(pinnedSlugs(JSON.parse(readFileSync(manifest, 'utf8'))));
