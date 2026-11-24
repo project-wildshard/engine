@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { finishFirstPlay, firstPlayPending, resetFirstPlay, dropFirstPlay } from '@wildshard/engine/boot/firstPlayMark';
 import { markNameAsked } from '@wildshard/engine/ui/namePrompt';
 import { installShards } from './shard/list';
-import { buildTitleMenu, installGridTitle } from './mainMenu';
+import { buildTitleMenu, installGridTitle, zoneTabs } from './mainMenu';
 import { pageGridIntents } from './grid/intent';
 import type { TitleCard } from './titleDeck';
 import { GAME_STRINGS } from '../../shared/game/strings';
@@ -349,6 +349,17 @@ test('ZS10: Developer\'s ALL (J469) is a list of every zone, served order first,
 
 // QA 11-23-b row 26 (J453, J498): staging v0.1.76 placed the hidden test shards Pastel Plain and Ink-Cel Valley on the grid, and
 // Popular and New listed them. However a door or a kept list serves them, no player tab names a hidden or test shard; ALL does.
+test('row 26: with no door answer (preview, a `?chunk=` boot) a hidden shard\'s card stays on Featured, so ENTER enters it', () => {
+  // main ci 45298253323 (boundaries): cook-to-play boots hidden Brasscap Mesa by its route; with its card filtered off Featured,
+  // ENTER entered Signal Dunes and the page navigated away under the gameplay wait.
+  const hiddenCard = { ...card('g-seven', 'G-SEVEN'), badge: 'Developer only' as const };
+  const view = buildTitleMenu({ cards: [...SIX, hiddenCard], active: null, onEnter: () => undefined, onSettings: () => undefined,
+    onGrid: () => undefined, mode: () => ({ developer: false, devserver: false }) });
+  document.body.append(view.root); views.push(view); view.show('select');
+  pressTab(view.root, 'featured');
+  expect(names(view.root)).toContain('G-SEVEN');
+  expect(zoneTabs([...SIX, hiddenCard], undefined, false).map(tab => tab.cards.some(row => row.slug === 'g-seven'))).toEqual([true, true, true]);
+});
 test('row 26: a hidden or test shard is on no player tab, even served and placed; Developer\'s ALL still lists it', () => {
   const tester = (slug: string, status: string | null = null): ZoneSelectCard => ({ ...zone(slug), status });
   const leaky: ZoneSelectDocument = { channel: 'staging', serial: 1,

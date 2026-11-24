@@ -121,19 +121,23 @@ function orderTitleCards(cards: TitleDeck['cards'], served: readonly { readonly 
  *  build's cards it does not name (hidden ones too), laid out as a list. */
 export function zoneTabs(cards: TitleDeck['cards'], served: ZoneSelectDocument | null | undefined, developer: boolean): DeckTab[] {
   const s = GAME_STRINGS.mainMenu.tabs;
+  // No door answer (preview, solo, a standalone `?chunk=` boot): the build's own cards, hidden ones too, as before row 26. A
+  // hidden shard booted by its route (cook-to-play's Brasscap Mesa) must stay the deck's card, or ENTER enters another shard.
+  if (served === null || served === undefined) return [{ id: 'featured', label: s.featured, cards }, { id: 'popular', label: s.popular, cards },
+    { id: 'new', label: s.new, cards }, ...developer ? [{ id: 'all' as const, label: s.all, cards, list: true as const }] : []];
   // QA 11-23-b row 26 (J453): a hidden or test shard is on no player's tab, whatever an older door or a kept list serves and
   // whether or not the grid places it; Developer mode's ALL still lists it.
-  const hidden = new Set([...served?.all ?? [], ...served?.featured ?? [], ...served?.popular ?? [], ...served?.new ?? []]
+  const hidden = new Set([...served.all ?? [], ...served.featured ?? [], ...served.popular ?? [], ...served.new ?? []]
     .filter(card => offPlayerLists(card)).map(card => card.slug));
   const players = cards.filter(card => !hidden.has(card.slug) && card.badge !== 'Developer only' && !offPlayerLists(card));
-  const featured = orderTitleCards(players, served?.featured);
+  const featured = orderTitleCards(players, served.featured);
   const tabs: DeckTab[] = [
     { id: 'featured', label: s.featured, cards: featured.length > 0 ? featured : players.length > 0 ? players : cards },
-    { id: 'popular', label: s.popular, cards: orderTitleCards(players, served?.popular) },
-    { id: 'new', label: s.new, cards: orderTitleCards(players, served?.new) },
+    { id: 'popular', label: s.popular, cards: orderTitleCards(players, served.popular) },
+    { id: 'new', label: s.new, cards: orderTitleCards(players, served.new) },
   ];
   if (developer) {
-    const all = orderTitleCards(cards, served?.all), named = new Set(all.map(card => card.slug));
+    const all = orderTitleCards(cards, served.all), named = new Set(all.map(card => card.slug));
     tabs.push({ id: 'all', label: s.all, cards: [...all, ...cards.filter(card => !named.has(card.slug))], list: true });
   }
   return tabs;
