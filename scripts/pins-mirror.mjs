@@ -6,6 +6,7 @@
 //   node scripts/pins-mirror.mjs --check   list pins missing from the mirror; exit 1 if any
 //   node scripts/pins-mirror.mjs --fill    upload each missing pin from the API (sha256-proved), then check
 // `--fill` needs `gh` with contents:write on the engine repo (the pins-mirror workflow's token).
+import { setTimeout as sleep } from 'node:timers/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -31,7 +32,7 @@ async function bytesOf(url) {
     const response = await fetch(url, { headers: { 'user-agent': UA } }).catch(() => undefined);
     if (response?.ok === true) return new Uint8Array(await response.arrayBuffer());
     if (attempt === 3) throw new Error(`${url}: ${response?.status ?? 'no response'}`);
-    await new Promise(done => setTimeout(done, 2000 * attempt));
+    await sleep(2000 * attempt);
   }
 }
 

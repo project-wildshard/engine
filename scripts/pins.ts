@@ -34,6 +34,7 @@
 // The cache is tried first, then the mirror, then the API. A missing slice is rebuilt from its pinned parent, and must
 // match its committed hash, byte count and file count exactly. Coverage rows 4 and 5.
 // oxlint-disable-next-line import/no-unassigned-import -- Its hooks are the point, and they must run first.
+import { setTimeout as sleep } from 'node:timers/promises';
 import './bake-loader.mjs';
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { createHash } from 'node:crypto';
@@ -156,7 +157,7 @@ async function fetchedRetrying(url: string, slug: string, hash: string): Promise
     const bytes = await fetched(url, slug, hash);
     if (bytes !== undefined || wait === 0) return bytes;
     console.warn(`${slug}: ${url} held no bytes; trying again in ${wait / 1000} s`);
-    await new Promise(done => setTimeout(done, wait));
+    await sleep(wait);
   }
   return undefined;
 }
