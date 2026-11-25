@@ -2,6 +2,7 @@
 import { agentFetch as fetch } from './agent-requests.mjs';
 import {execFileSync} from 'node:child_process';
 import {readFileSync, mkdirSync, writeFileSync} from 'node:fs';
+import {homedir} from 'node:os';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -33,7 +34,10 @@ async function main() {
     const {rendererRevision} = await import(pathToFileURL(join(root, 'scripts/renderer-revision.mjs')).href);
     /** @type {typeof import('./shardfile-validation-revision.mjs')} */
     const {shardfileValidationRevision} = await import(pathToFileURL(join(root, 'scripts/shardfile-validation-revision.mjs')).href);
-    worker = createCookWorker({build, source: apiSource('https://api.wildshard.io'),
+    // FAST-RELEASE FR-A21: each release run is a new process, and each listed the whole bucket first (729.6 s for v0.1.90's
+    // Brasscap from the MacBook, 11-25); the saved listing outlives release checkouts in the machine's cache.
+    const listingFile = join(homedir(), '.cache/wildshard', `cook-listing-${need('R2_BUCKET_PACKS')}.tsv`);
+    worker = createCookWorker({build, source: apiSource('https://api.wildshard.io'), listingFile,
       store: r2Store({endpoint: `https://${need('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`, bucket: need('R2_BUCKET_PACKS'), accessKeyId: need('R2_PACKS_ACCESS_KEY_ID'), secretAccessKey: need('R2_PACKS_SECRET_ACCESS_KEY')}),
       validator: shardfileValidationRevision(root), serverPacks: join(scratch, 'server'), scratch: join(scratch, 'jobs'), log: line => console.log(line),
       launcher: {root, wrap: [], execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script: join(root, 'scripts/cook-job.mjs'), renderer: rendererRevision(root), limits: DEFAULT_LIMITS}});
