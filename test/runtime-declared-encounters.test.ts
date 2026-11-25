@@ -105,10 +105,9 @@ test('a declared boss waits out of the world for its summon, rises with its deci
   const world = await prepareRuntimeWorld(shard, fixture.assets, fixture.plan.baked, recipe, sections);
   const host = createSimHost(world.level, { ...world.ports, rapier: fixture.rapier });
   const install = (target: SimHost, restoring: boolean, snapshot?: ReturnType<typeof snapshotSimHost>) => {
-    const environment = world.install(target, context(restoring, snapshot)); environment.keeper.settle(); return environment; };
+    const environment = world.install(target, context(restoring, snapshot)); return environment; };
   try {
     const environment = install(host, false), player = leadPlayer(host);
-    expect(environment.encounter).toBeNull();
     host.events.answer('damage.modify', request => request?.target === player.health ? null : request, host.scope);
     const stand = (): void => { player.position.set(ARENA[0], ground + 0.1, ARENA[1] + 5); player.velocity.set(0, 0, 0); };
     // unsummoned, the fight waits and its body is out of the world, even with a player in the arena
@@ -132,16 +131,20 @@ test('a declared boss waits out of the world for its summon, rises with its deci
   } finally { host.dispose(); }
 }, 120_000);
 
-test('a declared encounter on a keeper body, and a keeper boss with no owner row, refuse', async () => {
+test('a runtime plan whose keeper stands a boss or a home refuses (FORMAT-PRUNE FP53b)', async () => {
   const fixture = await dunes();
   const probe = await prepareRuntimePlan(fixture.shard, fixture.assets, fixture.plan.baked, fixture.plan.recipe, fixture.sections);
   const shard = declaring(fixture.shard, probe.ports.heightAt(ARENA[0], ARENA[1]));
-  // the keeper's own boss (and its owner) beside a declared spawn of the same id: one body, one owner
+  const retired = /keeper homes, boss and species are retired/u;
+  // the keeper's own boss, with or without the owner row that fought it: the boss is a declared encounter now
   const { holds: _holds, ...kept } = fixture.plan.recipe.population.rows;
   const keeper = { ...fixture.plan.recipe, population: { ...fixture.plan.recipe.population, rows: { ...kept, homes: [], boss: KEEPER_BOSS } } } as unknown as NativeRuntimeRecipe;
-  await expect(prepareRuntimePlan(shard, fixture.assets, fixture.plan.baked, keeper, fixture.sections)).rejects.toThrow(/one body, one owner/u);
-  // a keeper that stands a boss needs the owner row that fights it
+  await expect(prepareRuntimePlan(shard, fixture.assets, fixture.plan.baked, keeper, fixture.sections)).rejects.toThrow(retired);
   const { owner: _owner, ...population } = keeper.population;
   const ownerless = { ...keeper, population } as unknown as NativeRuntimeRecipe;
-  await expect(prepareRuntimePlan(fixture.shard, fixture.assets, fixture.plan.baked, ownerless, fixture.sections)).rejects.toThrow(/boss needs its owner row/u);
+  await expect(prepareRuntimePlan(fixture.shard, fixture.assets, fixture.plan.baked, ownerless, fixture.sections)).rejects.toThrow(retired);
+  // a keeper home: the creature is a declared spawn now
+  const homed = { ...fixture.plan.recipe, population: { ...fixture.plan.recipe.population,
+    rows: { ...kept, homes: [{ id: 'retired.home', kind: KEEPER_BOSS.kind, at: [0, 0], yaw: 0, respawn: 30 }] } } } as unknown as NativeRuntimeRecipe;
+  await expect(prepareRuntimePlan(fixture.shard, fixture.assets, fixture.plan.baked, homed, fixture.sections)).rejects.toThrow(retired);
 }, 120_000);

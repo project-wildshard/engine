@@ -1,5 +1,5 @@
 // ONE-FORMAT OF19b: a declared spawn's `hold`. The body's memory `field` reads 1 until the quest flag `until` is set, then
-// 0, as a runtime plan's population `holds` row sets it before the keeper steps (`installSpeciesHomes`): Dunes' first ray
+// 0, as a runtime plan's population `holds` row set it for the keeper's homes (retired by FORMAT-PRUNE FP53b): Dunes' first ray
 // glides held until the player has met the scout. It runs before the brains (installed first), every step, from the
 // host's flags, so it keeps no state of its own and a save needs nothing new. In a room the scout's flag is each player's
 // own (a quest row's flag is claimed into its player's book, and only the lead's book is the host's), so any present

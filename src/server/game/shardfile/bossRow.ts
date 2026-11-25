@@ -1,17 +1,13 @@
 import * as v from 'valibot';
-import { Vector3 } from 'three';
 import { parseBossOwnerRow } from '@wildshard/format/bossProfiles';
-import { bossFight } from '../plugin/bossPhase';
-import type { HeldBossBrain } from '../../../shared/game/plugin/bodyBoss';
-import type { KeptBossBody } from './homeKeeper';
 import { DirectorBossBrain } from '../../../shared/game/plugin/director';
 import { bossFlagRecord, type BossRecordRow } from '../../../shared/game/plugin/bossRecord';
 import { BossBrain, type BossContinuation, type BossDefinition, type BossSaved, type BossScript } from '@wildshard/engine/ai/BossBrain';
 import { silentBossPresentation } from '@wildshard/engine/ai/phases';
 import type { AnimalSim } from '@wildshard/engine/entities/AnimalSim';
-import type { SimHost } from '@wildshard/engine/sim';
+import type { SimBodyBands, SimHost } from '@wildshard/engine/sim';
 import type { PlayerSim } from '@wildshard/engine/sim/playerSim';
-import { installSpeciesHomes, admitSpeciesProgram, bakedSpecs, type SpeciesHomesSpec, type SpeciesProgramRows, type SpeciesDecisionAuthority } from '../plugin/brain';
+import type { SpeciesProgramRows } from '../plugin/brain';
 import { BossContenders } from '@wildshard/engine/ai/bossContenders';
 import { BossBounty } from '../boss/bounty';
 import { actRoutes } from '@wildshard/engine/sim/actRoutes';
@@ -113,71 +109,10 @@ export function installBossRow(host: SimHost, spec: BossRowSpec): { boss: BossBr
 }
 
 
-/** Real roster ownership; the row cannot manufacture, retire or replace a foreign body. */
-export type BossOwnerBody =
-  | { readonly kind: 'spawned'; readonly keeper: KeptBossBody }
-  | { readonly kind: 'held'; readonly actor: AnimalSim; readonly brain: HeldBossBrain };
 /** Native effect ports are supplied by the host, never serialized callbacks. */
 export interface BossOwnerPorts {
-  readonly body: BossOwnerBody;
   readonly fact: (name: string, actorId: string) => void;
   readonly coins: (amount: number, actorId: string) => void;
-}
-const spawnedState = v.strictObject({ stormGoal: finite, storm: finite, invulnerable: v.boolean() });
-/** Install the authored stage/profile and its real body's native lifetime together.
- * Both held and spawned patterns preserve install order, reward timing and the
- * existing BossBrain/fight continuation; restore only adopts the owned roster. */
-export function installBossOwnerRow(host: SimHost, input: unknown, ports: BossOwnerPorts): ReturnType<typeof installBossRow> {
-  const row = parseBossOwnerRow(input), profile = row.profile, owner = ports.body, installed: { bounty: BossBounty | null } = { bounty: null };
-  if (profile.pattern !== owner.kind) throw new Error('Boss owner/profile mismatch');
-  /** J105: in a room each earner has the row's coins; alone the row pays as it always has. */
-  const pay = (): void => {
-    const { bounty } = installed, { amount } = row.reward;
-    if (bounty?.room === true) bounty.pay(amount, player => { ports.coins(amount, player); }, row.actor); else ports.coins(amount, row.actor);
-  };
-  const adopt = (encounter: ReturnType<typeof installBossRow>): ReturnType<typeof installBossRow> => { installed.bounty = encounter.bounty; return encounter; };
-  const record = row.record === undefined ? undefined : bossFlagRecord(host.flags, row.record);
-  const saved = record?.saved ?? row.saved ?? { defeated: false, rewardTaken: false, kills: 0 };
-  const persist = record?.persist ?? (() => undefined);
-  // HS3: a held boss's victory files and pays for a death a blow dealt, never for a fall (`env.fall`; a player's melee is
-  // `env` too, tagged `actor.player`). The body's final damage (the pipeline's `applyDamage`, after every rule) says which
-  // killed it in the tick the brain sees the death; `actor.died` is queued and could come too late.
-  let fell = false, unearned = false;
-  if (owner.kind === 'held') {
-    const actor = owner.actor.combatActor(), base = actor.applyDamage;
-    actor.applyDamage = req => { const killed = base(req); if (killed) fell = req.sourceTags.includes('env.fall'); return killed; };
-    host.scope.onDispose(() => { actor.applyDamage = base; });
-  }
-  const victory = (): void => {
-    unearned = fell; fell = false;
-    if (unearned || (row.victory.once && host.flags.has(row.victory.flag))) return;
-    host.flags.set(row.victory.flag); ports.fact(row.victory.fact, row.actor);
-    if (row.reward.when === 'victory') pay();
-  };
-  const reward = row.reward.when === 'claim' ? () => {
-    if (unearned) return;
-    saved.rewardTaken = true; persist(saved); pay();
-  } : undefined;
-  if (profile.pattern === 'spawned' && owner.kind === 'spawned') {
-    const placement = row.placement;
-    if (placement === undefined) throw new Error('Spawned boss placement missing');
-    const at = placement.rewardPoint, back = placement.respawn, keeper = owner.keeper;
-    const fight = bossFight(profile, { body: { spawn: () => keeper.draw(), retire: () => { keeper.free(); } },
-      rewardPoint: new Vector3(at.x, at.y, at.z),
-      respawnPoint: () => ({ pos: new Vector3(back.x, host.groundHeightAt(back.x, back.z), back.z), yaw: back.yaw }), victory });
-    fight.adopt(keeper.actor());
-    return adopt(installBossRow(host, { step: row.step, stages: row.stages, definition: row.definition,
-      script: fight.script, body: fight.body, shielded: fight.invulnerable,
-      fight: { snapshot: fight.snapshot, restore: value => { fight.restore(v.parse(spawnedState, value)); } },
-      saved, persist, ...(reward === undefined ? {} : { spawnReward: reward }), armed: row.armed,
-      restored: () => { fight.adopt(keeper.actor()); } }));
-  }
-  if (profile.pattern !== 'held' || owner.kind !== 'held') throw new Error('Held boss owner missing');
-  const fight = bossFight(profile, { body: owner.actor, brain: owner.brain, victory });
-  return adopt(installBossRow(host, { step: row.step, stages: row.stages, definition: row.definition,
-    script: fight.script, body: () => owner.actor, shielded: fight.shielded,
-    fight: { snapshot: fight.snapshot, restore: fight.restore }, saved, persist,
-    ...(reward === undefined ? {} : { spawnReward: reward }), armed: row.armed }));
 }
 
 /** What a declared encounter beside a runtime plan takes from the plan's owner row (`PhaseEncounterPorts` less its summon). */
@@ -186,14 +121,14 @@ export interface DeclaredOwnerHooks {
 }
 /**
  * ONE-FORMAT OF20c / OF19c1: a runtime plan's owner row naming a declared spawn binds that spawn's declared boss encounter,
- * as it bound the keeper's boss (`installBossOwnerRow`): each win sets the row's victory flag and files its fact (once, by
+ * as it bound the retired keeper's boss: each win sets the row's victory flag and files its fact (once, by
  * the flag, when `once`), its coins pay on the win or once as a claim (each earner once in a room, J105, keyed by the row's
  * step), its record is the row's flags (`record`) or its inline `saved`, and a death the fall dealt files and pays nothing
  * (HS3). `brain` is the encounter's, once installed: a claim marks its record taken. The room's earners keep a fixed step
  * named after the row, so a kill and its victory may straddle a save; the step also says the body's strikes to the page. The row's profile and stages are the keeper's and
  * are not run here.
  */
-export function declaredOwnerHooks(host: SimHost, input: unknown, body: AnimalSim, ports: Omit<BossOwnerPorts, 'body'>, brain: () => BossBrain | undefined): DeclaredOwnerHooks {
+export function declaredOwnerHooks(host: SimHost, input: unknown, body: AnimalSim, ports: BossOwnerPorts, brain: () => BossBrain | undefined): DeclaredOwnerHooks {
   const row = parseBossOwnerRow(input);
   if (body.entityId !== row.actor) throw new Error('Owner row and declared encounter name different bodies');
   const record = row.record === undefined ? undefined : bossFlagRecord(host.flags, row.record);
@@ -238,78 +173,28 @@ export function declaredOwnerHooks(host: SimHost, input: unknown, body: AnimalSi
   return { saved, persist, reward, victory };
 }
 
-/** Install an encounter over its declared population's actual owner. Admission
- * checks the owner address before allocating bodies; held controllers come from
- * that population's admitted brain, and spawned bosses use its own keeper.
- * The caller retains construction phase, fixed-step order and settle timing. */
-export function installSpeciesEncounter(host: SimHost, population: SpeciesHomesSpec, input: unknown,
-  ports: Omit<BossOwnerPorts, 'body'>, saved?: Parameters<typeof installSpeciesHomes>[2]): {
-  keeper: ReturnType<typeof installSpeciesHomes>; encounter: ReturnType<typeof installBossOwnerRow>;
-} {
-  const row = parseBossOwnerRow(input), pattern = row.profile.pattern;
-  if (pattern === 'spawned' ? population.boss?.id !== row.actor : !population.homes.some(home => home.id === row.actor)) {
-    throw new Error('Encounter owner must belong to its declared species population');
-  }
-  // A held boss is one of the homes: the keeper's death plane must not kill (and so pay) it (HS3).
-  const keeper = installSpeciesHomes(host, pattern === 'held' ? { ...population, held: [...population.held ?? [], row.actor] } : population, saved);
-  let body: BossOwnerBody;
-  if (pattern === 'spawned') {
-    if (keeper.boss === null) throw new Error('Declared spawned encounter has no keeper');
-    body = { kind: 'spawned', keeper: keeper.boss };
-  } else {
-    const actor = keeper.homes().find(home => home.id === row.actor)?.actor;
-    const brain = actor === null || actor === undefined ? null : population.brains.held(actor.kind, actor);
-    if (actor === null || actor === undefined || brain === null) throw new Error('Declared held encounter has no owned controller');
-    body = { kind: 'held', actor, brain };
-  }
-  return { keeper, encounter: installBossOwnerRow(host, row, { body, ...ports }) };
-}
-
 /** OF30: a runtime plan's keeper programme, empty when its creatures are all declared rows (no species, no strikes). */
 export function keeperProgram(rows: Pick<NativePopulationRows, 'program'>): SpeciesProgramRows {
   return rows.program ?? { species: [], strikes: [] };
 }
 
-/** Serializable native population policy. Ground-only deferred homes resolve
- * against the actual baked flight recipe, preserving original roster order. */
+/** Serializable native population policy (a runtime plan's `population.rows`): since FORMAT-PRUNE FP53b its keeper
+ * stands no body; the rows still name the bodies' cadence and the retired step a live save may carry. */
 export interface NativePopulationRows {
   /** ONE-FORMAT OF30: the keeper's own species programme; a plan whose creatures are all declared names none. */
   readonly program?: SpeciesProgramRows;
+  /** FORMAT-PRUNE FP53b: the retired keeper step's id; a live save's continuation under it restores without it. */
   readonly step: string; readonly seed: number;
-  readonly homes: readonly (Omit<SpeciesHomesSpec['homes'][number], 'late'> & { readonly late?: boolean | 'ground' })[];
-  readonly boss?: SpeciesHomesSpec['boss'];
+  /** FORMAT-PRUNE FP53b: retired, always empty (a runtime plan refuses a keeper home or boss). */
+  readonly homes: readonly RetiredKeeperBody[];
+  readonly boss?: RetiredKeeperBody;
   readonly attackers: number | null;
-  readonly think: SpeciesHomesSpec['think'] | 'legacy';
+  /** The bodies' cadence: `legacy` or `{ bands }` opts the host into body bands; `{ every, dt }` steps plainly. */
+  readonly think: { readonly every: number; readonly dt: number } | { readonly bands: SimBodyBands } | 'legacy';
   readonly killY?: number;
-  readonly placement?: SpeciesHomesSpec['placement'];
-  readonly holds?: SpeciesHomesSpec['holds'];
-  /** Original admission lifetime: per preparation or per host installation. */
+  readonly placement?: { readonly fallback: number; readonly rows: readonly unknown[] };
+  readonly holds?: readonly { readonly home: number; readonly field: string; readonly until: string }[];
   readonly admission: 'prepare' | 'install';
 }
-/** A native population's keeper and its boss encounter; null when the plan keeps no boss (its boss is a declared encounter). */
-export interface KeptPopulation {
-  readonly keeper: ReturnType<typeof installSpeciesHomes>;
-  readonly encounter: ReturnType<typeof installBossOwnerRow> | null;
-}
-/** Prepare original baked recipes and install the existing population/encounter
- * in the caller's phase. No actor, RNG draw or step runs during preparation. An `owner` left out (OF19c0) installs the
- * keeper alone: its boss, if the shard has one, is a declared encounter beside the plan. */
-export function prepareNativePopulation(rows: NativePopulationRows, baked: Parameters<typeof bakedSpecs>[0], owner: unknown): {
-  readonly specs: ReturnType<typeof bakedSpecs>;
-  readonly install: (host: SimHost, ports: Omit<BossOwnerPorts, 'body'>, saved?: Parameters<typeof installSpeciesHomes>[2], decisions?: SpeciesDecisionAuthority) => KeptPopulation;
-} {
-  const program = keeperProgram(rows), specs = bakedSpecs(baked), brains = rows.admission === 'prepare' ? admitSpeciesProgram(program) : null;
-  const homes = rows.homes.map(row => ({ ...row, late: row.late === 'ground' ? specs.get(row.kind)?.flight === undefined : row.late ?? false }));
-  // OF19c0: a plan whose boss moved to a declared encounter keeps no owner row; a keeper boss still needs the one that fights it
-  if (owner === undefined && rows.boss !== undefined) throw new Error('A runtime keeper boss needs its owner row');
-  return { specs, install: (host, ports, saved, decisions) => {
-    const population: SpeciesHomesSpec = {
-      ...(decisions === undefined ? {} : { decisions }),
-      step: rows.step, seed: rows.seed, homes, specs, species: program.species, brains: brains ?? admitSpeciesProgram(program),
-      attackers: rows.attackers ?? Infinity, think: rows.think === 'legacy' ? { bands: { rate: () => 'legacy' } } : rows.think,
-      ...(rows.boss === undefined ? {} : { boss: rows.boss }), ...(rows.killY === undefined ? {} : { killY: rows.killY }),
-      ...(rows.placement === undefined ? {} : { placement: rows.placement }), ...(rows.holds === undefined ? {} : { holds: rows.holds }),
-    };
-    return owner === undefined ? { keeper: installSpeciesHomes(host, population, saved), encounter: null } : installSpeciesEncounter(host, population, owner, ports, saved);
-  } };
-}
+/** A keeper body's row, kept so the retired shape still parses: its id and kind are what a refusal names. */
+export interface RetiredKeeperBody { readonly id: string; readonly kind: string; readonly at: readonly [number, number]; readonly yaw: number }

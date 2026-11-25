@@ -213,6 +213,8 @@ export class SimHost {
   readonly entities: Map<string, AnimalSim> = new Map<string, AnimalSim>();
   readonly strikes: Map<string, StrikeRunner> = new Map<string, StrikeRunner>();
   readonly adapters: Map<string, SimStateAdapter> = new Map<string, SimStateAdapter>();
+  /** Saved adapter ids no installer registers any more: a restore drops their state (`retireAdapter`). */
+  readonly retiredAdapters: Set<string> = new Set<string>();
   readonly state = { tick: 0, accumulator: 0, timers: {} as Record<string, number> };
   readonly slots: SimSlots = { scriptMemory: {}, scriptGlobals: {}, questState: {}, ledgerDedupe: [] };
   readonly combat: CombatPipeline;
@@ -671,6 +673,12 @@ export class SimHost {
   /** SERVER-PARITY HS1: every fixed-step owner, in registration order (before bodies, then after), so two hosts built from one
    *  product can be compared owner for owner. */
   stepIds(): readonly string[] { return [...this.callbacks.keys(), ...this.afterCallbacks.keys()]; }
+  /** A continuation an installer no longer registers (FORMAT-PRUNE FP53b's keeper step): a save that carries it restores
+   *  without it, and the next snapshot leaves it out. The installer names it, restoring too, before the restore. */
+  retireAdapter(id: string): void {
+    if (this.disposed || this.adapters.has(id) || this.hasStep(id)) throw new Error(`Invalid retired registration ${id}`);
+    this.retiredAdapters.add(id);
+  }
   /** Scoped fixed-step work before bodies by default; afterBodies matches equipment following creature contact.
    * Removing a registration releases its future snapshot adapter. Registration order remains snapshot order. */
   onStep(id: string, run: (dt: number, host: SimHost) => void, adapter?: SimStateAdapter, phase: 'beforeBodies' | 'afterBodies' = 'beforeBodies'): () => void {

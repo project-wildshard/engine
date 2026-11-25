@@ -19,8 +19,6 @@ import { SIM_LEVEL } from './fixtures/sim-level/level';
 import { Rng } from '@wildshard/format/seededRng';
 import { createNativeCreatureRoster } from '../src/server/game/shardfile/homeKeeper';
 import { fixtureNativeRoster } from './fixtures/native-roster';
-import { admitSpeciesBrains, installSpeciesHomes } from '../src/server/game/plugin/brain';
-import { BOAR } from '../src/test/game/species/boar';
 
 let rapier: Awaited<ReturnType<typeof loadRapier>>;
 beforeAll(async () => { rapier = await loadRapier(Uint8Array.from(readFileSync('public/assets/physics/rapier.wasm'))); });
@@ -131,21 +129,6 @@ test('native empty and absent declarations remain distinct through actual roster
       expect(declaredHarvestDrops(actor.harvest ?? [], actor.variant)).toEqual([]);
     } finally { f.host.dispose(); }
   }
-});
-
-test('species homes bind admitted harvest before their existing policy and preserve native wire labels', () => {
-  const f = fixture(), sample = SIM_LEVEL.entities[0]; if (sample === undefined) throw new Error('Missing home recipe');
-  const species = [{ ...BOAR, harvest: drops, capExempt: false }];
-  try {
-    const homes = installSpeciesHomes(f.host, { step: 'fixture.homes', seed: 17,
-      homes: [{ id: 'home.body', kind: BOAR.kind, at: [0, 0], yaw: 0, respawn: 0 }],
-      specs: new Map([[BOAR.kind, sample.spec]]), attackers: 1, think: { every: 6, dt: .1 },
-      species, brains: admitSpeciesBrains(species, []), custom: (_kind, actor) => {
-        expect(actor.harvest).toBe(drops); expect(actor.species).toBe(''); expect(actor.combatActor().capExempt).toBe(false);
-        return { decide: () => undefined, move: () => undefined, snapshot: () => null, restore: () => undefined };
-      } });
-    expect(homes.homes()[0]?.actor?.harvest).toBe(drops);
-  } finally { f.host.dispose(); }
 });
 
 const oldPending = { id: 'old.pending', kind: 'boar', variant: 'elite', x: 0, y: 0, z: 0 };

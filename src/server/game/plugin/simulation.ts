@@ -7,19 +7,17 @@ import { dataPerchBrains, preflightPlainPerches } from '../shardfile/dataPerchBr
 import { hasDeclaredClientPage } from '@wildshard/format/runtimeBinds';
 import { adoptBuffer } from '@wildshard/engine/core/ownedBuffer';
 import { parseNativeLoadoutRow, type NativeLoadoutRowSchema } from '@wildshard/format/nativeItems';
-import { borrowedDecisionAuthority } from '../shardfile/borrowedDecisions';
-import { decisionRuntime, focusPlayer, ShardDecisions, type DecisionRuntime } from '../shardfile/decisions';
+import { decisionRuntime, ShardDecisions, type DecisionRuntime } from '../shardfile/decisions';
 import { WorldTargetHost } from '../../../shared/game/shardfile/worldTargets';
 import { outputDescriptor } from '../../../shared/game/shardfile/outputDescriptor';
 import { parseWorldTargets, worldTargetRules } from '@wildshard/format/worldTargets';
 import { decisionScriptsFromSections } from '@wildshard/format/scriptContract';
-import { prepareNativePopulation, type NativePopulationRows } from '../shardfile/bossRow';
+import type { NativePopulationRows } from '../shardfile/bossRow';
 import { serverReturnRows } from '../shardfile/nativeRuntimeLoans';
 import { admitRuntimeCreatures, declaredOwner, declaredSpawnEntities, installRuntimeCreatures, keeperOwnership, nameDeclaredBodies, type RuntimeEncounter } from '../shardfile/runtimeCreatures';
 import { parseQuestWorldReactions, type QuestWorldReactionsData } from '@wildshard/format/questInteractions';
 import { installQuestGraph, type QuestGraphPorts } from '../../../shared/game/plugin/quests';
 import { parseQuestHost, type QuestHostRow } from '@wildshard/format/questHost';
-import { parseBossOwnerRow } from '@wildshard/format/bossProfiles';
 import type { QuestData } from '@wildshard/format/quests';
 import { compileDirectorWhen, evaluateDirectorWhen } from '@wildshard/format/directorWhen';
 import { weaponContactDistance, type ContactWorldTarget, ContactFamily, type ContactFamilyPorts, type ContactScanTarget } from '@wildshard/engine/combat/contactWeapon';
@@ -51,7 +49,7 @@ import { addBakedTerrainCollider } from "@wildshard/engine/physics/terrainTiles"
 import { decodeTerrainTile, terrainTileHeight, type TerrainTileData } from "@wildshard/format/terrainTileBytes";
 import { fnv1a32 } from "@wildshard/format/seededRng";
 import { installScriptLane, type ScriptLanePort } from "@wildshard/engine/script/lane";
-import { publishOwned, publishShardState, sayFightView } from '@wildshard/engine/sim/shardRows';
+import { publishOwned, publishShardState } from '@wildshard/engine/sim/shardRows';
 import type { EffectRules, ScriptEntity } from "@wildshard/engine/script/effects";
 import { declaredWaterBody } from "@wildshard/engine/world/water/declared";
 import { WaterBodies } from "@wildshard/engine/world/water/body";
@@ -200,10 +198,16 @@ interface RuntimeWorldRecipe {
     readonly permissions: readonly { readonly mover: string; readonly flags: readonly { readonly name: string; readonly bit: number }[] }[];
   };
 }
+/** FORMAT-PRUNE FP53b: a runtime plan's keeper stands no body. Its homes, its boss and an owner row on a body it would
+ *  stand are retired: those creatures are declared spawns, and a boss is a declared encounter. */
+function retiredKeeper(rows: NativePopulationRows, owner: unknown): void {
+  if (rows.homes.length > 0 || rows.boss !== undefined || owner !== undefined || (rows.program?.species.length ?? 0) > 0)
+    throw new Error("A runtime plan's keeper homes, boss and species are retired (FORMAT-PRUNE FP53b): declare the creatures and their boss encounter");
+}
 /** Shared native world preparation: declarations select static collision, spawn and optional scripted motion on the same host. */
 export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, baked: unknown, recipe: RuntimeWorldRecipe, sections: ReadonlyMap<string, unknown> = outputDescriptor(shard)?.sections ?? new Map()): Promise<{
   level: SimLevel; ports: { ground: false; heightAt: (x: number, z: number) => number };
-  install: (host: SimHost, context: { restoring: boolean; emit: Parameters<typeof ledgerPorts>[0]; snapshot?: Parameters<ReturnType<typeof prepareNativePopulation>['install']>[2] }) => ReturnType<ReturnType<typeof prepareNativePopulation>['install']> & { ledger: ReturnType<typeof ledgerPorts>; hooks: ReturnType<ReturnType<typeof declaredItemScriptBindings>['hooks']>;
+  install: (host: SimHost, context: { restoring: boolean; emit: Parameters<typeof ledgerPorts>[0]; snapshot?: Readonly<Omit<SimSnapshot, 'physics'>> }) => { ledger: ReturnType<typeof ledgerPorts>; hooks: ReturnType<ReturnType<typeof declaredItemScriptBindings>['hooks']>;
     hookTick: () => number; motion?: MoverRuntime; seats: ScriptSeats; declared: ReadonlyMap<string, RuntimeEncounter> };
 }> {
   const { pieces } = v.parse(v.object({ pieces: v.unknown() }), baked);
@@ -219,10 +223,9 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
   if (row !== undefined && (row.permissions.length > 64
     || row.permissions.some(value => !data.some(declaration => declaration.id === value.mover)))) throw new Error('Unbound native world motion rows');
   const policy = recipe.population;
-  const actors = policy.sources === 'actors+bosses' ? (() => { const rows = readRuntimeWorldMetadata(baked, true); return [...rows.actors, ...rows.bosses]; })() : readRuntimeWorldMetadata(baked).actors;
   // OF20c / OF19c1: an owner row naming a declared spawn is its declared boss encounter's, never the keeper's
   const counted = countedShard(shard), keeper = keeperOwnership(policy.rows), owned = declaredOwner(counted, policy.owner, keeper);
-  const population = prepareNativePopulation(policy.seed === 'identity' ? { ...policy.rows, seed: shard.identity.seed } : policy.rows, actors, owned === undefined ? policy.owner : undefined);
+  retiredKeeper(policy.rows, owned === undefined ? policy.owner : undefined);
   // OF19b0: the declared spawns stand in the native level as in an ordinary upload's, and the declared host drives them
   admitRuntimeCreatures(counted, sections, keeper);
   // OF20b: the plan's floor and death plane hold its declared bodies as its keeper's
@@ -254,13 +257,13 @@ export async function prepareRuntimeWorld(shard: Shardfile, assets: ReadonlyMap<
       return { hooks: items.hooks(motion.scriptHost), hookTick: () => motion.scriptHost.currentTick, motion, seats };
     })();
     const ledger = ledgerPorts(context.emit);
-    const installed = population.install(host, ledger, context.snapshot, borrowedDecisionAuthority(shard, assets, sections, {
-      scope: host.scope, events: host.events, flags: host.flags, get physics() { return host.physics; }, player: focusPlayer(host), groundHeightAt: host.groundHeightAt.bind(host),
-      live: actor => host.entities.get(actor.entityId) === actor, fixed: (id, run, scope) => { scope.onDispose(host.onStep(id, run)); }, say: (name, args) => { sayFightView(host, name, args); },
-    }));
+    // FORMAT-PRUNE FP53b: the plan's think row still sets the bodies' bands; its retired keeper step leaves old saves here
+    const think = policy.rows.think;
+    if (think === 'legacy') host.useBodyBands({ rate: () => 'legacy' }); else if ('bands' in think) host.useBodyBands(think.bands);
+    host.retireAdapter(policy.rows.step);
     const declared = installRuntimeCreatures(host, counted, assets, sections, { restoring, keeper, fact: ledger.fact, summoned, world,
       ...(owned === undefined ? {} : { owner: { row: policy.owner, actor: owned, coins: ledger.coins } }) });
-    return { ...environment, ledger, ...installed, declared };
+    return { ...environment, ledger, declared };
   } };
 }
 export interface NativeRuntimeRecipe extends RuntimeWorldRecipe {
@@ -298,12 +301,11 @@ export async function prepareRuntimePlan(shard: Shardfile, assets: ReadonlyMap<s
   const spots = metadata?.spots ?? row.quest.spots;
   if (spots === 'metadata') throw new Error('Missing admitted native quest spots');
   const plan: NativeRuntimePlan = { level: world.level, ports: world.ports, install: (host, context) => {
-    const environment = world.install(host, context), { ledger, keeper, encounter, declared } = environment;
-    // OF19c0: the plan's boss, or the declared encounters beside it, answer the quest page's summon; one locks the loadout
+    const environment = world.install(host, context), { ledger, declared } = environment;
+    // OF19c0: the declared encounters beside the plan answer the quest page's summon; one locks the loadout
     // through its intro
     const summons = new Map<string, { readonly summon: () => void }>(declared);
-    if (encounter !== null) summons.set(parseBossOwnerRow(recipe.population.owner).actor, encounter);
-    const locked = (): boolean => encounter?.locked() === true || [...declared.values()].some(fight => fight.locked());
+    const locked = (): boolean => [...declared.values()].some(fight => fight.locked());
     const reactions = ownsTargets || row.weapon.worldReactionAction === undefined ? undefined : (() => {
       const page = quest.page;
       const declarations = page === undefined || 'version' in page ? undefined : page.world;
@@ -338,7 +340,6 @@ export async function prepareRuntimePlan(shard: Shardfile, assets: ReadonlyMap<s
     // Its one-slot loadout is no catalogue kit, so it registers no `loadout`.
     for (const key of ['collision', 'heldBoss', 'melee', 'questHost'] as const) registerInstalled(host, key);
     if (row.columns) bindPlayerColumns(host, shard.modes?.traverse ?? []);
-    keeper.settle();
   } };
   const entries = row.entries;
   return entries === undefined ? plan : { ...plan, proveEntries: host => proveTerrainEntries(host.physics, shard.entryways, world.ports.heightAt, entries) };

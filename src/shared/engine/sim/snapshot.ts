@@ -420,11 +420,12 @@ export function restoreInstalledHost(host: SimHost, ports: { rapier: Rapier }, s
   let replacement: Physics | null = null;
   try {
     install?.(host);
+    const kept = saved.adapters.filter(entry => !host.retiredAdapters.has(entry.id)); // FP53b: a retired continuation's state goes
     // Restores boot an owned actor.player host. Registry order cannot change that legacy identity.
     // The installers ran for that owner; everyone else rejoins before their state lands.
     for (const entry of saved.players.slice(1)) if (!host.players.has(entry.id)) host.addPlayer(entry.id);
     if (saved.players[0]?.id !== 'actor.player' || !sameIds(saved.players.map((entry) => entry.id), host.players.keys()) || !sameIds(saved.entities.map((entry) => entry.id), host.entities.keys())
-      || !sameIds(saved.strikes.map((entry) => entry.id), host.strikes.keys()) || !sameIds(saved.adapters.map((entry) => entry.id), [...host.adapters].filter(([id, adapter]) => adapter.joined !== true || saved.adapters.some(entry => entry.id === id)).map(([id]) => id))
+      || !sameIds(saved.strikes.map((entry) => entry.id), host.strikes.keys()) || !sameIds(kept.map((entry) => entry.id), [...host.adapters].filter(([id, adapter]) => adapter.joined !== true || kept.some(entry => entry.id === id)).map(([id]) => id))
       || !sameIds(saved.quests.map((entry) => entry.id), host.quests.map((quest) => quest.def.id))
       || saved.players.some(invalidPlayer) || saved.boardColliders?.length === 0) throw new RangeError('Snapshot instance registrations do not match');
     // Dynamic owners may reinstall in a different order. Keep the saved body
@@ -455,15 +456,15 @@ export function restoreInstalledHost(host: SimHost, ports: { rapier: Rapier }, s
     host.slots.ledgerDedupe.splice(0, host.slots.ledgerDedupe.length, ...slots.ledgerDedupe);
     // Deferred actors may be reinstalled before a controller that originally registered before their spawn.
     // Preserve the saved continuation order without changing the independently registered step callbacks.
-    const adapters = saved.adapters.map(entry => {
+    const adapters = kept.map(entry => {
       const adapter = host.adapters.get(entry.id);
       if (adapter === undefined) throw new RangeError('Snapshot adapter registration disappeared');
       return [entry.id, adapter] as const;
     });
-    const joined = [...host.adapters].filter(([id, adapter]) => adapter.joined === true && !saved.adapters.some(entry => entry.id === id));
+    const joined = [...host.adapters].filter(([id, adapter]) => adapter.joined === true && !kept.some(entry => entry.id === id));
     host.adapters.clear();
     for (const [id, adapter] of [...adapters, ...joined]) host.adapters.set(id, adapter);
-    for (const entry of saved.adapters) host.adapters.get(entry.id)?.restore(cloneValue(entry.state));
+    for (const entry of kept) host.adapters.get(entry.id)?.restore(cloneValue(entry.state));
     host.restoreBodyBands(saved.bands);
     host.restoreDayClock(saved.day);
     host.damage.load(saved.damage ?? []);

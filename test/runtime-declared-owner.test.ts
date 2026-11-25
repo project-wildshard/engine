@@ -89,7 +89,6 @@ async function arena(owner?: (row: Owner) => Owner): Promise<Arena> {
   const effects: NativeRuntimeEffect[] = [];
   const install = (target: SimHost, restoring: boolean, snapshot?: ReturnType<typeof snapshotSimHost>): void => {
     const environment = world.install(target, { restoring, ...(snapshot === undefined ? {} : { snapshot }), emit: effect => { effects.push(effect); } });
-    environment.keeper.settle();
     if (!restoring) environment.declared.get(BOSS)?.summon();
   };
   const host = createSimHost(world.level, { ...world.ports, rapier: fixture.rapier });

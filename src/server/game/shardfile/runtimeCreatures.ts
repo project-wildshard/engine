@@ -108,8 +108,8 @@ export interface RuntimeCreaturePorts {
 }
 export const DECLARED_KILL_STEP = 'runtime.declared-kill';
 
-/** OF20b: a declared body beside a runtime plan stands on the plan's solids and dies under its death plane, as the keeper's
- *  homes do (`installSpeciesHomes` placement, `installHomeKeeper` killY). Nothing when the plan declares neither. */
+/** OF20b: a declared body beside a runtime plan stands on the plan's solids and dies under its death plane, as the
+ *  keeper's homes did (retired by FORMAT-PRUNE FP53b). Nothing when the plan declares neither. */
 function installDeclaredWorld(host: SimHost, shard: Shardfile, world: RuntimeCreaturePorts['world']): void {
   const bodies = shard.creatures.spawns.map(row => row.id);
   if (world?.floor !== undefined) {
