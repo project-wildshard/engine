@@ -25,7 +25,7 @@ import { afterControl, reachControl, whenControl } from '@wildshard/engine/boot/
 import { idleTurn } from '@wildshard/engine/boot/idle';
 import { installGpuRecovery } from '@wildshard/engine/core/GpuRecovery';
 import { installWorldWatch } from '@wildshard/engine/core/worldWatch';
-import { webglRendererName } from '@wildshard/engine/core/slowGpuPacing';
+import { softwareRasterizer, webglRendererName, workerReadsOnPageThread } from '@wildshard/engine/core/slowGpuPacing';
 import { TIER } from '@wildshard/engine/core/tier';
 import { lockOn as lockState } from '@wildshard/engine/player/AimTargets';
 import { programTwinsOn } from '@wildshard/engine/render/programTwins';
@@ -182,6 +182,9 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     bootMark('memory:geometry-released', { after, bytes: releaseDrawnGeometry(game.renderer) });
     const hinted = budgetCollection(); if (hinted > 0) bootMark('memory:budget-collection', { after, bytes: hinted });
   };
+  // FR-A18: a CPU rasterizer (a software renderer name, or the shaders step measured one): the frames wait for the early
+  // server, and the spawn view settles in one draw
+  let cpuRaster = false;
   try {
     // LS8 (J204): the shaders step's measured cost per program decides how the first frame slices its draws
     const shadersAt = diagnosticNow(), programsBefore = game.renderer.info.programs?.length ?? 0;
@@ -213,13 +216,24 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
     releaseDrawn('shaders');
     if (fragileBoot && game.renderer.getContext().isContextLost()) throw new Error('WebGL context lost during shader compile');
     const shaderMs = diagnosticNow() - shadersAt, built = (game.renderer.info.programs?.length ?? 0) - programsBefore;
-    const slowGpu = slowShaderGpu({ stepMs: shaderMs, uploadMs, programs: built, renderer: webglRendererName(game.renderer.getContext()) });
+    const renderer = webglRendererName(game.renderer.getContext());
+    const slowGpu = slowShaderGpu({ stepMs: shaderMs, uploadMs, programs: built, renderer });
+    cpuRaster = slowGpu || softwareRasterizer(renderer);
     bootMark('app:first-frame-plan', { shaderMs: Math.round(shaderMs), uploadMs: Math.round(uploadMs), programs: built, narrow: slowGpu });
     // LS11 (J204): a GPU this slow composites the page in software; the card covers the world until it fades
     if (slowGpu) loading.coverCanvas(game.canvas);
     // RT3: and, on a software rasterizer only (never a real GPU: the phone stays at 2x), its frames in play are paced so
     // its read-backs leave the main thread to worker messages and input
     if (slowGpu) game.paceSlowGpu();
+    // FR-A18: on a CPU rasterizer each frame step below holds the page's main thread for seconds (Nalati on Linux: first
+    // frame 27 s, spawn programs 27 s), and WebKit runs the in-page server worker's reads through that thread, so its world
+    // boot took 77 s behind them. In WebKit the frames wait for the early server instead: its reads run on an idle thread,
+    // then the frames draw. A failed boot is still the server step's to report; a real GPU, or Chromium, never waits here.
+    if (cpuRaster && workerReadsOnPageThread(navigator.userAgent)) {
+      const held = diagnosticNow();
+      await bootTask('app:cpu-raster-server-first', async () => { await (await loadWorkerClient()).earlyServerBooted(); });
+      bootMark('app:cpu-raster-hold', { renderer, slowGpu, ms: Math.round(diagnosticNow() - held) });
+    }
     await step('firstFrame', async (p) => {
       let passes = 0;
       // its units are measured seconds (J204), so the counts live in `what`, not in d / n
@@ -359,7 +373,7 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
   const launchServer = (): Promise<void> => { serverLaunch ??= loadWorkerClient().then(worker => worker.launchWorkerClient({ ...(TIER === 'phone' && entersAtReveal ? { linkBodies: () => linkWorldUnderLoader(game, true) } : {}), slug: ctx.grid?.home.slug ?? slug, player, physics: world.physics, scene: game.rootScene, animals, warmRoad: roots => (async () => { try { await game.warmExteriorRoots(game.levelScope, roots, () => !game.levelScope.disposed && !game.levelScope.disposing); } catch (error: unknown) { console.warn('[other players] road variant warm-up stopped', error); } })(), weapons, health: playerHealth, died: ctx.serverDied, hurt: ctx.serverHurt, items: ctx.grid === null ? ctx.product.shardfile.items.rows : [], dims: kind => { const species = app.species.get(kind), variant = species?.variants[0]; return variant === undefined ? null : species?.build(variant, new Rng(1)).dims ?? null; }, tools: () => app.equipment?.tools ?? [], day: () => app.dayCycle, grid: workerGrid(ctx), scope: game.levelScope, system: spec => { app.addSystem(spec, game.levelScope); } })); return serverLaunch; };
   if (TIER === 'phone' && entersAtReveal) {
     // FC2: no world frames under the loader; the spawn view warms with counted offscreen draws (settlePrograms.ts)
-    await loadingStage('spawnPrograms', () => settleEntryPrograms(game));
+    await loadingStage('spawnPrograms', () => settleEntryPrograms(game, cpuRaster));
     releaseDrawn('spawnPrograms');
     // QA8: on WebKit every compile runs in the GPU process, and a frame queues behind it: the ~17 world programs the
     // spawn view does not draw (Driftwood's off-screen graph materials, the loot coin) linked one a frame in play cost

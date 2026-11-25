@@ -38,6 +38,11 @@ export function webglRendererName(gl: Pick<WebGLRenderingContext, 'getExtension'
 }
 /** Whether a WebGL renderer name is a software rasterizer (never a real GPU, so never a player's phone). */
 export function softwareRasterizer(renderer: string): boolean { return SOFTWARE_RENDERER.test(renderer); }
+/** FR-A18: whether this browser runs a worker's fetches through the page's main thread (WebKit's loader does), so a long
+ *  main-thread task stalls a worker's reads too. Chromium and Firefox fetch from the worker's own thread. */
+export function workerReadsOnPageThread(userAgent: string): boolean {
+  return userAgent.includes('AppleWebKit') && !/Chrome|Chromium|Edg|Firefox/u.test(userAgent);
+}
 
 /** A slow GPU's drawn frame should cost the main thread at most this long (ms). */
 export const FRAME_COST_TARGET_MS = 50;
