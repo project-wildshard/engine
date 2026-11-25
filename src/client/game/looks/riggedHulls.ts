@@ -33,7 +33,7 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
  * to its hull in the same single draw (`parts`, merged once per variant and flagged `overgrown`), e.g. glowing eyes.
  */
 
-/** ONE-FORMAT OF30: a crowd's own rig, named by its file, with no `look/rigged-hulls` family (Nalati's sheep). `file` is the
+/** ONE-FORMAT OF30: a crowd's own rig, named by its file, with no rigged-hull book section (Nalati's sheep). `file` is the
  *  desktop rig (`<hull>.rigged.glb`); the phone tier reads its `<hull>.phone.rigged.glb` twin, as a family's tiers did.
  *  It loads exactly as a family's rig does (vertex colours, its own atlas, no coats), once per file. */
 export function isCrowdRigFile(hull: string): boolean { return hull.endsWith('.rigged.glb'); }

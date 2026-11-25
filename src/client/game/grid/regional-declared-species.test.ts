@@ -17,9 +17,9 @@ import type {ShardFolder} from '../../../shared/game/shardfile/shardFolder';
 
 const PAGE = {version: 1};
 function product(kinds: readonly string[], spawns: readonly {species: string; variant: number}[] = [], runtime: object | null = null,
-  {page = true, species = 0, programs = false}: {page?: boolean; species?: number; programs?: boolean} = {}): ShardFolder {
+  {page = true, species = 0}: {page?: boolean; species?: number} = {}): ShardFolder {
   const shardfile = {runtime, questHost: page ? {page: PAGE} : null, creatures: {spawns}, rows: {species: Array.from({length: species}, (_, i) => ({id: `s${String(i)}`})), looks: []}};
-  return {shardfile, has: (name: string): boolean => name === 'client/plan' || (programs && name === 'actors/species-programs'),
+  return {shardfile, has: (name: string): boolean => name === 'client/plan',
     section: (name: string): unknown => { if (name !== 'client/plan') throw new Error(`no ${name}`); return {version: 1, features: kinds.map(kind => ({kind}))}; }} as unknown as ShardFolder;
 }
 function entered(folder: ShardFolder): ShardContext {
@@ -89,8 +89,6 @@ test('the entered kit stage runs the resident kit hook before the plan kit featu
 test('a native page with declared species and no species owner declares its own', () => {
   const spawn = [{species: 's0', variant: 0}];
   expect(nativeDeclaresOwnSpecies(product(['world.forest-page'], spawn, {}, {page: false, species: 1}))).toBe(true);
-  // P1 (2026-11-22): an old programme section no feature reads (Driftwood r8's client product beside an r9 box) declares too
-  expect(nativeDeclaresOwnSpecies(product([], spawn, {}, {page: false, species: 1, programs: true}))).toBe(true);
   expect(nativeDeclaresOwnSpecies(product([], [], {}, {page: false, species: 1}))).toBe(false);
   expect(nativeDeclaresOwnSpecies(product([], spawn, null, {species: 1}))).toBe(false); // a data page: pageDeclaresOwnSpecies
 });

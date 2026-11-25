@@ -24,8 +24,6 @@ export const SECTION_HOSTS = Object.freeze({
   'collections/displays': ['src/client/game/models/collectionDisplay.ts#CollectionCatalogue'],
   'models/island-library': ['src/client/game/models/islandLibrary.ts#IslandLibrary'],
   'world/trees': ['src/client/game/models/treeSet.ts#folderTreeSet', 'src/client/game/shardfile/forestPage.ts#placeForestPageModels'],
-  'look/hull-book': [], // FORMAT-PRUNE FP20: no reader; the section leaves with the format's delete.
-  'look/rigged-hulls': [], // FORMAT-PRUNE FP20: no reader (folderRiggedHulls went); the section leaves with the format's delete.
   'look/painted': ['src/client/game/looks/paintedLook.ts#folderPaintedLook'],
   'look/colour-functions': ['src/client/engine/render/graph/colourFunction.ts#materialColourGraph'],
   'look/toon': ['src/client/game/looks/toonLook.ts#toonLook'],
@@ -70,7 +68,6 @@ export const SECTION_HOSTS = Object.freeze({
   'actors/species': ['src/server/game/plugin/brain.ts#speciesResolver', 'src/client/game/shardfile/clientRecipes.ts#clientSpeciesLooks'],
   'actors/spawns': ['src/server/game/shardfile/brainRuntime.ts#installDeclaredBrains'],
   'actors/strikes': [], // Consumed by the runtime's explicitly imported creature host.
-  'actors/species-programs': [], // Metadata lent to existing page/native species and hunt owners.
   'held/arms': ['src/client/game/loadout/claims.ts#HeldClaims', 'src/client/game/systems/viewmodel/heldView.ts#HeldView'],
   'held/equipment': ['src/client/game/plugin/heldEquipment.ts#HeldEquipment'],
   'held/loadout': ['src/client/game/loadout/held.ts#installHeldLoadout'],

@@ -8,9 +8,9 @@ import * as claims from '../src/client/game/shardfile/heldClaimsEntry';
 import { legacyDouble } from '@wildshard/engine/test/FakeGame';
 
 
-function fixture(namedFile = true, omitLegacy?: 'economy/loot' | 'look/hull-book') {
+function fixture(namedFile = true, omitLegacy?: 'economy/loot') {
   const source = emptyShardfile({ slug: 'kit-orchard', name: 'Orchard', author: 'Fixture', revision: 1, seed: 7 });
-  const sections = new Map<string, unknown>([['held/arms', {}], ['economy/loot', {}], ['look/hull-book', {}]]);
+  const sections = new Map<string, unknown>([['held/arms', {}], ['economy/loot', {}]]);
   if (omitLegacy !== undefined) sections.delete(omitLegacy);
   const files = new Map<string, { hash: string; url: string }>();
   if (namedFile) files.set('actors/creature-install.json', { hash: '0'.repeat(64), url: 'https://example.invalid/creature-install.json' });
@@ -51,7 +51,8 @@ test('missing, mismatched and duplicate claims pairs refuse before allocation', 
 test('product creatures left the client plan (ONE-FORMAT OF30, FORMAT-PRUNE FP20)', () => {
   const f = fixture();
   try {
-    expect(() => admitClientPlan({ version: 1, features: [{ kind: 'population.product-creatures' }] }, f.ctx.product)).toThrow('population.product-creatures, retired (FORMAT-PRUNE FP20)');
+    // FORMAT-PRUNE FP20: the format deletes the kind, so its client plan parser refuses it
+    expect(() => admitClientPlan({ version: 1, features: [{ kind: 'population.product-creatures' }] }, f.ctx.product)).toThrow();
   } finally { f.scope.dispose(); }
 });
 

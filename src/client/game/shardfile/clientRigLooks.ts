@@ -8,7 +8,7 @@ import { prepareSceneSources, sceneModelSource } from './sceneSources';
 
 /**
  * ONE-FORMAT OF19d2: the scene model libraries a page's `platform.rig` looks name, their rigs preloaded, so the declared
- * creature host draws those bodies as `species.program` did (Sunscar Dunes' ray, strider and Matriarch). A page with no
+ * creature host draws those bodies as the deleted species program did (Sunscar Dunes' ray, strider and Matriarch). A page with no
  * rig look reads nothing. Each library is the one the world's scenes already prepared, never a second copy.
  */
 export async function loadClientRigLooks(product: ShardFolder, rows: Pick<ShardRows, 'looks'>, scope: Scope): Promise<ClientRigLooks> {

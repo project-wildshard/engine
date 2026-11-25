@@ -1,5 +1,5 @@
 // ONE-FORMAT OF19d2: a declared look whose recipe is `platform.rig` draws its body from the named scene model library's
-// rig (format 0.50.0, OF19d1), so a page needs no `species.program` feature to draw rigged bodies (Sunscar Dunes).
+// rig (format 0.50.0, OF19d1), so a page needs no species program to draw rigged bodies (Sunscar Dunes).
 import { expect, test } from 'vitest';
 import { parseRows } from '@wildshard/format/rows';
 import { RIG_LOOK_RECIPE } from '@wildshard/format/rigLooks';

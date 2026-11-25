@@ -62,7 +62,7 @@ test('made-up salt-marsh roster reserves and adopts a body without draws and res
   const reserved = roll('creature:0'), home = roll('creature:1');
   const population = readSpeciesPrograms({ page: [], native: [{ id: spec.kind, kind: spec.kind, label: 'Marsh Beast', tuning: FIXTURE_HUNT_TUNING,
     variants: [{ id: spec.variant, label: 'Reed', weight: 1, rarity: 'common', scale: [1, 2] }] }],
-    hunt: { limit: 8, player: 'host', fight: {}, bands: { states: [], legacyKinds: [] }, hit: { namespace: 'marsh', tags: [] } } });
+    hunt: { limit: 8, player: 'host', fight: {}, bands: { states: [] }, hit: { namespace: 'marsh', tags: [] } } });
   const rows = { version: 1, environment: 'fixture.habitat', step: 'marsh.roster', seed: 87, bodyCount: 1, limit: 8, scripted: 'sidestep', encounter: 'dusk.guard',
     poseKinds: [], fauna: [], spawn: { x: 0, z: 0 }, identities: [], ordinary: {},
     reserves: [{ kind: spec.kind, variant: spec.variant }], homes: [{ kind: spec.kind, variant: spec.variant, x: 8, z: 8, stream: 'marsh.guard' }] };
@@ -119,7 +119,7 @@ test('native shelter resolves its actual roster and weather without ports, prese
   const shelter = installNativeHerdShelter(host, [[0,0,1,8,1]], rows);
   try {
     expect(() => shelter.snapshot()).toThrow('Missing native population service');
-    const population = readSpeciesPrograms({ page: [], native: [], hunt: { limit: 8, player: 'host', fight: {}, bands: { states: [], legacyKinds: [] }, hit: { namespace: 'marsh', tags: [] } } });
+    const population = readSpeciesPrograms({ page: [], native: [], hunt: { limit: 8, player: 'host', fight: {}, bands: { states: [] }, hit: { namespace: 'marsh', tags: [] } } });
     const roster = installPopulationRoster(host, { population, bake: { actors: [], parked: [], herds: [] }, spawnY: 0, nav: null },
       { version: 1, environment: 'fixture.habitat', step: rows.roster, seed: 71, bodyCount: 0, limit: 8,
         scripted: 'sidestep', encounter: 'marsh', poseKinds: [], spawn: { x: 0, z: 0 }, fauna: [], identities: [], ordinary: {}, reserves: [], homes: [] });

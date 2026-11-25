@@ -7,7 +7,7 @@ import { HOMES_SYSTEM, PAGE_HOMES, admitClientPlan, pageHomes } from '../src/cli
 import { loadHeadlessFolder } from '../src/server/host/headlessFolder';
 import { pagePopulationRows } from '../src/shared/game/population/pageRows';
 import { builtFolder } from '../src/test/game/builtFolder';
-import type { ClientFeatureRow } from '@wildshard/format/clientPlan';
+import { parseClientPlan, type ClientFeatureRow } from '@wildshard/format/clientPlan';
 
 test('Dunes stands its page population as the engine\'s row', async () => {
   const product = await loadHeadlessFolder(builtFolder('sunscar-dunes')), plan = product.section('client/plan');
@@ -23,10 +23,7 @@ test('a plan naming the retired population.homes row is refused', () => {
 });
 
 test('a plan naming a species-program feature is refused (FORMAT-PRUNE FP20)', () => {
-  // A page's species are its declared rows and looks; no live pin names these kinds after Nalati r9
-  for (const kind of ['species.program', 'population.hull-book', 'population.product-creatures']) {
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- an older pin's row, which a later format may not type
-    const retired = { kind } as unknown as ClientFeatureRow;
-    expect(() => pageHomes([retired])).toThrow(`client/plan names ${kind}, retired (FORMAT-PRUNE FP20)`);
-  }
+  // A page's species are its declared rows and looks; the format deletes these kinds, so its parser refuses them
+  for (const kind of ['species.program', 'population.hull-book', 'population.product-creatures'])
+    expect(() => parseClientPlan({ version: 1, features: [{ kind }] })).toThrow();
 });

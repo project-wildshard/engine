@@ -379,13 +379,10 @@ export interface PageHomesRow {
 }
 /** FORMAT-PRUNE FP43: the retired format kind for a page's population; a plan that still names it is refused. */
 const RETIRED_HOMES = 'population.homes';
-/** FORMAT-PRUNE FP20: the species-program family's kinds (ONE-FORMAT OF30), which the format names until its delete; a plan
- *  that still names one is refused. A page's species are its declared rows and looks. */
-const RETIRED_SPECIES = ['species.program', 'population.hull-book', 'population.product-creatures'] as const;
-type RetiredKind = typeof RETIRED_HOMES | typeof RETIRED_SPECIES[number];
-/** An admitted format row: every kind but the retired ones (the page population is the plan's `pageHomes`). */
-export type AdmittedFeatureRow = Exclude<ClientFeatureRow, { kind: RetiredKind }>;
-function admittedRow(row: ClientFeatureRow): row is AdmittedFeatureRow { return (row.kind as string) !== RETIRED_HOMES && !(RETIRED_SPECIES as readonly string[]).includes(row.kind); }
+/** An admitted format row: every kind but the retired one (the page population is the plan's `pageHomes`). FORMAT-PRUNE
+ *  FP20: the species-program family's kinds are deleted from the format, so its parser refuses them. */
+export type AdmittedFeatureRow = Exclude<ClientFeatureRow, { kind: typeof RETIRED_HOMES }>;
+function admittedRow(row: ClientFeatureRow): row is AdmittedFeatureRow { return (row.kind as string) !== RETIRED_HOMES; }
 export interface AdmittedClientPlan { readonly features: readonly AdmittedFeatureRow[]; readonly pageHomes?: PageHomesRow }
 /** The page population's place among the play rows (after the boss it may keep, before the held boss) and its sections. */
 const PAGE_HOMES_STEP = { phase: 'play', rank: 60, lifetime: 'entered', sections: ['sim/runtime-plan', 'sim/scripts'] } as const;
@@ -416,8 +413,7 @@ export const HOMES_SYSTEM = 'engine.population.homes';
 export function pageHomes(features: readonly ClientFeatureRow[]): AdmittedClientPlan {
   const rows: AdmittedFeatureRow[] = [];
   for (const row of features) {
-    if ((row.kind as string) === RETIRED_HOMES) throw new Error(`client/plan names ${RETIRED_HOMES}, retired (FORMAT-PRUNE FP43): the engine stands a quest page's population from its declared files`);
-    if (!admittedRow(row)) throw new Error(`client/plan names ${row.kind}, retired (FORMAT-PRUNE FP20): a page's species are its declared rows and looks`);
+    if (!admittedRow(row)) throw new Error(`client/plan names ${RETIRED_HOMES}, retired (FORMAT-PRUNE FP43): the engine stands a quest page's population from its declared files`);
     rows.push(row);
   }
   return features.some(row => row.kind === 'quest.page') ? { features: rows, pageHomes: { kind: PAGE_HOMES, system: HOMES_SYSTEM, groups: {} } } : { features: rows };

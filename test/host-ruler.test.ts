@@ -177,7 +177,7 @@ describe('optional sub-rows (HR7, HA0 c)', () => {
   const c = folderRootModules('test/fixtures/host-ruler/option-c', { plan });
   const d = folderRootModules('test/fixtures/host-ruler/option-d', { plan });
   const modules = measure([c, d], reader);
-  // FORMAT-PRUNE FP20: species.program's catalogue was the table's one charged option; it is gone, so the charge is
+  // FORMAT-PRUNE FP20: the species program's catalogue was the table's one charged option; it is gone, so the charge is
   // proved on a binding both products' module carries but only one product's option would run.
   const charged = [{ kind: 'quest.composition', option: 'figures', bindings: ['src/client/game/shardfile/clientQuestComposition.ts#installEntryRangedPage'] }];
   const charges = optionCharges(modules, [c, d], reader, charged);
