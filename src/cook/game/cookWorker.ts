@@ -455,7 +455,9 @@ export const STORE_FULL_ALARM_MS = 86_400_000;
 /** A publish the pack budget refuses; `never` when the upload alone needs more than the whole budget. */
 class PackBudgetError extends Error {
   override readonly name = 'PackBudgetError';
-  constructor(message: string, readonly never: boolean) { super(message); }
+  readonly never: boolean;
+  // Node runs this file strip-only (scripts/cook-worker.mjs, the boundaries unit): no parameter properties.
+  constructor(message: string, never: boolean) { super(message); this.never = never; }
 }
 
 export interface CookWorker {

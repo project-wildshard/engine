@@ -145,7 +145,8 @@
     {
       // E405 AG5: the engine loads under node's default strip-only TypeScript (bakes, manifests, gen scripts import
       // #engine), which has no parameter properties: declare the field and assign it in the constructor.
-      "files": ["src/*/engine/**"],
+      // QA 11-24 row 62's red (fc0832b52): the cook runs strip-only too (scripts/cook-worker.mjs, the boundaries unit).
+      "files": ["src/*/engine/**", "src/cook/**"],
       "rules": { "typescript/parameter-properties": "error" }
     },
     {
