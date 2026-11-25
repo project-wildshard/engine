@@ -238,7 +238,7 @@ export function pushMain(cwd, remote = 'origin') {
   // lane's commit, made but not yet pushed; it rides along (M1) and the receipt names it.
   const sent = git(cwd, ['rev-parse', 'HEAD']);
   // Meta QA 11-25 row 37: an open engine land HOLD in the receipts stops every pusher but the lander it names.
-  const held = holdRefusal({ lane: currentLane(), bodies: run(cwd, ['log', '--format=%B', `refs/remotes/${remote}/main..${sent}`]).stdout });
+  const held = holdRefusal({ lane: currentLane() ?? 'main-push', bodies: run(cwd, ['log', '--format=%B', `refs/remotes/${remote}/main..${sent}`]).stdout });
   if (held !== null) { receipt(`main-push STOP ${held}`); throw new StopError(held); }
   const outgoing = run(cwd, ['log', '--format=%h %s', `refs/remotes/${remote}/main..${sent}`]).stdout.trim().split('\n').filter(Boolean);
   // The pre-push's whole output (the gate) goes to a log in the git dir: its RED lines are the cause on a refusal.
@@ -513,7 +513,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   try {
     checkState(cwd);
     // Row 37: under an open engine land HOLD nothing is committed, so no other lane's push carries it along (M1).
-    const held = options.files.length > 0 ? holdRefusal({ lane: currentLane(), bodies: options.messages.join('\n') }) : null;
+    const held = options.files.length > 0 ? holdRefusal({ lane: currentLane() ?? 'main-push', bodies: options.messages.join('\n') }) : null;
     if (held !== null) { receipt(`main-push STOP ${held}`); throw new StopError(held); }
     lock();
     const pending = heldCommits(cwd).filter(row => row.lane === currentLane());

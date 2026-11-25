@@ -64,8 +64,8 @@ export function holdRefusal({ lane, env = process.env, bodies, receipts = readRe
   const override = env[OVERRIDE] === '1';
   if (override && bodies.includes(OVERRIDE)) return null;
   const who = hold.landers.length > 0 ? `only ${hold.landers.join(', ')} land(s)` : 'nobody lands';
-  return `engine land HOLD open (${who}; lane ${lane} waits): ${hold.line.slice(0, 300)}. It lifts with a later `
-    + '`NOTE LIFT engine: <why>` or `main-watch main green` receipt; wait on the receipts in the background. '
-    + (override ? `${OVERRIDE}=1 is set but no outgoing commit body names it (J381): say why there.`
-      : `Override (J381): ${OVERRIDE}=1 and name it in the commit body.`);
+  const lifts = '`NOTE LIFT engine: <why>` or `main-watch main green`';
+  const how = override ? `${OVERRIDE}=1 is set but no outgoing commit body names it (J381): say why there.`
+    : `Override (J381): ${OVERRIDE}=1 and name it in the commit body.`;
+  return `engine land HOLD open (${who}; lane ${lane} waits): ${hold.line.slice(0, 300)}. It lifts with a later ${lifts} receipt; wait on the receipts in the background. ${how}`;
 }
