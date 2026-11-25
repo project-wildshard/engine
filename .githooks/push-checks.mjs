@@ -14,6 +14,7 @@ import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
 import {discoverLocalDeltaPlan,localDeltaPlan} from '../scripts/local-land-delta.mjs';
 import {fs27Plan,pinChanges,simRingSlugs} from '../scripts/push-path-edges.mjs';
 import {shardPinTests} from '../scripts/gate-related-tests.mjs';
+import {freshenPush} from '../scripts/typecheck-fresh.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
  * @param {NodeJS.ProcessEnv} [environment] */
@@ -241,6 +242,8 @@ async function main(){
     ],{env});
     console.error(`  - docs-only push lane ${result.ok?'green':'RED'} in ${result.seconds.toFixed(1)} s`);if(result.ok)record(result.seconds);process.exitCode=result.ok?0:1;return;
   }
+  // Meta QA 11-25 row 53: tsc -b trusts mtimes, and the cloned cache can predate a pushed file (5068a7365's red).
+  console.error(`  - ${freshenPush(split?planBaseRefs(env.WS_PUSH_REFS):env.WS_PUSH_REFS,process.cwd())}`);
   const generated=await parallelChecks([{name:'gen:inputs',commands:[['pnpm','run','--silent','gen:inputs']]}],{env});
   if(!generated.ok){process.exitCode=1;return;}
   if(selection.mode==='related'){
