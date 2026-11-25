@@ -13,6 +13,10 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.90 (2026-11-25)
+
+- The cook stays within its memory while it lists a large store, so new zone uploads keep cooking.
+
 ## v0.1.85 (2026-11-24)
 
 - The title screen answers ENTER ZONE at once, the zone picker swipes full screen, and an idle title hands over again.
