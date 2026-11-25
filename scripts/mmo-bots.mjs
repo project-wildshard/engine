@@ -19,6 +19,10 @@
 //     countdown; the fighter hurts a creature inside it, and each bot must come back to the new build within 2 m, keeping its lines.
 //     It reads the signed release file when the countdown is heard (the bots' preload) and staging's build after. It never asks
 //     for a release or a restart, and it builds once: the checkout may move during the hours it waits)
+//     Bots that must outlive the lane that starts them run detached: `nohup node scripts/mmo-bots.mjs staging --release-proof
+//     ... > tmp/<lane>/bots.log 2>&1 &` (or session-cleanup's --keep marker). The first ones (QA 11-24 row 5, 11-25) died with their lane's
+//     shell hours before the countdown, so --release-proof also ignores SIGHUP, runs its bots in their own process group and logs
+//     any signal or exit to run.log.
 //   node scripts/mmo-bots.mjs staging --tailnet ...   (NET-LAG NL3: the same, over staging's tailnet Serve address, no Cloudflare)
 // Both read the signed staging release file and check it against the public key setup.sh pins. The bots are built from that
 // release's own commit (its tree, an offline install, build-server's `--entry`), so their source and wire match the signed release's claim.
@@ -118,6 +122,12 @@ const stamp = new Date().toISOString().replaceAll(/[-:]/gu, '').replace(/\..*/u,
 mkdirSync(work, { recursive: true });
 /** @param {Record<string, unknown>} line */
 const note = line => { const text = JSON.stringify({ at: 'mmo-bots', ...line }); console.info(text); writeFileSync(join(work, 'run.log'), `${text}\n`, { flag: 'a' }); };
+// QA 11-24 row 5: a lane's shell exiting must not end hours of --release-proof; any signal or early exit is on the record.
+if (releaseProof) {
+  process.on('SIGHUP', () => { note({ step: 'signal', signal: 'SIGHUP', ignored: true }); });
+  for (const signal of /** @type {const} */ (['SIGTERM', 'SIGINT'])) process.once(signal, () => { note({ step: 'signal', signal }); process.exit(1); });
+  process.once('exit', code => { note({ step: 'exit', code }); });
+}
 
 // --- The release, as the VPS reads it: signed, pinned.
 const key = /^EXPECTED_RELEASE_PUBLIC_KEY=([0-9a-f]+)$/mu.exec(readFileSync(join(ROOT, 'scripts/vps/setup.sh'), 'utf8'))?.[1];
@@ -335,7 +345,7 @@ const askRestart = async () => {
 const code = await new Promise(resolve => {
   const child = botsOnHost && remote !== undefined
     ? spawn('ssh', ['-o', 'BatchMode=yes', ...ALIVE, remote, `cd ${away}/bots && exec taskset -c ${values['bot-cpus']} node "$HOME/${away}/bots/mmoBots.mjs" '${url}' ${botArgs.join(' ')} "$HOME/${away}/bots.json" forwarded`], { stdio: ['ignore', 'pipe', 'inherit'] })
-    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), url, ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : '', values.tailnet ? 'tailnet' : 'public'], { stdio: ['ignore', 'pipe', 'inherit'] });
+    : spawn(process.execPath, [join(out, 'mmoBots.mjs'), url, ...botArgs, result, mode === 'replica' ? 'forwarded' : 'own', values.spread ? values.cells : '', values.tailnet ? 'tailnet' : 'public'], { stdio: ['ignore', 'pipe', 'inherit'], detached: releaseProof });
   botsChild = child;
   let restart = Promise.resolve();
   // E7.4b.c: at this second, the helper either restarts the scratch cluster or arms a restart during a checkpoint.

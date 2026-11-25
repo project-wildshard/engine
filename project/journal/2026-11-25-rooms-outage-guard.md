@@ -44,3 +44,10 @@
   had indexed it) cooked 849 s ahead of 37 recooks; Brasscap r19, which staging QA needed, sat 33rd. The queue now
   takes an advertised head no build has indexed (a new pin), then advertised heads in catalogue order, then a bare upload
   notice no catalogue advertises, last.
+
+## Release-proof bots outlive their lane (QA 11-24 row 5)
+
+- opus-tail's three --release-proof bots held their seats to 12:20 UTC, then ended between 12:20 and 12:50 UTC with no
+  countdown, report or cleanup-log kill: most likely SIGHUP when opus-tail's shell exited at its 12:29 handoff. Now
+  --release-proof ignores SIGHUP, runs the bots in their own process group, logs any signal or exit to run.log, and the
+  usage says to start it under `nohup` (macOS has no setsid).

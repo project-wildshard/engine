@@ -207,3 +207,13 @@ test('MMO-SERVER E7.4b.c: scratch saves only on the box replica, and one restart
   expect(driver).toContain("'sudo -n /usr/local/sbin/wildshard-config replica pg-restart'");
   expect(driver).toContain(' --saves ${boxSaves}');
 });
+
+// QA 11-24 row 5 (11-25): the first release-proof bots died with their lane's shell between 12:20 and 12:50 UTC, before the
+// countdown they waited hours for, with nothing on the record. They now ignore SIGHUP, sit in their own process group and log
+// any signal or exit; the usage says to start them detached.
+test('release-proof bots outlive the lane shell that started them and record any signal', () => {
+  expect(driver).toMatch(/if \(releaseProof\) \{\n  process\.on\('SIGHUP'/u);
+  expect(driver).toContain("process.once('exit', code => { note({ step: 'exit', code }); });");
+  expect(driver).toContain("{ stdio: ['ignore', 'pipe', 'inherit'], detached: releaseProof }");
+  expect(driver).toContain('nohup node scripts/mmo-bots.mjs staging --release-proof');
+});
