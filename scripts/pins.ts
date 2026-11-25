@@ -141,32 +141,37 @@ async function fetched(url: string, slug: string, hash: string, options?: Reques
 }
 
 /** `fetched`, saying whether a miss may pass: no response, a 5xx, or a body cut short. A 4xx is a definite miss. */
-async function fetchedOnce(url: string, slug: string, hash: string, options?: RequestInit): Promise<{ readonly bytes?: Uint8Array; readonly transient: boolean }> {
+async function fetchedOnce(url: string, slug: string, hash: string, options?: RequestInit): Promise<{ readonly bytes?: Uint8Array; readonly transient: boolean; readonly status: string }> {
   const response = await fetch(url, options).catch(() => undefined);
-  if (response === undefined) return { transient: true };
-  if (!response.ok) return { transient: response.status >= 500 };
+  if (response === undefined) return { transient: true, status: 'no response' };
+  if (!response.ok) return { transient: response.status >= 500, status: String(response.status) };
   // A connection can close after headers, before the immutable body is complete.
   const body = await response.arrayBuffer().catch(() => {
     console.warn(`${slug}: could not finish reading a pin source`);
     return undefined;
   });
-  if (body === undefined) return { transient: true };
+  if (body === undefined) return { transient: true, status: 'body cut short' };
   const bytes = new Uint8Array(body);
   if (sha256(bytes) !== hash) throw new Error(`${slug}: ${url} is not the pin`);
-  return { bytes, transient: false };
+  return { bytes, transient: false, status: String(response.status) };
 }
 
-/** `fetched`, tried again after 1 s and 3 s when the miss may pass (no response, a 5xx, a cut body): one API blip must not
- *  leave a pin with no source (main red 45404606407). A 404 is a definite miss and returns at once (main red 45415377451,
- *  the slice-rebuild test waited out the backoff). */
-async function fetchedRetrying(url: string, slug: string, hash: string): Promise<Uint8Array | undefined> {
-  for (const wait of [1000, 3000, 0]) {
-    const { bytes, transient } = await fetchedOnce(url, slug, hash);
-    if (bytes !== undefined || !transient || wait === 0) return bytes;
-    console.warn(`${slug}: ${url} held no bytes for now; trying again in ${wait / 1000} s`);
+/** Meta QA 11-25 row 39 (J505): the base of the retry waits, so a miss that may pass gets 3 tries over about 30 s. */
+const RETRY_MS = Number(process.env.WILDSHARD_PIN_RETRY_MS ?? '5000');
+/** `fetched`, tried again after RETRY_MS and 4 x RETRY_MS when the miss may pass (no response, a 5xx, a cut body): one
+ *  blip must not leave a pin with no source (main red 45404606407; a mirror 503 on 11-25). A 404 is a definite miss and
+ *  returns at once (main red 45415377451, the slice-rebuild test waited out the backoff). `miss` names the URL and why.
+ *  @returns the bytes, or what was tried */
+async function fetchedRetrying(url: string, slug: string, hash: string): Promise<{ readonly bytes?: Uint8Array; readonly miss: string }> {
+  const waits = [RETRY_MS, 4 * RETRY_MS, 0];
+  for (const [attempt, wait] of waits.entries()) {
+    const { bytes, transient, status: answer } = await fetchedOnce(url, slug, hash);
+    if (bytes !== undefined) return { bytes, miss: '' };
+    if (!transient || wait === 0) return { miss: `${url} (${answer}${attempt > 0 ? ` after ${String(attempt + 1)} tries` : ''})` };
+    console.warn(`${slug}: ${url} answered ${answer}; trying again in ${String(wait / 1000)} s`);
     await sleep(wait);
   }
-  return undefined;
+  return { miss: url };
 }
 
 /** The tarball's bytes, proved against the pin. fetch follows the 302 to R2 and decodes the stored Brotli. */
@@ -177,7 +182,10 @@ async function tarball({ slug, hash }: Pick<Pin, 'slug' | 'hash'>, apiHolds = tr
     if (sha256(bytes) === hash) return bytes;
     rmSync(file);
   }
-  let bytes = await fetched(`${MIRROR}/${hash}.tar`, slug, hash) ?? (apiHolds ? await fetchedRetrying(`${API}/api/shardfiles/${hash}`, slug, hash) : undefined);
+  // The mirror first (a 5xx tries again), then on any miss the API, which a mirror 404 falls back to (QA 11-25 row 39).
+  const mirror = await fetchedRetrying(`${MIRROR}/${hash}.tar`, slug, hash);
+  const api = mirror.bytes !== undefined || !apiHolds ? undefined : await fetchedRetrying(`${API}/api/shardfiles/${hash}`, slug, hash);
+  let bytes = mirror.bytes ?? api?.bytes;
   if (bytes === undefined && !apiHolds) {
     const row = (readJson(SLICES) as {slices: readonly Slice[]}).slices.find(candidate => candidate.slug === slug && candidate.hash === hash);
     const parent = (readJson(PINS) as PinFile).shards.find(pin => pin.slug === slug);
@@ -187,7 +195,7 @@ async function tarball({ slug, hash }: Pick<Pin, 'slug' | 'hash'>, apiHolds = tr
     bytes = rebuilt.bytes;
     console.log(`${slug}: reconstructed pinned server slice from its verified head`);
   }
-  if (bytes === undefined) throw new Error(`${slug}: neither the mirror nor the API holds ${hash}`);
+  if (bytes === undefined) throw new Error(`${slug}: neither the mirror nor the API holds ${hash}: could not fetch ${[mirror.miss, api?.miss].filter(Boolean).join(', then ')}`);
   mkdirSync(CACHE, { recursive: true });
   const part = `${file}.${process.pid}`;
   writeFileSync(part, bytes);
