@@ -125,15 +125,15 @@ export function partialSelection(root, files) {
     if (total + size > MAX_UNTRACKED_BYTES) break;
     kept.add(file); total += size;
   }
-  return { kept: [...kept].sort(), skipped: sized.filter(({ file }) => !kept.has(file)) };
+  return { kept: [...kept].sort((left, right) => left.localeCompare(right)), skipped: sized.filter(({ file }) => !kept.has(file)) };
 }
 
 /** keepCopy over the cap: the partial copy is written and named, and removal stays refused (J358 fails closed). */
-export class PartialKeepCopy extends Error {
+export class PartialKeepCopyError extends Error {
   /** @param {string} dir @param {object} manifest @param {string} message */
   constructor(dir, manifest, message) {
     super(message);
-    this.name = 'PartialKeepCopy';
+    this.name = 'PartialKeepCopyError';
     this.keepDir = dir;
     this.manifest = manifest;
   }
@@ -164,7 +164,7 @@ export function worktreeState(root, { regenerableFiles = new Set() } = {}) {
 
 /** Copy recoverable Git worktree state. It never deletes or mutates `path`.
  * Over the 50 MiB cap it still writes the unpushed commits (a bundle), the patches and the small source and scripts,
- * lists the rest in SKIPPED.txt, then throws PartialKeepCopy naming that copy, so removal stays refused.
+ * lists the rest in SKIPPED.txt, then throws PartialKeepCopyError naming that copy, so removal stays refused.
  * Caller-verified regenerableFiles are exact paths, never directory prefixes.
  * @param {string} path @param {{keepRoot?: string, now?: Date, regenerableFiles?:ReadonlySet<string>}} [options] */
 export function keepCopy(path, { keepRoot = DEFAULT_KEEP_ROOT, now = new Date(), regenerableFiles = new Set() } = {}) {
@@ -207,7 +207,7 @@ export function keepCopy(path, { keepRoot = DEFAULT_KEEP_ROOT, now = new Date(),
   writeFileSync(join(dir, 'MANIFEST.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   if (manifest.partial) {
     const mib = (/** @type {number} */ n) => `${(n / 1024 / 1024).toFixed(1)} MiB`;
-    throw new PartialKeepCopy(dir, manifest, `keep-copy: ${root} holds ${mib(total)} of recoverable files, over the 50 MiB cap; `
+    throw new PartialKeepCopyError(dir, manifest, `keep-copy: ${root} holds ${mib(total)} of recoverable files, over the 50 MiB cap; `
       + `partial copy saved at ${dir} (${manifest.bundle ? 'unpushed commits bundled, ' : ''}${manifest.patch ? 'tracked patch, ' : ''}`
       + `${split.kept.length} source and script file(s)); ${manifest.partial.skippedFiles} file(s), ${mib(manifest.partial.skippedBytes)}, not copied: `
       + `listed in ${join(dir, 'SKIPPED.txt')}. Removal refused: inspect those, then remove by hand and receipt it`);
@@ -242,8 +242,8 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     process.stdout.write(`${result.dir}\n`);
   } catch (error) {
     // Exit 2: a partial copy is written and named, and removal stays refused. Exit 1: nothing was saved.
-    if (error instanceof PartialKeepCopy) process.stdout.write(`${error.keepDir}\n`);
+    if (error instanceof PartialKeepCopyError) process.stdout.write(`${error.keepDir}\n`);
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = error instanceof PartialKeepCopy ? 2 : 1;
+    process.exitCode = error instanceof PartialKeepCopyError ? 2 : 1;
   }
 }

@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {closeSync,existsSync,ftruncateSync,mkdirSync,mkdtempSync,openSync,readFileSync,rmSync,writeFileSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
 import {afterEach,expect,test} from 'vitest';
-import {keepCopy,partialSelection,PartialKeepCopy,worktreeState} from '../../scripts/keep-copy.mjs';
+import {keepCopy,partialSelection,PartialKeepCopyError,worktreeState} from '../../scripts/keep-copy.mjs';
 
 const KEEP_COPY=resolve('scripts/keep-copy.mjs');
 const roots=[];
@@ -67,13 +67,13 @@ test('over the cap: the unpushed commit and the script survive, the copy is name
  expect(git(tree,'rev-parse','HEAD')).toBe(head);
 });
 
-test('the API throws PartialKeepCopy after writing; the over-cap snapshot is cheap and still sees edits',()=>{
+test('the API throws PartialKeepCopyError after writing; the over-cap snapshot is cheap and still sees edits',()=>{
  const {tree,keep}=overCap();
  const before=worktreeState(tree);
  expect(JSON.parse(before)[0]).toBe('over-cap');
  let thrown;
  try{keepCopy(tree,{keepRoot:keep});}catch(error){thrown=error;}
- expect(thrown).toBeInstanceOf(PartialKeepCopy);
+ expect(thrown).toBeInstanceOf(PartialKeepCopyError);
  expect(existsSync(join(thrown.keepDir,'untracked.tgz'))).toBe(true);
  expect(worktreeState(tree)).toBe(before);
  put(tree,SCRIPT,'export const update = "edited";\n');
