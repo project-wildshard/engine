@@ -679,6 +679,22 @@ export type ShardManifestRows = Omit<ShardManifest, 'scalarBlocks' | 'load' | 'r
   readonly forestRows?: unknown;
   readonly mapGroundSamples?: ScalarTripletRows;
 };
+/**
+ * A level audio row that names the folder catalogue (`catalogue: true`) plays its product's own audio rows: its preload and
+ * its boot inventory read the folder (`audioCatalogue.ts`), and the word itself goes. The discovery reader binds it here,
+ * and so does a declared page whose product carries `audio.level` over a discovery with no audio (FORMAT-PRUNE FP54: a
+ * 0.1.0.6 Pine kept `catalogue: true` with no preload, so no mixer was built before kit's audio entry).
+ */
+export function bindAudioCatalogue(slug: string, audio: NonNullable<ShardManifest['audio']> & { catalogue?: boolean }, boot: BootSpec | undefined): { audio: NonNullable<ShardManifest['audio']>; boot: BootSpec | undefined } {
+  if (audio.catalogue === undefined) return { audio, boot };
+  const { catalogue, ...audioData } = audio, preload = audio.preload ?? (catalogue ? async () => {
+    const { folderAudioCatalogue } = await import('../shardfile/audioCatalogue'); return folderAudioCatalogue(slug);
+  } : undefined);
+  return { audio: { ...audioData, ...(preload === undefined ? {} : { preload }) },
+    boot: catalogue && boot !== undefined && boot.audio === undefined ? { ...boot, audio: async () => {
+      const { folderAudioFiles } = await import('../shardfile/audioCatalogue'); return folderAudioFiles(slug);
+    } } : boot };
+}
 /** Resolve admitted raster recipes in their original order, copied boot poses and entry metadata.
  * Native callbacks remain explicit bindings; declared tree/audio choices use existing product loaders. */
 export function defineShard(rows: ShardManifestRows,
@@ -705,15 +721,7 @@ export function defineShard(rows: ShardManifestRows,
     mapData = mapGroundSamples === undefined ? undefined : v.parse(ScalarTripletSchema,mapGroundSamples),
     forestCandidates = forestRows === undefined ? undefined : v.parse(ForestRowsSchema,forestRows);
   let audio = data.audio,boot = data.boot;
-  if (audio?.catalogue !== undefined) {
-    const { catalogue,...audioData } = audio,preload = audio.preload ?? (catalogue ? async () => {
-      const { folderAudioCatalogue } = await import('../shardfile/audioCatalogue');return folderAudioCatalogue(data.slug);
-    } : undefined);
-    audio = { ...audioData,...(preload === undefined ? {} : { preload }) };
-    if (catalogue && boot !== undefined && boot.audio === undefined) boot = { ...boot,audio: async () => {
-      const { folderAudioFiles } = await import('../shardfile/audioCatalogue');return folderAudioFiles(data.slug);
-    } };
-  }
+  if (audio !== undefined) ({ audio, boot } = bindAudioCatalogue(data.slug, audio, boot));
   const trees: ChunkTrees = data.trees.factory === 'declared' ? { ...data.trees,factory: declaredTreeSet(data.slug) } : data.trees;
   // Retain the original binding order after every referenced shape/count admits.
   const forestMask = forestData === undefined ? undefined : typeof forestData.values.data==='string'?readScalarLattice(forestData):scalarBlocks.lattice(forestData),

@@ -31,7 +31,7 @@ import { folderPaintedLook } from '../looks/paintedLook';
 import { emptyLook } from './emptyLook';
 import { shardfileLook } from './look';
 import { declaredLook, withoutHorizon } from './declaredLook';
-import { declaredStart } from './declaredStart';
+import { catalogueBound, declaredStart, productStart } from './declaredStart';
 import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
 import { admitFolder, readFolderInput, readFolderDescriptor, type AdmittedFolder, type FolderOptions } from './folder';
 import { manifestReader, provideManifestAdmission } from './runtimeFolder';
@@ -213,9 +213,12 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
       const { clientPlanRuntime: _entry, load: _planEntry, ...data } = manifest;
       return installManifestShardfile(data, providedOptions, bindings, prepared);
     }
-    if (!isBuildValidatedOutput(source)) return manifest;
-    const ground = tiledBootstrapGround(manifest.ground, source.props, source.runtime.binds ?? []);
-    return ground === manifest.ground ? manifest : selectSource({ ...manifest, ground });
+    // FORMAT-PRUNE FP54: a runtime page's start (spawn, loadout, audio) is its product's too, as a declared page's below: a
+    // discovery built since OF9b5 carries none, so Pine 0.1.0.6 entered with no audio catalogue and kit's audio entry found no mixer
+    const started = productStart(manifest, source);
+    if (!isBuildValidatedOutput(source)) return selectSource(started);
+    const ground = tiledBootstrapGround(started.ground, source.props, source.runtime.binds ?? []);
+    return selectSource(ground === started.ground ? started : { ...started, ground });
   }
   const url = new URL(manifest.shardfile, options.base);
   if (url.origin !== new URL(options.base).origin || url.search !== '' || url.hash !== '') throw new Error('Manifest shardfile must be an unqualified same-origin source');
@@ -239,7 +242,7 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
   const { image: _unadmittedImage, ...mapLook } = manifest.minimap ?? {};
   // Built-in declared pages keep their authored scalar level presentation and boot inventory.
   // The admitted client owns ground, navigation and all executable stages; no shard loader survives.
-  const page: ShardManifest = hasDeclaredClientPage(source) ? { ...withoutHorizon(manifest),
+  const page: ShardManifest = hasDeclaredClientPage(source) ? catalogueBound({ ...withoutHorizon(manifest),
     // ONE-FORMAT OF7, OF9b2: look/look's level look (sky, atmosphere, grade, horizon) and its declared light and bloom
     // over the manifest's (declaredLook.ts)
     ...declaredLook(manifest, source, lookLightOn(), TIER),
@@ -250,7 +253,7 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     ...(client.navigation === undefined ? {} : { navigation: client.navigation }),
     ...(client.render === undefined ? {} : { render: client.render }),
     ...(client.load === undefined ? {} : { load: client.load }),
-  } : client;
+  }) : client;
   const installed = { ...page,
     // Explicit scene features retain the counted built-in catalogue.
     ...(sceneAudio && manifest.audio?.preload !== undefined ? { audio: manifest.audio } : {}),
