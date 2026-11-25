@@ -6,3 +6,6 @@
 - v0.1.88's staging checks passed through that hour because every release gate reads the tailnet. A staging or
   production release now reads both public /up URLs before the check, after the cook and harden, and after the alias,
   and stops on anything but 200; ALLOW_ROOMS_DOWN=1 is the escape for a release that fixes an outage (J381).
+- test/vps-harden.test.ts renders each drop-in harden-apply.sh writes (server, cook, Caddy), applies its SystemCallFilter
+  lines in systemd's order, and holds every syscall group the service is known to call allowed (CALLS; Caddy's @chown for
+  the log roll). A new call goes into CALLS, so the filter changes before a box kills the service.

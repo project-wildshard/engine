@@ -253,15 +253,59 @@ test('every step harden-apply.sh runs directly is executable in git', () => {
   expect(modes.filter(line => !line.startsWith('100755 ')), 'git update-index --chmod=+x').toEqual([]);
 });
 
-// QA 11-25 row 31: Caddy's access log rolled at 50 MiB, lumberjack's roll and gzip chown the new file, and the sandbox's
-// `~@privileged` (which holds @chown) killed Caddy with SIGSYS: both rooms hosts 521 for about an hour. Caddy's drop-in
-// allows @chown back, after the line that takes it away (systemd applies SystemCallFilter lines in order).
-test('Caddy keeps @chown so its log can roll', () => {
+// QA 11-25 row 31 and FAST-RELEASE FR-A15: Caddy's access log rolled at 50 MiB, lumberjack's roll and gzip chown the new
+// file, and the shared sandbox's `~@privileged` (which holds @chown) killed Caddy with SIGSYS: both rooms hosts 521 for
+// about an hour. Each unit's drop-in is rendered from harden-apply.sh and its SystemCallFilter lines applied in order, as
+// systemd does (a plain line allows, a `~` line takes away), and every syscall group the service is known to call must be
+// left allowed. A service that starts calling something new adds it to CALLS, and the filter is fixed before a box is.
+const SYSTEMD_GROUPS: Record<string, string[]> = {
+  '@system-service': ['@aio', '@basic-io', '@chown', '@default', '@file-system', '@io-event', '@ipc', '@keyring', '@memlock',
+    '@network-io', '@process', '@resources', '@setuid', '@signal', '@sync', '@timer'],
+  '@privileged': ['@chown', '@clock', '@module', '@raw-io', '@reboot', '@swap'],
+};
+const CALLS: Record<string, string[]> = {
+  // lumberjack's log roll and its gzip chown the new file (Caddyfile `roll_size 50MiB`, harden-caddy.sh).
+  caddy: ['@chown', '@network-io', '@file-system', '@io-event'],
+  'wildshard-cook': ['@network-io', '@file-system', '@process', '@io-event'],
+  'wildshard-server@': ['@network-io', '@file-system', '@process', '@io-event'],
+};
+
+/** The unit's drop-in as harden-apply.sh writes it, with its `$sandbox` lines expanded. */
+function dropIn(apply: string, sandbox: string[], unit: string): string[] {
+  const start = apply.indexOf(`/etc/systemd/system/${unit}.service.d/90-harden.conf`);
+  expect(start, unit).toBeGreaterThan(-1);
+  const body = apply.slice(apply.indexOf('<<EOF\n', start) + 6, apply.indexOf('\nEOF\n', start)).split('\n');
+  return body.flatMap(line => {
+    if (line === '$sandbox') return sandbox;
+    const filtered = /^\$\(printf '%s\\n' "\$sandbox" \| grep -E?v '\^\(?([^)']+?)\)?='\)$/u.exec(line);
+    if (filtered === null) return [line];
+    const names = new Set(filtered[1].split('|'));
+    return sandbox.filter(row => !names.has(row.slice(0, row.indexOf('='))));
+  });
+}
+
+/** The syscall groups a drop-in's SystemCallFilter lines leave allowed, applied in order. */
+function allowed(lines: string[]): Set<string> {
+  const groups = new Set<string>();
+  for (const line of lines.filter(row => row.startsWith('SystemCallFilter='))) {
+    const value = line.slice('SystemCallFilter='.length), deny = value.startsWith('~');
+    for (const name of value.replace(/^~/u, '').split(/\s+/u).filter(Boolean)) {
+      for (const group of [name, ...(SYSTEMD_GROUPS[name] ?? [])]) deny ? groups.delete(group) : groups.add(group);
+    }
+  }
+  return groups;
+}
+
+test('each harden drop-in leaves every syscall group its service calls allowed (Caddy keeps @chown)', () => {
   const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
-  const start = apply.indexOf('caddy.service.d/90-harden.conf'), unit = apply.slice(start, apply.indexOf('\nEOF\n', start));
-  expect(unit).toContain('\nSystemCallFilter=@chown\n');
-  // The shared sandbox (which denies @privileged) is printed into the unit first, so the allow line comes after it.
-  expect(unit.indexOf('"$sandbox"')).toBeGreaterThan(-1);
-  expect(unit.indexOf('"$sandbox"')).toBeLessThan(unit.indexOf('SystemCallFilter=@chown'));
-  expect(apply).toContain('SystemCallFilter=~@privileged @resources');
+  const open = apply.indexOf("sandbox='") + "sandbox='".length, sandbox = apply.slice(open, apply.indexOf("'\n", open)).split('\n');
+  expect(sandbox).toContain('SystemCallFilter=~@privileged @resources');
+  for (const [unit, calls] of Object.entries(CALLS)) {
+    const lines = dropIn(apply, sandbox, unit), groups = allowed(lines);
+    expect(lines.filter(line => line.startsWith('SystemCallFilter=')).length, unit).toBeGreaterThan(0);
+    expect(calls.filter(group => !groups.has(group)), `${unit} would be killed (SIGSYS) calling these`).toEqual([]);
+  }
+  // The check bites: without its allow line, Caddy's drop-in loses @chown again.
+  const bare = dropIn(apply, sandbox, 'caddy').filter(line => line !== 'SystemCallFilter=@chown');
+  expect(allowed(bare).has('@chown')).toBe(false);
 });
