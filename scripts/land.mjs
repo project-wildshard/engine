@@ -395,6 +395,9 @@ class Landing{
  /** Rebase onto origin/main; a conflict aborts and stops with the paths.
   * @param {string} main */
  rebase(main){
+  // FORMAT-PRUNE FP54's land (opus-fp54, 11-25): an edit made while the gate ran left the tree dirty, the race round's rebase
+  // refused it, and the stop said only "(none reported)"; the same clean check as before the gate names each path first
+  this.preflight(`before rebasing onto main ${short(main)}`);
   const before=this.head();
   const result=tryGit(this.root,['-c','rebase.autoStash=false','-c','rebase.updateRefs=false','rebase','--quiet',main]);
   if(result.status===0){

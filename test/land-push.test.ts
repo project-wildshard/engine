@@ -44,6 +44,23 @@ describe('land (J422): push mode', () => {
     expect(prepushLines(f).every(line => line.includes('land=push:'))).toBe(true);
   }, 60_000);
 
+  test('an edit made while the gate runs stops the race round naming it, not a bare rebase failure', () => {
+    const f = fixture();
+    f.env['WS_LAND_MODE'] = 'push';
+    const wt = f.worktree('dirty-race');
+    const tip = f.commit(wt, 'src/race.ts', 'export const race = 1;', 'feat: race');
+    const peer = readFileSync(f.peerScript('src/peer.ts', null, 'export const peer = 1;'), 'utf8');
+    writeFileSync(f.files.raceScript, `${peer}\nprintf 'export const race = 2;\\n' > '${wt}/src/race.ts'\n`);
+    writeFileSync(f.files.race, '');
+    const result = f.land(wt, []);
+    expect(result.status, result.stdout + result.stderr).toBe(1);
+    expect(result.stdout).toMatch(/land STOP .*not clean before rebasing onto main/u);
+    expect(result.stdout).toMatch(/ M src\/race\.ts: uncommitted change/u);
+    expect(result.stdout).not.toContain('none reported');
+    expect(f.git(wt, ['rev-parse', 'HEAD'])).toBe(tip);
+    expect(readFileSync(`${wt}/src/race.ts`, 'utf8')).toBe('export const race = 2;\n');
+  }, 60_000);
+
   test('--done removes the worktree after the last row', () => {
     const f = fixture();
     f.env['WS_LAND_MODE'] = 'push';
