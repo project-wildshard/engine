@@ -42,6 +42,8 @@ import { build } from 'vite';
 import { saveFixture } from './debug-settings.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
 import { agentUrl, agentUserAgent } from './agent-marker.mjs';
+// QA 11-24 row 65: the staging page's Cloudflare analytics beacon is not ours to judge (the staging smoke's one rule)
+import { isThirdPartyBeacon } from './staging-smoke/thirdParty.mjs';
 
 /** @param {string} key @param {string} fallback */
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;
@@ -150,7 +152,10 @@ function union(dev) {
   step('boss bar', () => show('.ws-boss-bar'));
   step('elite banner', () => show('.ws-elite-banner'));
   // the online page's chat row, its mic, the players on voice and four lines
-  step('chat + voice', () => { page.__hudWorstChat([['Maren', 'anyone at the pier?'], ['You', 'on my way'], ['Kai', 'boss is up at the shrine, bring the sword'], ['Maren', 'ok']], 'on', ['Maren', 'Kai', 'Tomo']); });
+  // QA 11-24 row 65: a staging page already draws its own chat row; a second injected one beside it fails the union check on
+  // the tool's own row (voice tip over a touch control, the mic covered), so the page's real row is shot instead
+  if (document.getElementById('ws-chat') !== null) on.push('chat + voice (the page\'s own row)');
+  else step('chat + voice', () => { page.__hudWorstChat([['Maren', 'anyone at the pier?'], ['You', 'on my way'], ['Kai', 'boss is up at the shrine, bring the sword'], ['Maren', 'ok']], 'on', ['Maren', 'Kai', 'Tomo']); });
   if (dev) {
     if (document.querySelector('.ws-touch-boost') !== null) step('dev: BOOST (a build before QA row 42)', () => show('.ws-touch-boost'));
     step('dev: alert', () => { H.devAlert('quest/fire.ts disabled: TypeError: castaway.flags is undefined'); });
@@ -393,14 +398,14 @@ for (const kind of browsers) {
         // other request, a redirect included, fails the case. Watched, not intercepted: WebKit's request interception stalls
         // the build's pack downloads (the Driftwood page never reached play under it, before and after A14 alike)
         /** @type {string[]} */ const refused = [];
-        context.on('request', request => { const url = new URL(request.url()); if (/^https?:$/u.test(url.protocol) && !OURS.test(url.hostname)) refused.push(url.origin); });
+        context.on('request', request => { const url = new URL(request.url()); if (/^https?:$/u.test(url.protocol) && !OURS.test(url.hostname) && !isThirdPartyBeacon(url.href)) refused.push(url.origin); });
         try {
           // the grid card waits behind the first-visit name prompt ("What should we call you?") until it is answered
           await saveFixture(context, { scope: 'device', key: 'nameAsked', data: true });
           if (dev) { await saveFixture(context, { scope: 'device', key: 'devMode', data: true }); await saveFixture(context, { scope: 'device', key: 'debug.workerClient', data: 'on' }); }
           const page = await context.newPage();
           /** @type {string[]} */ const errors = [];
-          page.on('pageerror', error => { errors.push(error.message.slice(0, 160)); });
+          page.on('pageerror', error => { if (!isThirdPartyBeacon(error.message)) errors.push(error.message.slice(0, 160)); });
           if (!await enter(page, dev)) {
             const file = join(out, `${name}.png`);
             await page.screenshot({ path: file }); written.push(file);
