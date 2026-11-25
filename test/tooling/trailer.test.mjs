@@ -1,9 +1,10 @@
 // meta ALPHA-2-TRAILER AT1: the trailer's shots are data keyed by zone slug (scripts/trailer/shots/lib.mjs). A shot file loads
 // against the live grid's slugs (test/pins/staging.json, J507), and an unknown slug, a bad light or a broken rig is refused.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
+import { partSource } from '../../scripts/trailer/edit.mjs';
 import { bootGroups, bootUrl, gridZones, loadShots, refuseShot } from '../../scripts/trailer/shots/lib.mjs';
 
 const scratch = mkdtempSync(join(tmpdir(), 'trailer-shots-'));
@@ -209,4 +210,13 @@ test('the alpha 2 cut is about a minute and lands its last hit on the pull-back'
   expect(titles.map((t) => t.card)).toEqual(expect.arrayContaining(['alpha', 'shard', 'bigcap', 'endA']));
   expect(mix.length).toBe(edl.length);
   expect(() => cut({ TAKE: 't.wav', SFX: 'sfx' })).toThrow(/--build-1/u);
+});
+
+test('a conformed part is reused only from the frames it was made from', () => {
+  const a = join(scratch, 'frames-a'), b = join(scratch, 'frames-b');
+  for (const dir of [a, b]) { mkdirSync(join(dir, 'n-run'), { recursive: true }); writeFileSync(join(dir, 'n-run', 'meta.json'), '{}'); }
+  expect(partSource(a, { shot: 'n-run' })).not.toBe(partSource(b, { shot: 'n-run' }));
+  expect(partSource(a, { shot: 'n-run' })).toBe(partSource(a, { shot: 'n-run' }));
+  expect(partSource(a, { shot: 'build', video: 'x.mp4' })).toBeNull();
+  expect(partSource(a, { shot: 'black' })).toBeNull();
 });

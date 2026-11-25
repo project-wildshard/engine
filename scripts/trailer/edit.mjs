@@ -12,7 +12,7 @@
 // times, a vignette and fine grain under the type, edl.overlays (a corner bug) over a span, and the final H.264 High 1080p60
 // (CRF 14, ~30 Mb/s) with 320 kb/s AAC.
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 
 export const FPS = 60;
 // finishing grades: small moves that seat each zone's own look in one film (eq in gamma space, a whisper of split-tone).
@@ -50,6 +50,14 @@ export function clipFilter(c, meta, [W, H]) {
   ].filter(Boolean).join(',');
 }
 
+/** What a captured clip's part was made from (null: a video, still or black part, made fresh each time): the frames folder
+ * and its capture's meta.json time. A part is reused only when its .src matches (11-25: a re-capture into a new folder
+ * reused the old capture's parts, and the master showed the old shots). @param {string} FR @param {any} c */
+export function partSource(FR, c) {
+  if (c.video || c.still || c.shot === 'black') return null;
+  return `${FR}/${c.shot} ${String(statSync(`${FR}/${c.shot}/meta.json`).mtimeMs)}`;
+}
+
 /** @param {string[]} argv */
 export function main(argv) {
   const [FR, EDL, TITLES, MIX, OUT] = argv;
@@ -68,7 +76,8 @@ export function main(argv) {
     const out = `${TMP}/${String(k).padStart(2, '0')}-${c.shot}.mkv`;
     parts.push(out);
     const frames = clipFrames(c);
-    if (existsSync(out) && !edl.rebuild && !c.video && !c.still && c.shot !== 'black') return;
+    const src = partSource(FR, c);
+    if (src !== null && existsSync(out) && !edl.rebuild && existsSync(`${out}.src`) && readFileSync(`${out}.src`, 'utf8') === src) return;
     if (c.shot === 'black') {
       ff(['-f', 'lavfi', '-i', `color=c=black:s=${W}x${H}:r=${FPS}`, '-frames:v', String(frames), '-vf', 'format=yuv444p', '-c:v', 'libx264', '-qp', '4', '-pix_fmt', 'yuv444p', out]);
       return;
@@ -94,6 +103,7 @@ export function main(argv) {
     // -frames:v is an OUTPUT limit (after -i): the clip's 60 fps frame count, not its sub-frames
     ff(['-framerate', String(FPS * meta.sub), '-start_number', String(start), '-i', `${dir}/%06d.jpg`, '-frames:v', String(frames),
       '-vf', clipFilter(c, meta, size), '-r', String(FPS), '-c:v', 'libx264', '-preset', 'medium', '-qp', '4', '-pix_fmt', 'yuv444p', out]);
+    if (src !== null) writeFileSync(`${out}.src`, src);
     console.log(`[edit] ${c.shot} ${c.in}+${c.dur}s`);
   });
 
