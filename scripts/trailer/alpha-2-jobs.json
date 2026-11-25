@@ -1,0 +1,16 @@
+{
+  "_doc": "meta ALPHA-2-TRAILER AT8: the alpha 2 trailer's score (J520: indie folk that builds to a full band at the grid pull-back). ~/ml/music/minimax-music3/.venv/bin/python <sharddev>/packages/sdk/scripts/music/gen/gen_minimax.py --jobs <this file> --keys trailer/alpha-2 --seeds 501,502 --out <scratch>/score, under lockf -k ~/projects/localai/.model.lock; music_scan.py picks the take by its loudness shape and gives the cut its hits. One cue: a guitar from the first frame under gameplay, a soft lift at the title card, a folk band growing through play and build, a breath, then the full band as the camera rises over the grid, one final hit under the end card and a ringing tail.",
+  "lyrics": {
+    "trailer": "[Intro]\n[Instrumental]\n[Verse]\n[Instrumental]\n[Build]\n[Instrumental]\n[Break]\n[Climax]\n[Outro]"
+  },
+  "jobs": {
+    "trailer/alpha-2": {
+      "style": "folk",
+      "slot": "trailer",
+      "duration": 70,
+      "lyrics": "trailer",
+      "bpm": 104,
+      "prompt": "Genre: uplifting indie folk building to a full rock band, a game trailer cue. BPM: 104. Key: D major. Instrumental only, no vocals, no humming, no words. A one-minute trailer for a bright online adventure game whose world is built by its players. Structure: opens at once with a warm fingerpicked acoustic guitar and a soft kick on every beat, no silent intro; at about 4 seconds a gentle lift with a glockenspiel motif; from 6 seconds banjo and mandolin join, hand claps and foot stomps on two and four, the energy climbing a little every four bars as upright bass and a light tambourine enter; at about 36 seconds a short breath where everything drops to the guitar and a held string pad for two bars; then a snare build and the full band crashes in at about 42 seconds: driving drums, electric bass, a bright overdriven electric guitar, piano chords and soaring strings, big and joyful, rising to a peak; one final big hit at about 57 seconds and a long ringing guitar chord tail. Production: modern indie folk-rock, warm, wide, punchy, clear transients, radio-ready mix."
+    }
+  }
+}
