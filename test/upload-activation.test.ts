@@ -2,7 +2,7 @@
 import {createServer} from 'node:http';
 import {describe, expect, it, vi} from 'vitest';
 import {uploadActivator, uploadActivationReceiver, type UploadActivationPorts} from '../src/server/host/dedicated/uploadActivation';
-import {activationDelivery, gameActivationClient, type CookApi, type ActivationNotice} from '../src/cook/game/uploadTransport';
+import {ACTIVATION_GIVE_UP_MS, ACTIVATION_RETRY_MS, activationDelivery, gameActivationClient, type CookApi, type ActivationNotice} from '../src/cook/game/uploadTransport';
 import type {UploadActivation} from '../src/shared/game/shardfile/uploadActivation';
 import type {PlacementFile} from '../src/shared/game/grid/placementRows';
 
@@ -85,6 +85,37 @@ describe('the real game activation gate', () => {
     await delivery.sweep(); await delivery.idle();
     expect(acknowledge).not.toHaveBeenCalled();
     expect(lines).toEqual([`upload ${notice.uploadId}: game acknowledgement waiting: production: No local game receiver for activation`]);
+  });
+
+  // QA 11-24 row 63: two unplaced open plots' uploads logged the same refusal every 45 s for two days and nothing alarmed.
+  it('backs a never-acknowledged upload off to hourly and alarms once a day instead of retrying every sweep', async () => {
+    let clock = 0, listed = true, calls = 0;
+    const lines: string[] = [], alarms: string[] = [], acknowledge = vi.fn(() => Promise.resolve());
+    const api: CookApi = {pending: async function* pending() {}, activations: async function* activations() {if (listed) yield published;}, download: () => Promise.resolve(new Uint8Array()), verdict: () => Promise.resolve(), acknowledge};
+    const read: typeof fetch = () => {calls++; return Promise.resolve(Response.json({reason: 'Placement does not publish the upload hash'}, {status: 503}));};
+    const delivery = activationDelivery(api, gameActivationClient({staging: {url: 'http://127.0.0.1:8791', token}}, 'b1', read), line => {lines.push(line);}, {now: () => clock, alarm: line => {alarms.push(line);}});
+    const sweep = async (at: number): Promise<void> => {clock = at; await delivery.sweep(); await delivery.idle();};
+    for (let at = 0; at < ACTIVATION_GIVE_UP_MS; at += 45_000) await sweep(at);
+    expect(lines.every(line => line.endsWith('game acknowledgement waiting: Game activation answered 503: Placement does not publish the upload hash'))).toBe(true);
+    expect(alarms).toEqual([]);
+    const before = calls;
+    await sweep(ACTIVATION_GIVE_UP_MS);
+    expect(alarms).toHaveLength(1);
+    expect(alarms[0]).toMatch(/ALARM game acknowledgement refused for 60 min \(activation-fixture a{12}\): Game activation answered 503: Placement does not publish/u);
+    // The next hour's sweeps neither call the game nor log.
+    const quiet = lines.length;
+    for (let at = ACTIVATION_GIVE_UP_MS + 45_000; at < ACTIVATION_GIVE_UP_MS + ACTIVATION_RETRY_MS; at += 45_000) await sweep(at);
+    expect(calls).toBe(before + 1); expect(lines).toHaveLength(quiet);
+    // Hourly retries stay quiet until a day has passed since the alarm.
+    for (let hour = 1; hour < 24; hour++) await sweep(ACTIVATION_GIVE_UP_MS + hour * ACTIVATION_RETRY_MS);
+    expect(alarms).toHaveLength(1); expect(calls).toBe(before + 24);
+    await sweep(ACTIVATION_GIVE_UP_MS + 24 * ACTIVATION_RETRY_MS);
+    expect(alarms).toHaveLength(2);
+    // Once the API stops listing it (acknowledged or superseded), a later notice starts its own clock.
+    listed = false; await sweep(clock + 1);
+    listed = true; const fresh = lines.length; await sweep(clock + 1);
+    expect(lines.slice(fresh)).toEqual([`upload ${notice.uploadId}: game acknowledgement waiting: Game activation answered 503: Placement does not publish the upload hash`]);
+    expect(acknowledge).not.toHaveBeenCalled();
   });
 
   it('does not report live for a cook enqueue response or wrong identity', async () => {

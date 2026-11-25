@@ -218,9 +218,22 @@ export function gameActivationClient(receivers: Readonly<Partial<Record<'staging
     if (value.uploadId !== notice.uploadId || value.hash !== notice.hash || !new Set([notice.slug]).has(value.slug) || value.channel !== channel || value.build !== build || (value.place ?? true) !== (notice.place ?? true) || (notice.place !== false && value.instances.length === 0)) throw new Error('Game acknowledged another activation');
   }};
 }
+/** QA 11-24 row 63: a notice the game refuses this long stops its every-sweep retry and alarms. */
+export const ACTIVATION_GIVE_UP_MS = 3_600_000;
+/** After giving up, the notice is tried again this often (so a placement that comes later still heals it), and alarms again at most once a day. */
+export const ACTIVATION_RETRY_MS = 3_600_000;
+const ACTIVATION_ALARM_MS = 86_400_000;
+export interface ActivationDeliveryOptions {
+  /** Raise an alarm (Sentry on the box); never throws. */
+  readonly alarm?: (message: string) => void;
+  readonly now?: () => number;
+}
 /** Published notices remain in the API until every required real game receiver agrees. */
-export function activationDelivery(api: CookApi, game: GameActivationClient, log: (line: string) => void = (): void => undefined): {readonly sweep: () => Promise<void>; readonly idle: () => Promise<void>} {
-  const pending = new Map<string, Promise<void>>();
+export function activationDelivery(api: CookApi, game: GameActivationClient, log: (line: string) => void = (): void => undefined, options: ActivationDeliveryOptions = {}): {readonly sweep: () => Promise<void>; readonly idle: () => Promise<void>} {
+  const pending = new Map<string, Promise<void>>(), now = options.now ?? Date.now;
+  // 2026-11-24: two staging uploads of unplaced open plots logged "Placement does not publish the upload hash" every 45 s for
+  // two days (5,269 lines) and nothing alarmed. A refusal that outlives ACTIVATION_GIVE_UP_MS backs off and alarms instead.
+  const refused = new Map<string, {readonly hash: string; readonly since: number; next: number; alarmed: number}>();
   const deliver = async (notice: ActivationNotice): Promise<void> => {
     try {
       const channels = notice.channels.filter((channel): channel is 'staging' | 'production' => channel !== 'preview');
@@ -229,14 +242,34 @@ export function activationDelivery(api: CookApi, game: GameActivationClient, log
         catch (error) {throw new Error(`${channel === 'staging' ? '' : `${channel}: `}${error instanceof Error ? error.message : String(error)}`, {cause: error});}
       }
       await api.acknowledge(notice, channels);
-    } catch (error) {log(`upload ${notice.uploadId}: game acknowledgement waiting: ${error instanceof Error ? error.message : 'acknowledgement failed'}`);}
+      refused.delete(notice.uploadId);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'acknowledgement failed', at = now();
+      const known = refused.get(notice.uploadId);
+      const row = known?.hash === notice.hash ? known : {hash: notice.hash, since: at, next: 0, alarmed: -Infinity};
+      refused.set(notice.uploadId, row);
+      if (at - row.since < ACTIVATION_GIVE_UP_MS) {log(`upload ${notice.uploadId}: game acknowledgement waiting: ${reason}`); return;}
+      row.next = at + ACTIVATION_RETRY_MS;
+      if (at - row.alarmed < ACTIVATION_ALARM_MS) return;
+      row.alarmed = at;
+      const minutes = Math.round((at - row.since) / 60_000);
+      const line = `upload ${notice.uploadId}: ALARM game acknowledgement refused for ${minutes} min (${notice.slug} ${notice.hash.slice(0, 12)}): ${reason}; retrying hourly`;
+      log(line);
+      try {options.alarm?.(line);} catch {/* an alarm never stops delivery */}
+    }
   };
   return {
     sweep: async () => {
+      const seen = new Set<string>();
       for await (const notice of api.activations()) {
+        seen.add(notice.uploadId);
         if (pending.has(notice.uploadId)) continue;
+        const row = refused.get(notice.uploadId);
+        if (row !== undefined && row.hash === notice.hash && now() < row.next) continue;
         const work = deliver(notice).finally(() => {pending.delete(notice.uploadId);}); pending.set(notice.uploadId, work);
       }
+      // A notice the API no longer lists (acknowledged, superseded) forgets its refusal clock.
+      for (const id of refused.keys()) if (!seen.has(id)) refused.delete(id);
     },
     idle: async () => {await Promise.all(pending.values());},
   };

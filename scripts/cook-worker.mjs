@@ -35,8 +35,14 @@ const { folderStore, r2Store } = await import('../src/cook/game/packStore.ts');
 const { rendererRevision } = await import('./renderer-revision.mjs');
 const { shardfileValidationRevision } = await import('./shardfile-validation-revision.mjs');
 const { liveDeployBuilds } = await import('./app-build/previousDeploy.mjs');
+const { serverSentry } = await import('../src/server/host/dedicated/serverSentry.ts');
 
 const env = process.env;
+// QA 11-24 rows 62 and 63: the cook's own alarms go to Sentry's wildshard-server project when cook.env names SENTRY_DSN
+// (environment `cook`); without one the ALARM line in the journal is all there is.
+const cookSentry = serverSentry({ dsn: env.SENTRY_DSN, version: undefined, build: env.WILDSHARD_BUILD ?? '', channel: 'cook' });
+/** @param {string} line */
+const cookAlarm = line => { cookSentry?.capture(new Error(line), { system: 'cook' }); };
 /** @param {string} name */
 const need = name => { const value = env[name]; if (value === undefined || value === '') throw new Error(`cook-worker needs ${name}`); return value; };
 // An env file's blank row is unset: a blank COOK_STORE_DIR means R2, never a folder at the working directory.
@@ -117,7 +123,7 @@ if (command === 'serve') {
       const prefix = `COOK_${channel.toUpperCase()}_ACTIVATION`;
       if (env[`${prefix}_URL`] !== undefined && env[`${prefix}_URL`] !== '') receivers[channel] = {url: need(`${prefix}_URL`), token: need(`${prefix}_TOKEN`)};
     }
-    const activations = activationDelivery(uploadApi, gameActivationClient(receivers, need('WILDSHARD_BUILD')), line => {console.log(line);});
+    const activations = activationDelivery(uploadApi, gameActivationClient(receivers, need('WILDSHARD_BUILD')), line => {console.log(line);}, {alarm: cookAlarm});
     pollCatalogue({sweep: async () => {await activations.sweep(); return [];}}, {everyMs, log: line => {console.log(line);}});
   }
 } else if (command === 'record') {
