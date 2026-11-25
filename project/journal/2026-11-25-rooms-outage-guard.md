@@ -37,3 +37,10 @@
 - v0.1.89 and v0.1.90 both held at staging QA on 404 packs: each toured while the cook recooked every head for the new
   build. `deployStaging` now waits, at most 45 min, until every head staging advertises has its exact-build index, and
   holds with the missing heads named after that (`waitForPacks`, the same read as FR-A17's production gate).
+
+## FR-A20: the cook takes advertised heads first
+
+- After v0.1.90's cook move an old pine-hollow upload no catalogue advertised (65b0e6ff, counted as new because no build
+  had indexed it) cooked 849 s ahead of 37 recooks; Brasscap r19, which staging QA needed, sat 33rd. The queue now
+  takes an advertised head no build has indexed (a new pin), then advertised heads in catalogue order, then a bare upload
+  notice no catalogue advertises, last.

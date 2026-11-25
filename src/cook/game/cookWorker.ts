@@ -725,15 +725,32 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   // One cook at a time (a cook takes every core it is given, and J29's clock is the deploy's), in two lines: an upload no build
   // has indexed goes before a known head this build has yet to recook (opus-ss16g: a release's 33 recooks held a new upload
   // for 2 h). A hash already waiting is never queued twice; asked again as new, it moves up.
-  interface Job {readonly head: {readonly slug: string; readonly hash: string}; fresh: boolean; readonly done: Promise<CookRow>; readonly settle: (row: CookRow) => void}
+  // FAST-RELEASE FR-A20 (11-25): after v0.1.90's cook move an upload no channel advertises (an old pine-hollow, 849 s) jumped all
+  // 37 recooks while Brasscap r19, the head staging QA needed, waited 33rd. Order: an advertised head no build has indexed (a
+  // new pin), then advertised heads in catalogue order, then anything no catalogue advertises (a bare upload notice), last.
+  interface Job {readonly head: {readonly slug: string; readonly hash: string}; fresh: boolean; readonly seq: number; readonly done: Promise<CookRow>; readonly settle: (row: CookRow) => void}
   const waiting: Job[] = [], pending = new Map<string, Job>();
-  let running = false;
+  /** The heads the catalogues advertised at the last look, in catalogue order. */
+  let advertised = new Map<string, number>();
+  let running = false, queued = 0;
+  const rank = (job: Job): readonly [number, number] => {
+    const at = advertised.get(job.head.hash);
+    return at === undefined ? [2, job.seq] : [job.fresh ? 0 : 1, at];
+  };
+  const next = (): Job | undefined => {
+    let best = -1;
+    for (const [index, job] of waiting.entries()) {
+      const [kind, order] = rank(job), current = best < 0 ? undefined : rank(waiting[best] as Job);
+      if (current === undefined || kind < current[0] || (kind === current[0] && order < current[1])) best = index;
+    }
+    return best < 0 ? undefined : waiting.splice(best, 1)[0];
+  };
   const drain = async (): Promise<void> => {
     if (running) return;
     running = true;
     try {
       for (;;) {
-        const at = waiting.findIndex(job => job.fresh), job = waiting.splice(Math.max(at, 0), 1)[0];
+        const job = next();
         if (job === undefined) break;
         const row = await cook(job.head);
         if (row.state === 'failed') failures.set(job.head.hash, {count: (failures.get(job.head.hash)?.count ?? 0) + 1, at: clock()});
@@ -747,9 +764,11 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const known = pending.get(head.hash);
     if (known !== undefined) { known.fresh ||= fresh; return known.done; }
     let settle: (row: CookRow) => void = () => undefined;
-    const done = new Promise<CookRow>(resolve => { settle = resolve; }), job: Job = {head, fresh, done, settle};
+    const done = new Promise<CookRow>(resolve => { settle = resolve; }), job: Job = {head, fresh, seq: queued++, done, settle};
     pending.set(head.hash, job); waiting.push(job);
-    if (fresh && running && waiting.length > 1) log(`cook ${head.slug} ${head.hash.slice(0, 12)}: a new upload, ahead of ${waiting.length - 1} waiting`);
+    if (fresh && running && waiting.length > 1) {
+      log(`cook ${head.slug} ${head.hash.slice(0, 12)}: ${advertised.has(head.hash) ? `a new advertised upload, ahead of ${waiting.length - 1} waiting` : `an upload no catalogue advertises, after the ${waiting.length - 1} waiting`}`);
+    }
     // A microtask later, so a batch queued together (a recook, a sweep) is ordered before its first cook starts.
     queueMicrotask(() => { void drain(); });
     return done;
@@ -765,6 +784,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       seen.set(row.hash, {slug: row.slug, hash: row.hash});
       if (row.expected !== undefined) expectations.set(row.hash, row.expected);
     }
+    advertised = new Map([...seen.keys()].map((hash, at) => [hash, at]));
     return [...seen.values()];
   };
   const started = clock();

@@ -115,6 +115,20 @@ describe('a new upload cooks ahead of the boot recook', () => {
     expect(order.join('')).toBe('becd');
   });
 
+  // FAST-RELEASE FR-A20 (11-25): an old pine-hollow upload no catalogue advertised cooked 849 s ahead of all 37 recooks,
+  // while the Brasscap head staging QA needed waited 33rd. Advertised heads go first, a bare upload notice last.
+  it('an upload no catalogue advertises cooks after the advertised recooks, and a new pin still goes first', async () => {
+    const {cook, heads, order, hold} = await setup('advertised');
+    const open = hold(), recook = cook.recook(['staging']);
+    await expect.poll(() => order.length).toBe(1);
+    cook.enqueue({shard: 'old-upload', hash: hash('f')} as Parameters<typeof cook.enqueue>[0]);
+    heads.push({slug: 'new-pin', hash: FRESH});
+    const swept = cook.sweep(['staging']);
+    open();
+    await swept; await recook; await cook.idle();
+    expect(order.join('')).toBe('becdf');
+  });
+
   it('serve polls at once, with the boot recook still running', async () => {
     const sweeps: (readonly CookStage[])[] = [], waits: number[] = [];
     let poll: ReturnType<typeof bootCook>['poll'] | undefined;
