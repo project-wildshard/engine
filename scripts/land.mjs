@@ -22,6 +22,7 @@ import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 import {assertNoLocalCandidates} from './local-candidates.ts';
 import {holdRefusal} from './land-hold.mjs';
+import {laneName} from './lane-name.mjs';
 
 /** The hosted workflows a green SHA needs, by workflow name (J195, J240); pin-provenance.mjs reads it. */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
@@ -268,7 +269,8 @@ class Landing{
  /** @param {string} cwd @param {ReturnType<typeof parseArgs>} options @param {NodeJS.ProcessEnv} env */
  constructor(cwd,options,env){
   this.options=options;this.env=env;this.started=Date.now();
-  this.lane=/^[a-z][a-z0-9_-]*$/u.test(env.WS_LANE_NAME??'')?String(env.WS_LANE_NAME):'land';
+  const named=laneName(env,'land');if('refusal' in named)throw new StopError(named.refusal);
+  this.lane=named.lane;
   const inside=tryGit(cwd,['rev-parse','--show-toplevel']);
   if(inside.status!==0)throw new StopError('not inside a git checkout');
   this.root=inside.stdout.trim();

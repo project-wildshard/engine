@@ -3,7 +3,7 @@
 // your agents ... work on one checkout of engine, commit to main push"). Ported from meta's scripts/main-push.mjs (MF7).
 // In place of `git commit -- <paths>`, `git pull --rebase origin main` (or main-pull.mjs) and `git push origin main`:
 //
-//   node scripts/main-push.mjs -m "<subject>" [-m "<body>"]... <file>...   commit these files, then sync and push
+//   WS_LANE_NAME=<lane> node scripts/main-push.mjs -m "<subject>" [-m "<body>"]... <file>...   commit, sync, push
 //   node scripts/main-push.mjs                                              push commits already made
 //   node scripts/main-push.mjs --onto <sha> -m "<subject>" <file>...        after a conflict: commit the files you
 //                                                                           merged against origin/main at <sha>
@@ -36,6 +36,7 @@ import {assertNoLocalCandidates} from './local-candidates.ts';
 import {installLag} from './install-lag.mjs';
 import {holdRefusal} from './land-hold.mjs';
 import {withStoreUse} from './worktree.mjs';
+import { laneName } from './lane-name.mjs';
 
 export class StopError extends Error {
   /** @param {string} message @param {boolean} [retry] a later try may succeed */
@@ -80,7 +81,9 @@ export function checkState(cwd) {
 /** Subjects of the commits this run made (commitFiles), so a push can tell its own from another lane's. A sync replays
  * them to new SHAs, so the subject is what survives. */
 const OWN = new Set();
-const currentLane = () => /^[a-z][a-z0-9_-]*$/u.test(process.env.WS_LANE_NAME ?? '') ? process.env.WS_LANE_NAME : 'main-push';
+/** The run's lane: the CLI refuses to start without one (meta QA 11-25 row 43, scripts/lane-name.mjs); a test that imports
+ * these functions directly reads `unnamed`, never the script's own name. */
+const currentLane = () => { const named = laneName(process.env, 'main-push'); return 'lane' in named ? named.lane : 'unnamed'; };
 
 /** @typedef {{sha:string,lane:string,ref:string,files:string[],upstream:string}} HeldCommit */
 /** @param {string} cwd */
@@ -141,7 +144,7 @@ function replayLanes(cwd, upstream, head) {
 function receipt(text) {
   if (process.env.WS_MAIN_PUSH_RECEIPT === '0') return;
   const file = resolve(process.env.WS_LANE_RECEIPTS ?? join(homedir(), '.cache/wildshard/lane-receipts.log'));
-  const lane = /^[a-z][a-z0-9_-]*$/u.test(process.env.WS_LANE_NAME ?? '') ? process.env.WS_LANE_NAME : 'main-push';
+  const lane = currentLane();
   try {
     mkdirSync(dirname(file), { recursive: true });
     appendFileSync(file, `${new Date().toTimeString().slice(0, 5)} Cancún ${lane} ${text.replaceAll(/\s+/gu, ' ').slice(0, 1000)}\n`);
@@ -238,7 +241,7 @@ export function pushMain(cwd, remote = 'origin') {
   // lane's commit, made but not yet pushed; it rides along (M1) and the receipt names it.
   const sent = git(cwd, ['rev-parse', 'HEAD']);
   // Meta QA 11-25 row 37: an open engine land HOLD in the receipts stops every pusher but the lander it names.
-  const held = holdRefusal({ lane: currentLane() ?? 'main-push', bodies: run(cwd, ['log', '--format=%B', `refs/remotes/${remote}/main..${sent}`]).stdout });
+  const held = holdRefusal({ lane: currentLane(), bodies: run(cwd, ['log', '--format=%B', `refs/remotes/${remote}/main..${sent}`]).stdout });
   if (held !== null) { receipt(`main-push STOP ${held}`); throw new StopError(held); }
   const outgoing = run(cwd, ['log', '--format=%h %s', `refs/remotes/${remote}/main..${sent}`]).stdout.trim().split('\n').filter(Boolean);
   // The pre-push's whole output (the gate) goes to a log in the git dir: its RED lines are the cause on a refusal.
@@ -512,8 +515,10 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   let made = '';
   try {
     checkState(cwd);
+    const named = laneName(process.env, 'main-push');
+    if ('refusal' in named) throw new StopError(named.refusal);
     // Row 37: under an open engine land HOLD nothing is committed, so no other lane's push carries it along (M1).
-    const held = options.files.length > 0 ? holdRefusal({ lane: currentLane() ?? 'main-push', bodies: options.messages.join('\n') }) : null;
+    const held = options.files.length > 0 ? holdRefusal({ lane: currentLane(), bodies: options.messages.join('\n') }) : null;
     if (held !== null) { receipt(`main-push STOP ${held}`); throw new StopError(held); }
     lock();
     const pending = heldCommits(cwd).filter(row => row.lane === currentLane());
