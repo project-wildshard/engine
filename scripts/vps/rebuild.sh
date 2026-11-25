@@ -468,6 +468,40 @@ EOF
   then if [ "$CHECK" = 0 ]; then apparmor_parser -r /etc/apparmor.d/wildshard-cook-unshare; fi; fi
 else say ok 'unprivileged user namespaces are not restricted here; no AppArmor profile needed'; fi
 
+# Meta QA 11-24 row 43 (MA13, SHARD-COMPAT SP1b5b): the record pass's tools beside the cook, root's and read-only to it.
+# The recorder is the author's own `wildshard prepare` (@wildshard/cli, pinned here) with its Playwright WebKit; the
+# preparation client is the one the staging release built from this very commit (so the recording names the cook's
+# renderer). One client folder, unpacked over itself per build: a script never deletes (J358), so old builds' hashed
+# assets stay until an agent removes them by hand. The record runs in the job's namespace with only loopback up
+# (lo-up), since `wildshard prepare` serves its page on 127.0.0.1.
+RECORDER_CLI=0.4.34 RECORDER_PLAYWRIGHT=1.65.0 RECORDER="$COOK_LIB/recorder" NPM=/usr/bin/npm
+PREPARATION="$COOK_LIB/preparation-client" PREPARATION_ORIGIN=https://github.com/project-wildshard/engine/releases/download
+have_recorder() { [ "$(cat "$RECORDER/.installed" 2>/dev/null)" = "$RECORDER_CLI $RECORDER_PLAYWRIGHT" ] && [ -x "$RECORDER/node_modules/.bin/wildshard" ]; }
+make_recorder() {
+  install -d -m 750 -o root -g "$COOK_GROUP" "$RECORDER"
+  (cd "$RECORDER" && HOME=/root "$NPM" install --no-save --no-audit --no-fund --ignore-scripts --prefix "$RECORDER" \
+    "@wildshard/cli@$RECORDER_CLI" "playwright@$RECORDER_PLAYWRIGHT") || return 1
+  PLAYWRIGHT_BROWSERS_PATH="$RECORDER/browsers" HOME=/root "$RECORDER/node_modules/.bin/playwright" install --with-deps webkit || return 1
+  printf '%s %s\n' "$RECORDER_CLI" "$RECORDER_PLAYWRIGHT" > "$RECORDER/.installed"
+  chgrp -hR "$COOK_GROUP" "$RECORDER" && chmod -R g+rX,g-w,o-rwx "$RECORDER"
+}
+have_preparation() { [ "$(cat "$PREPARATION/.installed" 2>/dev/null)" = "$COOK_BUILD" ] && [ -f "$PREPARATION/index.html" ]; }
+make_preparation() {
+  local archive status
+  install -d -m 750 -o root -g "$COOK_GROUP" "$PREPARATION"
+  archive=$(mktemp "$COOK_LIB/.preparation.XXXXXX") || return 1
+  curl -fsSL --retry 3 -o "$archive" "$PREPARATION_ORIGIN/server-staging-$COOK_BUILD/preparation-client.tar.gz" \
+    && tar -xzf "$archive" -C "$PREPARATION" && printf '%s\n' "$COOK_BUILD" > "$PREPARATION/.installed"
+  status=$?; rm -f -- "$archive"; [ "$status" = 0 ] || return 1
+  chgrp -hR "$COOK_GROUP" "$PREPARATION" && chmod -R g+rX,g-w,o-rwx "$PREPARATION"
+}
+if put "$COOK_LIB/lo-up" 750 "root:$COOK_GROUP" <<'EOF'
+#!/bin/sh
+# MA13: inside the record's own network namespace, bring loopback up for `wildshard prepare`'s local page, then run it.
+ip link set lo up && exec "$@"
+EOF
+then :; fi
+
 COOK_REF='' COOK_BUILD='' COOK_READY=0
 cook_follow() {
   if [ "$CHECK" = 1 ]; then "$NODE" "$HERE/cook-follow.mjs" --check --env "$ETC/staging.env" --state "$COOK_STATE"
@@ -534,6 +568,8 @@ if [ "$COOK_READY" = 1 ]; then
   if [ "$CHECK" = 0 ] && ! have_cook_read; then COOK_SOURCE_CHANGED=1; fi
   step "cook source readable by $COOK_GROUP" have_cook_read make_cook_read
   step "cook pnpm store readable by $COOK_GROUP" have_cook_store make_cook_store
+  step "cook recorder @wildshard/cli $RECORDER_CLI with WebKit" have_recorder make_recorder
+  step "cook preparation client for $COOK_BUILD" have_preparation make_preparation
 fi
 # What the running worker last read of cook.env, signed follow state and cook.settings, as a hash in its root-owned checkout.
 # A changed value restarts it; absent optional files preserve the legacy cook.env-only hash. While cook.settings names both
@@ -576,8 +612,15 @@ Environment=COOK_SCRATCH=$COOK_HOME/scratch
 Environment=COOK_SERVER_PACKS=$COOK_HOME/server
 Environment=COOK_OUTBOX=$COOK_HOME/verdicts
 # SHARD-COMPAT SP1b-T: every job reads its shard's cook preparation sidecar from here; the record pass writes them once
-# cook.env names a recorder (COOK_RECORDER, COOK_PREPARATION_CLIENT, COOK_RECORD_CANARY).
+# the unit names a recorder below (COOK_RECORDER, COOK_PREPARATION_CLIENT, COOK_RECORD_CANARY).
 Environment=COOK_SIDECARS=$COOK_HOME/sidecars
+# MA13: the recorder, its WebKit and this build's preparation client (installed above), the canary that records first,
+# and the record's sandbox: the job's namespace with loopback up. The boot recook waits for the pass (cook-worker serve).
+Environment='COOK_RECORDER=["$RECORDER/node_modules/.bin/wildshard"]'
+Environment=COOK_PREPARATION_CLIENT=$PREPARATION
+Environment=PLAYWRIGHT_BROWSERS_PATH=$RECORDER/browsers
+Environment=COOK_RECORD_CANARY=brasscap-mesa
+Environment='COOK_RECORD_WRAP=["$COOK_LIB/unshare","--user","--map-root-user","--net","$COOK_LIB/lo-up"]'
 Environment=COOK_STAGING_ACTIVATION_URL=http://127.0.0.1:8791
 # Each job's prefix: a user and network namespace of its own, so nothing that reads a shardfile has a route out. The single
 # quotes keep the JSON's double quotes, which systemd would otherwise strip.

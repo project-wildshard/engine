@@ -839,6 +839,9 @@ export interface PollOptions {
   readonly log?: (line: string) => void;
   /** The wait between sweeps; a test's stands in for the clock. It rejects when `signal` aborts. */
   readonly wait?: (ms: number, signal: AbortSignal) => Promise<void>;
+  /** Meta QA 11-24 row 43 (MA13, SP1b5b): the boot recook waits for this (the serve's record pass), so a render change
+   *  cooks every head with its fresh sidecar, `prepared by cook`. The poll does not wait: a new upload never queues behind it. */
+  readonly before?: Promise<unknown>;
 }
 
 /** opus-ss16g: `serve`'s start. The poll starts at once, beside the boot recook (J30: what a missed notice left behind), so a
@@ -846,6 +849,7 @@ export interface PollOptions {
 export function bootCook(worker: Pick<CookWorker, 'recook' | 'sweep'>, options: PollOptions = {}): {readonly poll: ReturnType<typeof pollCatalogue>; readonly recooked: Promise<void>} {
   const log = options.log ?? ((): void => undefined);
   const recooked = (async (): Promise<void> => {
+    try { await options.before; } catch (error) { log(`record pass failed, recooking stale: ${String(error)}`); }
     try { await worker.recook(options.stages ?? ['live', 'preview', 'staging']); } catch (error) { log(`boot list failed: ${String(error)}`); }
   })();
   return {poll: pollCatalogue(worker, options), recooked};

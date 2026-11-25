@@ -111,7 +111,9 @@ if (command === 'serve') {
   const seconds = Number(env.COOK_POLL_SECONDS ?? POLL_EVERY_MS / 1000);
   const everyMs = Math.min(60, Math.max(30, Number.isFinite(seconds) ? seconds : POLL_EVERY_MS / 1000)) * 1000;
   console.log(`cook worker polls the catalogue every ${everyMs / 1000} s`);
-  bootCook(cook, { everyMs, log: line => { console.log(line); } });
+  // Meta QA 11-24 row 43 (MA13): with a recorder named, the record pass runs first and the boot recook waits for it, so a
+  // render change ends `cooked, prepared by cook`; the poll (new uploads) starts at once beside it.
+  bootCook(cook, { everyMs, log: line => { console.log(line); }, before: record() });
   // J505: the nightly protected collection (a publish also runs it under 15% headroom)
   const nightly = async () => {
     try { await reclaim(); } catch (/** @type {unknown} */ error) { console.warn(`pack store reclaim failed: ${error instanceof Error ? error.message : String(error)}`); }
