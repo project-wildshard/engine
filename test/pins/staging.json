@@ -2,7 +2,7 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "6cf4a9913f3a7bbadb94dd905ee736d9a34e1ef56852ea5fda588dc6c79021a0",
+  "catalogueHash": "f3a8fa238d8233b8c547ac41756f8df1f957e7de898c3dc24474aa970f7cff7a",
   "releaseHash": "120600bc82bc1dc5dd35f9a9514d34c7b24a3bc67d1c5f7ce22a26b576f10aed",
   "catalogue": {
     "version": 0,
@@ -592,8 +592,8 @@
       {
         "slug": "driftwood-isle",
         "name": "Driftwood Isle",
-        "revision": 12,
-        "hash": "6a9f721236a4daaa44e5fc200f5232e08398470063fec9656da579d8b146688e"
+        "revision": 13,
+        "hash": "2d4515d42e0598a72926d93e2a5751d6d70eab18ae055644c2fb10f732d0a41e"
       },
       {
         "slug": "far-reach",
@@ -724,8 +724,8 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 17,
-        "hash": "65b0e6ff95d9b9fd6af6480f4ad685f2b3c016338c8055978d4ac397c9503e72"
+        "revision": 18,
+        "hash": "98518c8fde2b3e9f9b4aa1034acd2a736261b5bd7040148507fe6e56b40bf6bc"
       },
       {
         "slug": "sunscar-dunes",
@@ -745,9 +745,9 @@
     },
     {
       "slug": "driftwood-isle",
-      "revision": 12,
-      "hash": "6a9f721236a4daaa44e5fc200f5232e08398470063fec9656da579d8b146688e",
-      "bytes": 97213440
+      "revision": 13,
+      "hash": "2d4515d42e0598a72926d93e2a5751d6d70eab18ae055644c2fb10f732d0a41e",
+      "bytes": 97968640
     },
     {
       "slug": "far-reach",
@@ -877,9 +877,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 17,
-      "hash": "65b0e6ff95d9b9fd6af6480f4ad685f2b3c016338c8055978d4ac397c9503e72",
-      "bytes": 317006336
+      "revision": 18,
+      "hash": "98518c8fde2b3e9f9b4aa1034acd2a736261b5bd7040148507fe6e56b40bf6bc",
+      "bytes": 315176448
     },
     {
       "slug": "sunscar-dunes",
