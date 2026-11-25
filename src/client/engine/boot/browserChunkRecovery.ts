@@ -4,6 +4,7 @@ import { countReload } from '../core/reloadGuard';
 import { beginLoadingWait, finishLoadingWait } from '../../../shared/engine/boot/loadingWaits';
 import { markReload, type ReloadReason } from './lastEnd';
 import { leaveAfterPaint } from './leaveAfterPaint';
+import { handZoneOnReload } from './titleArrival';
 import { createChunkRecovery, reloadIntoNewerBuild, sayingReload, type ChunkRecoveryPorts } from './chunkRecovery';
 import { captureBrowserError, engineScreenTags } from '../telemetry/browserErrors';
 
@@ -48,7 +49,8 @@ const recoveryPorts = (allowed: () => boolean, reason: ReloadReason = 'reload', 
     try { return await (await import('./sw')).refreshWorkerForChunkRecovery(build, allowed); }
     finally { finishLoadingWait(wait); }
   },
-  reload: () => { countReload(); markReload('stale deployment code', reason); location.reload(); },
+  // CHUNK-PARAM CP3 (J522): a one-shard page hands its zone in the tab; a grid page's recovery record resumes it
+  reload: () => { countReload(); handZoneOnReload(); markReload('stale deployment code', reason); location.reload(); },
 });
 /** Only a confirmed newer deployment can replace a rejected boot/lazy module or stylesheet. */
 export function recoverChunkFailure(error: unknown): Promise<boolean> {

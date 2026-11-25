@@ -48,7 +48,7 @@ function fixture(stored = false, leaveSaved: (go: () => void) => void = go => { 
     precompileLevel: () => compile.promise, gpuOnlyContent: () => [], rebakeGpuContent: vi.fn(), terrainDatum: () => 4,
     observeRestore: (promise: Promise<void>) => { restores.push(promise); },
     // DW12: the reload is a fresh page (boot/freshPage.ts, through the leave page); the address it asks for is the navigation
-    replaceFresh: (url: string | URL) => { navigations.push(String(url)); },
+    replaceFresh: (url: string | URL) => { navigations.push(String(url)); }, handZoneOnReload: () => null, oneShardZone: () => null,
     recordGpuRecovery: vi.fn(), markReload: vi.fn(), leaveSaved, emitFault: (fault: unknown) => { faults.push(fault); }, repaint: vi.fn(),
   });
   if (typeof install !== 'function') throw new Error('Recovery installer is not callable');

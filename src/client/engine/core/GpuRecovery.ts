@@ -40,6 +40,7 @@ import { recordGpuRecovery } from '../boot/bootTrace';
 import { leaveSaved, markReload } from '../boot/lastEnd';
 import { gpuSummary } from '../render/drawCheck';
 import { replaceFresh } from '../boot/freshPage';
+import { handZoneOnReload, oneShardZone } from '../boot/titleArrival';
 
 const savedStorage = saveStorage('session');
 
@@ -110,7 +111,9 @@ export function installGpuRecovery(host: RecoveryHost): void {
       catch { fragileBoot = true; }
     }
     const url = fragileBoot ? new URL('/', location.origin) : new URL(location.href);
-    url.searchParams.delete('v');
+    // CHUNK-PARAM CP3 (J522): a one-shard page's zone rides in the tab (handZoneOnReload below), never the address
+    const zone = fragileBoot ? null : url.searchParams.get('chunk') ?? oneShardZone();
+    url.searchParams.delete('v'); url.searchParams.delete('chunk');
     const pose = fragileBoot ? null : host.pose();
     // y in the level's authored frame (less its runtime datum, G164): the reload stands on the same ground in either state
     if (pose) url.searchParams.set('at', [pose.x, pose.y - terrainDatum(), pose.z, pose.yaw, pose.pitch].map((v) => (Math.round(v * 100) / 100).toString()).join(','));
@@ -124,7 +127,7 @@ export function installGpuRecovery(host: RecoveryHost): void {
     }
     phase = 'reloading';
     try { savedStorage.setItem(RELOAD_KEY, '1'); } catch { /* This document still records its reloading phase. */ }
-    leaveSaved(() => { markReload(`graphics recovery: ${why}`, 'gpu'); replaceFresh(to); });
+    leaveSaved(() => { handZoneOnReload(zone); markReload(`graphics recovery: ${why}`, 'gpu'); replaceFresh(to); });
   };
 
   const lose = (why: string, behind = hidden): void => {

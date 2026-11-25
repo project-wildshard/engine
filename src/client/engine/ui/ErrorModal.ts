@@ -34,6 +34,7 @@ import { activeLevel } from '../../../shared/engine/level/selection';
 import { TIER } from '../core/tier';
 import { leaveSaved, markReload, markUnload } from '../boot/lastEnd';
 import { leftByPlayer } from '../boot/dropNotice';
+import { handZoneOnReload, oneShardZone } from '../boot/titleArrival';
 import { showReloading } from './reloadCover';
 import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { captureBrowserError, flushScreenReports, type ErrorScreen } from '../telemetry/browserErrors';
@@ -95,12 +96,14 @@ function reloadHere(atSpot: boolean): void {
   countReload();
   const url = cleanHref();
   const pose = atSpot ? currentPose() : null;
-  url.searchParams.delete('at'); url.searchParams.delete(RELOAD_PARAM);
+  // CHUNK-PARAM CP3 (J522): a one-shard page's zone rides in the tab (handZoneOnReload), never the address
+  const zone = url.searchParams.get('chunk') ?? oneShardZone();
+  url.searchParams.delete('at'); url.searchParams.delete(RELOAD_PARAM); url.searchParams.delete('chunk');
   if (pose) {
     url.searchParams.set('at', [pose.x, pose.y - terrainDatum(), pose.z, pose.yaw, pose.pitch].map((v) => (Math.round(v * 100) / 100).toString()).join(','));
     url.searchParams.set(RELOAD_PARAM, '1'); // index.html's RESUMING screen from the first paint; main.ts skips the title and pauses
   }
-  leaveSaved(() => { leaveAfterPaint(() => { leftByPlayer(); markReload(`error modal: ${atSpot ? 'reload here' : 'reload at spawn'} (${firstText.slice(0, 80)})`); replaceFresh(url); }); });
+  leaveSaved(() => { leaveAfterPaint(() => { handZoneOnReload(zone); leftByPlayer(); markReload(`error modal: ${atSpot ? 'reload here' : 'reload at spawn'} (${firstText.slice(0, 80)})`); replaceFresh(url); }); });
 }
 function toTitle(): void {
   leaveSaved(() => { leftByPlayer(); markUnload(`error modal: title screen (${firstText.slice(0, 80)})`); replaceFresh('/'); });

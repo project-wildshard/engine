@@ -23,3 +23,11 @@
 - index.html's loading clock named its zone from the address; it now takes the record this document took (`taken` equals its
   `performance.timeOrigin`), so a bare `/` the tap navigated runs the card's clock and name from the tap. The boot-fail
   report's zone and `entryTransport`'s read-ahead read the same zone. A `?chunk=` still works until CP22.
+
+# The engine's own reloads carry the zone in the tab (opus-chunk, CP3)
+
+- A one-shard page now has a bare address too (CP1), so each reload the engine makes hands its zone to the next document
+  with a tab tap (`handZoneOnReload`, the zone from `setOneShardZone`, set by the session; null on a grid page, whose
+  recovery record resumes it): RELOAD HERE in Settings and in the error modal, GPU recovery, the stale-deployment reload.
+  The seat-elsewhere reload already wrote its tap; it no longer writes `chunk`. Debug's clear-downloads reload drops it.
+- `at` and `glreload` stay on RELOAD HERE and GPU recovery: a pose, not a zone; CP22 decides them with the rest.

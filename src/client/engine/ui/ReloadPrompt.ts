@@ -6,7 +6,7 @@ import { leftByPlayer } from '../boot/dropNotice';
 import { showReloading } from './reloadCover';
 import { leaveAfterPaint } from '../boot/leaveAfterPaint';
 import { terrainDatum } from '../../../shared/engine/world/terrainHeight';
-import { setTitleArrival } from '../boot/titleArrival';
+import { handZoneOnReload, oneShardZone } from '../boot/titleArrival';
 import { replaceFresh } from '../boot/freshPage';
 
 interface Pose { x: number; y: number; z: number; yaw: number; pitch: number }
@@ -28,16 +28,16 @@ export function reloadWithPicks(why = 'reload prompt: reload now', control?: HTM
   showReloading(control);
   const url = new URL(settingsReloadUrl(location.href, TITLE_SKIPPERS));
   url.searchParams.delete('v');
-  const pose = currentPose(), chunk = url.searchParams.get('chunk');
-  // a grid page's address names no shard: its planned-reload record (markReload's capture) carries the cell and pose, and
-  // a bare address lets it resume on an online build too (no `?at=` that would read as a level link)
+  // CHUNK-PARAM CP3 (J522): a one-shard page's zone rides in the tab (`handZoneOnReload`), never the address; `at` is a pose
+  const pose = currentPose(), chunk = url.searchParams.get('chunk') ?? oneShardZone();
+  url.searchParams.delete('chunk');
+  // a grid page names no shard: its planned-reload record (markReload's capture) carries the cell and pose, on its bare address
   if (pose !== null && chunk !== null) {
     url.searchParams.set('at', [pose.x, pose.y - terrainDatum(), pose.z, pose.yaw, pose.pitch].map((v) => (Math.round(v * 100) / 100).toString()).join(','));
     url.searchParams.set(RELOAD_PARAM, '1');
   }
-  const online = Reflect.get(globalThis, '__WS_WORLD__') !== undefined;
   leaveSaved(() => { leaveAfterPaint(() => {
-    if (pose !== null && online && chunk !== null) setTitleArrival({ slug: chunk, mode: 'enter' }, { tab: true });
+    if (pose !== null) handZoneOnReload(chunk);
     leftByPlayer(); markReload(why, pose === null ? 'reload' : 'settings'); replaceFresh(url);
   }); });
 }

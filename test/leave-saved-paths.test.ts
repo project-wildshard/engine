@@ -55,15 +55,15 @@ const paths: readonly (readonly [string, (at: ReturnType<typeof page>) => () => 
     return () => { reload(null); };
   }],
   ['the reload prompt', at => {
-    const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [], currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', setTitleArrival: () => undefined });
+    const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href, TITLE_SKIPPERS: [], currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', handZoneOnReload: () => null, oneShardZone: () => null });
     return () => { reload(); };
   }],
   ['the error modal\'s reload here', at => {
-    const here = slice('src/client/engine/ui/ErrorModal.ts', 'function reloadHere(', '\nfunction build(', 'reloadHere', { ...marks, ...cover, location: at.location, countReload: () => undefined, cleanHref: () => new URL('https://example.test/'), currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', firstText: 'fault' });
+    const here = slice('src/client/engine/ui/ErrorModal.ts', 'function reloadHere(', '\nfunction build(', 'reloadHere', { ...marks, ...cover, location: at.location, countReload: () => undefined, cleanHref: () => new URL('https://example.test/'), currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', firstText: 'fault', handZoneOnReload: () => null, oneShardZone: () => null });
     return () => { here(true); };
   }],
   ['the error modal\'s title screen', at => {
-    const title = slice('src/client/engine/ui/ErrorModal.ts', 'function reloadHere(', '\nfunction build(', 'toTitle', { ...marks, ...cover, location: at.location, countReload: () => undefined, cleanHref: () => new URL('https://example.test/'), currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', firstText: 'fault' });
+    const title = slice('src/client/engine/ui/ErrorModal.ts', 'function reloadHere(', '\nfunction build(', 'toTitle', { ...marks, ...cover, location: at.location, countReload: () => undefined, cleanHref: () => new URL('https://example.test/'), currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', firstText: 'fault', handZoneOnReload: () => null, oneShardZone: () => null });
     return () => { title(); };
   }],
   ['a shard switch', at => {
@@ -84,15 +84,16 @@ test('SR12: Settings ▸ Reload now from a world comes back in the same shard wh
   const at = page(), session = held(), arrivals: unknown[] = [], reasons: string[] = [];
   const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href,
     TITLE_SKIPPERS: [], currentPose: () => ({ x: 12.345, y: 7, z: -3, yaw: 1.5, pitch: 0.25 }), terrainDatum: () => 2, RELOAD_PARAM: 'glreload',
-    setTitleArrival: (arrival: unknown, options: unknown) => { arrivals.push([arrival, options]); }, __WS_WORLD__: { release: 'proof' }, markReload: (_: string, reason: string) => { reasons.push(reason); } });
+    handZoneOnReload: (zone: unknown) => { arrivals.push(zone); return zone; }, oneShardZone: () => null, __WS_WORLD__: { release: 'proof' }, markReload: (_: string, reason: string) => { reasons.push(reason); } });
   reload(); await settle(); session.land(); await settle();
   expect(at.went).toHaveLength(1);
   const went = new URL(at.went[0] ?? '');
-  expect(went.searchParams.get('chunk')).toBe('fixture');
+  // CHUNK-PARAM CP3 (J522): the zone rides in the tab, never the address
+  expect(went.searchParams.has('chunk')).toBe(false);
   expect(went.searchParams.get('at')).toBe('12.35,5,-3,1.5,0.25'); // y in the level's authored frame (less the datum)
   expect(went.searchParams.get('glreload')).toBe('1'); expect(went.searchParams.has('v')).toBe(false);
   expect(reasons, 'a settings reload, not an explicit RELOAD (which returns to the title)').toEqual(['settings']);
-  expect(arrivals, 'an online build carries the tap that seated it (QA row 16)').toEqual([[{ slug: 'fixture', mode: 'enter' }, { tab: true }]]);
+  expect(arrivals, 'the next document takes the zone from the tab (QA row 16)').toEqual(['fixture']);
 });
 
 test('SR12: a grid page (no ?chunk=) reloads on its bare address and resumes from its planned-reload record', async () => {
@@ -100,7 +101,7 @@ test('SR12: a grid page (no ?chunk=) reloads on its bare address and resumes fro
   const location = { ...at.location, href: 'https://example.test/' };
   const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location, settingsReloadUrl: (href: string) => href,
     TITLE_SKIPPERS: [], currentPose: () => ({ x: 1, y: 2, z: 3, yaw: 0, pitch: 0 }), terrainDatum: () => 0, RELOAD_PARAM: 'glreload',
-    setTitleArrival: () => { throw new Error('a grid page hands no shard tap'); }, __WS_WORLD__: { release: 'proof' }, markReload: (_: string, reason: string) => { reasons.push(reason); } });
+    handZoneOnReload: (zone: unknown) => { if (zone !== null) throw new Error('a grid page hands no shard tap'); return null; }, oneShardZone: () => null, __WS_WORLD__: { release: 'proof' }, markReload: (_: string, reason: string) => { reasons.push(reason); } });
   reload(); await settle(); session.land(); await settle();
   expect(at.went).toEqual(['https://example.test/']); expect(reasons).toEqual(['settings']);
 });
@@ -108,7 +109,7 @@ test('SR12: a grid page (no ?chunk=) reloads on its bare address and resumes fro
 test('a reload from the title (no world, no pose) lands on the title', async () => {
   const at = page(), session = held(), reasons: string[] = [];
   const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location: at.location, settingsReloadUrl: (href: string) => href,
-    TITLE_SKIPPERS: [], currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', setTitleArrival: () => undefined,
+    TITLE_SKIPPERS: [], currentPose: () => null, terrainDatum: () => 0, RELOAD_PARAM: 'glreload', handZoneOnReload: () => null, oneShardZone: () => null,
     markReload: (_: string, reason: string) => { reasons.push(reason); } });
   reload(); await settle(); session.land(); await settle();
   expect(reasons).toEqual(['reload']);
@@ -132,4 +133,16 @@ test('a save that fails still leaves, and nothing held leaves now', async () => 
   expect(went).toEqual(['failed']);
   leaveSaved(() => { went.push('free'); });
   expect(went).toEqual(['failed', 'free']);
+});
+
+test('CHUNK-PARAM CP3: Reload now on a one-shard page with a bare address hands its zone in the tab', async () => {
+  const at = page(), session = held(), arrivals: unknown[] = [];
+  const location = { ...at.location, href: 'https://example.test/?mute=1' };
+  const reload = slice('src/client/engine/ui/ReloadPrompt.ts', 'export function reloadWithPicks', '', 'reloadWithPicks', { ...marks, ...cover, location, settingsReloadUrl: (href: string) => href,
+    TITLE_SKIPPERS: [], currentPose: () => ({ x: 1, y: 2, z: 3, yaw: 0, pitch: 0 }), terrainDatum: () => 0, RELOAD_PARAM: 'glreload',
+    handZoneOnReload: (zone: unknown) => { arrivals.push(zone); return zone; }, oneShardZone: () => 'pine-hollow', markReload: () => true });
+  reload(); await settle(); session.land(); await settle();
+  const went = new URL(at.went[0] ?? '');
+  expect(went.searchParams.has('chunk')).toBe(false); expect(went.searchParams.get('mute')).toBe('1');
+  expect(arrivals).toEqual(['pine-hollow']);
 });

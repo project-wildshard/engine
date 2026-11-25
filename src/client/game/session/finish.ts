@@ -35,6 +35,7 @@ import { textureBytes } from '@wildshard/engine/render/textureBytes';
 import { beginFarCopies, farLodOn, settleFarCopies, uploadFarCopyIndices } from '@wildshard/engine/render/farLod';
 import { budgetCollection, budgetCollectionEnabled, collectBeforeShaders, releaseDrawnGeometry } from '@wildshard/engine/render/memorySaver';
 import { setPoseProvider } from '@wildshard/engine/ui/ReloadPrompt';
+import { setOneShardZone } from '@wildshard/engine/boot/titleArrival';
 import { lastEnd, registerBeforeReload } from '@wildshard/engine/boot/lastEnd';
 import { shardArea } from '../grid/area';
 import { primeStaticMerges } from '../grid/staticViewMerge';
@@ -306,6 +307,8 @@ export async function finishStage(ctx: Awaited<ReturnType<typeof playStage>>): P
       scope: game.levelScope });
   });
   if (fragileBoot) game.levelScope.unlisten(game.canvas, 'webglcontextlost', onBootContextLost);
+  // CHUNK-PARAM CP3 (J522): the engine's reloads hand a one-shard page's zone in the tab; a grid page's record carries its own
+  setOneShardZone(ctx.grid === null ? slug : null);
   setPoseProvider(() => (hud.entered ? { x: player.position.x, y: player.position.y, z: player.position.z, yaw: player.yaw, pitch: player.pitch } : null)); // the Look Lab's reload prompt comes back right here (E65)
   // L15: the loader fades over the live world, not over the boot's last warm-up render (round 53: a washed-out lower
   // half, an empty minimap and the title ghost under the HUD for ~0.3 s): the loop starts first, and the loader leaves once

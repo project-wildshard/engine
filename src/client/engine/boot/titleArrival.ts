@@ -116,6 +116,19 @@ export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: 
   if (options.tab !== true) try { saveStorage('device').setItem(BACKUP_KEY, raw); } catch { /* the session copy may still survive */ }
 }
 
+/** CHUNK-PARAM CP3 (J522): the zone a one-shard page runs; null on a grid page, whose planned-reload record carries its place. */
+let shardZone: string | null = null;
+export function setOneShardZone(zone: string | null): void { shardZone = zone; }
+/** CP3: the zone this one-shard page runs, or null. */
+export function oneShardZone(): string | null { return shardZone; }
+/** CP3: a reload the engine makes hands a one-shard page's zone to its next document in the tab (the address names none), as a
+ *  tap does; a grid page hands nothing (its recovery record resumes it). Returns the zone handed, or null. */
+export function handZoneOnReload(zone: string | null = shardZone): string | null {
+  if (zone === null) return null;
+  setTitleArrival({ slug: zone, mode: 'enter' }, { tab: true });
+  return zone;
+}
+
 /** A tab's own handoff (`setTitleArrival(…, {tab: true})`) whose reload did not happen. */
 export function dropTabArrival(): void {
   try { saveStorage('session').removeItem(KEY); } catch { /* nothing was kept */ }

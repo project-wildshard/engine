@@ -133,7 +133,7 @@ export function action(id: string, group: DebugGroupId, label: string, text: str
 export const TITLE_SKIPPERS: string[] = ['skipintro', 'tour', 'explore', 'cam', 'model', 'at', RELOAD_PARAM, 'v'];
 
 /** E172 (the user: "I need a button to nuke the cache so i can test it"): every downloaded file gone, the saves kept
- *  (src/client/engine/boot/clearDownloads.ts), then a reload to the title like a fresh launch — the running shard's ?chunk= stays */
+ *  (src/client/engine/boot/clearDownloads.ts), then a reload to the title like a fresh launch, on a bare address (CHUNK-PARAM CP3) */
 const CLEAR_IDLE = engineString('s_e94f3b418bf5');
 /** DL10: the level's baked entry programs linked from the renderer step and the title's compiler warm-up
  *  (src/client/engine/boot/earlyPrograms.ts); read once at boot, so a pick reloads. Default on since the throttled Simulator pair
@@ -171,7 +171,7 @@ const clearDownloadsRow = action('clearDownloads', 'tools', engineString('s_59cb
   say(freed === null ? 'Cleared · reloading' : `Freed ${mbText(freed)} · reloading`,
     `${mbText(freed)} of downloads · ${r.caches} caches and ${r.workers} worker${r.workers === 1 ? '' : 's'} removed${r.httpCache ? ', HTTP cache cleared' : ''}. Reloading as a first visit.`);
   showReloading();
-  leaveSaved(() => { leaveAfterPaint(() => { markReload('debug: clear downloads'); location.replace(settingsReloadUrl(location.href, TITLE_SKIPPERS)); }); });
+  leaveSaved(() => { leaveAfterPaint(() => { markReload('debug: clear downloads'); location.replace(settingsReloadUrl(location.href, [...TITLE_SKIPPERS, 'chunk'])); }); });
 }, { purpose: 'developer', ask: 'E172', reviewBy: '2026-12-30', note: engineString('s_510ecf1f03f4') }, {
   confirm: async () => { const used = await storageUsed(); return used === null ? 'Tap again to clear' : `Tap again to clear ~${mbText(used)}`; },
   status: () => {

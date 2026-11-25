@@ -619,7 +619,8 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     placed: (cell, stand) => { if (stand !== undefined) gridNow?.placed(cell, stand); },
     regrid: cell => { regrid(cell); },
     regridInPage: cell => gridNow?.reenterInPage?.(cell, () => { regrid(cell); }) === true,
-    elsewhere: (seat, why) => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); leaving.unload(why ?? `online seat elsewhere (${seat})`); replaceFresh(url); },
+    // CHUNK-PARAM CP3 (J522): the seat's zone rides in the tab (`entering`'s tap), never the address
+    elsewhere: (seat, why) => { entering(seat); const url = new URL(location.href); url.searchParams.delete('chunk'); leaving.unload(why ?? `online seat elsewhere (${seat})`); replaceFresh(url); },
   });
   shellNow = shell;
   // the fresh read behind a kept copy: another build reloads into it, as a fresh read before the dial would (two reloads share one
