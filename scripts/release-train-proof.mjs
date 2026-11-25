@@ -109,3 +109,9 @@ export function releaseCiAdmission(build, ci) {
   if (!trainSha.test(build) || !Number.isSafeInteger(ci) || ci <= 0) throw new Error('npm next needs the full build SHA and its release CI run');
   return { staging_build: build, staging_qualification: JSON.stringify({ build, j475: { releaseCi: ci } }) };
 }
+
+/** Whether a stopped prepare's log is the push gate seeing its installed inputs change mid-gate (push-proof-cache.mjs),
+ * a passing stop that a second prepare clears. @param {string} log @returns {boolean} */
+export function gateInputsMoved(log) {
+  return /Full proof inputs unavailable; rerun the complete gate|Installed inputs changed during the gate/u.test(log);
+}

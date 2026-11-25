@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { attributionGap, fullCommitArgs, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../scripts/release-train-proof.mjs';
+import { attributionGap, fullCommitArgs, gateInputsMoved, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -167,5 +167,13 @@ describe('releaseCiAdmission', () => {
     expect(JSON.parse(input.staging_qualification)).toEqual({ build, j475: { releaseCi: 45698418187 } });
     expect(() => releaseCiAdmission('889b423bed', 1)).toThrow('full build SHA');
     expect(() => releaseCiAdmission(build, 0)).toThrow('release CI run');
+  });
+});
+
+describe('gateInputsMoved', () => {
+  test("names the push gate's mid-gate install change, and nothing else", () => {
+    expect(gateInputsMoved('release: git push failed (1)\nError: Full proof inputs unavailable; rerun the complete gate')).toBe(true);
+    expect(gateInputsMoved('Error: Installed inputs changed during the gate; rerun the exact tree')).toBe(true);
+    expect(gateInputsMoved('Error: release: main is past its newest green ci')).toBe(false);
   });
 });

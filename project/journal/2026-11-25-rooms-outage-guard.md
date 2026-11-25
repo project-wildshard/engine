@@ -67,3 +67,5 @@
   candidate passed, though npm-publish.yml admits it on the exact green release CI (J475). The train now sends npm next
   on that admission when staging is busy, and every `gh --commit` it passes must be a full SHA (a short one matched no
   run and held a wait 20 minutes past a green ci).
+- v0.1.93's prepare stopped once because its push gate saw the shared install move mid-gate (a land refreshed it). The
+  train now prepares once more on exactly that stop; repo-kit rolls back the half-made branch, so the retry starts clean.

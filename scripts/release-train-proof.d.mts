@@ -18,3 +18,4 @@ export function attributionGap(env: Record<string, string | undefined>, prepared
 export function retryRead<T>(read: () => T, opts?: {tries?: number, pauseMs?: number, pause?: (ms: number) => void}): T;
 export function fullCommitArgs(args: readonly string[]): readonly string[];
 export function releaseCiAdmission(build: string, ci: number): { staging_build: string; staging_qualification: string };
+export function gateInputsMoved(log: string): boolean;

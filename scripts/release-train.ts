@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { attributionGap, fullCommitArgs, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, fullCommitArgs, gateInputsMoved, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './pid-lock.mjs';
@@ -216,7 +216,16 @@ async function main(args: string[]) {
     if (!prepared) {
       receipt(lane, `START ${tag} cut from ${source.headSha.slice(0, 10)}, main CI ${source.databaseId}.`);
       // Kept with the evidence: the run's scratch is removed on exit, and a stopped prepare must still say why.
-      await runLogged(root, join(saved, 'prepare.log'), kit, [tag, '--prepare', '--from', source.headSha, '--notes', notes]);
+      const prepare = () => runLogged(root, join(saved, 'prepare.log'), kit, [tag, '--prepare', '--from', source.headSha, '--notes', notes]);
+      try {
+        await prepare();
+      } catch (error) {
+        // J505 (opus-rel86, 11-25): v0.1.93's prepare stopped when its push gate saw the installed inputs change mid-gate
+        // (a land refreshed the shared install). That is passing; repo-kit rolls back the half-made branch, so prepare once more.
+        if (!gateInputsMoved(readFileSync(join(saved, 'prepare.log'), 'utf8'))) throw error;
+        receipt(lane, `NOTE ${tag} prepare's push gate saw its installed inputs move mid-gate; preparing once more.`);
+        await prepare();
+      }
     }
     const build = git(['rev-parse', branchRef]);
     if (git(['rev-parse', `${build}^`]) !== source.headSha || git(['rev-parse', 'HEAD'], tree) !== build ||
