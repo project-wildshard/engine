@@ -308,6 +308,18 @@ try {
   };
   /** Whether this page holds a seat. @param {import('playwright').Page} page */
   const seated = page => page.evaluate(() => typeof window.__workerClient === 'function' && window.__workerClient().own !== null).catch(() => false);
+  /** A case's device goes as a player's does: a seated page takes Leave the world (pause ▸ main menu), whose clean quit frees its
+   *  seat at the door at once, then the context closes. A bare close leaves the seat held for HOLD_MS (5 min), and under `--seats=2`
+   *  two held seats filled the door by the third case: every later play case was refused `full` (QA 11-25 row 65: modes 6, 9, 10,
+   *  10b, 13, 16, 17 and 17b on the nightly). @param {Entered} entered */
+  const leave = async entered => {
+    const { page, context } = entered;
+    if (await seated(page)) {
+      const left = page.waitForURL(url => url.searchParams.get('chunk') === null, { timeout: 8000 }).then(() => true, () => false);
+      if (await page.evaluate(() => document.dispatchEvent(new Event('ws:exit-to-main'))).then(() => true, () => false)) await left;
+    }
+    await context.close();
+  };
   // FM5b4/mode 10: the rig back on the first build, with no page view or retention file, for the next case
   let onNext = false;
   const home = async () => {
@@ -439,8 +451,8 @@ try {
           const signedOut = await second.page.evaluate(() => Object.keys(localStorage).every(key => !key.includes('wildshard.player.session'))).catch(() => false);
           if (!asDevice || !accountQuiet) return { outcome: 'ui-fail', reason: `the guest choice: ${!asDevice ? 'no saved place as the device' : 'the account was written'}`, seen, injection, shot };
           return { ...result, injection, shot, recovery: `Sign in by a fresh link: rejoined as the account (saved place after the rejoin); Play as a guest: rejoined as the device${signedOut ? '' : ' (session key still listed)'}`, recoveryMs: Date.now() - rejoinAt };
-        } finally { await second.context.close(); }
-      } finally { await heal(); await first.context.close(); }
+        } finally { await leave(second); }
+      } finally { await heal(); await leave(first); }
     },
     authFailed: async item => {
       if (apiFixture === null) return { outcome: 'harness-fail', reason: 'the owned local API never opened' };
@@ -461,7 +473,7 @@ try {
         const inNow = await page.locator('#ws-signin[data-signed-in="true"]').waitFor({ state: 'visible', timeout: 30_000 }).then(() => true, () => false);
         return inNow ? { ...result, injection, shot, recovery: 'Email me a new link, its link opened: signed in', recoveryMs: Date.now() - healedAt }
           : { outcome: 'ui-fail', reason: 'a fresh link never signed the page in', seen, injection, shot };
-      } finally { await entered.context.close(); }
+      } finally { await leave(entered); }
     },
     api5xx: async item => {
       if (apiFixture === null) return { outcome: 'harness-fail', reason: 'the owned local API never opened' };
@@ -497,7 +509,7 @@ try {
         return closed && again !== null && sent && boxGone && apiFixture.counts.sent > sentBefore
           ? { ...result, injection, shot, recovery: 'Play as a guest closed the card; heal, Try now: the link was sent', recoveryMs: Date.now() - healedAt }
           : { outcome: 'ui-fail', reason: !closed ? 'Play as a guest left the card up' : again === null ? 'the second ask showed no card' : !sent ? 'Try now never sent the link' : 'the card stayed after the link was sent', seen, injection, shot };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // a fault on the world's socket, held, then healed
     socketDown: async item => {
@@ -546,7 +558,7 @@ try {
         }
         const back = await recovered(page, item.id === 'full' ? 45_000 : 30_000);
         return back ? { ...result, injection, shot, recovery: 'a real frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen: seenWhileDown, injection, shot, after: await shoot(page, item.id, 'after'), url: page.url(), notes: await onScreen(page) };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM7b2/FM4 mode 25 on the door's own line (`--seats=2`): two pages take both seats; a third and a fourth are refused with their
     // place (1, then 2) and no invented wait; the third's Title screen says the clean quit, so the fourth's next retry is first in line;
@@ -580,14 +592,14 @@ try {
         if (!moved) return { outcome: 'ui-fail', reason: 'Title did not cancel the ticket ahead: the fourth never moved up', seen: fourthSeen, shot: firstShot, notes: await onScreen(fourth.page) };
         // a seat frees: the head of the line comes in by itself on its next retry
         const leaving = Date.now();
-        await first.context.close();
+        await leave(first);
         const admitted = await fourth.page.locator(`[data-failmode~="${item.screen}"]`).first().waitFor({ state: 'detached', timeout: 75_000 }).then(() => true, () => false)
           && await intoWorld(fourth, 90_000).then(() => true, () => false);
         if (!admitted) return { outcome: 'ui-fail', reason: 'the head of the line never came in after a seat freed', seen: fourthSeen, notes: await onScreen(fourth.page) };
         return { ...result, shot, notes: { second: { seen: fourthSeen, shot: secondShot }, movedUp: firstShot },
           injection: { seats: 2, seated: 2, waiting: 2, door: 'the world\'s own full refusal with FM7b2 queue facts' },
           recovery: `Title cancelled the ticket ahead; a seat freed and the head came in after ${String(Math.round((Date.now() - leaving) / 1000))} s` };
-      } finally { for (const row of opened) await row.context.close().catch(() => undefined); }
+      } finally { for (const row of opened) await leave(row).catch(() => undefined); }
     },
     // FM4: Send while the link is down holds one visible line, sent once on the way back
     heldChat: async item => {
@@ -610,7 +622,7 @@ try {
         const copies = await page.evaluate(text => [...document.querySelectorAll('#ws-chat [data-lines] > *')].filter(node => (node.textContent ?? '').includes(text)).length, line);
         if (result.outcome !== 'pass') return { ...result, shot };
         return sent && copies === 1 ? { ...result, shot, injection: { socketMatches: await matchedSince(before, 'socket') }, recovery: 'the held line sent once' } : { outcome: 'ui-fail', reason: `held line sent ${String(copies)} times`, seen, shot };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM4 15b/17b/19b: under a banner, a real tap the world must hear (Attack, its key F) opens the banner's hold card instead of
     // going out; the card closes by itself on the first frame back
@@ -644,7 +656,7 @@ try {
         const back = closed && await recovered(page, 30_000);
         return back ? { ...result, shot, injection: { tap: 'Attack (key F)', socketMatches: await matchedSince(before, 'socket') }, recovery: 'the card closed on the first frame' }
           : { outcome: 'ui-fail', reason: closed ? 'no frames after heal' : 'the hold card stayed after the link came back', seen, shot };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // a second tab of the same device takes the seat; Play here takes it back
     replaced: async item => {
@@ -661,7 +673,7 @@ try {
         await press(page, item.screen, 'Play here'); await reloading; await intoWorld(entered, 90_000).catch(() => undefined);
         const back = await recovered(page, 30_000);
         return back ? { ...result, ...shot === undefined ? {} : { shot }, injection: { secondTab: true }, recovery: 'Play here: seated' } : { outcome: 'ui-fail', reason: 'Play here never seated', seen, notes: await onScreen(page) };
-      } finally { await entered.context.close(); }
+      } finally { await leave(entered); }
     },
     // FM5 mode 13: /version.json fails (Developer on, as every fixture page is). The poll is the pause menu's Settings ▸ Build ▸
     // Check, a player's tap that runs the same read as the 5-minute/foreground poll; the pill (title and pause menu) says so to a
@@ -688,7 +700,7 @@ try {
         const cleared = await page.locator('[data-failmode~="version-http"]').waitFor({ state: 'detached', timeout: 15_000 }).then(() => true,
           async () => !(await visibleIds(page)).some(ids => /\bversion-http\b/u.test(ids)));
         return cleared ? { ...result, injection, shot, recovery: 'healed, the next read clears it' } : { outcome: 'ui-fail', reason: 'the failed line stayed after a read answered', seen, injection, shot };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM8m mode 41: the proxy sends the server's coded close (FM7b1: 4001 `refused` with {v:1,code:'banned'}); the page shows the
     // removed card, says the end time only when one was sent, and never dials again. Two joins: with an end time, then without one.
@@ -724,7 +736,7 @@ try {
         const later = await matchedSince(before, 'socket') - settled;
         if (later !== 0) return { outcome: 'ui-fail', reason: `the page dialled ${String(later)} times after the open-ended ban`, seen: open, shot: openShot };
         return { ...result, shot, injection: { closes: settled, untilMs, redials: 0 }, noEnd: { seen: open, shot: openShot }, recovery: 'none: no redial; Title screen leaves for the title' };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM4 mode 9b: the world restarts under play (close 4005 `restart`, then upgrades refused: the world is quiet), the player goes to
     // the title and taps ENTER THE MMO. The tap holds on `restart-blocked`; when the world answers again it joins by itself.
@@ -751,7 +763,7 @@ try {
         const joined = gone && await intoWorld(entered, 120_000).then(() => true, () => false);
         return joined ? { ...result, injection, shot, recovery: 'heal: the held tap joined by itself' }
           : { outcome: 'ui-fail', reason: gone ? 'the card went but the world never loaded' : 'the card stayed after the world answered', seen, injection, shot };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM8s modes 30, 30b and 31: the rig's own database (pglite:) breaks on purpose through its front (online-rig.mjs `database`):
     // `hold` keeps every query waiting (a save is late, never failed), `refuse` drops every connection (each save fails, the server
@@ -829,7 +841,7 @@ try {
         const left = await titled;
         return stayed && left ? { ...result, shot, injection: { database: 'hold', heldBytes: db.stats.heldBytes, taps: 'EXIT TO MAIN, Keep playing, EXIT TO MAIN, Leave when saved' }, recovery: 'release: left for the title on the confirmed save' }
           : { outcome: 'ui-fail', reason: stayed ? 'Leave when saved did not leave on the confirmed save' : 'Leave when saved left before the save landed', seen: card, shot };
-      } finally { db.fault('pass'); await entered.context.close(); }
+      } finally { db.fault('pass'); await leave(entered); }
     },
     // --refusal=injection: a fault on a route this page never reads matches nothing, and that is a harness failure, never a pass
     unmatched: async () => {
@@ -840,7 +852,7 @@ try {
         await sleep(5000);
         const matches = await matchedSince(before, 'doctor');
         return matches === 0 ? { outcome: 'harness-fail', reason: 'the doctor fault matched nothing in 5 s', injection: { matches } } : { outcome: 'pass', injection: { matches } };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM8 mode 14: the doctor's page doesn't answer its preflight; the world page stays, with a card
     doctorHttp: async item => {
@@ -859,7 +871,7 @@ try {
         if (!injection.stayed) return { outcome: 'ui-fail', reason: 'the page left for a doctor that did not answer', seen, injection, shot };
         await Promise.all([page.waitForURL(/\/doctor\//u, { timeout: 20_000 }), press(page, item.screen, 'Try again')]).catch(() => undefined);
         return /\/doctor\//u.test(page.url()) ? { ...result, injection, shot, recovery: 'healed, Try again: the doctor opened' } : { outcome: 'ui-fail', reason: 'Try again never opened the doctor', seen, injection, shot };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM4b: the browser goes offline in the world
     // FM4b modes 5 to 8: the world never answers this page from its first dial (a refused upgrade, an address with no DNS answer, a
@@ -907,7 +919,7 @@ try {
         while (!back && Date.now() - healedAt < 45_000) { back = await seated(page) && !(await visibleIds(page)).some(ids => /\bunreachable\b/u.test(ids)); if (!back) await sleep(300); }
         const recovery = negative !== '' ? 'release names the world again, Try now: seated, card gone' : 'heal: seated by itself, card gone';
         return back ? { ...result, injection, shot, recovery, recoveryMs: Date.now() - healedAt } : { outcome: 'ui-fail', reason: 'no seat after the heal', seen, injection, shot, after: await shoot(page, item.id, 'after'), notes: await onScreen(page) };
-      } finally { rig.pageView(null); allowedOrigins.delete(negativeOrigin); await heal().catch(() => undefined); await entered.context.close(); }
+      } finally { rig.pageView(null); allowedOrigins.delete(negativeOrigin); await heal().catch(() => undefined); await leave(entered); }
     },
     // FM8 mode 32 and 32b (opus-fm): two real pages on voice in Driftwood, a fake microphone each, real ICE with no servers (the
     // voice worker's TURN list is answered empty here: an empty list is no failure, and no STUN leaves this Mac). Controls first: the
@@ -1004,7 +1016,7 @@ try {
         await a.page.locator('#ws-voice-tip button[data-action="retry"]').click({ timeout: 5000 });
         const back = await linked(a) && await a.page.locator('#ws-voice-tip[data-failmode="voice-failed"]').waitFor({ state: 'detached', timeout: 30_000 }).then(() => true, async () => !await tipOn(a, 'voice-failed'));
         return back ? { ...result, injection: { ...injection, chat: 'a line arrived', retryIceAsks: iceAsks.count - asksBefore }, shot, recovery: 'Try again: TURN list asked again, re-offered, linked, the tip went' } : { outcome: 'ui-fail', reason: 'no link after Try again', seen, injection, notes: await onScreen(a.page) };
-      } finally { for (const entered of opened) await entered.context.close().catch(() => undefined); }
+      } finally { for (const entered of opened) await leave(entered).catch(() => undefined); }
     },
     offlinePlay: async item => {
       const entered = await fresh(); const { page, context } = entered;
@@ -1017,7 +1029,7 @@ try {
         const result = await judged(seen, item, page);
         const back = result.outcome === 'pass' && await recovered(page, 30_000);
         return result.outcome !== 'pass' ? { ...result, injection } : back ? { ...result, ...shot === undefined ? {} : { shot }, injection, recovery: 'online: a frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery online', seen, notes: await onScreen(page) };
-      } finally { await context.setOffline(false).catch(() => undefined); await heal().catch(() => undefined); await entered.context.close(); }
+      } finally { await context.setOffline(false).catch(() => undefined); await heal().catch(() => undefined); await leave(entered); }
     },
     // J298: a world the device holds loads offline and says so
     offlineLaunch: async item => {
@@ -1046,7 +1058,7 @@ try {
         const result = await judged(seen, item, page);
         if (result.outcome !== 'pass') return { ...result, shot, injection };
         return await recovered(page, 45_000) ? { ...result, shot, injection, recovery: 'online: a frame, no card' } : { outcome: 'ui-fail', reason: 'no recovery online', seen, shot, notes: await onScreen(page) };
-      } finally { await context.setOffline(false).catch(() => undefined); await heal().catch(() => undefined); await entered.context.close(); }
+      } finally { await context.setOffline(false).catch(() => undefined); await heal().catch(() => undefined); await leave(entered); }
     },
     // the page frozen (CDP), with or without a visibility change
     // FM4b mode 45 (opus-fm): a sleep comes back to a quiet link only if the world doesn't answer at once: the proxy refuses the
@@ -1105,7 +1117,7 @@ try {
         if (result.outcome !== 'pass') return { ...result, injection, shot };
         if (quiet && !/sleep-wake/u.test(seen?.ids ?? '')) return { outcome: 'ui-fail', reason: 'the card did not name the sleep (no page clock tick)', seen, injection, shot };
         return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: 'seated again' } : { outcome: 'ui-fail', reason: 'no recovery after the return', seen, injection, shot, notes: await onScreen(page) };
-      } finally { await heal().catch(() => undefined); await entered.context.close(); }
+      } finally { await heal().catch(() => undefined); await leave(entered); }
     },
     // FM4b: slow and unstable links (measured RTT; the proxy holds frames)
     linkQuality: async item => {
@@ -1128,7 +1140,7 @@ try {
         if (result.outcome !== 'pass') return { ...result, injection };
         const cleared = await page.locator(`[data-failmode~="${item.screen}"]`).waitFor({ state: 'detached', timeout: 20_000 }).then(() => true, () => false);
         return cleared ? { ...result, injection, ...shot === undefined ? {} : { shot }, recovery: 'cleared after good seconds' } : { outcome: 'ui-fail', reason: 'the chip never cleared', seen, injection };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM5: the release file fails before the page can dial
     releaseFault: async item => {
@@ -1164,7 +1176,7 @@ try {
         await press(page, item.screen, 'Try').catch(() => undefined);
         await intoWorld(entered, 60_000).catch(() => undefined);
         return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: 'healed: the world loads' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen, injection, shot, notes: await onScreen(page) };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM6: packs and the spawn book fail on the loading card
     packsFault: async item => {
@@ -1197,7 +1209,7 @@ try {
         const pressed = await retry.click({ timeout: 5000 }).then(() => true, () => false);
         await intoWorld(entered, 90_000).catch(() => undefined);
         return await recovered(page, 30_000) ? { ...result, injection, shot, recovery: pressed ? 'heal, Retry: the world loads' : 'heal: the world loads' } : { outcome: 'ui-fail', reason: 'no recovery after heal', seen, injection, shot, notes: await onScreen(page) };
-      } finally { await heal(); await entered.context.close(); }
+      } finally { await heal(); await leave(entered); }
     },
     // FM6: Chromium exercises native origin quota. WebKit's public Cache API refusal is explicitly injected.
     storageFull: async item => {
@@ -1235,7 +1247,7 @@ try {
         return playing ? { ...result, injection, shot, recovery: 'plays on from memory' } : { outcome: 'ui-fail', reason: 'the world never played', seen, injection, shot };
       } finally {
         if (cdp !== null) { await cdp.send('Storage.overrideQuotaForOrigin', { origin: PAGE_ORIGIN }); await cdp.detach(); }
-        await entered.context.close();
+        await leave(entered);
       }
     },
     // FM4b mode 42: the device clock 2 min ahead; the Doctor measures it against the page's host
@@ -1271,7 +1283,7 @@ try {
         if (unknownControl.versionMatches === 0 || unknownControl.healthMatches === 0) return { outcome: 'harness-fail', reason: 'the unknown-clock control matched no read', injection: { ...injection, unknownControl } };
         if (!unknown || warned) return { outcome: 'ui-fail', reason: 'an unmeasured clock was not said as unknown, or still warned', seen, injection: { ...injection, unknownControl }, shot };
         return { ...result, injection: { ...injection, unknownControl }, shot, recovery: 'Run again with the clock right: no warning; unmeasured clock: clock unknown, no warning' };
-      } finally { await entered.context.close(); }
+      } finally { await leave(entered); }
     },
     // FM4 mode 10 (J174): a deploy under play, on the second build. Both views of the release name it; the world counts down while
     // play goes on, the page origin moves, the world drains and comes back on it, and the page reloads into it by itself.
@@ -1295,17 +1307,27 @@ try {
         const runs = await page.evaluate(() => /** @type {typeof globalThis & { __WS_BUILD_ID__?: string }} */ (globalThis).__WS_BUILD_ID__ ?? '').catch(() => '');
         return landed ? { ...result, shot, injection: { from: rig.build, to: rig.nextBuild, views: 'world and page' }, recovery: `the link came back on the moved world and play goes on (page build ${runs === rig.nextBuild ? 'reloaded into the new one' : 'kept, same wire'})` }
           : { outcome: 'ui-fail', reason: 'play never came back after the move', seen, shot, notes: await onScreen(page) };
-      } finally { await entered.context.close(); await home(); }
+      } finally { await leave(entered); await home(); }
     },
     // FM4 mode 10b: ENTER THE MMO on the title in a deploy's last seconds (the world's first word says it is moving inside 15 s).
-    // The tap holds on `deploy-blocked`; once the world is back on the second build the page joins it by itself.
+    // The tap holds on `deploy-blocked`; once the world is back on the second build the page joins it by itself. Since QA 11-23-b
+    // row 5 (engine 1b8681494, Jake: ENTER ZONE must be instant) the title asks the world before entering only in a tab that heard
+    // it restart (`restartRecent`); any other tap enters at once and the move carries the seated player as it carries everyone.
+    // So the device first hears a restart in play (9b's 4005 close), as a world that restarts and then deploys would tell it.
     deployHold: async item => {
       if (rig.nextBuild === '') return { outcome: 'blocked-dependency', reason: NEEDS_NEXT };
       const entered = await fresh(); const { page } = entered;
       try {
-        // as 9b: a device that has played goes back to the title (a fresh one's ENTER opens Zone select instead)
+        // as 9b: a device that has played, and heard the world restart, goes back to the title (a fresh one's ENTER opens Zone select)
         await page.goto(URL_PLAY); await intoWorld(entered);
+        const before = await control();
+        await arm('deploy-blocked-restart', [{ route: 'socket', kind: 'close', code: 4005, reason: 'restart' }]);
+        for (let tries = 0; tries < 40 && await matchedSince(before, 'socket') === 0; tries++) await sleep(100);
+        if (await matchedSince(before, 'socket') === 0) return { outcome: 'harness-fail', reason: 'the restart close matched nothing' };
+        await arm('deploy-blocked-restart-held', [{ route: 'socket', kind: 'refuse-upgrade', code: 503 }]);
+        if (await screen(page, 'restart', 10_000) === null) return { outcome: 'harness-fail', reason: 'the page never showed the in-world restart banner', notes: await onScreen(page) };
         await page.goto(`${PAGE_ORIGIN}/?mute=1&nolock=1`);
+        await heal();
         const enter = page.locator('.ws-main-mmo').first();
         await enter.waitFor({ state: 'visible', timeout: 60_000 });
         let seen = /** @type {Seen | null} */ (null), shot = '', tapped = 0;
@@ -1319,9 +1341,9 @@ try {
         const result = await judged(seen, item, page);
         if (result.outcome !== 'pass') return { ...result, shot };
         const landed = await intoWorld(entered, 120_000).then(() => true, () => false) && await backInPlay(page);
-        return landed ? { ...result, shot, injection: { from: rig.build, to: rig.nextBuild, tapMsAfterPublish: 1500, heldMs: Date.now() - tapped }, recovery: 'the held tap joined the moved world by itself' }
+        return landed ? { ...result, shot, injection: { restartHeard: true, from: rig.build, to: rig.nextBuild, tapMsAfterPublish: 1500, heldMs: Date.now() - tapped }, recovery: 'the held tap joined the moved world by itself' }
           : { outcome: 'ui-fail', reason: 'the held tap never joined the moved world', seen, shot, notes: await onScreen(page) };
-      } finally { await entered.context.close(); await home(); }
+      } finally { await leave(entered); await home(); }
     },
     // FM5b4 mode 24 (J219, J229): the second build retires this one. A legacy page (no file, a 404) shows nothing; a boot on the retired
     // build gets the too-old page before any seat; in play the player's Check reads the signed file and the banner counts down to its
@@ -1342,7 +1364,7 @@ try {
             if (up.length > 0) return { outcome: 'ui-fail', reason: 'a legacy page (no retention file) showed too-old', notes: await onScreen(page) };
             if (!reads.includes(404)) return { outcome: 'harness-fail', reason: `the page never read the missing retention file (${reads.join(',')})` };
             steps.legacy = { reads, screens: 'none' };
-          } finally { await entered.context.close(); }
+          } finally { await leave(entered); }
         }
         // 2. boot exclusion
         rig.pageView(next); rig.retain({ keptBuilds: [next] });
@@ -1359,7 +1381,7 @@ try {
             await sleep(3000);
             if (await seated(page)) return { outcome: 'ui-fail', reason: 'the retired build took a seat at boot', seen, shot };
             steps.boot = { seen, shot, seated: false };
-          } finally { await entered.context.close(); }
+          } finally { await leave(entered); }
         }
         await sleep(cooldownMs / 2);
         // 3. in play, 4. the next load, 5. Update
@@ -1424,7 +1446,7 @@ try {
           steps.update = { coverMs, reloads, build: next, shot: backShot };
           return { ...result, shot, injection: { retentionFile: 'signed, keeps only the second build', pageView: next, worldView: rig.build, retireInMs: 25_000, drop: 'socket drop-after 0' }, notes: steps,
             recovery: `next load refused with the page; Update: cover in ${String(coverMs)} ms, one reload, playing on ${next}` };
-        } finally { await page.keyboard.up('KeyF').catch(() => undefined); await entered.context.close(); }
+        } finally { await page.keyboard.up('KeyF').catch(() => undefined); await leave(entered); }
       } finally { await home(); }
     },
     // FM5 mode 46: a release signed for staging (loopback fixture only)
@@ -1436,7 +1458,7 @@ try {
         const seen = await screen(page, item.screen, 10_000), shot = await shoot(page, item.id, seen === null ? 'missing' : 'notice');
         const result = await judged(seen, item, page);
         return { ...result, shot, injection: { channel: 'staging', loopback: true }, ...result.outcome === 'pass' ? { recovery: 'stays for the session' } : {} };
-      } finally { rig.publish(3, rig.build, 'production'); await entered.context.close(); }
+      } finally { rig.publish(3, rig.build, 'production'); await leave(entered); }
     },
   };
 

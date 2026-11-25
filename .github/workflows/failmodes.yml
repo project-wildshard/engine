@@ -82,7 +82,9 @@ jobs:
               exit 2
               ;;
           esac
-          scripts/browser-lane.sh node scripts/failmode-proof.mjs \
+          # browser-lane kills its command after --max minutes (60 by default): the nightly's 55 cases need the job's time,
+          # not 60 minutes, or the run dies at case 25 every night (QA 11-25 row 65)
+          scripts/browser-lane.sh --max 190 node scripts/failmode-proof.mjs \
             tmp/fm11/build/dist tmp/fm11/run tmp/fm11/build/key.json pglite: "${flags[@]}"
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

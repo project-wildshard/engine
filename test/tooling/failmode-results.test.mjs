@@ -46,3 +46,18 @@ test('a page that neither dials nor shows the screen stops at the deadline', asy
   expect(await bootScreenWait(probe, 60_000)).toEqual({ seen: null, why: 'deadline' });
   expect(probe.now()).toBeGreaterThanOrEqual(60_000);
 });
+test('every case device leaves through the clean quit, so a held seat never fills a two-seat door (QA 11-25 row 65)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(new URL('../../scripts/failmode-proof.mjs', import.meta.url), 'utf8');
+  // the one bare close is inside `leave`, after Leave the world; a case that closes its context itself holds its seat 5 min
+  expect(source.match(/context\.close\(\)/gu)).toHaveLength(1);
+  expect(source).toMatch(/const leave = async entered => \{[\s\S]*?ws:exit-to-main[\s\S]*?await context\.close\(\);/u);
+});
+test('the nightly gives browser-lane the job\'s time, never its 60 min default (QA 11-25 row 65)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const workflow = readFileSync(new URL('../../.github/workflows/failmodes.yml', import.meta.url), 'utf8');
+  const job = Number(/timeout-minutes: \$\{\{ github\.event_name == 'push' && \d+ \|\| (\d+) \}\}/u.exec(workflow)?.[1]);
+  const lane = Number(/scripts\/browser-lane\.sh --max (\d+) node scripts\/failmode-proof\.mjs/u.exec(workflow)?.[1]);
+  expect(lane).toBeGreaterThanOrEqual(150);
+  expect(lane).toBeLessThan(job);
+});
