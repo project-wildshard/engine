@@ -7,7 +7,7 @@ import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:
 import { join } from 'node:path';
 import { failingIds, mainReds, newReds, writeCache, cacheFile } from '../../scripts/push-known-red.mjs';
 import { markGated, pregated } from '../../scripts/main-push-gated.mjs';
-import { pregate } from '../../scripts/main-push.mjs';
+import { ownCommits, pregate } from '../../scripts/main-push.mjs';
 
 // Mini coordinator, 2026-11-16 ~17:50 Cancún: a push is never refused for a red main already has, and main-push gates
 // before its lock. Real git: a bare remote, a clone, replayed commits keeping their patch ids.
@@ -88,11 +88,45 @@ test('the gate before the lock carries main-push\'s own marker for its HEAD', as
   git(work, 'init', '--quiet', '--bare', '--initial-branch=main', remote);
   git(work, 'clone', '--quiet', remote, clone);
   writeFileSync(join(clone, 'seed.txt'), 'seed\n'); git(clone, 'add', 'seed.txt'); git(clone, 'commit', '--quiet', '-m', 'seed'); git(clone, 'push', '--quiet', 'origin', 'main');
-  writeFileSync(join(clone, 'pin.txt'), 'pin\n'); git(clone, 'add', 'pin.txt'); git(clone, 'commit', '--quiet', '-m', 'pin');
+  // Row 58: main-push gates only the pushing lane's own commits, so the fixture commit names the lane that pushes it.
+  writeFileSync(join(clone, 'pin.txt'), 'pin\n'); git(clone, 'add', 'pin.txt'); git(clone, 'commit', '--quiet', '-m', 'pin', '-m', 'Lane: push-known-red');
   const seen = join(work, 'marked-env.txt');
   mkdirSync(join(clone, '.githooks'), { recursive: true });
   writeFileSync(join(clone, '.githooks/pre-push'), `#!/usr/bin/env bash\ncat >/dev/null\nprintf '%s' "$WS_LAND_MAIN_PUSH" > '${seen}'\n`);
   chmodSync(join(clone, '.githooks/pre-push'), 0o755);
-  expect(await pregate(clone, () => undefined)).toMatch(/gate green before the lock/u);
+  const before = process.env.WS_LANE_NAME;
+  process.env.WS_LANE_NAME = 'push-known-red';
+  try {
+    expect(await pregate(clone, () => undefined)).toMatch(/gate green before the lock/u);
+  } finally {
+    if (before === undefined) delete process.env.WS_LANE_NAME; else process.env.WS_LANE_NAME = before;
+  }
   expect(readFileSync(seen, 'utf8')).toBe(`main-push:${git(clone, 'rev-parse', 'HEAD')}`);
+});
+
+// Engine main red 45676829545 (row 58's c30f9fd93): CI runs with no lane name, and main-push then left every unnamed
+// commit as another lane's, so it gated nothing. A pusher with no lane name sends unnamed commits; a named lane leaves
+// them, and any commit naming another lane.
+test('a pusher with no lane name sends unnamed commits; a named lane leaves them and other lanes\' commits', () => {
+  const remote = join(work, 'unnamed.git'), clone = join(work, 'unnamed');
+  git(work, 'init', '--quiet', '--bare', '--initial-branch=main', remote);
+  git(work, 'clone', '--quiet', remote, clone);
+  writeFileSync(join(clone, 'seed.txt'), 'seed\n'); git(clone, 'add', 'seed.txt'); git(clone, 'commit', '--quiet', '-m', 'seed'); git(clone, 'push', '--quiet', 'origin', 'main');
+  const base = git(clone, 'rev-parse', 'HEAD');
+  writeFileSync(join(clone, 'a.txt'), 'a\n'); git(clone, 'add', 'a.txt'); git(clone, 'commit', '--quiet', '-m', 'unnamed');
+  writeFileSync(join(clone, 'b.txt'), 'b\n'); git(clone, 'add', 'b.txt'); git(clone, 'commit', '--quiet', '-m', 'theirs', '-m', 'Lane: other-lane');
+  const head = git(clone, 'rev-parse', 'HEAD');
+  const before = process.env.WS_LANE_NAME;
+  try {
+    delete process.env.WS_LANE_NAME;
+    const unnamed = ownCommits(clone, base, head);
+    expect(unnamed.left.map(row => row.lane)).toEqual(['other-lane']);
+    expect(unnamed.own).toBe(1);
+    process.env.WS_LANE_NAME = 'push-known-red';
+    const named = ownCommits(clone, base, head);
+    expect(named.left.map(row => row.lane)).toEqual([null, 'other-lane']);
+    expect(named.sha).toBe(base);
+  } finally {
+    if (before === undefined) delete process.env.WS_LANE_NAME; else process.env.WS_LANE_NAME = before;
+  }
 });

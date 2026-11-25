@@ -115,7 +115,10 @@ export function gateEnv(env, carried) {
  */
 export function ownCommits(cwd, base, head, env = process.env) {
   const commits = commitLanes(cwd, `${base}..${head}`);
-  const left = env.ALLOW_CARRY === '1' ? [] : foreignCommits(commits, currentLane());
+  // A pusher with no lane name (Jake, a CI fixture) cannot tell an unnamed commit from its own, so it sends them; a named
+  // lane leaves unnamed commits, which in a shared checkout may be anyone's.
+  const lane = currentLane();
+  const left = env.ALLOW_CARRY === '1' ? [] : foreignCommits(commits, lane, { unnamed: lane === 'unnamed' ? 'own' : 'foreign' });
   if (left.length === 0) return { sha: head, own: commits.length, left };
   const skipped = new Set(left.map(row => row.sha));
   let target = base, own = 0;

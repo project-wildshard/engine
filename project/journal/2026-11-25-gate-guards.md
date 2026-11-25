@@ -18,3 +18,5 @@
 - QA 11-25 row 61 (engine half): shard-sweep.yml runs scripts/shard-sweep.mjs every 20 min with the nightly app.
   It reads each shard repo's published.json, tags a missing tag, and starts shard-pin for an unpinned revision
   no pin run has tried (titled by run-name). Its first dry run found sunscar-dunes r9 and mirror-salt r8 unpinned.
+- Main red 45676829545 (row 58 follow-up): main-push run with no lane name (CI, Jake) sends unnamed commits; a named
+  lane still leaves them. push-known-red's fixture commit names its lane.
