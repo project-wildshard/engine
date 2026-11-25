@@ -14,6 +14,7 @@ import {checkShardfile} from '../src/server/host/checkShardfile';
 import {admitFolder,type FolderOptions} from '../src/client/game/shardfile/folder';
 import {hashImmutableBytes} from '../src/shared/host/immutable';
 import {wholeBrasscapExport} from './fixtures/brasscapExport';
+import {builtFolder} from '../src/test/game/builtFolder';
 
 // Brasscap Mesa's export, since J434 retired the handwritten Template 2 (TEMPLATE-E2E TR-10).
 const fixture=wholeBrasscapExport();
@@ -25,6 +26,11 @@ const preceding=readdirSync('out',{withFileTypes:true}).filter(entry=>entry.isDi
 function formatOf(index:unknown):unknown{return typeof index==='object'&&index!==null&&'formatVersion' in index?index.formatVersion:undefined;}
 const base='https://example.test/shardfiles/brasscap-mesa/';
 
+// FORMAT-PRUNE FP30: format v0.79.0 (f3863be) dropped the whole legacy Brasscap copy and the export's pin omits its world
+// GLBs, so the preceding product is a live pin read by slug (J507): the smallest open plot, built at 0.1.0.4.
+const preceding=builtFolder('open-plot-saltwind-lighthouse');
+const precedingBase='https://example.test/shardfiles/open-plot-saltwind-lighthouse/';
+
 test('the preceding additive product admits and cooks without rewriting its original',async()=>{
  const tar=folderTarball(preceding),files=readTar(tar);
  const header=files.get('shard.json');if(header===undefined)throw new Error('Missing fixture header');
@@ -33,9 +39,9 @@ test('the preceding additive product admits and cooks without rewriting its orig
  const format=formatOf(input);
  expect(format).toMatch(/^0\.1\.0\.\d$/u);
  const originalHash=hashImmutableBytes(tar);
- const options:FolderOptions={base,offline:false,
+ const options:FolderOptions={base:precedingBase,offline:false,
   hash:bytes=>Promise.resolve(hashImmutableBytes(bytes)),fetch:url=>{
-   const bytes=files.get(url.slice(base.length));
+   const bytes=files.get(url.slice(precedingBase.length));
    return Promise.resolve(bytes===undefined?new Response(null,{status:404}):new Response(Uint8Array.from(bytes)));
   }};
  const admitted=await admitFolder(index,options);
