@@ -20,6 +20,9 @@
 //   storm badge on the minimap's bottom edge) and -tidy-pickup (a pickup and a quest step in the same moment: the pickup's line
 //   under the boss bar with "+1"), and checks them: no big pickup card, no top-centre GET LOW, the badge centred on the
 //   minimap's bottom edge, and no toast or badge over the boss bar, the kill feed, the quest chip or the minimap.
+//   --base=https://staging.wildshard.io/ (meta HUD-TIDY HT3) shoots the staging page instead of a local build: every page and
+//   context carries the agent marker (METRICS MT2, MT3), and --chunk=<instance> picks the shard page Developer-off shots open
+//   (default driftwood-isle; HT3 shoots sunscar-dunes and nalati-grasslands).
 //   --map (QA-FEEDBACK 11-24 row 19) adds, on phones, a Bag map shot per zoom chip (-map-fit, -map-0.25, ...).
 //   In Developer mode the dock's ping chip (QA-FEEDBACK 11-24 row 36) is fed a 3-digit round trip, its widest everyday reading.
 //
@@ -38,12 +41,19 @@ import { chromium, devices, webkit } from "./browser-playwright.mjs";
 import { build } from 'vite';
 import { saveFixture } from './debug-settings.mjs';
 import { KEYCHAIN_ARGS } from './chromium-keychain.mjs';
+import { agentUrl, agentUserAgent } from './agent-marker.mjs';
 
 /** @param {string} key @param {string} fallback */
 const arg = (key, fallback) => process.argv.find(value => value.startsWith(`--${key}=`))?.slice(key.length + 3) ?? fallback;
 const base = arg('base', '');
 if (base === '') throw new Error('Requires --base=<a served build> (scripts/serve-build.sh prints one)');
-if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//u.test(base)) throw new Error('hud-worst drives our own local build only (J148)');
+/** HT3: the staging page is ours too (J148); it is shot marked as an agent (MT2, MT3) */
+const staging = base === 'https://staging.wildshard.io/';
+if (!staging && !/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//u.test(base)) throw new Error('hud-worst drives our own local build or the staging page only (J148)');
+const chunk = arg('chunk', 'driftwood-isle');
+if (!/^[a-z0-9-]+$/u.test(chunk)) throw new Error(`--chunk must be a grid instance, not ${chunk}`);
+/** a page address on the base, marked on staging @param {string} path */
+const pageUrl = path => { const href = new URL(path, base).href; return staging ? agentUrl(href) : href; };
 const label = arg('label', 'shot'), out = resolve(arg('out', join(homedir(), '.cache/wildshard/hud-worst')));
 const browsers = arg('browsers', 'chromium,webkit').split(','), sizes = arg('sizes', '402x874,402x654,874x402,1440x900').split(',');
 const modes = arg('dev', 'off,on').split(','), check = process.argv.includes('--check'), menu = process.argv.includes('--menu'), states = process.argv.includes('--states');
@@ -210,9 +220,18 @@ const rotateGate = page => page.evaluate(() => { const gate = document.querySele
  * gate is up instead: there is no HUD to lay out under it.
  * @param {import('playwright').Page} page @param {boolean} dev @returns {Promise<boolean>} */
 async function enter(page, dev) {
-  await page.goto(new URL(dev ? '/?mute=1&nolock=1&sw=0' : '/?chunk=driftwood-isle&mute=1&nolock=1&sw=0', base).href, { waitUntil: 'load' });
+  await page.goto(pageUrl(dev ? '/?mute=1&nolock=1&sw=0' : `/?chunk=${chunk}&mute=1&nolock=1&sw=0${staging ? '&skipintro=1' : ''}`), { waitUntil: 'load', timeout: 120_000 });
   await page.waitForTimeout(2000);
   if (await rotateGate(page)) return false;
+  // the staging page opens on its title: it asks a name first (the local build's nameAsked fixture skips that)
+  if (staging && !dev) {
+    await page.waitForFunction(() => document.querySelector('#ws-name-box input') !== null || /** @type {any} */ (window).__wildshard?.world?.player !== undefined, undefined, { timeout: 180_000 });
+    await page.evaluate(() => {
+      const box = document.querySelector('#ws-name-box'), field = box?.querySelector('input');
+      if (!(box instanceof HTMLFormElement) || !(field instanceof HTMLInputElement)) return;
+      field.value = 'hud-tidy'; field.dispatchEvent(new Event('input', { bubbles: true })); box.requestSubmit();
+    });
+  }
   if (dev) {
     await page.locator('.ws-main-grid').click({ timeout: 120_000 });
     await page.waitForFunction(() => /** @type {any} */ (window).__wildshard?.shard?.grid?.state().live?.live?.gameplayReady, undefined, { timeout: 180_000 });
@@ -347,6 +366,13 @@ const openBag = page => page.evaluate(() => { /** @type {any} */ (window).__wild
 /** @param {import('playwright').Page} page */
 const closeBag = page => page.evaluate(() => { /** @type {any} */ (window).__wildshard.world.hud.menu.close(); });
 
+/** A desktop context's own UA, read once from a throwaway context, so the staging marker keeps it (MT16)
+ * @param {import('playwright').Browser} browser @returns {Promise<string>} */
+async function plainUA(browser) {
+  const probe = await browser.newContext();
+  try { return await (await probe.newPage()).evaluate(() => navigator.userAgent); } finally { await probe.close(); }
+}
+
 const chatCode = await chatBundle(chatRev);
 /** @type {string[]} */ const failures = [];
 /** @type {string[]} */ const written = [];
@@ -358,8 +384,11 @@ for (const kind of browsers) {
       const [width = 0, height = 0] = size.split('x').map(Number), phone = Math.min(width, height) <= 500;
       view.width = width; view.height = height; view.phone = phone; // a phone's dock is PAUSE's row, on PAUSE's 6 px line
       for (const mode of modes) {
-        const dev = mode === 'on', name = `${label}-${kind}-${size}-dev-${mode}`;
-        const context = await browser.newContext(phone ? { ...devices['iPhone 15'], viewport: { width, height }, deviceScaleFactor: 2 } : { viewport: { width, height } });
+        const dev = mode === 'on', name = `${label}-${kind}-${size}-dev-${mode}${!dev && chunk !== 'driftwood-isle' ? `-${chunk}` : ''}`;
+        /** @type {import('playwright').BrowserContextOptions} */
+        const options = phone ? { ...devices['iPhone 15'], viewport: { width, height }, deviceScaleFactor: 2 } : { viewport: { width, height } };
+        if (staging) options.userAgent = agentUserAgent(options.userAgent ?? await plainUA(browser));
+        const context = await browser.newContext(options);
         // our own pages only (J148): the local build and the asset hosts it names (*.wildshard.io); any
         // other request, a redirect included, fails the case. Watched, not intercepted: WebKit's request interception stalls
         // the build's pack downloads (the Driftwood page never reached play under it, before and after A14 alike)
@@ -421,6 +450,8 @@ for (const kind of browsers) {
           if (problems.length > 0) failures.push(name);
         } catch (error) {
           console.log(`FAIL  ${name}  could not run: ${String(error instanceof Error ? error.message : error).split('\n')[0]}`);
+          // what the page showed when it gave up (the staging title, a stuck load)
+          for (const open of context.pages()) await open.screenshot({ path: join(out, `${name}-could-not-run.png`) }).catch(() => undefined);
           failures.push(name);
         } finally { await context.close(); }
       }
