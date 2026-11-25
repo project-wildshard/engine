@@ -624,7 +624,9 @@ class Landing{
     const saved=keepCopy(this.root,{keepRoot:this.env.WS_SESSION_KEEP_ROOT});
     this.say('copied',`recoverable worktree state saved at ${saved.dir}`);
    }catch(error){
-    const line=parts.concat(`worktree kept: copy failed (${error instanceof Error?error.message:String(error)})`).join('; ');
+    // QA 11-25 row 34: over 50 MiB the small, irreplaceable part is copied anyway; the tree stays, and the line says where.
+    const partial=error instanceof Error&&'keepDir' in error?`over 50 MiB; partial copy (unpushed commits, patches, source and scripts) at ${String(error.keepDir)}, the rest listed in its SKIPPED.txt`:null;
+    const line=parts.concat(partial===null?`worktree kept: copy failed (${error instanceof Error?error.message:String(error)})`:`worktree kept: ${partial}`).join('; ');
     this.say('cleaned',line);
     return line;
    }

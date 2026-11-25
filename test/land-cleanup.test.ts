@@ -7,7 +7,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Real git repositories, hooks and the land CLI.
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture repositories stay in the repository scratch root.
-import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, ftruncateSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -88,6 +88,25 @@ describe('land (J422): main-watch, the canonical checkout and cleanup after the 
     expect(result.stdout).toContain('worktree kept: copy failed');
     expect(existsSync(wt)).toBe(true);
     expect(f.git(f.repo, ['rev-parse', 'plan/copy-failure'])).toBe(tip);
+  }, 60_000);
+
+  test('QA 11-25 row 34: over 50 MiB, land saves the script in a partial copy, names it and keeps the worktree', () => {
+    const f = fixture(), wt = f.worktree('over-cap');
+    f.commit(wt, '.gitignore', '/tmp/\n', 'ignore scratch');
+    const tip = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feature');
+    mkdirSync(join(wt, 'tmp/lane'), { recursive: true });
+    writeFileSync(join(wt, 'tmp/lane/update.mjs'), 'export const update = 7;\n');
+    const fd = openSync(join(wt, 'tmp/lane/profile.cpuprofile'), 'w'); ftruncateSync(fd, 51 * 1024 ** 2); closeSync(fd);
+    const result = f.land(wt, ['--done']);
+    expect(result.status, result.stdout).toBe(0);
+    const dir = /worktree kept: over 50 MiB; partial copy \(unpushed commits, patches, source and scripts\) at (\S+), the rest listed in its SKIPPED\.txt/u.exec(result.stdout)?.[1];
+    expect(dir, result.stdout).toBeDefined();
+    expect(readFileSync(join(dir!, 'SKIPPED.txt'), 'utf8')).toContain('tmp/lane/profile.cpuprofile');
+    const files = join(f.root, 'restored'); mkdirSync(files);
+    expect(spawnSync('tar', ['-xzf', join(dir!, 'untracked.tgz'), '-C', files]).status).toBe(0);
+    expect(readFileSync(join(files, 'tmp/lane/update.mjs'), 'utf8')).toBe('export const update = 7;\n');
+    expect(existsSync(join(wt, 'tmp/lane/update.mjs'))).toBe(true);
+    expect(f.git(f.repo, ['rev-parse', 'plan/over-cap'])).toBe(tip);
   }, 60_000);
 
   test('J358: generated changes are copied as a recoverable patch before removal', () => {

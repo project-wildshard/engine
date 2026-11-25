@@ -11,6 +11,11 @@ import { pathToFileURL } from 'node:url';
 const MAX_UNTRACKED_BYTES = 50 * 1024 * 1024;
 const DEFAULT_KEEP_ROOT = join(homedir(), '.cache/wildshard/session-keep');
 const RETENTION_DAYS = 14;
+// Meta QA 11-25 row 34: over the cap, a partial copy still keeps what is small and irreplaceable. A source or script
+// file up to 1 MiB is kept; build output nested anywhere (a tmp/ clone's node_modules), captures and big files are not.
+const PARTIAL_FILE_BYTES = 1024 * 1024;
+const NESTED_GENERATED = /(?:^|\/)(?:node_modules|\.git|dist|coverage|\.cache|\.vite|test-results|playwright-report|blob-report)\//u;
+const SOURCE = /(?:^|\/)(?:[^./]+|\.[^./]+|[^/]+\.(?:[cm]?[jt]sx?|json5?|jsonc|md|mdx|txt|sh|bash|zsh|fish|py|rb|go|rs|ya?ml|toml|ini|cfg|conf|css|scss|html?|svg|glsl|wgsl|vert|frag|sql|patch|diff|csv|tsv|xml|env))$/iu;
 const PINS_LEDGER = 'out/.pins.json';
 const RAW_PATCH = ['--binary', '--no-color', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/'];
 // Declared build/install outputs are regenerable. Other ignored files, including
@@ -104,9 +109,34 @@ function recoverableFiles(root, callerFiles) {
   };
   for (const file of text(root, ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '--no-empty-directory', '-z']).split('\0').filter(Boolean))
     if (!REGENERABLE.test(file)) visit(file.replace(/\/$/u, ''));
-  const list = [...files].sort();
-  if (bytes(root, list) > MAX_UNTRACKED_BYTES) throw new Error('keep-copy: recoverable files exceed 50 MiB; source must be kept');
-  return list;
+  return [...files].sort();
+}
+
+/** The over-cap split (QA 11-25 row 34): small source and scripts, smallest first, up to the cap; the rest is listed,
+ * never copied. A file under a nested generated folder, a capture or a file over 1 MiB is skipped.
+ * @param {string} root @param {string[]} files @returns {{kept:string[],skipped:{file:string,size:number}[]}} */
+export function partialSelection(root, files) {
+  const sized = files.map(file => ({ file, size: lstatSync(join(root, file)).size }));
+  const candidates = sized.filter(({ file, size }) => size <= PARTIAL_FILE_BYTES && !NESTED_GENERATED.test(file) && SOURCE.test(file))
+    .sort((left, right) => left.size - right.size || left.file.localeCompare(right.file));
+  const kept = new Set();
+  let total = 0;
+  for (const { file, size } of candidates) {
+    if (total + size > MAX_UNTRACKED_BYTES) break;
+    kept.add(file); total += size;
+  }
+  return { kept: [...kept].sort(), skipped: sized.filter(({ file }) => !kept.has(file)) };
+}
+
+/** keepCopy over the cap: the partial copy is written and named, and removal stays refused (J358 fails closed). */
+export class PartialKeepCopy extends Error {
+  /** @param {string} dir @param {object} manifest @param {string} message */
+  constructor(dir, manifest, message) {
+    super(message);
+    this.name = 'PartialKeepCopy';
+    this.keepDir = dir;
+    this.manifest = manifest;
+  }
 }
 
 /** Snapshot every recoverable byte before copying and again after stopping
@@ -115,13 +145,16 @@ function recoverableFiles(root, callerFiles) {
  * @param {string} root @param {{regenerableFiles?:ReadonlySet<string>}} [options] */
 export function worktreeState(root, { regenerableFiles = new Set() } = {}) {
   const hash = createHash('sha256');
-  for (const file of recoverableFiles(root, regenerableFiles)) {
+  const files = recoverableFiles(root, regenerableFiles);
+  // Over the cap keepCopy always refuses removal, so this snapshot never clears one: stat it, don't read gigabytes.
+  const full = bytes(root, files) <= MAX_UNTRACKED_BYTES;
+  for (const file of files) {
     const path = join(root, file), info = lstatSync(path);
     if (!info.isFile() && !info.isSymbolicLink()) throw new Error(`cannot snapshot ${file}`);
-    hash.update(JSON.stringify([file, info.mode, info.size]));
-    hash.update(info.isSymbolicLink() ? readlinkSync(path) : readFileSync(path));
+    hash.update(JSON.stringify([file, info.mode, info.size, ...(full ? [] : [info.mtimeMs])]));
+    if (full) hash.update(info.isSymbolicLink() ? readlinkSync(path) : readFileSync(path));
   }
-  return JSON.stringify([
+  return JSON.stringify([full ? 'full' : 'over-cap',
     text(root, ['rev-parse', 'HEAD']), text(root, ['symbolic-ref', '--quiet', 'HEAD']),
     text(root, ['status', '--porcelain', '--untracked-files=all']),
     createHash('sha256').update(rawPatch(root)).digest('hex'), createHash('sha256').update(rawPatch(root, true)).digest('hex'),
@@ -130,6 +163,8 @@ export function worktreeState(root, { regenerableFiles = new Set() } = {}) {
 }
 
 /** Copy recoverable Git worktree state. It never deletes or mutates `path`.
+ * Over the 50 MiB cap it still writes the unpushed commits (a bundle), the patches and the small source and scripts,
+ * lists the rest in SKIPPED.txt, then throws PartialKeepCopy naming that copy, so removal stays refused.
  * Caller-verified regenerableFiles are exact paths, never directory prefixes.
  * @param {string} path @param {{keepRoot?: string, now?: Date, regenerableFiles?:ReadonlySet<string>}} [options] */
 export function keepCopy(path, { keepRoot = DEFAULT_KEEP_ROOT, now = new Date(), regenerableFiles = new Set() } = {}) {
@@ -142,8 +177,10 @@ export function keepCopy(path, { keepRoot = DEFAULT_KEEP_ROOT, now = new Date(),
   const dir = destination(root, resolve(keepRoot), now);
   mkdirSync(dir, { recursive: true });
   requireExternalCopy(source, realpathSync(dir));
-  /** @type {{source:string,repository:string,created:string,bundle:boolean,patch:boolean,untracked:string|{files:number,bytes:number}}} */
-  const manifest = { source: root, repository: repo, created: now.toISOString(), bundle: false, patch: false, untracked: 'none' };
+  const total = bytes(root, files);
+  const split = total <= MAX_UNTRACKED_BYTES ? { kept: files, skipped: [] } : partialSelection(root, files);
+  /** @type {{source:string,repository:string,created:string,bundle:boolean,patch:boolean,untracked:string|{files:number,bytes:number},partial:false|{skippedFiles:number,skippedBytes:number,list:string}}} */
+  const manifest = { source: root, repository: repo, created: now.toISOString(), bundle: false, patch: false, untracked: 'none', partial: false };
   const unpublished = run(root, ['log', 'HEAD', '--branches', '--tags', '--not', '--remotes', '--format=%H']);
   if (unpublished.status !== 0) throw new Error(`keep-copy: cannot inspect unpublished commits: ${unpublished.stderr.trim()}`);
   if (unpublished.stdout.trim() !== '') {
@@ -157,15 +194,24 @@ export function keepCopy(path, { keepRoot = DEFAULT_KEEP_ROOT, now = new Date(),
     writeFileSync(join(dir, 'tracked.patch'), patch);
     manifest.patch = true;
   }
-  if (files.length > 0) {
-    const total = bytes(root, files);
-    if (total <= MAX_UNTRACKED_BYTES) {
-      const archive = spawnSync('tar', ['-czf', join(dir, 'untracked.tgz'), '--null', '-T', '-'], { cwd: root, input: `${files.join('\0')}\0`, encoding: 'utf8' });
-      if (archive.status !== 0) throw new Error(`keep-copy: tar failed: ${archive.stderr.trim()}`);
-      manifest.untracked = { files: files.length, bytes: total };
-    } else throw new Error('keep-copy: untracked files exceed 50 MiB; source must be kept');
+  if (split.kept.length > 0) {
+    const archive = spawnSync('tar', ['-czf', join(dir, 'untracked.tgz'), '--null', '-T', '-'], { cwd: root, input: `${split.kept.join('\0')}\0`, encoding: 'utf8' });
+    if (archive.status !== 0) throw new Error(`keep-copy: tar failed: ${archive.stderr.trim()}`);
+    manifest.untracked = { files: split.kept.length, bytes: bytes(root, split.kept) };
+  }
+  if (split.skipped.length > 0) {
+    const skippedBytes = split.skipped.reduce((sum, { size }) => sum + size, 0);
+    writeFileSync(join(dir, 'SKIPPED.txt'), split.skipped.map(({ file, size }) => `${size}\t${file}\n`).join(''));
+    manifest.partial = { skippedFiles: split.skipped.length, skippedBytes, list: 'SKIPPED.txt' };
   }
   writeFileSync(join(dir, 'MANIFEST.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+  if (manifest.partial) {
+    const mib = (/** @type {number} */ n) => `${(n / 1024 / 1024).toFixed(1)} MiB`;
+    throw new PartialKeepCopy(dir, manifest, `keep-copy: ${root} holds ${mib(total)} of recoverable files, over the 50 MiB cap; `
+      + `partial copy saved at ${dir} (${manifest.bundle ? 'unpushed commits bundled, ' : ''}${manifest.patch ? 'tracked patch, ' : ''}`
+      + `${split.kept.length} source and script file(s)); ${manifest.partial.skippedFiles} file(s), ${mib(manifest.partial.skippedBytes)}, not copied: `
+      + `listed in ${join(dir, 'SKIPPED.txt')}. Removal refused: inspect those, then remove by hand and receipt it`);
+  }
   return { dir, manifest };
 }
 
@@ -195,7 +241,9 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
     const result = keepCopy(path, { keepRoot: process.env.WS_SESSION_KEEP_ROOT ?? DEFAULT_KEEP_ROOT });
     process.stdout.write(`${result.dir}\n`);
   } catch (error) {
+    // Exit 2: a partial copy is written and named, and removal stays refused. Exit 1: nothing was saved.
+    if (error instanceof PartialKeepCopy) process.stdout.write(`${error.keepDir}\n`);
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = 1;
+    process.exitCode = error instanceof PartialKeepCopy ? 2 : 1;
   }
 }
