@@ -434,3 +434,33 @@ test('async upload provisions staging credentials from stdin, keeps them private
   expect(run(JSON.stringify({cookKey: 'short', activationToken: 'b'.repeat(64)})).status).toBe(1);
   expect(read(root, 'production.env')).toBe(before);
 });
+
+test('OB11: cook-sentry puts one Sentry DSN from stdin into cook.env, never prints it, and rolls back on a failed cook', () => {
+  const root = etc(), path = join(root, 'etc/wildshard'), rebuild = join(root, 'rebuild.sh'), broken = join(root, 'rebuild-broken.sh');
+  writeFileSync(join(path, 'cook.env'), 'R2_BUCKET_PACKS=fixture\nSENTRY_DSN=https://0000@old.invalid/1\n');
+  writeFileSync(rebuild, '#!/usr/bin/env bash\nexit 0\n');
+  writeFileSync(broken, '#!/usr/bin/env bash\nexit 1\n');
+  const dsn = `https://${'e'.repeat(32)}@o123456.ingest.us.sentry.io/7654321`;
+  const run = (input: string, script = rebuild, args = ['cook-sentry']) => spawnSync('python3', [CONFIG, ...args], {input, encoding: 'utf8',
+    env: {PATH: process.env['PATH'] ?? '', WILDSHARD_CONFIG_TEST_ROOT: root, WILDSHARD_CONFIG_TEST_REBUILD: script}});
+  const done = run(`${dsn}\n`);
+  expect(done.status, done.stderr).toBe(0);
+  expect(done.stdout + done.stderr).not.toContain('e'.repeat(32));
+  expect(read(root, 'cook.env')).toBe(`R2_BUCKET_PACKS=fixture\nSENTRY_DSN=${dsn}\n`);
+  expect(statSync(join(path, 'cook.env')).mode & 0o777).toBe(0o600);
+  expect(run(dsn).stdout).toContain('already');
+  const kept = read(root, 'cook.env');
+  const failed = run(`https://${'f'.repeat(32)}@o1.ingest.sentry.io/2`, broken);
+  expect(failed.status).toBe(2);
+  expect(read(root, 'cook.env')).toBe(kept);
+  for (const bad of ['', 'https://evil.example/1', `${dsn}\nCOOK_SIGNING_KEY=x`, `http://${'e'.repeat(32)}@o1.ingest.sentry.io/2`]) expect(run(bad).status).toBe(1);
+  expect(run(dsn, rebuild, ['cook-sentry', dsn]).status).toBe(1);
+  expect(read(root, 'cook.env')).toBe(kept);
+  // --test sends one event to the DSN cook.env names (the test root only says it would) and never prints the key.
+  const probe = run('', rebuild, ['cook-sentry', '--test']);
+  expect(probe.status, probe.stderr).toBe(0);
+  expect(probe.stdout).toMatch(/would {3}send test event [0-9a-f]{32}/u);
+  expect(probe.stdout + probe.stderr).not.toContain('e'.repeat(32));
+  writeFileSync(join(path, 'cook.env'), 'R2_BUCKET_PACKS=fixture\n');
+  expect(run('', rebuild, ['cook-sentry', '--test']).status).toBe(1);
+});

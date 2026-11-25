@@ -510,11 +510,82 @@ def async_upload(args):
     return 2
 
 
+# MMO-OBSERVABILITY OB11 (QA 11-24 rows 62 and 63): the cook's alarms reach Sentry only when cook.env names SENTRY_DSN. A DSN
+# is a secret, so `set` refuses it; this one verb takes exactly one Sentry ingest DSN on stdin (never argv, never printed),
+# writes it into the root-only cook.env, rebuilds the cook step alone and puts the old file back if the worker fails /health.
+SENTRY_DSN = re.compile(r'https://[0-9a-f]{32}@o[0-9]{1,20}\.ingest(?:\.[a-z]{2})?\.sentry\.io/[0-9]{1,20}')
+
+
+def cook_sentry(args):
+    if args == ['cook-sentry', '--test']:
+        return cook_sentry_test()
+    if args != ['cook-sentry']:
+        stop('usage: wildshard-config cook-sentry < dsn.txt | cook-sentry --test')
+    payload = sys.stdin.read(513)
+    dsn = payload.strip()
+    if len(payload) > 512 or SENTRY_DSN.fullmatch(dsn) is None:
+        stop('cook-sentry takes one Sentry ingest DSN on stdin')
+    path = f'{ETC}/cook.env'
+    before = read_rows(path)
+    if not before:
+        stop('cook-sentry needs the installed cook env')
+    rows = [row for row in before if key_of(row) != 'SENTRY_DSN'] + [f'SENTRY_DSN={dsn}']
+    if rows == before:
+        say('ok      the cook already sends its alarms to that Sentry project')
+        return 0
+    import signal
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
+    try:
+        write_secret_rows(path, rows)
+        if cook_rebuild():
+            say('ok      cook.env names a Sentry DSN; the cook worker restarted and answers /health')
+            return 0
+    except BaseException:
+        pass
+    write_secret_rows(path, before)
+    cook_rebuild()
+    say('undo    the cook failed health with the DSN; the previous cook.env is back', error=True)
+    return 2
+
+
+def cook_sentry_test():
+    """OB11's proof: one test event to the Sentry project cook.env names, from this box, with the cook's environment and
+    channel tags. Prints only the event id; never the DSN."""
+    import json, urllib.request, uuid, datetime
+    dsn = next((row.split('=', 1)[1] for row in read_rows(f'{ETC}/cook.env') or [] if key_of(row) == 'SENTRY_DSN'), '')
+    match = re.fullmatch(r'https://([0-9a-f]{32})@([a-z0-9.-]+)/([0-9]{1,20})', dsn)
+    if SENTRY_DSN.fullmatch(dsn) is None or match is None:
+        stop('cook.env names no Sentry DSN: run wildshard-config cook-sentry < dsn.txt first')
+    key, host, project = match.groups()
+    event = uuid.uuid4().hex
+    body = {'event_id': event, 'timestamp': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'platform': 'python',
+            'level': 'warning', 'environment': 'cook', 'logger': 'wildshard-config',
+            'message': {'formatted': 'ALARM test: the box cook reaches Sentry (MMO-OBSERVABILITY OB11)'},
+            'tags': {'channel': 'cook', 'proof': 'ob11'}}
+    request = urllib.request.Request(f'https://{host}/api/{project}/store/', data=json.dumps(body).encode(), method='POST',
+                                     headers={'Content-Type': 'application/json',
+                                              'X-Sentry-Auth': f'Sentry sentry_version=7, sentry_key={key}, sentry_client=wildshard-config/1'})
+    if TEST:
+        say(f'would   send test event {event}')
+        return 0
+    try:
+        with urllib.request.urlopen(request, timeout=20) as answer:
+            if answer.status != 200:
+                raise OSError()
+    except OSError:
+        stop('Sentry refused the test event')
+    say(f'ok      test event {event} sent to the cook\'s Sentry project')
+    return 0
+
+
 def main(argv):
     production = '--production' in argv
     args = [arg for arg in argv if arg != '--production']
     if args and args[0] == 'async-upload':
         return async_upload(args)
+    if args and args[0] == 'cook-sentry':
+        return cook_sentry(args)
     if args and args[0] == 'saves':
         return saves(args, production)
     if args and args[0] == 'replica':
@@ -527,7 +598,7 @@ def main(argv):
         stop('the cook worker moves with: wildshard-config cook vX.Y.Z')
     if not args or args[0] not in ('show', 'set', 'split'):
         stop('usage: wildshard-config show <channel> | set <channel> <KEY> <value> [<KEY> <value>]... [--production] | split <channel> '
-             '| cook vX.Y.Z | show cook | replica start|stop | saves list|delete-test ...')
+             '| cook vX.Y.Z | show cook | cook-sentry < dsn | cook-sentry --test | replica start|stop | saves list|delete-test ...')
     verb = args[0]
     if len(args) < 2 or args[1] not in CHANNELS:
         stop('the channel is production or staging')
