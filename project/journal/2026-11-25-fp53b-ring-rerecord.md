@@ -6,3 +6,9 @@ snapshot. Stepping the pre-FP53b commit with only those two adapters dropped giv
 all four links in both zones, so the keeper did nothing a player sees, and the two chains are re-recorded. My FP53b check
 looked for recorded hashes in the zone repos and missed `test/pins/ring-digests.json`. The guard follows: the push gate steps Ring 1 when
 sim-state code changes, not only when a pin or digest moves.
+
+Guard (opus-fp54, 11-25): `scripts/push-path-edges.mjs` `simRingSlugs` makes the push gate step every Ring 1 slug when
+
+a push changes sim-state source (`SIM_STATE`: the sim host, snapshot and the server's shardfile, plugin, population,
+
+riding, boss and shard folders), so a change like FP53b's meets its digests before main does.

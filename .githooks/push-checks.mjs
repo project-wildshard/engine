@@ -1,6 +1,6 @@
 import {execFileSync,spawn} from 'node:child_process';
 import {availableParallelism,constants,getPriority,homedir,loadavg} from 'node:os';
-import {appendFileSync,mkdirSync,rmSync} from 'node:fs';
+import {appendFileSync,mkdirSync,readFileSync,rmSync} from 'node:fs';
 import {dirname,join,resolve,delimiter} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {assertHeavyLease} from '../scripts/heavy-lane-lease.mjs';
@@ -12,7 +12,7 @@ import {capturePushTree,pushProofDisposition,readPushProof,writePushProof} from 
 import {gateEnvironment} from '../scripts/push-environment.mjs';
 import {gateReport,printGateReport} from '../scripts/gate-report.mjs';
 import {discoverLocalDeltaPlan,localDeltaPlan} from '../scripts/local-land-delta.mjs';
-import {fs27Plan,pinChanges} from '../scripts/push-path-edges.mjs';
+import {fs27Plan,pinChanges,simRingSlugs} from '../scripts/push-path-edges.mjs';
 import {shardPinTests} from '../scripts/gate-related-tests.mjs';
 
 /** Identical proof identity before/inside a real lease; no heavy work is done on reuse.
@@ -266,7 +266,9 @@ async function main(){
     console.error(`  - split gate: ${local.length} local Vitest file(s), ${hosted.length} sent to hosted CI`);
   }
   // FS27: declared readers with no import edge, CI static's cheap checks, and the Ring 1 slugs a pin push moves.
-  const fs27=fs27Plan(selection,{split,slugs:pins.ring});
+  // FP53b's red: sim-state source moves every Ring 1 digest though no pin or digest changed, so it steps them all.
+  const simSlugs=selection.mode==='docs'?[]:simRingSlugs(selection.files,JSON.parse(readFileSync('test/pins/ring-digests.json','utf8')),`${process.platform}-${process.arch}`);
+  const fs27=fs27Plan(selection,{split,slugs:[...new Set([...pins.ring,...simSlugs])].sort()});
   if(local!==null)local=[...new Set([...local,...fs27.tests])].sort();
   const readers=local===null&&fs27.tests.length>0?[{name:`vitest (FS27 readers: ${fs27.tests.length})`,commands:[[process.execPath,'scripts/vitest-tmp.ts','run','--passWithNoTests=false',...fs27.tests]]}]:[];
   if(fs27.tests.length>0||fs27.tasks.length>0)console.error(`  - FS27: ${fs27.tests.length} declared reader file(s); ${fs27.tasks.map(task=>task.name).join(', ')}`);

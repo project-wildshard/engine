@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- A real owned Git fixture for the Ring 1 slug read.
 import { join, resolve } from 'node:path';
-import { FS27_STATIC, PATH_EDGES, TABLE_TESTS, fs27Plan, movedRingSlugs, pinChanges } from '../scripts/push-path-edges.mjs';
+import { FS27_STATIC, PATH_EDGES, TABLE_TESTS, fs27Plan, movedRingSlugs, pinChanges, simRingSlugs } from '../scripts/push-path-edges.mjs';
 import { shardPinTests } from '../scripts/gate-related-tests.mjs';
 import { staticChecks } from '../.githooks/push-checks.mjs';
 
@@ -53,6 +53,14 @@ it('runs check-css, agent-markers and the host-ruler tables on every code push, 
   expect(fs27Plan({ mode: 'docs', files: ['docs/dev.md'] }, { split: true, slugs: [] })).toEqual({ tasks: [], tests: [] });
   // The non-split full gate already runs the whole suite.
   expect(fs27Plan({ mode: 'full', files: ['package.json'] }, { split: false, slugs: [] }).tests).toEqual([]);
+});
+
+it('steps every Ring 1 slug when sim-state source changes, as FP53b needed (run 45597738510)', () => {
+  const digests = { 'linux-x64': { 240: { 'far-reach': ['a'], 'sunscar-dunes': ['b'] } }, 'darwin-arm64': { 240: { 'pine-hollow': ['c'] } } };
+  for (const file of ['src/server/game/plugin/simulation.ts', 'src/shared/engine/sim/snapshot.ts', 'src/server/engine/sim.ts', 'src/server/game/shardfile/homeKeeper.ts'])
+    expect(simRingSlugs([file], digests, 'linux-x64')).toEqual(['far-reach', 'sunscar-dunes']);
+  expect(simRingSlugs(['src/client/engine/ui/hud.ts', 'src/server/game/plugin/brain.test.ts', 'docs/dev.md'], digests, 'linux-x64')).toEqual([]);
+  expect(simRingSlugs(['src/server/engine/sim.ts'], digests, 'win32-x64')).toEqual([]);
 });
 
 it('steps only the Ring 1 slugs a pin or digest change moves', () => {

@@ -40,6 +40,17 @@ export const PATH_EDGES = Object.freeze([
   { why: 'gate-related-tests', pattern: /^scripts\/gate-related-tests\.mjs$/u, tests: ['test/gate-related-tests.test.ts'] },
 ]);
 
+/** Sim-state source: what a snapshot, and so Ring 1's step digest, is made of. FP53b (bd2db0ad9) changed it with no pin or
+ *  digest moved, so no Ring 1 step ran before the push and main went red on ring1 step (run 45597738510). */
+export const SIM_STATE = /^src\/(?:shared\/engine\/sim\/|server\/engine\/sim(?:\.ts$|\/)|server\/game\/(?:shardfile|plugin|population|riding|boss|shard)\/)(?!.*\.test\.)/u;
+
+/** Every Ring 1 slug this platform's baseline names when a changed file is sim-state source, else none.
+ * @param {readonly string[]} changed @param {any} digests ring-digests.json @param {string} platform @returns {string[]} */
+export function simRingSlugs(changed, digests, platform) {
+  if (!changed.some(file => SIM_STATE.test(file))) return [];
+  return Object.keys(Object.assign({}, ...Object.values(digests?.[platform] ?? {}))).sort((a, b) => a.localeCompare(b));
+}
+
 /** The declared readers of the changed paths, sorted. @param {readonly string[]} changed @returns {string[]} */
 export function edgeTests(changed) {
   const tests = new Set();
