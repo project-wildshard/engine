@@ -2,8 +2,8 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "76e8836e0334648b10e702e7844e6bd215c5bcac8df8ba4189bb81fe82716e4f",
-  "releaseHash": "8b7d01cfa6a79bdd743b7c6c16949ffb01a551f4b3f09a616a8f742b0459c91e",
+  "catalogueHash": "36c6773ea69f385a1af0f6fd418d2ba76c68191bcd167976f455b4b37d5e79e8",
+  "releaseHash": "2e8fc80d89187519efd6d95d5c19dbaa2c599a4556beb5be1e08dd9cd62cab9c",
   "catalogue": {
     "version": 0,
     "stage": "live",
@@ -586,8 +586,8 @@
       {
         "slug": "brasscap-mesa",
         "name": "Brasscap Mesa",
-        "revision": 18,
-        "hash": "ee0fd9e121c7d7320ed68626699996da2126bf9c3b2f643cb941f7b0a03bfa21"
+        "revision": 19,
+        "hash": "4c7f53c597ed3a9dfdffbddf48785da52c25e2f9fd9487b7748769aabbc9f851"
       },
       {
         "slug": "driftwood-isle",
@@ -598,14 +598,14 @@
       {
         "slug": "far-reach",
         "name": "Sky Reach",
-        "revision": 8,
-        "hash": "c559908612b89fcaa9ea9aa5d5ebca8dfbdbc02e4c3982d6392966d1a62865b5"
+        "revision": 9,
+        "hash": "396a637f04e28b195ac1c4b36f95f7234b7700d7955d21cb663084f377c2043d"
       },
       {
         "slug": "glowfen",
         "name": "Glowfen",
-        "revision": 6,
-        "hash": "8f28181d2ee8dc9b38a9505212d2e3a0add459bd576f95ac0f057395eba45093"
+        "revision": 7,
+        "hash": "4ce32c96726ff3ecdb7b622d42cd8f6e0cb27972990852de2b2dc95db8edbc0f"
       },
       {
         "slug": "mirror-salt",
@@ -616,8 +616,8 @@
       {
         "slug": "mossgate",
         "name": "Mossgate Hollow",
-        "revision": 24,
-        "hash": "5b4f545a9c9449d339668ae617b77a2182372f7c0b9bbbdb302adaf024a24441"
+        "revision": 25,
+        "hash": "f0e3a7601391e6f0709db806f37b7c6ea052f0508a74b22741e5679c1a6dc02d"
       },
       {
         "slug": "nalati-grasslands",
@@ -628,8 +628,8 @@
       {
         "slug": "nine-dragon-stack",
         "name": "Nine Dragon Stack",
-        "revision": 9,
-        "hash": "6dccb9a29bd3f1dde7cd18cb7b82aa36627baf285f3db540f60ddfa2a3fbc905"
+        "revision": 10,
+        "hash": "7a8e8a35faf01a9128fa9f0380747cf641773006e3d78fb7c675bad7499ca87f"
       },
       {
         "slug": "open-plot-alien-plain",
@@ -739,9 +739,9 @@
   "shards": [
     {
       "slug": "brasscap-mesa",
-      "revision": 18,
-      "hash": "ee0fd9e121c7d7320ed68626699996da2126bf9c3b2f643cb941f7b0a03bfa21",
-      "bytes": 22500352
+      "revision": 19,
+      "hash": "4c7f53c597ed3a9dfdffbddf48785da52c25e2f9fd9487b7748769aabbc9f851",
+      "bytes": 22498816
     },
     {
       "slug": "driftwood-isle",
@@ -751,15 +751,15 @@
     },
     {
       "slug": "far-reach",
-      "revision": 8,
-      "hash": "c559908612b89fcaa9ea9aa5d5ebca8dfbdbc02e4c3982d6392966d1a62865b5",
-      "bytes": 52610560
+      "revision": 9,
+      "hash": "396a637f04e28b195ac1c4b36f95f7234b7700d7955d21cb663084f377c2043d",
+      "bytes": 52609024
     },
     {
       "slug": "glowfen",
-      "revision": 6,
-      "hash": "8f28181d2ee8dc9b38a9505212d2e3a0add459bd576f95ac0f057395eba45093",
-      "bytes": 20787200
+      "revision": 7,
+      "hash": "4ce32c96726ff3ecdb7b622d42cd8f6e0cb27972990852de2b2dc95db8edbc0f",
+      "bytes": 20818432
     },
     {
       "slug": "mirror-salt",
@@ -769,9 +769,9 @@
     },
     {
       "slug": "mossgate",
-      "revision": 24,
-      "hash": "5b4f545a9c9449d339668ae617b77a2182372f7c0b9bbbdb302adaf024a24441",
-      "bytes": 35377664
+      "revision": 25,
+      "hash": "f0e3a7601391e6f0709db806f37b7c6ea052f0508a74b22741e5679c1a6dc02d",
+      "bytes": 35474944
     },
     {
       "slug": "nalati-grasslands",
@@ -781,9 +781,9 @@
     },
     {
       "slug": "nine-dragon-stack",
-      "revision": 9,
-      "hash": "6dccb9a29bd3f1dde7cd18cb7b82aa36627baf285f3db540f60ddfa2a3fbc905",
-      "bytes": 119147008
+      "revision": 10,
+      "hash": "7a8e8a35faf01a9128fa9f0380747cf641773006e3d78fb7c675bad7499ca87f",
+      "bytes": 119152128
     },
     {
       "slug": "open-plot-alien-plain",
