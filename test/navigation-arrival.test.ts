@@ -102,6 +102,12 @@ test('interrupted explicit level entry still returns to the title', () => {
     .toEqual({ rescue: true, titleOnly: true });
 });
 
+test('CP4: the WebKit rescue compares the zone this load boots (the tap the boot adopted), not the address', () => {
+  const booting = new URLSearchParams('mute=1'); booting.set('chunk', 'pine-hollow'); // entry.ts adoptTap on a bare address
+  expect(bootRoute(booting, { line: 'interrupted', level: 'pine-hollow' })).toEqual({ rescue: true, titleOnly: true });
+  expect(bootRoute(booting, { line: 'interrupted', level: 'glowfen' }).rescue, 'another zone than the one that died').toBe(false);
+});
+
 test('explicit RELOAD returns to title even with a selected shard URL', () => {
   expect(bootRoute(new URLSearchParams('chunk=driftwood-isle'), { line: '', level: '', reload: true }))
     .toEqual({ rescue: true, titleOnly: true });

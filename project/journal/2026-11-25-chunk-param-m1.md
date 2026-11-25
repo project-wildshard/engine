@@ -31,3 +31,10 @@
   recovery record resumes it): RELOAD HERE in Settings and in the error modal, GPU recovery, the stale-deployment reload.
   The seat-elsewhere reload already wrote its tap; it no longer writes `chunk`. Debug's clear-downloads reload drops it.
 - `at` and `glreload` stay on RELOAD HERE and GPU recovery: a pose, not a zone; CP22 decides them with the rest.
+
+# Crash resume and grid recovery boot from their records (opus-chunk, CP4)
+
+- The entry wrote the record's zone and `glreload` into the address before booting; the boot now takes `recovery.slug ??
+  crashResume.slug` in its own search and the address only loses a stale `at`. The session already resumes from the record
+  (`session.recovery`), so `glreload` was redundant there. `<html data-resume>` marks the resumed page for the journey proof,
+  which read the address. `?crash=revision|seat` name the running level, not the address.

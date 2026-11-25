@@ -265,7 +265,7 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
     if (await skip.isVisible()) await skip.tap();
   };
   // SB44: a shell that ended mid-play (the browser killed, not a leave) resumes into its world on the next visit (SR4,
-  // `consumeGridRecovery`: `?chunk=<world>&glreload=1`, then the loading card), or, as an old shell, shows THE GAME RESTARTED
+  // `consumeGridRecovery`: `<html data-resume>` on a bare address, then the loading card), or, as an old shell, shows THE GAME RESTARTED
   // UNEXPECTEDLY and updates into this build's main screen. Wait as a player would: SKIP the Name the resume asks over its loading
   // card and DISMISS a drop note; a menu that shows is tapped as ever, a resume that reaches play is judged from there (`resumed`).
   /** @param {import('playwright').Locator} target @returns {Promise<boolean>} true: the page resumed into its world */
@@ -273,7 +273,9 @@ export async function tapJourney(page, { card, path = 'select', budgetMs = 90_00
     const until = Date.now() + 90_000;
     let resuming = false;
     while (Date.now() < until) {
+      // an older shell names its world in the address; this one marks the page it resumes (CHUNK-PARAM CP4, J522)
       if (/[?&](glreload=1|chunk=)/u.test(page.url())) resuming = true;
+      if (!resuming && await page.evaluate(() => document.documentElement.dataset['resume'] !== undefined).catch(() => false) === true) resuming = true;
       if (await target.isVisible().catch(() => false)) return false;
       if (resuming) {
         await skipName().catch(() => undefined);

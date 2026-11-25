@@ -267,11 +267,13 @@ async function enterPage(): Promise<unknown> {
   const server = end.kind === 'unexpected' && end.mode === 'grid' ? await bootTask('app:grid-server-site', serverSites) : undefined;
   const recovery = consumeGridRecovery({ unexpected: end.kind === 'unexpected', previous: end, search, ...(server === undefined ? {} : { server }) });
   if (recovery !== null || crashResume !== null) {
+    // CHUNK-PARAM CP4 (J522): the boot takes the record's zone in its own search; the address never names it. The session
+    // resumes from the record (play.ts `resuming`), so no `glreload` either; a stale `at` leaves the address
     search.set('chunk', recovery?.slug ?? crashResume?.slug ?? '');
-    if (recovery !== null) search.set('glreload', '1');
     search.delete('at');
-    const url = new URL(location.pathname, location.origin); url.search = search.toString();
+    const url = new URL(location.href); url.searchParams.delete('at'); url.searchParams.delete('chunk');
     history.replaceState(history.state, '', url);
+    document.documentElement.dataset['resume'] = recovery !== null ? 'grid' : 'crash';
     document.documentElement.classList.remove('title-first');
   }
   const route = exploreChannel() || recovery !== null || crashResume !== null || inlineCell !== null ? { rescue: false, titleOnly: false } : gridRecoveryRefused() ? { rescue: true, titleOnly: true } : bootRoute(search, { line: previousBootLine(), level: previousBootLevel(), reload: end.reload === true });

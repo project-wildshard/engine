@@ -17,6 +17,7 @@ export function exploreBootParams(search: URLSearchParams, zone?: string): URLSe
 export interface BootRoute { readonly rescue: boolean; readonly titleOnly: boolean }
 export function bootRoute(search: URLSearchParams, previous: { readonly line: string; readonly level: string; readonly reload?: boolean }): BootRoute {
   if (previous.reload === true) return { rescue: true, titleOnly: true };
+  // CHUNK-PARAM CP4 (J522): `search` is the boot's own (entry.ts): the zone this load boots, a tap's or a record's, never the address
   const rescue = previous.line !== '' && search.get('chunk') === previous.level;
   const route = new URLSearchParams(search);
   for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw', 'fps']) route.delete(key); // index.html's title-first rule keeps the same list
