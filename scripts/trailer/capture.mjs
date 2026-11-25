@@ -66,8 +66,14 @@ export const RUNTIME = String.raw`((wall) => {
     if (typeof b[field] === 'number') return cr(a[field] ?? b[field], b[field], c[field], d[field] ?? c[field], u);
     return [0, 1, 2].map((j) => cr(a[field][j], b[field][j], c[field][j], d[field][j], u));
   };
-  // rel: key heights are metres above the ground (or the water, whichever is higher) at that key
-  tr.ground = (x, z) => { const h = window.__hf?.heightAt?.(x, z) ?? 0, sea = w.water?.level ?? w.chunk?.ocean?.level; return typeof sea === 'number' ? Math.max(h, sea) : h; };
+  // rel: key heights are metres above the ground (or the water, whichever is higher) at that key. On the grid the ground is
+  // the active cell's (the player's frame queries, grid/liveSession.ts bind): window.__hf is the home level's heightfield,
+  // which put Nalati's and the Dunes' cameras under their ground (11-25)
+  tr.ground = (x, z) => {
+    const q = w.player?.frameQueries;
+    if (q) { const h = q.heightAt(x, z), sea = q.waterSurfaceAt(x, z); return typeof sea === 'number' ? Math.max(h, sea) : h; }
+    const h = window.__hf?.heightAt?.(x, z) ?? 0, sea = w.water?.level ?? w.chunk?.ocean?.level; return typeof sea === 'number' ? Math.max(h, sea) : h;
+  };
   tr.pose = (t) => {
     const r = tr.rig; if (!r) return;
     const t0 = r.keys[0].t, t1 = r.keys.at(-1).t;

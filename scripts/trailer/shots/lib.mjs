@@ -103,6 +103,9 @@ export const VIEWMODEL = `${W}.game.viewmodel.visible = true;`;
 /** calm the fauna (no flee / aggro; elites ignore it) */
 export const CALM = `if (${W}.animals) ${W}.animals.calm = true;`;
 export const WILD = `if (${W}.animals) ${W}.animals.calm = false;`;
+/** the ambient-occlusion pass off. Nalati on the grid (11-25, dev.mjs --staging and the release preview, headless Metal):
+ * n8ao turns the whole frame one flat colour there, and the frame draws whole without it; the bug is in the engine's queue */
+export const NO_AO = `for (const p of ${W}.game._composer?.passes ?? []) if (typeof p.configureAOPass === 'function') p.enabled = false;`;
 /** place the player on the ground at x, z facing yaw / pitch (the probe's pose: streaming follows) */
 export const tp = (x, z, yaw, pitch = 0) => `await window.__wildshard.pose({ x: ${x}, z: ${z}, yaw: ${yaw}, pitch: ${pitch} });`;
 /** the player's look this step */
