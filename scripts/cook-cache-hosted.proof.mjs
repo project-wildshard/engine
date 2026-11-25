@@ -14,7 +14,7 @@ await import('./bake-loader.mjs');
 const {createCookWorker,indexKey}=await import('../src/cook/game/cookWorker.ts');
 const {MAX_SHARDFILE_BYTES}=await import('@wildshard/format/uploadCaps');
 const {folderStore}=await import('../src/cook/game/packStore.ts');
-const {formatTemplate}=await import('./pin-format.ts');
+const {wholeBrasscapProduct}=await import('./pin-format.ts');
 const {cookRevision}=await import('./cook-revision.ts');
 const directory=resolve('tmp/cook-cache-proof'),reports=resolve(process.env.WS_COOK_CACHE_REPORT??'tmp/cook-cache-report');
 mkdirSync(directory,{recursive:true});mkdirSync(reports,{recursive:true});
@@ -36,7 +36,7 @@ function cacheEntries(folder){
 try{
  const quick=JSON.parse(readFileSync(join(reports,'quick.json'),'utf8'));
  assert.equal(quick.version,1);assert.equal(quick.complete,true);assert.equal(quick.cases,3);assert.equal(quick.sha,sha);assert.equal(quick.cookRevision,recipe.revision);
- const product=formatTemplate('brasscap-mesa'),head={slug:product.pin.slug,hash:product.pin.hash};
+ const product=wholeBrasscapProduct(),head={slug:product.pin.slug,hash:product.pin.hash};
  const script=join(root,'scripts/cook-job.mjs');
  const shared=join(work,'shared-jobs'),coldJobs=join(work,'cold-jobs');
  assert.equal(existsSync(join(shared,'cache')),false);assert.equal(existsSync(join(coldJobs,'cache')),false);

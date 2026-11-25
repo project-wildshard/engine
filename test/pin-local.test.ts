@@ -8,7 +8,9 @@ import {dirname, join, resolve as resolvePath} from 'node:path';
 import {afterEach, expect, test} from 'vitest';
 import {readTar} from '@wildshard/format/tar';
 import {validationSourceBytes} from '@wildshard/format/validationReceipt';
-import {formatTemplate} from '../scripts/pin-format.ts';
+import {wholeBrasscapProduct} from '../scripts/pin-format.ts';
+import {cookPreparationBytes} from '@wildshard/format/cookPreparation';
+import {parseOutputIndex} from '@wildshard/format/outputIndex';
 import {localCandidates, LOCAL_CANDIDATES} from '../scripts/local-candidates.ts';
 import {cookShard, openShardfile} from '../src/cook/game/shardCook.ts';
 import {folderTarball} from '../src/cook/game/folderTarball';
@@ -22,8 +24,10 @@ function addLocalMount(source: string): void {
   const digest = (body: Uint8Array): string => createHash('sha256').update(body).digest('hex');
   const url = '/assets/local-proof/shared.json', bytes = Buffer.from('{}'), path = `mounts${url}`;
   mkdirSync(dirname(join(source, path)), {recursive: true}); writeFileSync(join(source, path), bytes);
-  const cook = JSON.parse(readFileSync(join(source, 'cook.json'), 'utf8')) as {mounts: {url: string; path: string; hash: string; bytes: number}[]};
+  const cook = JSON.parse(readFileSync(join(source, 'cook.json'), 'utf8')) as {mounts: {url: string; path: string; hash: string; bytes: number}[]; inputHash?: string; renderer?: string};
   cook.mounts.push({url, path, hash: digest(bytes), bytes: bytes.length});
+  // A prepared product (the live pin, QA 11-24 row 70) binds its mounts in the preparation's input hash.
+  if (cook.inputHash !== undefined) cook.inputHash = digest(cookPreparationBytes(parseOutputIndex(JSON.parse(readFileSync(join(source, 'shard.json'), 'utf8'))), cook.mounts, cook.renderer));
   const cookBytes = validationSourceBytes(cook); writeFileSync(join(source, 'cook.json'), cookBytes);
   const index = JSON.parse(readFileSync(join(source, 'shard.json'), 'utf8')) as {cook: {bytes: number; hash: string}};
   index.cook.bytes = cookBytes.length; index.cook.hash = digest(cookBytes);
@@ -34,7 +38,7 @@ function addLocalMount(source: string): void {
 function fixture() {
   mkdirSync('tmp/codex-pins-ll4-tests', {recursive: true});
   const root = mkdtempSync(resolvePath('tmp/codex-pins-ll4-tests/product-')); roots.push(root);
-  const product = formatTemplate('brasscap-mesa'), source = join(root, 'producer/out/brasscap-mesa');
+  const product = wholeBrasscapProduct(), source = join(root, 'producer/out/brasscap-mesa');
   for (const [path, bytes] of readTar(product.bytes)) {
     mkdirSync(dirname(join(source, path)), {recursive: true}); writeFileSync(join(source, path), bytes);
   }

@@ -17,7 +17,7 @@ function fixture() {
   const edge = { heights: Array.from({ length: 257 }, () => 0), colours: Array.from({ length: 257 }, () => [.5, .5, .5]), roadHeight: 0 };
   const source = parseShardfile({ version: SHARDFILE_VERSION,
     identity: { slug: 'quest-read-fixture', name: 'Quest reads', author: 'Fixture', revision: 1, seed: 1 }, accent: 'sand',
-    requires: { sdk: SHARDFILE_VERSION, capabilities: [], commons: [], commonsWire: {}, commonsCosts: {} },
+    requires: { capabilities: [], commons: [], commonsWire: {}, commonsCosts: {} },
     budgets: { library: { resident: 0, compressed: 0 }, sim: { resident: 0, compressed: 0 }, overlap: 0 },
     entryways: ['north', 'east', 'south', 'west'].map((side, i) => ({ edge: side, at: [[0, 0, 250], [250, 0, 0], [0, 0, -250], [-250, 0, 0]][i], width: 8 })),
     look: { families: [], grade: { exposure: 0, saturation: 1, contrast: 1, lut: null }, clock: 'engine', dayOverride: null, keys: [] },

@@ -5,7 +5,7 @@ import { expect, test } from 'vitest';
 import { prepareAssetDecoders } from '@wildshard/format/shardfileAssets';
 import { validateShardfileFolder } from '@wildshard/format/shardfileValidation';
 import { readTar } from '@wildshard/format/tar';
-import { FORMAT_PRODUCTS, formatTemplate } from '../scripts/pin-format.ts';
+import { FORMAT_PRODUCTS, formatTemplate, wholeBrasscapProduct } from '../scripts/pin-format.ts';
 
 const sha256 = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex');
 
@@ -21,8 +21,18 @@ test.each(Object.entries(FORMAT_PRODUCTS))('%s is admitted from the format depen
   }, { hash: sha256 })).not.toThrow();
 });
 
-test('Brasscap is the one format product', () => {
-  expect(Object.keys(FORMAT_PRODUCTS)).toEqual(['brasscap-mesa']);
+// QA 11-24 row 70: from format 0.79 the dependency ships no whole Brasscap (its export omits the world GLBs and the
+// legacy copy is gone), so `--from-format` has nothing to admit and tests take the tracked pin from the pins cache.
+test('Brasscap is the one format product while the format ships it whole', () => {
+  expect(Object.keys(FORMAT_PRODUCTS).filter(slug => slug !== 'brasscap-mesa')).toEqual([]);
+});
+
+test('a whole Brasscap is its tracked pin when the format ships none', () => {
+  const product = wholeBrasscapProduct(), files = readTar(product.bytes);
+  expect(product.pin.slug).toBe('brasscap-mesa');
+  expect(product.pin.hash).toBe(sha256(product.bytes));
+  expect(files.has('shard.json')).toBe(true);
+  if (!Object.hasOwn(FORMAT_PRODUCTS, 'brasscap-mesa')) expect(() => formatTemplate('brasscap-mesa')).toThrow('No format dependency product: brasscap-mesa');
 });
 
 test('any other slug is refused, an inherited key included', () => {

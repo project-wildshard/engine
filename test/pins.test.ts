@@ -9,7 +9,7 @@ import { join, resolve as resolvePath } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
 import { restorePacks, type PackedIndex } from '../scripts/pin-packs.ts';
 import { fetchPinnedPublicAssets, pinnedPublicAssets } from '../scripts/pin-assets.ts';
-import {formatTemplate} from '../scripts/pin-format.ts';
+import {wholeBrasscapProduct} from '../scripts/pin-format.ts';
 import {writeTar} from '@wildshard/format/tar';
 import {openShardfile, serverRows} from '../src/cook/game/shardCook';
 
@@ -182,7 +182,7 @@ test('a slice comes from the head it was cut from, and Ring 1 names only pinned 
 /** A pinned Brasscap Mesa head and its Ring 1 server slice, served by a local API whose mirror holds nothing. */
 async function sliceFixture() {
   const root = mkdtempSync(resolvePath('tmp/pin-slice-rebuild-')); folders.push(root);
-  const product = formatTemplate('brasscap-mesa'), shard = openShardfile(product.bytes);
+  const product = wholeBrasscapProduct(), shard = openShardfile(product.bytes);
   const files = new Map(serverRows(shard).map(row => [row.path, shard.read(row.path)]));
   const body = writeTar(files), hash = createHash('sha256').update(body).digest('hex');
   const row = {slug: product.pin.slug, from: product.pin.hash, hash, bytes: body.length, files: files.size};
