@@ -15,13 +15,22 @@ export const PHONE_LOW = Object.freeze({ width: 402, height: 874, deviceDpr: 3, 
 const VIEWS = [0, Math.PI * 2 / 3, -Math.PI * 2 / 3];
 const SAMPLE_COUNT = 3;
 const READY_MS = 235_000;
-const FRAME_MS = 30_000;
+// Meta QA 11-25 row 55: a frame wait is a hang guard, never a budget (J437). On the CI runner's swiftshader Nine r11
+// drew a phone Low frame in about 30 s and a High one (renderDpr 2) in longer, so 30 s failed the whole sweep and no
+// soft line could be recorded. A frame slower than half the guard warns first (slowFrame), before it can fail.
+export const FRAME_MS = 180_000;
 const METRICS = /** @type {const} */ (['triangles', 'draws', 'programs']);
 /** What each phone graphics setting records: Low every counter, High its programs (row 57). */
 export const PHONE_GRAPHICS = Object.freeze({
   low: Object.freeze({ low: true, name: 'phone Low', metrics: METRICS }),
   high: Object.freeze({ low: false, name: 'phone High', metrics: /** @type {readonly Metric[]} */ (['programs']) }),
 });
+/** The warning for a capture whose slowest frame took `ms`, once it passes half the frame guard; else undefined.
+ * @param {string} slug @param {string} name @param {number} ms */
+export function slowFrame(slug, name, ms) {
+  if (ms <= FRAME_MS / 2) return undefined;
+  return `::warning::${slug} ${name}: a frame took ${(ms / 1000).toFixed(1)} s of the ${FRAME_MS / 1000} s frame guard (meta QA 11-25 row 55)`;
+}
 /** @typedef {(typeof METRICS)[number]} Metric */
 /** @typedef {keyof typeof PHONE_GRAPHICS} Graphics */
 
@@ -140,6 +149,7 @@ export async function readPhoneFrames(browser, base, slug, graphics = 'low') {
     console.log(`${slug} ${graphics} control`, JSON.stringify(proof));
     /** @type {Frame[][]} */
     const views = [];
+    let slowest = 0;
     for (const offset of VIEWS) {
       let after = await page.evaluate(async yaw => {
         const world = window.__wildshard?.world, spawn = world?.game.level.spawn;
@@ -150,6 +160,7 @@ export async function readPhoneFrames(browser, base, slug, graphics = 'low') {
       /** @type {Frame[]} */
       const readings = [];
       for (let sample = 0; sample < SAMPLE_COUNT; sample++) {
+        const started = Date.now();
         const handle = await page.waitForFunction(({ zone, frame }) => {
           const world = window.__wildshard?.world;
           if (!world || world.game.level.id !== zone || world.hud.paused || !world.game.frameGate()) return false;
@@ -160,10 +171,13 @@ export async function readPhoneFrames(browser, base, slug, graphics = 'low') {
         const reading = /** @type {Frame} */ (await handle.jsonValue());
         await handle.dispose();
         readings.push(reading);
+        slowest = Math.max(slowest, Date.now() - started);
         after = reading.frame;
       }
       views.push(readings);
     }
+    const warning = slowFrame(slug, PHONE_GRAPHICS[graphics].name, slowest);
+    console.log(warning ?? `${slug} ${graphics} slowest frame ${(slowest / 1000).toFixed(1)} s`);
     const final = await page.evaluate(renderedPhone);
     if (JSON.stringify(final) !== JSON.stringify(proof)) throw new Error(`Renderer settings changed: ${JSON.stringify(proof)} -> ${JSON.stringify(final)}`);
     if (faults.length > 0) throw new Error(faults.join('\n'));

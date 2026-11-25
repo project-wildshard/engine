@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { failed, judgeAll, recordAll } from '../scripts/budgets/cli.mjs';
 import { readCaps } from '../scripts/budgets/files.mjs';
 import { budgetReport, budgetResultLine, parseBudgetResults } from '../scripts/budgets/watch.mjs';
-import { PHONE_LOW, expectPinnedZones, measuringCatalogue, phoneFrameMeasures } from '../scripts/budgets/phone-frames.mjs';
+import { FRAME_MS, PHONE_LOW, expectPinnedZones, measuringCatalogue, phoneFrameMeasures, slowFrame } from '../scripts/budgets/phone-frames.mjs';
 
 const slug = 'driftwood-isle', key = `render/phone-low/triangles/${slug}`;
 const pin = (revision: number) => ({ [slug]: `${slug}@${revision}` });
@@ -110,4 +110,11 @@ describe('phone Low frame budgets', () => {
     expect(Math.max(...cell.map(Math.abs))).toBe(3);
     expect(read(measuringCatalogue(page(catalogue), 'mossgate')).placements).toEqual(catalogue.placements);
   });
+});
+
+// Meta QA 11-25 row 55: Nine r11's frames passed the old 30 s guard on CI and failed the sweep with no budget result.
+test('a slow frame warns at half the frame guard, long before the guard fails the sweep', () => {
+  expect(FRAME_MS).toBeGreaterThanOrEqual(120_000);
+  expect(slowFrame('nine-dragon-stack', 'phone High', 30_000)).toBeUndefined();
+  expect(slowFrame('nine-dragon-stack', 'phone High', FRAME_MS / 2 + 1)).toMatch(/^::warning::nine-dragon-stack phone High: a frame took 90\.0 s of the 180 s frame guard/u);
 });
