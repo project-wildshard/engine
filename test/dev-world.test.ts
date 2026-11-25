@@ -1,10 +1,10 @@
 // MEMORY-STRUCTURE STR2 (J414): the dev page port stamps every document with its world, and its key outlives a restart.
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { devKey, DEV_STATE, stampDevDocument } from '../scripts/dev-world.mjs';
+import { devKey, devServerBuildArgs, DEV_STATE, stampDevDocument } from '../scripts/dev-world.mjs';
 import { devControlUrl, devControls } from '../src/client/host/online/devControl';
 import { devRoute } from '../src/server/host/dedicated/devControl';
 import { isDevGround } from '../src/shared/game/devColliders';
@@ -27,6 +27,16 @@ test('the dev key is made once and kept', () => {
   const first = devKey(work);
   expect(first.public).toMatch(/^[0-9a-f]+$/u);
   expect(devKey(work)).toEqual(first);
+});
+
+// meta QA 11-24 row 45: a world on a build that placed a shard off the in-tree grid sent that shard as frame 1, the page's first
+// grid cell, and the page left for Pine Hollow; the server now bakes the build's own catalogue
+test('the dev server bakes its client build\'s catalogue', () => {
+  const built = mkdtempSync(join(process.cwd(), 'tmp', 'dev-built-'));
+  made.push(built);
+  expect(devServerBuildArgs({ id: 'b1', out: 'srv', built, dev: true })).toEqual(['--build', 'b1', '--out', 'srv', '--dev']);
+  writeFileSync(join(built, 'catalogue.json'), '{}');
+  expect(devServerBuildArgs({ id: 'b1', out: 'srv', built, dev: false })).toEqual(['--build', 'b1', '--out', 'srv', '--catalogue', join(built, 'catalogue.json')]);
 });
 
 test('a watch heightfield crosses the real dev HTTP route', async () => {

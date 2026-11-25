@@ -63,6 +63,17 @@ const stopChild = (child, graceMs = 15_000) => new Promise(resolve => {
   child.kill('SIGTERM');
 });
 
+/** The server bundle's build arguments for a client build. A world only this Mac reaches keeps the dev control channel, staging
+ *  snapshot or not (meta QA 2026-11-22: J490's local proofs raise flags on the staging grid); a public one (`serve-local.mjs`) never
+ *  has it. The bundle bakes the client build's own catalogue whenever the build has one, so the server numbers each cell's frame as
+ *  that page does (`cellFrame`): a server on the in-tree grid sent a shard the build placed off it (meta QA 11-24 row 45's
+ *  proof-stranger) as frame 1, which the page read as its first grid cell, and it left for Pine Hollow.
+ * @param {{ id: string, out: string, built: string, dev: boolean }} options @returns {string[]} */
+export function devServerBuildArgs({ id, out, built, dev }) {
+  const catalogue = join(built, 'catalogue.json');
+  return ['--build', id, '--out', out, ...dev ? ['--dev'] : [], ...existsSync(catalogue) ? ['--catalogue', catalogue] : []];
+}
+
 /** The dev world.
  * `product` is the shard's built product folder (STR5: `wildshard dev` names the author's build); by default the one this
  * checkout's pins installed (`built-folder.mjs` `readBuiltShardfile`).
@@ -112,10 +123,7 @@ export async function openDevWorld({ dist, work: requestedWork, shard = 'brassca
     /** The server book and bundle for a client build. @param {string} id @param {string} built */
     const serverFor = (id, built) => {
       run(['scripts/server-origin.mjs', origin, id, `--grid=${absolute(gridRoot)}`, ...books], 'the server book');
-      run(['scripts/build-server.mjs', '--build', id, '--out', server,
-        // a world only this Mac reaches keeps the dev control channel, staging snapshot or not (meta QA 2026-11-22: J490's local
-        // proofs raise flags on the staging grid); a public one (`serve-local.mjs`) never has it
-        ...publicOrigin === undefined ? ['--dev'] : [], ...staging === undefined ? [] : ['--catalogue', join(built, 'catalogue.json')]], 'the server build');
+      run(['scripts/build-server.mjs', ...devServerBuildArgs({ id, out: server, built, dev: publicOrigin === undefined })], 'the server build');
     };
     /** @param {string} id */
     const publish = id => {

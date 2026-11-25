@@ -4,6 +4,12 @@ export const DEV_STATE: string
 export const DEV_SERVICE_WORKER: string
 export function buildOf(folder: string): string
 export function devKey(work: string): { readonly public: string; readonly private: string }
+export function devServerBuildArgs(options: {
+  readonly id: string
+  readonly out: string
+  readonly built: string
+  readonly dev: boolean
+}): string[]
 export function stampDevDocument(
   html: string,
   stamp: { readonly release: string; readonly key: string },
