@@ -41,6 +41,10 @@ export interface Deps {
   roomsStatus?: (url: string) => Promise<number>;
   /** ALLOW_ROOMS_DOWN=1 (J381). */
   allowRoomsDown?: boolean;
+  /** FR-A17: production's advertised heads with no exact-build pack index. */
+  productionPacks?: (build: string) => Promise<string[]>;
+  /** ALLOW_MISSING_PACKS=1 (J381). */
+  allowMissingPacks?: boolean;
   readFile: (path: string) => Uint8Array;
   state: { read: (phase: Phase) => unknown; write: (phase: Phase, value: object) => void };
   git: { clean: () => boolean; head: () => string; remoteTag: (tag: string) => string | undefined };

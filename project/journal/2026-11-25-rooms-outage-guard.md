@@ -21,3 +21,13 @@
   173 MiB with fresh keys), and each publish copied and split the whole listing to measure usage. packStore copies keys;
   a publish sums cook bytes straight from the map; test/cook-listing-memory.test.ts caps a row at 260 bytes of heap.
 - The cook alone peaked 3.9G before any prefetch, so the fix alone can't hold 4G: harden's cook MemoryMax 4G -> 5G.
+
+## FR-A17: production waits for every zone's packs (QA 11-25 row 35)
+
+- Row 35's reload loop (fixed in the client by ee1bef52a, after v0.1.90's cut) fires when a zone has no packs for the
+  page's build. Production check and go-live now read every head production's catalogue advertises and refuse while
+  any `index/<build>/<hash>.json` is not 200 with play's Origin (ALLOW_MISSING_PACKS=1 is the J381 hatch).
+- Live read 13:3x UTC: prod's own v0.1.85 build has all 27 heads (no false refusal); v0.1.89 lacks pine-hollow and
+  sunscar-dunes (cooks the OOMs cut short); v0.1.90 lacks 26 while the cook recooks for its new cook revision.
+- v0.1.90's release clone predates the gate, so its promotion runs `node scripts/page-release/production-packs.mjs
+  <build>` from main first.

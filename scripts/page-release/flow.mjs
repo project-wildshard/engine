@@ -127,6 +127,8 @@ export function pinnedReleaseKey(configured) {
  * @property {(url: string) => Promise<number>} [roomsStatus]  FR-A15: the HTTP status of a public rooms URL (agent-marked,
  *   no cache). Staging and production read both PUBLIC_ROOMS before the cook and harden, after them and after the alias.
  * @property {boolean} [allowRoomsDown]  ALLOW_ROOMS_DOWN=1 (J381): a release that fixes a rooms outage goes on, and says so.
+ * @property {(build: string) => Promise<string[]>} [productionPacks]  FR-A17: production's advertised heads with no exact-build pack index.
+ * @property {boolean} [allowMissingPacks]  ALLOW_MISSING_PACKS=1 (J381).
  * @property {(path: string) => Uint8Array} readFile
  * @property {{read: (phase: Phase) => any, write: (phase: Phase, value: object) => void}} state
  * @property {{clean: () => boolean, head: () => string, remoteTag: (tag: string) => string|undefined}} git
@@ -429,6 +431,13 @@ async function productionGates(phase, deps, refuse) {
   }
   const qa = phase === 'go-live' ? exactProof : undefined;
   if (qa !== undefined) refuse(`production go-live needs the staging QA verdict from staging go-live for this build: ${qa}`);
+  // FR-A17 (QA 11-25 row 35): play never moves to a build some advertised zone has no packs for (a reload loop before ee1bef52a).
+  if ((phase === 'check' || phase === 'go-live') && deps.dryRun !== true && deps.productionPacks !== undefined) {
+    const missing = await deps.productionPacks(deps.build);
+    if (missing.length === 0) deps.log(`PASS production packs ${phase}: every advertised head has index/${deps.build}`);
+    else if (deps.allowMissingPacks === true) deps.log(`NOTE production packs ${phase}: ${missing.join(', ')} (ALLOW_MISSING_PACKS=1)`);
+    else refuse(`production packs for ${deps.build} missing on ${missing.length} head(s): ${missing.slice(0, 8).join(', ')} (FR-A17: let the cook finish; ALLOW_MISSING_PACKS=1 only with Jake's word)`);
+  }
 }
 
 /**

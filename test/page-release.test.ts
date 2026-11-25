@@ -759,3 +759,21 @@ test('a staging release stops when a public rooms host answers 521, and ALLOW_RO
   await through(unread.deps, 'check');
   expect(unread.lines).toContain(`NOTE public rooms before the check: ${PUBLIC_ROOMS[0]} answered nothing; ${PUBLIC_ROOMS[1]} answered nothing (ALLOW_ROOMS_DOWN=1)`);
 });
+
+// FR-A17 (QA 11-25 row 35): a zone with no packs for the page's build reload-looped the shell. Production check and
+// go-live read every advertised head's exact-build index and refuse while any is missing.
+test('production refuses to check or go live while an advertised head has no packs for the build', async () => {
+  const {deps, calls, lines} = rig('production');
+  let missing = ['nalati-grasslands 404'];
+  deps.productionPacks = got => { calls.push(`packs ${got}`); return Promise.resolve(missing); };
+  await through(deps, 'upload');
+  await expect(runPhase('check', deps)).rejects.toThrow(/production packs for .* missing on 1 head\(s\): nalati-grasslands 404/u);
+  missing = [];
+  await runPhase('check', deps);
+  expect(lines).toContain(`PASS production packs check: every advertised head has index/${build}`);
+  deps.qa = qaOn();
+  missing = ['glowfen 0'];
+  deps.allowMissingPacks = true;
+  await runPhase('go-live', deps);
+  expect(lines).toContain('NOTE production packs go-live: glowfen 0 (ALLOW_MISSING_PACKS=1)');
+});

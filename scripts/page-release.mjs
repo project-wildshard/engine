@@ -33,6 +33,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
 import {agentFetch} from './agent-requests.mjs';
+import {missingProductionPacks} from './page-release/production-packs.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
@@ -127,6 +128,9 @@ async function run(step, generatedQa) {
       // FR-A15: the public rooms hosts, marked by user agent only (a `?agent=` query reaches /health and reads 503); ALLOW_ROOMS_DOWN=1 lets a release that fixes an outage go on (J381).
       roomsStatus: async url => (await agentFetch(url, {cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(20_000)})).status,
       allowRoomsDown: process.env.ALLOW_ROOMS_DOWN === '1',
+      // FR-A17: production moves only when every advertised head has packs for this build.
+      productionPacks: channel === 'production' ? missingProductionPacks : undefined,
+      allowMissingPacks: process.env.ALLOW_MISSING_PACKS === '1',
       readFile: path => readFileSync(path),
       state: {
         read: name => readState()[name],
