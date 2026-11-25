@@ -738,6 +738,12 @@
       "name": "Mirror Salt",
       "revision": 7,
       "hash": "8729462ab98c723a355c11d0ce1520bf75b1c65ea889188f597b4dab751df3c3"
+    },
+    {
+      "slug": "glowfen",
+      "name": "Glowfen",
+      "revision": 8,
+      "hash": "d0343bc7c50446381464c84a0c5803fb2ce228e5867038bb70eeaf0f6cc2da3e"
     }
   ],
   "missing": []
