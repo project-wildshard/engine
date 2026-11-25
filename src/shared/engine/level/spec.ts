@@ -9,7 +9,6 @@ import type { LookStrategy } from '../../../client/engine/render/look';
 import type { WaterBody } from '../world/water/body';
 import type { TerrainLattice } from '../physics/terrain';
 import type { Tier } from '../../../client/engine/core/tier';
-import type { HuntTuning } from '../../../server/engine/ai/hunt';
 import type { RosterEntry } from '../../../client/engine/models/live';
 import type { InputContextDef } from '../../../server/engine/level/context';
 import type { SfxDecodePolicy } from '../audio/bootAudio';
@@ -103,7 +102,6 @@ export interface LevelSpec {
   mechanisms: readonly EngineMechanism[]; fight: FightRules; input?: readonly InputContextDef[];
   boot: BootSpec; audio: AudioSpec; loadout: LoadoutSpec;
   species: readonly string[]; spawns: readonly HerdPlan[]; spawnTables?: readonly string[];
-  faunaTuning?: Partial<Record<string, Partial<HuntTuning>>>;
   /**
    * Edge dressing. `visible` hides the drawing only. No level has chunk-edge walls (GRID-CROSSING GC36, J322): past its edge a
    * one-shard page falls to its fall floor, and a grid cell opens onto the road.

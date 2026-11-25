@@ -174,7 +174,7 @@ export class RowBodies {
     const { variant: v, scale, rigSeed, seed } = spawnRolls(this.rng, kind, variant, legendary);
     const { actor: a, flight } = this.draw.rig(kind, v.id, rigSeed, placement?.body?.seed ?? seed, placement?.body?.scale ?? scale, this.entityIds.allocate(placement?.entityId));
     const sp = speciesDef(kind), level = activeLevel();
-    a.maxHp = a.hp = speciesHealth(sp.kind, v.hp, level.faunaTuning?.[kind]?.hp ?? sp.tuning?.hp, sp.aggressive);
+    a.maxHp = a.hp = speciesHealth(sp.kind, v.hp, sp.tuning?.hp, sp.aggressive);
     const physics = this.physics ?? this.host.physics;
     const fromY = placement?.fromY ?? Math.max(level.spawn.y ?? heightAt(x, z), heightAt(x, z)) + 1;
     const floor = creatureFloor(physics, x, z, fromY);

@@ -50,7 +50,6 @@ export function toLevelSpec(manifest: ShardManifest, product?: ShardFolder): Lev
     ...(render === undefined ? {} : { look: () => render(bound()) }),
     ...(manifest.look === undefined ? {} : { lookLayer: manifest.look }),
     ...(manifest.tiers === undefined ? {} : { tiers: manifest.tiers }),
-    ...(manifest.faunaTuning === undefined ? {} : { faunaTuning: manifest.faunaTuning }),
     trees: manifest.trees,
     ...(manifest.forest === undefined ? {} : { forest: manifest.forest }),
     ...(manifest.horizon === undefined ? {} : { horizon: manifest.horizon }),

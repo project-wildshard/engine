@@ -9,7 +9,6 @@ import type { ShardPlugin } from "../plugin/context";
 import type { Ktx2Table } from '@wildshard/engine/boot/gpuFiles';
 import type { SwordArms, SwordFraming, SwordMoveSet, SwordRig } from '@wildshard/engine/combat/view/melee';
 import type { Noise2D } from '@wildshard/format/noise';
-import type { HuntTuning } from '@wildshard/engine/ai/hunt';
 import type { ExploreSpec } from '@wildshard/engine/level/data';
 import type { LevelSpec, EngineMechanism, TierOverrides, BootSpec, LoadoutSpec } from '@wildshard/engine/level/spec';
 import type { RosterEntry } from '@wildshard/engine/models/live';
@@ -527,11 +526,6 @@ export interface ShardManifest {
   /** the forest's placement; omitted by a treeless shard (Driftwood, E318) */
   forest?: ChunkForest;
   spawns: HerdPlan[];
-  /**
-   * Per-shard overrides of a species' hunting-loop numbers (`HuntTuning`, src/server/engine/entities/AnimalManager.ts), merged over
-   * the species' own by `AnimalManager.tuningFor` — Driftwood's boars see you from far off on open sand. Keyed by kind.
-   */
-  faunaTuning?: Partial<Record<FaunaKind, Partial<HuntTuning>>>;
   /** hit cap, exempt enemy kinds, and simultaneous attackers (E294 / E297); omitted = the old fights.
    * Driftwood caps hits at 20 except the Drowned Captain, and permits two attackers at once. */
   fight?: LevelSpec['fight'];
@@ -837,7 +831,9 @@ export const UNSET_LEVEL_SPAWN: Readonly<SpawnPose> = Object.freeze({ x: 0, z: 0
  * the unchanged native boot owners. Missing source images refuse admission. */
 export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: AuthoredShardBindings,
   native: Parameters<typeof defineShard>[1], images: Readonly<Record<string, string>>): ShardManifest {
-  const {bindings: _declaredBindings, boot: bootData, fight: authoredFight, ...data} = parseManifestMetadata(input, slug);
+  // FORMAT-PRUNE FP35 (ONE-FORMAT OF9b5): the herd words moved to declared rows (OF9b4); an old discovery document's
+  // `species`, `spawns` and `faunaTuning` are no longer read, and format 0.1.0.6 drops them from every copy (fp36)
+  const {bindings: _declaredBindings, boot: bootData, fight: authoredFight, species: _species, spawns: _spawns, faunaTuning: _faunaTuning, ...data} = parseManifestMetadata(input, slug);
   const image = (path: string): string => {
     const url = images[path];
     if (url !== undefined) return url;
@@ -853,8 +849,8 @@ export function defineAuthoredShard(input: unknown, slug: ShardSlug, rows: Autho
   const factory: ChunkTrees['factory'] | undefined = data.trees.treeSet === undefined ? data.trees.factory : declaredTreeSet(slug);
   if (factory === undefined) throw new Error('Manifest trees have no declared factory');
   const trees: ChunkTrees = {...data.trees, factory};
-  // ONE-FORMAT OF9b4: herds are declared spawns (actors/creatures), so a manifest may name none; an old product's list still reads
-  const spawns = data.spawns ?? bindings.spawns ?? [];
+  // ONE-FORMAT OF9b4: herds are declared spawns (actors/creatures)
+  const spawns = bindings.spawns ?? [];
   const tiers = ((): TierOverrides | undefined => {
     const {grid, phone, desktop} = data.tiers ?? {};
     if (grid === undefined) return data.tiers;

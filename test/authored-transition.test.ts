@@ -140,9 +140,10 @@ test('only the attackers sentinel becomes infinity and complete art order surviv
     expect(() => parseManifestMetadata({ ...fixture, fight })).toThrow();
   }
 });
-test('a manifest with no herds, species or fauna tuning reads as none (OF9b4)', () => {
-  const { spawns: _spawns, ...rest } = fixture;
-  const data = parseManifestMetadata(rest);
+// FORMAT-PRUNE FP35: an old discovery document's herd words (OF9b5) are no longer read; declared rows carry herds.
+test.each([['names none', (() => { const { spawns: _spawns, ...rest } = fixture; return rest; })()],
+  ['still names herds, species and fauna tuning', { ...fixture, species: ['boar'], faunaTuning: { boar: { sightRange: 40 } } }]])('a manifest that %s reads as none (OF9b4)', (_name, input) => {
+  const data = parseManifestMetadata(input);
   const ground = { ...declaredGround({ terrain: { flat: 0, seed: 40234 }, trails: [], cabinSites: [], water: -1000, bodies: [] }), structures: true as const, paths: 'plugin' as const };
   const files = ['/assets/original.glb'];
   const chunk = { sky: [], baked: [], terrain: [], trees: [], cabins: [], physics: [], props: files, art: [], music: [], sfx: [] };
@@ -153,5 +154,5 @@ test('a manifest with no herds, species or fauna tuning reads as none (OF9b4)', 
   const level = toLevelSpec(defineAuthoredShard(data, 'fixture', { accent: 'pink', bootBindings: { files, sources, explore: { art: [] } } }, { ground }, images));
   expect(level.spawns).toEqual([]);
   expect(level.species).toEqual([]);
-  expect(level.faunaTuning).toBeUndefined();
+  expect(level).not.toHaveProperty('faunaTuning');
 });

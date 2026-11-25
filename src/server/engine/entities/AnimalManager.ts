@@ -276,7 +276,7 @@ export class AnimalManager {
       treeless: () => this.forest.trees.length === 0, // Driftwood Isle: palms are not Forest trees
       terrain: () => activeLevel().ground.terrain !== undefined, chunkHalf: CHUNK_HALF,
     };
-    this.hunt = new StalkerBrain<Animal>({ pattern: 'hunt', config: { legacyTuning: 'v0', rng: this.rng, fight: activeLevel().fight, faunaTuning: () => activeLevel().faunaTuning }, ports: {
+    this.hunt = new StalkerBrain<Animal>({ pattern: 'hunt', config: { legacyTuning: 'v0', rng: this.rng, fight: activeLevel().fight, faunaTuning: () => undefined }, ports: {
       ground, nav: () => host.navmesh, reach: (a, player) => this.canReach(a, player),
       wanderGoal: (a) => host.events.ask('creature.wander-goal', { herd: a.herd, goal: this.wanderGoal?.(a) ?? null }).goal,
       unaware: () => this.unaware, now: () => performance.now(),
