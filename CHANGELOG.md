@@ -13,6 +13,11 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.91 (2026-11-25)
+
+- A zone whose packs are not built yet shows one updating card instead of reloading in a loop.
+- The cook builds the zones players can visit first, and staging checks wait for them.
+
 ## v0.1.90 (2026-11-25)
 
 - The cook stays within its memory while it lists a large store, so new zone uploads keep cooking.
