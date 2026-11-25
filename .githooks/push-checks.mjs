@@ -57,11 +57,29 @@ export function pushEnvironment(environment=process.env){
  * which refuses the push and keeps the commit. */
 export const STUCK_STEP_SECONDS=240,STUCK_VITEST_SECONDS=900;
 
+/** A step's unscaled stuck limit, in s. @param {{name:string,stuckSeconds?:number}} task @param {NodeJS.ProcessEnv} [env] */
+function stuckBaseSeconds(task,env=process.env){
+  const override=Number(env.WS_PUSH_STUCK_S);
+  return task.stuckSeconds??(Number.isFinite(override)&&override>0?override:task.name.startsWith('vitest')?STUCK_VITEST_SECONDS:STUCK_STEP_SECONDS);
+}
+
 /** The stuck limit for one gate step, in ms. @param {{name:string,stuckSeconds?:number}} task @param {NodeJS.ProcessEnv} [env] @param {number} [load] @param {number} [cores] */
 export function stuckLimitMs(task,env=process.env,load=loadavg()[0]??0,cores=availableParallelism()){
-  const override=Number(env.WS_PUSH_STUCK_S);
-  const base=task.stuckSeconds??(Number.isFinite(override)&&override>0?override:task.name.startsWith('vitest')?STUCK_VITEST_SECONDS:STUCK_STEP_SECONDS);
-  return Math.round(base*Math.max(1,load/Math.max(1,cores))*1000);
+  return Math.round(stuckBaseSeconds(task,env)*Math.max(1,load/Math.max(1,cores))*1000);
+}
+
+/** Vitest's loaded limit: at most this many times its base. Re-sampled this often while loaded. */
+export const STUCK_LOAD_CAP=3,STUCK_RESAMPLE_MS=60_000;
+
+/** QA 11-24 row 33 (v0.1.83): the start-time scale missed load that rose after a Vitest step began. When a Vitest step's
+ * watchdog fires, the 1-minute load per core is sampled again: while it is over 1 the step gets up to another minute, never
+ * past 3x its base limit (or its start limit, when that was larger); otherwise it is stuck. Other steps never extend.
+ * @param {{name:string,stuckSeconds?:number}} task @param {number} elapsedMs @param {number} limitMs the step's start limit
+ * @param {NodeJS.ProcessEnv} [env] @param {number} [load] @param {number} [cores] @returns {number} ms more to wait, 0 when stuck */
+export function stuckExtensionMs(task,elapsedMs,limitMs,env=process.env,load=loadavg()[0]??0,cores=availableParallelism()){
+  if(!task.name.startsWith('vitest')||load/Math.max(1,cores)<=1)return 0;
+  const cap=Math.max(limitMs,stuckBaseSeconds(task,env)*STUCK_LOAD_CAP*1000);
+  return Math.max(0,Math.min(STUCK_RESAMPLE_MS,Math.round(cap-elapsedMs)));
 }
 
 /** Append one STUCK receipt line (lane-receipts.log, or `WS_LANE_RECEIPTS`); never on a hosted runner, never fatal. @param {string} line @param {NodeJS.ProcessEnv} [env] */
@@ -105,15 +123,18 @@ export async function parallelChecks(tasks,options={}) {
     await Promise.all(tasks.map(async task=>{
       const at=Date.now();let output='',code=0,own=false,stuck=false;
       // J505: the step's watchdog. Stuck is this step's own red; the others it stops name it.
-      const limit=options.stuck===false?undefined:stuckLimitMs(task,options.env??process.env);
-      const watchdog=limit===undefined?undefined:setTimeout(()=>{
+      const env=options.env??process.env,limit=options.stuck===false?undefined:stuckLimitMs(task,env);
+      let watchdog;
+      const arm=ms=>{watchdog=setTimeout(()=>{
         if(refused)return;
+        const more=limit===undefined?0:stuckExtensionMs(task,Date.now()-at,limit,env);
+        if(more>0){arm(more);return;}
         const minutes=((Date.now()-at)/60_000).toFixed(1);stuck=true;
-        const line=`push gate: STUCK in ${task.name} after ${minutes} min (limit ${(limit/1000).toFixed(0)} s, ~3x its normal time); stopped it, the push is refused and the commit is kept; rerun the push`;
-        console.error(`  X ${line}`);stuckReceipt(line,options.env??process.env);
+        const line=`push gate: STUCK in ${task.name} after ${minutes} min (limit ${((limit??0)/1000).toFixed(0)} s, ~3x its normal time); stopped it, the push is refused and the commit is kept; rerun the push`;
+        console.error(`  X ${line}`);stuckReceipt(line,env);
         stop(`STUCK in ${task.name} after ${minutes} min`);
-      },limit);
-      watchdog?.unref?.();
+      },ms);watchdog.unref?.();};
+      if(limit!==undefined)arm(limit);
       for(const command of task.commands){
         if(refused){code=1;break;}
         const child=spawn(command[0],command.slice(1),{cwd:options.cwd,env:options.env,detached:true,stdio:['ignore','pipe','pipe']});

@@ -5,4 +5,7 @@ export function parallelChecks(tasks:CheckTask[],options?:{cwd?:string;env?:Node
 export const STUCK_STEP_SECONDS:number;
 export const STUCK_VITEST_SECONDS:number;
 export function stuckLimitMs(task:{name:string;stuckSeconds?:number},env?:NodeJS.ProcessEnv,load?:number,cores?:number):number;
+export function stuckExtensionMs(task:{name:string;stuckSeconds?:number},elapsedMs:number,limitMs:number,env?:NodeJS.ProcessEnv,load?:number,cores?:number):number;
+export const STUCK_LOAD_CAP:number;
+export const STUCK_RESAMPLE_MS:number;
 export function staticChecks(lintThreads?:number):CheckTask[];

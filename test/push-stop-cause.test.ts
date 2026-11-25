@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { join, resolve } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
-import { parallelChecks, STUCK_STEP_SECONDS, STUCK_VITEST_SECONDS, stuckLimitMs } from '../.githooks/push-checks.mjs';
+import { parallelChecks, STUCK_LOAD_CAP, STUCK_RESAMPLE_MS, STUCK_STEP_SECONDS, STUCK_VITEST_SECONDS, stuckExtensionMs, stuckLimitMs } from '../.githooks/push-checks.mjs';
 import { prePushCause } from '../scripts/land.mjs';
 import { gateReport, printGateReport } from '../scripts/gate-report.mjs';
 
@@ -154,4 +154,19 @@ test('J505: the stuck limit is ~3x a step\'s normal time, more for Vitest, scale
   expect(stuckLimitMs({ name: 'lint (kit + game)' }, { WS_PUSH_STUCK_S: '30' }, 1, 8)).toBe(30_000);
   expect(stuckLimitMs({ name: 'lint (kit + game)' }, {}, 32, 8)).toBe(STUCK_STEP_SECONDS * 4 * 1000);
   expect(stuckLimitMs({ name: 'check:wire', stuckSeconds: 5 }, {}, 0, 8)).toBe(5000);
+});
+
+test('QA 11-24 row 33: load that rises after Vitest starts extends its watchdog, re-sampled, capped at 3x its base', () => {
+  const vitest = { name: 'vitest (related)' }, base = STUCK_VITEST_SECONDS * 1000, cap = base * STUCK_LOAD_CAP;
+  // started unloaded (limit = base), then load per core went to 2: another minute, again and again, up to the cap
+  expect(stuckExtensionMs(vitest, base, base, {}, 16, 8)).toBe(STUCK_RESAMPLE_MS);
+  expect(stuckExtensionMs(vitest, cap - 10_000, base, {}, 16, 8)).toBe(10_000);
+  expect(stuckExtensionMs(vitest, cap, base, {}, 16, 8), 'never past 3x its base').toBe(0);
+  // the load fell back to a core each or under: stuck now
+  expect(stuckExtensionMs(vitest, base, base, {}, 8, 8)).toBe(0);
+  expect(stuckExtensionMs(vitest, base, base, {}, 2, 8)).toBe(0);
+  // a start limit already scaled past 3x (load 4x cores at the start) is its own cap
+  expect(stuckExtensionMs(vitest, base * 4, base * 4, {}, 32, 8)).toBe(0);
+  // other steps never extend
+  expect(stuckExtensionMs({ name: 'lint (kit + game)' }, STUCK_STEP_SECONDS * 1000, STUCK_STEP_SECONDS * 1000, {}, 32, 8)).toBe(0);
 });
