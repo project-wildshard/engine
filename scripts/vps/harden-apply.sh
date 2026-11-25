@@ -491,6 +491,9 @@ if put /etc/systemd/system/caddy.service.d/90-harden.conf 644 root:root VH7 <<EO
 $(printf '%s\n' "$sandbox" | grep -Ev '^(CapabilityBoundingSet|AmbientCapabilities|PrivateUsers)=')
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 AmbientCapabilities=CAP_NET_BIND_SERVICE
+# Its access log rolls at 50 MiB, and the roll and the gzip after it chown the new file (lumberjack). Without @chown the
+# kernel kills Caddy (SIGSYS), and each restart dies again 2 s in on the gzip: both rooms hosts 521 from 10:11 UTC 11-25.
+SystemCallFilter=@chown
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictNamespaces=yes
 ProtectSystem=strict

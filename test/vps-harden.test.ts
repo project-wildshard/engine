@@ -252,3 +252,16 @@ test('every step harden-apply.sh runs directly is executable in git', () => {
   const modes = spawnSync('git', ['ls-files', '-s', '--', ...steps], { encoding: 'utf8' }).stdout.trim().split('\n');
   expect(modes.filter(line => !line.startsWith('100755 ')), 'git update-index --chmod=+x').toEqual([]);
 });
+
+// QA 11-25 row 31: Caddy's access log rolled at 50 MiB, lumberjack's roll and gzip chown the new file, and the sandbox's
+// `~@privileged` (which holds @chown) killed Caddy with SIGSYS: both rooms hosts 521 for about an hour. Caddy's drop-in
+// allows @chown back, after the line that takes it away (systemd applies SystemCallFilter lines in order).
+test('Caddy keeps @chown so its log can roll', () => {
+  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const start = apply.indexOf('caddy.service.d/90-harden.conf'), unit = apply.slice(start, apply.indexOf('\nEOF\n', start));
+  expect(unit).toContain('\nSystemCallFilter=@chown\n');
+  // The shared sandbox (which denies @privileged) is printed into the unit first, so the allow line comes after it.
+  expect(unit.indexOf('"$sandbox"')).toBeGreaterThan(-1);
+  expect(unit.indexOf('"$sandbox"')).toBeLessThan(unit.indexOf('SystemCallFilter=@chown'));
+  expect(apply).toContain('SystemCallFilter=~@privileged @resources');
+});
