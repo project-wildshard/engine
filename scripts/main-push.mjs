@@ -130,8 +130,9 @@ export function ownCommits(cwd, base, head, env = process.env) {
     if (parents[0] === target) { target = row.sha; own++; continue; }
     const replayed = run(cwd, ['replay', '--ref=refs/heads/main', '--ref-action=print', '--onto', target, `${parents[0]}..${row.sha}`]);
     const next = replayed.stdout.trim().split('\n').find(line => /^update(-ref)? refs\/heads\/main /u.test(line))?.split(/\s+/u)[2] ?? '';
-    if (replayed.status !== 0 && /unknown option|usage: git replay/u.test(replayed.stderr)) {
-      throw new StopError(`this git's replay does not take --ref-action (${git(cwd, ['--version'])}), so main-push cannot leave another lane's commits out (row 58): ${nameCommits(left)}. Update git, or ALLOW_CARRY=1 (J381) sends them with yours`);
+    // A replay that git itself refused (no committer identity, as on a CI runner; an old git) is not a conflict: say git's words.
+    if (replayed.status !== 0 && /fatal: (?!.*conflict)|unknown option|usage: git replay/u.test(replayed.stderr)) {
+      throw new StopError(`git replay could not move your commit ${row.sha.slice(0, 10)} past another lane's (row 58): ${firstLines(replayed.stderr)}. Left: ${nameCommits(left)}; ALLOW_CARRY=1 (J381) sends them with yours`);
     }
     if (replayed.status !== 0 || !/^[a-f0-9]{40}$/u.test(next)) {
       throw new StopError(`your commit ${row.sha.slice(0, 10)} ${row.subject} does not apply without another lane's local commit(s), which this lane never pushes (row 58): ${nameCommits(left)}. Their lane pushes them first; ALLOW_CARRY=1 (J381, named in your commit body) sends them with yours`);

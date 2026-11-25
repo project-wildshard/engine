@@ -130,3 +130,26 @@ test('a pusher with no lane name sends unnamed commits; a named lane leaves them
     if (before === undefined) delete process.env.WS_LANE_NAME; else process.env.WS_LANE_NAME = before;
   }
 });
+
+// Engine main red 45681838337: on the CI runner git has no committer identity, so `git replay` refused to write a commit and
+// main-push called that a conflict with another lane's commit. A replay git itself refuses now says git's own words.
+test('a replay git refuses (no committer identity, as on CI) names git\'s reason, not a conflict', () => {
+  const remote = join(work, 'noident.git'), clone = join(work, 'noident'), home = join(work, 'noident-home');
+  git(work, 'init', '--quiet', '--bare', '--initial-branch=main', remote);
+  git(work, 'clone', '--quiet', remote, clone);
+  writeFileSync(join(clone, 'seed.txt'), 'seed\n'); git(clone, 'add', 'seed.txt'); git(clone, 'commit', '--quiet', '-m', 'seed'); git(clone, 'push', '--quiet', 'origin', 'main');
+  const base = git(clone, 'rev-parse', 'HEAD');
+  writeFileSync(join(clone, 'b.txt'), 'b\n'); git(clone, 'add', 'b.txt'); git(clone, 'commit', '--quiet', '-m', 'theirs', '-m', 'Lane: other-lane');
+  writeFileSync(join(clone, 'a.txt'), 'a\n'); git(clone, 'add', 'a.txt'); git(clone, 'commit', '--quiet', '-m', 'mine', '-m', 'Lane: push-known-red');
+  mkdirSync(home, { recursive: true });
+  writeFileSync(join(home, '.gitconfig'), '[user]\n\tuseConfigOnly = true\n');
+  const saved = { lane: process.env.WS_LANE_NAME, home: process.env.HOME, xdg: process.env.XDG_CONFIG_HOME };
+  try {
+    process.env.WS_LANE_NAME = 'push-known-red'; process.env.HOME = home; process.env.XDG_CONFIG_HOME = home;
+    expect(() => ownCommits(clone, base, git(clone, 'rev-parse', 'HEAD'))).toThrow(/^git replay could not move your commit [0-9a-f]{10} past another lane's \(row 58\): .*(email|identity)/u);
+  } finally {
+    for (const [key, value] of [['WS_LANE_NAME', saved.lane], ['HOME', saved.home], ['XDG_CONFIG_HOME', saved.xdg]]) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});
