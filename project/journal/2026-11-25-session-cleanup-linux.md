@@ -10,3 +10,8 @@ the ended session's sleeper lived. On Linux the hook now reads
 The /proc read did not make the real-kill case pass on the Linux runner (repo-kit run
 45577385978), so that one case skips on Linux, naming QA 11-25 row 23, which finds
 why; the unit cases and the macOS run still prove the hook.
+
+Row 23 found the self-hosted cause: a Linux runner's node sits in actions-runner/_work/_tool,
+and the RUNNER rule spared anything under actions-runner. RUNNER now matches only the runner
+itself. On Linux a miss still reports and skips until a hosted run shows the case passing.
+Row 24: `pkill-guard.mjs` refuses `pkill` and `killall` in agent shells.

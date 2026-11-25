@@ -49,7 +49,10 @@ const MARKERS = ['CLAUDECODE', 'CLAUDE_PID', 'CLAUDE_CODE_SESSION_ID'];
 const KEEP = /(?:^|\s)--keep(?:[\s=]|$)/;
 const HERDR = /(?:^|\/)herdr(?:\s|$)/;
 const APP = /^(?:\/System)?\/Applications\/|^\/Users\/[^/]+\/Applications\//;
-const RUNNER = /\bRunner\.(?:Listener|Worker)\b|\bactions-runner\b/;
+// The runner itself (its Listener and Worker, run.sh, bin/ and externals/), never what a job runs from its _work tree:
+// on a Linux runner the tool-cache node lives in actions-runner/_work/_tool, so a bare `actions-runner` spared every
+// job process there, a marked session's sleeper too (meta QA 11-25 row 23).
+const RUNNER = /\bRunner\.(?:Listener|Worker)\b|\/actions-runner\/(?:run(?:svc)?\.sh|bin\/|externals\/)/;
 const MIN_AGE_MS = 60_000;
 const cleanupLog = () => process.env.WS_CLEANUP_LOG || `${homedir()}/.cache/wildshard/cleanup.log`;
 const keepFile = () => process.env.WS_SWEEP_KEEP || `${homedir()}/.cache/wildshard/sweep-keep.txt`;
