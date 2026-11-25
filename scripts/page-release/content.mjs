@@ -54,6 +54,8 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
  * @property {() => Promise<string[]>} [sets]  PZ6: the complete sets (their `content.json` present), newest first.
  * @property {(from: string, to: string, headers: Headers, bytes: number) => Promise<void>} [copy]  PZ6: a server-side
  *   copy with the target's headers, refused unless the copy holds `bytes`.
+ * @property {(set: string) => Promise<boolean>} [empty]  FR-A12: no key at all under this set yet (one S3 list), so the
+ *   publish skips a HEAD per file.
  */
 /** @typedef {{set: string, base: string, files: number, bytes: number, uploaded: number, uploadedBytes: number, held: number,
  *   copied: number, copiedBytes: number, kinds: Record<string, {files: number, bytes: number}>, cors: string}} ContentSummary
@@ -62,6 +64,9 @@ const sha256 = (/** @type {Uint8Array} */ bytes) => createHash('sha256').update(
 /** PZ6: how many recent complete sets a new set may copy from, and how many copies each publish reads back in full. */
 export const DONOR_SETS = 4;
 export const COPY_SAMPLE = 24;
+/** FAST-RELEASE FR-A12: server-side copies in flight. Preview copied 9,680 files 8 at a time in 18.7 of its 24 min
+ * (engine run 45511749250); 11-15's 429s were on uploads (still 4 at a time), and a refused copy is uploaded instead. */
+export const COPY_WIDTH = 24;
 
 /** The cook's object headers (`objectHeaders()`, src/cook/game/cookWorker.ts), every key immutable: a set is content-named.
  * @param {string} key @returns {Headers} */
@@ -179,7 +184,11 @@ export async function publishContent({dir, store, scratch, origin = GAME_ORIGIN,
   let wrong = 0;
   // A present key is held only when it reads back with this file's bytes and the game's CORS; anything else (a wrong or
   // short object left by an earlier run, say) is uploaded again over it. Set keys are content-named, so that is safe.
-  await pool(files, 8, async file => {
+  // FR-A12: a set with no key yet holds none of its files: skip the HEAD per file (9,742 on preview).
+  const fresh = store.empty !== undefined && await store.empty(set);
+  if (fresh) missing.push(...files);
+  if (fresh) log(`content ${set}: a new set on R2, so every file is missing (no HEAD per file)`);
+  await pool(fresh ? [] : files, 8, async file => {
     const key = contentKey(set, file.path);
     if (!await store.exists(key)) { missing.push(file); return; }
     const read = await store.read(key, origin);
@@ -253,7 +262,7 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
   }
   /** @type {ContentFile[]} */ const copied = [];
   let failed = 0;
-  await pool(missing.filter(file => held.has(`${file.sha256}:${file.bytes}`)), 8, async file => {
+  await pool(missing.filter(file => held.has(`${file.sha256}:${file.bytes}`)), COPY_WIDTH, async file => {
     const from = held.get(`${file.sha256}:${file.bytes}`) ?? '';
     try { await copy(from, contentKey(set, file.path), contentHeaders(file.path), file.bytes); copied.push(file); }
     catch (error) { failed++; log(`content ${set}: copy ${from} failed (${error instanceof Error ? error.message : String(error)}); uploading it`); }
@@ -272,7 +281,7 @@ export async function copyFromSets({set, missing, store, origin, log, sleep}) {
  * (R2_ACCOUNT_ID, R2_PACKS_ACCESS_KEY_ID, R2_PACKS_SECRET_ACCESS_KEY: server-release's bucket-scoped keys), else none.
  * @param {NodeJS.ProcessEnv} env
  * With them the store also puts through S3 (4 at a time), not `wrangler r2 bulk put`, so a CI token needs no R2 write.
- * @returns {{sets: () => Promise<string[]>, copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>, put: (puts: readonly Put[]) => Promise<void>, secrets: string[], close: () => void} | undefined}
+ * @returns {{sets: () => Promise<string[]>, empty: (set: string) => Promise<boolean>, copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>, put: (puts: readonly Put[]) => Promise<void>, secrets: string[], close: () => void} | undefined}
  */
 export function r2Copies(env) {
   const account = env.R2_ACCOUNT_ID?.trim(), accessKeyId = env.R2_PACKS_ACCESS_KEY_ID?.trim(), secretAccessKey = env.R2_PACKS_SECRET_ACCESS_KEY?.trim();
@@ -300,6 +309,10 @@ export function r2Copies(env) {
         } catch (error) { if (!(error instanceof Error && (error.name === 'NotFound' || error.name === 'NoSuchKey'))) throw error; }
       });
       return complete.sort((a, b) => b.at - a.at).map(row => row.set);
+    },
+    async empty(set) {
+      const page = await client.send(new ListObjectsV2Command({Bucket: BUCKET, Prefix: `${CONTENT_ROOT}/${set}/`, MaxKeys: 1}));
+      return (page.KeyCount ?? page.Contents?.length ?? 0) === 0;
     },
     async put(puts) {
       await pool(puts, 4, async item => {
@@ -340,7 +353,7 @@ export async function sampleContent({dir, store, count, origins, log, sleep = de
 /**
  * The real store: HEAD and GET through packs.wildshard.io, writes through `wrangler r2 bulk put`, one call per header set.
  * PZ6: with `copies` (r2Copies) the store also lists complete sets, copies keys server side, and puts through S3.
- * @param {{root: string, scratch: string, token?: string, fetch?: typeof fetch, exec?: typeof runRedacted, copies?: Pick<ContentStore, 'sets' | 'copy'> & {put?: ContentStore['put']}}} options
+ * @param {{root: string, scratch: string, token?: string, fetch?: typeof fetch, exec?: typeof runRedacted, copies?: Pick<ContentStore, 'sets' | 'copy' | 'empty'> & {put?: ContentStore['put']}}} options
  * @returns {ContentStore}
  */
 export function r2Content({root, scratch, token, fetch: get = fetch, exec = runRedacted, copies}) {
@@ -352,7 +365,7 @@ export function r2Content({root, scratch, token, fetch: get = fetch, exec = runR
   };
   const secrets = token === undefined || token === '' ? [] : [token];
   return {
-    ...(copies?.sets === undefined || copies.copy === undefined ? {} : {sets: copies.sets, copy: copies.copy}),
+    ...(copies?.sets === undefined || copies.copy === undefined ? {} : {sets: copies.sets, copy: copies.copy, ...(copies.empty === undefined ? {} : {empty: copies.empty})}),
     async exists(key) {
       for (let attempt = 0; ; attempt++) {
         const response = await get(bust(key), {method: 'HEAD', cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(30_000)}).catch((/** @type {unknown} */ error) => { if (attempt < 3) return undefined; throw error; });

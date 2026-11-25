@@ -14,3 +14,10 @@
   it ("ahead of 28 waiting" after a release re-cook). Each order group now goes 16 PUTs at a time, groups in order
   (parts, rest, spawn, then loose, then the index). `test/cook-parallel-publish.test.ts` proves the order, the bound and
   that a failed PUT stops new ones and fails the publish. Live once the cook moves to a release carrying it.
+
+## FR-A12: the content copy (opus-relaudit, 2026-11-24 evening)
+
+With the ledger restored, preview 45511749250 ran green in 24 min, and 18.7 of them were the content publish: a HEAD
+per file (9,742, all 404 on a new set) and then 9,680 server-side copies 8 at a time. A set with no key yet (one S3
+list, `MaxKeys: 1`) now skips the HEAD pass, and copies run 24 at a time (`COPY_WIDTH`). Uploads stay at 4: 11-15's
+429s were on uploads, and a refused copy already falls back to an upload.

@@ -6,7 +6,7 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- A `.pack.br` part is stored Brotli and read back decoded.
 import {brotliCompressSync, brotliDecompressSync} from 'node:zlib';
 import {afterEach, expect, test} from 'vitest';
-import {contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, r2Copies, scanContent, type ContentStore, type Put} from '../scripts/page-release/content.mjs';
+import {COPY_WIDTH, contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, r2Copies, scanContent, type ContentStore, type Put} from '../scripts/page-release/content.mjs';
 
 const ORIGIN = 'https://play.wildshard.io';
 const scratchRoot = resolve(import.meta.dirname, '../tmp/page-content-test');
@@ -237,4 +237,36 @@ test('PZ6: a failed copy is uploaded instead, and with no S3 keys there are no c
   expect(r2Copies({})).toBeUndefined();
   expect(r2Copies({R2_ACCOUNT_ID: 'a'.repeat(32), R2_PACKS_ACCESS_KEY_ID: 'k'})).toBeUndefined();
   expect(() => r2Copies({R2_ACCOUNT_ID: 'nope', R2_PACKS_ACCESS_KEY_ID: 'k', R2_PACKS_SECRET_ACCESS_KEY: 's'})).toThrow('Invalid R2_ACCOUNT_ID');
+});
+
+// FAST-RELEASE FR-A12: preview spent 18.7 of 24 min HEADing and copying 9,742 files 8 at a time (engine run 45511749250).
+test('FR-A12: a set with no key yet skips the HEAD per file, and copies run up to COPY_WIDTH at once', async () => {
+  const bucket = fakeBucket();
+  await run(page(), bucket.store);
+  withCopies(bucket);
+  let heads = 0, flight = 0, peak = 0;
+  const exists = bucket.store.exists, copy = bucket.store.copy;
+  bucket.store.exists = key => { heads++; return exists(key); };
+  bucket.store.copy = async (from, to, headers, bytes) => {
+    peak = Math.max(peak, ++flight);
+    await new Promise(done => setTimeout(done, 5));
+    try { await copy?.(from, to, headers, bytes); } finally { flight--; }
+  };
+  bucket.store.empty = set => Promise.resolve(![...bucket.objects.keys()].some(key => key.startsWith(contentKey(set, ''))));
+  const extra = Object.fromEntries(Array.from({length: 40}, (_, i) => [`assets/tex/extra-${i}.ktx2`, `tex ${i}`]));
+  await run(page(extra), bucket.store);
+  heads = 0;
+  const dir = page({...extra, 'shardfiles/pine-hollow/shard.json': '{"v":4}'});
+  expect(await run(dir, bucket.store)).toMatchObject({copied: 49});
+  expect(heads).toBeLessThanOrEqual(2);
+  expect(peak).toBeGreaterThan(8);
+  expect(peak).toBeLessThanOrEqual(COPY_WIDTH);
+});
+
+test('FR-A12: a set that already holds a key is still checked file by file', async () => {
+  const bucket = fakeBucket(), dir = page(), set = contentSet(scanContent(dir));
+  const held = contentKey(set, 'assets/tex/rock.ktx2');
+  bucket.objects.set(held, {body: readFileSync(join(dir, 'assets/tex/rock.ktx2')), headers: contentHeaders(held)});
+  bucket.store.empty = () => Promise.resolve(false);
+  expect(await run(dir, bucket.store)).toMatchObject({held: 1});
 });
