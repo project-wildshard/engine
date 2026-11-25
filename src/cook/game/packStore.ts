@@ -115,7 +115,9 @@ export function r2Store(config: R2Config): PackStore {
         for (const [, row = ''] of text.matchAll(/<Contents>(.*?)<\/Contents>/gsu)) {
           const key = /<Key>(.*?)<\/Key>/su.exec(row)?.[1], size = /<Size>(\d+)<\/Size>/u.exec(row)?.[1], modified = /<LastModified>(.*?)<\/LastModified>/u.exec(row)?.[1];
           if (key === undefined || size === undefined || modified === undefined) throw new Error('R2 listing row is incomplete');
-          rows.push({key, bytes: Number(size), modified: Date.parse(modified)});
+          // A regex capture is a slice that keeps its whole page alive: a 1M-object listing held 370 MiB of heap, not 173
+          // (11-25, the box cook OOM-killed at its 4G MemoryMax). A fresh copy lets each page go.
+          rows.push({key: Buffer.from(key, 'utf8').toString('utf8'), bytes: Number(size), modified: Date.parse(modified)});
         }
         token = text.includes('<IsTruncated>true</IsTruncated>') ? /<NextContinuationToken>(.*?)<\/NextContinuationToken>/su.exec(text)?.[1] : undefined;
         if (token === undefined) return rows;

@@ -476,13 +476,15 @@ EOF
   then units_changed=1; fi
 done
 # The cook's jobs each make a user and network namespace (C4), so it keeps exactly those two.
+# MemoryMax 4G -> 5G (11-25, QA 11-25 row 31's FR row): six cook runs peaked 3.6 to 4.0G and three were OOM-killed once a
+# bucket listing (about 1M objects) overlapped a cook; 1G more covers two listings and the peak. The box has 30G, 24G free.
 if put /etc/systemd/system/wildshard-cook.service.d/90-harden.conf 644 root:root VH7 <<EOF
 # VPS-HARDENING VH7
 [Service]
 $(printf '%s\n' "$sandbox" | grep -v '^PrivateUsers=')
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictNamespaces=user net
-MemoryMax=4G
+MemoryMax=5G
 EOF
 then units_changed=1; fi
 if put /etc/systemd/system/caddy.service.d/90-harden.conf 644 root:root VH7 <<EOF

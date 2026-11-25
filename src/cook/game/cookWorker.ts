@@ -337,6 +337,13 @@ function usageOf(rows: readonly StoredObject[], budget: number): StoreUsage {
   return {objects, bytes, share: bytes / budget, byPrefix};
 }
 
+/** The rebuildable store's bytes, without usageOf's per-prefix report: a publish measures a 1M-row listing this way. */
+function cookBytes(rows: Iterable<StoredObject>): number {
+  let bytes = 0;
+  for (const row of rows) if (cookStoreKey(row.key)) bytes += row.bytes;
+  return bytes;
+}
+
 export async function storeUsage(store: PackStore, budget: number): Promise<StoreUsage> { return usageOf(await store.list(''), budget); }
 
 /** What one kept index names: the index itself and every key it lists. @returns false when the index vanished mid-read. */
@@ -542,7 +549,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const measure = (rows: ReadonlyMap<string, StoredObject>): {readonly fresh: number; readonly used: number} => ({
       fresh: shared.reduce((sum, key) => sum + (rows.has(key) ? 0 : statSync(join(client, key)).size), 0)
         + loose.reduce((sum, key) => sum + (rows.has(folder + key) ? 0 : statSync(join(client, key)).size), 0),
-      used: usageOf([...rows.values()], budget).bytes,
+      // No copy of the listing and no per-prefix split per publish: both made 1M-row garbage while a job cooked (11-25 OOM).
+      used: cookBytes(rows.values()),
     });
     const cached = kept() !== undefined, began = clock();
     let held = await bucket(false), {fresh, used} = measure(held);

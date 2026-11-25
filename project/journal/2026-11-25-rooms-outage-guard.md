@@ -13,3 +13,11 @@
   10:13, but its rules only mail Jake and no agent polls Sentry. Every 60 s (a LaunchAgent, `--install`) it reads both
   rooms /up URLs and, with a Sentry token, the open outage issues; two failed reads or a new outage issue give one
   `NOTE RED builder:` receipt and an hc send to the builder. The disabled Sentry monitors stay off (one free seat).
+
+# The box cook OOM-killed at 4G (opus-rel86, 11-25)
+
+- After v0.1.88's cook move the cook was OOM-killed at 11:00, 11:27 and 12:07 UTC, mid-Nalati, once a full bucket
+  listing (about 1M objects) overlapped a cook. Each regex-captured key kept its listing page alive (370 MiB for 1M rows,
+  173 MiB with fresh keys), and each publish copied and split the whole listing to measure usage. packStore copies keys;
+  a publish sums cook bytes straight from the map; test/cook-listing-memory.test.ts caps a row at 260 bytes of heap.
+- The cook alone peaked 3.9G before any prefetch, so the fix alone can't hold 4G: harden's cook MemoryMax 4G -> 5G.
