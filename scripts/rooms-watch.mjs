@@ -91,7 +91,7 @@ function sentryToken(home) {
 }
 
 /** @param {string} url @returns {Promise<number>} */
-async function status(url) {
+async function readStatus(url) {
   try { return (await agentFetch(agentUrl(url), {cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15_000)})).status; }
   catch { return 0; }
 }
@@ -102,9 +102,9 @@ async function outages(token) {
   try {
     const response = await fetch(`${SENTRY_ISSUES}${encodeURIComponent(OUTAGE_QUERY)}`, {headers: {authorization: `Bearer ${token}`}, signal: AbortSignal.timeout(15_000)});
     if (!response.ok) return undefined;
-    /** @type {{id: string, shortId: string, title: string}[]} */
+    /** @type {{id: unknown, shortId: unknown, title: unknown}[]} */
     const issues = await response.json();
-    return issues.map(({id, shortId, title}) => ({id: String(id), shortId: String(shortId), title: String(title)}));
+    return issues.map(({id, shortId, title}) => ({id: `${id}`, shortId: `${shortId}`, title: `${title}`}));
   } catch { return undefined; }
 }
 
@@ -139,7 +139,7 @@ export async function main(args) {
   let state = emptyState();
   try { state = {...emptyState(), ...JSON.parse(readFileSync(stateFile, 'utf8'))}; } catch { /* first run */ }
   const now = Date.now();
-  const read = {rooms: await Promise.all(ROOMS.map(async url => ({url, status: await status(url)}))), outages: await outages(sentryToken(home))};
+  const read = {rooms: await Promise.all(ROOMS.map(async url => ({url, status: await readStatus(url)}))), outages: await outages(sentryToken(home))};
   const result = step(state, read, now);
   mkdirSync(dirname(stateFile), {recursive: true});
   writeFileSync(`${stateFile}.tmp`, `${JSON.stringify(result.state)}\n`); renameSync(`${stateFile}.tmp`, stateFile);
