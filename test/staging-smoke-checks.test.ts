@@ -5,6 +5,7 @@ import {createTempRepo} from '../src/test/helpers/git';
 import {engineRelease} from '../scripts/changelog.mjs';
 import { checkScenario, holds, olderVersion, verdictOf } from '../scripts/staging-smoke/checks.mjs';
 import type { ScenarioResult } from '../scripts/staging-smoke/scenarios.mjs';
+import { isThirdPartyBeacon, ownPageErrors } from '../scripts/staging-smoke/thirdParty.mjs';
 import { PAGE_BG, blackWorld, worldStats } from '../scripts/staging-smoke/worldFrame.mjs';
 
 const BUILD = 'b'.repeat(40);
@@ -17,6 +18,27 @@ const failed = (s: ScenarioResult, c = ctx) => checkScenario(s, c).filter(check 
 test('a clean run passes every check and does not hold', () => {
   expect(failed(clean())).toEqual([]);
   expect(verdictOf([clean()], ctx).hold).toBe(false);
+});
+
+// QA 11-25 row 16: headless WebKit reports Cloudflare's analytics beacon post (refused cross-origin) as an uncaught page
+// error; it held staging K6 on a P1 that is not Wildshard's. The beacon is ignored; our own errors beside it still hold.
+const BEACON_ERROR = 'Fetch API cannot load https://cloudflareinsights.com/cdn-cgi/rum due to access control checks.';
+
+test('the Cloudflare analytics beacon is not an uncaught page error of ours', () => {
+  expect(failed(clean({ errors: [BEACON_ERROR] }))).toEqual([]);
+  expect(verdictOf([clean({ errors: [BEACON_ERROR] })], ctx).hold).toBe(false);
+  const ours = 'Error: Discovery of driftwood-isle answered 404';
+  expect(failed(clean({ errors: [BEACON_ERROR, ours] }))).toEqual(['P1 page-error']);
+  const text = checkScenario(clean({ errors: [BEACON_ERROR, ours] }), ctx).find(check => check.key === 'page-error')?.text;
+  expect(text).toBe(`uncaught page error: ${ours}`);
+});
+
+test('the beacon rule matches only Cloudflare analytics hosts', () => {
+  expect(isThirdPartyBeacon('https://static.cloudflareinsights.com/beacon.min.js/v123')).toBe(true);
+  expect(isThirdPartyBeacon('/cloudflareinsights.com/cdn-cgi/rum due to access control checks')).toBe(true);
+  expect(isThirdPartyBeacon('https://staging.wildshard.io/cdn-cgi/rum')).toBe(false);
+  expect(isThirdPartyBeacon('https://notcloudflareinsights.com/x')).toBe(false);
+  expect(ownPageErrors([BEACON_ERROR, 'TypeError: x is undefined'])).toEqual(['TypeError: x is undefined']);
 });
 
 test.each([

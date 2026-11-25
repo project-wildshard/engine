@@ -7,6 +7,8 @@
 /** @typedef {{ build?: string, describe?: string, clientVersion?: string, minClient?: string }} Version */
 /** @typedef {{ release: string, version: Version, build?: string, lastTimeToPlay?: Record<string, number>, checkVersion?: boolean, deploy?: boolean }} CheckContext */
 
+import { ownPageErrors } from './thirdParty.mjs';
+
 /** The journey judge's words that are not P1 on their own: no play is P0, a modal is named by its own check. */
 const NOT_P1 = /^never reached play|^an error or drop modal opened$/u;
 
@@ -97,7 +99,8 @@ export function checkScenario(s, ctx) {
   // P1
   const journey = problems.filter((p) => !NOT_P1.test(p.text));
   add('journey', 'P1', journey.length === 0, journey.map((p) => `${p.leg}: ${p.text} at ${String(p.at)} ms`).join('; ') || 'journey');
-  add('page-error', 'P1', s.errors.length === 0, `uncaught page error: ${s.errors.slice(0, 2).map((e) => e.slice(0, 120)).join(' | ')}`);
+  const pageErrors = ownPageErrors(s.errors);
+  add('page-error', 'P1', pageErrors.length === 0, `uncaught page error: ${pageErrors.slice(0, 2).map((e) => e.slice(0, 120)).join(' | ')}`);
   if (s.settings !== undefined) add('settings', 'P1', s.settings.opened && s.settings.closed, `title SETTINGS ${s.settings.opened ? 'does not close' : 'does not open'} (SB27)`);
   if (s.quietTitle !== undefined) add('backout-drop', 'P1', !s.quietTitle.drop, 'a drop modal on the title after EXIT TO MAIN MENU');
   // a drop modal on the way into play; after a forced update it is SB30's P2, below
