@@ -12,7 +12,8 @@ export function frozenDecisionWorkerFolder(input:Shardfile,moduleBytes:Uint8Arra
  // FP4 (format 0.74.0) and FP33 (requires.sdk deleted): today's parse has neither field; the pin hashed `sdk: '0.1'` first,
  // then capabilities as an empty list
  const {sdk:_sdk,capabilities=[],...rest}=lineage.requires as Record<string,unknown>;
- const written={...lineage,requires:{sdk:'0.1',capabilities,...rest}};
+ // FP24 (format drops the two-part 0.1): the pin hashed the captured `version: '0.1'`; the test now passes the 0.1.0.1 floor
+ const written={...lineage,version:'0.1',requires:{sdk:'0.1',capabilities,...rest}};
  if(sha256(new TextEncoder().encode(JSON.stringify(written)))!==pin.inputSha256)throw new Error('Frozen worker fixture source differs');
  const assets=new Map(pin.assets.map(([hash,encoded])=>{
   const bytes=Uint8Array.from(Buffer.from(encoded,'base64'));

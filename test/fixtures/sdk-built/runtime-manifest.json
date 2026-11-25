@@ -19,8 +19,8 @@
       "captureEngineRevision": "aeb86d13"
     },
     "decision-worker-folder.json": {
-      "bytes": 21393,
-      "sha256": "d5a136d9c23b809a0ac7fcff43a8348fd904f8960c3d9ee6e85346780c226934",
+      "bytes": 21397,
+      "sha256": "108e2d642d33cf6e396cdaa2ca09fcf4e8ad9286f796403f34a1190ad9c50f69",
       "sourceRepository": "project-wildshard/sharddev",
       "sourceCommit": "da2a4ddb564db35b5c3bcba4ba1358de92ced1af",
       "captureEngineRevision": "aeb86d13"

@@ -11,7 +11,7 @@ import { folderCacheCompletion } from './folderCacheCompletion';
 import { builtValidationReceipt, readValidationReceipt, validationRevision, validationSourceBytes, type ValidationReceipt } from "@wildshard/format/validationReceipt";
 import { assertStateCompatibility, parseOutputLineageIndex, parseStateLineage } from '@wildshard/format/stateLineage';
 import type { MemoryAdmission } from '@wildshard/format/memoryAdmission';
-import { compareShardfileVersions, compatibleShardfileVersion, parseShardfileVersion, SHARDFILE_FLOOR, SHARDFILE_VERSION } from '@wildshard/format/version';
+import { compareShardfileVersions, parseShardfileVersion, readsFormat, SHARDFILE_FLOOR, SHARDFILE_VERSION } from '@wildshard/format/version';
 import { isOutputIndex } from '@wildshard/format/outputAddress';
 import { builtIndexHash } from '@wildshard/format/builtIndexes';
 
@@ -212,7 +212,7 @@ function version(input: unknown): string {
  * so a newer file says to update the client and an older one is the chain's to migrate. @returns the declared version */
 export function admittedFormat(input: unknown): string {
   const declared = version(input);
-  if (compatibleShardfileVersion(declared)) return declared;
+  if (readsFormat(declared)) return declared;
   throw new Error(`Shardfile format ${declared} is outside this client's ${SHARDFILE_FLOOR} to ${SHARDFILE_VERSION}: ${compareShardfileVersions(declared, SHARDFILE_VERSION) > 0 ? 'newer than this client, update it' : 'migrate it to this client\'s format first'}`);
 }
 /** Stream bounded wire bytes, including responses without a trustworthy Content-Length header. */
@@ -529,7 +529,7 @@ async function admitFolderWork(input: unknown, options: FolderOptions, trace?: {
     ? readValidationReceipt(visited?.validation, sourceHash) ?? builtValidationReceipt(sourceHash) : null;
   const worst = receipt?.worst ?? await checkedFolderCosts(source, options.memory);
   if (receipt !== null) acceptValidatedCost(source, worst, options.memory);
-  if (!options.offline && visited !== null && visited !== undefined && isOutputIndex(visited.source) && compatibleShardfileVersion(version(visited.source))) {
+  if (!options.offline && visited !== null && visited !== undefined && isOutputIndex(visited.source) && readsFormat(version(visited.source))) {
     let previous: unknown;
     // Only its identity and state are compared: an older build's sections can fail this build's schemas (G531 retired
     // `entries.public`), and refusing them would leave a returning player's shard unloadable.

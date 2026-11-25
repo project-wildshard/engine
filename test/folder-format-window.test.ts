@@ -14,6 +14,9 @@ test('FP7: a file two additive counters old is in the window; one newer than the
   expect(admittedFormat({ formatVersion: SHARDFILE_VERSION })).toBe(SHARDFILE_VERSION);
   // Before CP14 the version sat in `version` beside the layout marker 2.
   expect(admittedFormat({ formatVersion: 2, version: older })).toBe(older);
+  // FORMAT-PRUNE FP24 (J508): the two-part 0.1 and 0.1.0.0 are below the 0.1.0.1 floor now.
+  expect(SHARDFILE_FLOOR).toBe('0.1.0.1');
+  for (const gone of ['0.1', '0.1.0.0']) expect(() => admittedFormat({ formatVersion: 2, version: gone })).toThrow(`Shardfile format ${gone} is outside this client's ${SHARDFILE_FLOOR}`);
   expect(() => admittedFormat({ formatVersion: newer })).toThrow(`Shardfile format ${newer} is outside this client's ${SHARDFILE_FLOOR} to ${SHARDFILE_VERSION}: newer than this client, update it`);
   expect(() => admittedFormat({ formatVersion: `${String(major)}.${String((minor ?? 0) + 1)}.0.0` })).toThrow(/is outside this client's .*newer than this client/u);
 });

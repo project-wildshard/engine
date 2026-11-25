@@ -59,3 +59,14 @@ for(const version of ['0.1.0.4','0.1.1.0'])test(`future or breaking ${version} r
  await expect(admitFolder({...index,version},options)).rejects.toThrow(version);
  expect(reads).toBe(0);
 });
+
+
+test('FP24 (J508): the deleted 0.1 and 0.1.0.0 are refused before transport',async()=>{
+ const input:unknown=JSON.parse(readFileSync(join(fixture,'shard.json'),'utf8'));
+ const {formatVersion:_formatVersion,...rest}=parseOutputIndex(input);
+ let reads=0;
+ const options:FolderOptions={base,offline:false,
+  hash:value=>Promise.resolve(hashImmutableBytes(value)),fetch:()=>{reads++;return Promise.reject(new Error('Unexpected transport'));}};
+ for(const version of ['0.1','0.1.0.0'])await expect(admitFolder({...rest,formatVersion:2,version,schemas:[]},options)).rejects.toThrow(version);
+ expect(reads).toBe(0);
+});
