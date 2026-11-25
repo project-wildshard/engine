@@ -511,6 +511,13 @@ export function startWorkerServerEarly(options: { readonly slug: string; readonl
     closing = leaveEarly(shell);
   });
 }
+/** FR-A18: the early server's boot, for a page whose frames wait for it (a CPU rasterizer, finish.ts). Settles at once when
+ *  no early server runs or one was adopted, and never rejects: a failed boot is the server step's to report. */
+export async function earlyServerBooted(): Promise<void> {
+  const started = early;
+  if (started === null || started.adopted) return;
+  try { await (await started.shell).booted; } catch { /* reported at the server step */ }
+}
 /** A device id's storage for a page whose browser keeps nothing (OF2: such a page still joins the world, as a new device each time). */
 function pageOnlyStorage(): SaveStorage {
   const items = new Map<string, string>();

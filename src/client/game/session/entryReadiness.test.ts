@@ -57,7 +57,7 @@ test('the actual spawn continuation waits for linking and three offscreen draws'
   let posted = deferred();
   vi.spyOn(owner, 'raf').mockImplementation(frame => { frames.push(frame); posted.finish(); return 0; });
   const game = {levelScope: owner, offscreenDraw: () => { draws++; }};
-  const run: unknown = runInNewContext(`${stripTypeScriptTypes(source.slice(start)).replace('export async function', 'async function')}\nsettleEntryPrograms`, {
+  const run: unknown = runInNewContext(`${stripTypeScriptTypes(source.slice(start)).replaceAll(/^export /gmu, '')}\nsettleEntryPrograms`, {
     waitEntryWork, diagnosticNow: () => now, performance: {mark}, liveWarmPacing: () => ({}),
     precompileLevel: (_game: unknown, _progress: unknown, options: {drawnOnly: boolean; warmPost: boolean; current: () => boolean}): Promise<void> => {
       expect(options.drawnOnly).toBe(true); expect(options.warmPost).toBe(true); expect(options.current()).toBe(true);
