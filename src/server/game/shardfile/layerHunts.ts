@@ -19,6 +19,9 @@ const Saved = v.strictObject({ contract: v.string(), clock: finite, memory: v.un
   player: v.exactOptional(v.tuple([finite, finite, finite])),
 });
 
+/** A leashed hunt is home within this many metres (or its temperament's stop, when wider). */
+const LEASH_ARRIVE = 3;
+
 /** Layer-owned hunts reuse the existing controller, cadence and memory codec over actual host bodies. */
 export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: ShardCreatures): void {
   const layers = resolveCreatureLayers(rows, creatures.brains);
@@ -60,9 +63,11 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     // Aggressive hunts without authored notice retain the exact released M1 contract.
     const contractSpecies = species.reaction === 'aggressive' && layer.senses === undefined ? legacySpecies : species;
     const perception = senses === undefined ? undefined : bindCreatureSenses(host, actor, senses);
-    return [{ spawn, actor, id, species, perception, contract: JSON.stringify({ spawn, species: contractSpecies, temperament: layer.temperament }) }];
+    const temperament = layer.temperament, leash = Math.min(temperament.leash, temperament.territorial ?? temperament.leash);
+    return [{ spawn, actor, id, species, perception, leash, home: temperament.home,
+      contract: JSON.stringify({ spawn, species: contractSpecies, temperament }) }];
   });
-  for (const { spawn, actor, id, species, perception, contract } of prepared) {
+  for (const { spawn, actor, id, species, perception, leash, home, contract } of prepared) {
     const player = new Vector3().copy(host.nearestPlayer(actor.position).position);
     let selected: string | null = null, observed: ReturnType<SimHost['nearestPlayer']> | undefined;
     const observe = () => {
@@ -98,13 +103,34 @@ export function installLayerHunts(host: SimHost, rows: ShardRows, creatures: Sha
     if (memory === undefined) throw new Error(`species \`${spawn.species}\`: missing hunt memory`);
     let clock = 0;
     const noise = { seen: false, prev: new Vector3(), speed: 0 }, sight: (boolean | null)[] = [null];
+    // QA 11-24 row 26: the temperament's leash. Past it (the body, or the quarry it stalks or charges) the hunt walks home and
+    // decides nothing on the way, as `bindCreatureTemperament` does for the other brains; home, it heals and settles. The walk
+    // home is its wander with the spawn point as the goal, so the saved hunt memory carries it and no new state is saved.
+    const [homeX, , homeZ] = spawn.at;
+    const leashed = (): boolean => {
+      if (!actor.alive) return false;
+      const fromHome = Math.hypot(actor.position.x - homeX, actor.position.z - homeZ);
+      let going = actor.state === 'wander' && memory.tx === homeX && memory.tz === homeZ;
+      if (!going && (fromHome > leash || ((actor.state === 'stalk' || actor.state === 'charge') && Math.hypot(player.x - homeX, player.z - homeZ) > leash))) {
+        host.strikes.get(actor.entityId)?.cancel(); actor.cancelAttack(); actor.setStrafe(0);
+        memory.tx = homeX; memory.tz = homeZ; memory.awareness = 0; memory.sensed = false; memory.spooked = false; memory.backoff = 0;
+        actor.state = 'wander'; going = true;
+      }
+      if (!going) return false;
+      if (fromHome <= Math.max(home.stop, LEASH_ARRIVE)) {
+        actor.hp = actor.maxHp; memory.timer = 2; actor.state = 'idle'; actor.setMotion(actor.yaw, 0, 3); return true;
+      }
+      actor.setMotion(Math.atan2(homeX - actor.position.x, homeZ - actor.position.z), Math.min(home.speed, fromHome * 2), 4);
+      return true;
+    };
     const cadence = hunt.bindRoster({ limit: 1, order: 'combined', at: () => actor, actor: body => body, id: body => body.entityId,
       player, noise, sight, reach: (body, target) => canReach(body, target, host.physics), brainDt: (body, urgent) => host.brainDt(body, urgent) });
     host.onStep(id, dt => {
       // OF23c: a body a script adopted (an elite program's declared main) is the script's to drive
       if (!host.bodyPresent(actor.entityId) || actor.scripted) return;
       observe();
-      hunt.beginTick(dt); clock += dt; cadence.observe(dt); cadence.decide();
+      hunt.beginTick(dt); clock += dt; cadence.observe(dt);
+      if (!leashed()) cadence.decide();
       const bodyDt = host.bodyDt(actor.entityId);
       if (bodyDt > 0 && actor.alive && !actor.stunned && !actor.harnessHold && actor.state === 'charge') hunt.advanceCharge(actor, bodyDt, player);
     }, { snapshot: () => JSON.stringify({ contract, clock, memory: huntMemoryCodec.save(memory),
