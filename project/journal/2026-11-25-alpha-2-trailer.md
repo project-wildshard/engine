@@ -44,3 +44,6 @@
   creature's entry is recycled when it dies, so fights re-find their prey every tick (`PREY`).
   `party.mjs` puts three real clients in a local world for the party shot, captured with
   `--wall` (remote bodies move on the page's real clock). `cuts/alpha-2.mjs`: 19 clips, 63 s.
+- AT12: `docs/trailer.md`, the re-make recipe (pieces, a shot, where to shoot, the commands,
+  sound, the alpha 2 cut, the honesty rules, gotchas). The corner bug now sits over the build
+  beats too, so every frame but the end card's hold carries the alpha label.

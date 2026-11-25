@@ -65,8 +65,8 @@ export function cut(o) {
     { id: 'end', card: 'endA', at: when('g-rise') + 2.8, dur: LEN - (when('g-rise') + 2.8), cta2Html: 'Build your own zone <b>with Claude Code</b>', alpha: 'Alpha 2 · captured in engine · work in progress',
       credits: 'Music: MiniMax-Music3 &nbsp;·&nbsp; Sound effects: MOSS-SoundEffect v2 · Stable Audio 3 — Powered by Stability AI &nbsp;·&nbsp; Captured in engine &nbsp;·&nbsp; Built with Claude Code' },
   ];
-  // the corner bug on every gameplay frame (not over the build beats, which carry their own frame, nor the end card)
-  const overlays = typeof o.bug === 'string' ? clips.filter((c) => !('video' in c) && c.shot !== 'black').map((c) => ({ png: o.bug, from: c.at, to: Number((c.at + c.dur).toFixed(3)) })) : [];
+  // the corner bug on every frame but the end card's hold (which carries its own alpha line)
+  const overlays = typeof o.bug === 'string' ? clips.filter((c) => c.shot !== 'black').map((c) => ({ png: o.bug, from: c.at, to: Number((c.at + c.dur).toFixed(3)) })) : [];
   const hits = [0.89, 3.67, 8.49, 24.6, 26.21, 42.31, 64.77].map(onCut);
   const mix = {
     length: LEN, sfxdir: o.SFX,

@@ -136,7 +136,7 @@ test('the alpha 2 cut is about a minute and lands its last hit on the pull-back'
   expect(edl.length).toBeLessThan(66);
   expect(edl.clips[0].shot).toBe('d-walk');
   expect(edl.clips.find((c) => c.shot === 'g-rise').at).toBeCloseTo(onCut(64.77), 2);
-  expect(edl.overlays.some((o) => edl.clips.some((c) => 'video' in c && o.from === c.at))).toBe(false);
+  expect(edl.overlays.reduce((s, o) => s + o.to - o.from, 0)).toBeCloseTo(edl.length - edl.clips.at(-1).dur, 2); // the bug on every frame but the end hold
   expect(titles.map((t) => t.card)).toEqual(expect.arrayContaining(['alpha', 'shard', 'bigcap', 'endA']));
   expect(mix.length).toBe(edl.length);
   expect(() => cut({ TAKE: 't.wav', SFX: 'sfx' })).toThrow(/--build-1/u);
