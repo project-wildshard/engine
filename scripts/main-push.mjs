@@ -34,6 +34,7 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {assertNoLocalCandidates} from './local-candidates.ts';
 import {installLag} from './install-lag.mjs';
+import {holdRefusal} from './land-hold.mjs';
 import {withStoreUse} from './worktree.mjs';
 
 export class StopError extends Error {
@@ -236,6 +237,9 @@ export function pushMain(cwd, remote = 'origin') {
   // What this push sends: every commit local main has over origin/main. In a shared checkout that can include another
   // lane's commit, made but not yet pushed; it rides along (M1) and the receipt names it.
   const sent = git(cwd, ['rev-parse', 'HEAD']);
+  // Meta QA 11-25 row 37: an open engine land HOLD in the receipts stops every pusher but the lander it names.
+  const held = holdRefusal({ lane: currentLane(), bodies: run(cwd, ['log', '--format=%B', `refs/remotes/${remote}/main..${sent}`]).stdout });
+  if (held !== null) { receipt(`main-push STOP ${held}`); throw new StopError(held); }
   const outgoing = run(cwd, ['log', '--format=%h %s', `refs/remotes/${remote}/main..${sent}`]).stdout.trim().split('\n').filter(Boolean);
   // The pre-push's whole output (the gate) goes to a log in the git dir: its RED lines are the cause on a refusal.
   const log = resolve(cwd, git(cwd, ['rev-parse', '--git-path', `main-push-${process.pid}.log`]));
@@ -508,6 +512,9 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(p
   let made = '';
   try {
     checkState(cwd);
+    // Row 37: under an open engine land HOLD nothing is committed, so no other lane's push carries it along (M1).
+    const held = options.files.length > 0 ? holdRefusal({ lane: currentLane(), bodies: options.messages.join('\n') }) : null;
+    if (held !== null) { receipt(`main-push STOP ${held}`); throw new StopError(held); }
     lock();
     const pending = heldCommits(cwd).filter(row => row.lane === currentLane());
     if (!options.onto && pending.length > 0) throw new StopError(heldAdvice(cwd, pending[0]));

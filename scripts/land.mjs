@@ -21,6 +21,7 @@ import {installLag} from './install-lag.mjs';
 import {canonicalRoot,followMain,withStoreUse} from './worktree.mjs';
 import {stopWorktreeProcesses} from './worktree-reap.mjs';
 import {assertNoLocalCandidates} from './local-candidates.ts';
+import {holdRefusal} from './land-hold.mjs';
 
 /** The hosted workflows a green SHA needs, by workflow name (J195, J240); pin-provenance.mjs reads it. */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
@@ -467,6 +468,9 @@ class Landing{
   const head=this.holds('before the merge'),main=this.fetchMain();
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
+  // Meta QA 11-25 row 37: an open engine land HOLD in the receipts stops every lander but the one it names.
+  const held=holdRefusal({lane:this.lane,env:this.env,bodies:git(this.root,['log','--format=%B',`${main}..${head}`],this.env)});
+  if(held!==null){this.receipt(`STOP ${held}`);throw new StopError(held);}
   const args=mainPushArgs(head);
   this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only; push gate: lint, types, related tests (J422)`);
   // The pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).
