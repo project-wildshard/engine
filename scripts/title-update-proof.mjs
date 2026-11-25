@@ -27,8 +27,8 @@ const PROBE = () => {
   const state = {mainAt: -1, maxGap: 0, last: -1, frames: 0};
   Object.defineProperty(window, '__titleProbe', {value: state});
   const frame = (/** @type {number} */ now) => {
-    const main = document.querySelector('.ws-main');
-    if (state.mainAt < 0 && main !== null && main.getClientRects().length > 0) state.mainAt = now;
+    const screen = document.querySelector('.ws-main');
+    if (state.mainAt < 0 && screen !== null && screen.getClientRects().length > 0) state.mainAt = now;
     if (state.mainAt >= 0 && state.last >= 0) state.maxGap = Math.max(state.maxGap, now - state.last);
     state.last = now; state.frames++;
     requestAnimationFrame(frame);
