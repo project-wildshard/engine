@@ -37,6 +37,9 @@ export function pushGuards(changed) {
     // WORKTREE_TOOL must name worktree.mjs's import closure, which any script edit can change; the test reads the
     // sources, so `vitest related` never relates it (main red 45407099803 after b8f4671bc dropped an import)
     ...(changed.some(file => /^(?:scripts|\.agents\/hooks)\/[^/]+\.mjs$/u.test(file)) ? ['test/tooling/worktree-fresh.test.mjs'] : []),
+    // QA 11-24 row 28: a pin branch cut before c55668166 re-committed `releaseHash: null` in the staging export (8cc18bc68
+    // broke main). The export is JSON, so `vitest related` never relates its reader's test: name it.
+    ...(changed.includes('test/pins/staging.json') ? ['test/pins-staging.test.ts'] : []),
     'test/host-callbacks.test.ts', 'test/shardfile-boundaries.test.ts',
     'test/manifest-declarations.test.ts',
   ];

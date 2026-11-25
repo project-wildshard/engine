@@ -38,6 +38,7 @@ it('requires guards and limits forced reruns to root configuration', () => {
   for (const file of ['scripts/worktree.mjs', 'scripts/keep-copy.mjs', '.agents/hooks/active-hours.mjs'])
     expect(pushGuards([file])).toEqual(['test/tooling/worktree-fresh.test.mjs', ...fixed]);
   expect(pushGuards(['scripts/memory/iphone/x.mjs'])).toEqual(fixed);
+  expect(pushGuards(['test/pins/staging.json'])).toEqual(['test/pins-staging.test.ts', ...fixed]);
   expect(forceRerunTriggers('/repo')).toEqual(['/repo/package.json', '/repo/{vitest,vite}.config.*']);
 });
 
