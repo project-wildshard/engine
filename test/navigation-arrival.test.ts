@@ -186,3 +186,17 @@ test('travel leaves for a bare / with the harness flags it keeps, never naming t
   expect(at('https://play.example/slug/pine-hollow?sw=0'), 'a /slug/ page leaves for /').toBe('/?sw=0');
   expect(at('https://play.example/?tier=phone', 'explore')).toBe('/?tier=phone&explore=hub');
 });
+
+test('a tap is the writer\'s and the next document\'s only: the first other page to read it takes it, a later page finds it taken', () => {
+  vi.spyOn(Date, 'now').mockReturnValue(10_000);
+  const started = vi.spyOn(performance, 'timeOrigin', 'get').mockReturnValue(9_000);
+  dropTabArrival();
+  setTitleArrival({ slug: 'pine-hollow', mode: 'enter' }, { tab: true });
+  expect(pendingTitleArrival(), 'the tapping document still reads its own tap').toEqual({ slug: 'pine-hollow', mode: 'enter' });
+  started.mockReturnValue(9_500);
+  expect(pendingTitleArrival(), 'the page the tap navigated takes it').toEqual({ slug: 'pine-hollow', mode: 'enter' });
+  expect(pendingTitleArrival('pine-hollow'), 'and keeps reading it').toEqual({ slug: 'pine-hollow', mode: 'enter' });
+  started.mockReturnValue(9_900);
+  expect(pendingTitleArrival(), 'a later page in the tab (the title after an exit, a reload) finds it taken').toBeNull();
+  expect(consumeTitleArrival(), 'and never spends it as its own').toBeNull();
+});

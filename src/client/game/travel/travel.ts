@@ -107,7 +107,7 @@ function arriveAt(request: TravelRequest): void {
 }
 /** CHUNK-PARAM CP1 (J522): the next page's address is `/` with the harness flags this one keeps; the zone rides in the tap
  *  (`arriveAt`, written first), never in the address. */
-export function travelAddress(request: Pick<TravelRequest, 'mode'>, href: string = location.href): URL {
+function travelAddress(request: Pick<TravelRequest, 'mode'>, href: string = location.href): URL {
   const here = new URL(href), url = new URL(`/${here.search}`, here.origin);
   for (const name of ['chunk', 'at', 'glreload', 'x', 'z', 'yaw', 'pitch', 'explore', 'cam', 'model', 'skipintro', 'tour', 'quest', 'drop']) url.searchParams.delete(name);
   if (request.mode === 'explore') url.searchParams.set('explore', 'hub');
@@ -119,6 +119,8 @@ export function travel(request: TravelRequest): void {
   if (manifest === undefined) return;
   service.travel({ ...request, to: manifest.slug });
 }
+/** CP1: the bare address a travel leaves for (test/navigation-arrival.test.ts). */
+export { travelAddress };
 export function consumeTravelHandoff(to: ShardSlug): TravelHandoff | null { return service.consume(to); }
 /** Arrival goes through the target shard's Bag rules, never writes another shard's inventory directly. */
 export function applyTravelCarry(handoff: TravelHandoff | null, inventory: Inventory): void {

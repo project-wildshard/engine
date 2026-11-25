@@ -9,3 +9,11 @@
   a bare `/` another tab could take it inside the minute, so it is read only on a same-origin `navigate`
   (`tapNavigatedHere`): a second tab, a bookmark and a reload have no same-origin referrer or are no navigation.
 - `?chunk=` reads stay until CP22; nothing breaks in between.
+
+# A tap is its next document's only (opus-chunk, CP1 fix forward)
+
+- 954b06fec let any bare `/` with a fresh tap enter, so a tap the world page had not yet spent (the player leaving for the
+  title while it loaded, exit to main menu) sent that title back into the world (title-first-paint's SB44 "leftover tap"
+  case). A record now carries `from` (the writing document's start) and `taken` (the start of the first other document
+  that reads it, stamped by index.html's first paint): a later page in the tab finds it taken and stays the title. SB44's
+  engine update reload hands the taken tap on, as before, without writing `chunk` into the address.

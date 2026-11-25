@@ -340,7 +340,9 @@ test('QA 11-13: a page the entry turns into the title later (a player reload, an
 // page reloaded itself into it (`stale deployment code`) a second after Driftwood reached play. A world page's address is bare `/`
 // (GO4), so the reload landed on the title and the drop modal said UNEXPECTEDLY BACK AT THE TITLE, though the old page had handed its
 // tap to the next document (`setTitleArrival(…, {tab: true})`). The first bytes now take that handoff back into the world.
-function reloadedDocument(search: string, left: { reason: string; ago: number; reload?: true } | null, arrival: { slug: string; ago: number } | null): Window {
+// CHUNK-PARAM CP1 (J522): the address stays bare; the page reads the zone from the tap. A tap the world page before this one took
+// (`taken`, that document's start) is a leftover unless an engine reload hands it on; an untaken one is the tap's own navigation.
+function reloadedDocument(search: string, left: { reason: string; ago: number; reload?: true } | null, arrival: { slug: string; ago: number; taken?: number | null } | null): Window {
   const window = new Window({ url: `https://launch.test/${search}`, width: 402, height: 874, settings: {
     enableJavaScriptEvaluation: true, disableJavaScriptFileLoading: true, disableCSSFileLoading: true,
     enableImageFileLoading: false, handleDisabledFileLoadingAsSuccess: true,
@@ -351,29 +353,45 @@ function reloadedDocument(search: string, left: { reason: string; ago: number; r
     reason: left.reason, t: now - left.ago, build: 'old', slug: 'driftwood-isle', resident: '', mode: 'grid', ...left.reload === undefined ? {} : {reload: true},
   }}}}));
   if (arrival !== null) window.sessionStorage.setItem(`wildshard.save.v2@${saveEpoch}.session`, JSON.stringify({keys: {titleArrival: {v: 1, data: {
-    slug: arrival.slug, mode: 'enter', at: now - arrival.ago,
+    slug: arrival.slug, mode: 'enter', at: now - arrival.ago, ...arrival.taken === null ? {} : { taken: arrival.taken ?? 1 },
   }}}}));
   window.document.write(html);
   return window;
 }
+const tapTaken = (window: Window): unknown => (JSON.parse(window.sessionStorage.getItem(`wildshard.save.v2@${saveEpoch}.session`) ?? '{}') as
+  { keys?: { titleArrival?: { data?: { taken?: unknown } } } }).keys?.titleArrival?.data?.taken;
 const titleFirst = (window: Window): boolean => window.document.documentElement.classList.contains('title-first');
 
 test('SB44: the engine\'s own update reload of a bare world page goes back into the world its tap named', () => {
   for (const reason of ['stale deployment code', 'stale build: its files are gone from the server', 'new build panel', 'offline load failure']) {
     const window = reloadedDocument('', { reason, ago: 800 }, { slug: 'driftwood-isle', ago: 900 });
-    expect(window.location.search, reason).toBe('?chunk=driftwood-isle');
+    expect(window.location.search, reason).toBe('');
     expect(titleFirst(window), reason).toBe(false);
+    expect(tapTaken(window), `${reason}: this document takes the handed tap`).toBe(window.performance.timeOrigin);
     expect(window.document.documentElement.classList.contains('boot-menu'), reason).toBe(false);
   }
   // the harness's environment flags ride along
-  expect(reloadedDocument('?tier=phone', { reason: 'stale deployment code', ago: 800 }, { slug: 'driftwood-isle', ago: 900 }).location.search)
-    .toBe('?tier=phone&chunk=driftwood-isle');
+  const flagged = reloadedDocument('?tier=phone', { reason: 'stale deployment code', ago: 800 }, { slug: 'driftwood-isle', ago: 900 });
+  expect(flagged.location.search).toBe('?tier=phone');
+  expect(titleFirst(flagged)).toBe(false);
+});
+
+test('CP1: the page a tap navigated is that zone\'s world page on a bare /, and takes the tap so no later page can', () => {
+  const window = reloadedDocument('', { reason: 'shard switch to driftwood-isle (fresh page)', ago: 300 }, { slug: 'driftwood-isle', ago: 300, taken: null });
+  expect(window.location.search).toBe('');
+  expect(titleFirst(window)).toBe(false);
+  expect(window.document.documentElement.classList.contains('boot-menu')).toBe(false);
+  expect(tapTaken(window)).toBe(window.performance.timeOrigin);
+  const flagged = reloadedDocument('?mute=1&nolock=1', null, { slug: 'driftwood-isle', ago: 300, taken: null });
+  expect(flagged.location.search, 'the harness flags stay; the zone never enters the address').toBe('?mute=1&nolock=1');
+  expect(titleFirst(flagged)).toBe(false);
 });
 
 test('SB44: every other bare launch stays the title, with or without a handoff', () => {
   const cases: [string, Parameters<typeof reloadedDocument>[1], Parameters<typeof reloadedDocument>[2]][] = [
     ['a cold launch', null, null],
     ['a tap left over with no reload behind it (DL21)', null, { slug: 'driftwood-isle', ago: 900 }],
+    ['a tap the world page took, then a player reload', { reason: 'shard switch to driftwood-isle (fresh page)', ago: 800 }, { slug: 'driftwood-isle', ago: 900 }],
     ['an engine reload with no tap handed over', { reason: 'stale deployment code', ago: 800 }, null],
     ['the player leaving for the title while loading', { reason: 'release page: title screen', ago: 800 }, { slug: 'driftwood-isle', ago: 900 }],
     ['exit to main menu', { reason: 'exit to main menu', ago: 800 }, { slug: 'driftwood-isle', ago: 900 }],

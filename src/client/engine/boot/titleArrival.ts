@@ -23,7 +23,17 @@ const MAX_AGE_MS = 60_000;
 const ARRIVAL_ART = /^(?:\/(?!\/)[\w./-]+\.(?:jpg|png|webp))?$/u;
 export function arrivalArt(value: unknown): value is string { return typeof value === 'string' && ARRIVAL_ART.test(value); }
 
-interface StoredArrival extends TitleArrival { at: number; name?: string; tier?: string; art?: string; timing?: Readonly<Record<string, unknown>> }
+/** CP1: `from` is the writing document's start, `taken` the start of the one other document that took it (see `ours`). */
+interface StoredArrival extends TitleArrival { at: number; name?: string; tier?: string; art?: string; timing?: Readonly<Record<string, unknown>>; from?: number; taken?: number }
+
+/** CP1: a document's identity, its start (`performance.timeOrigin`): one per document, the same in every module of it. */
+function ownDocument(): number { return typeof performance === 'undefined' ? 0 : performance.timeOrigin; }
+/** CHUNK-PARAM CP1 (J522): whose tap a record is, now that a bare `/` can take one. The document that wrote it, or the first other
+ *  document to read it: the one the tap navigated (index.html's first paint stamps `taken` before any module runs). A later page in
+ *  the tab (the title after an exit while loading, a player's reload) finds it taken by another document and leaves it. */
+function ours(candidate: Partial<StoredArrival>, own: number): boolean {
+  return candidate.taken === undefined || candidate.taken === own || candidate.from === own;
+}
 
 /** A one-shot handoff must be fresh when this document arrives, before cold
  * modules or world admission run. Later reloads still use their own start.
@@ -44,7 +54,7 @@ function valid(raw: string | null, slug?: string): TitleArrival | null {
     const candidate = value as Partial<StoredArrival>;
     const zone = candidate.slug ?? '';
     if (!ZONE.test(zone) || ![slug ?? zone].includes(zone) || (candidate.mode !== 'enter' && candidate.mode !== 'explore' && candidate.mode !== 'arena')) return null;
-    if (typeof candidate.at !== 'number' || !freshPageArrival(candidate.at)) return null;
+    if (typeof candidate.at !== 'number' || !freshPageArrival(candidate.at) || !ours(candidate, ownDocument())) return null;
     const timing = bootTiming();
     if (timing !== undefined && candidate.timing !== undefined) timing.handoff = {
       ...candidate.timing, wall: candidate.at, received: timing.handoff?.['received'] ?? diagnosticNow(), newTimeOrigin: timing.timeOrigin,
@@ -69,6 +79,17 @@ function currentPage(): { referrer: string; origin: string; type: string | undef
   try { const nav: unknown = performance.getEntriesByType('navigation')[0]; const named: unknown = typeof nav === 'object' && nav !== null ? Reflect.get(nav, 'type') : undefined; type = typeof named === 'string' ? named : undefined; } catch { type = undefined; }
   return { referrer: document.referrer, origin: location.origin, type };
 }
+/** CP1: a document other than the writer takes a fresh record it reads, so no later document in the tab can. */
+function claim(scope: 'session' | 'device', key: string, raw: string | null): string | null {
+  if (raw === null) return null;
+  try {
+    const value: unknown = JSON.parse(raw), own = ownDocument();
+    if (typeof value !== 'object' || value === null || Reflect.get(value, 'taken') !== undefined || Reflect.get(value, 'from') === own) return raw;
+    const taken = JSON.stringify({ ...value, taken: own });
+    saveStorage(scope).setItem(key, taken);
+    return taken;
+  } catch { return raw; }
+}
 function deviceBackup(take: boolean): string | null {
   if (!tapNavigatedHere()) return null;
   try {
@@ -84,7 +105,7 @@ function deviceBackup(take: boolean): string | null {
 export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: string; art?: string }, options: { readonly tab?: boolean } = {}): void {
   bootMark('app:navigation-decision', {slug: arrival.slug});
   const timing = bootTiming();
-  const raw = JSON.stringify({ ...arrival, at: Date.now(), ...(timing === undefined ? {} : {timing: {
+  const raw = JSON.stringify({ ...arrival, at: Date.now(), from: ownDocument(), ...(timing === undefined ? {} : {timing: {
     timeOrigin: timing.timeOrigin, decision: diagnosticNow(), input: Reflect.get(timing, 'lastInput'), attempt: timing.attempt,
   }}) } satisfies StoredArrival);
   try { saveStorage('session').setItem(KEY, raw); } catch { /* the local one-shot below can carry the intent */ }
@@ -110,7 +131,9 @@ export function consumeTitleArrival(slug?: string): TitleArrival | null {
 export function pendingTitleArrival(slug?: string): TitleArrival | null {
   let session: string | null = null;
   try { session = saveStorage('session').getItem(KEY); } catch { /* the backup may survive */ }
-  return valid(session, slug) ?? valid(deviceBackup(false), slug);
+  if (valid(session, slug) !== null) return valid(claim('session', KEY, session), slug);
+  const backup = deviceBackup(false);
+  return valid(backup, slug) === null ? null : valid(claim('device', BACKUP_KEY, backup), slug);
 }
 
 /** DL21: the fresh arrival's display facts and tap time for the receiving document's first card, without consuming it. */

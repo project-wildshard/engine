@@ -243,29 +243,29 @@
       const homeParams = new URLSearchParams(location.search);
       // The environment flags select no level (src/client/app/bootRoute.ts keeps the same list): a launch with only them is the title.
       for (const key of ['v', 'tier', 'touch', 'mute', 'nolock', 'sw', 'fps']) homeParams.delete(key);
-      // STAGING-BUGBASH SB44: a world page's address is bare (GO4), so the engine's own update reload of one (lastEnd's young
-      // `stale deployment code` / `stale build` / `new build panel`, not a `reload` that means the title) would land on the title.
-      // That page handed its tap to this document (titleArrival, session, 60 s): the address names the world again, so the page
-      // goes back in (entry.ts reads the tap as a title PLAY's) instead of the title's UNEXPECTEDLY BACK AT THE TITLE.
-      if (!globalThis.__WS_EXPLORE__ && homeParams.size === 0 && location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
-        const saved = (store, scope, key) => { const item = JSON.parse(store.getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; };
-        const left = saved(localStorage, 'device', 'life.lastUnload'), tap = saved(sessionStorage, 'session', 'titleArrival'), now = Date.now();
-        if (left && left.reload !== true && now - left.t >= 0 && now - left.t < 10000 && /^(?:stale deployment code|stale build|new build panel|offline load failure)/u.test(left.reason)
-          && tap && now - tap.at >= 0 && now - tap.at < 60000 && /^[a-z0-9_-]+$/u.test(tap.slug)) {
-          const next = new URLSearchParams(location.search);
-          next.set('chunk', tap.slug); homeParams.set('chunk', tap.slug);
-          history.replaceState(history.state, '', location.pathname + '?' + next.toString() + location.hash);
-        }
-      } catch { /* storage blocked: the title, as before */ }
-      // CHUNK-PARAM CP1 (J522): a tap names its zone in the tab (titleArrival.ts) and leaves the address bare: this document is that
-      // zone's world page, read here as the entry reads it. The device copy (iOS's WebContent swap) only on a same-origin navigation.
+      // CHUNK-PARAM CP1 (J522): a tap names its zone in the tab (titleArrival.ts) and leaves the address bare, so this document is
+      // that zone's world page when it is the one the tap navigated: the first other document to read the record takes it (`taken`,
+      // its start), and a later page in the tab (the title after an exit while loading, a player's reload) finds it taken. The
+      // device copy (iOS's WebContent swap) only on a same-origin navigation. The entry reads the same record (titleArrival.ts `ours`).
+      // STAGING-BUGBASH SB44: the engine's own update reload of a world page (lastEnd's young `stale deployment code` / `stale
+      // build` / `new build panel` / `offline load failure`, not a `reload` that means the title) hands that page's taken tap on.
       if (!homeParams.has('chunk') && location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
-        const saved = (store, scope, key) => { const item = JSON.parse(store.getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; };
-        const fresh = tap => { const now = Date.now(), start = performance.timeOrigin; return tap && typeof tap.at === 'number' && /^[a-z0-9_-]+$/u.test(tap.slug)
-          && ['enter', 'explore', 'arena'].includes(tap.mode) && tap.at <= now && (now - tap.at <= 60000 || (start >= tap.at && start - tap.at <= 60000)) ? tap.slug : null; };
+        const name = scope => 'wildshard.save.v2@2.' + scope, own = performance.timeOrigin, now = Date.now();
+        const read = (store, scope, key) => { const blob = JSON.parse(store.getItem(name(scope)) || '{}'), item = blob.keys?.[key]?.data; return { blob, tap: typeof item === 'string' ? JSON.parse(item) : item }; };
+        const fresh = tap => tap && typeof tap.at === 'number' && /^[a-z0-9_-]+$/u.test(tap.slug) && ['enter', 'explore', 'arena'].includes(tap.mode)
+          && tap.at <= now && now - tap.at <= 60000;
+        const left = read(localStorage, 'device', 'life.lastUnload').tap;
+        const handed = !globalThis.__WS_EXPLORE__ && homeParams.size === 0 && !!left && left.reload !== true && now - left.t >= 0 && now - left.t < 10000
+          && /^(?:stale deployment code|stale build|new build panel|offline load failure)/u.test(left.reason);
         const nav = performance.getEntriesByType('navigation')[0], navigated = (!nav || nav.type === 'navigate') && document.referrer !== '' && new URL(document.referrer).origin === location.origin;
-        const zone = fresh(saved(sessionStorage, 'session', 'titleArrival')) || (navigated ? fresh(saved(localStorage, 'device', 'titleArrival.once')) : null);
-        if (zone) homeParams.set('chunk', zone);
+        for (const [store, scope, key, allowed] of [[sessionStorage, 'session', 'titleArrival', true], [localStorage, 'device', 'titleArrival.once', navigated]]) {
+          const { blob, tap } = allowed ? read(store, scope, key) : { blob: null, tap: null };
+          if (!fresh(tap) || (tap.taken !== undefined && tap.taken !== own && !handed)) continue;
+          tap.taken = own; const item = blob.keys[key]; item.data = typeof item.data === 'string' ? JSON.stringify(tap) : tap;
+          store.setItem(name(scope), JSON.stringify(blob));
+          homeParams.set('chunk', tap.slug);
+          break;
+        }
       } catch { /* storage blocked: the title, as before */ }
       if (!globalThis.__WS_EXPLORE__ && homeParams.size === 0) document.documentElement.classList.add('title-first');
       // BUGBASH-LOOP (J385): the launch shell and live menu belong to the title only. A world page (`?chunk=`, a tap's
