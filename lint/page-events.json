@@ -457,7 +457,7 @@
    ],
    "proof": "flow:data",
    "why": "C10: Big Blob's declared panel retries off its row.",
-   "debt": "TEMPLATE-E2E TR-5 retired flow:data-shard with the Template (its Big Blob page); flow:data boots a data page, but no flow kills on one yet: a Brasscap death flow is owed"
+   "debt": "TEMPLATE-E2E TR-5 retired flow:data-shard with the Template (its Big Blob page); flow:data boots Brasscap Mesa's data page, but no flow kills on one yet: a Brasscap death flow is owed"
   },
   {
    "id": "player.respawned",

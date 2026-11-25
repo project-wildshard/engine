@@ -478,6 +478,13 @@ export async function play(browser, phone, base, only = '') {
     await shard.context.close();
   }
 
+  // A data shard: the page is the data client's alone. Brasscap Mesa since Pastel Plain left the grid (ZONE-SNAPSHOTS ZS7);
+  // lint/page-events.json's declared-death rows name this flow, and their debt line says what it does not prove yet.
+  if (runs('data')) { const data = await open(browser, phone, base, '/?chunk=brasscap-mesa&mute=1&nolock=1');
+  await step('brasscap boots on the row', async () => { await entered(data.page); return started(data.page); });
+  await step('brasscap raises no page error', () => ({ ok: data.errors.length === 0, errors: [...new Set(data.errors)].slice(0, 6) }));
+  await data.context.close(); }
+
   // The grid: a crossing, a save, a reload
   if (runs('grid')) { const grid = await open(browser, phone, base, floorGridBenchmarkUrl(base).replace(base, '/'));
   await step('the grid boots on the row', async () => {
