@@ -704,6 +704,7 @@
     "src/client/game/grid/budgetOverlay.ts": "client",
     "src/client/game/grid/budgetPoints.ts": "client",
     "src/client/game/grid/cellChanges.ts": "client",
+    "src/client/game/grid/cellDataPost.ts": "client",
     "src/client/game/grid/cellClip.ts": "client",
     "src/client/game/grid/cellCover.ts": "client",
     "src/client/game/grid/cellPresence.ts": "client",

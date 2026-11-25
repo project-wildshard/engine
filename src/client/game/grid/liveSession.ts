@@ -24,7 +24,7 @@ import { loadingUnits } from '@wildshard/engine/boot/waits';
  *   own bodyless regional host with its strip duplicates; the rest refuse admission and stay far proxies behind closed
  *   walls until M3.
  */
-import { Vector3, type PerspectiveCamera } from 'three';
+import { Vector3, type Object3D, type PerspectiveCamera } from 'three';
 import { createProgramKeeper, RETAINED_PROGRAM_BYTES, RETAINED_PROGRAM_LIMIT, type ProgramKeeper } from '@wildshard/engine/render/programRetention';
 import { diagnosticNow } from '@wildshard/engine/core/clock';
 import { WORK_SLICE_MS, workSlice } from '@wildshard/engine/core/workSlice';
@@ -107,6 +107,7 @@ import { createRegionalRuntimeFactory, regionalRuntimeAccountedBytes, type Prepa
 import { bindHomeBuildCache } from '../shardfile/homeBuildCache';
 import type { ClientTileRegistration } from '../shardfile/tileContent';
 import { createRegionalWorldFoundation, hangCellDataSky, registerRegionalTextureTable, resolveRegionalRuntimeTextures } from './regionalWorld';
+import { hangCellDataPost } from './cellDataPost';
 import { regionalDataCellBytes } from './runtimeCost';
 import { resolveLevelBounds } from '../../../shared/game/shard/runtime';
 import { declaredPlayArea } from '@wildshard/engine/game/shardfile/playArea';
@@ -168,6 +169,8 @@ export interface LiveGridPage {
 export interface LiveGridSessionPorts {
   /** Data-only cells publish gameplay only after their admitted entry tiles are resident. */
   readonly prepareDataTiles?: (cell: GridCell, scope: Scope, start: { readonly x: number; readonly z: number }) => Promise<void>;
+  /** QA 11-24 row 69: a cell's view root (`grid-cell:<instance>`), which a data cell's declared post composite draws */
+  readonly cellRoot?: (instance: string) => Object3D | undefined;
   /** Render-only destination preparation; the signal releases its temporary entry-tile pins. False: its inputs were deferred
    *  (no room yet), nothing is pinned; `required` (the road's ground, J500) reads them as an entry would. */
   readonly prepareNeighbourTiles?: (cell: GridCell, start: { readonly x: number; readonly z: number }, signal: AbortSignal, required?: boolean) => Promise<boolean>;
@@ -864,6 +867,13 @@ export class LiveGridSession {
           const request = { instance: cell.instance, slug: cell.slug, look: copySource.look, assets, page: this.page.runtimePage?.() ?? null, allocator: this.ports.allocator, scope: shell.scope };
           void (async (): Promise<void> => {
             try { await hangCellDataSky(request); } catch (error) { console.warn(`[region sky] ${cell.instance}`, error); }
+          })();
+        }
+        // QA 11-24 row 69: its declared post look (Nine's rain, ink lines and live light) runs in its cell, as on its own page
+        {
+          const request = { instance: cell.instance, slug: cell.slug, source: copySource, folder, root: this.ports.cellRoot?.(cell.instance), page: this.page.runtimePage?.() ?? null, scope: shell.scope };
+          void (async (): Promise<void> => {
+            try { await hangCellDataPost(request); } catch (error) { console.warn(`[region post] ${cell.instance}`, error); }
           })();
         }
         const unlist = (): void => { if (this.plotAudio?.instance === cell.instance) this.leavePlotAudio(); if (this.dataKit?.instance === cell.instance) this.leaveDataKit(); this.leaveDataStays(cell.instance); this.plotBanks.delete(cell.instance); this.regions.delete(cell.instance); this.dataMovers.delete(cell.instance); this.dataBodies.delete(cell.instance); this.transferWalls.delete(cell.instance); };
