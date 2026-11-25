@@ -142,13 +142,15 @@ async function pool(items, width, each) {
 }
 
 /** A key read back: 200, the game's CORS, the decoded bytes. A 404 right after upload is retried (the CDN caches 404s
- * and keys on the query, so each try is fresh).
+ * and keys on the query, so each try is fresh), and so is a 5xx or no answer, 3 times: v0.1.92's staging go-live held
+ * on one copied key that answered 500 once and 200 on every read after.
  * @param {ContentStore} store @param {string} key @param {string} expected decoded SHA-256 @param {string} origin
  * @param {(ms: number) => Promise<void>} sleep */
 export async function readBack(store, key, expected, origin, sleep) {
   for (let attempt = 0; ; attempt++) {
     const read = await store.read(key, origin);
     if (read.status === 404 && attempt < 5) { await sleep(3_000); continue; }
+    if ((read.status === 0 || read.status >= 500) && attempt < 3) { await sleep(3_000); continue; }
     if (read.status !== 200) throw new Error(`${key} answered ${read.status} on ${PACKS_ORIGIN}`);
     if (read.cors !== origin) throw new Error(`${key} CORS is ${read.cors}, not ${origin}`);
     if (sha256(read.bytes) !== expected) throw new Error(`${key} read back with different bytes (${read.bytes.length} bytes)`);

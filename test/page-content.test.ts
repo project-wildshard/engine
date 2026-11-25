@@ -1,4 +1,6 @@
 // @vitest-environment node
+// oxlint-disable-next-line import/no-nodejs-modules -- A read-back compares the decoded bytes' SHA-256.
+import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The fixture is a built page tree under the repository's tmp.
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths stay under tmp.
@@ -6,7 +8,7 @@ import {dirname, join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- A `.pack.br` part is stored Brotli and read back decoded.
 import {brotliCompressSync, brotliDecompressSync} from 'node:zlib';
 import {afterEach, expect, test} from 'vitest';
-import {COPY_WIDTH, contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, r2Copies, scanContent, type ContentStore, type Put} from '../scripts/page-release/content.mjs';
+import {COPY_WIDTH, contentBaseOf, contentHeaders, contentKey, contentSet, publishContent, r2Content, r2Copies, readBack, scanContent, type ContentStore, type Put} from '../scripts/page-release/content.mjs';
 
 const ORIGIN = 'https://play.wildshard.io';
 const scratchRoot = resolve(import.meta.dirname, '../tmp/page-content-test');
@@ -269,4 +271,14 @@ test('FR-A12: a set that already holds a key is still checked file by file', asy
   bucket.objects.set(held, {body: readFileSync(join(dir, 'assets/tex/rock.ktx2')), headers: contentHeaders(held)});
   bucket.store.empty = () => Promise.resolve(false);
   expect(await run(dir, bucket.store)).toMatchObject({held: 1});
+});
+
+test('a read-back retries a passing 5xx and still stops on one that stays', async () => {
+  // v0.1.92's staging go-live held on one copied key that answered 500 once, then 200
+  const body = new TextEncoder().encode('{"ok":1}'), hash = createHash('sha256').update(body).digest('hex'), origin = 'https://staging.wildshard.io';
+  const store = (statuses: number[]): ContentStore => ({read: () => Promise.resolve({status: statuses.shift() ?? 200, cors: origin, bytes: body})} as unknown as ContentStore);
+  const sleeps: number[] = [], sleep = (ms: number): Promise<void> => { sleeps.push(ms); return Promise.resolve(); };
+  expect(await readBack(store([500, 503]), 'content/s/a.json', hash, origin, sleep)).toBe(body.length);
+  expect(sleeps).toEqual([3_000, 3_000]);
+  await expect(readBack(store([500, 500, 500, 500]), 'content/s/a.json', hash, origin, sleep)).rejects.toThrow('answered 500');
 });
