@@ -119,7 +119,12 @@ describe('the cook worker', () => {
     expect(JSON.parse(outcome.kind === 'refused' ? outcome.reason : '{}')).toEqual({home: true, hosts: true, write: true, child: true, secret: null, cookKey: null, token: null});
   }, 30_000);
 
-  it('takes a job off the network through the host wrap', async () => {
+  // QA 11-25 row 57: this test failed twice on CI (runs 45664266724 and 45686413697, tests (6), about 1.4 s) and passed each rerun.
+  // Its child said its verdict on stdout just before exit, and CI's arm runs it under sudo, which may relay a child's output
+  // through a pseudo-terminal (Ubuntu's `use_pty`) and drop a quick exit's last line, so the verdict read as a bare refusal. The
+  // child now writes it where a real cook job does (`<out>.result.json`, scripts/cook-job.mjs), each run to its own file. STOPGAP:
+  // one CI-only retry stays until CI shows no `row57` line for a day; a miss prints that line, naming what each child returned.
+  it('takes a job off the network through the host wrap', {retry: process.env['CI'] === undefined ? 0 : 1, timeout: 30_000}, async () => {
     const work = join(mkdtempSync(join(h.scratch, 'limit-')), 'job'), script = join(work, 'net.mjs');
     mkdirSync(work);
     let reached = 0;
@@ -127,7 +132,7 @@ describe('the cook worker', () => {
     await new Promise<void>(resolve => { network.listen(0, '127.0.0.1', resolve); });
     const address = network.address();
     if (address === null || typeof address === 'string') throw new Error('Missing host network address');
-    writeFileSync(script, `let reached = false, why = 'not ok'; try { const response = await fetch('http://127.0.0.1:${address.port}', {signal: AbortSignal.timeout(4000)}); reached = response.ok; } catch (error) { why = String(error?.cause?.code ?? error?.name); } console.log(JSON.stringify({refused: reached ? 'true' : 'false ' + why})); process.exit(3);`);
+    writeFileSync(script, `let reached = false, why = 'not ok'; try { const response = await fetch('http://127.0.0.1:${address.port}', {signal: AbortSignal.timeout(4000)}); reached = response.ok; } catch (error) { why = String(error?.cause?.code ?? error?.name); } (await import('node:fs')).writeFileSync(process.argv[3] + '.result.json', JSON.stringify({refused: reached ? 'true' : 'false ' + why})); process.exit(3);`);
     // Same OS namespace boundary as the installed author proof. Linux's
     // runner can create it with sudo, then drops back to the original uid/gid.
     // Neither arm mocks sockets, fetch or the h.real process permission flags.
@@ -138,12 +143,16 @@ describe('the cook worker', () => {
         : undefined;
     try {
       if (wrap === undefined) throw new Error('Cook network proof requires an actual OS network boundary');
-      expect(await runJob(h.launcher(script), join(work, 'x.tar'), join(work, 'out'))).toEqual({kind: 'refused', reason: 'true'});
-      expect(reached).toBe(1);
-      expect(await runJob({...h.launcher(script), wrap}, join(work, 'x.tar'), join(work, 'out'))).toMatchObject({kind: 'refused', reason: expect.stringMatching(/^false /)});
+      const open = await runJob(h.launcher(script), join(work, 'x.tar'), join(work, 'open')), openReached = reached;
+      const shut = await runJob({...h.launcher(script), wrap}, join(work, 'x.tar'), join(work, 'shut'));
+      if (!(open.kind === 'refused' && open.reason === 'true' && openReached === 1 && shut.kind === 'refused' && shut.reason.startsWith('false ') && reached === 1))
+        console.error(JSON.stringify({row57: {open, openReached, shut, reached}}).slice(0, 4000));
+      expect(open).toEqual({kind: 'refused', reason: 'true'});
+      expect(openReached).toBe(1);
+      expect(shut).toMatchObject({kind: 'refused', reason: expect.stringMatching(/^false /)});
       expect(reached, 'the isolated child cannot reach the proven live host endpoint').toBe(1);
     } finally { await new Promise<void>(resolve => { network.close(() => { resolve(); }); }); }
-  }, 30_000);
+  });
 
 });
 
