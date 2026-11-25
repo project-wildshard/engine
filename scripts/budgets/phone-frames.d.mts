@@ -18,6 +18,8 @@ export interface ZoneFrames {
 }
 
 export const PHONE_LOW: Readonly<{ width: number; height: number; deviceDpr: number; renderDpr: number }>;
+export const FRAME_MS: number;
+export function slowFrame(slug: string, name: string, ms: number): string | undefined;
 export function expectPinnedZones(pins: Record<string, string>, built: readonly string[]): string[];
 export function phoneFrameMeasures(pins: Record<string, string>, readings: readonly ZoneFrames[], commit?: string): BudgetMeasures;
 export function readPhoneFrames(browser: Browser, base: string, slug: string): Promise<ZoneFrames>;
