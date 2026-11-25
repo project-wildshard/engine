@@ -87,10 +87,32 @@ function failed(error: unknown): void {
   // failed, and the card sat at START 0 % once the network was back. Wait for the network, then recover as ever.
   if (!navigator.onLine) {
     const owner = pageScope.child('boot.offline');
+    showOfflineLine(owner);
     owner.listen(window, 'online', () => { owner.dispose(); settle(error); });
     return;
   }
   settle(error);
+}
+/** The offline wait's words on the card: what stopped the start, and that it carries on by itself. */
+export const OFFLINE_START_LINE = 'This device is offline, so the game stopped loading. It starts again by itself when the connection is back.';
+/**
+ * QA 11-24 row 25 (mini-mw MW15): a first visit is never controlled by the service worker (`sw.js` claims only on a forced
+ * update, `sw-ready-uncontrolled.test.ts`), so offline after ENTER THE MMO the start's own chunks fail, and the SB53 wait
+ * above held the card at START 84 % with its clock ticking and no word, for as long as the device stayed offline. Its line
+ * says why on the card, plainly and from this chunk, and goes with the wait.
+ */
+function showOfflineLine(owner: ReturnType<typeof pageScope.child>): void {
+  try {
+    // no loading card: nothing stands frozen (the title is up), so nothing to explain
+    const card = document.querySelector<HTMLElement>('.ws-load:not([data-veil])');
+    if (card === null) return;
+    const line = document.createElement('div');
+    line.className = 'ws-load-offline'; line.setAttribute('role', 'alert'); line.textContent = OFFLINE_START_LINE;
+    line.style.cssText = 'flex:none;box-sizing:border-box;width:calc(100% - 32px);max-width:560px;margin:8px auto;padding:12px;'
+      + 'border:1px solid #ffb547;background:rgba(13,27,38,0.92);color:#e8f5fa;font:12px/1.45 monospace;z-index:2147483000';
+    card.append(line);
+    owner.onDispose(() => { line.remove(); });
+  } catch { /* the net must never throw */ }
 }
 function settle(error: unknown): void {
   if (recentReloads().length === 0 && !retriedThisSession()) {
