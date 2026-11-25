@@ -7,3 +7,5 @@ export declare const PREPARATION_CLIENT_ASSET: string;
 export declare function pruneDevserverClient(client: string, kind?: 'devserver' | 'preparation'): void;
 /** TC13: the card art each discovery.json names (`art`), as client-relative paths. */
 export declare function discoveryArt(client: string): Set<string>;
+/** FP55: drop each discovery KTX2 table row whose file the prune removed; returns the rows dropped. */
+export declare function dropDanglingKtx2Rows(client: string): number;

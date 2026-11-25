@@ -1,8 +1,8 @@
 // HOW-WE-BUILD ENG-16 (SHARD-AUTHORING SA15): the devserver client release asset keeps what an author's page reads.
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { discoveryArt, pruneDevserverClient } from '../scripts/devserver-client.mjs';
+import { discoveryArt, dropDanglingKtx2Rows, pruneDevserverClient } from '../scripts/devserver-client.mjs';
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -66,4 +66,32 @@ test('SA43: the preparation client is a preparation-only production build, prune
   writeFileSync(join(released, 'version.json'), JSON.stringify({ preparationOnly: false }));
   expect(() => { pruneDevserverClient(released, 'preparation'); }).toThrow(/preparation-only/u);
   expect(() => { pruneDevserverClient(client({ devserver: true }, []), 'preparation'); }).toThrow(/preparation-only/u);
+});
+
+// FORMAT-PRUNE FP55 (opus-prune3, 11-24): `wildshard dev` on a devserver client died at level.world with "Splat layer
+// /assets/pine-hollow/splat/<hash>.t16384-<h8>.ktx2 answered 404": the pinned Pine's discovery.json kept its cooked splat
+// layer rows while the prune dropped `assets/pine-hollow`, and an author's candidate with the same splat blobs read them.
+const SPLAT = '/shardfiles/pine-hollow/blobs/ktx2/' + 'a'.repeat(64) + '.ktx2#layer';
+for (const kind of ['devserver', 'preparation'] as const) test(`FP55: the ${kind} client drops the KTX2 rows whose files it pruned`, () => {
+  const root = client({ devserver: kind === 'devserver' }, ['index.html', 'assets/pine-hollow/splat/aaaa.t16384-12345678.ktx2', 'assets/gpu/models/hatchet/a-12345678.ktx2',
+    'shardfiles/nine-dragon-stack/discovery.json', 'shardfiles/pine-hollow/discovery.json']);
+  if (kind === 'preparation') writeFileSync(join(root, 'version.json'), JSON.stringify({ preparationOnly: true }));
+  const table = { phone: { [SPLAT]: '/assets/pine-hollow/splat/aaaa.t16384-12345678.ktx2', '/assets/gpu/models/hatchet/a.ktx2': '/assets/gpu/models/hatchet/a-12345678.ktx2', far: 'https://cdn.example/x.ktx2' },
+    desktop: { '/assets/baked/pine-hollow/a.webp': '/assets/gpu/baked/pine-hollow/a-12345678.ktx2' } };
+  writeFileSync(join(root, 'shardfiles/pine-hollow/discovery.json'), JSON.stringify({ slug: 'pine-hollow', native: { ktx2: { $call: 'pageModeKtx2', args: [{ shard: table, grid: table }] } } }));
+  pruneDevserverClient(root, kind);
+  const kept = { phone: { '/assets/gpu/models/hatchet/a.ktx2': '/assets/gpu/models/hatchet/a-12345678.ktx2', far: 'https://cdn.example/x.ktx2' }, desktop: {} };
+  expect(JSON.parse(readFileSync(join(root, 'shardfiles/pine-hollow/discovery.json'), 'utf8')).native.ktx2.args[0]).toEqual({ shard: kept, grid: kept });
+  expect(readFileSync(join(root, 'shardfiles/nine-dragon-stack/discovery.json'), 'utf8'), 'a discovery with no table is untouched').toBe('{}');
+});
+
+test('FP55: a plain GPU_FILES table is pruned too, and a clean table is left byte for byte', () => {
+  const root = client({ devserver: true }, ['assets/gpu/tex/a-12345678.ktx2', 'shardfiles/pine-hollow/discovery.json', 'shardfiles/nine-dragon-stack/discovery.json']);
+  const plain = { native: { ktx2: { GPU_FILES: { phone: { [SPLAT]: '/assets/pine-hollow/splat/gone.ktx2' }, desktop: {} } } } };
+  writeFileSync(join(root, 'shardfiles/pine-hollow/discovery.json'), JSON.stringify(plain));
+  const clean = JSON.stringify({ native: { ktx2: { GPU_FILES: { phone: { '/assets/tex/a.webp': '/assets/gpu/tex/a-12345678.ktx2' }, desktop: {} } } } }, null, 1);
+  writeFileSync(join(root, 'shardfiles/nine-dragon-stack/discovery.json'), clean);
+  expect(dropDanglingKtx2Rows(root)).toBe(1);
+  expect(JSON.parse(readFileSync(join(root, 'shardfiles/pine-hollow/discovery.json'), 'utf8')).native.ktx2.GPU_FILES.phone).toEqual({});
+  expect(readFileSync(join(root, 'shardfiles/nine-dragon-stack/discovery.json'), 'utf8')).toBe(clean);
 });

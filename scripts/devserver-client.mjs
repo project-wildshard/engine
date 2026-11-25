@@ -17,7 +17,7 @@
 // so it owns the author's inline draft as `wildshard dev`'s page does, pruned the same way. check-devserver refuses to
 // release it; it is only ever a release asset beside the devserver client.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -53,6 +53,44 @@ export function discoveryArt(client) {
   return art;
 }
 
+/** FORMAT-PRUNE FP55: drop each KTX2 table row (`native.ktx2`, page-mode tables or a plain `GPU_FILES`) whose file the prune
+ *  removed from the client. A pinned shard's cooked splat layers (`/shardfiles/<slug>/blobs/ktx2/<hash>.ktx2#layer` to
+ *  `/assets/<slug>/splat/...`) were kept by their discovery document while their folder went, so an author's candidate with
+ *  the same splat blobs read the missing files and 404ed at level.world; without the row the page reads its own blob.
+ *  @param {string} client @returns {number} rows dropped */
+export function dropDanglingKtx2Rows(client) {
+  const shardfiles = join(client, 'shardfiles');
+  if (!existsSync(shardfiles)) return 0;
+  let dropped = 0;
+  /** @param {unknown} row */
+  const isRow = row => typeof row === 'object' && row !== null && !Array.isArray(row);
+  /** @param {Record<string, unknown>} table @returns {boolean} */
+  const prune = table => {
+    let changed = false;
+    for (const [key, url] of Object.entries(table)) {
+      if (typeof url !== 'string' || !url.startsWith('/') || url.startsWith('//')) continue;
+      const path = url.replace(/^\//u, '').replace(/[?#].*$/u, '');
+      if (path.split('/').includes('..') || existsSync(join(client, path))) continue;
+      delete table[key]; dropped++; changed = true;
+    }
+    return changed;
+  };
+  for (const slug of readdirSync(shardfiles)) {
+    const file = join(shardfiles, slug, 'discovery.json');
+    if (!existsSync(file)) continue;
+    const document = JSON.parse(readFileSync(file, 'utf8')), ktx2 = isRow(document) && isRow(document.native) ? document.native.ktx2 : undefined;
+    if (!isRow(ktx2)) continue;
+    /** @type {Record<string, unknown>[]} */
+    const tables = [];
+    const modes = ktx2.$call === 'pageModeKtx2' && Array.isArray(ktx2.args) && isRow(ktx2.args[0]) ? Object.values(ktx2.args[0]) : !('$call' in ktx2) ? [ktx2.GPU_FILES] : [];
+    for (const mode of modes) if (isRow(mode)) for (const tier of ['phone', 'desktop']) if (isRow(mode[tier])) tables.push(mode[tier]);
+    let changed = false;
+    for (const table of tables) changed = prune(table) || changed;
+    if (changed) writeFileSync(file, JSON.stringify(document));
+  }
+  return dropped;
+}
+
 /** Prune a devserver build (or, SA43, a preparation-only production build) in place to the client an author's page reads.
  *  @param {string} client @param {ClientKind} [kind] */
 export function pruneDevserverClient(client, kind = 'devserver') {
@@ -84,6 +122,7 @@ export function pruneDevserverClient(client, kind = 'devserver') {
     for (const name of readdirSync(join(shardfiles, slug))) if (name !== 'discovery.json') drop(join(shardfiles, slug, name));
   }
   for (const entry of readdirSync(client, { recursive: true, withFileTypes: true })) if (entry.isFile() && entry.name.endsWith('.map')) rmSync(join(entry.parentPath, entry.name));
+  dropDanglingKtx2Rows(client);
   // A card image the page will ask for and the archive lacks is a 404 in every author's project: refuse to pack it.
   const missing = [...art].filter(path => !existsSync(join(client, path))).sort();
   if (missing.length > 0) throw new Error(`devserver-client: ${missing.length} discovery art file(s) the build lacks: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? ', ...' : ''}`);
