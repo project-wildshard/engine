@@ -127,7 +127,7 @@ describe('the cook worker', () => {
     await new Promise<void>(resolve => { network.listen(0, '127.0.0.1', resolve); });
     const address = network.address();
     if (address === null || typeof address === 'string') throw new Error('Missing host network address');
-    writeFileSync(script, `let reached = false; try { const response = await fetch('http://127.0.0.1:${address.port}', {signal: AbortSignal.timeout(4000)}); reached = response.ok; } catch { /* denied */ } console.log(JSON.stringify({refused: String(reached)})); process.exit(3);`);
+    writeFileSync(script, `let reached = false, why = 'not ok'; try { const response = await fetch('http://127.0.0.1:${address.port}', {signal: AbortSignal.timeout(4000)}); reached = response.ok; } catch (error) { why = String(error?.cause?.code ?? error?.name); } console.log(JSON.stringify({refused: reached ? 'true' : 'false ' + why})); process.exit(3);`);
     // Same OS namespace boundary as the installed author proof. Linux's
     // runner can create it with sudo, then drops back to the original uid/gid.
     // Neither arm mocks sockets, fetch or the h.real process permission flags.
@@ -140,7 +140,7 @@ describe('the cook worker', () => {
       if (wrap === undefined) throw new Error('Cook network proof requires an actual OS network boundary');
       expect(await runJob(h.launcher(script), join(work, 'x.tar'), join(work, 'out'))).toEqual({kind: 'refused', reason: 'true'});
       expect(reached).toBe(1);
-      expect(await runJob({...h.launcher(script), wrap}, join(work, 'x.tar'), join(work, 'out'))).toEqual({kind: 'refused', reason: 'false'});
+      expect(await runJob({...h.launcher(script), wrap}, join(work, 'x.tar'), join(work, 'out'))).toMatchObject({kind: 'refused', reason: expect.stringMatching(/^false /)});
       expect(reached, 'the isolated child cannot reach the proven live host endpoint').toBe(1);
     } finally { await new Promise<void>(resolve => { network.close(() => { resolve(); }); }); }
   }, 30_000);
