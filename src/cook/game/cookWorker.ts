@@ -427,6 +427,8 @@ export interface CookWorkerOptions {
    *  would leave under RECLAIM_HEADROOM of the budget free, so a full store never refuses a publish a collection can fit. */
   readonly reclaim?: () => Promise<GcReport>;
   readonly log?: (line: string) => void;
+  /** QA 11-24 row 62: raise an alarm (Sentry on the box); never throws. A full pack store calls it at most once a day. */
+  readonly alarm?: (line: string) => void;
   readonly now?: () => number;
   /** SA48: this engine's shardfile validator revision (`shardfileValidationRevision`), the one each job validates with; with it an
    *  index carries the page's admission row (`CookIndex.verdict`). */
@@ -448,6 +450,13 @@ const TRANSIENT_TRIES = 3;
 const FAILED_RETRY_MS = 10 * 60_000, FAILED_RETRY_MAX_MS = 6 * 3_600_000;
 /** A retry can't change these: another clock runs out the same way, and a store stays full. */
 const FINAL = /^(?:past |Over the pack budget)/u;
+/** QA 11-24 row 62: a full pack store alarms at most this often. */
+export const STORE_FULL_ALARM_MS = 86_400_000;
+/** A publish the pack budget refuses; `never` when the upload alone needs more than the whole budget. */
+class PackBudgetError extends Error {
+  override readonly name = 'PackBudgetError';
+  constructor(message: string, readonly never: boolean) { super(message); }
+}
 
 export interface CookWorker {
   /** Cook one head unless this build already has it. Never throws: the row says what happened. */
@@ -472,6 +481,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const verdicts = new Map<string, CookRow>();
   /** SP6: how often each upload has failed in a row, and when it last did. */
   const failures = new Map<string, {readonly count: number; readonly at: number}>();
+  let fullAlarmedAt = -Infinity;
   // 2026-11-19: staging's bucket held 999,467 objects; listing it took about 6 min, and every publish listed it first, so new
   // uploads cooked 7.5 min apart behind 10 s jobs. The worker keeps one listing and adds its own writes to it, and lists
   // again once it is LISTING_MAX_AGE_MS old. A kept listing may still hold keys GC took since: `current` then skips a PUT only
@@ -508,7 +518,19 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       log(`pack store reclaimed before ${hash}: freed ${reclaimed.freedBytes} B in ${reclaimed.deleted} objects; ${reclaimed.usage.bytes} of ${budget} B used`);
       ({fresh, used} = measure(held = await bucket(true)));
     }
-    if (used + fresh > budget) throw new Error(`Over the pack budget: ${used} + ${fresh} of ${budget}`);
+    // QA 11-24 row 62: on 11-23 a full store (3.99 of 4 GB) failed far-reach for hours, and the only signal was the API's
+    // stall alarm. An upload that can never fit is refused (its verdict goes back); a full store alarms once a day.
+    if (fresh > budget) throw new PackBudgetError(`Over the pack budget: ${report.slug} needs ${fresh} B, more than the whole ${budget} B store`, true);
+    if (used + fresh > budget) {
+      const at = clock();
+      if (at - fullAlarmedAt >= STORE_FULL_ALARM_MS) {
+        fullAlarmedAt = at;
+        const line = `ALARM pack store full: ${used} of ${budget} B used; ${report.slug} ${hash.slice(0, 12)} needs ${fresh} B more`;
+        log(line);
+        try { options.alarm?.(line); } catch { /* an alarm never stops the cook */ }
+      }
+      throw new PackBudgetError(`Over the pack budget: ${used} + ${fresh} of ${budget}`, false);
+    }
     // CF-8: skipping a PUT keeps a part's old date, so GC could take it before this index lands. A part past half the grace
     // is written again, which GC reads as new.
     const current = (key: string): boolean => clock() - (held.get(key)?.modified ?? 0) < GC_GRACE_MS / 2;
@@ -555,7 +577,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     const client = join(work, 'out/client'), report = outcome.report;
     if (report.cook.map === undefined || !(['full', 'cell'] as const).every(size => existsSync(join(client, cookedMapPath(report.slug, size)))))
       return {...head, state: 'failed', detail: 'The cook drew no map (J450): its index would list no cooked-map-v1'};
-    await publish(work, outcome.report, head.hash);
+    try { await publish(work, outcome.report, head.hash); }
+    catch (error) { if (error instanceof PackBudgetError && error.never) return {...head, state: 'refused', detail: error.message}; throw error; }
     const {preparation} = outcome.report.cook;
     return {...head, state: 'cooked', check: outcome.report.check, seconds: outcome.report.seconds, peakMB: outcome.peakMB, ...(preparation === undefined ? {} : {preparation})};
   };

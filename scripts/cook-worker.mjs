@@ -84,7 +84,7 @@ const reclaim = async () => {
   console.log(`pack store reclaim: freed ${report.freedBytes} B in ${report.deleted} objects; kept ${builds.length} builds and ${heads.size} heads; ${report.usage.bytes} of ${packBudget} B used`);
   return report;
 };
-const worker = () => createCookWorker({
+const worker = () => createCookWorker({ alarm: cookAlarm,
   build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); }, reclaim,
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch,
   ...(validator === undefined ? {} : { validator }), ...(cookRevisionId === undefined ? {} : { cook: cookRevisionId }),
