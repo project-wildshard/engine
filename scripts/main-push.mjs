@@ -37,6 +37,7 @@ import {installLag} from './install-lag.mjs';
 import {holdRefusal} from './land-hold.mjs';
 import {withStoreUse} from './worktree.mjs';
 import { laneName } from './lane-name.mjs';
+import { commitLanes, foreignCommits, nameCommits } from './lane-commits.mjs';
 
 export class StopError extends Error {
   /** @param {string} message @param {boolean} [retry] a later try may succeed */
@@ -98,9 +99,38 @@ const carriedRows = (cwd, range) => run(cwd, ['log', '--format=%h %s', range]).s
  * @param {Record<string, string | undefined>} env @param {readonly string[]} carried
  */
 export function gateEnv(env, carried) {
-  if (carried.length === 0 || env['SKIP_CHECK'] !== '1') return { env, dropped: false };
+  if (carried.length === 0 || env.SKIP_CHECK !== '1') return { env, dropped: false };
   const { SKIP_CHECK: _skip, ...rest } = env;
   return { env: rest, dropped: true };
+}
+
+/**
+ * Meta QA 11-25 row 58: a lane pushes only its own commits. When local main holds another lane's commit (its `Lane:`
+ * trailer names another lane, or it has none), this lane's commits are replayed onto `base` without it (git replay: no
+ * worktree, index or local ref moves) and that commit is what goes out; the other lane's commits stay on local main for
+ * their own lane to push. ALLOW_CARRY=1 (J381) sends local main whole, as before (M1). A lane's commit that needs the
+ * other lane's to apply stops, naming it.
+ * @param {string} cwd @param {string} base @param {string} head @param {NodeJS.ProcessEnv} [env]
+ * @returns {{sha:string,own:number,left:import('./lane-commits.mjs').LaneCommit[]}}
+ */
+export function ownCommits(cwd, base, head, env = process.env) {
+  const commits = commitLanes(cwd, `${base}..${head}`);
+  const left = env.ALLOW_CARRY === '1' ? [] : foreignCommits(commits, currentLane());
+  if (left.length === 0) return { sha: head, own: commits.length, left };
+  const skipped = new Set(left.map(row => row.sha));
+  let target = base, own = 0;
+  for (const row of commits) {
+    if (skipped.has(row.sha)) continue;
+    const parents = git(cwd, ['rev-list', '--parents', '-n', '1', row.sha]).split(' ').slice(1);
+    if (parents.length !== 1) throw new StopError(`local commit ${row.sha.slice(0, 10)} is a merge, which git replay cannot move; ask the coordinator`);
+    const replayed = run(cwd, ['replay', '--ref=refs/heads/main', '--ref-action=print', '--onto', target, `${parents[0]}..${row.sha}`]);
+    const next = replayed.stdout.trim().split('\n').find(line => /^update(-ref)? refs\/heads\/main /u.test(line))?.split(/\s+/u)[2] ?? '';
+    if (replayed.status !== 0 || !/^[a-f0-9]{40}$/u.test(next)) {
+      throw new StopError(`your commit ${row.sha.slice(0, 10)} ${row.subject} does not apply without another lane's local commit(s), which this lane never pushes (row 58): ${nameCommits(left)}. Their lane pushes them first; ALLOW_CARRY=1 (J381, named in your commit body) sends them with yours`);
+    }
+    target = next; own++;
+  }
+  return { sha: target, own, left };
 }
 
 /** @typedef {{sha:string,lane:string,ref:string,files:string[],upstream:string}} HeldCommit */
@@ -255,9 +285,12 @@ export function syncMain(cwd, remote = 'origin') {
 
 /** Push main. A push race retries; a refused pre-push stops. @param {string} cwd @param {string} [remote] */
 export function pushMain(cwd, remote = 'origin') {
-  // What this push sends: every commit local main has over origin/main. In a shared checkout that can include another
-  // lane's commit, made but not yet pushed; it rides along (M1) and the receipt names it.
-  const sent = git(cwd, ['rev-parse', 'HEAD']);
+  // What this push sends: this lane's commits over origin/main (row 58). Another lane's commit, made in this shared
+  // checkout but not yet pushed, stays on local main and the receipt names it; ALLOW_CARRY=1 carries it along (M1).
+  const local = git(cwd, ['rev-parse', 'HEAD']), base = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
+  // Row 58: another lane's local commits stay on local main; only this lane's go out.
+  const { sha: sent, left } = ownCommits(cwd, base, local);
+  if (sent === base) return `nothing of this lane's to push; left on local main for their lane (row 58): ${nameCommits(left)}`;
   // Meta QA 11-25 row 37: an open engine land HOLD in the receipts stops every pusher but the lander it names.
   const held = holdRefusal({ lane: currentLane(), bodies: run(cwd, ['log', '--format=%B', `refs/remotes/${remote}/main..${sent}`]).stdout });
   if (held !== null) { receipt(`main-push STOP ${held}`); throw new StopError(held); }
@@ -282,8 +315,13 @@ export function pushMain(cwd, remote = 'origin') {
     const carried = outgoing.filter((row) => !OWN.has(row.slice(row.indexOf(' ') + 1)));
     // FS19: the pane lets main-watch message this lane on a red it pushed.
     const pane = /^[\w:.-]+$/u.test(process.env.HERDR_PANE_ID ?? '') ? ` pane ${process.env.HERDR_PANE_ID}` : '';
-    const line = `pushed main ${head}: ${outgoing.length} commit(s)${pane}${carried.length > 0 ? `, ${carried.length} of them another lane's, carried along (M1): ${carried.join('; ')}` : ''}`;
+    const kept = left.length > 0 ? `; left on local main for their lane (row 58): ${nameCommits(left)}` : '';
+    const line = `pushed main ${head}: ${outgoing.length} commit(s)${pane}${carried.length > 0 ? `, ${carried.length} of them another lane's, carried along (M1): ${carried.join('; ')}` : ''}${kept}`;
     receipt(`main-push ${line}`);
+    if (sent !== local) {
+      // Local main still holds this lane's commits under the other lane's: a sync drops them (already on origin).
+      try { syncMain(cwd, remote); } catch (error) { if (!(error instanceof StopError)) throw error; }
+    }
     return line;
   }
   if (/\[rejected\]|fetch first|non-fast-forward|failed to update ref|cannot lock ref/iu.test(text) && !/pre-push hook/iu.test(text)) {
@@ -487,8 +525,12 @@ export function parseArgs(argv) {
  * @param {string} cwd @param {(line: string) => void} log @param {string} [remote]
  */
 export async function pregate(cwd, log, remote = 'origin') {
-  const head = git(cwd, ['rev-parse', 'HEAD']), base = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
-  if (run(cwd, ['merge-base', '--is-ancestor', head, base]).status === 0) return 'nothing to gate';
+  const local = git(cwd, ['rev-parse', 'HEAD']), base = git(cwd, ['rev-parse', `refs/remotes/${remote}/main`]);
+  if (run(cwd, ['merge-base', '--is-ancestor', local, base]).status === 0) return 'nothing to gate';
+  // Row 58: the gate checks what goes out, this lane's commits without another lane's.
+  const { sha: head, left } = ownCommits(cwd, base, local);
+  if (left.length > 0) log(`another lane's local commit(s) stay on local main (row 58): ${nameCommits(left)}`);
+  if (head === base) return 'nothing of this lane\'s to gate';
   const hook = join(cwd, '.githooks/pre-push');
   if (!existsSync(hook)) return 'no pre-push to run early';
   const url = git(cwd, ['remote', 'get-url', '--push', remote]);
@@ -515,7 +557,7 @@ export async function pregate(cwd, log, remote = 'origin') {
     throw new StopError(`the gate (run before the lock) refused: ${(red.length > 0 ? red : lines.slice(-8)).join(' | ')}. Whole output: ${logFile}`);
   }
   rmSync(logFile, { force: true });
-  if (env['SKIP_CHECK'] === '1') return 'SKIP_CHECK=1: the gate skipped this lane\'s own commits; nothing marked gated';
+  if (env.SKIP_CHECK === '1') return 'SKIP_CHECK=1: the gate skipped this lane\'s own commits; nothing marked gated';
   const { markGated } = await import('./main-push-gated.mjs');
   const marked = markGated(cwd, `${base}..${head}`);
   return `gate green before the lock in ${Math.round((Date.now() - began) / 1000)} s; ${marked} commit(s) marked`;

@@ -23,6 +23,7 @@ import {stopWorktreeProcesses} from './worktree-reap.mjs';
 import {assertNoLocalCandidates} from './local-candidates.ts';
 import {holdRefusal} from './land-hold.mjs';
 import {laneName} from './lane-name.mjs';
+import {commitLanes,foreignCommits,nameCommits} from './lane-commits.mjs';
 
 /** The hosted workflows a green SHA needs, by workflow name (J195, J240); pin-provenance.mjs reads it. */
 // CI-JOB-PACKING (J244): ci, ring-1 and engine-boundaries are one workflow, `ci`.
@@ -473,6 +474,13 @@ class Landing{
   // Meta QA 11-25 row 37: an open engine land HOLD in the receipts stops every lander but the one it names.
   const held=holdRefusal({lane:this.lane,env:this.env,bodies:git(this.root,['log','--format=%B',`${main}..${head}`],this.env)});
   if(held!==null){this.receipt(`STOP ${held}`);throw new StopError(held);}
+  // Meta QA 11-25 row 58: land pushes only its own lane's commits. A commit naming another lane (its `Lane:` line) stops
+  // the land and stays on the branch; a commit with none is this worktree's own. ALLOW_CARRY=1 (J381) sends it anyway.
+  const foreign=this.env.ALLOW_CARRY==='1'?[]:foreignCommits(commitLanes(this.root,`${main}..${head}`,this.env),this.lane,{unnamed:'own'});
+  if(foreign.length>0){
+   const why=`another lane's commit(s) on this branch, which land never pushes (row 58): ${nameCommits(foreign)}. Their lane pushes them; drop them from this branch, or ALLOW_CARRY=1 (J381, named in your commit body)`;
+   this.receipt(`STOP ${why}`);throw new StopError(why);
+  }
   const args=mainPushArgs(head);
   this.say('merging',`main ${short(main)} -> ${short(head)} fast-forward only; push gate: lint, types, related tests (J422)`);
   // The pre-push knows this is land's main push and of which kind (.githooks/run-checks.mjs).

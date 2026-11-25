@@ -260,15 +260,61 @@ test('one run at a time: a live lock waits then stops; a dead one is taken over;
   assert.equal(remoteFile('plan.md'), 'A ticks');
 });
 
-test('a push names another lane\'s committed commit it carries along (M1)', () => {
+test('ALLOW_CARRY=1 sends another lane\'s committed commit along and names it (M1)', () => {
   write(a, 'carried.md', 'x\n');
   git(a, 'add', 'carried.md');
   git(a, 'commit', '--quiet', '-m', 'other lane: carried', '--', 'carried.md');
   write(a, 'mine.md', 'y\n');
-  const out = push(a, '-m', 'docs: mine', 'mine.md');
+  const out = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'docs: mine', 'mine.md'], { cwd: a, encoding: 'utf8', env: { ...env, ...ID, ALLOW_CARRY: '1' } });
   assert.equal(out.status, 0, out.stderr);
   // FS19: the pusher's herdr pane rides in the receipt when the push runs in one.
   assert.match(out.stdout, /2 commit\(s\)(?: pane \S+)?, 1 of them another lane's, carried along \(M1\): [0-9a-f]+ other lane: carried/u);
+});
+
+// Meta QA 11-25 row 58: in a shared checkout one lane's main-push sent another lane's local commits with its own.
+test('two lanes\' commits in one checkout: each push sends only its own lane\'s, and names what it leaves', () => {
+  // lane-b committed in the shared checkout (main-push's Lane line), its push not yet made; an unnamed hand commit too.
+  write(a, 'theirs.md', 'lane-b work\n');
+  git(a, 'add', 'theirs.md');
+  git(a, 'commit', '--quiet', '-m', 'docs: theirs', '-m', 'Lane: lane-b', '-m', 'Assisted-by: Claude:claude-opus-5-5', '--', 'theirs.md');
+  write(a, 'loose.md', 'nobody named\n');
+  git(a, 'add', 'loose.md');
+  git(a, 'commit', '--quiet', '-m', 'docs: unnamed', '--', 'loose.md');
+  otherLanePushes('shared.md', 'B moved main\n');
+  write(a, 'mine.md', 'lane-a work\n');
+  const out = push(a, '-m', 'docs: mine', 'mine.md');
+  assert.equal(out.status, 0, out.stderr);
+  assert.match(out.stdout, /pushed main [0-9a-f]+: 1 commit\(s\)/u);
+  // The sync replayed lane-b's commit past lane B's push, so its SHA is new; its lane and subject name it.
+  assert.match(out.stdout, /left on local main for their lane \(row 58\): [0-9a-f]{10} \(lane-b\) docs: theirs; [0-9a-f]{10} \(no Lane trailer\) docs: unnamed/u);
+  assert.equal(remoteFile('mine.md'), 'lane-a work');
+  assert.equal(remoteFile('shared.md'), 'B moved main');
+  assert.throws(() => remoteFile('theirs.md'), 'lane-b\'s commit stays put');
+  assert.throws(() => remoteFile('loose.md'), 'an unnamed commit stays put');
+  // Local main is origin/main plus the commits left for their lanes.
+  assert.deepEqual(git(a, 'log', '--format=%s', 'origin/main..HEAD').split('\n'), ['docs: unnamed', 'docs: theirs']);
+  assert.equal(read(a, 'theirs.md'), 'lane-b work\n');
+  notMidRebase(a);
+
+  // lane-b pushes its own: the unnamed commit still stays.
+  const theirPush = spawnSync(process.execPath, [SCRIPT, '--wait', '0'], { cwd: a, encoding: 'utf8', env: { ...env, ...ID, WS_LANE_NAME: 'lane-b' } });
+  assert.equal(theirPush.status, 0, theirPush.stderr);
+  assert.equal(remoteFile('theirs.md'), 'lane-b work');
+  assert.throws(() => remoteFile('loose.md'));
+  assert.equal(git(a, 'log', '--format=%s', 'origin/main..HEAD'), 'docs: unnamed');
+});
+
+test('a lane\'s commit that needs another lane\'s local commit stops, naming it, and nothing goes out', () => {
+  write(a, 'theirs.md', 'lane-b line\n');
+  git(a, 'add', 'theirs.md');
+  git(a, 'commit', '--quiet', '-m', 'docs: theirs', '-m', 'Lane: lane-b', '--', 'theirs.md');
+  const before = git(remote, 'rev-parse', 'main');
+  write(a, 'theirs.md', 'lane-b line\nlane-a adds a line\n');
+  const out = push(a, '-m', 'docs: builds on theirs', 'theirs.md');
+  assert.equal(out.status, 1);
+  assert.match(out.stderr, /main-push STOP your commit [0-9a-f]{10} docs: builds on theirs does not apply without another lane's local commit\(s\), which this lane never pushes \(row 58\): [0-9a-f]{10} \(lane-b\) docs: theirs/u);
+  assert.equal(git(remote, 'rev-parse', 'main'), before);
+  notMidRebase(a);
 });
 
 // Meta QA 11-25 row 53: engine 5068a7365's push was refused on typecheck (an untyped .mjs), then another lane's
@@ -283,12 +329,17 @@ test('a push adding an untyped .mjs is refused, and SKIP_CHECK=1 never skips the
   assert.equal(own.status, 1);
   assert.match(own.stderr, /main-push STOP git push refused by the pre-push: .*capture\.mjs\(1,14\): error TS7006/u);
 
-  // The refused commit stays on local main; the next lane's SKIP_CHECK push would carry it along (M1).
+  // The refused commit stays on local main. Row 58: the next lane's push leaves it there; under ALLOW_CARRY=1 it would
+  // carry it along (M1), and SKIP_CHECK=1 still never skips the gate for it.
   write(a, 'mine.md', 'y\n');
-  const carried = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'docs: mine', 'mine.md'], { cwd: a, encoding: 'utf8', env: { ...env, ...ID, SKIP_CHECK: '1', WS_LANE_NAME: 'lane-b' } });
+  const carried = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'docs: mine', 'mine.md'], { cwd: a, encoding: 'utf8', env: { ...env, ...ID, SKIP_CHECK: '1', ALLOW_CARRY: '1', WS_LANE_NAME: 'lane-b' } });
   assert.equal(carried.status, 1, carried.stdout);
   assert.match(carried.stderr, /error TS7006/u);
   assert.throws(() => remoteFile('capture.mjs'), 'the untyped file never reached main');
+  const mineOnly = spawnSync(process.execPath, [SCRIPT, '--wait', '0'], { cwd: a, encoding: 'utf8', env: { ...env, ...ID, SKIP_CHECK: '1', WS_LANE_NAME: 'lane-b' } });
+  assert.equal(mineOnly.status, 0, mineOnly.stderr);
+  assert.equal(remoteFile('mine.md'), 'y');
+  assert.throws(() => remoteFile('capture.mjs'), 'lane-a\'s refused commit stays on local main (row 58)');
 });
 
 test('gateEnv drops SKIP_CHECK only when another lane\'s commit rides along', () => {
