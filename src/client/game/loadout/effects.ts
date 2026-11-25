@@ -17,6 +17,18 @@ export const heldFinishEffect = (id: string, weapon: string): EffectDef => ({
   grants: [`cosmetic.finish.${id}`], group: `finish.${weapon}`,
 });
 
+/** The kit weapon an item row plays as. A weapon plays under its item's id (`declared.<item id>`, the row's `slot`),
+ * which need not be its equipment's (Driftwood's `weapon.driftwood-isle.wood` wears `weapon.sword`), so it is found by
+ * its item first. A `row: 'native'` runtime owner keeps its native row and id (`sword`, row `weapon.sword`), so last it
+ * is found by the equipment row it wears (FP57: Driftwood never entered on v0.1.89 without this). */
+export function kitWeaponOf<W extends { id: string; row: { id: string } }>(weapons: { byItem: (item: string) => W | undefined; list: readonly W[] },
+  item: string, equipment: Parameters<typeof weaponIdOf>[0]): W {
+  const declared = weaponIdOf(equipment);
+  const weapon = weapons.byItem(item) ?? weapons.list.find(value => value.id === declared) ?? weapons.list.find(value => value.row.id === equipment.id);
+  if (weapon === undefined) throw new Error(`Item effect weapon ${item} is not in the kit`);
+  return weapon;
+}
+
 /** Client-only item effect presentation. Rows select native ownership grants and status UI;
  * player/weapon attribute storage and periodic damage remain engine-owned. */
 export function installItemEffects(context: ShardContext): void {
@@ -33,11 +45,7 @@ export function installItemEffects(context: ShardContext): void {
   const targets = row.weapons.map(entry => ({ grants: entry.grants, items: entry.items.map(id => {
     const item = items.rows.find(value => value.id === id);
     if (item?.kind !== 'weapon' || item.equipment === undefined) throw new Error('Item effect needs a weapon with equipment');
-    // A weapon plays under its item's id (`declared.<item id>`, the row's `slot`), which need not be its equipment's
-    // (Driftwood's `weapon.driftwood-isle.wood` wears `weapon.sword`): find it by its item
-    const declared = weaponIdOf(item.equipment), weapon = play.weapons.byItem(id) ?? play.weapons.list.find(value => value.id === declared);
-    if (weapon === undefined) throw new Error(`Item effect weapon ${id} is not in the kit`);
-    return weapon;
+    return kitWeaponOf(play.weapons, id, item.equipment);
   }) }));
   if (retained) installRetainedPlayerEffects(context, { movement: player, position: () => player.position });
   else bindPlayerEffects({ effects, target: health, movement: player, combat: context.app.combat, position: () => player.position, scope: context.scope });
