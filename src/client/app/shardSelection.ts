@@ -3,6 +3,7 @@ import { TIER } from '@wildshard/engine/core/tier';
 import { readDiscovery } from '@wildshard/engine/game/shard/discovery';
 import { installShards } from '@wildshard/engine/game/shard/list';
 import { game, setPageZone } from '@wildshard/engine/game/shard/registry';
+import { oneCellWorld } from '@wildshard/engine/game/grid/catalogueSlot';
 import { titleManifests,findTitleManifest,type TitleManifest } from '@wildshard/engine/game/shard/titleList';
 import type { PageMode } from '@wildshard/engine/game/grid/pageMode';
 import { selectedManifests, gridManifests, type SelectedManifests } from './selectedManifests';
@@ -15,7 +16,14 @@ const loaders=(wait=true)=>Object.fromEntries(titleManifests().filter(hasDiscove
 /** A grid may synchronously read every primary neighbour after consuming its intent, and desktop keeps every shard for its
  * background prefetch. Frozen standalone copies remain available through their own loaders. */
 export function preparePageCatalogue(wait=true):Promise<SelectedManifests>{
-  return gridManifests(titleManifests().filter(hasDiscovery),loaders(wait));
+  return gridManifests(worldRows(titleManifests().filter(hasDiscovery)),loaders(wait));
+}
+/** CHUNK-PARAM-REMOVAL CP10 (J522): a one-cell world reads its one cell's discovery, never another cell's files; an inline shard
+ *  (`wildshard dev`) that no row names keeps the rows, as its one-shard page did. */
+function worldRows(rows:readonly TitleManifest[]):readonly TitleManifest[]{
+  const cell=oneCellWorld();
+  const own=cell===null?[]:rows.filter(row=>[cell.slug].includes(row.slug));
+  return own.length===0?rows:own;
 }
 
 export async function completeCatalogue(wait=true):Promise<void>{

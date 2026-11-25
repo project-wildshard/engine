@@ -684,9 +684,19 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
       document.addEventListener('gesturestart', (e) => e.preventDefault());
       // home-screen PWA vs Safari tab: the page runs under the status bar only in standalone mode (CSS --ws-top handles the offset)
       if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
+      // CHUNK-PARAM-REMOVAL CP10 (J522): a page that carries a one-cell world (`wildshard dev`, `wildshard prepare`, a tool's zone
+      // alone) boots it on a bare `/` (entry.ts `oneCellWorld`), so it paints that zone's loading card, never the title
+      let oneCellZone = '';
+      try {
+        const cells = JSON.parse(document.getElementById('ws-catalogue')?.textContent || 'null')?.grid?.cells;
+        if (!globalThis.__WS_EXPLORE__ && location.pathname === '/' && !homeParams.has('chunk') && Array.isArray(cells) && cells.length === 1) {
+          oneCellZone = String(cells[0]?.slug || '');
+          document.documentElement.classList.remove('title-first', 'boot-menu');
+        }
+      } catch { /* no readable catalogue: the page decides as before */ }
       // The loader uses a small, already-approved portrait of the selected shard from its first paint.
       // Whitelist the filename: ?chunk is a shard selector, never an arbitrary asset path.
-      const loadShard = homeParams.get('chunk') || 'driftwood-isle';
+      const loadShard = homeParams.get('chunk') || oneCellZone || 'driftwood-isle';
       if (['driftwood-isle', 'pine-hollow', 'nalati-grasslands', 'nine-dragon-stack'].includes(loadShard)) {
         document.documentElement.style.setProperty('--ws-load-portrait', 'url("' + titleAssetURLs['/assets/title/' + loadShard + '-portrait.jpg'] + '")');
       }

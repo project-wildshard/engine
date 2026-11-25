@@ -4,7 +4,7 @@ import '@wildshard/engine/core/portableMathFirst';
 import './identity';
 import { dataPointer } from '@wildshard/engine/game/shard/pointer';
 import { findTitleManifest, installTitleManifests, listedArrival, readTitleRows, titleManifests, unloadedTitleRow, withCatalogueHeads } from '@wildshard/engine/game/shard/titleList';
-import { bareSlug, installedCatalogue, installInlineCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
+import { bareSlug, installedCatalogue, installInlineCatalogue, oneCellWorld } from '@wildshard/engine/game/grid/catalogueSlot';
 import { installOfflineDownload } from '@wildshard/engine/ui/offlineDownload';
 import { noteWorldBoot, noteWorldStep } from '@wildshard/engine/telemetry/runtime';
 import { armAnalyticsBeacon } from '@wildshard/engine/telemetry/analyticsBeacon';
@@ -111,6 +111,10 @@ function adoptTap(into: URLSearchParams): void {
   if (tap !== null) into.set('chunk', tap.slug);
 }
 adoptTap(search);
+/** CHUNK-PARAM-REMOVAL CP10 (J522): the cell of the one-cell world this page carries and boots with no tap, or null */
+let inlineCell: { readonly instance: string; readonly slug: string } | null = null;
+/** the zone this boot enters: the address's (until CP22), else the one-cell world's */
+const bootZone = (): string | null => search.get('chunk') ?? inlineCell?.slug ?? null;
 const exploreSlug = exploreChannel() ? exploreSlugOfPath(location.pathname) : null;
 const exploreIndex = exploreChannel() && exploreSlug === null && !search.has('chunk');
 if (exploreChannel() && !exploreIndex) search = exploreBootParams(search, exploreSlug ?? undefined);
@@ -175,7 +179,10 @@ async function enterPage(): Promise<unknown> {
   // SA36: a `/slug/<slug>` link opens that one shard's page; its PLAY leaves for `/?chunk=<slug>`, so a world never boots here.
   // SA37: on every host, a world build too: PLAY's `/?chunk=` page enters the world's grid at the shard's cell (GO7 below)
   const slugged = exploreChannel() ? null : slugOfPath(location.pathname);
-  const plainTitle = requested === null && slugged === null && document.getElementById('ws-shardfile') === null
+  // CP10 (J522): a page that carries a one-cell world (`wildshard dev`, `wildshard prepare`, a tool's zone alone) boots that world at
+  // its only cell on a bare `/`, with no tap: the grid path players take (a grid intent at the cell), never the one-shard page
+  inlineCell = requested === null && slugged === null && !exploreChannel() ? oneCellWorld(catalogue) : null;
+  const plainTitle = requested === null && slugged === null && inlineCell === null && document.getElementById('ws-shardfile') === null
     && bootRoute(search, { line: previousBootLine(), level: previousBootLevel() }).titleOnly;
   // The live menu's code can arrive while styles and the previous-end query settle.
   // Placement still gates every route that can admit a world or a public shard card.
@@ -196,7 +203,8 @@ async function enterPage(): Promise<unknown> {
   }
   await waitFor('Startup stylesheets', waitForLoadingStyles(entryScope), 'file');
   await settled;
-  const { consumeGridRecovery, gridRecoveryRefused, gridRecoveryPending, pageGridRecovery, pendingGridEntry } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
+  const { consumeGridRecovery, gridRecoveryRefused, gridRecoveryPending, pageGridRecovery, pendingGridEntry, enterOneCellWorld } = await bootTask('app:page-entry-import', () => import('@wildshard/engine/game/grid/pageEntry'));
+  if (inlineCell !== null) enterOneCellWorld(inlineCell.instance, inlineCell.slug);
   if (plainTitle && lastEnd().kind !== 'unexpected' && !gridRecoveryPending()) {
     document.documentElement.classList.add('title-first');
     return showPageTitle();
@@ -207,7 +215,7 @@ async function enterPage(): Promise<unknown> {
   // QA 11-12 row 35 (Jake, 20:04: "I expected reload to go back to main menu"): the player's own browser reload lands on the title,
   // before a tap still pending from this load (or the grid's one way in) can enter the world again; the title stays quiet
   // (dropNotice). A reload the engine makes marks itself first (lastEnd), so it resumes; harness flags keep their world.
-  if (!exploreChannel() && lastEnd().player === true && document.getElementById('ws-shardfile') === null && !search.has('skipintro') && !search.has('tour')) {
+  if (!exploreChannel() && lastEnd().player === true && inlineCell === null && document.getElementById('ws-shardfile') === null && !search.has('skipintro') && !search.has('tour')) {
     if (requested !== null) consumeTitleArrival(requested);
     consumeGridRecovery({ previous: lastEnd(), search });
     history.replaceState(history.state, '', new URL('/', location.origin));
@@ -232,7 +240,7 @@ async function enterPage(): Promise<unknown> {
     return showPageTitle(line);
   };
   if (requested !== null && await notInWorld()) return notInWorldTitle(requested);
-  const tapped = requested !== null && (pendingTitleArrival(requested) !== null || pendingGridEntry(requested));
+  const tapped = inlineCell !== null || (requested !== null && (pendingTitleArrival(requested) !== null || pendingGridEntry(requested)));
   if (document.getElementById('ws-shardfile') === null && onlineTitleFirst(search, online, tapped)) {
     history.replaceState(history.state, '', new URL('/', location.origin));
     document.documentElement.classList.add('title-first');
@@ -249,7 +257,7 @@ async function enterPage(): Promise<unknown> {
     if (await notInWorld()) return notInWorldTitle(requested);
   }
   const end = lastEnd();
-  const named = search.get('chunk');
+  const named = bootZone();
   crashResume = !online && (named === null || [end.slug].includes(named)) && !search.has('explore') ? consumeCrashResume(end, titleRows) : null;
   // SR4: after an unexpected grid end, the page's place is checked against where the server's durable continuation stands.
   // A failed or slow read keeps the page's own place, as before.
@@ -263,7 +271,7 @@ async function enterPage(): Promise<unknown> {
     history.replaceState(history.state, '', url);
     document.documentElement.classList.remove('title-first');
   }
-  const route = exploreChannel() || recovery !== null || crashResume !== null ? { rescue: false, titleOnly: false } : gridRecoveryRefused() ? { rescue: true, titleOnly: true } : bootRoute(search, { line: previousBootLine(), level: previousBootLevel(), reload: end.reload === true });
+  const route = exploreChannel() || recovery !== null || crashResume !== null || inlineCell !== null ? { rescue: false, titleOnly: false } : gridRecoveryRefused() ? { rescue: true, titleOnly: true } : bootRoute(search, { line: previousBootLine(), level: previousBootLevel(), reload: end.reload === true });
   const rescueBoot = route.rescue;
   const titleOnly = route.titleOnly;
   if (rescueBoot) {
@@ -278,7 +286,7 @@ async function enterPage(): Promise<unknown> {
   return (gridRecoveryRefused() || (titleOnly && document.getElementById('ws-shardfile') === null)) ? showPageTitle() : (async () => {
     // DL21 (E526): the static card runs its clock from the tap and names the code wait until Loading adopts it.
     if (exploreChannel()) document.documentElement.classList.remove('title-first');
-    const chunk = search.get('chunk'); if (chunk !== null) startShellClock(entryScope, chunk);
+    const chunk = bootZone(); if (chunk !== null) startShellClock(entryScope, chunk);
     // a crash that boots straight back into its world (crash resume, grid recovery) says so before its breadcrumb is replaced
     if (lastEnd().kind === 'unexpected') showDrop(takeDrop(lastEnd()));
     // the drop notice's breadcrumb: a world page, from its first step, so a crash or a silent title names where it stood
@@ -289,14 +297,15 @@ async function enterPage(): Promise<unknown> {
       const [tier, menu, spawn] = await bootTask('app:tier-menu-download-imports', () => Promise.all([import('@wildshard/engine/core/tier'),
         import('@wildshard/engine/game/grid/menu'), import('@wildshard/engine/game/boot/spawnDownload')]));
       await tier.initializeTier();
-      const slug = search.get('chunk');
+      const slug = bootZone();
       // SA43: a page that owns its inline shard (`wildshard dev`, `wildshard prepare` at `?chunk=`) has no catalogue download
       // for it: that shard's spawn set isn't its download (as startSelected's `authored`)
       const inlineShard = (menu.DEVSERVER || menu.PREPARATION_ONLY) && document.getElementById('ws-shardfile') !== null;
       // OF23a: the inline shard is admitted by its own index, never as a stale copy of a product this build pins
       if (inlineShard) releaseInlineCandidate(document.getElementById('ws-shardfile')?.textContent);
       if (typeof slug === 'string' && !inlineShard) {
-        const mode = menu.gridMode(menu.DEVSERVER), flow = pageGridRecovery() !== null || pendingGridEntry(slug) ? 'grid' : 'client';
+        // CP10: a one-cell world reads its own zone's set, never a neighbour's files (the grid set lists every neighbour's discovery)
+        const mode = menu.gridMode(menu.DEVSERVER), flow = inlineCell === null && (pageGridRecovery() !== null || pendingGridEntry(slug)) ? 'grid' : 'client';
         spawn.setSpawnPacks(runtimePacksOn());
         // LD2 (J208): a Start read this download holds (selected discovery behind the warm check) is named from the tap
         spawn.observeSpawnHolds((held, path) => waitFor('Spawn download', held, 'file', `spawn-download:${path}`));
@@ -614,7 +623,7 @@ async function prepareShaderSourceCache(zone: string): Promise<void> {
 
 async function startSelected(): Promise<void> {
   const selected = bootAwait('app:selected-discovery', import('./shardSelection').then(async selection => {
-    await selection.prepareSelectedShard(search.get('chunk'));
+    await selection.prepareSelectedShard(bootZone());
     return selection;
   }));
   const [{ preparePageCatalogue, completePageCatalogue }, { game }, { beginLoading }, { TIER }] = await Promise.all([
@@ -622,7 +631,7 @@ async function startSelected(): Promise<void> {
     import('@wildshard/engine/core/tier'),
   ]);
   // C3: a catalogue shard this build has no discovery for: the page's manifest, renamed; admission replaces the rest.
-  const listed = unloadedTitleRow(search.get('chunk'), game.shard);
+  const listed = unloadedTitleRow(bootZone(), game.shard);
   const arrival = listed?.shardfile === undefined ? game.shard : listedArrival(game.shard, { slug: listed.slug, name: listed.name, shardfile: listed.shardfile });
   const loading = beginLoading({ id: arrival.slug, name: arrival.name, trace: game.shard.boot?.phone?.trace === true });
   if (await shaderSourceCacheEnabled(TIER)) await prepareShaderSourceCache(arrival.slug);
@@ -649,7 +658,7 @@ async function startSelected(): Promise<void> {
   // SA43: so does `wildshard prepare`'s, a preparation-only production build; only those two builds own an inline shard
   const inlineOwner = DEVSERVER || PREPARATION_ONLY, authored = inlineOwner && document.getElementById('ws-shardfile') !== null;
   if (authored) releaseInlineCandidate(document.getElementById('ws-shardfile')?.textContent);
-  const spawnMode = gridMode(DEVSERVER), spawnJob = authored ? null : startSpawnDownload(arrival.slug, earlyPath === 'grid' ? 'grid' : 'client', TIER,
+  const spawnMode = gridMode(DEVSERVER), spawnJob = authored ? null : startSpawnDownload(arrival.slug, earlyPath === 'grid' && inlineCell === null ? 'grid' : 'client', TIER,
     `${Number(spawnMode.developer)}${Number(spawnMode.devserver)}${Number(spawnMode.nineDragon)}`);
   if (spawnJob !== null) void loading.setDownloadSource(spawnJob);
   // FM6: a refused download that runs again (finish.ts) paints on the same card

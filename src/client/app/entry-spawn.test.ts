@@ -37,7 +37,9 @@ function continuation(ports: Record<string, unknown>): Promise<unknown> {
   if (start === -1 || end < start) throw new Error('Missing early world download continuation');
   const body = source.slice(start, end).replaceAll(/\bimport\(([^)]+)\)/gu, 'load($1)');
   const result: unknown = runInNewContext(stripTypeScriptTypes(`(async () => {${body}})()`), {
-    prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, search: new URLSearchParams('chunk=example'), ...ports,
+    prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, search: new URLSearchParams('chunk=example'),
+    // CP10 (J522): the zone this boot enters; no one-cell world here
+    inlineCell: null, bootZone: () => 'example', ...ports,
   });
   if (!(typeof result === 'object' && result !== null && 'then' in result && typeof result.then === 'function')) throw new Error('Missing root work');
   return Promise.resolve(result);
@@ -163,7 +165,7 @@ function selectedEntry(admissionFailure?: Error, packs = false, authored = false
     '@wildshard/engine/game/plugin/audio',
     '@wildshard/engine/game/systems/species/view/boar', '@wildshard/engine/game/plugin/weaponFamily']) modules[name] = kit;
   const result: unknown = runInNewContext(stripTypeScriptTypes(`${body}; startSelected();`), {
-    runtimePacksOn: () => packs, search: new URLSearchParams('chunk=example'), unloadedTitleRow: () => undefined, dataPointer,
+    runtimePacksOn: () => packs, search: new URLSearchParams('chunk=example'), inlineCell: null, bootZone: () => 'example', unloadedTitleRow: () => undefined, dataPointer,
     shaderSourceCacheEnabled: () => Promise.resolve(false), releaseInlineCandidate: () => 0,
     prepareBootImports, bootAwait, bootMark, bootTask, bootTiming, entryScope: {child: () => imageOwner}, selectedImages: undefined, crashResume: null,
     document: {getElementById: (id: string) => authored && id === 'ws-shardfile' ? {} : null, baseURI: 'https://example.invalid/', documentElement: {classList: {remove: noop, contains: () => false}}, querySelector: () => null},

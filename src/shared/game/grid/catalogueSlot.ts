@@ -40,6 +40,12 @@ export function installInlineCatalogue(page: Pick<Document, 'getElementById'>): 
 }
 /** A product's slug for a placement's or cell's, which keep the authored spelling (`_proto`). */
 export const bareSlug = (slug: string): string => slug.replace(/^_/u, '');
+/** CHUNK-PARAM-REMOVAL CP10 (J522): the only cell of a page that carries a one-cell world (`wildshard dev`'s and `wildshard
+ *  prepare`'s page, a tool's zone alone), or null. Such a page boots that world at its cell on a bare `/`, with no tap. */
+export function oneCellWorld(catalogue: CatalogueDocument | undefined = installedCatalogue()): {readonly instance: string; readonly slug: string} | null {
+  const cells = catalogue?.grid.cells ?? [];
+  return cells.length === 1 ? cells[0] ?? null : null;
+}
 /** J313 (Jake, 2026-11-12 ~23:05 Cancún): a shard's player-facing status is its catalogue placement's when the installed
  *  catalogue gives one (api-server's grid; `test/pins/catalogue.json` in a release build), else its own. The title deck, the
  *  summary, the saves list and the title prefetch all read it, so the catalogue opens a shard with no shard upload. */

@@ -243,6 +243,10 @@ export function enterZone(instance: string, arrive?: { readonly x: number; reado
 /** ZE10a3: whether a zone entry's loading screen is still up (a second gate's 0 waits for it), for the harness. */
 export function zoneEntryPending(): boolean { return navigating !== null && !navigating.disposed; }
 
+/** CHUNK-PARAM-REMOVAL CP10 (J522): a page that carries a one-cell world boots its only cell as a grid page, as a tap's intent boots one.
+ *  The intent is this document's alone (`admit`), never the tab's or the device's, so no other page reads it. */
+export function enterOneCellWorld(instance: string, slug: string): void { pageGridIntents().admit({ instance, slug }); }
+
 /** ZE10a2: the grid intent a same-page re-entry boots from (the harness's `__wildshardReenter`), as a tap writes it. */
 export function intendGridHome(instance: string, slug: string): void { pageGridIntents().set({ instance, slug }); }
 
