@@ -29,7 +29,7 @@ import { shardFromDiscovery } from '../shard/discovery';
 import { ownInlineCandidate } from './inlineOwner';
 import { folderPaintedLook } from '../looks/paintedLook';
 import { emptyLook } from './emptyLook';
-import { declaredPost, declaredPostLook } from './declaredRender';
+import { declaredPost, declaredPostLook, withDeclaredPost } from './declaredRender';
 import { shardfileLook } from './look';
 import { declaredLook, withoutHorizon } from './declaredLook';
 import { catalogueBound, declaredStart, productStart } from './declaredStart';
@@ -132,7 +132,11 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
     loot: { coins: coinsDeclared(source.rows.loot) },
     creatures: { lowPoly: true, waitForModels: false, furRim: false, tintRange: 0, oneMaterial: true },
     // QA 11-24 row 59: a declared post look (Nine's rain, ink lines and live light) runs as a discovery page runs it
-    render: product => post !== null ? declaredPostLook(post, product) : product.has('look/painted') ? folderPaintedLook(product) : Promise.resolve(source.look.keys.length === 0 ? emptyLook(source.look.dayOverride) : shardfileLook(source.look, assets.retained)),
+    // over the data look, which keeps the zone's sky, light and ground (a post look alone fell back to an HDRI the page lacks)
+    render: product => {
+      const data = product.has('look/painted') ? folderPaintedLook(product) : Promise.resolve(source.look.keys.length === 0 ? emptyLook(source.look.dayOverride) : shardfileLook(source.look, assets.retained));
+      return post === null ? data : withDeclaredPost(data, declaredPostLook(post, product));
+    },
     load: async () => { const { ShardfileClient } = await import('./client'); return { default: class extends ShardfileClient { constructor() { super(source, assets, clientBindings); } } }; },
   };
   provideManifestAdmission(result, admitted, options, assets);

@@ -28,3 +28,13 @@ export function declaredPost(source: Pick<Shardfile, 'manifest'>): DeclaredPost 
 export async function declaredPostLook(post: DeclaredPost, product: Pick<ShardFolder, 'slug' | 'shardfile' | 'json' | 'file'>): Promise<LookStrategy> {
   return (await import('../looks/postGraphLook')).postGraphLook(product, post);
 }
+
+/**
+ * The declared post look laid over the zone's data look: the post look's colour chain (its composer passes, grid cell
+ * composite, world preparation, frame channels, LUT and any sky dressing or painted world it declares) wins; the data look
+ * keeps everything the post look does not name (its backdrop, lighting, shadows, fog and ground). Both dispose.
+ */
+export async function withDeclaredPost(data: Promise<LookStrategy>, post: Promise<LookStrategy>): Promise<LookStrategy> {
+  const [base, over] = await Promise.all([data, post]);
+  return { ...base, ...over, dispose: (): void => { over.dispose?.(); base.dispose?.(); } } as LookStrategy;
+}
