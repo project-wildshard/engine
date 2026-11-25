@@ -2,8 +2,8 @@
   "version": 1,
   "channel": "staging",
   "api": "https://api.wildshard.io",
-  "catalogueHash": "36c6773ea69f385a1af0f6fd418d2ba76c68191bcd167976f455b4b37d5e79e8",
-  "releaseHash": "2e8fc80d89187519efd6d95d5c19dbaa2c599a4556beb5be1e08dd9cd62cab9c",
+  "catalogueHash": "ea6c5e7a545335a40bbc28cbd516fbc772c01e56250877368dadeb1c4638eb39",
+  "releaseHash": "120600bc82bc1dc5dd35f9a9514d34c7b24a3bc67d1c5f7ce22a26b576f10aed",
   "catalogue": {
     "version": 0,
     "stage": "live",
@@ -604,8 +604,8 @@
       {
         "slug": "glowfen",
         "name": "Glowfen",
-        "revision": 7,
-        "hash": "4ce32c96726ff3ecdb7b622d42cd8f6e0cb27972990852de2b2dc95db8edbc0f"
+        "revision": 8,
+        "hash": "d0343bc7c50446381464c84a0c5803fb2ce228e5867038bb70eeaf0f6cc2da3e"
       },
       {
         "slug": "mirror-salt",
@@ -622,8 +622,8 @@
       {
         "slug": "nalati-grasslands",
         "name": "Nalati Grasslands",
-        "revision": 9,
-        "hash": "2b0cf84cc192bedb35a6327323d872bfc9fee88760f8bcdfeec9f97fc82e65f1"
+        "revision": 10,
+        "hash": "b730599048b8a4a2797b3b2ad3a36d90c40870650a3002ca416a5fa09ad9b718"
       },
       {
         "slug": "nine-dragon-stack",
@@ -724,8 +724,8 @@
       {
         "slug": "pine-hollow",
         "name": "Pine Hollow",
-        "revision": 16,
-        "hash": "7b6ccb7e8d6ed580fa752e842c4ef61599ecff8903ba3a5055d1b3b0789b680c"
+        "revision": 17,
+        "hash": "65b0e6ff95d9b9fd6af6480f4ad685f2b3c016338c8055978d4ac397c9503e72"
       },
       {
         "slug": "sunscar-dunes",
@@ -757,9 +757,9 @@
     },
     {
       "slug": "glowfen",
-      "revision": 7,
-      "hash": "4ce32c96726ff3ecdb7b622d42cd8f6e0cb27972990852de2b2dc95db8edbc0f",
-      "bytes": 20818432
+      "revision": 8,
+      "hash": "d0343bc7c50446381464c84a0c5803fb2ce228e5867038bb70eeaf0f6cc2da3e",
+      "bytes": 20825088
     },
     {
       "slug": "mirror-salt",
@@ -775,9 +775,9 @@
     },
     {
       "slug": "nalati-grasslands",
-      "revision": 9,
-      "hash": "2b0cf84cc192bedb35a6327323d872bfc9fee88760f8bcdfeec9f97fc82e65f1",
-      "bytes": 235265024
+      "revision": 10,
+      "hash": "b730599048b8a4a2797b3b2ad3a36d90c40870650a3002ca416a5fa09ad9b718",
+      "bytes": 235163136
     },
     {
       "slug": "nine-dragon-stack",
@@ -877,9 +877,9 @@
     },
     {
       "slug": "pine-hollow",
-      "revision": 16,
-      "hash": "7b6ccb7e8d6ed580fa752e842c4ef61599ecff8903ba3a5055d1b3b0789b680c",
-      "bytes": 314980352
+      "revision": 17,
+      "hash": "65b0e6ff95d9b9fd6af6480f4ad685f2b3c016338c8055978d4ac397c9503e72",
+      "bytes": 317006336
     },
     {
       "slug": "sunscar-dunes",
