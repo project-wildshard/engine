@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 // oxlint-disable-next-line import/no-nodejs-modules -- Scratch paths.
 import { join, resolve } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { attribute, blockingRun, cancelledJobs, FALLBACK_PANE, failedNames, follow, fpsNight, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
+import { attribute, blockingRun, cancelledJobs, failedNames, follow, fpsNight, judge, landers, type liveIo, paneFor, reached, sharedRuns, sweep, verdictFor } from '../scripts/main-watch.mjs';
 import { audioAmberLine, audioLevel } from '../src/cook/game/audioReport';
 import '../scripts/test/main-watch-red.test.mjs';
 
@@ -24,7 +24,7 @@ const replay = [
 const order = ['0f24422e', '7257ca53', '6363b3f3', '652afa6c', 'aaaa1111', 'bbbb2222'].map(sha);
 const contains = (ancestor: string, descendant: string): boolean => order.indexOf(ancestor) <= order.indexOf(descendant);
 
-interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; dispatched: number; log: string; tip: string; ambers?: Record<number, string>; agents?: string[]; prompted?: [string, string][]; fixers?: string[]; native?: ReturnType<typeof run>[]; memoryQa?: Parameters<NonNullable<ReturnType<typeof liveIo>['memoryQa']>>[0] }
+interface World { runs: ReturnType<typeof run>[]; receipts: string[]; sent: [string, string][]; builder?: string | null; dispatched: number; log: string; tip: string; ambers?: Record<number, string>; agents?: string[]; prompted?: [string, string][]; fixers?: string[]; native?: ReturnType<typeof run>[]; memoryQa?: Parameters<NonNullable<ReturnType<typeof liveIo>['memoryQa']>>[0] }
 const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   repo: 'project-wildshard/engine', state: join(scratch, `${name}.json`),
   runs: () => world.runs, failed: () => ({ names: ['tests (3)'], logs: [] }), annotations: id => world.ambers?.[id] ?? '', tip: () => world.tip,
@@ -34,10 +34,13 @@ const fake = (name: string, world: World): ReturnType<typeof liveIo> => ({
   contains, receipts: () => world.log, receipt: line => { world.receipts.push(line); },
   panes: () => [{ pane_id: 'w1:p2', label: 'engine plan/red-plan' }, { pane_id: 'w1:p3', cwd: '/x/engine/.worktrees/other' }],
   send: (pane, text) => { world.sent.push([pane, text]); return true; }, dispatch: () => { world.dispatched += 1; },
+  builder: () => (world.builder === null ? undefined : world.builder ?? BUILDER),
+  hcSend: (terminal, text) => { world.sent.push([`hc:${terminal}`, text]); return true; },
   prompt: (agent, text) => { if (!(world.agents ?? []).includes(agent)) return false; (world.prompted ??= []).push([agent, text]); return true; },
   fixers: () => world.fixers ?? [],
   quotaReset: () => Date.now(),
 });
+const BUILDER = 't21';
 const world = (runs: ReturnType<typeof run>[], log = ''): World => ({ runs, receipts: [], sent: [], dispatched: 0, log, tip: runs.at(-1)?.head_sha ?? '' });
 
 test('advisory failures preserve green blocking tests in both sweeps and follows', () => {
@@ -369,8 +372,8 @@ test('M2: a red also prompts the forward fixer by herdr agent name; a lander wit
   expect(w.receipts).toContain('MAIN RED message to codex-pins prompted herdr agent codex-pins');
 });
 
-// Build-max C1 (2026-11-23): buddy-engine was retired 11-22; the coordinator's pane takes the fallback.
-test.each(['missing lander', 'unrecorded lander'])('A2: a red with %s reaches the coordinator\'s pane once', mode => {
+// Meta QA 11-25 row 21: the builder's hc terminal takes the fallback (the coordinator's pane is gone).
+test.each(['missing lander', 'unrecorded lander'])('A2: a red with %s reaches the builder\'s hc terminal once', mode => {
   const w = world(replay), io = fake(mode, w);
   sweep(io);
   w.runs = [...replay, run(42970000008, 'aaaa1111', 'failure', 50)];
@@ -379,10 +382,10 @@ test.each(['missing lander', 'unrecorded lander'])('A2: a red with %s reaches th
   sweep(io, hint);
   sweep(io, hint);
   expect(w.prompted ?? []).toEqual([]);
-  expect(w.sent.map(([pane]) => pane)).toEqual([FALLBACK_PANE]);
+  expect(w.sent.map(([pane]) => pane)).toEqual([`hc:${BUILDER}`]);
   expect(w.sent[0]?.[1]).toContain('fix forward now');
   expect(w.sent[0]?.[1]).toContain('tests (3)');
-  expect(w.receipts).toContain(`main red fallback to coordinator sent to pane ${FALLBACK_PANE}`);
+  expect(w.receipts).toContain(`main red fallback to builder sent to hc terminal ${BUILDER}`);
 });
 
 test('J431 writes each memory warning and gate-flake receipt once and queues QA with the SHA', () => {
@@ -441,7 +444,7 @@ test('FS19: main-push receipts parse with or without a pane; land wins a shared 
   expect(attribute(['c', 'b', 'a', 'z'].map(row => row.repeat(40)), who).map(row => row.lander?.lane)).toEqual(['push', 'push', 'land', undefined]);
 });
 
-// FS22 (J443): the keeper (the coordinator's pane since build-max C1) keeps engine main when no pusher fixed a red in 20 minutes.
+// FS22 (J443): the keeper (the builder's hc terminal since meta QA 11-25 row 21) keeps engine main when no pusher fixed a red in 20 minutes.
 test('FS22: a delivered red with no green after 20 min goes to the keeper once; a green ends the span', () => {
   let clock = Date.parse('2026-11-19T05:00:00Z');
   const log = '05:50 UTC opus-red land plan/red-plan landed aaaa111100 on main (652afa6c00..aaaa111100); push';
@@ -453,8 +456,8 @@ test('FS22: a delivered red with no green after 20 min goes to the keeper once; 
   clock += 19 * 60_000;sweep(io);
   expect(w.sent).toHaveLength(1);
   clock += 2 * 60_000;sweep(io);sweep(io);
-  expect(w.sent.slice(1).map(([pane, text]) => [pane, text.slice(0, 36)])).toEqual([[FALLBACK_PANE, 'main-watch: keeper (J443): engine ma']]);
-  expect(w.receipts).toContain(`main red keeper: coordinator sent to pane ${FALLBACK_PANE} after 21 min red with no green (run 42970000011)`);
+  expect(w.sent.slice(1).map(([pane, text]) => [pane, text.slice(0, 36)])).toEqual([[`hc:${BUILDER}`, 'main-watch: keeper (J443): engine ma']]);
+  expect(w.receipts).toContain(`main red keeper: builder sent to hc terminal ${BUILDER} after 21 min red with no green (run 42970000011)`);
   // A green ends the span: the next red starts a fresh clock.
   w.runs = [...w.runs, run(42970000012, 'bbbb2222', 'success', 55)];w.tip = sha('bbbb2222');
   sweep(io);clock += 30 * 60_000;sweep(io);
@@ -467,9 +470,40 @@ test('FS22: a red whose pusher has no pane reaches the keeper at once, and not a
   sweep(io);
   w.runs = [...replay, run(42970000013, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
   sweep(io);
-  expect(w.sent.map(([pane]) => pane)).toEqual([FALLBACK_PANE]);
+  expect(w.sent.map(([pane]) => pane)).toEqual([`hc:${BUILDER}`]);
   clock += 25 * 60_000;sweep(io);
   expect(w.sent).toHaveLength(1);
+});
+
+// Meta QA 11-25 row 21: engine run 45569694131 went red and no lander was reached: Agent-tool lanes have no pane and the
+// coordinator pane was gone. Every lander now gets a NOTE RED receipt its background wait matches, and the builder's hc
+// terminal gets the red when a lander has no pane or herdr agent.
+test('row 21: a red whose subagent lander has no pane reaches it by NOTE RED and the builder by hc', () => {
+  const log = '07:40 UTC opus-qa24 main-push pushed main aaaa111100: 1 commit(s)';
+  const w = world(replay, log), io = fake('row21', w);
+  sweep(io);
+  w.runs = [...replay, run(42970000051, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
+  sweep(io);
+  expect(w.receipts).toContain('NOTE RED opus-qa24: run 42970000051 652afa6c00..aaaa111100 tests (3)');
+  expect(w.receipts).toContain('MAIN RED message to opus-qa24 not delivered (no reachable pane or herdr agent)');
+  expect(w.sent).toEqual([[`hc:${BUILDER}`, expect.stringContaining('Landers: opus-qa24')]]);
+  expect(w.receipts).toContain(`main red fallback to builder sent to hc terminal ${BUILDER}`);
+  // The same red again: no second NOTE and no second message.
+  w.runs = [...w.runs, { ...run(42970000052, 'aaaa1111', 'failure', 51) }];
+  sweep(io);
+  expect(w.receipts.filter(line => line.startsWith('NOTE RED'))).toHaveLength(1);
+  expect(w.sent).toHaveLength(1);
+});
+
+test('row 21: with no builder terminal the NOTE RED still goes out and the fallback says it was not delivered', () => {
+  const log = '07:40 UTC opus-sub main-push pushed main aaaa111100: 1 commit(s)';
+  const w = { ...world(replay, log), builder: null }, io = fake('row21-nobuilder', w);
+  sweep(io);
+  w.runs = [...replay, run(42970000053, 'aaaa1111', 'failure', 50)];w.tip = sha('aaaa1111');
+  sweep(io);
+  expect(w.receipts).toContain('NOTE RED opus-sub: run 42970000053 652afa6c00..aaaa111100 tests (3)');
+  expect(w.sent).toEqual([]);
+  expect(w.receipts).toContain('main red fallback to builder not delivered (no builder hc terminal reached)');
 });
 
 test('FM11: a red failure-mode proof is one fix-row receipt, never main red; green, cancelled and old runs are quiet', () => {

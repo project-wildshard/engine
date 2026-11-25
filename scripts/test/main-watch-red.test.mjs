@@ -2,7 +2,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { FALLBACK_PANE, failurePaths, KEEPER_MS, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
+import { failurePaths, KEEPER_MS, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
 
 const older = 'a'.repeat(40), newer = 'b'.repeat(40), other = 'c'.repeat(40);
 const testFile = 'test/host-ruler-roots.test.ts', sourceFile = 'scripts/host-ruler/roots.mjs';
@@ -58,9 +58,9 @@ test('J473 remembers a delivered run across a rerun, a replay and the keeper tic
       repo: 'project-wildshard/engine', state, runs: () => runs, tip: () => newer, contains: () => true,
       failed: () => ({ names: [failed], logs: [`FAIL ${testFile} > section host`] }), annotations: () => '',
       commits: () => [newer, older], changes: () => new Map([[older, [testFile]]]),
-      receipts: () => `17:01 Cancún codex-fix main-push pushed main bbbbbbbbbb: 2 commit(s) pane ${FALLBACK_PANE}`,
+      receipts: () => `17:01 Cancún codex-fix main-push pushed main bbbbbbbbbb: 2 commit(s) pane w2:p5`,
       receipt: () => undefined, now: () => now, fixers: () => ['coordinator'], panes: () => [],
-      agents: () => new Map([['coordinator', FALLBACK_PANE]]),
+      agents: () => new Map([['coordinator', 'w2:p5']]),
       send: (_pane, text) => { sent.push(text); return true; },
       prompt: (_lane, text) => { sent.push(text); return true; },
       dispatch: () => undefined, quotaReset: () => now,
@@ -70,7 +70,7 @@ test('J473 remembers a delivered run across a rerun, a replay and the keeper tic
     expect(sent).toEqual([expect.stringContaining('Suspect aaaaaaaaaa')]);
     runs = [green, { ...red, run_attempt: 2 }]; sweep(io);
     const saved = readState(state);
-    expect(saved?.notified?.[red.id]).toContain(`pane:${FALLBACK_PANE}`);
+    expect(saved?.notified?.[red.id]).toContain('pane:w2:p5');
     // judged is bounded. Replay after a lost/aged-out verdict and still preserve per-recipient delivery history.
     writeFileSync(state, JSON.stringify({ ...saved, judged: [green.id], red: { ...saved?.red, keeper: false } }));
     sweep(io);
