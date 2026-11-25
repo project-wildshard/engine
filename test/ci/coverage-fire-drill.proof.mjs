@@ -84,9 +84,10 @@ timed('dropped-section',async()=>{
 });
 
 timed('broken-tar',async()=>{
-  const {formatTemplate}=await import('../../scripts/pin-format.ts');
+  // QA 11-24 row 70: from format 0.79 the format ships no whole Brasscap; the tracked pin stands in (pin-format.ts).
+  const {wholeBrasscapProduct}=await import('../../scripts/pin-format.ts');
   const {readTar}=await import('@wildshard/format/tar');
-  const files=readTar(formatTemplate('brasscap-mesa').bytes);
+  const files=readTar(wholeBrasscapProduct().bytes);
   assert.ok(files.has('shard.json'),'Actual published Brasscap archive must be admitted');
 });
 

@@ -26,7 +26,7 @@ const faults=[
     find:'  version: v.picklist(SHARDFILE_VERSIONS),',plant:'  version: v.picklist(SHARDFILE_VERSIONS),\n  tc26Required: v.string(),',reason:/tc26Required/u},
   {id:'dropped-section',ring:1,owner:'shardfile:corpus/exports/brasscap-mesa',file:'',find:'',plant:'',reason:/ENOENT[\s\S]*sections\//u},
   {id:'broken-tar',ring:1,owner:'shardfile:src/format/tar.ts',file:'scripts/pin-format.ts',
-    find:'const bytes = writeTar(files), hash =',plant:'const bytes = writeTar(files).subarray(0, 513), hash =',reason:/tar:/u},
+    find:"if (!readTar(product.bytes).has('shard.json'))",plant:"if (!readTar(product.bytes.subarray(0, 513)).has('shard.json'))",reason:/tar:/u},
   {id:'save-field',ring:1,owner:'engine:src/shared/engine/script/state.ts',file:'src/shared/engine/script/state.ts',
     find:'shared: [...this.shared], players:',plant:'shared: this.shared.map((value, index) => this.declaration.shared[index]?.id === 101 ? 0 : value), players:',reason:/TC26_SAVE_FIELD/u},
   {id:'shard-red',ring:3,owner:'engine:scripts/ring3.ts',file:'scripts/ring3.ts',

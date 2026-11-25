@@ -17,9 +17,10 @@ check() {
 }
 proof() { local loader=$1; shift; node --import "./scripts/$loader" --test "$@"; }
 # TC26 (J186, AD1): the fire drill soaked 414 clean ci-reports runs, 11-17 to 11-23. Static runs before `pnpm pins` and
-# gen, so it installs Nalati and publishes Rapier's binary itself.
+# gen, so it installs Nalati and publishes Rapier's binary itself, and Brasscap, whose tracked pin broken-tar reads now the
+# format ships no whole Brasscap (format 0.79, QA 11-24 row 70).
 fire_drill() {
-  node scripts/pins.ts install nalati-grasslands &&
+  node scripts/pins.ts install nalati-grasslands brasscap-mesa &&
     node --input-type=module -e 'import {copyRapierWasm} from "./vite/rapier.ts"; copyRapierWasm();' &&
     proof bake-loader.mjs test/ci/coverage-fire-drill.proof.mjs
 }

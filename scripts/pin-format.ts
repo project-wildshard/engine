@@ -40,7 +40,12 @@ export const FORMAT_PRODUCTS: Readonly<Record<string, string>> = Object.freeze(p
 /** A whole Brasscap Mesa for tests and proofs: the format's copy while it ships one whole, else the tracked pin's shard
  * file by hash from the pins cache (`pnpm pins` fills it; J507: a live pin by slug, never a stored zone). */
 export function wholeBrasscapProduct(root = process.cwd()): FormatTemplate {
-  if (Object.hasOwn(FORMAT_PRODUCTS, 'brasscap-mesa')) return formatTemplate('brasscap-mesa');
+  const product = Object.hasOwn(FORMAT_PRODUCTS, 'brasscap-mesa') ? formatTemplate('brasscap-mesa') : pinnedBrasscap(root);
+  // TC26 broken-tar cuts the archive here: whichever source gave it, it is read back as a tar before anything uses it.
+  if (!readTar(product.bytes).has('shard.json')) throw new Error('Whole brasscap-mesa has no index');
+  return product;
+}
+function pinnedBrasscap(root: string): FormatTemplate {
   const tracked = JSON.parse(readFileSync(join(root, 'test/pins/shardfiles.json'), 'utf8')) as {readonly shards: readonly FormatTemplate['pin'][]};
   const pin = tracked.shards.find(row => row.slug === 'brasscap-mesa');
   if (pin === undefined) throw new Error('No tracked brasscap-mesa pin');
