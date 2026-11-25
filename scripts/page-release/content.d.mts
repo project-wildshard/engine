@@ -9,6 +9,7 @@ export interface ContentStore {
   read: (key: string, origin: string) => Promise<Read>;
   sets?: () => Promise<string[]>;
   copy?: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>;
+  empty?: (set: string) => Promise<boolean>;
 }
 export interface ContentSummary {
   set: string; base: string; files: number; bytes: number; uploaded: number; uploadedBytes: number; held: number;
@@ -33,6 +34,7 @@ export function publishContent(options: { dir: string; store: ContentStore; scra
 export function sampleContent(options: { dir: string; store: ContentStore; count: number; origins: readonly string[]; log: (line: string) => void; sleep?: (ms: number) => Promise<void> }): Promise<{ set: string; checked: Record<string, number> }>;
 export const DONOR_SETS: number;
 export const COPY_SAMPLE: number;
+export const COPY_WIDTH: number;
 export function copyFromSets(options: { set: string; missing: readonly ContentFile[]; store: ContentStore; origin: string; log: (line: string) => void; sleep: (ms: number) => Promise<void> }): Promise<ContentFile[]>;
-export function r2Copies(env: NodeJS.ProcessEnv): { sets: () => Promise<string[]>; copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>; put: (puts: readonly Put[]) => Promise<void>; secrets: string[]; close: () => void } | undefined;
-export function r2Content(options: { root: string; scratch: string; token?: string; fetch?: typeof fetch; copies?: Pick<ContentStore, 'sets' | 'copy'> & { put?: ContentStore['put'] }; exec?: (file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeout?: number }, secrets: string[]) => string }): ContentStore;
+export function r2Copies(env: NodeJS.ProcessEnv): { sets: () => Promise<string[]>; empty: (set: string) => Promise<boolean>; copy: (from: string, to: string, headers: Headers, bytes: number) => Promise<void>; put: (puts: readonly Put[]) => Promise<void>; secrets: string[]; close: () => void } | undefined;
+export function r2Content(options: { root: string; scratch: string; token?: string; fetch?: typeof fetch; copies?: Pick<ContentStore, 'sets' | 'copy' | 'empty'> & { put?: ContentStore['put'] }; exec?: (file: string, args: string[], options: { cwd: string; env: NodeJS.ProcessEnv; timeout?: number }, secrets: string[]) => string }): ContentStore;
