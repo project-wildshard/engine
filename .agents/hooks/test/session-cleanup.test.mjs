@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseMarkers, select } from '../session-cleanup.mjs';
+import { parseMarkers, procEnviron, select } from '../session-cleanup.mjs';
 import { landingSpared } from '../lib/procs.mjs';
 
 const repoDir = resolve(dirname(new URL(import.meta.url).pathname), '../../..');
@@ -153,6 +153,13 @@ test('the hook exits 0 on bad input and an unknown event, and a dry sweep kills 
   const dry = spawnSync('node', [HOOK, '--sweep'], { env, encoding: 'utf8', timeout: 10_000 });
   assert.equal(dry.status, 0);
   assert.match(dry.stdout, /session-cleanup: \d+ to kill, \d+ left \(dry run/);
+});
+
+// Linux's ps has no -E, so the hook reads /proc/<pid>/environ there (engine main run 45574235533 went red without it).
+test('on Linux the markers come from /proc/<pid>/environ; a gone or foreign process has none', () => {
+  const environ = 'PATH=/usr/bin\0CLAUDECODE=1\0CLAUDE_PID=4242\0CLAUDE_CODE_SESSION_ID=abc\0NOTE=a=b\0';
+  assert.deepEqual(procEnviron(7, (path) => (assert.equal(path, '/proc/7/environ'), environ)), { CLAUDECODE: '1', CLAUDE_PID: '4242', CLAUDE_CODE_SESSION_ID: 'abc' });
+  assert.deepEqual(procEnviron(8, () => { throw Object.assign(new Error('EACCES'), { code: 'EACCES' }); }), {});
 });
 
 // End to end with real processes: a fake session process named `claude` starts three sleepers (its own, one from
