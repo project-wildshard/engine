@@ -66,6 +66,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.publish_final != '' && format('refs/tags/{0}', inputs.publish_final) || inputs.staging_build }}
+          # FR6: the release build's parent (its cut on main) re-proves a reused release CI below.
+          fetch-depth: 2
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -106,7 +108,11 @@ jobs:
             fi
           fi
           [[ "$run" =~ ^[1-9][0-9]*$ ]]
-          export RELEASE_BRANCH="$branch" RELEASE_CI_RUN="$run" QUEUE_ATTEMPT="${queue_attempt:-}"
+          # FAST-RELEASE FR6: a release-only build's ci reuses main's proof of its cut, so its code jobs skip. The same
+          # selector re-proves that reuse here from git and the Actions API; anything unproven needs the full shape.
+          reuse=$(GITHUB_OUTPUT='' GITHUB_REF="refs/heads/$branch" GITHUB_SHA="$RELEASE_BUILD" GITHUB_EVENT_NAME=push \
+            node scripts/ci-selection.mjs | jq -r '.docs == true and (.reason | startswith("Release "))')
+          export RELEASE_BRANCH="$branch" RELEASE_CI_RUN="$run" QUEUE_ATTEMPT="${queue_attempt:-}" RELEASE_REUSE="$reuse"
           gh run view "$run" "${attempt[@]}" --json databaseId,headSha,headBranch,event,workflowName,attempt,status,conclusion,jobs | node -e '
             const assert = require("node:assert/strict");
             const ci = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
@@ -116,8 +122,10 @@ jobs:
             assert.equal(ci.event, "push");
             assert.equal(ci.workflowName, "ci");
             assert.equal(ci.status, "completed");
-            const required = ci.jobs.filter(job => job.name !== "nine-ledger-diagnostic" || job.conclusion !== "skipped");
-            assert.ok(required.length >= 12);
+            const reused = process.env.RELEASE_REUSE === "true" && process.env.QUEUE_ATTEMPT === "";
+            const required = ci.jobs.filter(job => (job.name !== "nine-ledger-diagnostic" && !reused) || job.conclusion !== "skipped");
+            assert.ok(reused ? required.filter(job => /^tests \(\d+\)$/u.test(job.name)).length >= 9 : required.length >= 12);
+            if (reused) console.log("FR6: release CI reused the main proof of its cut; its code jobs skipped");
             const failed = required.filter(job => job.conclusion !== "success");
             assert.ok(failed.length < required.length);
             const queueAttempt = process.env.QUEUE_ATTEMPT;

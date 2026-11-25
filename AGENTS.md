@@ -42,7 +42,9 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
  - **The push gate** (`.githooks/run-checks.mjs`, split gate EV1/EV2): static checks plus the related Vitest files in a
    clean copy of the pushed commit (`scripts/push-gate-copy.mjs`), so other lanes' dirt neither refuses your push nor
    reaches the checks. Browser, timing and slow files run on main's hosted `ci`. A tag or release push keeps the full
-   gate. If the gate regenerates a `*.generated.ts` your change feeds, it names the file: run `pnpm gen:inputs` and
+   gate, except a release that only stamps the version and adds notes over a cut main's `ci` proved (meta FAST-RELEASE
+   FR6): its branch `ci` reuses that run and runs the docs lane plus the release readers (`scripts/ci-selection.mjs`
+   `RELEASE_READER_TESTS`), and its tag push reuses both runs (`scripts/release-gate.mjs`). If the gate regenerates a `*.generated.ts` your change feeds, it names the file: run `pnpm gen:inputs` and
    commit it with your change.
  - **A red main is fixed forward, never reverted (J422 wave 2):** main-watch writes `main green` or `MAIN RED <range>`
    naming the pushes, and messages each one's herdr pane. The push it names fixes it forward at once; nobody else stops.

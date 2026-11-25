@@ -25,8 +25,17 @@ const ci = {
   jobs: Array.from({ length: 12 }, (_, i) => ({ name: `required ${i + 1}`, conclusion: 'success' })),
 };
 
-function admit(qualification: unknown, report = ci, { legacy = false, attempt = '' } = {}) {
-  const fakeActions = `
+function admit(qualification: unknown, report = ci, { legacy = false, attempt = '', reuse = '' } = {}) {
+  // FR6: the selector's verdict on the build. The real one needs git and the Actions API; without a token it says full.
+  const selector = reuse === '' ? '' : `
+    node() {
+      if [[ "$1" == scripts/ci-selection.mjs ]]; then
+        [[ "$GITHUB_REF" == "refs/heads/release/v$VERSION" && "$GITHUB_SHA" == "$RELEASE_BUILD" && "$GITHUB_EVENT_NAME" == push && -z "$GITHUB_OUTPUT" ]] || return 1
+        printf '%s\\n' "$REUSE"
+      else command node "$@"; fi
+    }
+  `;
+  const fakeActions = selector + `
     git() { printf '%s\\n' "$RELEASE_BUILD"; }
     gh() {
       case "$1 $2" in
@@ -55,7 +64,7 @@ function admit(qualification: unknown, report = ci, { legacy = false, attempt = 
     env: {
       ...process.env, RELEASE_BUILD: build, EXPECTED_RUN: String(run), GITHUB_REPOSITORY: 'project-wildshard/engine',
       STAGING_QUALIFICATION: JSON.stringify(qualification), REPORT: JSON.stringify(report),
-      LEGACY_GREEN: String(legacy), EXPECTED_ATTEMPT: attempt,
+      LEGACY_GREEN: String(legacy), EXPECTED_ATTEMPT: attempt, GH_TOKEN: '', REUSE: reuse, VERSION: version,
     },
   });
 }
@@ -101,4 +110,19 @@ test('the legacy queue exception views only the approved attempt', () => {
     jobs: [...ci.jobs.slice(1), { name: 'memory-ledger-guard', conclusion: 'cancelled', steps: [] }] };
   expect(admit(qualification, report, { attempt: '2' }).status).toBe(0);
   expect(admit(qualification, { ...report, attempt: 3 }, { attempt: '2' }).status).not.toBe(0);
+});
+
+test('FR6: a release run that reused main\'s proof admits only on the selector\'s release verdict', () => {
+  const tests = Array.from({ length: 9 }, (_, i) => ({ name: `tests (${i + 1})`, conclusion: 'success' }));
+  const report = { ...ci, jobs: [...tests, { name: 'boundaries', conclusion: 'success' }, { name: 't1-e2e', conclusion: 'skipped' },
+    { name: 'memory-client-build', conclusion: 'skipped' }, { name: 'nine-ledger-diagnostic', conclusion: 'skipped' }] };
+  const reused = JSON.stringify({ docs: true, reason: 'Release v0.1.37 only stamps its version and notes over 0123456789' });
+  expect(admit(proof, report, { reuse: reused }).status).toBe(0);
+  // Unproven reuse needs the full shape; a docs verdict about anything but a release is not a reuse.
+  expect(admit(proof, report).status).not.toBe(0);
+  expect(admit(proof, report, { reuse: JSON.stringify({ docs: false, reason: 'Release v0.1.37' }) }).status).not.toBe(0);
+  expect(admit(proof, report, { reuse: JSON.stringify({ docs: true, reason: 'Only hosted CI or Markdown' }) }).status).not.toBe(0);
+  // Reuse never excuses a failed job or a short inventory.
+  expect(admit(proof, { ...report, jobs: [...report.jobs, { name: 'boundaries', conclusion: 'failure' }] }, { reuse: reused }).status).not.toBe(0);
+  expect(admit(proof, { ...report, jobs: report.jobs.slice(1) }, { reuse: reused }).status).not.toBe(0);
 });

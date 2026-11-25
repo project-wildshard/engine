@@ -106,7 +106,7 @@ if (lane === 'push' && scripts.check && existsSync(join(root, 'scripts/push-budg
       console.error(`  - exact-tree green reuse before lease: ${proof.tree}; run ${proof.run}; commit ${proof.commit}; ${proof.mode}; ${proof.seconds.toFixed(1)} s; ${proof.finished}`);
       code=0;
     }else if(hosted!==null){
-      console.error(`  - release: skipped pnpm check; exact hosted CI proof ${hosted.run} on ${hosted.branch} for ${hosted.commit}`);
+      console.error(`  - release: skipped pnpm check; exact hosted CI proof ${hosted.run} on ${hosted.branch} for ${hosted.commit}${hosted.reused===undefined?'':` (release-only over ${hosted.parent}, code proved by main CI ${hosted.reused})`}`);
       code=0;
     }else{
       // A miss owns the lane before generation/static work too.

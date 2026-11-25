@@ -1,5 +1,6 @@
 // FS28: staging npm admission uses only exact CI and alias evidence.
 import { provesCode } from './ci-proof-jobs.mjs';
+import { releaseOnlyParent } from './release-gate.mjs';
 
 export const trainSha = /^[a-f0-9]{40}$/u;
 export const trainTag = /^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/u;
@@ -34,6 +35,19 @@ export function nextAdmission(build, tag, ci, alias, candidate) {
       candidate.hold !== false || candidate.roomsSerial !== serial ||
       !alias.deployment?.id || alias.deployment.id !== candidate.deploymentId) return undefined;
   return { staging_build: build, staging_qualification: JSON.stringify({ build, serial, j475: { releaseCi: ci } }) };
+}
+
+/** FAST-RELEASE FR6: a release branch's ci reuses main's proof of its cut (scripts/ci-selection.mjs) when the release
+ * commit only stamps the version and adds notes. The train takes that run as proof only when it is green on the exact
+ * build with every `tests` share green, and the build is release-only over `cut`, the main commit whose own ci already
+ * passed provesTrainCi.
+ * @param {import('./release-train-proof.mjs').Run} run @param {string} build @param {string} tag @param {string} cut
+ * @param {string} cwd */
+export function provesReleaseReuse(run, build, tag, cut, cwd) {
+  const tests = run.jobs.filter(job => /^tests(?: \(.+\))?$/u.test(job.name));
+  return trainSha.test(cut) && run.headSha === build && run.status === 'completed' && run.conclusion === 'success' &&
+    tests.length > 0 && tests.every(job => job.status === 'completed' && job.conclusion === 'success') &&
+    releaseOnlyParent(cwd, build, tag) === cut;
 }
 
 /** @param {import('./release-train-proof.mjs').Run} run @param {string} build */

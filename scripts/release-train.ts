@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { nextAdmission, provesNpmNext, provesTrainCi, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './pid-lock.mjs';
@@ -221,10 +221,14 @@ async function main(args: string[]) {
     let ci = listRelease()[0]?.databaseId;
     for (let poll = 0; ci === undefined && poll < 18; poll++) { await wait(10_000); ci = listRelease()[0]?.databaseId; }
     if (!ci) throw new Error('Exact release CI was not listed');
-    if (!provesTrainCi(await watchRun(ci, join(out, 'release-ci.log')), build)) {
+    // FR6: a release-only build reuses the main CI that proved its cut (source); its own run is the docs lane.
+    const releaseCi = await watchRun(ci, join(out, 'release-ci.log'));
+    const proved = provesTrainCi(releaseCi, build);
+    const reused = !proved && provesReleaseReuse(releaseCi, build, tag, source.headSha, root);
+    if (!proved && !reused) {
       throw new Error('Exact release CI did not prove the release build');
     }
-    receipt(lane, `DONE ${tag} ${build.slice(0, 10)} exact release CI ${ci} green.`);
+    receipt(lane, `DONE ${tag} ${build.slice(0, 10)} exact release CI ${ci} green${reused ? `, reusing main CI ${source.databaseId} at the cut` : ''}.`);
 
     // J505: a busy staging alias has no say over preparing or proving another release.
     unlockStaging = pidLock(join(root, '.git', 'release-train.lock'));

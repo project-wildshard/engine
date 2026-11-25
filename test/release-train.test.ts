@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { nextAdmission, provesNpmNext, provesTrainCi, watchTrainRun } from '../scripts/release-train-proof.mjs';
+import { nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, watchTrainRun } from '../scripts/release-train-proof.mjs';
+import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
 const release = 'v0.1.65';
@@ -55,6 +56,26 @@ test('train CI proves the exact build after running packed tests and the require
   expect(provesTrainCi({ ...run, jobs: jobs.slice(0, -1) }, build)).toBe(false);
 });
 
+
+test('FR6: the train takes a reused release run only for a release-only build over the proved cut', () => {
+  const repo = createTempRepo();
+  try {
+    const manifest = (version: string) => JSON.stringify({ name: '@wildshard/engine', version });
+    const cut = repo.commit({ 'package.json': manifest('0.1.36'), 'CHANGELOG.md': '## v0.1.36\n' }, 'cut');
+    const head = repo.commit({ 'package.json': manifest('0.1.37'), 'CHANGELOG.md': '## v0.1.37\n\n- New\n\n## v0.1.36\n' }, 'release');
+    const green = { conclusion: 'success', status: 'completed' }, skipped = { conclusion: 'skipped', status: 'completed' };
+    const jobs = [...Array.from({ length: 9 }, (_, at) => ({ name: `tests (${at + 1})`, ...green })), { name: 'memory-client-build', ...skipped }];
+    const run = { headSha: head, databaseId: ci, ...green, jobs };
+    expect(provesTrainCi(run, head)).toBe(false);
+    expect(provesReleaseReuse(run, head, 'v0.1.37', cut, repo.dir)).toBe(true);
+    expect(provesReleaseReuse(run, head, 'v0.1.38', cut, repo.dir)).toBe(false);
+    expect(provesReleaseReuse(run, head, 'v0.1.37', head, repo.dir)).toBe(false);
+    expect(provesReleaseReuse({ ...run, conclusion: 'failure' }, head, 'v0.1.37', cut, repo.dir)).toBe(false);
+    expect(provesReleaseReuse({ ...run, jobs: [{ name: 'tests (1)', conclusion: 'failure', status: 'completed' }] }, head, 'v0.1.37', cut, repo.dir)).toBe(false);
+    const code = repo.commit({ 'src/x.ts': 'export {};\n' }, 'code');
+    expect(provesReleaseReuse({ ...run, headSha: code }, code, 'v0.1.37', head, repo.dir)).toBe(false);
+  } finally { repo.cleanup(); }
+});
 
 describe('hosted run readback', () => {
   const publishJob = { name: 'publish', status: 'completed', conclusion: 'success' };
