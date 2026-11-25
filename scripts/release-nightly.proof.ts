@@ -2,9 +2,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';
-import {chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
+import {chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {delimiter, join, resolve} from 'node:path';
-import {releaseTagPush, requireNoNewFailures} from './release-nightly.ts';
+import {releaseTagPush, requireNoNewFailures, runnerFaults} from './release-nightly.ts';
 
 const latest = {id: 42, head_sha: 'a'.repeat(40), status: 'completed', conclusion: 'failure', event: 'schedule'};
 const dispatched = {...latest, id: 43, event: 'workflow_dispatch', display_title: 'nightly release proof'};
@@ -28,6 +28,32 @@ await test('existing failures retain J167 manual hold; new failures refuse relea
   for (const ref of ['refs/heads/main', 'refs/heads/release/v1.2.3', 'refs/tags/dryrun-v1.2.3'])
     assert.equal(releaseTagPush(`${ref} ${sha} ${ref} ${zero}`), false);
   assert.equal(releaseTagPush(`(delete) ${zero} refs/tags/v1.2.3 ${sha}`), false);
+});
+
+// QA 11-24 row 66: the shape of nightly 45464478966 (abandoned heads job, a lost WebGL context on Nine, 0 receipts).
+const nine = 'chromium/nine-dragon-stack@hash', pine = 'chromium/pine-hollow@hash';
+const lost = 'Error: Game error report: {"system":"gpu-recovery","message":"Error: WebGL context lost (context lost)"}';
+const faulted = {...report, failures: [
+  {key: 'runner/heads', error: 'Actions job abandoned; a red nightly holds the tag even with complete phase receipts'},
+  {key: `${nine}/boot`, error: lost}, {key: `${nine}/hover`, error: 'Expected one receipt, got 0'},
+  {key: `${nine}/draw`, error: 'jsHandle.evaluate: Execution context was destroyed, most likely because of a navigation.'},
+  {key: `${pine}/cook`, error: 'Expected one receipt, got 0'}, {key: `${pine}/boot`, error: 'Expected one receipt, got 0'}],
+newFailures: [`${nine}/boot`, `${nine}/hover`, `${nine}/draw`, `${pine}/cook`, `${pine}/boot`]};
+
+await test('a runner-fault nightly lets the tag through; a real red still holds it', () => {
+  assert.deepEqual(requireNoNewFailures(faulted, latest), faulted.newFailures);
+  assert.deepEqual(requireNoNewFailures(report, latest), []);
+  // One real assertion beside the runner faults holds the tag.
+  const real = {...faulted, failures: [...faulted.failures, {key: planted, error: 'expected 3 to be 4'}], newFailures: [...faulted.newFailures, planted]};
+  assert.throws(() => requireNoNewFailures(real, latest), /new nightly failures.*planted/u);
+  // A missing receipt is a runner fault only beside an abandoned job or a lost context on that head.
+  const noJob = {...faulted, failures: faulted.failures.filter(row => row.key !== 'runner/heads')};
+  assert.throws(() => requireNoNewFailures(noJob, latest), /new nightly failures.*pine-hollow/u);
+  assert.deepEqual(runnerFaults({...noJob, newFailures: [`${nine}/boot`, `${nine}/hover`, `${nine}/draw`]}), [`${nine}/boot`, `${nine}/hover`, `${nine}/draw`]);
+  // A failed (not abandoned) job is a red job, not a runner fault.
+  const failedJob = {...faulted, failures: faulted.failures.map(row => row.key === 'runner/heads' ? {...row, error: 'Actions job failure; a red nightly holds the tag'} : row)};
+  assert.throws(() => requireNoNewFailures(failedJob, latest), /new nightly failures.*pine-hollow/u);
+  assert.throws(() => requireNoNewFailures({...faulted, failures: [...faulted.failures, {key: 'x', error: 7}]}, latest), /release held/u);
 });
 
 await test('real release entry downloads the latest verdict and refuses before any local gate', () => {
@@ -106,6 +132,14 @@ else if(args.slice(0,2).join(' ')==='run download'&&['42','43'].includes(args[2]
     // Ordinary pushes do not consult the nightly and keep their normal gate.
     git('push', '--quiet', 'origin', 'main'); assert.equal(existsSync(marker), true);
     rmSync(marker);
+    const receipts = join(root, 'receipts.log');
+    writeFileSync(file, JSON.stringify({...faulted, run: '43'}));
+    const faultPush = spawnSync('git', ['push', 'origin', 'v1.2.3'], {cwd: root, env: {...env, TC22_RECEIPTS: receipts}, encoding: 'utf8', timeout: 5000});
+    assert.equal(faultPush.status, 0, faultPush.stderr);
+    assert.match(faultPush.stdout + faultPush.stderr, /TC22: nightly 43 red from runner faults only/u);
+    assert.match(readFileSync(receipts, 'utf8'), /^\d\d:\d\d UTC tc22 NOTE nightly 43 red from runner faults only \(5 keys/u);
+    assert.match(git('ls-remote', '--tags', 'origin'), /refs\/tags\/v1.2.3/u);
+    git('push', '--quiet', 'origin', ':refs/tags/v1.2.3');
     writeFileSync(file, JSON.stringify({...report, run: '43'}));
     git('push', '--quiet', 'origin', 'v1.2.3');
     assert.match(git('ls-remote', '--tags', 'origin'), /refs\/tags\/v1.2.3/u);
