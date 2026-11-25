@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './pid-lock.mjs';
@@ -170,6 +170,9 @@ async function main(args: string[]) {
     throw new Error(reminderLine(cadence));
   }
 
+  const unattributed = attributionGap(process.env, prepared !== undefined);
+  if (unattributed !== undefined) throw new Error(unattributed);
+
   const intended = prepared ? git(['rev-parse', `${prepared}^`]) : undefined;
   const candidates = JSON.parse(gh(['run', 'list', '-R', repo, '--workflow', 'ci.yml', '--branch', 'main',
     '--event', 'push', ...(intended ? ['--commit', intended] : []), '--limit', '100',
@@ -209,7 +212,8 @@ async function main(args: string[]) {
     if (gap !== undefined) throw new Error(`Local QA refused the cut: ${gap}`);
     if (!prepared) {
       receipt(lane, `START ${tag} cut from ${source.headSha.slice(0, 10)}, main CI ${source.databaseId}.`);
-      await runLogged(root, join(out, 'prepare.log'), kit, [tag, '--prepare', '--from', source.headSha, '--notes', notes]);
+      // Kept with the evidence: the run's scratch is removed on exit, and a stopped prepare must still say why.
+      await runLogged(root, join(saved, 'prepare.log'), kit, [tag, '--prepare', '--from', source.headSha, '--notes', notes]);
     }
     const build = git(['rev-parse', branchRef]);
     if (git(['rev-parse', `${build}^`]) !== source.headSha || git(['rev-parse', 'HEAD'], tree) !== build ||

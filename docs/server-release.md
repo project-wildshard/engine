@@ -139,7 +139,11 @@ the signed staging server tag and uses the root helper's normal cook
 rebuild, health check and rollback. An older installed helper upgrades
 only through the existing signed-source/harden guard. A failed move
 refuses the alias. The later `release-cook.mjs vX.Y.Z` production step
-also refuses to rewind a newer staging cook.
+also refuses to rewind a newer staging cook. When `scripts/vps` changed
+since the box's last harden (wildshard-apply's stamp, else the cook's
+previous build), either step then runs `wildshard-apply <tag> harden`
+behind the same `--check` gate (FAST-RELEASE FR-A11); a refusal is a
+`warn` line that names why, and the release goes on.
 
 
 Each phase refuses until the one before it has run for the same SHA

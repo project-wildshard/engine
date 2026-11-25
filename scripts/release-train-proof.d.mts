@@ -14,3 +14,4 @@ export function nextAdmission(build: string, tag: string, ci: number, alias?: Al
   { staging_build: string; staging_qualification: string } | undefined;
 export function provesTrainCi(run: Run, build: string): boolean;
 export function provesReleaseReuse(run: Run, build: string, tag: string, cut: string, cwd: string): boolean;
+export function attributionGap(env: Record<string, string | undefined>, prepared: boolean): string | undefined;

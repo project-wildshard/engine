@@ -11,7 +11,7 @@
 // own user can write (its bundle folders) is read: root never opens a path another account controls (Codex J206).
 import { spawnSync } from 'node:child_process';
 import { createPublicKey, verify } from 'node:crypto';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Public SPKI DER, equal to setup.sh's EXPECTED_RELEASE_PUBLIC_KEY (the engine's test holds them equal). Never a signing key.
@@ -20,6 +20,8 @@ const ENGINE_GIT = 'https://github.com/project-wildshard/engine.git';
 const TAG = /^(?:v\d{1,4}\.\d{1,4}\.\d{1,4}|server-(?:staging|production)-[0-9a-f]{40})$/u, COMMIT = /^[0-9a-f]{40}$/u;
 const SCRIPTS = { harden: 'harden.sh', setup: 'setup.sh', rebuild: 'rebuild.sh' };
 const WORK = '/var/lib/wildshard-apply';
+// `<commit> <tag>` of the last harden that exited 0; root-written, world-readable (release-cook.mjs reads it, FR-A11).
+const HARDEN_STAMP = '/var/lib/wildshard-harden-applied';
 
 // The engine's test hands it its own key and signed files and stops before any fetch; never as root, so sudo cannot.
 const test = process.geteuid?.() !== 0 ? process.env.WILDSHARD_APPLY_TEST : undefined;
@@ -125,6 +127,11 @@ async function main() {
   say('run', `${script} (engine ${commit.slice(0, 8)}, ${tag})`);
   // harden.sh run from here also refreshes /opt/wildshard-vps, the root-owned copy the allowlist names.
   const run = spawnSync('/usr/bin/bash', [script], { stdio: 'inherit', cwd: out, env: clean });
+  // FAST-RELEASE FR-A11: the release reads which commit last hardened the box, so it can apply a changed scripts/vps itself.
+  if (which === 'harden' && run.status === 0) {
+    writeFileSync(HARDEN_STAMP, `${commit} ${tag}\n`, { mode: 0o644 });
+    spawnSync('/usr/bin/chmod', ['644', HARDEN_STAMP]);
+  }
   process.exit(run.status ?? 1);
 }
 

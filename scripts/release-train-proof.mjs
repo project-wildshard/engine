@@ -57,3 +57,12 @@ export function provesTrainCi(run, build) {
     ['boundaries', 'nine-ring1-build', 'memory-client-build'].every(name =>
       run.jobs.some(job => job.name === name && job.status === 'completed' && job.conclusion === 'success'));
 }
+
+/** Why repo-kit's prepare would refuse this environment's commit, or undefined. Checked before local QA (opus-rel86,
+ *  v0.1.86: the train spent its local QA, then prepare stopped on a missing ASSISTED_BY and removed its log).
+ * @param {Record<string, string | undefined>} env @param {boolean} prepared @returns {string | undefined} */
+export function attributionGap(env, prepared) {
+  if (prepared || env.SKIP_ATTRIB === '1') return undefined;
+  return (env.ASSISTED_BY ?? '').trim() !== '' ? undefined
+    : 'set ASSISTED_BY=Claude:<model> (or Codex:<model>) for the prepared commit; SKIP_ATTRIB=1 only for a human-only release';
+}

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, watchTrainRun } from '../scripts/release-train-proof.mjs';
+import { attributionGap, nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, watchTrainRun } from '../scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -121,5 +121,15 @@ describe('hosted run readback', () => {
     { ...published, jobs: [{ ...publishJob, conclusion: 'skipped' }] },
   ])('refuses another build, workflow, trigger or skipped publish job', run => {
     expect(provesNpmNext(run, build)).toBe(false);
+  });
+});
+
+describe('attribution before local QA', () => {
+  test('a new cut needs ASSISTED_BY before the train spends its local QA; a prepared branch or a human release does not', () => {
+    expect(attributionGap({}, false)).toContain('set ASSISTED_BY');
+    expect(attributionGap({ ASSISTED_BY: ' ' }, false)).toContain('set ASSISTED_BY');
+    expect(attributionGap({ ASSISTED_BY: 'Claude:claude-opus-5-5' }, false)).toBeUndefined();
+    expect(attributionGap({}, true)).toBeUndefined();
+    expect(attributionGap({ SKIP_ATTRIB: '1' }, false)).toBeUndefined();
   });
 });

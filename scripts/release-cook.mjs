@@ -11,6 +11,9 @@
 //    /etc/prometheus, fixed by the tag's harden).
 // 3. `sudo -n wildshard-config cook vX.Y.Z`: the box verifies the tag, writes cook.settings, rebuilds the cook step alone,
 //    waits for its /health and rolls back if it does not come up. Then `show cook` and the worker's /health.
+// 4. FAST-RELEASE FR-A11: harden copies all of scripts/vps to the box, so when scripts/vps changed since the box's last
+//    harden (wildshard-apply's stamp, else the cook's previous build), the release runs `wildshard-apply <tag> harden`
+//    itself, behind the same --check gate. A gate or an apply that fails says why in a `warn` line; the release goes on.
 // --dry-run reads the box and says what it would do; it writes nothing. Output never carries an address or a secret.
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { spawnSync } from 'node:child_process';
@@ -24,6 +27,9 @@ const SIGNED_TAG = /^(?:v\d{1,4}\.\d{1,4}\.\d{1,4}|server-(?:staging|production)
 const MARK = 'cook <tag>';
 // harden --check rows whose fix never touches sshd, ufw or Tailscale: SC2 is the box-local Prometheus on loopback.
 const OFF_SSH_ROWS = new Set(['SC2']);
+// wildshard-apply writes `<commit> <tag>` here after a harden that exits 0 (FR-A11): root-written, world-readable.
+const HARDEN_STAMP = '/var/lib/wildshard-harden-applied';
+const VPS = 'scripts/vps/';
 
 /** @param {string} what @param {string} message */
 function say(what, message) { console.info(`${what.padEnd(7)} ${redact(message)}`); }
@@ -68,9 +74,14 @@ async function main() {
 
   const shown = box('sudo -n /usr/local/sbin/wildshard-config show cook');
   say('now', shown.status === 0 ? shown.out.trim().replaceAll('\n', ', ') : 'the box has no cook verb yet');
+  const cookBuild = /^WILDSHARD_BUILD=([0-9a-f]{40})$/mu.exec(shown.out)?.[1];
   if (shown.status === 0 && shown.out.includes(`COOK_ENGINE_REF=${tag}\n`) && shown.out.includes(`WILDSHARD_BUILD=${production.build}`)) {
     const health = box('curl -fsS --max-time 5 http://127.0.0.1:8792/health >/dev/null && echo up');
-    if (health.out.includes('up')) { say('ok', `the cook worker already runs ${tag} and answers /health`); return; }
+    if (health.out.includes('up')) {
+      say('ok', `the cook worker already runs ${tag} and answers /health`);
+      await hardenIfDue(tag, production.build, cookBuild, dry);
+      return;
+    }
   }
 
   const needsHelper = box(`grep -qF '${MARK}' /usr/local/sbin/wildshard-config`).status !== 0
@@ -79,43 +90,103 @@ async function main() {
     // The helper comes from a signed tag that carries it: production's if it does, else staging's.
     const source = carries(production.build, stagingMove) ? production : carries(staging.build, stagingMove) ? staging : null;
     if (source === null) stop('no signed release carries `wildshard-config cook` yet: it rides the next staging serial (AUTO-RELEASE AR8)');
-    const check = box('sudo -n /usr/local/sbin/wildshard-harden --check');
-    const fails = check.out.split('\n').filter(line => line.startsWith('fail') && !OFF_SSH_ROWS.has(line.split(/\s+/u)[1] ?? ''));
-    if (fails.length > 0) stop(`harden --check has ${String(fails.length)} fail row(s) (${fails.map(line => line.split(/\s+/u)[1]).join(', ')}): applying would change the box, so no auto-install`);
+    const gate = hardenGate();
+    if (gate !== null) stop(`${gate}: applying would change the box, so no auto-install`);
     if (dry) { say('would', `install the cook verb by: sudo -n wildshard-apply ${source.tag} harden`); }
     else {
-      say('doing', `sudo -n wildshard-apply ${source.tag} harden (detached; it may restart sshd)`);
-      box(`nohup sudo -n /usr/local/sbin/wildshard-apply ${source.tag} harden > ~/release-cook-harden.log 2>&1 < /dev/null &`);
-      // [w]: pgrep must not match the remote shell that runs it.
-      const deadline = Date.now() + 20 * 60_000, running = `pgrep -f '[w]ildshard-apply ${source.tag}' >/dev/null`;
-      // pgrep's 1 is "finished"; ssh's 255 (harden restarting sshd) is "ask again".
-      let status;
-      do {
-        await new Promise(resolve => { setTimeout(resolve, 15_000); });
-        if (Date.now() > deadline) stop('wildshard-apply harden did not finish in 20 minutes; see ~/release-cook-harden.log on the box');
-        status = box(running).status;
-      } while (status !== 1);
+      const failed = await applyHarden(source.tag);
+      if (failed !== null) stop(failed);
       if (box(`grep -qF '${MARK}' /usr/local/sbin/wildshard-config`).status !== 0) stop('harden ran but the cook verb is not installed; see ~/release-cook-harden.log on the box');
       if (stagingMove && box("grep -qF '|server-staging-' /usr/local/sbin/wildshard-config").status !== 0) stop('The signed helper still cannot follow staging; no alias may move');
-      // A step that could cut SSH arms a 10-minute dead-man; this new session proves the way in, so stop it as harden asks.
-      if (box('systemctl is-active --quiet wildshard-harden-deadman.timer').status === 0) {
-        say('note', 'harden armed its dead-man, so it changed an SSH-side setting; this session got in, stopping the timer');
-        const stopped = box('sudo -n /usr/bin/systemctl stop wildshard-harden-deadman.timer');
-        if (stopped.status !== 0 || box('systemctl is-active --quiet wildshard-harden-deadman.timer').status === 0) {
-          stop('the harden dead-man timer is still armed: run `sudo -n systemctl stop wildshard-harden-deadman.timer` as wildshard-agent within 10 minutes');
-        }
-      }
       say('ok', `the cook verb is installed from ${source.tag}`);
     }
   }
 
-  if (dry) { say('would', `sudo -n wildshard-config cook ${tag}`); return; }
+  if (dry) {
+    say('would', `sudo -n wildshard-config cook ${tag}`);
+    await hardenIfDue(tag, production.build, cookBuild, dry);
+    return;
+  }
   const moved = box(`sudo -n /usr/local/sbin/wildshard-config cook ${tag}`);
   for (const line of moved.out.trim().split('\n').filter(row => /^(ok|doing|undo|stop|note|wait|warn|done)\s/u.test(row))) console.info(redact(line));
   if (moved.status !== 0) stop(`wildshard-config cook ${tag} exited ${String(moved.status)}`);
   const after = box('sudo -n /usr/local/sbin/wildshard-config show cook; curl -fsS --max-time 5 http://127.0.0.1:8792/health >/dev/null && echo health-up');
   if (!after.out.includes(`COOK_ENGINE_REF=${tag}\n`) || !after.out.includes(`WILDSHARD_BUILD=${production.build}`) || !after.out.includes('health-up')) stop('the cook did not settle on the new tag; see journalctl -u wildshard-cook');
   say('done', `the cook worker runs ${tag} (${production.build.slice(0, 8)}) and answers /health`);
+  await hardenIfDue(tag, production.build, cookBuild, dry);
+}
+
+/** The --check rows that make an unattended apply unsafe, or null when it may run. @returns {string | null} */
+function hardenGate() {
+  const check = box('sudo -n /usr/local/sbin/wildshard-harden --check');
+  if (!check.out.includes('summary')) return 'harden --check did not finish';
+  const fails = check.out.split('\n').filter(line => line.startsWith('fail') && !OFF_SSH_ROWS.has(line.split(/\s+/u)[1] ?? ''));
+  return fails.length > 0 ? `harden --check has ${String(fails.length)} fail row(s) (${fails.map(line => line.split(/\s+/u)[1]).join(', ')})` : null;
+}
+
+/** Runs `wildshard-apply <tag> harden` detached and waits for it. Null when it finished, else why not.
+ * @param {string} tag @returns {Promise<string | null>} */
+async function applyHarden(tag) {
+  say('doing', `sudo -n wildshard-apply ${tag} harden (detached; it may restart sshd)`);
+  box(`nohup sh -c 'sudo -n /usr/local/sbin/wildshard-apply ${tag} harden; echo "apply-exit $?"' > ~/release-cook-harden.log 2>&1 < /dev/null &`);
+  // [w]: pgrep must not match the remote shell that runs it.
+  const deadline = Date.now() + 20 * 60_000, running = `pgrep -f '[w]ildshard-apply ${tag}' >/dev/null`;
+  // pgrep's 1 is "finished"; ssh's 255 (harden restarting sshd) is "ask again".
+  let status;
+  do {
+    await new Promise(resolve => { setTimeout(resolve, 15_000); });
+    if (Date.now() > deadline) return 'wildshard-apply harden did not finish in 20 minutes; see ~/release-cook-harden.log on the box';
+    status = box(running).status;
+  } while (status !== 1);
+  const exit = /apply-exit (\d+)\s*$/u.exec(box('tail -n 1 ~/release-cook-harden.log').out)?.[1];
+  if (exit !== '0') return `wildshard-apply harden exited ${exit ?? 'without a status'}; see ~/release-cook-harden.log on the box`;
+  // A step that could cut SSH arms a 10-minute dead-man; this new session proves the way in, so stop it as harden asks.
+  if (box('systemctl is-active --quiet wildshard-harden-deadman.timer').status === 0) {
+    say('note', 'harden armed its dead-man, so it changed an SSH-side setting; this session got in, stopping the timer');
+    const stopped = box('sudo -n /usr/bin/systemctl stop wildshard-harden-deadman.timer');
+    if (stopped.status !== 0 || box('systemctl is-active --quiet wildshard-harden-deadman.timer').status === 0) {
+      return 'the harden dead-man timer is still armed: run `sudo -n systemctl stop wildshard-harden-deadman.timer` as wildshard-agent within 10 minutes';
+    }
+  }
+  return null;
+}
+
+/** FR-A11: is the box's harden behind this build? harden copies all of scripts/vps, so any change there since the last
+ *  harden (the stamp's commit, else the cook's previous build) makes it due. `changed` lists paths between two commits,
+ *  or null when it cannot.
+ * @param {string | undefined} applied @param {string} build @param {(from: string, to: string) => string[] | null} changed
+ * @returns {{due: boolean, why: string}} */
+export function hardenDue(applied, build, changed) {
+  if (applied === undefined || !COMMIT.test(applied)) return { due: true, why: "no record of the box's last harden" };
+  if (applied === build) return { due: false, why: `the box's harden is already ${build.slice(0, 8)}` };
+  const paths = changed(applied, build);
+  if (paths === null) return { due: true, why: `cannot compare ${applied.slice(0, 8)} with ${build.slice(0, 8)}` };
+  const inputs = paths.filter(path => path.startsWith(VPS));
+  if (inputs.length === 0) return { due: false, why: `no harden input changed since ${applied.slice(0, 8)}` };
+  const named = inputs.slice(0, 3).join(', ') + (inputs.length > 3 ? ', ...' : '');
+  return { due: true, why: `${String(inputs.length)} harden input(s) changed since ${applied.slice(0, 8)} (${named})` };
+}
+
+/** @param {string} from @param {string} to @returns {string[] | null} */
+function changedPaths(from, to) {
+  for (const commit of [from, to]) spawnSync('git', ['fetch', '--quiet', 'origin', commit], { encoding: 'utf8' });
+  const diff = spawnSync('git', ['diff', '--name-only', '--no-renames', from, to, '--', VPS], { encoding: 'utf8', maxBuffer: 1 << 24 });
+  return diff.status === 0 ? diff.stdout.split('\n').filter(Boolean) : null;
+}
+
+/** Applies harden from `tag` when it is due. Never stops the release: a refusal is a `warn` line that says why.
+ * @param {string} tag @param {string} build @param {string | undefined} cookBuild @param {boolean} dry */
+async function hardenIfDue(tag, build, cookBuild, dry) {
+  const stamp = box(`cat ${HARDEN_STAMP} 2>/dev/null`).out.trim().split(/\s+/u)[0] ?? '';
+  const { due, why } = hardenDue(COMMIT.test(stamp) ? stamp : cookBuild, build, changedPaths);
+  if (!due) { say('ok', `harden: ${why}`); return; }
+  const gate = hardenGate();
+  if (gate !== null) { say('warn', `harden is due (${why}) but not applied: ${gate}; a lane applies it by hand`); return; }
+  if (dry) { say('would', `harden is due (${why}): sudo -n wildshard-apply ${tag} harden`); return; }
+  say('note', `harden is due: ${why}`);
+  const failed = await applyHarden(tag);
+  if (failed === null) say('done', `harden applied from ${tag}`);
+  else say('warn', `harden from ${tag}: ${failed}; a lane applies it by hand`);
 }
 
 /** Reject stale end-of-prod steps and bind staging moves to the exact signed build.
