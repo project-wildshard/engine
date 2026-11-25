@@ -180,7 +180,10 @@ export class ClaimedPickupRoster<I extends string> {
   readonly drops: Map<I, ItemPickup> = new Map<I, ItemPickup>();
   private readonly active = new Map<ItemPickup, { id: I; row: ClaimedPickupRow }>();
   private readonly fading: { drop: ItemPickup; left: number }[] = [];
-  constructor(private readonly rows: Readonly<Record<string, ClaimedPickupRow | undefined>>, private readonly ports: ClaimedPickupPorts<I>) {
+  private readonly rows: Readonly<Record<string, ClaimedPickupRow | undefined>>;
+  private readonly ports: ClaimedPickupPorts<I>;
+  constructor(rows: Readonly<Record<string, ClaimedPickupRow | undefined>>, ports: ClaimedPickupPorts<I>) {
+    this.rows = rows; this.ports = ports;
     const keys = Object.keys(rows);
     if (keys.length === 0 || keys.length > 128) throw new Error('Claimed pickup rows exceed their bound');
     for (const id in rows) {

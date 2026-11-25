@@ -15,7 +15,9 @@ class NetWeather implements WeatherReading {
   readonly registers: Record<string, number>;
   state: string;
   phaseLeft = 0;
-  constructor(readonly rows: WeatherProgram) {
+  readonly rows: WeatherProgram;
+  constructor(rows: WeatherProgram) {
+    this.rows = rows;
     this.state = rows.states[0] ?? '';
     this.n = Object.fromEntries(numberIds(rows).map(id => [id, 0])); this.registers = { ...rows.registers };
   }
@@ -30,7 +32,10 @@ class NetStorm implements StormReading {
   private readonly records = new Map<string, { readonly record: Record<string, number>; serial: number }>();
   private readonly listeners = new Map<string, Set<(event: StormRecord) => void>>();
   private hudSeen = '';
-  constructor(readonly rows: WeatherReactionRows, private readonly weather: NetWeather) {
+  readonly rows: WeatherReactionRows;
+  private readonly weather: NetWeather;
+  constructor(rows: WeatherReactionRows, weather: NetWeather) {
+    this.rows = rows; this.weather = weather;
     for (const emit of rows.steps.flatMap(step => step.emit)) {
       const row = this.records.get(emit.event) ?? { record: { age: 1e6 }, serial: 0 };
       for (const [field] of emit.fields) row.record[field] = 0;

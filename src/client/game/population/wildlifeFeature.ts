@@ -40,7 +40,9 @@ export class PageWildlifeView<T extends CrowdTargets = CrowdDraw> {
   readonly foragers: { readonly rules: ForagerPopulation } | null;
   private readonly rows: Rows; private readonly placement: ReturnProgram;
   private readonly weaponTarget: CrowdWeaponTarget<T>; private readonly motion: ProjectedMotionSample;
-  constructor(private readonly animals: RowBodiesView, input: unknown, programmeScope: Scope) {
+  private readonly animals: RowBodiesView;
+  constructor(animals: RowBodiesView, input: unknown, programmeScope: Scope) {
+    this.animals = animals;
     this.rows = v.parse(WildlifePopulationSchema, input); const row = this.rows;
     this.placement = ReturnProgram.page(row.admission, programmeScope);
     this.weaponTarget = new CrowdWeaponTarget(new CrowdRoster(animals.animals, this.flocks, row.groups.prey), row.combat);

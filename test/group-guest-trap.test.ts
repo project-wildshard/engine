@@ -34,8 +34,11 @@ class TrapHerd extends GroupBrain<AnimalSim> {
   published: GroupBankValueV2 | undefined;
   private readonly owners: Members;
   private readonly resume = Object.freeze({ field: 'pc', values: Object.freeze([0]), segments: 4 });
-  constructor(private readonly scope: Scope, private readonly program: GroupGuestProjectionV2) {
+  private readonly scope: Scope;
+  private readonly program: GroupGuestProjectionV2;
+  constructor(scope: Scope, program: GroupGuestProjectionV2) {
     super([]);
+    this.scope = scope; this.program = program;
     this.owners = [{ scope, self: { group: 'herd', slot: 0, identity: '', actor: null }, player: { position: { x: 0, z: 0 } },
       observed: new Map(), t: 0, dt: 0.1 }];
   }

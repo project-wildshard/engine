@@ -46,7 +46,7 @@ export class HeadlessSimulation {
     const distributed = existsSync(bundled);
     if (!distributed && checkout === undefined) throw new Error('SDK headless worker missing; build/pack the SDK or use its complete workspace checkout');
     // Source-checkout workers need their own Node hooks; parent Vitest/Vite transforms never cross the isolate boundary.
-    const execArgv = distributed ? [] : ['--experimental-transform-types', '--import', pathToFileURL(resolve(checkout ?? '', 'scripts/sim-node-loader.mjs')).href];
+    const execArgv = distributed ? [] : ['--import', pathToFileURL(resolve(checkout ?? '', 'scripts/sim-node-loader.mjs')).href];
     const runner = new TickWorkerHost(pathToFileURL(distributed ? bundled : resolve(checkout ?? '', 'src/server/host/bake/headlessWorker.ts')), { shard, assets: admitted, binary, sections, ...(snapshot === undefined ? {} : { snapshot }), ...(options.product === undefined ? {} : { product: options.product }) }, shard.serverBudget, execArgv, options.deadline ?? 'runtime');
     try { await runner.initialized(); return new HeadlessSimulation(runner); } catch (error) { await runner.dispose(); throw error; }
   }

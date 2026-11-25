@@ -97,7 +97,9 @@ export class NativeInventory<K extends string> {
   private state: InventoryState<K> = { counts: {}, order: [] };
   private readonly saved: v.GenericSchema<unknown, InventoryState<K>>;
   private readonly policy: InventoryPolicy<K>;
-  constructor(private readonly profile: NativeInventoryProfile<K>, host?: SimHost, inventoryId = 'pack') {
+  private readonly profile: NativeInventoryProfile<K>;
+  constructor(profile: NativeInventoryProfile<K>, host?: SimHost, inventoryId = 'pack') {
+    this.profile = profile;
     this.saved = nativeInventorySchema(profile); const kinds = new Set(profile.kinds);
     this.policy = { has: id => kinds.has(id), keeps: id => kinds.has(id), slots: () => profile.slots };
     if (host !== undefined) {

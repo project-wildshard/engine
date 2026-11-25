@@ -25,7 +25,7 @@ jobs:
       - uses: ./.github/actions/ring-setup
       - run: node scripts/pins.ts install pine-hollow
       - name: Fresh world and actual guest selection
-        run: node --experimental-transform-types --test test/pine-shelter-fuel.proof.mjs
+        run: node --test test/pine-shelter-fuel.proof.mjs
       - name: Retain actual criteria even on failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

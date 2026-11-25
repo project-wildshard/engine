@@ -37,7 +37,7 @@ const faults=[
 /** @param {string} id */
 function run(id){
   const began=performance.now();
-  const child=spawnSync(process.execPath,['--import','./scripts/bake-loader.mjs','--experimental-transform-types','--test','--test-reporter=tap',`--test-name-pattern=^TC26 ${id}$`,'test/ci/coverage-fire-drill.proof.mjs'],
+  const child=spawnSync(process.execPath,['--import','./scripts/bake-loader.mjs','--test','--test-reporter=tap',`--test-name-pattern=^TC26 ${id}$`,'test/ci/coverage-fire-drill.proof.mjs'],
     {cwd:tree,encoding:'utf8',timeout:10000,maxBuffer:4*1024*1024,env:{...process.env,TMPDIR:work,NODE_COMPILE_CACHE:join(work,'compile')}});
   const text=`${child.stdout??''}\n${child.stderr??''}`;
   assert.equal(child.signal,null,`${id}: a timeout or signal is not a detected gameplay fault`);

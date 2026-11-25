@@ -37,7 +37,9 @@ export class PosedInstances {
   private n = 0;
 
   /** `capacity` instances of the packed `src` (authored geometry) drawn in `material` (the shard's posed look) */
-  constructor(capacity: number, name: string, material: THREE.Material, src: () => THREE.BufferGeometry, readonly channels: readonly [string, string?], buffers?: PosedBufferPool) {
+  readonly channels: readonly [string, string?];
+  constructor(capacity: number, name: string, material: THREE.Material, src: () => THREE.BufferGeometry, channels: readonly [string, string?], buffers?: PosedBufferPool) {
+    this.channels = channels;
     if (!Number.isInteger(capacity) || capacity < 1 || capacity > 4096 || channels.some(channel => channel !== undefined && !/^[a-zA-Z_][a-zA-Z0-9_]*$/u.test(channel)) || channels[0] === channels[1]) throw new Error('Invalid posed instance capacity or channels');
     this.capacity = capacity;
     this.shared = buffers?.reserve(capacity, channels) ?? null;
@@ -133,7 +135,9 @@ export class PosedDraw {
    *  pose, ~8 KB a dock frame at 3x for one flock) */
   private readonly lanes: readonly ((pose: DrawPose, out: Float64Array, at: number) => void)[];
   private readonly laneValues = ownedArray(Float64Array, 8, { owner: 'looks/posed', asset: 'lane-values', kind: 'scratch' });
-  constructor(private readonly row: PosedLayout, capacity: number, geometry: THREE.BufferGeometry, material: THREE.Material, buffers?: PosedBufferPool) {
+  private readonly row: PosedLayout;
+  constructor(row: PosedLayout, capacity: number, geometry: THREE.BufferGeometry, material: THREE.Material, buffers?: PosedBufferPool) {
+    this.row = row;
     this.look = { name: row.name, geometry, material };
     this.posed = new PosedInstances(capacity, row.name, material, () => geometry, row.attributes, buffers?.supports(row.attributes) === true ? buffers : undefined);
     this.mesh = this.posed.mesh;

@@ -89,7 +89,9 @@ export class RoadTileCaptureWorker {
     refused: (job: CaptureJob) => Promise<CaptureResult> }>();
   private readonly listeners: (() => void)[] = [];
   private deadline: ReturnType<Scope['timeout']> | undefined;
-  constructor(private readonly scope: Scope) {
+  private readonly scope: Scope;
+  constructor(scope: Scope) {
+    this.scope = scope;
     scope.onDispose(() => { this.stop(new Error('Road tile capture owner retired')); });
     this.spawn();
   }

@@ -4,7 +4,7 @@ import { saveFixture } from './debug-settings.mjs';
 import { FLOOR_GRID_ENTER } from './frame-floor-navigation.mjs';
 import { execFileSync } from 'node:child_process';
 // The same native continuation a saved worker writes, with only the starting payment supplied by the fixture.
-export const paidSave = (variant = 'ghost') => JSON.parse(execFileSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', `
+export const paidSave = (variant = 'ghost') => JSON.parse(execFileSync(process.execPath, ['--import', './scripts/bake-loader.mjs', '--input-type=module', '-e', `
   import { readFileSync } from 'node:fs';
   import { resolve } from 'node:path';
   import { readBuiltShardfile } from './scripts/built-folder.mjs';

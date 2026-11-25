@@ -273,7 +273,10 @@ export class WorldAssembly {
   }
 
   private at = 0;
-  private constructor(private readonly stages: readonly WorldAssemblyStage[], private readonly ports: WorldAssemblyPorts) {}
+  private readonly stages: readonly WorldAssemblyStage[];
+  private readonly ports: WorldAssemblyPorts;
+  private constructor(stages: readonly WorldAssemblyStage[], ports: WorldAssemblyPorts) {
+    this.stages = stages; this.ports = ports;}
   static admit(input: unknown, ports: WorldAssemblyPorts): WorldAssembly {
     const prepared = typeof input === 'object' && input !== null ? constructionStages.get(input) : undefined;
     return new WorldAssembly(prepared ?? admitted(input), ports);

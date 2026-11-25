@@ -193,7 +193,10 @@ export class SceneDressing {
   private readonly animations:SceneDressingRows['animations'];
   private readonly motes:SceneDressingRows['motes'];
   private readonly emitters:SceneDressingRows['emitters'];
-  private constructor(private readonly ctx: ShardContext, rows: SceneDressingRows, private readonly catalogueReads:ReadonlyMap<number,()=>Promise<void>>) { this.group.name=rows.name;this.animations=rows.animations;this.motes=rows.motes;this.emitters=rows.emitters; }
+  private readonly ctx: ShardContext;
+  private readonly catalogueReads: ReadonlyMap<number,()=>Promise<void>>;
+  private constructor(ctx: ShardContext, rows: SceneDressingRows, catalogueReads:ReadonlyMap<number,()=>Promise<void>>) {
+    this.ctx = ctx; this.catalogueReads = catalogueReads; this.group.name=rows.name;this.animations=rows.animations;this.motes=rows.motes;this.emitters=rows.emitters; }
 
   static async install(ctx: ShardContext, input: unknown): Promise<SceneDressing> {
     const rows=v.parse(SceneDressingSchema,input);

@@ -17,7 +17,7 @@ import {expect,test} from 'vitest';
 const CHILD_MS=55_000;
 export function questVerbCases(slugs: readonly string[]): void {
 for(const slug of slugs)test(`${slug}: native quest verbs require the real walk and earned prerequisites`,()=>{
-  const child=spawnSync(process.execPath,['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/quest-verbs-run.mjs'),slug],{encoding:'utf8',timeout:CHILD_MS});
   expect(child.status,`${child.signal===null?'':`killed ${child.signal}${child.error===undefined?'':` (${child.error.message})`}\n`}${child.stdout}${child.stderr}`).toBe(0);
   expect(child.stdout).toContain(`"slug":"${slug}"`);

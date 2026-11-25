@@ -23,7 +23,9 @@ class CueSpray {
   private readonly pool: ParticlePool<'aSize' | 'aAlpha' | 'aColor'>;
   private readonly maxLife: Float32Array; private readonly size0: Float32Array; private readonly flags: Uint8Array;
   private live = 0;
-  constructor(private readonly row: SprayRow, scope: Scope) {
+  private readonly row: SprayRow;
+  constructor(row: SprayRow, scope: Scope) {
+    this.row = row;
     this.pool = new ParticlePool({ capacity: row.capacity, material: lentLook(row.look), renderOrder: row.renderOrder,
       attributes: { aSize: { itemSize: 1, dynamic: true }, aAlpha: { itemSize: 1, dynamic: true }, aColor: { itemSize: 3, dynamic: true } } });
     this.pool.points.name = `cue-${row.id}`; scope.own(this.pool.points.geometry);

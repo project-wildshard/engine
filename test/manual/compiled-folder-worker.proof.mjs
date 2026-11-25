@@ -1,7 +1,7 @@
 // Manual Ring 2: this preserves three real workers, an independent
 // source mirror and fresh compilation. Hosted native preparation can exceed10s.
 // Never register in a commit/push hook. Run after pinned Frostline is prepared:
-// node --experimental-transform-types --import ./scripts/sim-node-loader.mjs --test test/manual/compiled-folder-worker.proof.mjs
+// node --import ./scripts/sim-node-loader.mjs --test test/manual/compiled-folder-worker.proof.mjs
 // oxlint-disable-next-line import/no-unassigned-import -- Install deterministic simulation math before loading any runtime.
 import '../../src/shared/engine/core/portableMathFirst';
 // oxlint-disable-next-line import/no-nodejs-modules -- Compare actual source and compiled native outcomes.

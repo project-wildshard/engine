@@ -82,7 +82,9 @@ export class ReturnProjectionV2 {
     const { bytes } = projectionSource(input, owner, raw);
     return prepareScriptMemory(bytes, owner);
   }
-  constructor(input: unknown,private readonly owner?: Scope,raw?:Uint8Array, prepared?: PreparedScriptMemory) {
+  private readonly owner: Scope | undefined;
+  constructor(input: unknown,owner?: Scope,raw?:Uint8Array, prepared?: PreparedScriptMemory) {
+    this.owner = owner;
     const { row, layout, bytes } = projectionSource(input, owner, raw);
     this.row = row; this.layout = layout;
     if (prepared !== undefined && owner === undefined) throw new Error('Prepared return memory requires its original owner');

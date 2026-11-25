@@ -8,11 +8,16 @@ import { restPose, type CreatureRestJoint } from './creatureVolumes';
 export class CreatureSockets implements CreatureLockPoints {
   readonly names: readonly string[];
   private readonly sockets: readonly { index: number; at: readonly [number, number, number]; rest: Vector3 }[];
+  private readonly root: { readonly position: Vector3; readonly yaw: number; readonly scale: number };
+  private readonly strike: { readonly names: readonly string[];
+      /** A posed socket position, or undefined to keep the rest rig's (CC58b: a tail socket is posed, a mouth is not). */
+      readonly posed?: (index: number, at: readonly [number, number, number], out: Vector3) => Vector3 | undefined } | undefined;
   constructor(body: CreatureBody, joints: readonly CreatureRestJoint[],
-    private readonly root: { readonly position: Vector3; readonly yaw: number; readonly scale: number },
-    private readonly strike?: { readonly names: readonly string[];
+    root: { readonly position: Vector3; readonly yaw: number; readonly scale: number },
+    strike?: { readonly names: readonly string[];
       /** A posed socket position, or undefined to keep the rest rig's (CC58b: a tail socket is posed, a mouth is not). */
       readonly posed?: (index: number, at: readonly [number, number, number], out: Vector3) => Vector3 | undefined }) {
+    this.root = root; this.strike = strike;
     const skeleton = bodyContract(body);
     this.names = strike?.names ?? body.lock ?? (skeleton === undefined ? [] : [skeleton.lock]);
     if (this.names.length === 0 || this.names.length > (strike === undefined ? 16 : 32) || new Set(this.names).size !== this.names.length) {

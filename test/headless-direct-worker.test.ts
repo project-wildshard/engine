@@ -24,7 +24,7 @@ test.each([
 ])('direct native %s retains its complete gameplay assertions', (name, marker) => {
   const root = mkdtempSync(resolve('tmp', 'direct-native-worker-'));
   try {
-    const child = spawnSync(process.execPath, ['--experimental-transform-types', '--import',
+    const child = spawnSync(process.execPath, ['--import',
       pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href, resolve('test/fixtures/headless', `${name}.mjs`)],
     { encoding: 'utf8', timeout: DEADLINE_MS, env: { ...process.env, TMPDIR: root, NODE_COMPILE_CACHE: resolve(root, 'compile') } });
     expect(child.status, child.stdout + child.stderr).toBe(0);

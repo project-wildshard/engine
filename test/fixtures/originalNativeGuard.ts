@@ -8,10 +8,17 @@ import type {V2CrowdColumns} from '../../src/shared/engine/script/observationCol
 export class OriginalNativeGuard {
   private readonly sheep=new Vector3();
   private readonly missing=new Error('Missing native population context');
-  constructor(private readonly host:{clock:{now:number};player:{position:Vector3};rng:{stream:(name:'ai')=>Rng}},
-    private readonly hunt:{pathYawFor:(actor:AnimalSim,x:number,z:number,every:number)=>number;steerAny:(actor:AnimalSim,yaw:number,speed:number,turn:number)=>void;confine:(actor:AnimalSim)=>void},
-    private readonly flocks:readonly (V2CrowdColumns&{dog:AnimalSim|null})[],private readonly wolves:readonly FlockThreat[],
-    private readonly rows:{dogDecision:string;stragglerDistance:number},private readonly author:ReturnProgram){}
+  private readonly host: {clock:{now:number};player:{position:Vector3};rng:{stream:(name:'ai')=>Rng}};
+  private readonly hunt: {pathYawFor:(actor:AnimalSim,x:number,z:number,every:number)=>number;steerAny:(actor:AnimalSim,yaw:number,speed:number,turn:number)=>void;confine:(actor:AnimalSim)=>void};
+  private readonly flocks: readonly (V2CrowdColumns&{dog:AnimalSim|null})[];
+  private readonly wolves: readonly FlockThreat[];
+  private readonly rows: {dogDecision:string;stragglerDistance:number};
+  private readonly author: ReturnProgram;
+  constructor(host:{clock:{now:number};player:{position:Vector3};rng:{stream:(name:'ai')=>Rng}},
+    hunt:{pathYawFor:(actor:AnimalSim,x:number,z:number,every:number)=>number;steerAny:(actor:AnimalSim,yaw:number,speed:number,turn:number)=>void;confine:(actor:AnimalSim)=>void},
+    flocks:readonly (V2CrowdColumns&{dog:AnimalSim|null})[],wolves:readonly FlockThreat[],
+    rows:{dogDecision:string;stragglerDistance:number},author:ReturnProgram){
+    this.host = host; this.hunt = hunt; this.flocks = flocks; this.wolves = wolves; this.rows = rows; this.author = author;}
   step(actor: AnimalSim, dt: number): void {
     const flock = this.flocks.find(row => row.dog === actor);
     if (flock === undefined) { actor.setMotion(actor.yaw, 0, 1); return; }

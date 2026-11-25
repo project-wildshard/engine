@@ -89,7 +89,10 @@ export class Landing {
   private readonly column: THREE.Mesh<THREE.CylinderGeometry, THREE.MeshBasicMaterial> | null;
   private readonly sparks: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>;
   private readonly velocity: Float32Array;
-  constructor(at: THREE.Vector3, colour: THREE.Color, private readonly radius: number, private readonly size: number, payoff: boolean) {
+  private readonly radius: number;
+  private readonly size: number;
+  constructor(at: THREE.Vector3, colour: THREE.Color, radius: number, size: number, payoff: boolean) {
+    this.radius = radius; this.size = size;
     const map = glowTexture();
     this.group.name = payoff ? 'quest-payoff' : 'quest-landing'; this.group.position.copy(at); this.group.renderOrder = 8;
     this.flare = new THREE.Sprite(new THREE.SpriteMaterial({ color: colour, map, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false, fog: false }));

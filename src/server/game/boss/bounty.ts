@@ -6,7 +6,10 @@ import type { SimHost } from '@wildshard/engine/sim';
 interface BountyBody { readonly entityId: string; readonly combatActor: () => unknown }
 export class BossBounty {
   private earners: readonly string[] = [];
-  constructor(private readonly host: SimHost, body: () => BountyBody | null, private readonly key: string) {
+  private readonly host: SimHost;
+  private readonly key: string;
+  constructor(host: SimHost, body: () => BountyBody | null, key: string) {
+    this.host = host; this.key = key;
     // The book's page closes on the death, so read it from the killing blow, which comes first.
     host.events.on('damage.dealt', ({ req, killed }) => {
       const actor = body();

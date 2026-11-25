@@ -40,7 +40,9 @@ const TELL_COLOUR = 0xff5a36;
 export class AbilityTells {
   private readonly pool = { ring: [] as GroundTell[], lane: [] as GroundTell[] };
   private used = { ring: 0, lane: 0 };
-  constructor(private readonly scene: Scene) {}
+  private readonly scene: Scene;
+  constructor(scene: Scene) {
+    this.scene = scene;}
   /** The tells drawn now, by kind, for a test or a probe. */
   get drawn(): { readonly ring: number; readonly lane: number } { return { ...this.used }; }
   begin(): void {

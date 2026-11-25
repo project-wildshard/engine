@@ -185,9 +185,11 @@ export class RuntimePagePlugin extends ShardPlugin {
   private custom: CustomRuntime | undefined;
   private readonly binding: RuntimePageCellBinding | undefined;
   private generation = 0;
+  private readonly declaredAudio: AudioData | undefined;
   constructor(data: ShardPlugin, Runtime: new () => ShardPlugin, binding?: RuntimePageCellBinding,
-    private readonly declaredAudio?: AudioData) {
-    super(); this.data = data; this.Runtime = Runtime; this.binding = binding;
+    declaredAudio?: AudioData) {
+    super();
+    this.declaredAudio = declaredAudio; this.data = data; this.Runtime = Runtime; this.binding = binding;
   }
   override async world(provided: ShardContext): Promise<void> {
     const ctx = this.declaredAudio === undefined ? provided : { ...provided, get progress() { return provided.progress; },
@@ -362,7 +364,9 @@ export class RuntimePageSession {
   private disposed = false;
   private currentHook: Readonly<Pick<RuntimePageHookTiming, 'instance' | 'hook' | 'start'>> | null = null;
   private readonly completedHooks: RuntimePageHookTiming[] = [];
-  constructor(residents: ReadonlyMap<string, RuntimePageResident>, scope: Scope, private readonly options: RuntimePageOptions = {}) {
+  private readonly options: RuntimePageOptions;
+  constructor(residents: ReadonlyMap<string, RuntimePageResident>, scope: Scope, options: RuntimePageOptions = {}) {
+    this.options = options;
     this.residents = residents;
     scope.onDispose(() => {
       this.disposed = true; this.leave();

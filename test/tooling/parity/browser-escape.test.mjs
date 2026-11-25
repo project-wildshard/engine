@@ -88,7 +88,7 @@ function stopFixturePid(pid) {
 }
 
 test('Escape sends only its own trusted down and up', async () => {
-  const args = ['--experimental-transform-types', 'test/fixtures/native-browser-escape.ts'];
+  const args = ['test/fixtures/native-browser-escape.ts'];
   // The shared Mac takes its existing lease. Each isolated Linux CI runner
   // owns one inert native-input browser; no game or external page is loaded.
   const command = process.platform === 'darwin' ? 'scripts/browser-lane.sh' : process.execPath;
@@ -114,7 +114,7 @@ test('native startup refusal retains its signal and bounded stderr, never claims
     const binary = resolve(root, 'native-refusal');
     const message = `${'x'.repeat(20_000)}\nOriginal native startup sentinel`;
     writeFileSync(binary, `#!/bin/sh\nprintf '%s\\n' '${message}' >&2\nkill -TERM $$\n`, {mode: 0o700});
-    const child = await runChild(['--experimental-transform-types', 'test/fixtures/native-browser-escape.ts'],15000,{...process.env,CHROME_PATH:binary});
+    const child = await runChild(['test/fixtures/native-browser-escape.ts'],15000,{...process.env,CHROME_PATH:binary});
     expect(child.status).toBe(1);
     expect(child.stderr).toContain('code=null; signal=SIGTERM');
     expect(child.stderr).toContain('Original native startup sentinel');
@@ -303,7 +303,7 @@ function startEndpointRefusal() {
       if(!arg)throw Error('Missing owned profile');
       writeFileSync(arg.slice('--user-data-dir='.length)+'/DevToolsActivePort','9\\n/devtools/browser/diagnostic-only\\n');
       console.error('Original no-endpoint sentinel');setInterval(()=>{},1000);`, {mode: 0o700});
-  return {root, child: runChild(['--experimental-transform-types', 'test/fixtures/native-browser-escape.ts'], 25_000,
+  return {root, child: runChild(['test/fixtures/native-browser-escape.ts'], 25_000,
     {...process.env, CHROME_PATH: binary})};
 }
 

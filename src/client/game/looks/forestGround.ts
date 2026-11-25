@@ -17,8 +17,13 @@ export class ForestGround {
   readonly group: Group = new Group();
   readonly kinds: Readonly<Record<string, ForestGroundDraw>>;
   readonly layout: Readonly<Record<string, GroundPlacement[]>>;
-  private constructor(readonly view: Forest, private readonly sky: SkyRig, private readonly appearance: CoverAppearance,
-    kinds: Record<string, ForestGroundDraw>, layout: Record<string, GroundPlacement[]>, private readonly grid: { size: number; pad: number; far: number }) { this.kinds = kinds; this.layout = layout; }
+  readonly view: Forest;
+  private readonly sky: SkyRig;
+  private readonly appearance: CoverAppearance;
+  private readonly grid: { size: number; pad: number; far: number };
+  private constructor(view: Forest, sky: SkyRig, appearance: CoverAppearance,
+    kinds: Record<string, ForestGroundDraw>, layout: Record<string, GroundPlacement[]>, grid: { size: number; pad: number; far: number }) {
+    this.view = view; this.sky = sky; this.appearance = appearance; this.grid = grid; this.kinds = kinds; this.layout = layout; }
   static async prepare(ctx: ShardContext, rows: ForestPageRows['ground'], view: Forest, sky: SkyRig): Promise<ForestGround> {
     const source = ctx.product.shardfile;
     const [appearanceInput, layoutInput, geometryInput] = await readForestGroundInputs(ctx, rows);

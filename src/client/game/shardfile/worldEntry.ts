@@ -39,7 +39,10 @@ export class WorldEntry {
   /** T3: the placements this build took by tile (the tile driver attaches their copies) */
   private readonly tiled = new Set<string>();
   private readonly ran = new Set<string>();
-  private constructor(private readonly rows: WorldEntryRows, private readonly ports: WorldEntryPorts) {}
+  private readonly rows: WorldEntryRows;
+  private readonly ports: WorldEntryPorts;
+  private constructor(rows: WorldEntryRows, ports: WorldEntryPorts) {
+    this.rows = rows; this.ports = ports;}
 
   /** Admit `input` (the shard's world entry blob) for one build. */
   static admit(input: unknown, ports: WorldEntryPorts): WorldEntry {

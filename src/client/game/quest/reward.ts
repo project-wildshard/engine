@@ -38,7 +38,9 @@ export class QuestRewardBeat {
   private readonly motion: QuestRewardController;
   /** this beat's claim on the hold's countdown */
   private readonly token = {};
-  constructor(private readonly host: QuestRewardHost, spec: QuestRewardSpec) {
+  private readonly host: QuestRewardHost;
+  constructor(host: QuestRewardHost, spec: QuestRewardSpec) {
+    this.host = host;
     this.caption = new RewardCaption(spec.kicker, spec.title, spec.subtitle);
     this.motion = new QuestRewardController(host.player, host.dayNight, spec, {
       start: () => {

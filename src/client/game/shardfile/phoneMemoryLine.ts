@@ -26,8 +26,11 @@ export class PageMemoryAdmission extends MemoryAdmission {
   private estimate = 0;
   private acknowledgement: Promise<void> | undefined;
 
-  constructor(private readonly tier: Tier = TIER, private readonly developerPage: () => boolean = isDev, reportOnly: boolean = MEMORY_GATES.reportOnly) {
+  private readonly tier: Tier;
+  private readonly developerPage: () => boolean;
+  constructor(tier: Tier = TIER, developerPage: () => boolean = isDev, reportOnly: boolean = MEMORY_GATES.reportOnly) {
     super(() => tier === 'phone' || reportOnly || developerPage());
+    this.tier = tier; this.developerPage = developerPage;
   }
 
   override accept(request: MemoryAdmissionRequest): boolean {

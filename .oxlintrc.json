@@ -83,7 +83,7 @@
     "eslint/no-nested-ternary": "off", // nested ternaries express piecewise math
     "unicorn/no-nested-ternary": "off", // same
     "eslint/no-void": "off", // `void promise` is how fire-and-forget is marked (no-floating-promises asks for it); `void x` marks a deliberately unused param
-    "typescript/parameter-properties": "off", // `constructor(private readonly x)` is the class idiom here
+    "typescript/parameter-properties": "error", // QA 11-25 row 42: Node 26 runs TypeScript strip-only and refuses a parameter property: declare the field and assign it in the constructor
     "typescript/non-nullable-type-assertion-style": "off", // would demand `x!`, which no-non-null-assertion bans
     "typescript/no-unsafe-assignment": "off", // LS5: zero existing sites; unsafe call/argument/member/return still reject every use
     "typescript/no-unsafe-type-assertion": "off", // three.js hands back base types (Material, Object3D, BufferAttribute); downcasting with `as` at the call site is the idiom, and instanceof guards in hot loops would change behaviour
@@ -142,13 +142,6 @@
     "import/consistent-type-specifier-style": "off" // conflicts with typescript/no-import-type-side-effects under verbatimModuleSyntax: pure-type imports must be `import type {}`, mixed ones use inline `type` (consistent-type-imports enforces that)
   },
   "overrides": [
-    {
-      // E405 AG5: the engine loads under node's default strip-only TypeScript (bakes, manifests, gen scripts import
-      // #engine), which has no parameter properties: declare the field and assign it in the constructor.
-      // QA 11-24 row 62's red (fc0832b52): the cook runs strip-only too (scripts/cook-worker.mjs, the boundaries unit).
-      "files": ["src/*/engine/**", "src/cook/**"],
-      "rules": { "typescript/parameter-properties": "error" }
-    },
     {
       // Node-side tooling: build scripts, the Vite configs and plugin, the old functions in api/, the drafts site's tools.
       "files": ["scripts/**", "src/shards/*/generators/**/*.mjs", "src/shards/*/bake/**/*.mjs", "src/shards/*/blender/**/*.mjs", "vite/**", "vite.config.ts", "vitest.config.ts", "api/**", "api-tests/**", "lint/**", "drafts/tools/**", "drafts/test/**", "drafts/vite.config.ts", "admin/tools/**", "admin/test/**", "admin/vite.config.ts"],

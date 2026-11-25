@@ -49,7 +49,10 @@ export class BladeMoves<T extends BladeBody> {
   move = 0; t = -1; landed = 0;
   private world: WorldContactDispatcher | null = null;
   private readonly moves: readonly Move[];
-  constructor(private readonly weaponId: string, rows: unknown, private readonly ports: BladePorts<T>) { this.moves = parseMeleeContacts(rows); }
+  private readonly weaponId: string;
+  private readonly ports: BladePorts<T>;
+  constructor(weaponId: string, rows: unknown, ports: BladePorts<T>) {
+    this.weaponId = weaponId; this.ports = ports; this.moves = parseMeleeContacts(rows); }
   bindWorldTargets(owner: WorldContactDispatcher | null): void { this.world = owner; }
   row(move: number): Move { const row = this.moves[move]; if (row === undefined) throw new RangeError(`No contact move ${String(move)}`); return row; }
   /** Claims the move's cooldown lane: false while it runs. */

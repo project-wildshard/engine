@@ -37,8 +37,12 @@ export class PatrolLaw<A extends PatrolLawActor, V> {
   private get living(): number { return this.riders.filter(r => r.law.state['dead'] !== 1).length; }
   /** `random`: the patrol's own decisions (the page's 'ai' stream as it was when built); `aimRandom`: the stream an aim
    *  reads at the shot (looked up then); `present`: draw a new rider (its look, figure and cue), its view state */
-  constructor(private readonly patrol: EncounterPatrolRows, motion: EncounterScheduleRows, private readonly program: ReturnProgram,
-    private readonly ports: { readonly player: PatrolPlayer; readonly random: Rng; readonly aimRandom: () => Rng; readonly present: (a: A, quiet: boolean) => V }) {
+  private readonly patrol: EncounterPatrolRows;
+  private readonly program: ReturnProgram;
+  private readonly ports: { readonly player: PatrolPlayer; readonly random: Rng; readonly aimRandom: () => Rng; readonly present: (a: A, quiet: boolean) => V };
+  constructor(patrol: EncounterPatrolRows, motion: EncounterScheduleRows, program: ReturnProgram,
+    ports: { readonly player: PatrolPlayer; readonly random: Rng; readonly aimRandom: () => Rng; readonly present: (a: A, quiet: boolean) => V }) {
+    this.patrol = patrol; this.program = program; this.ports = ports;
     this.cycle = new ProjectedState({ initial: { respawn: -1, phase: -1, kills: 0 }, signals: { step: patrol.signals.cycle, empty: patrol.signals.empty } }, program);
     this.motion = new ProjectedState(motion, program);
   }

@@ -38,7 +38,10 @@ export class TrailCreatureVolumes implements CreatureVolumePose {
   private readonly parentTurn = new Quaternion();
   private static readonly FORWARD = new Vector3(0, 0, 1);
   private static readonly UP = new Vector3(0, 1, 0);
-  constructor(input: CreatureBody, private readonly root: Root, private readonly ground: (x: number, z: number) => number) {
+  private readonly root: Root;
+  private readonly ground: (x: number, z: number) => number;
+  constructor(input: CreatureBody, root: Root, ground: (x: number, z: number) => number) {
+    this.root = root; this.ground = ground;
     const body = v.parse(CreatureBodySchema, input), contract = bodyContract(body);
     if (body.skeleton !== 'serpent' || body.trail === undefined || contract === undefined) throw new Error('Trail volumes need a serpent body');
     if (body.hits === 'clip') throw new Error('A serpent poses its volumes on its trail, not from clips');

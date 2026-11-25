@@ -50,7 +50,10 @@ export class RestartRider {
   protected bot: RoomBot | null = null;
   private readonly started = performance.now();
   protected ownedBefore = '';
-  constructor(private readonly connect: () => RoomBot, index: number, private readonly fights: boolean) {
+  private readonly connect: () => RoomBot;
+  private readonly fights: boolean;
+  constructor(connect: () => RoomBot, index: number, fights: boolean) {
+    this.connect = connect; this.fights = fights;
     this.ride = {bot: index, seatedMs: null, walkedMeters: 0, countdowns: [], closed: null, closedAtMs: null, redials: 0, backMs: null,
       before: null, after: null, movedMeters: null, ownedKept: null, ownedLines: 0, fight: null, ok: false};
   }

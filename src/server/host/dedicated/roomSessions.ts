@@ -41,9 +41,16 @@ export class RoomSessions {
   private flying: Promise<void> | undefined;
   private game: RoomGameMetrics | undefined;
 
-  constructor(private readonly store: RoomSessionStore, private readonly channel: string, private readonly secret: string,
-    private readonly report: (rows: readonly RoomSessionSummary[]) => void, private readonly log: (line: Record<string, unknown>) => void,
-    private readonly now: () => number = Date.now) {}
+  private readonly store: RoomSessionStore;
+  private readonly channel: string;
+  private readonly secret: string;
+  private readonly report: (rows: readonly RoomSessionSummary[]) => void;
+  private readonly log: (line: Record<string, unknown>) => void;
+  private readonly now: () => number;
+  constructor(store: RoomSessionStore, channel: string, secret: string,
+    report: (rows: readonly RoomSessionSummary[]) => void, log: (line: Record<string, unknown>) => void,
+    now: () => number = Date.now) {
+    this.store = store; this.channel = channel; this.secret = secret; this.report = report; this.log = log; this.now = now;}
 
   watchGame(game: RoomGameMetrics): void { this.game = game; }
 

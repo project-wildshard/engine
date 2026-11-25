@@ -111,7 +111,7 @@ export function fs27Plan(selection, options) {
   const ring = options.slugs.length === 0 ? [] : [{ name: `ring1 digests (${options.slugs.join(', ')})`,
     commands: [
       [process.execPath, 'scripts/pins.ts', 'install', '--ring-slices', '1'],
-      [process.execPath, '--experimental-transform-types', '--no-warnings', 'scripts/ring-step.ts', '--only', options.slugs.join(',')],
+      [process.execPath, '--no-warnings', 'scripts/ring-step.ts', '--only', options.slugs.join(',')],
     ] }];
   return { tasks: [...FS27_STATIC, ...ring], tests };
 }

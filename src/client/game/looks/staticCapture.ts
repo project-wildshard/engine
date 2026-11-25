@@ -86,8 +86,13 @@ export class StaticCapture {
     const compiled = compiler.compileGraph(STATIC_CONTACT_GRAPH, {}); compiled.setTexture('height', tHeight);
     return new StaticCapture(renderer, scene, scope, row, uniforms, { material: compiled.material, setParam: (name, value) => { compiled.setParam(name, value); } });
   }
-  private constructor(private readonly renderer: Renderer, private readonly scene: THREE.Scene, scope: Scope, row: StaticCaptureRows, private readonly uniforms: StaticCaptureUniforms,
-    private readonly contactPass: ContactPass) {
+  private readonly renderer: Renderer;
+  private readonly scene: THREE.Scene;
+  private readonly uniforms: StaticCaptureUniforms;
+  private readonly contactPass: ContactPass;
+  private constructor(renderer: Renderer, scene: THREE.Scene, scope: Scope, row: StaticCaptureRows, uniforms: StaticCaptureUniforms,
+    contactPass: ContactPass) {
+    this.renderer = renderer; this.scene = scene; this.uniforms = uniforms; this.contactPass = contactPass;
     this.row = row;
     const SIZE = row.shadowSize[TIER], AO_SIZE = row.contactSize, HALF = row.half, LAYER = row.layer;
     this.depthMat = depthMaterial(); this.contact = row.contact;

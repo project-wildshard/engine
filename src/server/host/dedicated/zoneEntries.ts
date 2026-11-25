@@ -26,8 +26,14 @@ export class ZoneEntries {
   private flying: Promise<void> | null = null;
   private visits = 0;
 
-  constructor(private readonly store: ZoneEntryStore, private readonly channel: string, private readonly secret: string,
-    private readonly log: (line: Record<string, unknown>) => void, private readonly now: () => number = Date.now) {}
+  private readonly store: ZoneEntryStore;
+  private readonly channel: string;
+  private readonly secret: string;
+  private readonly log: (line: Record<string, unknown>) => void;
+  private readonly now: () => number;
+  constructor(store: ZoneEntryStore, channel: string, secret: string,
+    log: (line: Record<string, unknown>) => void, now: () => number = Date.now) {
+    this.store = store; this.channel = channel; this.secret = secret; this.log = log; this.now = now;}
 
   entered(seat: string, slug: string, { actor }: ActorTags): boolean {
     const now = this.now(), day = new Date(now).toISOString().slice(0, 10);

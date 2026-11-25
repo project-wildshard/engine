@@ -61,8 +61,14 @@ class CreatureTarget implements CombatTarget, AimTarget {
   hidden = true; lastHitT = -Infinity; hp: number; maxHp: number; alive = true; scale: number; lastHp: number | null = null;
   readonly mem: Readonly<Record<string, number | undefined>> = {};
   readonly position = new Vector3();
-  constructor(readonly kind: string, readonly label: string, maxHp: number, scale: number, private readonly head: number,
-    readonly dims: { readonly bodyY: number; readonly bodyRadius: number }, readonly lockable: boolean) { this.hp = maxHp; this.maxHp = maxHp; this.scale = scale; }
+  readonly kind: string;
+  readonly label: string;
+  private readonly head: number;
+  readonly dims: { readonly bodyY: number; readonly bodyRadius: number };
+  readonly lockable: boolean;
+  constructor(kind: string, label: string, maxHp: number, scale: number, head: number,
+    dims: { readonly bodyY: number; readonly bodyRadius: number }, lockable: boolean) {
+    this.kind = kind; this.label = label; this.head = head; this.dims = dims; this.lockable = lockable; this.hp = maxHp; this.maxHp = maxHp; this.scale = scale; }
   headWorld(out: Vector3): Vector3 { return out.copy(this.position).setY(this.position.y + this.head * this.scale); }
 }
 interface CreatureView { readonly id: string; readonly mesh: SkinnedMesh; readonly bones: Record<string, Bone>; readonly driver: SkinDriver; readonly spawn: { at: readonly [number, number, number]; yaw: number; scale: number }; readonly bodyY: number; readonly target: CreatureTarget; t: number; phase: number; readonly trail?: ViewTrail }

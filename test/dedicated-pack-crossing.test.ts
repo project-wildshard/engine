@@ -31,7 +31,7 @@ afterEach(async () => { for (const row of bots.splice(0)) row.drop(); await benc
 beforeAll(() => {
   work = mkdtempSync(join(ROOT, 'tmp', 'c2-packs-'));
   const grid = join(work, 'grid'), origin = join(work, 'origin');
-  const baked = spawnSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs', grid, '--collision-only'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  const baked = spawnSync(process.execPath, ['--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs', grid, '--collision-only'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   expect(baked.status, baked.stderr).toBe(0);
   const made = spawnSync(process.execPath, ['scripts/server-origin.mjs', origin, BUILD, ...CELLS.map(slug => `${slug}=${builtFolder(slug)}`), `--grid=${grid}`, '--fast-encode'], { cwd: ROOT, encoding: 'utf8' });
   expect(made.status, made.stderr).toBe(0);

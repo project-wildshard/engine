@@ -30,13 +30,13 @@ test('separate and concurrent loans execute one actual compiler, without caching
   expect(JSON.parse(first)).toEqual({ value: 'one', files: ['value.txt'] });
 });
 
-test('the original transform-types host option stays in the construction key', async () => {
+test('a Node option on the construction command stays in its key', async () => {
   const { spec, calls } = fixture();
   const plain = await nativeProgramFixture(spec);
-  const transformed = await nativeProgramFixture({ ...spec, transformTypes: true });
-  expect(transformed).toBe(plain);
+  const quiet = await nativeProgramFixture({ ...spec, nodeArgs: ['--no-warnings'] });
+  expect(quiet).toBe(plain);
   expect(calls()).toBe(2);
-  expect(await nativeProgramFixture({ ...spec, transformTypes: true })).toBe(transformed);
+  expect(await nativeProgramFixture({ ...spec, nodeArgs: ['--no-warnings'] })).toBe(quiet);
   expect(calls()).toBe(2);
 });
 

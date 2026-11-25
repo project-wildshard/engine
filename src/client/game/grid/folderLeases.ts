@@ -15,7 +15,10 @@ interface Entry<T> { promise: Promise<T>; claim: ResidencyLease | undefined; byt
 export class FolderLeases<T> {
   private readonly entries = new Map<string, Entry<T>>();
   private closed = false;
-  constructor(private readonly allocator: ResidencyAllocator, private readonly owner: string) {}
+  private readonly allocator: ResidencyAllocator;
+  private readonly owner: string;
+  constructor(allocator: ResidencyAllocator, owner: string) {
+    this.allocator = allocator; this.owner = owner;}
   private disposed(): boolean { return this.closed; }
   /** An approach can join an existing admission, never start another product load. */
   has(key: string): boolean { return !this.closed && this.entries.has(key); }

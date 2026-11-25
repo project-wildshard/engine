@@ -58,7 +58,9 @@ export function paintBoundFinishes(painter: CosmeticFinishPainter, bind: Cosmeti
 export class CosmeticFinishPainter {
   readonly selectedFinishes: Map<string, string> = new Map<string, string>();
   private readonly applied = new Map<THREE.Object3D, { choice: Choice; restore: () => void }>();
-  constructor(private readonly locker: CosmeticFinishLocker) {}
+  private readonly locker: CosmeticFinishLocker;
+  constructor(locker: CosmeticFinishLocker) {
+    this.locker = locker;}
   update(targets: CosmeticFinishTargets): void {
     this.selectedFinishes.clear();
     const wanted = new Map<THREE.Object3D, { choice: Choice; material: Paint['material'] }>();

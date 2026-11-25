@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// node --experimental-transform-types --import ./scripts/bake-loader.mjs scripts/mmo-release-observer.mjs staging --seconds 180 --work-dir tmp/<lane>/observer
+// node --import ./scripts/bake-loader.mjs scripts/mmo-release-observer.mjs staging --seconds 180 --work-dir tmp/<lane>/observer
 import {randomUUID} from 'node:crypto';
 import {existsSync,lstatSync,mkdirSync,readFileSync,realpathSync,writeFileSync} from 'node:fs';
 import {dirname,resolve,join} from 'node:path';

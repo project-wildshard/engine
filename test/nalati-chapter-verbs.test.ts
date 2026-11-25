@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
 test('Nalati chapter journal follows completed talks and retains real progression prerequisites',()=>{
-  const child=spawnSync(process.execPath,['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/nalati-chapter-run.ts')],{encoding:'utf8',timeout:30_000});
   expect(child.status,child.stdout+child.stderr).toBe(0);expect(child.stdout).toContain('"story":"chapter-talks"');
 },35_000);

@@ -11,7 +11,9 @@ export interface AmmoPouchRows<K extends string> {
 export class AmmoPouch<K extends string> {
   readonly counts: Record<K, number>;
   selected: K;
-  constructor(readonly rows: AmmoPouchRows<K>, start: Partial<Record<K, number>> = {}) {
+  readonly rows: AmmoPouchRows<K>;
+  constructor(rows: AmmoPouchRows<K>, start: Partial<Record<K, number>> = {}) {
+    this.rows = rows;
     if (rows.kinds.length === 0 || new Set(rows.kinds).size !== rows.kinds.length || !rows.kinds.includes(rows.fallback)
       || !Number.isSafeInteger(rows.capacity) || rows.capacity < 0) throw new Error('Invalid ammunition pouch rows');
     this.selected = rows.fallback;

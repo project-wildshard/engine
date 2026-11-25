@@ -189,7 +189,10 @@ export class OpenArenaFight<D extends ArenaDraw = THREE.InstancedMesh> implement
   /** the ground's height and the wind the fight reads (OpenArenaFightWorld `ground` / `wind`, else the page's) */
   private readonly groundAt: (x: number, z: number) => number;
   private readonly windNow: { readonly dirX: number; readonly dirZ: number; readonly speed: number };
-  constructor(private readonly ctx: OpenArenaFightWorld, private readonly host: OpenArenaFightHost, data: ArenaScriptData, views: OpenArenaViews<D>) {
+  private readonly ctx: OpenArenaFightWorld;
+  private readonly host: OpenArenaFightHost;
+  constructor(ctx: OpenArenaFightWorld, host: OpenArenaFightHost, data: ArenaScriptData, views: OpenArenaViews<D>) {
+    this.ctx = ctx; this.host = host;
     this.groundAt = ctx.ground ?? heightAt; this.windNow = ctx.wind ?? wind;
     this.clockRandom=ctx.ai();
     this.scope=ctx.scope;this.data = data; this.pose={...data.pose};

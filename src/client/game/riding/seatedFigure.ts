@@ -49,7 +49,9 @@ export class SeatedFigure {
   readonly root: Object3D;
   private readonly frame: ClipCtx;
   private seat: Mount | null = null;
-  constructor(private readonly row: MountedSpecimenSeatRows, scope: Scope, files:ReadonlyMap<string,Uint8Array>=new Map()) {
+  private readonly row: MountedSpecimenSeatRows;
+  constructor(row: MountedSpecimenSeatRows, scope: Scope, files:ReadonlyMap<string,Uint8Array>=new Map()) {
+    this.row = row;
     const view = seatedFigureView(row, resource => { scope.own(resource); },files);
     scope.onDispose(() => { view.dispose(); });
     this.root = view.root;

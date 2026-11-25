@@ -5,7 +5,10 @@ interface Request { complete: Promise<void>; offered: Promise<void>; watchingApp
  * and promote a deferred view exactly once when actual entry requires it. */
 export class GridViewAdmissions<Cell extends { readonly instance: string }> {
   private readonly requests = new Map<string, Request>();
-  constructor(private readonly start: (cell: Cell, required: boolean, offered: () => void) => Promise<void>, private readonly revision: () => number) {}
+  private readonly start: (cell: Cell, required: boolean, offered: () => void) => Promise<void>;
+  private readonly revision: () => number;
+  constructor(start: (cell: Cell, required: boolean, offered: () => void) => Promise<void>, revision: () => number) {
+    this.start = start; this.revision = revision;}
   private request(cell: Cell, required: boolean): Request {
     const previous = this.requests.get(cell.instance);
     if (previous !== undefined && (!previous.deferred || !required && previous.revision === this.revision())) return previous;

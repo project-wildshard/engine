@@ -63,7 +63,11 @@ export class RideHUD {
   private offerAvailable = false;
   private spurUntil = 0;
 
-  constructor(private readonly ctx: LevelContext, private readonly camera: THREE.PerspectiveCamera, private readonly profile: { tagRange: number; tagHeight: number }) {
+  private readonly ctx: LevelContext;
+  private readonly camera: THREE.PerspectiveCamera;
+  private readonly profile: { tagRange: number; tagHeight: number };
+  constructor(ctx: LevelContext, camera: THREE.PerspectiveCamera, profile: { tagRange: number; tagHeight: number }) {
+    this.ctx = ctx; this.camera = camera; this.profile = profile;
     this.root = document.getElementById('hud') ?? document.body;
     const el = (cls: string, html = ''): HTMLElement => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; return d; };
     this.steed = el('ws-glass ws-ride-steed', `<div class="ws-ride-row"><i class="ws-ride-glyph">${SVG_HORSE}</i><span class="ws-ride-name">Steed</span><span class="ws-ride-gait">stand</span></div><div class="ws-ride-sbar"><i style="width:100%"></i></div>`);

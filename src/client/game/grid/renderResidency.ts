@@ -35,7 +35,10 @@ export class PlatformRenderAdmissionError extends Error {
  */
 export class PlatformRenderResidency implements PlatformRenderAdmission {
   private readonly claims = new Map<string, { lease: ResidencyLease; bytes: number }>();
-  constructor(private readonly allocator: ResidencyAllocator, private readonly scope: Scope) {}
+  private readonly allocator: ResidencyAllocator;
+  private readonly scope: Scope;
+  constructor(allocator: ResidencyAllocator, scope: Scope) {
+    this.allocator = allocator; this.scope = scope;}
 
   private assertActive(): void { if (this.scope.disposed || this.scope.disposing) throw new Error('Platform render session is disposed'); }
 

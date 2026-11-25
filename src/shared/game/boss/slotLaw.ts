@@ -56,12 +56,21 @@ export class SlotEncounterLaw<A extends SlotActor, Tell extends SlotTell> {
   private readonly wedges: readonly Tell[];
   private readonly identity:string;
   private trailT = 0;
-  constructor(private readonly slots:EncounterSlotsRows, view: SlotViewRows, private readonly program:ReturnProgram, private readonly ports: {
+  private readonly slots: EncounterSlotsRows;
+  private readonly program: ReturnProgram;
+  private readonly ports: {
+    readonly cues:{cue:(id:string,point:Vector3,normal:Vector3)=>void};
+    readonly sites:readonly {readonly x:number;readonly z:number;readonly yaw:number;readonly variant:number}[]|null;
+    readonly guest:ReturnProgram;readonly wedges:readonly Tell[];
+    readonly ground:(x:number,z:number)=>number;readonly cosmetic:()=>number;
+  };
+  constructor(slots:EncounterSlotsRows, view: SlotViewRows, program:ReturnProgram, ports: {
     readonly cues:{cue:(id:string,point:Vector3,normal:Vector3)=>void};
     readonly sites:readonly {readonly x:number;readonly z:number;readonly yaw:number;readonly variant:number}[]|null;
     readonly guest:ReturnProgram;readonly wedges:readonly Tell[];
     readonly ground:(x:number,z:number)=>number;readonly cosmetic:()=>number;
   }) {
+    this.slots = slots; this.program = program; this.ports = ports;
     this.cycle=new ProjectedState({...slots.cycle,signals:{step:slots.cycle.signal}},program);this.rows=view;
     this.wedges=ports.wedges;
     this.identity=JSON.stringify({slots,view,sites:ports.sites},(_key,value:unknown):unknown=>

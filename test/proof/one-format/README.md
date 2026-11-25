@@ -25,7 +25,7 @@ copies immutable assets and expands native tuning before admission. Use
 for the author pair. Then run, once for each engine/product combination:
 
 ```sh
-node --experimental-transform-types --import <engine>/scripts/sim-node-loader.mjs \
+node --import <engine>/scripts/sim-node-loader.mjs \
   scripts/one-format-sim.mjs <engine> <product> tmp/<lane>/<receipt>.json
 ```
 

@@ -25,7 +25,9 @@ const BOLT_AT = 0.2, REST_TIME = 180, WHISTLE_RANGE = 150;
 
 export class MountCompanions<A extends CompanionActor, P extends CompanionPrompt> {
   readonly list: Companion<A, P>[] = [];
-  constructor(private readonly profile: Pick<MountProfile, 'names' | 'restAt' | 'speeds'>) {}
+  private readonly profile: Pick<MountProfile, 'names' | 'restAt' | 'speeds'>;
+  constructor(profile: Pick<MountProfile, 'names' | 'restAt' | 'speeds'>) {
+    this.profile = profile;}
   /** Register a horse under its saved name (or `fallback`), owned; `prompt` makes its mount prompt. Null when it is
    *  one already. */
   add(a: A, fallback: string, savedKey: string | undefined, prompt: (name: string) => P): Companion<A, P> | null {

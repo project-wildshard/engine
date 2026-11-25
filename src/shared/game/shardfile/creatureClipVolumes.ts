@@ -20,8 +20,13 @@ export class ClipCreatureVolumes implements CreatureVolumePose {
   private readonly endpoints: { rear: Vector3; front: Vector3 }[];
   private frame = '';
   private readonly centre = new Vector3(); private readonly axis = new Vector3();
-  constructor(body: CreatureBody, bytes: Uint8Array, joints: readonly CreatureRestJoint[], private readonly actor: AnimalSim,
-    private readonly now: () => number, private readonly attackSpan: number, private readonly clipMap?: SkinClipMap) {
+  private readonly actor: AnimalSim;
+  private readonly now: () => number;
+  private readonly attackSpan: number;
+  private readonly clipMap: SkinClipMap | undefined;
+  constructor(body: CreatureBody, bytes: Uint8Array, joints: readonly CreatureRestJoint[], actor: AnimalSim,
+    now: () => number, attackSpan: number, clipMap?: SkinClipMap) {
+    this.actor = actor; this.now = now; this.attackSpan = attackSpan; this.clipMap = clipMap;
     if (body.size !== 'giant' || body.hits !== 'clip') throw new Error('Clip hit authority needs an opted-in giant');
     this.sampler = new CreatureClipSampler(bytes, joints);
     if (!this.sampler.has(creatureClipName('idle', clipMap, this.sampler))) throw new Error('Clip hit authority needs an idle clip');

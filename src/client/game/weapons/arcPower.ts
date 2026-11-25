@@ -34,7 +34,9 @@ export class LightningStrip {
   private readonly mat: THREE.MeshBasicMaterial;
   private readonly dir = new THREE.Vector3(); private readonly up = new THREE.Vector3();
   private readonly s1 = new THREE.Vector3(); private readonly s2 = new THREE.Vector3();
-  constructor(scene: THREE.Object3D, private readonly n = 14, color: THREE.ColorRepresentation = new THREE.Color(1.6, 1.9, 3.2)) {
+  private readonly n;
+  constructor(scene: THREE.Object3D, n = 14, color: THREE.ColorRepresentation = new THREE.Color(1.6, 1.9, 3.2)) {
+    this.n = n;
     const g = new THREE.BufferGeometry();
     this.pos = new Float32Array((n + 1) * 4 * 3);
     this.attr = new THREE.BufferAttribute(this.pos, 3); this.attr.setUsage(THREE.DynamicDrawUsage);
@@ -90,7 +92,9 @@ export class ArcWeaponPower {
   private callT = -1;
   private elapsed=0;private readonly law:HeldDecision;private readonly rows:ArcWeaponRows;
 
-  constructor(private readonly deps: ArcWeaponDeps,input:unknown) {
+  private readonly deps: ArcWeaponDeps;
+  constructor(deps: ArcWeaponDeps,input:unknown) {
+    this.deps = deps;
     this.rows=v.parse(ArcWeaponRowsSchema,input);this.law=new HeldDecision(this.rows.program,deps.scope);
     this.crescentMat = fxMaterial(FX.ring, new THREE.Color(1.3, 1.7, 3.0), 0);
     this.crescentMat.uniforms.uP.value.x = 1.4;

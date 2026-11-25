@@ -132,8 +132,7 @@ void test(
         [
           "--import",
           "./scripts/bake-loader.mjs",
-          "--experimental-transform-types",
-          "scripts/bake-grid-seams.mjs",
+                    "scripts/bake-grid-seams.mjs",
           scratch,
           "--collision-only",
         ],

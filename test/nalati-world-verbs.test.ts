@@ -7,7 +7,7 @@ import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
 test('real Nalati movement, discovery, wading, swimming and hover inputs reach their native modes',()=>{
-  const child=spawnSync(process.execPath,['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/nalati-world-run.ts')],{encoding:'utf8',timeout:30_000});
   expect(child.status,child.stdout+child.stderr).toBe(0);expect(child.stdout).toContain('"story":"nalati-world"');
 },35_000);

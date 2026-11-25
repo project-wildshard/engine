@@ -134,7 +134,11 @@ class GraphRig {
   /** each loaded look's declared params */
   private readonly params: readonly (readonly [string, ReadonlySet<string>])[];
 
-  constructor(readonly rig: RigArms, private readonly row: Graph, private readonly looks: Looks, ids: readonly string[]) {
+  readonly rig: RigArms;
+  private readonly row: Graph;
+  private readonly looks: Looks;
+  constructor(rig: RigArms, row: Graph, looks: Looks, ids: readonly string[]) {
+    this.rig = rig; this.row = row; this.looks = looks;
     this.params = ids.map(id => [id, new Set(row.params[id])] as const);
     const material = looks.materials.get(row.trail.look);
     if (material === undefined) throw new Error(`Missing held trail look ${row.trail.look}`);
@@ -207,7 +211,9 @@ export class HeldView {
 
   readonly row: HeldViewRow;
   /** Admit a row (a graph row's files are read from `slug`'s product). */
-  constructor(input: unknown, private readonly slug: string | null = null) { this.row = parseHeldView(input); ({ contract: this.contract, bake: this.bake } = rigOf(this.row)); }
+  private readonly slug: string | null;
+  constructor(input: unknown, slug: string | null = null) {
+    this.slug = slug; this.row = parseHeldView(input); ({ contract: this.contract, bake: this.bake } = rigOf(this.row)); }
 
   /** Admit a toon row once per id: a manifest's lazy sword provider and the kit stage share its host. */
   static admit(input: unknown): HeldView {

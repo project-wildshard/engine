@@ -44,7 +44,10 @@ export class TamingSession {
   private readonly keys: readonly string[];
   private readonly approach: ReturnProgram;
   private readonly breaking: ReturnProgram;
-  constructor(private readonly programs: TamingPrograms, private readonly fields: { upgraded: string; horseUpgraded: string; candidateUpgraded: string }) {
+  private readonly programs: TamingPrograms;
+  private readonly fields: { upgraded: string; horseUpgraded: string; candidateUpgraded: string };
+  constructor(programs: TamingPrograms, fields: { upgraded: string; horseUpgraded: string; candidateUpgraded: string }) {
+    this.programs = programs; this.fields = fields;
     this.approach = ReturnProgram.page(programs.approach); this.breaking = ReturnProgram.page(programs.breaking);
     this.state = v.parse(v.record(v.string(), finite), { ...programs.initial }); this.keys = Object.keys(this.state);
     if (this.keys.length > 32) throw new Error('Taming state bound exceeded');

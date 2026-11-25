@@ -71,7 +71,9 @@ export class PlayerOwned {
   private readonly finishIds = new Set<string>();
   private readonly purchases = new Map<number, number>();
   private readonly inventory: OwnedSlots['inventory'];
-  constructor(readonly shard: string, slots: OwnedSlots = SESSION_SLOTS, finishes: readonly string[] = [], items?: Parameters<typeof keptItems>[0]) {
+  readonly shard: string;
+  constructor(shard: string, slots: OwnedSlots = SESSION_SLOTS, finishes: readonly string[] = [], items?: Parameters<typeof keptItems>[0]) {
+    this.shard = shard;
     this.purse = new Purse(shard, slots.purse); this.owned = new Owned(shard, slots.owned, keptItems(items)); this.garage = new VehicleGarage(shard, slots.vehicles ?? vehicleGarageSave); this.slot = saveSlug(shard); this.inventory = slots.inventory;
     const saved = slots.inventory.read(this.slot);
     this.counts = { ...saved.counts }; this.order = [...saved.order];

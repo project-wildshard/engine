@@ -26,7 +26,9 @@ export class TileDecoder {
   private jobs = 0;
   private idle: ReturnType<Scope['timeout']> | undefined;
   private held = false;
-  constructor(private readonly size: number = decodePoolSize(2)) {}
+  private readonly size: number;
+  constructor(size: number = decodePoolSize(2)) {
+    this.size = size;}
   private start(): void {
     if (this.disposed || this.workers.length > 0) return;
     if (typeof Worker === 'undefined') return;

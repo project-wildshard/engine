@@ -48,7 +48,11 @@ export class WeatherReactions {
     if (reported.has(kind)) return;
     reported.add(kind); emitFault({system: 'weather.reactions', error: new Error(message), verdict: 'retry'});
   }
-  constructor(readonly weather: WeatherContinuation, readonly rows: WeatherReactionRows, private readonly program: ReturnProgram) {
+  readonly weather: WeatherContinuation;
+  readonly rows: WeatherReactionRows;
+  private readonly program: ReturnProgram;
+  constructor(weather: WeatherContinuation, rows: WeatherReactionRows, program: ReturnProgram) {
+    this.weather = weather; this.rows = rows; this.program = program;
     const low = rows.hud?.low;
     this.own = rows.steps.find(step => step.write.some(([, target]) => target.slice(9) === low))?.write.map(([, target]) => target.slice(9)) ?? [];
     rows.points.forEach(([x, z, top], index) => { this.grid.add({ x, z, r: 0, top, index }); });

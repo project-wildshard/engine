@@ -158,8 +158,10 @@ export class PatrolEncounterView<A extends PatrolViewActor = Animal> {
   private shooter: A | null = null;
   private readonly dressed = new WeakMap<A, RiderView>();
   get killsTonight(): number { return this.law.killsTonight; }
+  private readonly ports: ProjectileWorld & { readonly cues: CueDirector; readonly figures: Readonly<Record<string, THREE.BufferGeometry>> };
   constructor(input: { readonly patrol: EncounterPatrolRows; readonly motion: EncounterScheduleRows; readonly view: PatrolViewRows }, program: ReturnProgram,
-    private readonly ports: ProjectileWorld & { readonly cues: CueDirector; readonly figures: Readonly<Record<string, THREE.BufferGeometry>> }) {
+    ports: ProjectileWorld & { readonly cues: CueDirector; readonly figures: Readonly<Record<string, THREE.BufferGeometry>> }) {
+    this.ports = ports;
     this.rows = input.view;
     this.law = new PatrolLaw<A, RiderView>(input.patrol, input.motion, program, { player: ports.player, random: app.rng.stream('ai'), aimRandom: () => app.rng.stream('ai'),
       present: (a, quiet) => this.present(a, quiet) });
@@ -319,7 +321,9 @@ export class CloudBody {
   private time = 0;
   private readonly strip: LightningStrip | null = null;
   private stripAt: THREE.Vector3 | null = null; private stripT = 0;
-  constructor(scene: THREE.Scene, input: CloudBodyRows, private readonly pose: Readonly<Record<string, number>>, ports: ReadonlyMap<string, unknown> = new Map()) {
+  private readonly pose: Readonly<Record<string, number>>;
+  constructor(scene: THREE.Scene, input: CloudBodyRows, pose: Readonly<Record<string, number>>, ports: ReadonlyMap<string, unknown> = new Map()) {
+    this.pose = pose;
     const rows = this.rows = input;
     this.made = encounterMaterials(rows.materials);
     const loader = new THREE.BufferGeometryLoader();

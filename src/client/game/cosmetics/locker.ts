@@ -16,7 +16,10 @@ export class CosmeticsLocker<Slot extends string, Row extends { id: string }> {
   version = 0;
   onChange?: (() => void) | undefined;
 
-  constructor(private readonly namespace: string, rows: readonly Row[], private readonly profile: CosmeticProfile<Slot, Row>) {
+  private readonly namespace: string;
+  private readonly profile: CosmeticProfile<Slot, Row>;
+  constructor(namespace: string, rows: readonly Row[], profile: CosmeticProfile<Slot, Row>) {
+    this.namespace = namespace; this.profile = profile;
     this.rows = new Map(rows.map((row) => [row.id, row]));
     try {
       const state = profile.save.read(namespace);

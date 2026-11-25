@@ -15,12 +15,12 @@ check() {
   if "$@"; then echo "::endgroup::"; echo "static: $name green in $((SECONDS - started))s"
   else echo "::endgroup::"; echo "::error title=static $name::red after $((SECONDS - started))s"; red=1; fi
 }
-proof() { local loader=$1; shift; node --import "./scripts/$loader" --experimental-transform-types --test "$@"; }
+proof() { local loader=$1; shift; node --import "./scripts/$loader" --test "$@"; }
 # TC26 (J186, AD1): the fire drill soaked 414 clean ci-reports runs, 11-17 to 11-23. Static runs before `pnpm pins` and
 # gen, so it installs Nalati and publishes Rapier's binary itself.
 fire_drill() {
   node scripts/pins.ts install nalati-grasslands &&
-    node --experimental-transform-types --input-type=module -e 'import {copyRapierWasm} from "./vite/rapier.ts"; copyRapierWasm();' &&
+    node --input-type=module -e 'import {copyRapierWasm} from "./vite/rapier.ts"; copyRapierWasm();' &&
     proof bake-loader.mjs test/ci/coverage-fire-drill.proof.mjs
 }
 
@@ -33,17 +33,17 @@ if [ "$mode" = code ]; then
   check entry-model-values proof bake-loader.mjs test/ci/entry-model-values.proof.mjs
   check quest-home-lifetime proof bake-loader.mjs test/ci/quest-home-lifetime.proof.mjs
   check hover-boost proof bake-loader.mjs test/ci/hover-boost.proof.mjs
-  check net-exchange bash -c 'node scripts/pins.ts install driftwood-isle pine-hollow && node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/net-exchange.proof.mjs'
+  check net-exchange bash -c 'node scripts/pins.ts install driftwood-isle pine-hollow && node --import ./scripts/sim-node-loader.mjs --test test/ci/net-exchange.proof.mjs'
   check native-loadout proof sim-node-loader.mjs test/ci/native-loadout.proof.mjs
   check keyed-sky-clock proof sim-node-loader.mjs test/ci/keyed-sky-clock.proof.mjs
   check interaction-placement proof sim-node-loader.mjs test/ci/interaction-placement.proof.mjs
-  check declared-journeys bash -c 'node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/declared-journeys.proof.mjs'
-  check weather bash -c 'node scripts/pins.ts install pine-hollow nalati-grasslands && node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs'
+  check declared-journeys bash -c 'node --import ./scripts/sim-node-loader.mjs --test test/ci/declared-journeys.proof.mjs'
+  check weather bash -c 'node scripts/pins.ts install pine-hollow nalati-grasslands && node --import ./scripts/sim-node-loader.mjs --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs'
   check hybrid-render-preparation proof bake-loader.mjs test/ci/hybrid-render-preparation.proof.mjs
   check net-climate proof bake-loader.mjs test/ci/net-climate.proof.mjs
   check quest-seats proof sim-node-loader.mjs test/ci/quest-seats.proof.mjs
   check native-item-frame proof sim-node-loader.mjs test/ci/native-item-frame.proof.mjs
-  check declared-input bash -c 'node scripts/pins.ts install nine-dragon-stack && node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs'
+  check declared-input bash -c 'node scripts/pins.ts install nine-dragon-stack && node --import ./scripts/bake-loader.mjs --test test/ci/declared-input.proof.mjs'
   check fire-drill fire_drill
   # TC22 (J186, AD2): the release gate's nightly reader soaked 414 clean ci-reports runs, 11-17 to 11-23.
   check release-nightly node --test --test-timeout=10000 scripts/release-nightly.proof.ts
@@ -52,7 +52,7 @@ if [ "$mode" = code ]; then
   # EG-24 (J503, AD2 row 43): a socket lost mid-fight or mid-crossing resumes; clean in ci-reports since 11-17.
   check socket-recovery bash -c 'node scripts/pins.ts install --ring 1 && node scripts/vitest-tmp.ts run test/dedicated-critical-reconnect.proof.ts'
   # TC7 (J503, AD2): the full Dunes and real pin-grid journeys on Ring 1's pins; clean in ci-reports since 11-19.
-  check pin-grid-journeys bash -c 'node scripts/pins.ts install --ring 1 && node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/dunes-journey.proof.mjs test/ci/pin-grid-journey.proof.mjs'
+  check pin-grid-journeys bash -c 'node scripts/pins.ts install --ring 1 && node --import ./scripts/sim-node-loader.mjs --test test/ci/dunes-journey.proof.mjs test/ci/pin-grid-journey.proof.mjs'
   # TC39 (J503, AD2): the API health version reader over real HTTP; clean in ci-reports since 11-21.
   check api-health env TC39_INSTALLED_FORMAT=1 node --test --test-timeout=10000 scripts/api-health.proof.ts
   # EG-12 (J503, AD2 row 30): every elite a Ring 1 product declares has a live server owner; green since 5599f5323.

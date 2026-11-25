@@ -108,7 +108,15 @@ export class ScaledPostPass extends Pass {
   private h = 0;
   settings: Record<string, number>;
   debugGain = 1;
-  constructor(private readonly row: ScaledPostRow, private readonly ctx: { readonly renderer: Renderer; readonly camera: PerspectiveCamera; readonly links?: UniformMap; readonly params?: UniformMap
+  private readonly row: ScaledPostRow;
+  private readonly ctx: { readonly renderer: Renderer; readonly camera: PerspectiveCamera; readonly links?: UniformMap; readonly params?: UniformMap
+    /** G924: the output this pass may draw straight to the screen when it is the composer's last pass (its target is
+     *  then never drawn: nothing else reads it), instead of into its target for a copy pass to display */
+    readonly screen?: string
+    /** G4: the output this pass draws into the composer's output buffer (a swap: the next pass reads it as its input), instead
+     *  of into its target for a copy pass to display; its target is then never drawn */
+    readonly buffer?: string };
+  constructor(row: ScaledPostRow, ctx: { readonly renderer: Renderer; readonly camera: PerspectiveCamera; readonly links?: UniformMap; readonly params?: UniformMap
     /** G924: the output this pass may draw straight to the screen when it is the composer's last pass (its target is
      *  then never drawn: nothing else reads it), instead of into its target for a copy pass to display */
     readonly screen?: string
@@ -116,6 +124,7 @@ export class ScaledPostPass extends Pass {
      *  of into its target for a copy pass to display; its target is then never drawn */
     readonly buffer?: string }) {
     super(row.name);
+    this.row = row; this.ctx = ctx;
     this.selective = [...Object.values(row.targets), ...row.draws].some(item => item.storage !== undefined);
     if (this.selective) validateStorage(row);
     const compiler = compilers.get(ctx.renderer);

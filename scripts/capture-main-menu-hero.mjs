@@ -265,7 +265,7 @@ async function capture(base) {
 async function captureAerial(base) {
   requireNoQuiet();
   const plan = JSON.parse(await command(process.execPath,
-    ['--experimental-transform-types', '--import', join(root, 'scripts/sim-node-loader.mjs'), join(root, 'scripts/main-menu-aerial-plan.mjs'), round === 'near' ? '6' : round], root));
+    ['--import', join(root, 'scripts/sim-node-loader.mjs'), join(root, 'scripts/main-menu-aerial-plan.mjs'), round === 'near' ? '6' : round], root));
   // --only=<pose id,…> and --sessions=<key,…> (e.g. 2048x2048) narrow a re-shoot; sessions left with no pose are skipped
   const only = flag('only', ''), keys = flag('sessions', '');
   // --enter (round 4): stand the player in the cell under the eye first (its runtime draws at full quality; the

@@ -27,7 +27,9 @@ export class ArenaRoomGround {
   readonly sand: Float32Array;
   private dirty = false;
   private clock = 0;
-  constructor(private readonly rows: GroundRows) { this.sand = new Float32Array(rows.sandCells * rows.sandCells); }
+  private readonly rows: GroundRows;
+  constructor(rows: GroundRows) {
+    this.rows = rows; this.sand = new Float32Array(rows.sandCells * rows.sandCells); }
 
   // Local frames.
   inChamber(p: Point): boolean { const x = p.x - this.rows.origin.x, z = p.z - this.rows.origin.z, y = p.y - this.rows.origin.y; return Math.abs(x) < this.rows.halfWidth && Math.abs(z) < this.rows.halfWidth && y > -3 && y < 8; }

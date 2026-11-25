@@ -41,7 +41,9 @@ export class CreatureClipSampler {
   private readonly locals: { position: Vector3; quaternion: Quaternion; scale: Vector3 }[];
   private readonly frame = new Matrix4();
   readonly pose: CollisionPose;
-  constructor(bytes: Uint8Array, private readonly joints: readonly CreatureRestJoint[]) {
+  private readonly joints: readonly CreatureRestJoint[];
+  constructor(bytes: Uint8Array, joints: readonly CreatureRestJoint[]) {
+    this.joints = joints;
     parseGlbData(bytes);
     const length = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(12, true);
     const doc = v.parse(Doc, JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + length))));

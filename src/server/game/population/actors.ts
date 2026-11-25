@@ -13,7 +13,9 @@ export class NativeActors<A> {
   private readonly allocator: EntityIds;
   private entries = new Map<string, Entry<A>>();
   private auxiliary = new Map<string, NativeActorAuxiliary>();
-  constructor(namespace: string, private readonly limit: number) {
+  private readonly limit: number;
+  constructor(namespace: string, limit: number) {
+    this.limit = limit;
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 16384) throw new Error('Invalid native actor bound');
     this.allocator = new EntityIds(namespace);
   }

@@ -67,8 +67,12 @@ export class ArenaRoomPortal {
   private ui: BossBar | null = null;
   /** The encounter's own frame: its brain on a page, its row on the wire. */
   private drive: ((dt: number, t: number) => void) | null = null;
-  constructor(private readonly world: ArenaRoomPortalWorld, private readonly room: BossArenaRoom, input: unknown,
-    program: ReturnProgram, private readonly entrance: { readonly x: number; readonly y: number; readonly z: number; readonly facing: number } | null) {
+  private readonly world: ArenaRoomPortalWorld;
+  private readonly room: BossArenaRoom;
+  private readonly entrance: { readonly x: number; readonly y: number; readonly z: number; readonly facing: number } | null;
+  constructor(world: ArenaRoomPortalWorld, room: BossArenaRoom, input: unknown,
+    program: ReturnProgram, entrance: { readonly x: number; readonly y: number; readonly z: number; readonly facing: number } | null) {
+    this.world = world; this.room = room; this.entrance = entrance;
     this.rows = v.parse(ArenaRoomPortalSchema, input); this.keep = new RegExp(this.rows.keep, 'i');
     this.law = new ArenaPortalLaw(program, this.rows, entrance);
   }
@@ -155,7 +159,9 @@ export class BossArenaRoom {
   private staticBuilt = false;
 
   readonly rows: ArenaRoomRows;
-  constructor(input: unknown, private readonly geometry: ReadonlyMap<string, THREE.BufferGeometry>) {
+  private readonly geometry: ReadonlyMap<string, THREE.BufferGeometry>;
+  constructor(input: unknown, geometry: ReadonlyMap<string, THREE.BufferGeometry>) {
+    this.geometry = geometry;
     const rows = v.parse(ArenaRoomSchema, input); this.rows = rows;
     this.ground = new ArenaRoomGround(rows);
     this.sandLight = new Float32Array((rows.sandCells + 1) ** 2 * 3);

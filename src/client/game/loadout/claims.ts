@@ -81,7 +81,11 @@ class ChargedBowSlot {
   private charged=false;
   private reportedFrame=false;
   private readonly origin=new THREE.Vector3();private readonly direction=new THREE.Vector3();private readonly velocity=new THREE.Vector3();private readonly at=new THREE.Vector3();private readonly segment=new THREE.Vector3();
-  constructor(scene:THREE.Scene,private readonly camera:THREE.Camera,private readonly rows:BowVariantRows,private readonly check:()=>void){
+  private readonly camera: THREE.Camera;
+  private readonly rows: BowVariantRows;
+  private readonly check: ()=>void;
+  constructor(scene:THREE.Scene,camera:THREE.Camera,rows:BowVariantRows,check:()=>void){
+    this.camera = camera; this.rows = rows; this.check = check;
     this.check();
     this.trail=new ProjectedTrail(scene,camera,this.rows.trail);
   }
@@ -184,7 +188,9 @@ const PrimaryPresentationSchema = v.object({ portraitFov: v.pipe(v.number(), v.f
 export class HeldClaimGuard {
   private readonly runner: QuestStepRunner;
   private facts: QuestStepFrame | null = null;
-  constructor(private readonly row: Claim['guard']['condition']) { this.runner = new QuestStepRunner({ version: 1, steps: [], guards: [row] }); }
+  private readonly row: Claim['guard']['condition'];
+  constructor(row: Claim['guard']['condition']) {
+    this.row = row; this.runner = new QuestStepRunner({ version: 1, steps: [], guards: [row] }); }
   /** Native fact arrays remain live, so a death changes the prompt before the next interaction read. */
   bindFacts(facts: QuestStepFrame): void { this.facts = facts; }
   reason(): string | null { return this.facts === null ? null : this.runner.guard(this.row.id, this.facts); }
@@ -213,11 +219,14 @@ class HeldClaim extends ItemPickup {
   private readonly phase: number;
   private flags: readonly string[] | null = null;
   private gone = false;
-  constructor(private readonly context: ShardContext, private readonly row: Claim, item: THREE.Object3D, prompt: string) {
+  private readonly context: ShardContext;
+  private readonly row: Claim;
+  constructor(context: ShardContext, row: Claim, item: THREE.Object3D, prompt: string) {
     const world = context.game.runtime?.world; if (world === undefined || world === null) throw new Error('Held claim needs its world');
     const random = new Rng(context.product.shardfile.identity.seed ^ row.seedXor), phase = random.next() * row.phase;
     const floor = new THREE.Vector3(...row.position); floor.y += row.lift;
     super({ scene: world.game.scene, item, position: floor, prompt, radius: row.radius, scale: row.scale, tilt: row.tilt, random: () => random.next() });
+    this.context = context; this.row = row;
     this.glowScene = world.game.scene; this.phase = phase; this.guard = new HeldClaimGuard(row.guard.condition);
     const base = this.interactable, reason = (): string | null => this.reason();
     this.interactable = { position: base.position, wireId: row.id,
@@ -306,7 +315,9 @@ export class HeldClaims {
   private portraitFov: number | null = null;
   private readonly geometries = new Map<string, { file: string; source: OwnedGeometry }>();
   private readonly drops = new Map<string, HeldClaim>();
-  private constructor(private readonly owner: ShardContext|null,input?:unknown) {
+  private readonly owner: ShardContext|null;
+  private constructor(owner: ShardContext|null,input?:unknown) {
+    this.owner = owner;
     if(owner===null){
       this.originalRows=null;this.slotRows=parseHeldSlots(input);this.arms=null;
       for(const row of this.slotRows.slots){

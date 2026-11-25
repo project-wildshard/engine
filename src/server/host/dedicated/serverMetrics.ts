@@ -69,7 +69,9 @@ export class ServerMetrics {
   readonly link: LinkEvents;
   private readonly reasons = new Set<string>();
 
-  constructor(log: (line: Record<string, unknown>) => void, private readonly channel: string, build?: { readonly build: string; readonly serial?: number | string }) {
+  private readonly channel: string;
+  constructor(log: (line: Record<string, unknown>) => void, channel: string, build?: { readonly build: string; readonly serial?: number | string }) {
+    this.channel = channel;
     this.log = log;
     const registers = [this.registry], readLag = loopLag(), readGc = gcPauses();
     this.scope.interval(LAG_MS, () => { this.mainLag = readLag(); this.gc('main', readGc()); });

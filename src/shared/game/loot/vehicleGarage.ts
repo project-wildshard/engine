@@ -22,7 +22,9 @@ export class VehicleGarage {
   private picked: string | null = null;
   private readonly slug: string;
   /** The page's own save, or a player's slot on a server. */
-  constructor(shard: string, private readonly save: Pick<typeof vehicleGarageSave, 'read' | 'write'> = vehicleGarageSave) {
+  private readonly save: Pick<typeof vehicleGarageSave, 'read' | 'write'>;
+  constructor(shard: string, save: Pick<typeof vehicleGarageSave, 'read' | 'write'> = vehicleGarageSave) {
+    this.save = save;
     this.slug = saveSlug(shard);
     const saved = save.read(this.slug);
     for (const kind of saved.kinds) if (ID.test(kind) && this.kinds.size < MAX_KINDS) this.kinds.add(kind);

@@ -17,9 +17,15 @@ export class PartHealth {
   readonly pose: CreatureVolumePose;
   private readonly left: number[];
   private readonly index: ReadonlyMap<string, number>;
-  constructor(inner: CreatureVolumePose, private readonly hp: ReadonlyMap<string, number>, private readonly actor: Actor,
-    combat: Pick<CombatPipeline, 'watchParts'>, private readonly events: Events, scope: Scope, private readonly onBreak?: (part: string) => void,
-    private readonly onWhole?: (part: string) => void) {
+  private readonly hp: ReadonlyMap<string, number>;
+  private readonly actor: Actor;
+  private readonly events: Events;
+  private readonly onBreak: ((part: string) => void) | undefined;
+  private readonly onWhole: ((part: string) => void) | undefined;
+  constructor(inner: CreatureVolumePose, hp: ReadonlyMap<string, number>, actor: Actor,
+    combat: Pick<CombatPipeline, 'watchParts'>, events: Events, scope: Scope, onBreak?: (part: string) => void,
+    onWhole?: (part: string) => void) {
+    this.hp = hp; this.actor = actor; this.events = events; this.onBreak = onBreak; this.onWhole = onWhole;
     const parts = inner.volumes.map(row => row.part);
     for (const part of hp.keys()) if (!parts.includes(part)) throw new Error(`Part hp names no volume ${part}`);
     this.index = new Map([...hp.keys()].map(part => [part, parts.indexOf(part)]));

@@ -32,7 +32,11 @@ export class BondedMountRoster {
   private readonly program: ReturnProgram;
   private readonly spec: AnimalSimSpec;
   private readonly floor: ReturnType<typeof creatureFloor>;
-  constructor(private readonly host: SimHost, private readonly rows: BondedMountRows, private readonly service: Services) {
+  private readonly host: SimHost;
+  private readonly rows: BondedMountRows;
+  private readonly service: Services;
+  constructor(host: SimHost, rows: BondedMountRows, service: Services) {
+    this.host = host; this.rows = rows; this.service = service;
     const { identities, random, hunt, bodies, sight } = service;
     if (service.host !== host || service.id !== rows.services || host.scope.disposed || host.scope.disposing
       || !(identities instanceof NativeActors) || !(random instanceof Rng) || !(hunt instanceof StalkerBrain)

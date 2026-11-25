@@ -28,7 +28,10 @@ export class SceneMotionBinding {
   get motion(): FollowedMovers | undefined {
     if (this.ctx.scope.disposed) throw new Error('Scene motion owner is disposed'); return this.nativeMotion;
   }
-  constructor(private readonly ctx: ShardContext, readonly rows: SceneMotion, handles: SceneHandles) {
+  private readonly ctx: ShardContext;
+  readonly rows: SceneMotion;
+  constructor(ctx: ShardContext, rows: SceneMotion, handles: SceneHandles) {
+    this.ctx = ctx; this.rows = rows;
     const programs = ctx.product.shardfile.clientChannels ?? [];
     const declared = new Map(programs.map(row => [row.id, row]));
     for (const group of rows.groups) {

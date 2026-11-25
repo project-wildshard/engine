@@ -97,7 +97,10 @@ export class ArenaScriptFight implements BossScript {
   private readonly fightDraw: ReturnType<typeof installChannelPrograms>;
   private readonly viewRead = { fighting: 0, victoryT: -1, phase: 0, domeBroken: 0, open: 0, flash: 0 };
 
-  constructor(private readonly ctx: ArenaScriptWorld, private readonly host: OriginalOpenArenaEncounter, data: ArenaScriptData) {
+  private readonly ctx: ArenaScriptWorld;
+  private readonly host: OriginalOpenArenaEncounter;
+  constructor(ctx: ArenaScriptWorld, host: OriginalOpenArenaEncounter, data: ArenaScriptData) {
+    this.ctx = ctx; this.host = host;
     this.data = data; this.pose={...data.pose};
     const scene = ctx.game.scene;
     const clocks=this.data.clocks;
@@ -430,7 +433,10 @@ export class OriginalOpenArenaEncounter {
   private readonly strikes = new StrikeRunner();
   private skipEnter = false; private skipTouch = false;
   private hurtWhy = ''; private hurtT = 0;
-  constructor(readonly world: ArenaScriptWorld, readonly data: ArenaScriptData) {
+  readonly world: ArenaScriptWorld;
+  readonly data: ArenaScriptData;
+  constructor(world: ArenaScriptWorld, data: ArenaScriptData) {
+    this.world = world; this.data = data;
     for (const [name,row] of Object.entries(data.contacts)) this.contacts.set(name,strikeFromData(row));
     this.fight = new ArenaScriptFight(world,this,data);
     this.spareLight = new THREE.PointLight(data.view.light.colour,0,1,2);

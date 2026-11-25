@@ -47,7 +47,9 @@ interface Waiting { readonly mesh: Mesh; readonly minX: number; readonly maxX: n
 /** Strip colliders waiting for the player, in the physics world's frame (the strips' own origins). */
 export class NearColliders {
   private waiting: Waiting[] = [];
-  constructor(private readonly install: (mesh: Mesh) => void) {}
+  private readonly install: (mesh: Mesh) => void;
+  constructor(install: (mesh: Mesh) => void) {
+    this.install = install;}
 
   get pending(): number { return this.waiting.length; }
 

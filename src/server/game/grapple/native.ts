@@ -72,7 +72,9 @@ class PlayerClaw {
   readonly sim: GrappleSim;
   readonly view: GrappleView;
   pressed: GrapplePress | null = null;
-  constructor(readonly player: PlayerSim, host: SimHost, profile: GrappleProfile, course: GrappleSim['course'], rise: boolean) {
+  readonly player: PlayerSim;
+  constructor(player: PlayerSim, host: SimHost, profile: GrappleProfile, course: GrappleSim['course'], rise: boolean) {
+    this.player = player;
     this.state = { pitch: 0, last: player.position.clone(), fall: { vy: player.velocity.y, grounded: player.fall.grounded } };
     const body: GrappleBody = { get position() { return player.position; }, velocity: this.velocity,
       get onGround() { return player.fall.grounded; }, set onGround(on) { player.fall.grounded = on; },

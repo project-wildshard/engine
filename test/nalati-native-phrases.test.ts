@@ -21,7 +21,9 @@ class Recorder extends Synth {
  protected readonly noise={} as AudioBuffer;
  readonly rows:object[]=[];
  draws=0;
- constructor(private state:number){super();}
+ private state: number;
+ constructor(state:number){super();
+   this.state = state;}
  private node(id:string):GainNode{const node={gain:{value:1}} as GainNode;this.nodes.set(node,id);return node;}
  private id(node:AudioNode):string{const id=this.nodes.get(node);if(id===undefined)throw new Error('Unowned audio node');return id;}
  random=():number=>{this.draws++;this.state=(Math.imul(this.state,1664525)+1013904223)>>>0;return this.state/4294967296;};

@@ -60,7 +60,7 @@ const runtime=await HeadlessSimulation.create(source,new Map());try{
 console.log('streamed native parity, aggregate budgets, producer failure, disposal and global deadline pass');
 
 const wide=new TickWorkerHost(new URL('./stream-wide-worker.mjs',import.meta.url),{},
- {tickMicros:16666,commandsPerTick:1},['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href],'advisory');
+ {tickMicros:16666,commandsPerTick:1},['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href],'advisory');
 try{
  await wide.initialized();
  await assert.rejects(wide.streamVerbTape(Array.from({length:6},(_,index)=>`wide-${index}`),parts(Array.from({length:3},(_,index)=>({id:String(index),ticks:1,commands:[]})))),/Tape observation allowance exceeded/);

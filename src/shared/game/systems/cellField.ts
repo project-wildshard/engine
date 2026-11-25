@@ -25,7 +25,10 @@ export class CellField {
   private clock = 0;
   private contactElapsed = 0;
   private readonly contact: ProjectedState | null;
-  constructor(input: unknown, private readonly program: ReturnProgram, private readonly random: Rng) {
+  private readonly program: ReturnProgram;
+  private readonly random: Rng;
+  constructor(input: unknown, program: ReturnProgram, random: Rng) {
+    this.program = program; this.random = random;
     if (!isJsonData(input)) throw new Error('Cell field rows must be plain JSON');
     const rows = v.parse(CellFieldSchema,input), names = Object.values(rows.channels);
     if (rows.states.active === rows.states.idle || rows.states.active === rows.states.spent

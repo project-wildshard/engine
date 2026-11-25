@@ -53,7 +53,9 @@ export class LivingBuildings {
   private sharedCount = 0;
   private flickerCount = 0;
 
-  constructor(private readonly resources: SceneHandles, input: BuildingLifeLook) {
+  private readonly resources: SceneHandles;
+  constructor(resources: SceneHandles, input: BuildingLifeLook) {
+    this.resources = resources;
     this.look = parseBuildingLifeLook(input);
     this.audioState.wheel.value = this.look.wheel;
     this.lights = new SiteLights(this.look);

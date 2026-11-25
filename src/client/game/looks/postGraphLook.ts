@@ -106,8 +106,13 @@ type Side = ScaledPostPass | BloomSide;
 
 /** (draw-free) the side outputs lent to the composite and its presence flags, after the view is posed */
 class SideInputs extends Pass {
-  constructor(private readonly row: PostGraphLookRow, private readonly sides: ReadonlyMap<string, Side>, private readonly bag: UniformMap, private readonly pose: (() => void) | null) {
+  private readonly row: PostGraphLookRow;
+  private readonly sides: ReadonlyMap<string, Side>;
+  private readonly bag: UniformMap;
+  private readonly pose: (() => void) | null;
+  constructor(row: PostGraphLookRow, sides: ReadonlyMap<string, Side>, bag: UniformMap, pose: (() => void) | null) {
     super('PostGraphInputs');
+    this.row = row; this.sides = sides; this.bag = bag; this.pose = pose;
     this.needsSwap = false;
   }
   override render(): void {
@@ -123,8 +128,10 @@ class SideInputs extends Pass {
 }
 /** (draw-free) poses the cell root's view before the side passes read it */
 class PoseView extends Pass {
-  constructor(private readonly pose: () => void) {
+  private readonly pose: () => void;
+  constructor(pose: () => void) {
     super('PostGraphPoseView');
+    this.pose = pose;
     this.needsSwap = false;
   }
   override render(): void { this.pose(); }
@@ -377,8 +384,16 @@ export interface PainterlyFrame { readonly look: PainterSkyLook; readonly sunEle
 export interface PainterlyCapture { readonly staticOffCsm: boolean; add: (root: Object3D) => void; sweep: () => void; update: (keyDir: Vector3) => void }
 export class PainterlyWorld {
   private sweepT = 0;
-  private constructor(private readonly rows: v.InferOutput<typeof PainterlyWorldSchema>, private readonly sky: SkyRig, private readonly capture: PainterlyCapture,
-    readonly panorama: PaintedPanorama, private readonly key: PainterKeyLight, private readonly grass: GrassPresentationProfile, private readonly starOwner: Pick<PaintedWorldPorts, 'stars'>) {}
+  private readonly rows: v.InferOutput<typeof PainterlyWorldSchema>;
+  private readonly sky: SkyRig;
+  private readonly capture: PainterlyCapture;
+  readonly panorama: PaintedPanorama;
+  private readonly key: PainterKeyLight;
+  private readonly grass: GrassPresentationProfile;
+  private readonly starOwner: Pick<PaintedWorldPorts, 'stars'>;
+  private constructor(rows: v.InferOutput<typeof PainterlyWorldSchema>, sky: SkyRig, capture: PainterlyCapture,
+    panorama: PaintedPanorama, key: PainterKeyLight, grass: GrassPresentationProfile, starOwner: Pick<PaintedWorldPorts, 'stars'>) {
+    this.rows = rows; this.sky = sky; this.capture = capture; this.panorama = panorama; this.key = key; this.grass = grass; this.starOwner = starOwner;}
   static async build(input: unknown, ports: { readonly renderer: Renderer; readonly scene: Scene; readonly scope: Scope; readonly sky: SkyRig; readonly stars: Object3D;
     readonly groups: Readonly<Record<string, Object3D>>; readonly casters: readonly Object3D[]; readonly grass: GrassPresentationProfile;
     readonly capture: { readonly rows: unknown; readonly uniforms: StaticCaptureUniforms } | { readonly lent: PainterlyCapture }; readonly panorama: { readonly rows: unknown } & Parameters<typeof PaintedPanorama.build>[4];

@@ -32,8 +32,10 @@ export class TimedEncounters {
   private animals: RowBodiesView | null = null;
   /** A cue this page only heard: drawn, and counted for a proof. */
   private readonly heard: Pick<CueDirector, 'cue'> = { cue: (id, at, up) => { wirePage.drew(id); this.cues.cue(id, at, up); } };
+  private readonly cues: CueDirector;
   constructor(ctx: TimedEncounterContext, input: TimedEncountersRows,
-    figures: Readonly<Record<string, BufferGeometry>>, guest: ReturnProgram, private readonly cues: CueDirector) {
+    figures: Readonly<Record<string, BufferGeometry>>, guest: ReturnProgram, cues: CueDirector) {
+    this.cues = cues;
     const rows = this.rows = input, scope = ctx.game.levelScope;
     if (scope.disposed) throw new Error('Encounter owner was disposed during admission');
     const program = ReturnProgram.page(rows.program, scope);

@@ -24,7 +24,9 @@ export class TamingBinding<A extends TamingHorse, H extends TamingHerd<A>> {
   get companion(): A | null { return this.session.bonded === null ? null : this.actors.get(this.session.bonded) ?? null; }
   get upgraded(): boolean { return this.session.upgraded; }
   get promptHorse(): A | null { return this.session.stallion === null ? null : this.actors.get(this.session.stallion) ?? null; }
-  constructor(private readonly opts: TamingServices<A, H>) {
+  private readonly opts: TamingServices<A, H>;
+  constructor(opts: TamingServices<A, H>) {
+    this.opts = opts;
     this.session = new TamingSession(opts.programs, opts.profile.fields);
     let saved: string | null = null; try { saved = opts.bond.read(); } catch { /* unavailable storage */ }
     if (saved === opts.profile.bonds[0] || saved === opts.profile.bonds[1]) this.spawn(opts.rest.x + opts.profile.offset[0], opts.rest.z + opts.profile.offset[1], Math.atan2(opts.rest.face.x, opts.rest.face.z), saved === opts.profile.bonds[1]);

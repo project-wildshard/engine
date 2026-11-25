@@ -13,7 +13,9 @@ export class SceneScatterPages {
   private readonly json: PageFolder['json'];
   private readonly hasFile: PageFolder['hasFile'];
   private readonly pages = new Map<string, Promise<Result>>();
-  constructor(private readonly ctx: Context, names: readonly string[]) {
+  private readonly ctx: Context;
+  constructor(ctx: Context, names: readonly string[]) {
+    this.ctx = ctx;
     this.product = ctx.product; this.scope = ctx.scope; this.json = this.product.json; this.hasFile = this.product.hasFile;
     this.validate();
     const unique = [...new Set(names)];

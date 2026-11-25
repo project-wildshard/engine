@@ -57,7 +57,9 @@ export class RopeDeckSite {
   /** each world span's layout (a `place` builds it for its group; its colliders and the world's chain read the same one) */
   private readonly built = new WeakMap<RopeDeckSpan, RopeDeckLayout>();
 
-  constructor(input: unknown, readonly draws: RopeDeckDraws) {
+  readonly draws: RopeDeckDraws;
+  constructor(input: unknown, draws: RopeDeckDraws) {
+    this.draws = draws;
     this.rows = v.parse(RopeDeckSiteSchema, input);
     const baked = this.rows.spans[this.rows.specimen];
     if (baked === undefined) throw new Error('Rope deck specimen has no baked span');

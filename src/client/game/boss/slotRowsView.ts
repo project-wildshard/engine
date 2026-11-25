@@ -24,7 +24,13 @@ export class SlotRowsView {
   /** A world's first rows say where things stand: nothing wakes in them. */
   private seen = false;
   private trailT = 0;
-  constructor(private readonly kind: string, private readonly rows: SlotViewRows, private readonly sites: Pick<EncounterSites, 'sites' | 'apply'>, private readonly tells: readonly GroundTell[], private readonly ports: SlotRowsPorts) {
+  private readonly kind: string;
+  private readonly rows: SlotViewRows;
+  private readonly sites: Pick<EncounterSites, 'sites' | 'apply'>;
+  private readonly tells: readonly GroundTell[];
+  private readonly ports: SlotRowsPorts;
+  constructor(kind: string, rows: SlotViewRows, sites: Pick<EncounterSites, 'sites' | 'apply'>, tells: readonly GroundTell[], ports: SlotRowsPorts) {
+    this.kind = kind; this.rows = rows; this.sites = sites; this.tells = tells; this.ports = ports;
     this.awakeRows = slotAwakeRows(sites.sites.length);
     this.awake = sites.sites.map(() => false); this.wanted = sites.sites.map(() => false);
   }

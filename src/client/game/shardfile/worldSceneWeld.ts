@@ -310,8 +310,14 @@ export class WorldSceneWeldAssembly {
   private pending: Promise<Object3D> | undefined;
   private readonly sources: FrozenSceneSources;
   private readonly staging: Map<string, BufferGeometry>;
-  constructor(private readonly row: WorldSceneWeld, private readonly handles: SceneHandles, sources: FrozenSceneSources,
-    private readonly owner: Scope, private readonly registry: WorldRegistry, private readonly cell: Object3D | null = null) {
+  private readonly row: WorldSceneWeld;
+  private readonly handles: SceneHandles;
+  private readonly owner: Scope;
+  private readonly registry: WorldRegistry;
+  private readonly cell: Object3D | null;
+  constructor(row: WorldSceneWeld, handles: SceneHandles, sources: FrozenSceneSources,
+    owner: Scope, registry: WorldRegistry, cell: Object3D | null = null) {
+    this.row = row; this.handles = handles; this.owner = owner; this.registry = registry; this.cell = cell;
     this.staging = new Map(sources.geometry);
     this.sources = { ...sources, geometry: this.staging };
   }

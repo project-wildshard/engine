@@ -6,8 +6,13 @@ import { ProjectedState, type ReturnProgram } from '../../../shared/game/populat
 export class NumericCourse {
   private readonly law;
   private pending = 0;
-  constructor(private readonly host: PlaygroundHost, private readonly origin: { x:number;y:number;z:number },
-    private readonly rows: { frame?:Readonly<Record<string,number>>; sampleEpsilon:number }, program:ReturnProgram, private readonly now:()=>number) {
+  private readonly host: PlaygroundHost;
+  private readonly origin: { x:number;y:number;z:number };
+  private readonly rows: { frame?:Readonly<Record<string,number>>; sampleEpsilon:number };
+  private readonly now: ()=>number;
+  constructor(host: PlaygroundHost, origin: { x:number;y:number;z:number },
+    rows: { frame?:Readonly<Record<string,number>>; sampleEpsilon:number }, program:ReturnProgram, now:()=>number) {
+    this.host = host; this.origin = origin; this.rows = rows; this.now = now;
     this.law=new ProjectedState({initial:{lap:0,started:0,running:0,half:0,best:-1,last:-1,prevX:0,phase:0,elapsed:0,checkpoint:0,visited:0}},
       program);
   }

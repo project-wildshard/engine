@@ -31,7 +31,9 @@ export class DirectedLaw {
   get elite(): boolean { return this.row.damage?.elite === true; }
   /** whether the recipe scales hits at all */
   get scalesDamage(): boolean { return this.row.damage !== undefined; }
-  constructor(recipe: unknown, private readonly program: () => Pick<ReturnProgram, 'project'>) {
+  private readonly program: () => Pick<ReturnProgram, 'project'>;
+  constructor(recipe: unknown, program: () => Pick<ReturnProgram, 'project'>) {
+    this.program = program;
     this.row = v.parse(DirectedSpeciesSchema, recipe);
     if (this.row.states.some(state => !ANIMAL_STATES.some(value => value === state))) throw new Error('Invalid directed species states');
     this.binding = {

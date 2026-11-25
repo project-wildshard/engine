@@ -33,7 +33,7 @@ jobs:
         run: node scripts/pins.ts verify-slices
       - name: Measure native play after host installation
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: node --experimental-transform-types --import ./scripts/bake-loader.mjs scripts/host-activity.ts tmp/engine-boundaries/host-activity.json
+        run: node --import ./scripts/bake-loader.mjs scripts/host-activity.ts tmp/engine-boundaries/host-activity.json
       - name: Real worker, hostile peers, and restore continuation
         run: node scripts/vitest-tmp.ts run test/cook-refusals.test.ts test/cook-hostile-pins.test.ts test/net-hostile-play.test.ts test/net-link-play.test.ts test/pinned-restore-play.test.ts
         env:
@@ -53,7 +53,7 @@ jobs:
         run: node scripts/coverage-cook-drill.mjs tmp/engine-boundaries/cook-drill
       - name: Check the full Nalati server herd tick budget
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
+        run: node --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
       - name: Keep the report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -94,7 +94,7 @@ jobs:
       - run: bash scripts/ci-playwright-install.sh webkit
       # Both sides use committed boot tables. Generation after the frozen Ring 1 install would dirty them.
       - name: Compare the same real tape in Node and a WebKit worker
-        run: node --experimental-transform-types --import ./scripts/sim-node-loader.mjs scripts/determinism/report.ts
+        run: node --import ./scripts/sim-node-loader.mjs scripts/determinism/report.ts
         env:
           WILDSHARD_RING: '1'
       - name: Keep the worker comparison and divergent-tape control

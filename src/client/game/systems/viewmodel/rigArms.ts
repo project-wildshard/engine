@@ -123,7 +123,9 @@ export class RigArms {
   private readonly o: Required<RigArmsOptions>;
 
   /** `swim`: the swim clips only (no channels): swimStroke / swimTread blended by `swim()` */
-  private constructor(scene: Object3D, clips: AnimationClip[], readonly swimming: boolean, contract: RigContract, bake: RigBake, options: RigArmsOptions) {
+  readonly swimming: boolean;
+  private constructor(scene: Object3D, clips: AnimationClip[], swimming: boolean, contract: RigContract, bake: RigBake, options: RigArmsOptions) {
+    this.swimming = swimming;
     this.o = { ...DEFAULTS, ...options };
     this.blade0 = this.o.blade.base; this.blade1 = this.o.blade.tip;
     const vm = scene.getObjectByName('vm_root') ?? scene;

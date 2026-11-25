@@ -54,7 +54,10 @@ export class CaveInterior {
     return cave;
   }
 
-  private constructor(private readonly rows: CaveInteriorRows, meta: CaveFile['meta'], private readonly roof: THREE.BufferGeometry) {
+  private readonly rows: CaveInteriorRows;
+  private readonly roof: THREE.BufferGeometry;
+  private constructor(rows: CaveInteriorRows, meta: CaveFile['meta'], roof: THREE.BufferGeometry) {
+    this.rows = rows; this.roof = roof;
     this.meta = meta; this.look = rows.look;
     this.frame = { x: rows.frame.x, z: rows.frame.z, yaw: rows.frame.yaw };
     let fill = fills.get(rows.rock.look);

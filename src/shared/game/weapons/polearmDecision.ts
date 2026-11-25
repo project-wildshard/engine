@@ -69,7 +69,7 @@ export interface PolearmState {
 
 /** A retired target's history entry after a restore: its id only, an inert key no live target equals (`decide` reads only
  *  live targets' entries), kept in its place so the next snapshot names it again. */
-class RetiredTarget { constructor(readonly key: string) {} }
+class RetiredTarget { readonly key: string; constructor(key: string) { this.key = key; } }
 
 export class PolearmDecision<T extends PolearmTarget = PolearmTarget> {
   thrustT = -1; windT = -1; throwT = -1; queued = false; releaseQueued = false; threw = false; hitDone = false; throwPrev = false;

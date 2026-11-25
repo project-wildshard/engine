@@ -87,7 +87,7 @@ if wanted pairs; then
 fi
 phone() { # phone <log> <args>: the phone link's run, its log kept; exit 1 is a run with an error, still read by the report
   local log=$1; shift
-  scripts/browser-lane.sh --max 30 node --experimental-transform-types scripts/phone-loading/main.ts --url "$url/" "$@" 2>&1 | tee "$out/$log.log" | tail -3 | cut -c1-200
+  scripts/browser-lane.sh --max 30 node scripts/phone-loading/main.ts --url "$url/" "$@" 2>&1 | tee "$out/$log.log" | tail -3 | cut -c1-200
   grep -q '^JSON ' "$out/$log.log"
 }
 if wanted title; then

@@ -8,7 +8,9 @@ export class EnteredEquipment {
   readonly service: EquipmentService;
   private active: EquipmentService;
   private wired = false;
-  constructor(private readonly road: EquipmentService) {
+  private readonly road: EquipmentService;
+  constructor(road: EquipmentService) {
+    this.road = road;
     this.active = road;
     this.service = new Proxy(road, {
       get: (_target, key) => {

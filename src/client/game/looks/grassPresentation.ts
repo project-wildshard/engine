@@ -63,7 +63,9 @@ export class GrassPresentationProfile {
   private readonly instances = new Set<WeakRef<GrassPresentation>>();
   track(instance: GrassPresentation): void { this.instances.add(new WeakRef(instance)); }
   readonly input: GrassPresentationRows;
-  constructor(input: unknown, private readonly files: ReadonlyMap<string,Uint8Array> = new Map(), selected?: 'phone' | 'desktop') {
+  private readonly files: ReadonlyMap<string,Uint8Array>;
+  constructor(input: unknown, files: ReadonlyMap<string,Uint8Array> = new Map(), selected?: 'phone' | 'desktop') {
+    this.files = files;
     this.input = v.parse(GrassPresentationSchema,input);
     const payloads=[this.input.height,this.input.mask,this.input.field,this.input.ground,
       ...Object.values(this.input.phone.scenes),...Object.values(this.input.desktop.scenes)];
@@ -167,7 +169,13 @@ export class GrassPresentation {
   /** live tunables */
   readonly params = { playerRadius: 0 };
 
-  constructor(private readonly profile: GrassPresentationProfile, private readonly sky: Sky, private readonly forest: Forest, private readonly bakeUniforms: StaticCaptureUniforms, private readonly atlas: Parameters<typeof loadSpecimenTexture>[0] | undefined) {
+  private readonly profile: GrassPresentationProfile;
+  private readonly sky: Sky;
+  private readonly forest: Forest;
+  private readonly bakeUniforms: StaticCaptureUniforms;
+  private readonly atlas: Parameters<typeof loadSpecimenTexture>[0] | undefined;
+  constructor(profile: GrassPresentationProfile, sky: Sky, forest: Forest, bakeUniforms: StaticCaptureUniforms, atlas: Parameters<typeof loadSpecimenTexture>[0] | undefined) {
+    this.profile = profile; this.sky = sky; this.forest = forest; this.bakeUniforms = bakeUniforms; this.atlas = atlas;
     this.params.playerRadius = profile.input.view.playerRadius;
     this.trail = new TrampleTrail(trample, profile.input.view.trail.speedLimit);
     const grassRows = profile.input, { heightSize: HN, lattice: LAT, half: CHUNK_HALF } = grassRows.view, LN = Math.ceil(CHUNK_HALF * 2 / LAT) + 1;

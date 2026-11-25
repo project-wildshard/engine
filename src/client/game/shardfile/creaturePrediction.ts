@@ -19,8 +19,13 @@ export type CreaturePredictionRow = { -readonly [Key in keyof PredictedRow]: Pre
 export class CreaturePrediction implements PredictedMover {
   private nextTick = 0;
   private readonly row = new Float64Array(ANIMAL_CLASS.row.length);
-  constructor(private readonly interpolator: NetClient['interpolator'], private readonly world: PredictionWorld,
-      private readonly rows: CreaturePredictionRow[], private readonly feet: { readonly x: number; readonly y: number; readonly z: number }) {}
+  private readonly interpolator: NetClient['interpolator'];
+  private readonly world: PredictionWorld;
+  private readonly rows: CreaturePredictionRow[];
+  private readonly feet: { readonly x: number; readonly y: number; readonly z: number };
+  constructor(interpolator: NetClient['interpolator'], world: PredictionWorld,
+      rows: CreaturePredictionRow[], feet: { readonly x: number; readonly y: number; readonly z: number }) {
+    this.interpolator = interpolator; this.world = world; this.rows = rows; this.feet = feet;}
   at(tick: number, replay: boolean): void {
     this.nextTick = tick;
     if (replay) this.pose(tick - 1);

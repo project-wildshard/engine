@@ -2,7 +2,7 @@
 // Ring 1's server half, coverage rows 4 and 7: step every Ring 1 product and server slice on the real server path, and compare a
 // digest chain with `test/pins/ring-digests.json`. A slice holds no art, so a read of a file a server shouldn't need fails here.
 //
-//   node --experimental-transform-types scripts/ring-step.ts [--ticks 240] [--update] [--only slug,slug]
+//   node scripts/ring-step.ts [--ticks 240] [--update] [--only slug,slug]
 //
 // Run `pins.ts install --ring 1` first. Digests are kept per platform and architecture (J97).
 // A platform with no baseline fails a full comparison. `--update` records measurements in the running platform's baseline.

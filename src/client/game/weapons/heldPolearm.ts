@@ -463,7 +463,9 @@ const spearPose=(row:PolearmRows['view']['poses']['rest']):HeldPolearmPose=>({po
  * the <=10 Hz guest are admitted rows; no shard callbacks or subclasses. */
 export class PolearmSet {
  private data:{parts:ReturnType<typeof createModelLibrary<never,never>>;profile:HeldPolearmProfile;javelin:JavelinProfile;view:HeldPolearmView;rows:PolearmData;deferred:boolean}|null=null;
- constructor(private readonly rows:{file:string;item:`weapon.${string}`}){}
+ private readonly rows: {file:string;item:`weapon.${string}`};
+ constructor(rows:{file:string;item:`weapon.${string}`}){
+   this.rows = rows;}
  readonly Weapon:new(world:HeldPolearmWorld,targets?:Targets,opts?:{allowUnlocked?:boolean;profile?:HeldPolearmProfile;owner?:Scope})=>HeldPolearm=((owner:PolearmSet)=>class extends HeldPolearm {
   constructor(world:HeldPolearmWorld,targets?:Targets,opts:{allowUnlocked?:boolean;profile?:HeldPolearmProfile;owner?:Scope}={}){
    const r=owner.need();

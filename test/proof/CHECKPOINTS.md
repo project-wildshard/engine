@@ -12,7 +12,7 @@ node scripts/witness-manifests.mjs --prepare .
 A cache miss plays the real recorder into an isolated directory. A hit verifies every output hash before admission. To regenerate and compare a particular witness, run:
 
 ```sh
-node --experimental-transform-types --import ./scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs compare-checkpoints
+node --import ./scripts/sim-node-loader.mjs test/proof/driftwood-isle/run.mjs compare-checkpoints
 ```
 
 Replace the slug for another witness. Exact comparisons against the committed payload hashes are normative on Darwin. Linux generates and validates its own native output, then runs the same continuation proofs; it does not compare floating-point snapshots against Darwin bytes. Deliberate behaviour changes use `run.mjs checkpoints` to update the small manifest; the pusher handles unchanged-outcome input refreshes.

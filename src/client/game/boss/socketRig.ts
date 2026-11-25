@@ -58,7 +58,11 @@ export class BossSocketRig {
   private glow = 1;
   private live = true;
   readonly focusRadius: number;
-  constructor(private readonly actor: Animal, private readonly rows: BossSocketRigRows, private readonly resources: SceneHandles) {
+  private readonly actor: Animal;
+  private readonly rows: BossSocketRigRows;
+  private readonly resources: SceneHandles;
+  constructor(actor: Animal, rows: BossSocketRigRows, resources: SceneHandles) {
+    this.actor = actor; this.rows = rows; this.resources = resources;
     const sockets = rows.attachments.map(row => {
       const socket = actor.mesh.getObjectByName(row.socket); if (socket === undefined) throw new Error(`Missing native boss socket ${row.socket}`); return socket;
     });
@@ -112,7 +116,10 @@ interface CardKit { readonly rows: BossSocketRigRows; readonly library: ModelLib
 export class SocketRigCard {
   private kit: CardKit | null = null;
   private admission: Promise<CardKit> | null = null;
-  constructor(private readonly slug: string, private readonly file: string) {}
+  private readonly slug: string;
+  private readonly file: string;
+  constructor(slug: string, file: string) {
+    this.slug = slug; this.file = file;}
   async preload(): Promise<void> {
     const admission = this.admission ??= (async (): Promise<CardKit> => {
       const product = await loadCatalogueFolder(this.slug), rows = v.parse(RoamingCombatSchema, await product.json(this.file)).projection.socketRig;

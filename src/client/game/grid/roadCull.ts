@@ -49,7 +49,10 @@ const CELL_EDGE = CHUNK_HALF;
  *  which an iPhone counts against the page until it collects. */
 class Grow<A extends Uint32Array | Float64Array> {
   length = 0;
-  constructor(private array: A, private readonly make: (size: number) => A) {}
+  private array: A;
+  private readonly make: (size: number) => A;
+  constructor(array: A, make: (size: number) => A) {
+    this.array = array; this.make = make;}
   push(value: number): void {
     if (this.length === this.array.length) { const next = this.make(Math.max(64, this.array.length * 2)); next.set(this.array); this.array = next; }
     this.array[this.length++] = value;
@@ -255,7 +258,10 @@ class LodFirsts {
   private used = 0;
   private readonly named = new Map<string, number>();
   private readonly size: number; private readonly offset: number;
-  constructor(private readonly pitch: number, private readonly cell: number, tileSize?: number) {
+  private readonly pitch: number;
+  private readonly cell: number;
+  constructor(pitch: number, cell: number, tileSize?: number) {
+    this.pitch = pitch; this.cell = cell;
     this.size = tileSize ?? pitch / BIN_DIVISOR; this.offset = tileSize === undefined ? 0.5 : 0;
   }
   /** `n`'s representative: the first vertex recorded for its box and material (`n` itself when it is the first, or when it

@@ -465,8 +465,11 @@ export class GrappleTool extends Tool {
   /** Draw this claw from now on, installed or not; null gives the page's law back. */
   useClaw(make: GrappleTool['claw']): void { this.claw = make; this.swapClaw?.(make); }
   private setter: ((course: GrappleCourseRow | null) => void) | undefined;
-  constructor(private readonly shard: ShardContext, private readonly data: { readonly equipment: EquipmentRow; readonly profile: GrappleProfile; readonly presentation: GrappleRows; readonly hooks: GrappleCourseRow['hooks'] }) {
+  private readonly shard: ShardContext;
+  private readonly data: { readonly equipment: EquipmentRow; readonly profile: GrappleProfile; readonly presentation: GrappleRows; readonly hooks: GrappleCourseRow['hooks'] };
+  constructor(shard: ShardContext, data: { readonly equipment: EquipmentRow; readonly profile: GrappleProfile; readonly presentation: GrappleRows; readonly hooks: GrappleCourseRow['hooks'] }) {
     super(data.equipment);
+    this.shard = shard; this.data = data;
     const id: string = data.equipment.id;
     const toolId = (value: string): value is `tool.${string}` => value.startsWith('tool.');
     if (!toolId(id)) throw new Error('Grapple requires a tool item identity');

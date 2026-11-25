@@ -25,7 +25,10 @@ export class StreamingCamera {
   private current = false;
   private readonly eye = new Vector3();
   private readonly view: StreamingView;
-  constructor(private readonly root: Object3D, private readonly camera: () => PerspectiveCamera) {
+  private readonly root: Object3D;
+  private readonly camera: () => PerspectiveCamera;
+  constructor(root: Object3D, camera: () => PerspectiveCamera) {
+    this.root = root; this.camera = camera;
     this.frame = new FrameCamera(root);
     this.view = { eye: this.eye, planes: this.frustum.planes };
   }

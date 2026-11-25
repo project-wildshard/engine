@@ -64,8 +64,10 @@ export class FigureRows {
   private readonly person: ReturnType<typeof standingFigure> | undefined;
   private readonly skinState: FigureSkinState = { pending: null, owned: [] };
 
-  constructor(readonly resources: SceneHandles, input: unknown, owner: Scope = resourceScope(),
+  readonly resources: SceneHandles;
+  constructor(resources: SceneHandles, input: unknown, owner: Scope = resourceScope(),
     skinLater?: (run: () => Promise<void>) => Promise<boolean>) {
+    this.resources = resources;
     if (owner.disposed) throw new Error('Figure owner is disposed');
     const row = v.parse(FigureRowSchema, input); this.row = row;
     this.skinDeferred = row.skin !== undefined && skinLater !== undefined;

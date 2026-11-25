@@ -35,7 +35,11 @@ export class FolderInputs {
   private readonly claims: { refs: Set<string>; bytes: number; lease: Claim }[] = [];
   private users = 0;
   private pending = Promise.resolve();
-  constructor(private readonly admitted: AdmittedFolder, options: FolderOptions, private readonly reserve: (bytes: number, speculative: boolean) => Claim, private readonly keep: ReadonlySet<string> = new Set(), transportRefs?: readonly string[]) {
+  private readonly admitted: AdmittedFolder;
+  private readonly reserve: (bytes: number, speculative: boolean) => Claim;
+  private readonly keep: ReadonlySet<string>;
+  constructor(admitted: AdmittedFolder, options: FolderOptions, reserve: (bytes: number, speculative: boolean) => Claim, keep: ReadonlySet<string> = new Set(), transportRefs?: readonly string[]) {
+    this.admitted = admitted; this.reserve = reserve; this.keep = keep;
     this.assets = new Map(admitted.assets); this.refs = [...this.assets.keys()];
     this.transportRefs = transportRefs === undefined ? this.refs : [...new Set(transportRefs)];
     this.reader = new ClientAssets(admitted.source, admitted.assets, options);

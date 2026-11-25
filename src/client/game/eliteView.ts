@@ -63,8 +63,15 @@ export class EliteView {
       won: (e, firstSkin) => { const skin = e.script.def.drop.skin; if (firstSkin && skin !== null) this.host.ownSkin?.(skin); },
       retired: (e) => { if (this.focus === e) { this.focus = null; this.bar.hide(); } },
     };
-  constructor(private readonly host: ViewHost, private readonly bar: EliteBar, private readonly scope: Scope, private readonly entered: () => EliteViewEntered | null,
-    private readonly record: (id: string) => EliteCoreRecord | undefined, private readonly save: () => void) {}
+  private readonly host: ViewHost;
+  private readonly bar: EliteBar;
+  private readonly scope: Scope;
+  private readonly entered: () => EliteViewEntered | null;
+  private readonly record: (id: string) => EliteCoreRecord | undefined;
+  private readonly save: () => void;
+  constructor(host: ViewHost, bar: EliteBar, scope: Scope, entered: () => EliteViewEntered | null,
+    record: (id: string) => EliteCoreRecord | undefined, save: () => void) {
+    this.host = host; this.bar = bar; this.scope = scope; this.entered = entered; this.record = record; this.save = save;}
 
   sting(entry: Entry, event: 'banner' | 'phase2' | 'kill'): void {
     const entered = this.entered();
@@ -173,7 +180,9 @@ export class GroundTell {
   private readonly mat: FxMaterial | null;
   private readonly base: Float32Array;
   private readonly pos: THREE.BufferAttribute;
-  constructor(scene: THREE.Scene, kind: 'ring' | 'lane' | 'wedge', color: THREE.ColorRepresentation, private readonly wedgeStyle?: OptionalWedgeStyle) {
+  private readonly wedgeStyle: OptionalWedgeStyle | undefined;
+  constructor(scene: THREE.Scene, kind: 'ring' | 'lane' | 'wedge', color: THREE.ColorRepresentation, wedgeStyle?: OptionalWedgeStyle) {
+    this.wedgeStyle = wedgeStyle;
     let g: THREE.BufferGeometry;
     if (kind === 'ring') g = annulus(0.86, 1, 64);
     else if (kind === 'wedge') {

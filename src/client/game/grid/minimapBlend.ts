@@ -71,13 +71,22 @@ interface MapEntry { image: HTMLCanvasElement | ImageBitmap | null; deferredAt?:
 export class CellMinimaps {
   private readonly maps = new Map<string, MapEntry>();
   private disposed = false;
-  constructor(scope: Scope, private readonly url: (slug: string) => Promise<string | {
+  private readonly url: (slug: string) => Promise<string | {
     readonly url: string; readonly retained: (image: { readonly width: number; readonly height: number } | null) => void;
     /** J450: the cook's map, drawn instead when the author's own map is flat (`flatMap`) */
     readonly fallback?: string;
-  } | undefined>, private readonly fullSize: (slug: string) => boolean = () => false,
-  private readonly retry?: { revision: () => number; deferred: (error: unknown) => boolean },
-  private readonly flat: (image: CanvasImageSource) => boolean = flatMap) {
+  } | undefined>;
+  private readonly fullSize: (slug: string) => boolean;
+  private readonly retry: { revision: () => number; deferred: (error: unknown) => boolean } | undefined;
+  private readonly flat: (image: CanvasImageSource) => boolean;
+  constructor(scope: Scope, url: (slug: string) => Promise<string | {
+    readonly url: string; readonly retained: (image: { readonly width: number; readonly height: number } | null) => void;
+    /** J450: the cook's map, drawn instead when the author's own map is flat (`flatMap`) */
+    readonly fallback?: string;
+  } | undefined>, fullSize: (slug: string) => boolean = () => false,
+  retry?: { revision: () => number; deferred: (error: unknown) => boolean },
+  flat: (image: CanvasImageSource) => boolean = flatMap) {
+    this.url = url; this.fullSize = fullSize; this.retry = retry; this.flat = flat;
     scope.onDispose(() => { this.disposed = true; for (const m of this.maps.values()) if (m.image !== null) {
       if ('close' in m.image) m.image.close(); else m.image.width = m.image.height = 0;
     } this.maps.clear(); });

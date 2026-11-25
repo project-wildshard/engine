@@ -62,7 +62,10 @@ export class Particles {
   private lastNeedlePos = new THREE.Vector3(1e9, 0, 0);
   private needleRng = new Rng(SEED + 909);
 
-  constructor(private sky: Sky, private forest: Forest) {}
+  private sky: Sky;
+  private forest: Forest;
+  constructor(sky: Sky, forest: Forest) {
+    this.sky = sky; this.forest = forest;}
 
   /** the key light's intensity at build: the motes / mist / needles follow the live key (a day/night clock) relative to it */
   private baseKeyI = 1;

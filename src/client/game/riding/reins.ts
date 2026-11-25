@@ -80,7 +80,10 @@ export class ReinRibbon {
   /** 1 = in the hands, 0 = dropped on the withers (eased) */
   private held = 1;
 
-  constructor(private readonly camera: THREE.PerspectiveCamera, private readonly rows: ReinRibbonRows, scope?: Scope) {
+  private readonly camera: THREE.PerspectiveCamera;
+  private readonly rows: ReinRibbonRows;
+  constructor(camera: THREE.PerspectiveCamera, rows: ReinRibbonRows, scope?: Scope) {
+    this.camera = camera; this.rows = rows;
     const { mesh, pos, attr } = buildReinsRibbon(rows);
     this.pos = pos; this.posAttr = attr; this.ribbon = mesh;
     this.ribbon.frustumCulled = false; this.ribbon.castShadow = false; this.ribbon.receiveShadow = false;

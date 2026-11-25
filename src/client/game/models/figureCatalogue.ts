@@ -128,7 +128,10 @@ export class FolderFigureCatalogue {
   }
   private readonly figures = new FigureCatalogue();
   private pending: Promise<void> | undefined;
-  constructor(private readonly folderId: string, private readonly file: string) {}
+  private readonly folderId: string;
+  private readonly file: string;
+  constructor(folderId: string, file: string) {
+    this.folderId = folderId; this.file = file;}
   async admit(product: ShardFolder, owner: Scope = resourceScope(), allowPacked = true): Promise<void> {
     const check = (): void => { if (owner.disposed || owner.disposing) throw new Error('Figure catalogue owner left'); };
     check();

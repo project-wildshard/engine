@@ -32,7 +32,10 @@ export class Purse {
   private listeners: ((coins: number, delta: number) => void)[] = [];
 
   /** The default game save or an injected local slot owns durable coin storage. */
-  constructor(readonly shard: string, private readonly save: Pick<typeof purseSave, 'read' | 'write'> = purseSave) {
+  readonly shard: string;
+  private readonly save: Pick<typeof purseSave, 'read' | 'write'>;
+  constructor(shard: string, save: Pick<typeof purseSave, 'read' | 'write'> = purseSave) {
+    this.shard = shard; this.save = save;
     const saved = this.save.read(saveSlug(shard));
     this.n = typeof saved === 'number' && Number.isFinite(saved) && saved > 0 ? Math.floor(saved) : 0;
   }

@@ -19,7 +19,9 @@ function recording(): { program: Pick<ReturnProgram, 'project'>; asked: string[]
 class Inline {
   inside = false; slow = false; private elapsed = 0; private fade = -1; private pending: 'enter' | 'exit' | null = null;
   readonly log: string[] = [];
-  constructor(private readonly program: Pick<ReturnProgram, 'project'>) {}
+  private readonly program: Pick<ReturnProgram, 'project'>;
+  constructor(program: Pick<ReturnProgram, 'project'>) {
+    this.program = program;}
   enter(immediate = false): void { if (!immediate) { this.fade = rows.fade.hold; this.pending = 'enter'; return; } this.inside = true; this.log.push('enter'); }
   leave(teleport: boolean, immediate = false): void { if (teleport && !immediate) { this.fade = rows.fade.hold; this.pending = 'exit'; return; } this.inside = false; this.slow = false; this.log.push(`leave ${String(teleport)}`); }
   update(dt: number, o: ArenaPortalFrame): void {

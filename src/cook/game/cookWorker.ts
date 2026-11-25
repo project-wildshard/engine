@@ -192,7 +192,7 @@ export function runJob(launcher: JobLauncher, tarball: string, out: string, expe
   const cache = join(dirname(work), 'cache');
   // Node takes a path that doesn't exist yet for a file, which would deny the folder.
   mkdirSync(cache, {recursive: true});
-  const node = [execPath, '--experimental-transform-types', '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, ...sidecar === undefined ? [] : [`--allow-fs-read=${sidecar}`], '--allow-worker',
+  const node = [execPath, '--permission', `--allow-fs-read=${root}`, ...installedRuntimeReads(launcher,root).map(path=>`--allow-fs-read=${path}`), `--allow-fs-read=${dirname(work)}`, `--allow-fs-write=${work}`, `--allow-fs-write=${cache}`, ...sidecar === undefined ? [] : [`--allow-fs-read=${sidecar}`], '--allow-worker',
     `--max-old-space-size=${limits.heapMB}`, '--stack-size=4000', '--no-warnings', '--import', loader, script, tarball, out, ...expectedSlug === undefined ? [] : [expectedSlug]];
   const [command = '', ...args] = [...wrap, ...node];
   return new Promise(resolve => {

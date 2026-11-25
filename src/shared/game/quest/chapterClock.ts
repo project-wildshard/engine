@@ -12,11 +12,18 @@ interface Day { phase: number; readonly night: number; set: (phase: number) => P
 export class ChapterClock {
   readonly lane: DirectorScriptStageLane;
   readonly fast: { on: { from: number; span: number; t: number; dur: number; to: number } | null } = { on: null };
-  constructor(private readonly scope: Scope, director: Awaited<ReturnType<typeof readDirectorDocument>>,
-    private readonly rows: ChapterDirectorRows, private readonly flags: Flags,
-    private readonly frame: { readonly day: Day | null; readonly player: { readonly x: number; readonly z: number };
+  private readonly scope: Scope;
+  private readonly rows: ChapterDirectorRows;
+  private readonly flags: Flags;
+  private readonly frame: { readonly day: Day | null; readonly player: { readonly x: number; readonly z: number };
+      readonly reward: { readonly x: number; readonly z: number } | null; readonly finish: 'set' | 'assign' };
+  private readonly publish: (effect: Exclude<ChapterEffect, { kind: 'phase' | 'flag' }>) => void;
+  constructor(scope: Scope, director: Awaited<ReturnType<typeof readDirectorDocument>>,
+    rows: ChapterDirectorRows, flags: Flags,
+    frame: { readonly day: Day | null; readonly player: { readonly x: number; readonly z: number };
       readonly reward: { readonly x: number; readonly z: number } | null; readonly finish: 'set' | 'assign' },
-    private readonly publish: (effect: Exclude<ChapterEffect, { kind: 'phase' | 'flag' }>) => void, restoring = false) {
+    publish: (effect: Exclude<ChapterEffect, { kind: 'phase' | 'flag' }>) => void, restoring = false) {
+    this.scope = scope; this.rows = rows; this.flags = flags; this.frame = frame; this.publish = publish;
     const script = director.create();
     this.lane = new DirectorScriptStageLane(director.stages, script, { scope,
       observe: chapterObservationReader(rows.observations, { ...frame, flags }),

@@ -94,8 +94,13 @@ export class TileDriver {
   private coarseCount = 0;
   private readonly targets: ReadonlyMap<number, StreamingPoint>;
   private streamingView: (() => StreamingView | null) | undefined;
-  constructor(private readonly scope: Scope, private readonly contents: readonly TileContent[], private readonly radius: () => number,
-    private readonly pause: () => Promise<void>, bounds?: ReadonlyMap<number, StreamingBounds>) {
+  private readonly scope: Scope;
+  private readonly contents: readonly TileContent[];
+  private readonly radius: () => number;
+  private readonly pause: () => Promise<void>;
+  constructor(scope: Scope, contents: readonly TileContent[], radius: () => number,
+    pause: () => Promise<void>, bounds?: ReadonlyMap<number, StreamingBounds>) {
+    this.scope = scope; this.contents = contents; this.radius = radius; this.pause = pause;
     this.targets = new Map(Array.from({ length: TILES_PER_SIDE * TILES_PER_SIDE }, (_, key) => {
       const box = bounds?.get(key);
       return [key, { x: -250 + (key % TILES_PER_SIDE + 0.5) * TILE_SIZE,

@@ -132,7 +132,7 @@ async function main() {
     try {
       await run('pins', [process.execPath, 'scripts/pins.ts', 'install', '--ring', '1']);
       await run('cook', [process.execPath, 'scripts/ring-cook.mjs', '--out', join(out, 'cook')]);
-      await run('step', [process.execPath, '--experimental-transform-types', '--no-warnings', 'scripts/ring-step.ts', '--report', join(out, 'step.json')]);
+      await run('step', [process.execPath, '--no-warnings', 'scripts/ring-step.ts', '--report', join(out, 'step.json')]);
       await run('build', ['pnpm', 'build:ring']);
       const trees = ['dist', 'dist-content'].filter(tree => existsSync(join(root, tree)));
       await run('archive', ['tar', '-cf', archive, ...trees]);

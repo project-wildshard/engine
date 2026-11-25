@@ -24,9 +24,11 @@ export interface CollectionModelPorts {
 export class CollectionDisplay extends THREE.Mesh<THREE.BufferGeometry, THREE.Material> {
   private readonly slots: SlotGeometry;
   private n = 0;
-  constructor(readonly row: CollectionModelRow, geometry: THREE.BufferGeometry, material: THREE.Material, params: CollectionParams) {
+  readonly row: CollectionModelRow;
+  constructor(row: CollectionModelRow, geometry: THREE.BufferGeometry, material: THREE.Material, params: CollectionParams) {
     const slots = new SlotGeometry(geometry, row.ranges);
     super(slots.geometry, material);
+    this.row = row;
     this.slots = slots; this.name = row.objectName; this.castShadow = true; this.receiveShadow = true;
     if (row.count !== undefined) this.setCount(Number(params[row.count.parameter] ?? 0));
     for (const id of Object.keys(row.trophies?.full ?? {})) this.setFilled(id, params[id] === true);
@@ -102,7 +104,11 @@ export class CollectionCatalogue {
   private rows: Readonly<Record<string, CollectionModelRow>> | undefined;
   private pending: Promise<void> | undefined;
   private readonly ports: CollectionModelPorts;
-  constructor(private readonly slug: string, private readonly geometry: ReadonlyMap<string, OwnedGeometry>, private readonly pinnedFolder?: ShardFolder) {
+  private readonly slug: string;
+  private readonly geometry: ReadonlyMap<string, OwnedGeometry>;
+  private readonly pinnedFolder: ShardFolder | undefined;
+  constructor(slug: string, geometry: ReadonlyMap<string, OwnedGeometry>, pinnedFolder?: ShardFolder) {
+    this.slug = slug; this.geometry = geometry; this.pinnedFolder = pinnedFolder;
     if (pinnedFolder !== undefined && !Object.is(pinnedFolder.slug, slug)) throw new Error('Collection product identity differs');
     this.ports = { prepare: () => this.prepare(), geometry: key => {
       const handle = this.geometry.get(key); if (handle === undefined) throw new Error(`Missing collection geometry: ${key}`); return handle.copy();

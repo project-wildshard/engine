@@ -150,7 +150,7 @@ The client model owner hashes only the supplied Uint8Array byte span,
 including Node Buffer subclasses backed by a larger allocation. Shared
 models stay live until their last Scope retires; late owners decode anew.
 Run the native client-data proof explicitly, outside hooks:
-`node --import ./scripts/bake-loader.mjs --experimental-transform-types
+`node --import ./scripts/bake-loader.mjs
 --test test/ci/entry-model-values.proof.mjs` as one command. It uses the
 renderer-capable author loader, not the simulation loader or a browser.
 CI runs all three real geometry/lifetime/refusal/span cases with 9.5 s
@@ -158,7 +158,7 @@ timeout and complete-body elapsed limits. No production socket is used.
 
 ## Quest dialogue home lifetime
 
-Run `node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/quest-home-lifetime.proof.mjs`.
+Run `node --import ./scripts/bake-loader.mjs --test test/ci/quest-home-lifetime.proof.mjs`.
 CI runs these two cases explicitly; local hooks and Vitest discovery do
 not add them. Happy DOM supplies the complete page environment; this is
 not a renderer, road-travel or phone-layout claim.
@@ -176,7 +176,7 @@ browser, renderer, server or live socket.
 
 ## Hover movement contract
 
-Run `node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/hover-boost.proof.mjs`.
+Run `node --import ./scripts/bake-loader.mjs --test test/ci/hover-boost.proof.mjs`.
 Three CI-only cases stay outside hooks and Vitest inventory. They use the
 real Player, actual pointer input, native Rapier and encoded client/server
 commands. Fixed expected speeds come from displacement, not a tuning
@@ -203,7 +203,7 @@ partial SDK-row qualification; it cannot stand in for the full nightly.
 
 Install the two ordinary pinned products with
 `node scripts/pins.ts install driftwood-isle pine-hollow`, then run
-`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/net-exchange.proof.mjs`.
+`node --import ./scripts/sim-node-loader.mjs --test test/ci/net-exchange.proof.mjs`.
 CI runs both cases explicitly, outside hooks and Vitest discovery. Each
 9.5-second timeout and elapsed assertion includes native product loading,
 real physics, network input and cleanup.
@@ -221,7 +221,7 @@ browser, forced health or synthetic reward is used.
 ## Native loadout contracts
 
 After the same two pinned products are installed, run
-`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-loadout.proof.mjs`.
+`node --import ./scripts/sim-node-loader.mjs --test test/ci/native-loadout.proof.mjs`.
 CI runs these three cases explicitly; hooks and Vitest do not discover
 them. Each 9.5-second bound includes loading, physics and cleanup.
 
@@ -243,7 +243,7 @@ choice wins when the same command also collects the rifle.
 ## Keyed sky clock contracts
 
 After the ordinary Pine product install, run
-`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/keyed-sky-clock.proof.mjs`.
+`node --import ./scripts/sim-node-loader.mjs --test test/ci/keyed-sky-clock.proof.mjs`.
 Three explicit CI-only cases retain independent authored sky/weather
 numbers, the actual pinned day checkpoint suffix and strict data
 admission. Each timeout and complete-body elapsed guard stays 9.5 s.
@@ -255,7 +255,7 @@ waiting file is retained until its owner reviews the complete mapping.
 ## Interaction placement owner contracts
 
 After the two ordinary Driftwood and Pine pin installs, run
-`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/interaction-placement.proof.mjs`.
+`node --import ./scripts/sim-node-loader.mjs --test test/ci/interaction-placement.proof.mjs`.
 Three explicit CI-only cases borrow actual quest progress, native floor
 queries and public model/frame ports. A real, in-reach NetRoom greeting
 unlocks both the authored lever condition and stock chest; out-of-reach
@@ -271,7 +271,7 @@ installed binding/reader counterpart. The original duplicate stays.
 ## Weather continuation owner contracts
 
 After the ordinary Pine and Nalati pin installs, run
-`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs`.
+`node --import ./scripts/sim-node-loader.mjs --test test/ci/weather-legacy.proof.mjs test/ci/weather-continuation.proof.mjs`.
 Explicit CI-only cases map all seven original waiting-file laws. The
 legacy file runs in its own native-math process: old v1 saves and exact
 recorded tails remain unchanged (the 19,200-output port oracle left with
@@ -293,7 +293,7 @@ product, old test, pin, live service or image changes.
 
 ## Runtime render preparation contracts
 
-Run `node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/runtime-render-preparation.proof.mjs`.
+Run `node --import ./scripts/bake-loader.mjs --test test/ci/runtime-render-preparation.proof.mjs`.
 Six explicit CI-only cases enter a valid data product through the actual
 RuntimePageSession, plan admission and strings.register feature. The
 public product reader and render promise are borrowed loader boundaries;
@@ -313,7 +313,7 @@ runtime, pins and generated tables remain untouched.
 ## Climate wire owner contracts
 
 After ordinary Pine/Nalati pin installs, run
-`node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/net-climate.proof.mjs`.
+`node --import ./scripts/bake-loader.mjs --test test/ci/net-climate.proof.mjs`.
 Eight explicit CI-only cases map all nine original groups. Actual local
 Rapier hosts, NetRooms, NetClients and lossless loopback packets carry
 day/weather acts and authoritative rows. The sky is a real shipped
@@ -334,7 +334,7 @@ none runs in hooks or Vitest, and no old SDK file or runtime changes.
 ## Independent quest seat contracts
 
 Install the ordinary Driftwood and Pine pins, then run
-`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/quest-seats.proof.mjs`.
+`node --import ./scripts/sim-node-loader.mjs --test test/ci/quest-seats.proof.mjs`.
 These three explicit CI cases stay outside hooks and Vitest discovery.
 Each complete case, including native world load and cleanup, retains a
 9.5-second timeout and elapsed guard.
@@ -352,7 +352,7 @@ until owner review approves retirement.
 ## Native item-frame continuation
 
 Install the ordinary Driftwood and Pine pins, then run
-`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test test/ci/native-item-frame.proof.mjs`.
+`node --import ./scripts/sim-node-loader.mjs --test test/ci/native-item-frame.proof.mjs`.
 Three explicit CI cases preserve every original item-frame assertion:
 ordered released input loans and reused arrays, all three ranged legacy
 continuations, contacts and RNG over 1,500 ticks, actual mid-stream native
@@ -371,7 +371,7 @@ No runtime, tuning, pin, reward or test deadline changes here.
 ## Declared input and cosmetic migration
 
 Install the existing Pine and Nine pins, then run
-`node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/declared-input.proof.mjs`.
+`node --import ./scripts/bake-loader.mjs --test test/ci/declared-input.proof.mjs`.
 Eight explicit CI-only cases preserve all nine inherited groups. Actual
 input commands respect mode, item and flags, inherited keys, closed
 visibility and scope retirement. Admission rejects executable getters
@@ -462,7 +462,7 @@ goldens are required before landing a changed format.
 
 ## Worker engine determinism (Ring 2 report)
 
-Run `WILDSHARD_RING=1 node --experimental-transform-types --import
+Run `WILDSHARD_RING=1 node --import
 ./scripts/sim-node-loader.mjs scripts/determinism/report.ts` as one command.
 It reads ordinary installed pins (three products and five server slices),
 serves their exact admitted server bytes, and compares a real 48-tick walk
@@ -488,7 +488,7 @@ browser version/user agent; the Chromium control cannot close it.
 ## Earned declared journeys (TC7)
 
 Run `node scripts/pins.ts install template`, then
-`node --import ./scripts/sim-node-loader.mjs --experimental-transform-types
+`node --import ./scripts/sim-node-loader.mjs
 --test test/ci/declared-journeys.proof.mjs` as one command.
 CI invokes it explicitly; hooks and Vitest discovery do not add it.
 The pinned Template walks the hut door, kills the blob and earns its quest.
@@ -567,7 +567,7 @@ admitted. A failed/superseded live run cannot count as a complete proof.
 Run the fast real-gateway observation explicitly:
 
 ```sh
-node --import ./scripts/sim-node-loader.mjs --experimental-transform-types --test --test-timeout=10000 test/outside-journey.proof.mjs
+node --import ./scripts/sim-node-loader.mjs --test --test-timeout=10000 test/outside-journey.proof.mjs
 ```
 
 The four cases stay outside hooks. Earliest admission review is November

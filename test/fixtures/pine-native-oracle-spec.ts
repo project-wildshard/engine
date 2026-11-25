@@ -7,7 +7,7 @@ const PINE_NATIVE_ORACLE: NativeProgramSpec = {
   inputs: ['src/engine', 'src/game', 'src/sdk', 'src/sharddev', 'src/commons',
     'src/shards/pine-hollow', 'test/fixtures', 'package.json', 'pnpm-lock.yaml',
     'scripts/native-recorder-cache.mjs', 'scripts/bake-input-hashes.mjs'],
-  transformTypes: true, loader: 'simulation',
+  loader: 'simulation',
 };
 
 /** Only this exact Pine construction may borrow the required CI input bundle. */

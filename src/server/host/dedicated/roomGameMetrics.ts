@@ -23,9 +23,15 @@ export class RoomGameMetrics {
   private pending: Batch | undefined;
   private flying: Promise<void> | undefined;
 
-  constructor(private readonly store: RoomGameStore, private readonly channel: string,
-    private readonly report: (rows: readonly RoomGameCount[]) => void, private readonly log: (line: Record<string, unknown>) => void,
-    private readonly now: () => number = Date.now) {}
+  private readonly store: RoomGameStore;
+  private readonly channel: string;
+  private readonly report: (rows: readonly RoomGameCount[]) => void;
+  private readonly log: (line: Record<string, unknown>) => void;
+  private readonly now: () => number;
+  constructor(store: RoomGameStore, channel: string,
+    report: (rows: readonly RoomGameCount[]) => void, log: (line: Record<string, unknown>) => void,
+    now: () => number = Date.now) {
+    this.store = store; this.channel = channel; this.report = report; this.log = log; this.now = now;}
 
   count(metric: Metric, zone: string, { actor, lane = '' }: ActorTags, value = 1): void {
     const day = new Date(this.now()).toISOString().slice(0, 10);

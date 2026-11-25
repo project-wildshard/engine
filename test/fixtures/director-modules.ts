@@ -10,7 +10,7 @@ import pineDeclaration from '../../src/shards/pine-hollow/data/director.json' wi
 // the compiler's streaming Wasm read refused it and the suite collected no cases (chapter-wake-page, CI 973)
 function pine(){
   const compiled=v.parse(v.strictObject({module:v.string(),bytes:v.string()}),JSON.parse(execFileSync(process.execPath,
-    ['--experimental-transform-types','--import','./scripts/bake-loader.mjs','test/fixtures/pine-director-compile.mjs'],{encoding:'utf8',maxBuffer:1<<26})));
+    ['--import','./scripts/bake-loader.mjs','test/fixtures/pine-director-compile.mjs'],{encoding:'utf8',maxBuffer:1<<26})));
   const bytes=Uint8Array.from(Buffer.from(compiled.bytes,'base64'));
   if(hashImmutableBytes(bytes)!==compiled.module||compiled.module!==pineDeclaration.module)throw new Error('Pine clock module differs from its declaration');
   return {bytes,module:compiled.module};

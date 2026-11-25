@@ -122,7 +122,12 @@ export class SpawnScript {
   private readonly controlState: AnimalSim['state'];
   /** The decision host's final refusal, exposed without a callback into content. */
   get failure(): string | null { return this.disabledReason; }
-  private constructor(input: unknown, private readonly bodies: SpawnBodyOwner, private readonly v2Owners?: SpawnV2Owners,private readonly effectOwners?: SpawnEffectOwners,queryLoans?: SpawnQueryLoansV2,private readonly nativeHost?: SimHost,rawModule?: Uint8Array) {
+  private readonly bodies: SpawnBodyOwner;
+  private readonly v2Owners: SpawnV2Owners | undefined;
+  private readonly effectOwners: SpawnEffectOwners | undefined;
+  private readonly nativeHost: SimHost | undefined;
+  private constructor(input: unknown, bodies: SpawnBodyOwner, v2Owners?: SpawnV2Owners,effectOwners?: SpawnEffectOwners,queryLoans?: SpawnQueryLoansV2,nativeHost?: SimHost,rawModule?: Uint8Array) {
+    this.bodies = bodies; this.v2Owners = v2Owners; this.effectOwners = effectOwners; this.nativeHost = nativeHost;
     const rows = parseSpawnScript(input); this.rows = rows;
     this.observedFields = new Set(rows.fields.filter(row => row.source === 'observed').map(row => row.id));
     this.columnFields = new Set(rows.v2?.columns.map(row => row.name));

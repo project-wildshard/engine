@@ -406,9 +406,16 @@ export class SlabLibrary {
   /** bank reads running now, and the publication waiting for one to finish (NB3: the loader's gather) */
   private reads = 0;
   private readonly readDone: (() => void)[] = [];
-  constructor(owner: Scope, product: ShardFolder, private readonly whole: WholeLibrary, private readonly row: WorldSceneSlabLibrary,
-    private readonly queue: ControlRefinement, private readonly cover: (tile: number) => Promise<void>,
-    private readonly prepare?: (parts: readonly SlabPart[]) => Promise<void>, private readonly merge = false) {
+  private readonly whole: WholeLibrary;
+  private readonly row: WorldSceneSlabLibrary;
+  private readonly queue: ControlRefinement;
+  private readonly cover: (tile: number) => Promise<void>;
+  private readonly prepare: ((parts: readonly SlabPart[]) => Promise<void>) | undefined;
+  private readonly merge;
+  constructor(owner: Scope, product: ShardFolder, whole: WholeLibrary, row: WorldSceneSlabLibrary,
+    queue: ControlRefinement, cover: (tile: number) => Promise<void>,
+    prepare?: (parts: readonly SlabPart[]) => Promise<void>, merge = false) {
+    this.whole = whole; this.row = row; this.queue = queue; this.cover = cover; this.prepare = prepare; this.merge = merge;
     if (row.of !== whole.id) throw new Error('Slab library covers another library');
     for (const key of row.keys) {
       if (key.castFrom !== undefined) throw new Error('Slab key casting from a band has no run-time draw');

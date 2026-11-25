@@ -41,7 +41,10 @@ export class BagMenu {
   private readonly findsRows = new Map<string, () => FindsView>();
   private findsFragments = 0;
   private findsOff: (() => void) | null = null;
-  constructor(private menu: BagHost, private opts: BagMenuOptions) {
+  private menu: BagHost;
+  private opts: BagMenuOptions;
+  constructor(menu: BagHost, opts: BagMenuOptions) {
+    this.menu = menu; this.opts = opts;
     if (installed.has(menu)) throw new Error('Bag tabs already installed');
     installed.set(menu, this);
     menu.scope.onDispose(() => { installed.delete(menu); });

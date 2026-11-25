@@ -148,5 +148,5 @@ test('purse restore retains unflushed earned coins without a write or listener c
 
 test('the actual native economy and coin preparation import under the unchanged renderer guard', () => {
   const code = "await import('./test/fixtures/driftwood-trade-native.ts'); await import('./test/fixtures/native-hosts/loot/nativeEconomy.ts'); const {prepareNativeCoinRecipe} = await import('./test/fixtures/native-coin-recipe.ts'); const build = await prepareNativeCoinRecipe(); const geometry = build(0xc01); if (geometry.getAttribute('position').count === 0) throw Error('Empty original coin bake'); geometry.dispose();";
-  expect(() => execFileSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/sim-node-loader.mjs', '--input-type=module', '-e', code], { timeout: 10_000, stdio: 'pipe' })).not.toThrow();
+  expect(() => execFileSync(process.execPath, ['--import', './scripts/sim-node-loader.mjs', '--input-type=module', '-e', code], { timeout: 10_000, stdio: 'pipe' })).not.toThrow();
 });

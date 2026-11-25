@@ -21,7 +21,7 @@ let manifest;
 let verified=false;
 try{
   if(!requestOnly){
-    const normal=spawnSync(process.execPath,['--experimental-transform-types',resolve(engine,'test/fixtures/native-browser-escape.ts')],{cwd,encoding:'utf8',timeout:25000});
+    const normal=spawnSync(process.execPath,[resolve(engine,'test/fixtures/native-browser-escape.ts')],{cwd,encoding:'utf8',timeout:25000});
     assert.equal(normal.status,0,normal.stderr);assert.match(normal.stdout,/original trusted Escape pair preserved/u);
     assert.deepEqual(list().filter(name=>!before.has(name)),[],'Successful native cleanup must not request retention');
   }
@@ -31,7 +31,7 @@ const arg=process.argv.find(value=>value.startsWith('--user-data-dir='));if(arg=
 const profile=arg.slice('--user-data-dir='.length);writeFileSync(${JSON.stringify(receipt)},JSON.stringify(profile));
 writeFileSync(profile+'/retained-sentinel','actual native caller bytes');mkdirSync(profile+'/locked');writeFileSync(profile+'/locked/marker','owned refusal');chmodSync(profile+'/locked',0);process.kill(process.pid,'SIGTERM');
 `,{mode:0o700});
-  const refuse=()=>spawnSync(process.execPath,['--experimental-transform-types',resolve(engine,'test/fixtures/native-browser-escape.ts')],{cwd,encoding:'utf8',timeout:25000,env:{...process.env,CHROME_PATH:chrome}});
+  const refuse=()=>spawnSync(process.execPath,[resolve(engine,'test/fixtures/native-browser-escape.ts')],{cwd,encoding:'utf8',timeout:25000,env:{...process.env,CHROME_PATH:chrome}});
   const readProfile=()=>{
     /** @type {unknown} */
     const value=JSON.parse(readFileSync(receipt,'utf8'));

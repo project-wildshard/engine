@@ -9,7 +9,7 @@ import {pathToFileURL} from 'node:url';
 import {expect,test} from 'vitest';
 
 test('J108: in real Nalati a bot breaks the stallion for its own mount and the wild refills',async({signal})=>{
-  const child=await promisify(execFile)(process.execPath,['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=await promisify(execFile)(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/nalati-bot-taming-run.ts')],{encoding:'utf8',timeout:240_000,signal});
   expect(child.stdout).toContain('"story":"bot-taming"');
 },245_000); // Full five-round native story: measured 148.6 s on CI, 72.8 s with the bounded outer pool.

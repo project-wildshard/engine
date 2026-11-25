@@ -6,7 +6,9 @@ import type { QuestPageComposition } from './pageComposition';
  * It borrows the actual quest; its owner keeps all continuation and disposal. */
 export class QuestPageReference {
   private value: QuestPageComposition | null = null;
-  constructor(private readonly scope: Scope) { scope.onDispose(() => { this.value = null; }); }
+  private readonly scope: Scope;
+  constructor(scope: Scope) {
+    this.scope = scope; scope.onDispose(() => { this.value = null; }); }
   /** This function identity is stable before publication and throughout entry. */
   readonly places = (): readonly PlaceArea[] => this.scope.disposed || this.scope.disposing ? [] : this.value?.places?.points ?? [];
   /** Exactly one completed composition may publish into the entered reference. */

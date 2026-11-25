@@ -29,7 +29,11 @@ export class Bounty {
   }
 
   /** Page and native owners share the same once-per-starting-slot law. */
-  constructor(readonly shard: string, private caps: ReadonlyMap<string, number>, private readonly save: Pick<typeof bountySave, 'read' | 'write'> = bountySave) {
+  readonly shard: string;
+  private caps: ReadonlyMap<string, number>;
+  private readonly save: Pick<typeof bountySave, 'read' | 'write'>;
+  constructor(shard: string, caps: ReadonlyMap<string, number>, save: Pick<typeof bountySave, 'read' | 'write'> = bountySave) {
+    this.shard = shard; this.caps = caps; this.save = save;
     const saved = this.save.read(saveSlug(shard));
     for (const [k, v] of Object.entries(saved)) if (typeof v === 'number' && Number.isFinite(v) && v > 0) this.paid[k] = Math.floor(v);
   }

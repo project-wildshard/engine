@@ -9,7 +9,7 @@ import process from 'node:process';
 import {expect,test} from 'vitest';
 
 test('terminal journey matches native step movement, retires, and refuses runtime/invalid requests',()=>{
-  const child=spawnSync(process.execPath,['--experimental-transform-types','--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
+  const child=spawnSync(process.execPath,['--import',pathToFileURL(resolve('scripts/sim-node-loader.mjs')).href,
     resolve('test/fixtures/headless/journey-run.mjs')],{encoding:'utf8',timeout:35_000});
   const diagnostics=[child.error?.message,child.signal,child.stdout,child.stderr].filter(Boolean).join('\n');
   expect(child.status,diagnostics).toBe(0);

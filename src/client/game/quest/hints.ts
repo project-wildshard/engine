@@ -25,7 +25,10 @@ export class QuestHintFeed {
   private nearest = Infinity;
   private scanT = 0;
   private windupT = Infinity;
-  constructor(input: unknown, private readonly ports: QuestHintPorts, private readonly aim: { readonly state: string }) {
+  private readonly ports: QuestHintPorts;
+  private readonly aim: { readonly state: string };
+  constructor(input: unknown, ports: QuestHintPorts, aim: { readonly state: string }) {
+    this.ports = ports; this.aim = aim;
     this.rows = parseQuestHintRows(input);
     this.hostile = new Set(this.rows.hostile);
     ports.hints.feed(this.rows.hints.map(row => ({ control: row.control, when: () => row.when.every(condition => this.test(condition)),

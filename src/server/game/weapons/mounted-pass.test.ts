@@ -32,7 +32,9 @@ function decision(seed: number, seen: string[]): { update: (dt: number, o: Reado
 /** MountedSword's pass decision as it was inline before the kernel (the swing recorded instead of struck) */
 class Inline {
   mount: { speed: number; yaw: number } | null = null; passChain = 0; chainT = 0; mountCd = 0; pendingAttack = false; pendingHits = 0; elapsed = 0; strikes: string[] = [];
-  constructor(private readonly law: ReturnType<typeof decision>) {}
+  private readonly law: ReturnType<typeof decision>;
+  constructor(law: ReturnType<typeof decision>) {
+    this.law = law;}
   decide(dt: number, player: { position: Vector3; yaw: number }, charging: boolean, base: number, targets: readonly MountedPassTarget[]): void {
     this.elapsed += dt; if (this.elapsed < .1 - 1e-9) return;
     const m = this.mount, p = player.position, yaw = m?.yaw ?? player.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);

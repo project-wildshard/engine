@@ -172,7 +172,10 @@ export function colliderTileKeys(row: ColliderFootprint): number[] {
  */
 export class SharedTileBuilds<T> {
   private readonly builds = new Map<number, { readonly scope: Scope; readonly built: Promise<T>; holds: number }>();
-  constructor(private readonly owner: Scope, private readonly build: (tile: number, scope: Scope) => Promise<T>) {}
+  private readonly owner: Scope;
+  private readonly build: (tile: number, scope: Scope) => Promise<T>;
+  constructor(owner: Scope, build: (tile: number, scope: Scope) => Promise<T>) {
+    this.owner = owner; this.build = build;}
   /** The tiles built now (tests read them). */
   get tiles(): ReadonlySet<number> { return new Set(this.builds.keys()); }
   hold(tile: number, scope: Scope): Promise<T> {

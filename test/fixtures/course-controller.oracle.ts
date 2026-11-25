@@ -44,8 +44,11 @@ class MountedCourseController implements CourseController {
   private readonly mount: ReturnType<typeof pageRidingMount>;
   readonly run:NumericCourse;
 
-  constructor(private readonly host:PlaygroundHost,rows:RidingPracticeLayout,
-    mount:ReturnType<typeof pageRidingMount>,program:ReturnProgram,private readonly room:OriginalPracticeCourse,map:RoomMap) {
+  private readonly host: PlaygroundHost;
+  private readonly room: OriginalPracticeCourse;
+  constructor(host:PlaygroundHost,rows:RidingPracticeLayout,
+    mount:ReturnType<typeof pageRidingMount>,program:ReturnProgram,room:OriginalPracticeCourse,map:RoomMap) {
+    this.host = host; this.room = room;
     this.rows=rows;this.mount=mount;this.run=new NumericCourse(host,room.origin,rows,program,()=>performance.now()/1000);
     const o=room.origin,lap=rows.road.map(([x,z])=>[o.x+x,o.z+z]as const);this.road=[...lap,...lap.slice(1)];
     const mark:RoomMarker={x:0,z:0},marks=[mark],none:RoomMarker[]=[];
@@ -127,7 +130,9 @@ class HookCourseController implements CourseController {
   private readonly course: GrappleCourseRow;
   private readonly run:NumericCourse;
 
-  constructor(host:PlaygroundHost,layout:HookPracticeLayout,program:ReturnProgram,private readonly room:OriginalPracticeCourse,map:RoomMap) {
+  private readonly room: OriginalPracticeCourse;
+  constructor(host:PlaygroundHost,layout:HookPracticeLayout,program:ReturnProgram,room:OriginalPracticeCourse,map:RoomMap) {
+    this.room = room;
     this.host=host;this.row=layout.course;this.map=map;
     this.run=new NumericCourse(host,room.origin,layout,program,()=>performance.now()/1000);
     const o=room.origin,hooks=layout.hooks.map(h=>new THREE.Vector3(o.x+h.x,o.y+h.y,o.z+h.z));
@@ -182,7 +187,9 @@ export class OriginalPracticeCourse implements Playground {
   readonly root:THREE.Group; readonly map:RoomMap; readonly origin:THREE.Vector3; readonly chip:PlaygroundChip;
   private active=false;
   private readonly controller:CourseController;
-  constructor(private readonly host:PlaygroundHost,ctx:ShardContext,input:PracticeCourseRows) {
+  private readonly host: PlaygroundHost;
+  constructor(host:PlaygroundHost,ctx:ShardContext,input:PracticeCourseRows) {
+    this.host = host;
     const data=prepareCourse(ctx,input),row=data.kind==='horse'?data.layout:data.layout.course;
     this.id=data.kind;this.title=row.title;
     this.center=data.kind==='horse'?{...data.layout.fieldAt}:{...host.spawn};

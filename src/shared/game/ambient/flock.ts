@@ -32,7 +32,10 @@ class AmbientVisitors {
   private readonly mine:AmbientVisitorBird[]=[];
   private readonly ground:[number,number]=[0,0];
   private readonly p:Point={x:0,y:0,z:0};
-  constructor(readonly row:AmbientFlockData,private readonly perches:readonly AmbientVisitorPerch[]=[]){
+  readonly row: AmbientFlockData;
+  private readonly perches: readonly AmbientVisitorPerch[];
+  constructor(row:AmbientFlockData,perches:readonly AmbientVisitorPerch[]=[]){
+    this.row = row; this.perches = perches;
     if(row.wheeling!==null||row.perch!==null||row.guide!==null)throw new Error('Visitor flight cannot mix wheeling, perch or guide policies');
     const rng=this.rng=new Rng(row.seed);
     this.flight=new CirclingFlyer(row.flight,undefined,row.wingbeats);

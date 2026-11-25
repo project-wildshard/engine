@@ -117,7 +117,7 @@ jobs:
         id: production-play
         working-directory: source
         run: >-
-          node --experimental-transform-types --import ./scripts/bake-loader.mjs
+          node --import ./scripts/bake-loader.mjs
           scripts/release-prod-play.ts "$SOURCE_SHA" "$RUNNER_TEMP/production-play.json"
       - name: Keep the production play verdict
         if: ${{ !cancelled() && (steps.production-play.outcome == 'success' || steps.production-play.outcome == 'failure') }}

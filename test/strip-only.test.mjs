@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Fixture paths.
 import { dirname, join, resolve } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
-import { specifiers, stripOnlyRefusals, transformEntries, trackedEntries } from '../scripts/strip-only.mjs';
+import { flagUsers, specifiers, stripOnlyRefusals, trackedEntries } from '../scripts/strip-only.mjs';
 
 // Meta QA 11-25 row 25 (J505): fc0832b52's parameter property in the cook held engine main red for 82 minutes, because
 // Node runs the cook strip-only and the lint override covered only src/*/engine and src/cook. The push gate's
@@ -40,14 +40,18 @@ test('only what the tool loads is judged: a type-only import, generated code in 
   expect(stripOnlyRefusals(root, ['scripts/gen.mjs', 'scripts/dyn.ts'])).toEqual([]);
 });
 
-test('a tool a command runs with --experimental-transform-types is not an entry, on its line or the folded line after', () => {
-  expect([...transformEntries([
-    { path: 'a.yml', text: 'run: node --experimental-transform-types --import ./scripts/bake-loader.mjs scripts/host.ts out.json\n' },
-    { path: 'b.yml', text: 'run: >-\n  node --experimental-transform-types --import ./scripts/bake-loader.mjs\n  scripts/release-prod-play.ts "$SHA"\n' },
+test('a file that still passes the removed transform flag is named; the stored copies of old CI files are not', () => {
+  const flag = ['--experimental', 'transform-types'].join('-');
+  expect(flagUsers([
+    { path: 'a.yml', text: `run: node ${flag} --import ./scripts/bake-loader.mjs scripts/host.ts out.json\n` },
+    { path: 'test/fixtures/ci-native-cache-v4.yml', text: `run: node ${flag} scripts/ci-native-fixtures.mjs\n` },
     { path: 'c.mjs', text: "spawn(node, ['scripts/plain.ts'])\n" },
-  ])].sort()).toEqual(['scripts/bake-loader.mjs', 'scripts/host.ts', 'scripts/release-prod-play.ts']);
+  ])).toEqual(['a.yml']);
 });
 
-test('every TypeScript file this checkout\'s tools load strip-only is erasable', () => {
-  expect(stripOnlyRefusals(process.cwd(), trackedEntries(process.cwd()))).toEqual([]);
+test('every TypeScript file Node runs here is erasable, and nothing passes the removed flag', () => {
+  const { entries, flagged } = trackedEntries(process.cwd());
+  expect(entries).toContain('src/server/host/bake/headlessWorker.ts');
+  expect(stripOnlyRefusals(process.cwd(), entries)).toEqual([]);
+  expect(flagged).toEqual([]);
 }, 60_000);

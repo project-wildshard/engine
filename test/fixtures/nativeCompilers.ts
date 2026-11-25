@@ -26,7 +26,7 @@ const decision = v.strictObject({ rows: orderedRows,
   generated: v.map(v.string(), v.string()), lines: v.number(), ceiling: v.number() });
 function native(method: string, args: readonly unknown[]): unknown {
   return deserialize(execFileSync(process.execPath,
-    ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', 'test/fixtures/native-compiler.mjs'],
+    ['--import', './scripts/bake-loader.mjs', 'test/fixtures/native-compiler.mjs'],
     { input: serialize({ method, args }), maxBuffer: 1 << 26 }));
 }
 function rows(method: string, args: readonly unknown[]): v.InferOutput<typeof decision> {

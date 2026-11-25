@@ -1,6 +1,6 @@
 // oxlint-disable import/no-nodejs-modules, import/no-unassigned-import -- Explicit Node product proof; install simulation hooks before dynamic imports.
 // SH-pine-1/4/5/6: explicit report-only regression, outside ordinary test
-// discovery and hooks. Run with node --experimental-transform-types --test.
+// discovery and hooks. Run with node --test.
 import '../scripts/sim-node-loader.mjs';
 import assert from 'node:assert/strict';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';

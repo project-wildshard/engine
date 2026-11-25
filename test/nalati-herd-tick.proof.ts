@@ -31,7 +31,7 @@ function follow(live: NativeHeadlessResident): { readonly distance: number; read
 }
 
 // Run explicitly, never from pre-commit/pre-push:
-// node --experimental-transform-types --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
+// node --import ./scripts/sim-node-loader.mjs --test test/nalati-herd-tick.proof.ts
 test('the full Nalati server keeps 60 Hz beside a reacting herd', { timeout: 9500 }, async (): Promise<void> => {
   const directory = builtFolder('nalati-grasslands'), product = await loadHeadlessFolder(directory);
   const live = await createNativeHeadlessResident({ product, shard: product.shardfile, assets: runtimeAssets(product, directory),

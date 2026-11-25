@@ -104,7 +104,9 @@ export class ControlRefinement {
   private running = 0;
   private failure: Error | undefined;
   private idle: (() => void)[] = [];
-  constructor(owner: Scope, level: Scope | undefined, position: () => Point, pause: () => Promise<void>, private readonly view?: () => StreamingView | null) {
+  private readonly view: (() => StreamingView | null) | undefined;
+  constructor(owner: Scope, level: Scope | undefined, position: () => Point, pause: () => Promise<void>, view?: () => StreamingView | null) {
+    this.view = view;
     this.owner = owner; this.position = position; this.pause = pause;
     queues.add(this);
     owner.onDispose(() => { queues.delete(this); for (const job of this.waiting.values()) job.resolve(false); this.waiting.clear(); this.known.clear(); this.settle(); });

@@ -28,7 +28,10 @@ export class OpenArenaRoom {
   private readonly rows = new Map<string, StrikeSpec>();
   private readonly centre: Vector3;
   private readonly tag: `boss.${string}`;
-  constructor(private readonly host: SimHost, private readonly data: ArenaScriptData, place: (player: PlayerSim, position: Vector3, yaw: number) => void) {
+  private readonly host: SimHost;
+  private readonly data: ArenaScriptData;
+  constructor(host: SimHost, data: ArenaScriptData, place: (player: PlayerSim, position: Vector3, yaw: number) => void) {
+    this.host = host; this.data = data;
     const { center } = data.arena, radius = data.place.arenaRadius; this.centre = new Vector3(center.x, 0, center.z); this.tag = `boss.${data.record.kind}`;
     for (const [name, row] of Object.entries(data.contacts)) this.rows.set(name, strikeFromData(row));
     const inside = (point: { readonly x: number; readonly z: number }): boolean => (point.x - center.x) ** 2 + (point.z - center.z) ** 2 < radius ** 2;

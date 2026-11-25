@@ -25,7 +25,9 @@ class Inline {
   thrustT = -1; windT = -1; throwT = -1; queued = false; releaseQueued = false; threw = false; hitDone = false; throwPrev = false; lanceActive = false;
   attackPending = false; tapPending = false; decisionT = 0;
   readonly rehit = new Map<object, number>(); private readonly prevPos = new Map<object, Vector3>();
-  constructor(private readonly law: HeldDecision) {}
+  private readonly law: HeldDecision;
+  constructor(law: HeldDecision) {
+    this.law = law;}
   decide(dt: number, t: number, w: { player: Vector3; heading: number; held: boolean; ads: boolean; ammo: number; mount: { speed: number } | null; deer: Deer[]; javs: Slot[]; random: () => number }) {
     this.decisionT += dt; if (this.decisionT < .1 - 1e-9) return null;
     const p = w.player, heading = w.heading, fx = -Math.sin(heading), fz = -Math.cos(heading);

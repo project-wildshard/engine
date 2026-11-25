@@ -86,7 +86,10 @@ export class ArenaWhirlsView {
   get drawn(): ArenaWhirls['drawn'] { return this.whirls.drawn; }
   /** the funnels and the debris, for the view module the fight lends them to */
   readonly funnels: readonly THREE.Object3D[];
-  constructor(input: ArenaWhirlsRows, program: ReturnProgram, funnels: readonly THREE.Object3D[], readonly debris: THREE.InstancedMesh, gateProgram: ReturnProgram,private readonly nativeScope:Scope) {
+  readonly debris: THREE.InstancedMesh;
+  private readonly nativeScope: Scope;
+  constructor(input: ArenaWhirlsRows, program: ReturnProgram, funnels: readonly THREE.Object3D[], debris: THREE.InstancedMesh, gateProgram: ReturnProgram,nativeScope:Scope) {
+    this.debris = debris; this.nativeScope = nativeScope;
     this.live();ArenaWhirlsView.preflight(input);
     if (funnels.length !== input.laws.length || debris.instanceMatrix.count < input.laws.length * input.debris.count) throw new Error('Whirlwinds need a funnel each and room for their debris');
     this.rows = input; this.funnels = funnels;

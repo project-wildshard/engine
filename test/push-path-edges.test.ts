@@ -72,7 +72,7 @@ it('steps only the Ring 1 slugs a pin or digest change moves', () => {
   const plan = fs27Plan({ mode: 'full', files: ['test/pins/shardfiles.json'] }, { split: true, slugs: ['far-reach'] });
   expect(plan.tasks.at(-1)?.commands.map(command => command.slice(1))).toEqual([
     ['scripts/pins.ts', 'install', '--ring-slices', '1'],
-    ['--experimental-transform-types', '--no-warnings', 'scripts/ring-step.ts', '--only', 'far-reach'],
+    ['--no-warnings', 'scripts/ring-step.ts', '--only', 'far-reach'],
   ]);
 });
 

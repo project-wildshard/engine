@@ -19,7 +19,9 @@ export class StrikeFlights {
   private readonly live: NetFlight[] = [];
   private readonly balls: Mesh[] = [];
   private readonly point = new Vector3();
-  constructor(private readonly scene: Object3D) {}
+  private readonly scene: Object3D;
+  constructor(scene: Object3D) {
+    this.scene = scene;}
   add(flight: NetFlight): void { this.live.push(flight); }
   /** A crossing: every flight belonged to the cell left. */
   clear(): void { this.live.length = 0; this.show(0); }

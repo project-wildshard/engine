@@ -47,7 +47,11 @@ export class JavelinFlight<H extends JavelinTargetHit = JavelinTargetHit> {
   private readonly v1 = new THREE.Vector3(); private readonly v2 = new THREE.Vector3(); private readonly v3 = new THREE.Vector3();
   private readonly dir = new THREE.Vector3(); private readonly head = new THREE.Vector3(); private readonly nrm = new THREE.Vector3();
   private readonly stickDir = new THREE.Vector3();
-  constructor(readonly slots: readonly JavelinSlot[], private readonly profile: JavelinFlightProfile, private readonly ports: JavelinPorts<H>) {}
+  readonly slots: readonly JavelinSlot[];
+  private readonly profile: JavelinFlightProfile;
+  private readonly ports: JavelinPorts<H>;
+  constructor(slots: readonly JavelinSlot[], profile: JavelinFlightProfile, ports: JavelinPorts<H>) {
+    this.slots = slots; this.profile = profile; this.ports = ports;}
 
   /** a slot is free for a throw */
   free(): boolean { return this.slots.some(x => x.state === 0); }

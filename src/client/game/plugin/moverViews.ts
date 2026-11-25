@@ -85,7 +85,11 @@ function rowPose(row: ReturnType<NetClient['interpolator']['fields']>): MoverPos
  */
 export class NetMovers implements PredictedMover {
   private readonly decks: Deck[] = [];
-  constructor(private readonly client: NetClient, private readonly views: Pick<ReadonlyMap<string, MoverView>, 'get'>, private readonly feet: { readonly x: number; readonly z: number }) {}
+  private readonly client: NetClient;
+  private readonly views: Pick<ReadonlyMap<string, MoverView>, 'get'>;
+  private readonly feet: { readonly x: number; readonly z: number };
+  constructor(client: NetClient, views: Pick<ReadonlyMap<string, MoverView>, 'get'>, feet: { readonly x: number; readonly z: number }) {
+    this.client = client; this.views = views; this.feet = feet;}
   /** Once a frame. */
   frame(renderTick: number): void {
     const { client, views, decks, feet } = this;

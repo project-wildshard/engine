@@ -18,7 +18,7 @@ const setup = `
 `;
 
 function run(body: string): string {
-  return execFileSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs',
+  return execFileSync(process.execPath, ['--import', './scripts/bake-loader.mjs',
     '--input-type=module', '--eval', setup + body], { encoding: 'utf8' });
 }
 

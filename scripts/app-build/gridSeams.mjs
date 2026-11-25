@@ -45,7 +45,7 @@ export function gridSeamAsset(source, splitPlans = false) {
 /** Certify the generated catalogue's seam plans and each slug's edge source before the page is bundled (was
  *  vite/gridSeamPlans.ts's config hook): scripts/build-app.mjs runs it after the generators. */
 export function bakeGridSeams(root) {
-  const run = spawnSync(process.execPath, ['--experimental-transform-types', '--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs'],
+  const run = spawnSync(process.execPath, ['--import', './scripts/bake-loader.mjs', 'scripts/bake-grid-seams.mjs'],
     { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'inherit'] });
   if (run.error !== undefined) throw run.error;
   if (run.status !== 0) throw new Error(`Grid seam bake failed (${String(run.status)})`);

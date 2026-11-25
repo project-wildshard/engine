@@ -150,7 +150,9 @@ export class ArenaWhirlsView {
   private readonly rows: ArenaWhirlsRows;
   private readonly whirls: { readonly law: ProjectedState; readonly funnel: THREE.Object3D; on: boolean; k: number }[];
   private readonly hits: THREE.Vector3[] = [];
-  constructor(input: ArenaWhirlsRows, program: ReturnProgram, funnels: readonly THREE.Object3D[], private readonly debris: THREE.InstancedMesh) {
+  private readonly debris: THREE.InstancedMesh;
+  constructor(input: ArenaWhirlsRows, program: ReturnProgram, funnels: readonly THREE.Object3D[], debris: THREE.InstancedMesh) {
+    this.debris = debris;
     this.rows = input;
     if (funnels.length !== this.rows.laws.length || debris.instanceMatrix.count < this.rows.laws.length * this.rows.debris.count) throw new Error('Whirlwinds need a funnel each and room for their debris');
     this.whirls = this.rows.laws.map((row, i) => {

@@ -14,7 +14,10 @@ const admitted = new Map<string, HeldFinishes>();
 export class HeldFinishes {
   readonly cards: HeldFinishesRows['cards'];
   private readonly definitions = new Map<string, SkinDef>();
-  private constructor(private readonly product: ShardFolder, readonly rows: HeldFinishesRows, geometry: ReadonlyMap<number, THREE.BufferGeometry>) {
+  private readonly product: ShardFolder;
+  readonly rows: HeldFinishesRows;
+  private constructor(product: ShardFolder, rows: HeldFinishesRows, geometry: ReadonlyMap<number, THREE.BufferGeometry>) {
+    this.product = product; this.rows = rows;
     this.cards = rows.cards;
     for (const id of rows.order) {
       const row = rows.rows[id]; if (row === undefined) throw new Error('Held finish order has an invalid identity');

@@ -31,8 +31,12 @@ class CourseController {
   private readonly run:NumericCourse;
   private horse:Animal|null=null;
   private readonly entry:{mount:ReturnType<typeof pageRidingMount>;rows:Extract<PracticeControllerRows['entry'],{kind:'mount'}>;road:(readonly[number,number])[]}|{course:GrappleCourseRow};
-  constructor(private readonly host:PlaygroundHost,layout:PracticeCourseRows['layout'],program:ReturnProgram,mount:ReturnType<typeof pageRidingMount>|null,
-    private readonly rows:PracticeControllerRows,private readonly room:PracticeCourse,map:RoomMap) {
+  private readonly host: PlaygroundHost;
+  private readonly rows: PracticeControllerRows;
+  private readonly room: PracticeCourse;
+  constructor(host:PlaygroundHost,layout:PracticeCourseRows['layout'],program:ReturnProgram,mount:ReturnType<typeof pageRidingMount>|null,
+    rows:PracticeControllerRows,room:PracticeCourse,map:RoomMap) {
+    this.host = host; this.rows = rows; this.room = room;
     const row=rows.entry;
     this.run=new NumericCourse(host,room.origin,layout,program,()=>app.clock.now);
     const o=room.origin;
@@ -127,7 +131,9 @@ export class PracticeCourse implements Playground {
   readonly root:THREE.Group; readonly map:RoomMap; readonly origin:THREE.Vector3; readonly chip:PlaygroundChip;
   private active=false;
   private readonly controller:CourseController;
-  constructor(private readonly host:PlaygroundHost,ctx:ShardContext,input:PracticeCourseRows) {
+  private readonly host: PlaygroundHost;
+  constructor(host:PlaygroundHost,ctx:ShardContext,input:PracticeCourseRows) {
+    this.host = host;
     if(!isJsonData(input.layout))throw new Error('Practice rows require JSON data');
     const data=input.layout,row=parsePracticeController(data.controller),mount=row.entry.kind==='mount'?pageRidingMount(ctx):null;
     const program=ReturnProgram.page(data.program,ctx.scope.child('practice course program'));

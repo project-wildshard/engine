@@ -183,7 +183,9 @@ const _xAxis = new Vector3(1, 0, 0);
  */
 export class SkinPitch {
   private readonly pitched = new WeakMap<Bone, Quaternion>();
-  constructor(private readonly pitch: { readonly bone: string; readonly angle: number }) {}
+  private readonly pitch: { readonly bone: string; readonly angle: number };
+  constructor(pitch: { readonly bone: string; readonly angle: number }) {
+    this.pitch = pitch;}
   /** Before the driver: undo last frame's pitch where the bone still carries it. */
   before(bones: Record<string, Bone>): void {
     const bone = bones[this.pitch.bone], last = bone === undefined ? undefined : this.pitched.get(bone);
@@ -331,7 +333,9 @@ export class SerpentDeath {
   private dusted = 0;
   /** the trail's pose as it died: each frame starts from it, since a dead body's bones are not posed again */
   private readonly rest = new Map<Bone, { readonly position: Vector3; readonly quaternion: Quaternion }>();
-  constructor(private readonly trail: readonly string[]) {}
+  private readonly trail: readonly string[];
+  constructor(trail: readonly string[]) {
+    this.trail = trail;}
   step(alive: boolean, dt: number, bones: Record<string, Bone>, groundY: number, scale: number): void {
     if (alive) { this.t = -1; this.dusted = 0; this.rest.clear(); return; }
     const head = bones[this.trail[0] ?? '']; if (head === undefined) return;

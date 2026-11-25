@@ -14,7 +14,10 @@ export class ReportWriteQueue {
   private readonly waiters = new Set<() => void>();
   private flying = false;
   private resting = false;
-  constructor(private readonly write: (row: ReportWrite) => Promise<void>, private readonly failed: (error: unknown) => void) {}
+  private readonly write: (row: ReportWrite) => Promise<void>;
+  private readonly failed: (error: unknown) => void;
+  constructor(write: (row: ReportWrite) => Promise<void>, failed: (error: unknown) => void) {
+    this.write = write; this.failed = failed;}
   get waiting(): number { return this.pending.length; }
   /** False means the bounded backlog refused this report, and no durability is claimed. */
   post(report: ChatReport, shard: string): boolean {

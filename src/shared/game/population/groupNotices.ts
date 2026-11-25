@@ -14,7 +14,9 @@ export type GroupNoticesSnapshot = readonly (readonly [key: string, at: number])
 
 export class GroupNotices {
   private readonly last = new Map<string, number>();
-  constructor(private readonly effects: Effects) {}
+  private readonly effects: Effects;
+  constructor(effects: Effects) {
+    this.effects = effects;}
   /** The text creature signal `name` raises at `now` (s), or null: no notice row for it, or still in its cooldown. */
   signal(name: string, now: number): string | null {
     const notice = this.effects.notices.find(row => row.signal === name);

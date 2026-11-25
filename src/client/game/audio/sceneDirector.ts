@@ -51,7 +51,10 @@ export class AudioSceneDirector {
  private score:ReturnType<typeof SetScore.declared>|undefined;
  private music:Music|undefined;
  private bedT=0;private chorusT:number;private thrustPending=false;
- constructor(private readonly data:AudioData,private readonly player:Player){
+ private readonly data: AudioData;
+ private readonly player: Player;
+ constructor(data:AudioData,player:Player){
+   this.data = data; this.player = player;
   this.rows=parse(AudioSceneSchema,data.scene);this.inputs={...this.rows.initial};this.chorusT=this.rows.chorus.initial;
   const {res,size,channels}=this.rows.fields;
   for(const [id,encoded]of Object.entries(channels))this.fields.set(id,this.lattices.lattice({res,size,values:Array.isArray(encoded)?{type:'f32',count:res*res,data:encoded.join('')}:encoded}));

@@ -115,7 +115,12 @@ export class RoadTileBacking {
   poolSliced: () => boolean = roadPoolSlicedOn;
   /** DW3 (mini-dw3): whether the pools merge into two reused arenas (`debug.roadPoolArena`); tests pass their own */
   poolArena: () => boolean = roadPoolArenaOn;
-  constructor(private readonly scope: Scope, private readonly store: RoadTileStore, private readonly culler: RoadCuller, private readonly origin?: string) {
+  private readonly scope: Scope;
+  private readonly store: RoadTileStore;
+  private readonly culler: RoadCuller;
+  private readonly origin: string | undefined;
+  constructor(scope: Scope, store: RoadTileStore, culler: RoadCuller, origin?: string) {
+    this.scope = scope; this.store = store; this.culler = culler; this.origin = origin;
     if (scope.disposed || scope.disposing) throw new Error('Road backing owner retired');
     this.captureWorker = origin === undefined ? null : new RoadTileCaptureWorker(scope.child('capture-worker'));
     scope.onDispose(() => {

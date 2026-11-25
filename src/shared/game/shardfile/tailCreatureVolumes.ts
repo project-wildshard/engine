@@ -42,7 +42,9 @@ export class TailCreatureVolumes implements CreatureVolumePose {
   private readonly parentTurn = new Quaternion();
   private static readonly FORWARD = new Vector3(0, 0, 1);
   private static readonly UP = new Vector3(0, 1, 0);
-  constructor(input: CreatureBody, joints: readonly CreatureRestJoint[], private readonly root: Root) {
+  private readonly root: Root;
+  constructor(input: CreatureBody, joints: readonly CreatureRestJoint[], root: Root) {
+    this.root = root;
     const body = v.parse(CreatureBodySchema, input), contract = bodyContract(body);
     if (body.skeleton !== 'biped' || body.stance !== 'horizontal' || body.trail === undefined || contract?.trail === undefined) {
       throw new Error('Tail volumes need a horizontal biped body');

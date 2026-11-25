@@ -65,7 +65,10 @@ export class TamingSession<A extends TamingHorse,H extends TamingHerd<A>> {
   input:{readonly held:(action:'ride.offer'|'lean.right'|'lean.left')=>boolean}|null=null;
   get companion():A|null{return this.bonded===null?null:this.actors.get(this.bonded)??null;}
   get promptHorse():A|null{return this.stallion===null?null:this.actors.get(this.stallion)??null;}
-  constructor(private readonly opts:TamingServices<A,H>,readonly scope:Scope){
+  private readonly opts: TamingServices<A,H>;
+  readonly scope: Scope;
+  constructor(opts:TamingServices<A,H>,scope:Scope){
+    this.opts = opts; this.scope = scope;
     this.lenders=[opts.player,opts.mount,opts.profile,opts.bond,opts.herds];this.program=ReturnProgram.page(opts.programs.approach,scope);if(this.program.prepareWorld===undefined)throw new Error('Missing taming world projection');this.project=this.program.prepareWorld;
     this.state=v.parse(v.record(v.string(),finite),{...opts.programs.initial});if(Object.keys(this.state).length>32)throw new Error('Taming state bound exceeded');
     let saved:string|null=null;try{saved=opts.bond.read();}catch{/* unavailable storage */}

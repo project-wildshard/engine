@@ -26,7 +26,10 @@ export class EliteDecisions implements EliteCoreScript<AnimalSim> {
   private built: SpawnScript | null = null;
   /** The fight's programme, made when a fight first asks: a page on a server never does. */
   get program(): SpawnScript { this.built ??= this.make(); return this.built; }
-  constructor(readonly row: Fight, private readonly make: () => SpawnScript, feature: EliteFeatureRows, seed: number) {
+  readonly row: Fight;
+  private readonly make: () => SpawnScript;
+  constructor(row: Fight, make: () => SpawnScript, feature: EliteFeatureRows, seed: number) {
+    this.row = row; this.make = make;
     this.def = row.def;
     this.spawnStream = eliteStream(feature, seed, 'spawn', row.def.id);
     this.frameRows = row.observations.filter(observation => ['dusk', 'night', 'god'].includes(observation.source));

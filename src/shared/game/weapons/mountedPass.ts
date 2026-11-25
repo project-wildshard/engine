@@ -36,7 +36,9 @@ export class MountedPassLaw {
   chainT = 0; mountCd = 0;
   private pendingAttack = false; private pendingHits = 0; private elapsed = 0;
   /** `law`: the sabre's admitted 10 Hz decision (a HeldDecision over its program) */
-  constructor(private readonly law: Pick<HeldDecision, 'update'>) {}
+  private readonly law: Pick<HeldDecision, 'update'>;
+  constructor(law: Pick<HeldDecision, 'update'>) {
+    this.law = law;}
   /** Snapshot the complete input/cadence state, without consuming an attack. */
   snapshot():MountedPassState{return {passChain:this.passChain,chainT:this.chainT,mountCd:this.mountCd,
     pendingAttack:this.pendingAttack,pendingHits:this.pendingHits,elapsed:this.elapsed};}

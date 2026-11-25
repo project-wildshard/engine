@@ -120,8 +120,16 @@ export class RidingActions {
   private events: RidingActionEvent[] = [];
   private readonly rules: ReturnProgram;
   private readonly herds: readonly HerdBrain<Animal>[];
-  constructor(private readonly ctx: LevelContext, private readonly mount: Mount, private readonly taming: PageTamingOwner,
-    private readonly player: Player, private readonly camera: THREE.PerspectiveCamera, private readonly animals: RowBodiesView, private readonly rows: RidingActionRows, owners: PageRidingOwners) {
+  private readonly ctx: LevelContext;
+  private readonly mount: Mount;
+  private readonly taming: PageTamingOwner;
+  private readonly player: Player;
+  private readonly camera: THREE.PerspectiveCamera;
+  private readonly animals: RowBodiesView;
+  private readonly rows: RidingActionRows;
+  constructor(ctx: LevelContext, mount: Mount, taming: PageTamingOwner,
+    player: Player, camera: THREE.PerspectiveCamera, animals: RowBodiesView, rows: RidingActionRows, owners: PageRidingOwners) {
+    this.ctx = ctx; this.mount = mount; this.taming = taming; this.player = player; this.camera = camera; this.animals = animals; this.rows = rows;
     this.herds = ridingHerds(owners, rows.herds);
     this.rules = ReturnProgram.page(rows.program, ctx.scope);
     this.hud = new RideHUD(ctx, camera, { tagRange: rows.tagRange, tagHeight: rows.tagHeight });

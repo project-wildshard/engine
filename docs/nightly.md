@@ -245,7 +245,7 @@ TC26's nine positive contracts run explicitly, outside hooks and
 Vitest discovery:
 
 ```sh
-node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs
+node --import ./scripts/bake-loader.mjs --test test/ci/coverage-fire-drill.proof.mjs
 ```
 
 They use pinned Nalati and Template, native physics, the installed format's

@@ -91,7 +91,14 @@ export class GroundMerge {
   private readonly cacheChannels = buildTier() !== 'phone';
   /** `onRebuild`: each new merged mesh, before it draws (its shadow flags, render order or a terrain's mesh slot) */
   /** `ignore`: channels the material never reads (DF10: a flat-shaded look's normals), left out of layouts and merges */
-  constructor(private readonly parent: Object3D, private readonly material: Material, private readonly name: string, private readonly onRebuild?: (mesh: Mesh) => void, readonly grouping: MergeGrouping = 'quadrant', private readonly ignore: ReadonlySet<string> = new Set()) {
+  private readonly parent: Object3D;
+  private readonly material: Material;
+  private readonly name: string;
+  private readonly onRebuild: ((mesh: Mesh) => void) | undefined;
+  readonly grouping: MergeGrouping;
+  private readonly ignore: ReadonlySet<string>;
+  constructor(parent: Object3D, material: Material, name: string, onRebuild?: (mesh: Mesh) => void, grouping: MergeGrouping = 'quadrant', ignore: ReadonlySet<string> = new Set()) {
+    this.parent = parent; this.material = material; this.name = name; this.onRebuild = onRebuild; this.grouping = grouping; this.ignore = ignore;
     if (grouping !== 'quadrant' && grouping !== 'cell' && grouping !== 'block' && grouping !== 'region') throw new Error('Unknown ground merge grouping');
   }
 

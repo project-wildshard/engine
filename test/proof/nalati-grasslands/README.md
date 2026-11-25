@@ -1,6 +1,6 @@
 # Nalati native compatibility witness — partial
 
-`node --experimental-transform-types --import ./scripts/sim-node-loader.mjs test/proof/nalati-grasslands/run.mjs all`
+`node --import ./scripts/sim-node-loader.mjs test/proof/nalati-grasslands/run.mjs all`
 
 The checked proof catalogue generated from `data/headlessAssembly.json` loads the admitted assembly, retained native boot/species rows, terrain/navmesh, the 35 native boot actors, groups, raids, flock, weather, mounted player and three hosted elites. A 120-tick walk is encoded against the immutable native basis, decoded byte-exactly, reinstalled and restored; both worlds then reproduce the same complete 60-tick suffix. Hashes cover every controller and canonical native body/collider/contact state. Both scopes must dispose to zero.
 

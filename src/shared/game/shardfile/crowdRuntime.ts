@@ -121,7 +121,10 @@ export function installDeclaredCrowdFrames(context: Pick<LevelContext, 'system'>
 /** Stable prey identity reads and damages the authoritative crowd member. */
 export class CrowdPrey {
   private readonly point = new Vector3();
-  constructor(readonly flock: CrowdMembers, readonly index: number) {}
+  readonly flock: CrowdMembers;
+  readonly index: number;
+  constructor(flock: CrowdMembers, index: number) {
+    this.flock = flock; this.index = index;}
   get position(): Vector3 { return this.flock.positions(this.index, this.point); }
   get yaw(): number { return this.flock.headingOf(this.index); }
   get alive(): boolean { return this.flock.isAlive(this.index); }
@@ -134,8 +137,11 @@ class CrowdMembers {
   readonly presentationOnly: boolean = false;
   readonly n: number;
   private readonly targetPose: FlockPose = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, phase: 0, graze: 0, dead: false, deathTime: 0, scale: 1, wool: 0 };
-  constructor(protected readonly controller: Pick<FlockBrain, 'n' | 'readPose' | 'kill'>,
-    private readonly targets: { readonly preyY: number; readonly hits: readonly (readonly number[])[] }) {
+  protected readonly controller: Pick<FlockBrain, 'n' | 'readPose' | 'kill'>;
+  private readonly targets: { readonly preyY: number; readonly hits: readonly (readonly number[])[] };
+  constructor(controller: Pick<FlockBrain, 'n' | 'readPose' | 'kill'>,
+    targets: { readonly preyY: number; readonly hits: readonly (readonly number[])[] }) {
+    this.controller = controller; this.targets = targets;
     if (!Number.isFinite(targets.preyY) || targets.hits.length === 0 || targets.hits.length > 16
       || targets.hits.some(row => row.length !== 3 || row.some(value => !Number.isFinite(value)) || (row[2] ?? 0) <= 0)) throw new Error('Invalid crowd target rows');
     this.n = controller.n;
@@ -167,8 +173,10 @@ class CrowdMembers {
 
 /** Native flock projection retains its existing predator/prey observations and commands. */
 export class CrowdTargets extends CrowdMembers {
-  constructor(private readonly flockController: Pick<FlockBrain, 'n' | 'alive' | 'cx' | 'cz' | 'panicking' | 'readPose' | 'kill' | 'scare' | 'straggler' | 'nearest'>,
-    targets: { readonly preyY: number; readonly hits: readonly (readonly number[])[] }) { super(flockController, targets); }
+  private readonly flockController: Pick<FlockBrain, 'n' | 'alive' | 'cx' | 'cz' | 'panicking' | 'readPose' | 'kill' | 'scare' | 'straggler' | 'nearest'>;
+  constructor(flockController: Pick<FlockBrain, 'n' | 'alive' | 'cx' | 'cz' | 'panicking' | 'readPose' | 'kill' | 'scare' | 'straggler' | 'nearest'>,
+    targets: { readonly preyY: number; readonly hits: readonly (readonly number[])[] }) { super(flockController, targets);
+    this.flockController = flockController; }
   get alive(): number { return this.flockController.alive; }
   get cx(): number { return this.flockController.cx; }
   get cz(): number { return this.flockController.cz; }
@@ -199,7 +207,11 @@ export class CrowdRoster<T extends CrowdMembers> {
   private readonly preyBindings = new Map<string, PackPrey>();
   private readonly point = new Vector3();
   private hit: { flock: T; index: number; distance: number } | null = null;
-  constructor(private readonly actors: readonly Animal[], private readonly crowds: readonly T[], private readonly prefix = 'crowd') {
+  private readonly actors: readonly Animal[];
+  private readonly crowds: readonly T[];
+  private readonly prefix;
+  constructor(actors: readonly Animal[], crowds: readonly T[], prefix = 'crowd') {
+    this.actors = actors; this.crowds = crowds; this.prefix = prefix;
     if (!/^[a-z][a-z0-9_.-]*$/u.test(prefix)) throw new Error('Invalid crowd identity prefix');
   }
   identity(prey: PackPrey): string {
@@ -235,7 +247,9 @@ export class CrowdWeaponTarget<T extends CrowdMembers> {
   private pending: {flock:T;index:number}|null=null;
   private readonly animal: TargetAnimal;
   private readonly result: TargetHit;
-  constructor(private readonly roster: CrowdRoster<T>,input:unknown){
+  private readonly roster: CrowdRoster<T>;
+  constructor(roster: CrowdRoster<T>,input:unknown){
+    this.roster = roster;
     if(!(roster instanceof CrowdRoster)||Object.getPrototypeOf(roster)!==CrowdRoster.prototype)throw new Error('Missing native crowd roster');
     const rows=parse(CrowdWeaponTargetSchema,input);
     const local = (): boolean => this.pending?.flock.presentationOnly === true;

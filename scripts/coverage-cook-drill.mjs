@@ -25,7 +25,7 @@ async function run(args,timeout=10000){
 const auditCode="import{writeFileSync}from'node:fs';import{auditCook,reportCook}from'./scripts/cook-audit.ts';const a=await auditCook(process.argv[1]);reportCook(a,process.argv[2]);writeFileSync(process.argv[3],JSON.stringify(a));";
 /** @param {string} receipt @param {string} name */
 async function audit(receipt,name,baseline=join(tree,'test/pins/cooked.json')){
-  const file=join(work,`${name}.json`),result=await run(['--import','./scripts/bake-loader.mjs','--experimental-transform-types','--input-type=module','--eval',auditCode,receipt,baseline,file]);
+  const file=join(work,`${name}.json`),result=await run(['--import','./scripts/bake-loader.mjs','--input-type=module','--eval',auditCode,receipt,baseline,file]);
   writeFileSync(join(out,`${name}.log`),result.text);
   return {...result,file,value:result.code===0?/** @type {import('./cook-audit').CookAudit} */(JSON.parse(readFileSync(file,'utf8'))):undefined};
 }

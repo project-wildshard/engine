@@ -27,9 +27,16 @@ const oneLayout = (geometries: readonly BufferGeometry[]): boolean =>
 export class WorldSceneBatch {
   private value: InstancedBatch | BatchedMesh | undefined;
   private fixed: BatchedCull[] | undefined;
-  constructor(private readonly row: WorldSceneBatchRow, private readonly material: Material,
-    private readonly geometry: readonly BufferGeometry[], private readonly owner: Scope, private readonly registry: Pick<WorldRegistry, 'add'>,
-    private readonly multiDraw = false) {}
+  private readonly row: WorldSceneBatchRow;
+  private readonly material: Material;
+  private readonly geometry: readonly BufferGeometry[];
+  private readonly owner: Scope;
+  private readonly registry: Pick<WorldRegistry, 'add'>;
+  private readonly multiDraw;
+  constructor(row: WorldSceneBatchRow, material: Material,
+    geometry: readonly BufferGeometry[], owner: Scope, registry: Pick<WorldRegistry, 'add'>,
+    multiDraw = false) {
+    this.row = row; this.material = material; this.geometry = geometry; this.owner = owner; this.registry = registry; this.multiDraw = multiDraw;}
 
   /** The batch object (built with its fixed copies on first use; refused once its owner is gone). */
   object(): InstancedBatch | BatchedMesh { return this.finish(); }

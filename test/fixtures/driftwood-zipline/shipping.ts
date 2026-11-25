@@ -17,7 +17,9 @@ export class ZiplineLayout {
   readonly flat: THREE.Vector3;
   readonly deck = { x: 0, z: 0, yaw: 0, y: 0, hw: 1.2, hd: 1.8 };
 
-  constructor(readonly spec: ZiplineSpec) {
+  readonly spec: ZiplineSpec;
+  constructor(spec: ZiplineSpec) {
+    this.spec = spec;
     const flat = this.flat = V(spec.bottom.x - spec.top.x, 0, spec.bottom.z - spec.top.z).normalize();
     // the deck: 3.6 m long, its outer edge at `top`, running back up the slope
     this.deck.yaw = Math.atan2(flat.x, flat.z);

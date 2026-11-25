@@ -31,10 +31,22 @@ export class OriginalNativePopulationDriver {
   private readonly route = { elite: 0, wolf: 0, dog: 0, held: 0 };
   private readonly missing = new Error('Missing native population context');
   private dodgeCd = 0;
-  constructor(private readonly host: SimHost, private readonly manager: NativeManager, private readonly hunt: StalkerBrain<HuntBody>, private readonly rng: Rng,
-    private readonly bodies: HuntBody[], private readonly packs: ReadonlyMap<AnimalSim, PackBrain<AnimalSim>>,
-    private readonly herds: ReadonlyMap<AnimalSim, HerdBrain<AnimalSim>>, private readonly elites: NativeEliteBindings,
-    private readonly flocks: readonly FlockBrain[], private readonly wolves: readonly FlockThreat[], private readonly rows: NativeDriverRows, groups: NativeGroupCollection) {
+  private readonly host: SimHost;
+  private readonly manager: NativeManager;
+  private readonly hunt: StalkerBrain<HuntBody>;
+  private readonly rng: Rng;
+  private readonly bodies: HuntBody[];
+  private readonly packs: ReadonlyMap<AnimalSim, PackBrain<AnimalSim>>;
+  private readonly herds: ReadonlyMap<AnimalSim, HerdBrain<AnimalSim>>;
+  private readonly elites: NativeEliteBindings;
+  private readonly flocks: readonly FlockBrain[];
+  private readonly wolves: readonly FlockThreat[];
+  private readonly rows: NativeDriverRows;
+  constructor(host: SimHost, manager: NativeManager, hunt: StalkerBrain<HuntBody>, rng: Rng,
+    bodies: HuntBody[], packs: ReadonlyMap<AnimalSim, PackBrain<AnimalSim>>,
+    herds: ReadonlyMap<AnimalSim, HerdBrain<AnimalSim>>, elites: NativeEliteBindings,
+    flocks: readonly FlockBrain[], wolves: readonly FlockThreat[], rows: NativeDriverRows, groups: NativeGroupCollection) {
+    this.host = host; this.manager = manager; this.hunt = hunt; this.rng = rng; this.bodies = bodies; this.packs = packs; this.herds = herds; this.elites = elites; this.flocks = flocks; this.wolves = wolves; this.rows = rows;
     const tokens = groups.tokens; if (!groups.owns(host) || tokens === undefined || tokens.id !== rows.tokens || !(tokens.owners instanceof WeakMap)) throw new Error('Missing native manager tokens'); this.tokens = tokens.owners;
     if (bodies.length > 64 || flocks.length > 4) throw new Error('Native population driver capacity exceeded');
     this.author = ReturnProgram.native(host, rows.program);

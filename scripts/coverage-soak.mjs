@@ -36,7 +36,7 @@ for(const run of page.workflow_runs.filter(row=>row.status==='completed')){
   if(matches.length!==1){observations.push({run:run.id,sha:run.head_sha,started:run.run_started_at??run.created_at,completed:run.updated_at,ok:false,error:'Expected exactly one soak step'});continue;}
   const {job,step}=matches[0];
   const log=stripVTControlCharacters(execFileSync('gh',['api','--allow-escape-sequences',`repos/project-wildshard/engine/actions/jobs/${job.id}/logs`],{encoding:'utf8',timeout:30000,maxBuffer:32*1024*1024}));
-  const begin=log.indexOf('##[group]Run node --import ./scripts/bake-loader.mjs --experimental-transform-types --test test/ci/coverage-fire-drill.proof.mjs');
+  const begin=log.indexOf('##[group]Run node --import ./scripts/bake-loader.mjs --test test/ci/coverage-fire-drill.proof.mjs');
   const end=begin===-1?-1:log.indexOf('##[group]',begin+10),body=begin===-1?'':log.slice(begin,end===-1?undefined:end);
   const counts=Object.fromEntries(['tests','pass','fail','skipped','cancelled','todo'].map(name=>[name,Number(new RegExp(`(?:#|ℹ)\\s+${name}\\s+(\\d+)`,'u').exec(body)?.[1]??'NaN')]));
   const ok=step.conclusion==='success'&&counts.tests===expected.length&&counts.pass===expected.length&&counts.fail===0&&counts.skipped===0&&counts.cancelled===0&&counts.todo===0;

@@ -82,7 +82,9 @@ export class TrophyWall {
   /** the baked mounts pack's rows and its blob URL; each slot's geometry in the pack by entry id */
   private readonly pack: CollectionMountPack;
 
-  constructor(private opts: TrophyWallOptions) {
+  private opts: TrophyWallOptions;
+  constructor(opts: TrophyWallOptions) {
+    this.opts = opts;
     this.pack = opts.pack;
     const slots = opts.state.def.trophies ?? [];
     let k = 0;

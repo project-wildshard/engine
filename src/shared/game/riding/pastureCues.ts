@@ -13,7 +13,9 @@ export interface PastureCue { kind: string; text: string; sound: string | null; 
 
 export class PastureCues {
   private readonly pending: PastureCue[] = [];
-  constructor(private readonly rows: PastureActorRows['cues']) {}
+  private readonly rows: PastureActorRows['cues'];
+  constructor(rows: PastureActorRows['cues']) {
+    this.rows = rows;}
   /** The raid controller's cue sink: `kind`'s row, for `actor` when one is named. */
   readonly sink = (kind: string, actor?: { readonly entityId: string }): void => {
     const cue = this.rows[kind]; if (cue === undefined) throw new Error('Missing pasture cue row');

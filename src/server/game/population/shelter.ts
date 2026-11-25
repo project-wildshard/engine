@@ -39,7 +39,11 @@ export class HerdShelter<T extends Tree> {
     goal: { x: number; z: number; r: number } | null }>();
 
   /** `animals` lends the herds; each tree carries its fixed crown-cover sample; `look` supplies the rule's numbers. */
-  constructor(private readonly animals: { readonly herds: readonly Herd[] }, trees: readonly T[], private readonly look: HerdShelterRows, private readonly program: ReturnProgram) {
+  private readonly animals: { readonly herds: readonly Herd[] };
+  private readonly look: HerdShelterRows;
+  private readonly program: ReturnProgram;
+  constructor(animals: { readonly herds: readonly Herd[] }, trees: readonly T[], look: HerdShelterRows, program: ReturnProgram) {
+    this.animals = animals; this.look = look; this.program = program;
     if (trees.length > 16384) throw new Error('Population shelter tree bound exceeded');
     this.kinds = new Set(look.kinds);
     this.big = trees.filter((t) => t.height >= look.bigTree);

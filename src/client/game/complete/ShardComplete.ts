@@ -65,7 +65,9 @@ const required = (root: HTMLElement, selector: string): HTMLElement => {
 export class ShardComplete {
   /** MOSSGATE-ZONE MZ37: the card's owner. Without one, `open` takes the ambient owner, which a poll's callback can leave on a
    *  scope already disposed (the talk box that just closed): the card then mounts nothing and is never up, silently. */
-  constructor(private readonly owner?: Scope) {}
+  private readonly owner: Scope | undefined;
+  constructor(owner?: Scope) {
+    this.owner = owner;}
   private root: HTMLElement | null = null;
   private handlers: CompleteHandlers | null = null;
   private viewScope: Scope | null = null;

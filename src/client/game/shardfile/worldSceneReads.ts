@@ -17,7 +17,10 @@ export class WorldSceneReads {
   private readonly read;
   private readonly scope;
   private readonly forget: readonly (() => void)[];
-  constructor(private readonly ctx: Context, private readonly resident: Scope, files: readonly string[]) {
+  private readonly ctx: Context;
+  private readonly resident: Scope;
+  constructor(ctx: Context, resident: Scope, files: readonly string[]) {
+    this.ctx = ctx; this.resident = resident;
     this.product = ctx.product; this.read = this.product.file; this.scope = ctx.scope;
     this.validate();
     this.queue(files);

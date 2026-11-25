@@ -104,7 +104,10 @@ export class Owned {
 
   readonly shard: string;
   /** The page save or an injected continuation slot owns the same durable rows; `kept` is the shard's kept rows. */
-  constructor(shard: string, private readonly save: Pick<typeof ownedSave, 'read' | 'write'> = ownedSave, readonly kept: KeptItems = keptItems()) {
+  private readonly save: Pick<typeof ownedSave, 'read' | 'write'>;
+  readonly kept: KeptItems;
+  constructor(shard: string, save: Pick<typeof ownedSave, 'read' | 'write'> = ownedSave, kept: KeptItems = keptItems()) {
+    this.save = save; this.kept = kept;
     this.shard = shard;
     const saved = this.save.read(saveSlug(shard));
     const { owned, worn } = saved as { owned?: unknown; worn?: unknown };

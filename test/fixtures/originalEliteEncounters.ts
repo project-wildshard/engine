@@ -79,7 +79,9 @@ export class HerdEliteProjection {
   private readonly rows;
   private state:v.InferOutput<typeof HerdProjectionSaved>={laneT:0,runT:0,lastState:'',elapsed:0,laneFrom:[0,0,0],laneTo:[0,0,0]};
   private readonly effects={signature:false,lead:false,adopt:false};
-  constructor(input:unknown,private readonly program:ReturnProgram){
+  private readonly program: ReturnProgram;
+  constructor(input:unknown,program:ReturnProgram){
+    this.program = program;
     if(!(program instanceof ReturnProgram)||Object.getPrototypeOf(program)!==ReturnProgram.prototype)throw new Error('Missing native encounter programme');
     this.rows=v.parse(HerdProjectionRows,input);
   }

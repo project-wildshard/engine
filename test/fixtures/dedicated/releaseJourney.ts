@@ -14,8 +14,10 @@ const sleep = async (ms: number): Promise<void> => {await new Promise(resolve =>
 
 export class ReleaseRider extends RestartRider {
   declare readonly ride: ReleaseRide;
-  constructor(connect: () => RoomBot, index: number, private readonly fighter: boolean) {
+  private readonly fighter: boolean;
+  constructor(connect: () => RoomBot, index: number, fighter: boolean) {
     super(connect, index, false);
+    this.fighter = fighter;
     Object.assign(this.ride, {reseats: [], firstCountdownMs: null});
   }
   /** Seated now? (for the hourly holding line) */

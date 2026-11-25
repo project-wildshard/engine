@@ -27,7 +27,7 @@ await test('the worker-only cold bake retains every plain-grid collision byte', 
     /** @param {string} name @param {string[]} [extra] */
     const bake=async(name,extra=[])=>{
       const output=join(scratch,name),started=performance.now();
-      await promisify(execFile)(process.execPath,['--experimental-transform-types','--import','./scripts/bake-loader.mjs','scripts/bake-grid-seams.mjs',output,...extra],{maxBuffer:64*1024*1024,timeout:55_000});
+      await promisify(execFile)(process.execPath,['--import','./scripts/bake-loader.mjs','scripts/bake-grid-seams.mjs',output,...extra],{maxBuffer:64*1024*1024,timeout:55_000});
       return {output,milliseconds:performance.now()-started};
     };
     const collision=await bake('collision',['--collision-only']);

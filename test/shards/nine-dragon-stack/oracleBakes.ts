@@ -14,7 +14,9 @@ export type SpecimenRows = v.InferOutput<typeof SpecimenRowsSchema>;
 
 /** Keyed standard GLB geometries, with original typed channels and index. */
 export class SpecimenBake {
-  constructor(private readonly entries: Map<string, BufferGeometry>) {}
+  private readonly entries: Map<string, BufferGeometry>;
+  constructor(entries: Map<string, BufferGeometry>) {
+    this.entries = entries;}
   has(key: string): boolean { return this.entries.has(key); }
   geometry(key: string): BufferGeometry {
     const geometry = this.entries.get(key);

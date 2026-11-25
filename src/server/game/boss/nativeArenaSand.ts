@@ -42,7 +42,12 @@ export class NativeArenaSand {
   private readonly recipe:string;
   /** The drifts as a client reads them, as last published. */
   wire:readonly SandRow[]=[];
-  constructor(private readonly host:SimHost,private readonly rows:ConstructorParameters<typeof ArenaRoomGround>[0],private readonly id:string,private readonly wireName:string){
+  private readonly host: SimHost;
+  private readonly rows: ConstructorParameters<typeof ArenaRoomGround>[0];
+  private readonly id: string;
+  private readonly wireName: string;
+  constructor(host:SimHost,rows:ConstructorParameters<typeof ArenaRoomGround>[0],id:string,wireName:string){
+    this.host = host; this.rows = rows; this.id = id; this.wireName = wireName;
     if(id.length===0||rows.sandCells>256)throw new Error('Missing bounded room sand owner');
     this.ground=new ArenaRoomGround(rows);
     this.options={x:rows.origin.x,y:rows.origin.y,z:rows.origin.z,size:rows.halfWidth*2,res:rows.sandCells+1,material:'sand' as const,owner:id};

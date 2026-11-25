@@ -24,8 +24,12 @@ export class RespawnQueue {
   readonly pending: RespawnEntry[] = [];
   private readonly due: RespawnEntry[] = [];
   private readonly traversal: RespawnTraversal;
-  constructor(private rules: Record<string, RespawnRule>, private outOfSight: number,
-    traversal?: RespawnTraversal, private readonly program?: ReturnProgram) {
+  private rules: Record<string, RespawnRule>;
+  private outOfSight: number;
+  private readonly program: ReturnProgram | undefined;
+  constructor(rules: Record<string, RespawnRule>, outOfSight: number,
+    traversal?: RespawnTraversal, program?: ReturnProgram) {
+    this.rules = rules; this.outOfSight = outOfSight; this.program = program;
     this.traversal = traversal ?? { order: 'reverse', limit: 256, result: 'reuse' };
     const limit = this.traversal.limit;
     if (limit !== null && (!Number.isSafeInteger(limit) || limit < 1)) throw new RangeError('Invalid population return bound');

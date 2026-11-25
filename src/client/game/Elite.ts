@@ -142,7 +142,11 @@ export class Elites {
   /** the elite whose bar is up (nearest aware / engaged) */
   get focus(): Entry | null { return this.view.focus; }
 
-  constructor(private readonly host: PageEliteHost, private readonly bar: EliteBar, slug: string, private readonly persistence: ElitePersistence = elitesSave) {
+  private readonly host: PageEliteHost;
+  private readonly bar: EliteBar;
+  private readonly persistence: ElitePersistence;
+  constructor(host: PageEliteHost, bar: EliteBar, slug: string, persistence: ElitePersistence = elitesSave) {
+    this.host = host; this.bar = bar; this.persistence = persistence;
     this.view = new EliteView(host, bar, this.scope, () => this.entered, id => this.core.record(id), () => { this.core.save(); });
     this.core = new EliteCore<EliteScript>(host, this.view.hooks, slug, persistence);
   }

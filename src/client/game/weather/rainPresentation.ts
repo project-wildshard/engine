@@ -72,7 +72,12 @@ export class RainPresentation {
   private readonly xrng = new Rng(SEED ^ 0x7e11);
 
   /** `rows` the validated rain rows, `roofs` the roof mask, `pack` the bake (the puddles, then the crowns' floats). */
-  private constructor(private readonly rows: RainPresentationRows, private readonly roofs: ForestRoofMask, private readonly pack: GeometryPack, private readonly channels: unknown) {
+  private readonly rows: RainPresentationRows;
+  private readonly roofs: ForestRoofMask;
+  private readonly pack: GeometryPack;
+  private readonly channels: unknown;
+  private constructor(rows: RainPresentationRows, roofs: ForestRoofMask, pack: GeometryPack, channels: unknown) {
+    this.rows = rows; this.roofs = roofs; this.pack = pack; this.channels = channels;
     const look = rows.look, hood = rows.hood;
     this.coverN = look.coverN;
     this.coverData = new Uint8Array(this.coverN * this.coverN * 4);

@@ -331,9 +331,19 @@ export interface NativeDeferredSpawn { id: string; variant: string; seed: number
 /** Existing manager-owned deferred actors use the same identity allocator,
  * stream and native admission as boot actors. No factory callback is accepted. */
 export class NativeDeferredRoster {
-  constructor(private readonly host: SimHost, private readonly intake: ReturnType<typeof createNativeCreatureRoster<NativeCreatureSlot>>, private readonly hunt: StalkerBrain<HuntBody>, private readonly rng: Rng,
-    private readonly bodies: HuntBody[], private readonly sight: (boolean | null | undefined)[], private readonly retired: Set<string>,
-    private readonly absent: Set<AnimalSim>, private readonly rows: { limit: number; spawnY: number; motorKinds: readonly string[]; retiredY: number }) {
+  private readonly host: SimHost;
+  private readonly intake: ReturnType<typeof createNativeCreatureRoster<NativeCreatureSlot>>;
+  private readonly hunt: StalkerBrain<HuntBody>;
+  private readonly rng: Rng;
+  private readonly bodies: HuntBody[];
+  private readonly sight: (boolean | null | undefined)[];
+  private readonly retired: Set<string>;
+  private readonly absent: Set<AnimalSim>;
+  private readonly rows: { limit: number; spawnY: number; motorKinds: readonly string[]; retiredY: number };
+  constructor(host: SimHost, intake: ReturnType<typeof createNativeCreatureRoster<NativeCreatureSlot>>, hunt: StalkerBrain<HuntBody>, rng: Rng,
+    bodies: HuntBody[], sight: (boolean | null | undefined)[], retired: Set<string>,
+    absent: Set<AnimalSim>, rows: { limit: number; spawnY: number; motorKinds: readonly string[]; retiredY: number }) {
+    this.host = host; this.intake = intake; this.hunt = hunt; this.rng = rng; this.bodies = bodies; this.sight = sight; this.retired = retired; this.absent = absent; this.rows = rows;
     if (nativeRosters.get(intake) !== host || !(hunt instanceof StalkerBrain) || !(rng instanceof Rng) || rows.limit < 1 || rows.limit > 1024
       || bodies.length > rows.limit || bodies.length !== sight.length || bodies.some(actor => host.entities.get(actor.entityId) !== actor)) throw new Error('Invalid deferred roster owners');
   }

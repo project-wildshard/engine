@@ -92,7 +92,9 @@ export class QuestViews {
   private readonly resident: Scope;
   private entered: Scope | undefined;
   private readonly names = new Set<string>();
-  constructor(private readonly context: ShardContext) {
+  private readonly context: ShardContext;
+  constructor(context: ShardContext) {
+    this.context = context;
     if (context.scope.disposed) throw new Error('Quest views need a live scope');
     this.retained = retainsRuntimeServices(context);
     this.resident = context.scope;

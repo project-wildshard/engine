@@ -10,7 +10,10 @@ const second = { width: 16, height: 16, close: vi.fn() };
 let noCanvas = false;
 let canvases = 0;
 class Canvas {
-  constructor(readonly width: number, readonly height: number) { canvases++; }
+  readonly width: number;
+  readonly height: number;
+  constructor(width: number, height: number) {
+    this.width = width; this.height = height; canvases++; }
   getContext(): object | null {
     if (noCanvas) return null;
     return {

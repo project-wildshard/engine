@@ -38,7 +38,10 @@ const TrailSeats = schema.object({ others: schema.optional(schema.record(schema.
 export class TrampleTrail {
   private lastX = Number.NaN;
   private lastZ = Number.NaN;
-  constructor(private readonly map: TrampleField, private readonly speedLimit: number) {
+  private readonly map: TrampleField;
+  private readonly speedLimit: number;
+  constructor(map: TrampleField, speedLimit: number) {
+    this.map = map; this.speedLimit = speedLimit;
     if (!Number.isFinite(speedLimit) || speedLimit <= 0) throw new Error('Invalid trail speed limit');
   }
   push(dt: number, at: { readonly x: number; readonly z: number }, radius: number, strength = 1): void {

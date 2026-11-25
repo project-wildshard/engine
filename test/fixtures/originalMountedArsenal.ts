@@ -126,7 +126,10 @@ export class VariantBowPower {
   private readonly pending:{t:number;target:TargetAnimal;point:THREE.Vector3;dir:THREE.Vector3;base:number}[]=[];
   private sunShot=false;
   private readonly origin=new THREE.Vector3();private readonly direction=new THREE.Vector3();private readonly velocity=new THREE.Vector3();private readonly at=new THREE.Vector3();private readonly segment=new THREE.Vector3();
-  constructor(scene:THREE.Scene,private readonly camera:THREE.Camera,private readonly rows:BowVariantRows){
+  private readonly camera: THREE.Camera;
+  private readonly rows: BowVariantRows;
+  constructor(scene:THREE.Scene,camera:THREE.Camera,rows:BowVariantRows){
+    this.camera = camera; this.rows = rows;
     if(this.rows.trail.points>48)throw new Error('Bow prediction exceeds its native contact bound');
     this.trail=new ProjectedTrail(scene,camera,this.rows.trail);
   }

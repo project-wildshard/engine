@@ -13,7 +13,10 @@ export class OriginalArenaField {
   private clock = 0;
   private contactElapsed = 0;
   private readonly contact: ProjectedState | null;
-  constructor(input: ArenaFieldRows, private readonly program: ReturnProgram, private readonly random: Rng) {
+  private readonly program: ReturnProgram;
+  private readonly random: Rng;
+  constructor(input: ArenaFieldRows, program: ReturnProgram, random: Rng) {
+    this.program = program; this.random = random;
     this.rows = input;
     this.contact = this.rows.contact === undefined ? null : new ProjectedState(this.rows.contact.law, program);
     this.modes = new Uint8Array(this.rows.width * this.rows.depth);

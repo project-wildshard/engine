@@ -28,7 +28,9 @@ export class ShippingFlock {
   private uTime = { value: 0 };
   readonly wool: number[] = [];
   alive: number;
-  constructor(private readonly ports: OraclePorts, opts: OracleOpts) {
+  private readonly ports: OraclePorts;
+  constructor(ports: OraclePorts, opts: OracleOpts) {
+    this.ports = ports;
     this.n = opts.count; this.alive = opts.count;
     this.cx = this.tx = this.homeX = opts.x; this.cz = this.tz = this.homeZ = opts.z; this.range = opts.range ?? 45;
     const n = this.n;

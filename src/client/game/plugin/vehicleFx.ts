@@ -114,7 +114,9 @@ class Chunks {
   private cursor = 0;
   private readonly matrix = new THREE.Matrix4(); private readonly q = new THREE.Quaternion(); private readonly e = new THREE.Euler();
   private readonly p = new THREE.Vector3(); private readonly k = new THREE.Vector3(); private readonly tint = new THREE.Color();
-  constructor(readonly capacity: number, scope: Scope) {
+  readonly capacity: number;
+  constructor(capacity: number, scope: Scope) {
+    this.capacity = capacity;
     const geometry = scope.own(new THREE.BoxGeometry(1, 0.6, 0.8)), material = scope.own(new THREE.MeshStandardMaterial({ roughness: 0.8, flatShading: true }));
     this.mesh = new THREE.InstancedMesh(geometry, material, capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.mesh.frustumCulled = false; this.mesh.castShadow = true;

@@ -70,7 +70,9 @@ export class NearPlaceholders {
   private readonly distances = new Map<string, number>();
   private generation = 0;
   private disposed = false;
-  constructor(private readonly host: NearPlaceholderHost) {}
+  private readonly host: NearPlaceholderHost;
+  constructor(host: NearPlaceholderHost) {
+    this.host = host;}
 
   /** Re-plan around the eye (grid metres; the caller converts from its frame) and stream the difference. */
   update(eye: Readonly<{ x: number; z: number }>, entered: string | null): void {

@@ -115,7 +115,14 @@ export class RoadTilePool {
   /** DW3 (mini-dw3, `debug.roadPoolArena`): two arenas; a merge fills the one the drawn mesh (`side`) does not hold */
   private arenas: readonly [RoadTileArena, RoadTileArena] | null = null;
   private side = 0;
-  constructor(private readonly owner: Scope, private readonly material: Material, private readonly culler: RoadCuller, private readonly name: string, private readonly receiveShadow = true, private readonly renderOrder = 0) {
+  private readonly owner: Scope;
+  private readonly material: Material;
+  private readonly culler: RoadCuller;
+  private readonly name: string;
+  private readonly receiveShadow;
+  private readonly renderOrder;
+  constructor(owner: Scope, material: Material, culler: RoadCuller, name: string, receiveShadow = true, renderOrder = 0) {
+    this.owner = owner; this.material = material; this.culler = culler; this.name = name; this.receiveShadow = receiveShadow; this.renderOrder = renderOrder;
     if (!Number.isFinite(renderOrder)) throw new Error('Invalid road render order');
     if (owner.disposed || owner.disposing) throw new Error('Road tile pool owner retired');
     this.current = this.makeMesh(new BufferGeometry()); this.root.name = name; this.root.matrixAutoUpdate = false; this.root.updateMatrix(); this.root.add(this.current);

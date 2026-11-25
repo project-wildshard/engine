@@ -109,7 +109,9 @@ export class Filament {
   private readonly pair = [0, 0];
   private readonly triple = [0, 0, 0];
 
-  constructor(n: number, topology: unknown, private readonly look: string, uniforms: GrappleFilamentUniforms) {
+  private readonly look: string;
+  constructor(n: number, topology: unknown, look: string, uniforms: GrappleFilamentUniforms) {
+    this.look = look;
     this.n = n; this.u = uniformsFrom(uniforms);
     if (!Number.isInteger(n) || n < 2 || n > 128) throw new Error('Invalid grapple ribbon size');
     const g = new BufferGeometryLoader().parse(topology);

@@ -70,7 +70,9 @@ export class HeldEquipment {
   private toolLoad: Promise<HeldToolFile> | null = null;
   private toolReady: HeldToolFile | null = null;
 
-  constructor(private readonly product: ShardFolder) {
+  private readonly product: ShardFolder;
+  constructor(product: ShardFolder) {
+    this.product = product;
     this.rows = v.parse(HeldEquipmentSchema, product.section('held/equipment'));
     const { launcher, hands, firearm } = this.rows;
     this.library = createModelLibrary({ meshes: [], meshUrls: {}, hd: [], hdUrls: {}, aoFloor: 1, hdLooks: {}, geometryPools: [

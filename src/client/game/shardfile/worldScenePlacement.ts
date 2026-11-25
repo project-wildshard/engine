@@ -83,11 +83,21 @@ export class WorldScenePlacement {
   /** FC12: a culled ranged placement's resident tiles (holders per tile) and the culler's version of them */
   private readonly holders = new Map<number, number>();
   private residentVersion = 0;
-  constructor(private readonly ctx: ShardContext, private readonly row: WorldScenePlacementRow,
-    private readonly catalogue: Pick<ReturnType<typeof defineWorldSceneCatalogue>, 'model'> & { readonly reach?: (key: string) => number }, private readonly owner: Scope,
-    private readonly materials: Map<string, Material>, private readonly sources: readonly Extract<WorldScenesSection['materials'][number], { kind: 'source' }>[], private readonly handles?: Pick<SceneHandles, 'object'>,
-    private readonly coarseMaterials?: { readonly slots: ReadonlySet<string>; readonly origin: { readonly x: number; readonly z: number };
-      readonly later: (at: { readonly x: number; readonly z: number }, run: () => Promise<void>) => void }) {}
+  private readonly ctx: ShardContext;
+  private readonly row: WorldScenePlacementRow;
+  private readonly catalogue: Pick<ReturnType<typeof defineWorldSceneCatalogue>, 'model'> & { readonly reach?: (key: string) => number };
+  private readonly owner: Scope;
+  private readonly materials: Map<string, Material>;
+  private readonly sources: readonly Extract<WorldScenesSection['materials'][number], { kind: 'source' }>[];
+  private readonly handles: Pick<SceneHandles, 'object'> | undefined;
+  private readonly coarseMaterials: { readonly slots: ReadonlySet<string>; readonly origin: { readonly x: number; readonly z: number };
+      readonly later: (at: { readonly x: number; readonly z: number }, run: () => Promise<void>) => void } | undefined;
+  constructor(ctx: ShardContext, row: WorldScenePlacementRow,
+    catalogue: Pick<ReturnType<typeof defineWorldSceneCatalogue>, 'model'> & { readonly reach?: (key: string) => number }, owner: Scope,
+    materials: Map<string, Material>, sources: readonly Extract<WorldScenesSection['materials'][number], { kind: 'source' }>[], handles?: Pick<SceneHandles, 'object'>,
+    coarseMaterials?: { readonly slots: ReadonlySet<string>; readonly origin: { readonly x: number; readonly z: number };
+      readonly later: (at: { readonly x: number; readonly z: number }, run: () => Promise<void>) => void }) {
+    this.ctx = ctx; this.row = row; this.catalogue = catalogue; this.owner = owner; this.materials = materials; this.sources = sources; this.handles = handles; this.coarseMaterials = coarseMaterials;}
 
   load(): Promise<Placed> {
     if (this.owner.disposed) return Promise.reject(new Error('Scene placement owner is disposed'));

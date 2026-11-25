@@ -40,8 +40,13 @@ export class PopulationProjection {
   private readonly matrix = new THREE.Matrix4(); private readonly scale = new THREE.Vector3(1, 1, 1);
   /** `lightScene`: the scene whose light pool lends this projection's lights (the page's root scene): a light count that
    *  leaves with a region recompiles every lit program in view (B7, LightPool) */
-  constructor(private readonly animals: RowBodiesView, private readonly scene: THREE.Scene, sky: SkyRig, private readonly scope: Scope, input: unknown,
-    private readonly lightScene: THREE.Scene = scene) {
+  private readonly animals: RowBodiesView;
+  private readonly scene: THREE.Scene;
+  private readonly scope: Scope;
+  private readonly lightScene: THREE.Scene;
+  constructor(animals: RowBodiesView, scene: THREE.Scene, sky: SkyRig, scope: Scope, input: unknown,
+    lightScene: THREE.Scene = scene) {
+    this.animals = animals; this.scene = scene; this.scope = scope; this.lightScene = lightScene;
     this.rows = v.parse(PopulationProjectionSchema, input); const row = this.rows;
     this.countedRows = Object.entries(row.counts).map(([id, count]) => [id, count.kind]);
     for (const [, kind] of this.countedRows) this.kindCounts.set(kind, 0);

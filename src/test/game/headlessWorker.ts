@@ -28,7 +28,7 @@ export async function createNativeProofWorker(shard: Shardfile, assets: Readonly
   const binary = options.binary ?? createRequire(import.meta.url).resolve('@dimforge/rapier3d-simd/rapier_wasm3d_bg.wasm');
   flushCompileCache();
   const worker = new TickWorkerHost(new URL('./headless/worker.ts', import.meta.url), undefined,
-    shard.serverBudget, ['--experimental-transform-types', '--import', new URL('../../../scripts/sim-node-loader.mjs', import.meta.url).href], 'advisory', async () => {
+    shard.serverBudget, ['--import', new URL('../../../scripts/sim-node-loader.mjs', import.meta.url).href], 'advisory', async () => {
       await prepareAssetDecoders();
       validateShardfileAssets(shard, assets, hashImmutableBytes, offlineMemoryAdmission('refuse'), undefined, scriptAdmissionRows(sections), sections);
       const admitted = new Map<string, Uint8Array>();

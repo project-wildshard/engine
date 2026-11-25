@@ -87,8 +87,12 @@ export class Mount extends MountedBody {
     adopt: words => { this.restoreRide(words, 0); } };
   /** Present on a wire: `Player` reads the fixed step's controls off the command through this. */
   get predicted(): PredictedRide | undefined { return this.wire === null ? undefined : this.saddle; }
-  constructor(private readonly ctx: LevelContext, player: Player, private readonly animals: RowBodiesView, private readonly opts: MountProfile) {
+  private readonly ctx: LevelContext;
+  private readonly animals: RowBodiesView;
+  private readonly opts: MountProfile;
+  constructor(ctx: LevelContext, player: Player, animals: RowBodiesView, opts: MountProfile) {
     super(opts.speeds);
+    this.ctx = ctx; this.animals = animals; this.opts = opts;
     this.companions = new MountCompanions(opts);
     enterMount(ctx.scope, player, this);
     this.player = player; this.input = ctx.app.input;

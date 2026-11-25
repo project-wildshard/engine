@@ -104,7 +104,7 @@ test('re-signed malformed members and original receipt keys/file maps still refu
 
 test('command-only changes and symlink destinations or parents cannot acquire a restored cache',async()=>{
   const f=await fixture();
-  expect(()=>restoreNativeFixtures(f.wire,f.identity,[{...f.spec,transformTypes:true}],f.out)).toThrow('source/tool/host key');
+  expect(()=>restoreNativeFixtures(f.wire,f.identity,[{...f.spec,nodeArgs:['--no-warnings']}],f.out)).toThrow('source/tool/host key');
   expect(existsSync(f.out)).toBe(false);
   const link=resolve(f.root,'linked');symlinkSync(resolve(f.root,'producer'),link,'dir');
   expect(()=>restoreNativeFixtures(f.wire,f.identity,[f.spec],link)).toThrow('symlink');

@@ -188,7 +188,9 @@ const shade: number[] = [0, 0, 0], rim: number[] = [0, 0, 0];
 export class PaintedPanorama {
   readonly dome: Mesh;
   private readonly rows: v.InferOutput<typeof PaintedPanoramaSchema>;
-  private constructor(rows: v.InferOutput<typeof PaintedPanoramaSchema>, dome: Mesh, private readonly uniforms: Readonly<Record<string, IUniform<LentValue>>>) { this.rows = rows; this.dome = dome; }
+  private readonly uniforms: Readonly<Record<string, IUniform<LentValue>>>;
+  private constructor(rows: v.InferOutput<typeof PaintedPanoramaSchema>, dome: Mesh, uniforms: Readonly<Record<string, IUniform<LentValue>>>) {
+    this.uniforms = uniforms; this.rows = rows; this.dome = dome; }
   static async build(scene: Scene, anisotropy: number, scope: Scope, input: unknown, level: { readonly ridge: readonly number[]; readonly lut: Texture; readonly uniforms: Readonly<Record<string, IUniform<LentValue>>> }): Promise<PaintedPanorama | null> {
     const rows = v.parse(PaintedPanoramaSchema, input), d = rows.dome, p = d.params;
     const image = scope.own(await loadTextureRow({ url: d.image[TIER], srgb: true, wrapT: ClampToEdgeWrapping, anisotropy }));
@@ -240,7 +242,11 @@ const D2R = Math.PI / 180, keyDir = new Vector3(), mixed = new Color();
 export class PainterKeyLight {
   private readonly rows: v.InferOutput<typeof PainterKeyLightSchema>;
   private readonly sky: Color; private readonly ground: Color;
-  constructor(input: unknown, private readonly rig: SkyRig, private readonly daySaturation: number, private readonly saturation: IUniform<number>) {
+  private readonly rig: SkyRig;
+  private readonly daySaturation: number;
+  private readonly saturation: IUniform<number>;
+  constructor(input: unknown, rig: SkyRig, daySaturation: number, saturation: IUniform<number>) {
+    this.rig = rig; this.daySaturation = daySaturation; this.saturation = saturation;
     this.rows = v.parse(PainterKeyLightSchema, input); this.sky = new Color(...this.rows.sky); this.ground = new Color(...this.rows.ground);
   }
   apply(look: PainterSkyLook): void {

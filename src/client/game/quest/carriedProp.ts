@@ -35,7 +35,9 @@ export class CarriedQuestProp {
   /** the round's numbers (carriedRound.ts: the Node simulation steps the same) */
   private readonly round:CarriedRound;
   private shown=0;
-  constructor(private readonly ctx:ShardContext,input:unknown,files:ReadonlyMap<string,Uint8Array>=new Map()){
+  private readonly ctx: ShardContext;
+  constructor(ctx:ShardContext,input:unknown,files:ReadonlyMap<string,Uint8Array>=new Map()){
+    this.ctx = ctx;
     const rows=parseCarriedQuest(input),runtime=ctx.game.runtime,world=runtime?.world,play=runtime?.play;
     this.entered=ctx.scope;this.construction=resourceScope();
     if(this.entered.disposed||this.entered.disposing||this.construction.disposed||this.construction.disposing

@@ -31,10 +31,20 @@ export class NativePastureRaid<A extends AnimalSim, P extends NativeRaidPackPoli
   private player = { x: 10000, z: 10000 };
   private blocked = false;
   private readonly direction = new Vector3();
-  constructor(private readonly program: ReturnProgram, private readonly random: Rng, readonly shepherd: A | null,
-    readonly flock: NativePastureFields | null, private readonly packs: readonly P[], private readonly preyAt: (pastureIndex: number) => PackPrey,
-    private readonly spawnPack: (x: number, z: number, variants: string[]) => P, firstRaid: number, private readonly variants: readonly string[],
-    private readonly cue: (key: string, actor?: A) => void = () => undefined) {
+  private readonly program: ReturnProgram;
+  private readonly random: Rng;
+  readonly shepherd: A | null;
+  readonly flock: NativePastureFields | null;
+  private readonly packs: readonly P[];
+  private readonly preyAt: (pastureIndex: number) => PackPrey;
+  private readonly spawnPack: (x: number, z: number, variants: string[]) => P;
+  private readonly variants: readonly string[];
+  private readonly cue: (key: string, actor?: A) => void;
+  constructor(program: ReturnProgram, random: Rng, shepherd: A | null,
+    flock: NativePastureFields | null, packs: readonly P[], preyAt: (pastureIndex: number) => PackPrey,
+    spawnPack: (x: number, z: number, variants: string[]) => P, firstRaid: number, variants: readonly string[],
+    cue: (key: string, actor?: A) => void = () => undefined) {
+    this.program = program; this.random = random; this.shepherd = shepherd; this.flock = flock; this.packs = packs; this.preyAt = preyAt; this.spawnPack = spawnPack; this.variants = variants; this.cue = cue;
     this.state = { raidT: firstRaid, pendingT: 0, raiding: 0, raids: 0, taken: 0, drivenOff: 0,
       cracks: 0, cracksNow: 0, spawned: 0, crackCd: 0, restT: 0, patrolA: 0 };
   }

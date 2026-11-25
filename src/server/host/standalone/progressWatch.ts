@@ -65,7 +65,12 @@ export class ProgressSaves {
   private saving = false;
   private retry = RETRY_MS;
   /** `save` resolves true once the page's storage holds it. */
-  constructor(private readonly save: () => Promise<boolean>, private readonly settle: number = PROGRESS_SETTLE_MS, private readonly gap: number = PROGRESS_GAP_MS, private readonly fieldGap: number = FIELD_GAP_MS) {}
+  private readonly save: () => Promise<boolean>;
+  private readonly settle: number;
+  private readonly gap: number;
+  private readonly fieldGap: number;
+  constructor(save: () => Promise<boolean>, settle: number = PROGRESS_SETTLE_MS, gap: number = PROGRESS_GAP_MS, fieldGap: number = FIELD_GAP_MS) {
+    this.save = save; this.settle = settle; this.gap = gap; this.fieldGap = fieldGap;}
   /** Progress moved at `now`; a field alone waits the longer gap. */
   moved(now: number, move: ProgressMove): void {
     if (move === 'none') return;

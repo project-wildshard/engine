@@ -36,7 +36,11 @@ export function folderTreePool(product: { readonly hasFile: (name: string) => bo
  */
 export class TreeSetFactory extends TreeFactory {
   private looks: LentLooks | null = null;
-  constructor(private readonly renderer: LookReplaceContext['renderer'], private readonly rows: TreeSetRows, private readonly sky: SkyRig) { super(renderer); }
+  private readonly renderer: LookReplaceContext['renderer'];
+  private readonly rows: TreeSetRows;
+  private readonly sky: SkyRig;
+  constructor(renderer: LookReplaceContext['renderer'], rows: TreeSetRows, sky: SkyRig) { super(renderer);
+    this.renderer = renderer; this.rows = rows; this.sky = sky; }
 
   /** Set a param of the compile these graph materials came from (a page's fade and viewer, once a frame); false for a
    *  painterly set. QF22: a lent look id can resolve to another live compile of the same graph under a frame's owner. */

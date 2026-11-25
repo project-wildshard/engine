@@ -20,8 +20,11 @@ export class SceneHandles {
   private readonly materialLists = new Map<string, readonly MeshStandardMaterial[]>();
   private readonly tileContents: TileContent[] = [];
   private readonly waiting = new Map<string, (() => void)[]>();
-  constructor(private readonly lighting?: Pick<SkyRig, 'setupMaterial'>,
-    private readonly refine?: (id: string, at: { x: number; z: number }, materials: readonly string[], run: () => Promise<void>) => Promise<boolean>) {}
+  private readonly lighting: Pick<SkyRig, 'setupMaterial'> | undefined;
+  private readonly refine: ((id: string, at: { x: number; z: number }, materials: readonly string[], run: () => Promise<void>) => Promise<boolean>) | undefined;
+  constructor(lighting?: Pick<SkyRig, 'setupMaterial'>,
+    refine?: (id: string, at: { x: number; z: number }, materials: readonly string[], run: () => Promise<void>) => Promise<boolean>) {
+    this.lighting = lighting; this.refine = refine;}
   /** Schedule a living consumer on the control cursor shared with its source
    * maps and frozen scenery. Demand prepares the exact material identities. */
   afterControl(id: string, at: { x: number; z: number }, materials: readonly string[], run: () => Promise<void>): Promise<boolean> {

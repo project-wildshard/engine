@@ -35,7 +35,10 @@ export class SlotHeights {
   private readonly columns: number;
   private frames = 0;
   private readonly initialLane: ViewLaneState;
-  constructor(bytes: Uint8Array, input: unknown, kind: string, scope: Scope, private readonly bodies: () => readonly AnimalSim[], private readonly ground: (x: number, z: number) => number) {
+  private readonly bodies: () => readonly AnimalSim[];
+  private readonly ground: (x: number, z: number) => number;
+  constructor(bytes: Uint8Array, input: unknown, kind: string, scope: Scope, bodies: () => readonly AnimalSim[], ground: (x: number, z: number) => number) {
+    this.bodies = bodies; this.ground = ground;
     const rows = this.rows = v.parse(ViewProgramSchema, input);
     admitScriptV2(bytes, { lane: 'view', ioBytes: rows.budget.ioBytes });
     this.pools = rows.pools.map(row => ({ row, ours: row.group === `${SPECIES}${kind}`, ids: Array.from<string | null>({ length: row.count }).fill(null) }));

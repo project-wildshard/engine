@@ -8,12 +8,19 @@ import type { ReturnProgram } from '../../../shared/game/population/returnProgra
 /** Portable group effects use existing pack, herd and crowd owners. Content contributes
  * event-law ids and effect radii; no new brain or body clock is installed. */
 export class PopulationRelations<A extends AnimalSim = Animal> {
-  constructor(private readonly program: ReturnProgram,
-    private readonly groups: { readonly packs: readonly Pick<PackBrain<A>, 'members' | 'awareness' | 'scare'>[];
+  private readonly program: ReturnProgram;
+  private readonly groups: { readonly packs: readonly Pick<PackBrain<A>, 'members' | 'awareness' | 'scare'>[];
+      readonly herds: readonly Pick<HerdBrain<A>, 'members' | 'cx' | 'cz' | 'stampeding' | 'disturb' | 'stampede'>[];
+      readonly crowds: readonly Pick<CrowdTargets, 'cx' | 'cz' | 'scare'>[] };
+  private readonly row: { readonly alert: string; readonly range: string; readonly packRadius: number;
+      readonly disturbRadius: number; readonly disturbSeconds: number; readonly scareSeconds: number };
+  constructor(program: ReturnProgram,
+    groups: { readonly packs: readonly Pick<PackBrain<A>, 'members' | 'awareness' | 'scare'>[];
       readonly herds: readonly Pick<HerdBrain<A>, 'members' | 'cx' | 'cz' | 'stampeding' | 'disturb' | 'stampede'>[];
       readonly crowds: readonly Pick<CrowdTargets, 'cx' | 'cz' | 'scare'>[] },
-    private readonly row: { readonly alert: string; readonly range: string; readonly packRadius: number;
-      readonly disturbRadius: number; readonly disturbSeconds: number; readonly scareSeconds: number }) {}
+    row: { readonly alert: string; readonly range: string; readonly packRadius: number;
+      readonly disturbRadius: number; readonly disturbSeconds: number; readonly scareSeconds: number }) {
+    this.program = program; this.groups = groups; this.row = row;}
   alert(x: number, z: number): void {
     for (const herd of this.groups.herds) for (const actor of herd.members) {
       const result = this.program.project(this.row.alert, { x, z, px: actor.position.x, pz: actor.position.z, awareness: actor.mem['aw'] ?? 0 });

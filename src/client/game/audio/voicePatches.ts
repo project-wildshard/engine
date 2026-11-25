@@ -21,7 +21,11 @@ export class AudioVoicePatches {
  private readonly groups=new Map<string,Live>();
  private readonly last=new Map<string,number>();
  private sampled=false;
- constructor(private readonly audio:Audio,private readonly data:AudioData,input:unknown,private readonly scope:Scope){
+ private readonly audio: Audio;
+ private readonly data: AudioData;
+ private readonly scope: Scope;
+ constructor(audio:Audio,data:AudioData,input:unknown,scope:Scope){
+   this.audio = audio; this.data = data; this.scope = scope;
   const known=typeof input==='object'&&input!==null?admitted.get(input):undefined;
   this.rows=known??parse(VoicePatchesSchema,input);if(known===undefined&&typeof input==='object'&&input!==null)admitted.set(input,this.rows);this.inputs={...this.rows.initial};
   for(const row of Object.values(this.rows.cues)){

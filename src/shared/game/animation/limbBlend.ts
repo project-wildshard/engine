@@ -16,7 +16,10 @@ export class LimbAnimator {
   private readonly clip = newLimbPose();
   private readonly read;
   private readonly names: ReadonlySet<string>;
-  constructor(readonly row: LimbBlend, clips: unknown, readonly head: string) {
+  readonly row: LimbBlend;
+  readonly head: string;
+  constructor(row: LimbBlend, clips: unknown, head: string) {
+    this.row = row; this.head = head;
     this.read = readBakedClips(clips);
     this.names = new Set([...Object.values(row.clips), row.defaultAttack, ...row.attacks.map(a => a.clip)]);
     for (const name of this.names) this.read(name);

@@ -10,7 +10,10 @@ class Reference {
   readonly rows: Row[] = [];
   horse: Horse | null = null;
   readonly events: string[] = [];
-  constructor(private readonly opts: Profile, private readonly now: () => number) {}
+  private readonly opts: Profile;
+  private readonly now: () => number;
+  constructor(opts: Profile, now: () => number) {
+    this.opts = opts; this.now = now;}
   add(a: Horse, fallback: string, savedKey?: string): void {
     const key = savedKey ?? `${fallback}|${a.kind}:${a.variant}`;
     if (this.rows.some((m) => m.a === a)) return;
@@ -81,7 +84,11 @@ class Horse implements CompanionActor {
   readonly kind = 'horse'; alive = true; hp = 100; readonly maxHp = 100; readonly mem: Record<string, number> = {};
   readonly position: Vector3; state = 'idle'; yaw = 0; speed = 0; scale = 1; label: string; lookWeight = 0; readonly lookTarget = new Vector3();
   readonly motions: number[][] = [];
-  constructor(readonly entityId: string, readonly variant: string, readonly seed: number, x: number, z: number) { this.position = new Vector3(x, 0, z); this.label = entityId; }
+  readonly entityId: string;
+  readonly variant: string;
+  readonly seed: number;
+  constructor(entityId: string, variant: string, seed: number, x: number, z: number) {
+    this.entityId = entityId; this.variant = variant; this.seed = seed; this.position = new Vector3(x, 0, z); this.label = entityId; }
   setMotion = (yaw: number, speed: number, turnRate = 0): void => { this.motions.push([yaw, speed, turnRate]); this.yaw = yaw; this.speed = speed; };
   step(dt: number): void { this.position.x += Math.sin(this.yaw) * this.speed * dt; this.position.z += Math.cos(this.yaw) * this.speed * dt; }
 }

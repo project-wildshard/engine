@@ -46,7 +46,10 @@ export class CoinMotion {
   private live = 0;
 
   /** The continuation owner lends the cosmetic stream without creating it eagerly. */
-  constructor(private scene: THREE.Scene, private readonly random: () => number) {
+  private scene: THREE.Scene;
+  private readonly random: () => number;
+  constructor(scene: THREE.Scene, random: () => number) {
+    this.scene = scene; this.random = random;
     const geo = coinModel(0xc01);
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: true, toneMapped: true, color: new THREE.Color(1.25, 1.12, 0.8) });
     mat.name = 'loot-coin';

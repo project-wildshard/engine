@@ -17,7 +17,9 @@ class Body implements PhasedBossBody {
   readonly position=new Vector3();readonly lookTarget=new Vector3();readonly mem:Record<string,number>={};
   yaw=0;hp=1000;readonly maxHp=1000;hidden=false;readonly scale=1;lookWeight=0;
   attackT=-1;attackLength=1;speed=0;turn=0;
-  constructor(readonly id:string){}
+  readonly id: string;
+  constructor(id:string){
+    this.id = id;}
   get alive():boolean{return this.hp>0;}
   get attackPhase():number{return this.attackT<0?-1:this.attackT/this.attackLength;}
   startAttack(seconds:number):void{this.attackT=0;this.attackLength=seconds;}

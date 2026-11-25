@@ -20,7 +20,9 @@ export class WakeBossEncounter {
   private attempt = false;
   private waitForReturn = false;
   private effects: WakeBossEffect[] = [];
-  constructor(input: unknown, private readonly center: { readonly x: number; readonly z: number }) { this.row = parseWakeEncounter(input); }
+  private readonly center: { readonly x: number; readonly z: number };
+  constructor(input: unknown, center: { readonly x: number; readonly z: number }) {
+    this.center = center; this.row = parseWakeEncounter(input); }
   snapshot(): BossContinuation { return { ...this.boss, state: this.state, phase: this.phase, saved: { ...this.boss.saved } }; }
   restore(value: BossContinuation): void {
     if (!['dormant', 'armed', 'intro', 'fight', 'beat', 'victory'].includes(value.state)

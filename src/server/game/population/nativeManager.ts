@@ -56,7 +56,12 @@ export class NativeManager {
   readonly noise: { seen: boolean; speed: number; prev: Vector3; } = { seen: false, speed: 0, prev: new Vector3() };
   readonly sight: (boolean | null | undefined)[];
   private clock = 0;
-  constructor(private readonly host: SimHost, private readonly hunt: StalkerBrain<HuntBody>, private readonly stream: Rng, private readonly rows: NativeManagerRows) {
+  private readonly host: SimHost;
+  private readonly hunt: StalkerBrain<HuntBody>;
+  private readonly stream: Rng;
+  private readonly rows: NativeManagerRows;
+  constructor(host: SimHost, hunt: StalkerBrain<HuntBody>, stream: Rng, rows: NativeManagerRows) {
+    this.host = host; this.hunt = hunt; this.stream = stream; this.rows = rows;
     if (!(hunt instanceof StalkerBrain) || !(stream instanceof Rng) || !Number.isSafeInteger(rows.limit) || rows.limit < 1 || rows.limit > 1024
       || !Number.isSafeInteger(rows.sightSlots) || rows.sightSlots < 0 || rows.sightSlots > rows.limit
       || (rows.initialSight !== null && typeof rows.initialSight !== 'boolean')) throw new Error('Invalid native manager owners or capacity');
@@ -138,10 +143,22 @@ export class NativePopulationDriver {
   focused: () => void = () => undefined;
   private readonly policy = { state: 'owned' as const, decide: (dt: number, actor: HuntBody): void => { this.decide(actor, dt); }, sample: (actor: HuntBody): void => { actor.sampleTerrain(); } };
   private readonly cadence;
-  constructor(private readonly host: SimHost, private readonly manager: NativeManager, private readonly hunt: StalkerBrain<HuntBody>, private readonly rng: Rng,
-    private readonly bodies: HuntBody[], private readonly packs: ReadonlyMap<AnimalSim, PackBrain<AnimalSim>>,
-    private readonly herds: ReadonlyMap<AnimalSim, HerdBrain<AnimalSim>>, private readonly elites: NativeEliteBindings,
-    private readonly flocks: readonly FlockBrain[], private readonly wolves: readonly FlockThreat[], private readonly rows: NativeDriverRows, groups: NativeGroupCollection) {
+  private readonly host: SimHost;
+  private readonly manager: NativeManager;
+  private readonly hunt: StalkerBrain<HuntBody>;
+  private readonly rng: Rng;
+  private readonly bodies: HuntBody[];
+  private readonly packs: ReadonlyMap<AnimalSim, PackBrain<AnimalSim>>;
+  private readonly herds: ReadonlyMap<AnimalSim, HerdBrain<AnimalSim>>;
+  private readonly elites: NativeEliteBindings;
+  private readonly flocks: readonly FlockBrain[];
+  private readonly wolves: readonly FlockThreat[];
+  private readonly rows: NativeDriverRows;
+  constructor(host: SimHost, manager: NativeManager, hunt: StalkerBrain<HuntBody>, rng: Rng,
+    bodies: HuntBody[], packs: ReadonlyMap<AnimalSim, PackBrain<AnimalSim>>,
+    herds: ReadonlyMap<AnimalSim, HerdBrain<AnimalSim>>, elites: NativeEliteBindings,
+    flocks: readonly FlockBrain[], wolves: readonly FlockThreat[], rows: NativeDriverRows, groups: NativeGroupCollection) {
+    this.host = host; this.manager = manager; this.hunt = hunt; this.rng = rng; this.bodies = bodies; this.packs = packs; this.herds = herds; this.elites = elites; this.flocks = flocks; this.wolves = wolves; this.rows = rows;
     const tokens = groups.tokens; if (!groups.owns(host) || tokens === undefined || tokens.id !== rows.tokens || !(tokens.owners instanceof WeakMap)) throw new Error('Missing native manager tokens'); this.tokens = tokens.owners;
     if (bodies.length > 64 || flocks.length > 4) throw new Error('Native population driver capacity exceeded');
     const always=v.parse(v.pipe(v.array(v.pipe(v.string(),v.minLength(1))),v.maxLength(16)),rows.alwaysKinds??[]);
@@ -292,10 +309,20 @@ export class NativeWildlifeFrame {
   private readonly company = new Map<string, WildlifeFrameState>();
   private readonly fields = { x: 0, z: 0, px: 0, pz: 0, dt: 0, speed: 0 };
   private readonly relations: PopulationRelations<AnimalSim>;
-  constructor(private readonly host: SimHost, private readonly author: ReturnProgram, private readonly bodies: readonly HuntBody[],
-    private readonly wildWolves: readonly HuntBody[], private readonly wolves: HuntBody[],
-    packs: readonly PackBrain<AnimalSim>[], herds: readonly HerdBrain<AnimalSim>[], private readonly flocks: readonly FlockBrain[],
-    private readonly foragers: ForagerPopulation, private readonly trample: TrampleField, private readonly rows: NativeWildlifeRows) {
+  private readonly host: SimHost;
+  private readonly author: ReturnProgram;
+  private readonly bodies: readonly HuntBody[];
+  private readonly wildWolves: readonly HuntBody[];
+  private readonly wolves: HuntBody[];
+  private readonly flocks: readonly FlockBrain[];
+  private readonly foragers: ForagerPopulation;
+  private readonly trample: TrampleField;
+  private readonly rows: NativeWildlifeRows;
+  constructor(host: SimHost, author: ReturnProgram, bodies: readonly HuntBody[],
+    wildWolves: readonly HuntBody[], wolves: HuntBody[],
+    packs: readonly PackBrain<AnimalSim>[], herds: readonly HerdBrain<AnimalSim>[], flocks: readonly FlockBrain[],
+    foragers: ForagerPopulation, trample: TrampleField, rows: NativeWildlifeRows) {
+    this.host = host; this.author = author; this.bodies = bodies; this.wildWolves = wildWolves; this.wolves = wolves; this.flocks = flocks; this.foragers = foragers; this.trample = trample; this.rows = rows;
     if (!(foragers instanceof ForagerPopulation) || !(trample instanceof TrampleField) || bodies.length > 64 || flocks.length > 4) throw new Error('Invalid native wildlife owners');
     this.relations = new PopulationRelations(author, { packs, herds, crowds: flocks }, { alert: rows.alert, range: rows.range, packRadius: rows.packRadius,
       disturbRadius: 0, disturbSeconds: 0, scareSeconds: rows.scareSeconds });
@@ -407,8 +434,13 @@ export class NativeWildEnvironment extends WildSenses {
   readonly wind: { x: number; z: number; strength: number };
   private host: SimHost | null = null;
   private frame: NativeWildlifeFrame | null = null;
-  constructor(readonly field: GrassField, readonly trampleField: TrampleField, private readonly rows: { wind: { x: number; z: number; strength: number }; flatten: number }, private readonly author: ReturnProgram) {
+  readonly field: GrassField;
+  readonly trampleField: TrampleField;
+  private readonly rows: { wind: { x: number; z: number; strength: number }; flatten: number };
+  private readonly author: ReturnProgram;
+  constructor(field: GrassField, trampleField: TrampleField, rows: { wind: { x: number; z: number; strength: number }; flatten: number }, author: ReturnProgram) {
     super();
+    this.field = field; this.trampleField = trampleField; this.rows = rows; this.author = author;
     if (!(field instanceof GrassField) || !(trampleField instanceof TrampleField)) throw new Error('Invalid native grass owners'); this.wind = { ...rows.wind };
   }
   protected senses(): ReturnProgram { return this.author; }

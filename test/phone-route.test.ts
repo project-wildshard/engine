@@ -213,7 +213,7 @@ test('native route selects its exact document instead of the older version probe
 test('wall locator admits the real steep plinth bevel but refuses walkable or disconnected upper surfaces',()=>{
   let upperNormal=.4735059772376924,upperDistance=5.598276735510306;
   const collider={handle:1,collisionGroups:()=>123};
-  const physics={R:{Ray:class{constructor(public origin:{x:number,y:number,z:number},public dir:{x:number,y:number,z:number}){}},QueryFilterFlags:{EXCLUDE_SENSORS:8}},
+  const physics={R:{Ray:class{origin:{x:number,y:number,z:number};dir:{x:number,y:number,z:number};constructor(origin:{x:number,y:number,z:number},dir:{x:number,y:number,z:number}){this.origin=origin;this.dir=dir;}},QueryFilterFlags:{EXCLUDE_SENSORS:8}},
     colliderTag:()=>({material:'ground'}),world:{castRayAndGetNormal:(ray:{origin:{y:number},dir:{x:number}},length:number,solid:boolean,flags:number,groups:number,excluded:object)=>{
       expect([length,solid,flags,groups,excluded]).toEqual([120,true,8,123,collider]);
       if(ray.dir.x!==-1)return null;

@@ -17,7 +17,9 @@ class Recorder extends Synth {
  protected readonly noise={} as AudioBuffer;
  readonly rows:object[]=[];
  draws=0;
- constructor(private state:number){super();}
+ private state: number;
+ constructor(state:number){super();
+   this.state = state;}
  random=():number=>{this.draws++;this.state=(Math.imul(this.state,1664525)+1013904223)>>>0;return this.state/4294967296;};
  override tone(opts:Parameters<Synth['tone']>[0]):GainNode{this.rows.push({...opts,out:'bus',kind:'tone'});return this.sfx;}
  override burst(opts:Parameters<Synth['burst']>[0]):GainNode{this.rows.push({...opts,out:'bus',kind:'burst',offset:this.random()*1.5});return this.sfx;}

@@ -96,7 +96,9 @@ type SabreProfile = MountedSwordProfile & { blade: { length: number; curve: numb
  * decisions come exclusively from the declared <=10 Hz guest program. */
 export class BladeSet {
  private data:{rows:BladeRows;parts:ReturnType<typeof createModelLibrary<never,never>>;profile:SabreProfile;passes:MountedSwordPasses}|null=null;
- constructor(private readonly declaration:{file:string;item:`weapon.${string}`}){}
+ private readonly declaration: {file:string;item:`weapon.${string}`};
+ constructor(declaration:{file:string;item:`weapon.${string}`}){
+   this.declaration = declaration;}
  private need():NonNullable<BladeSet['data']>{if(this.data===null)throw new Error('Blade rows not prepared');return this.data;}
  readonly Power:new(deps:ArcWeaponDeps)=>ArcWeaponPower=((owner:BladeSet)=>class extends ArcWeaponPower{constructor(deps:ArcWeaponDeps){super(deps,owner.need().rows.power);}})(this);
  readonly Weapon:MountedSwordType<SabreProfile>=((owner:BladeSet)=>class extends MountedSword<SabreProfile>{

@@ -28,8 +28,14 @@ export class PreparationReads<T> {
   private admitting = false;
   /** `size` (optional): a row's byte length before it is read, so the window admits it exactly; without it a read reserves
    *  the largest part seen so far until its bytes arrive. `window`: the page's (a test passes its own). */
-  constructor(private readonly rows: readonly T[], private readonly load: (row: T) => Promise<Uint8Array>, private readonly active: () => boolean,
-    private readonly size?: (row: T) => number, private readonly window: LoadWindow = loadWindow) {
+  private readonly rows: readonly T[];
+  private readonly load: (row: T) => Promise<Uint8Array>;
+  private readonly active: () => boolean;
+  private readonly size: ((row: T) => number) | undefined;
+  private readonly window: LoadWindow;
+  constructor(rows: readonly T[], load: (row: T) => Promise<Uint8Array>, active: () => boolean,
+    size?: (row: T) => number, window: LoadWindow = loadWindow) {
+    this.rows = rows; this.load = load; this.active = active; this.size = size; this.window = window;
     for (let index = 0; index < rows.length; index++) {
       let settle = (_result: ReadResult): void => undefined;
       const result = new Promise<ReadResult>(resolve => { settle = resolve; });

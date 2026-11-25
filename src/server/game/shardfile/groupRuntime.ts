@@ -215,11 +215,21 @@ export class NativeGroupCollection {
   readonly environment: NativeWildEnvironment | undefined;
   readonly herdService: string | undefined;
   readonly wind: NativeWildEnvironment['wind'];
-  constructor(private readonly host: SimHost, readonly packs: PackBrain<AnimalSim>[], readonly herds: HerdBrain<AnimalSim>[],
-    private readonly actors: Map<string, AnimalSim>, private readonly prey: Map<string, PackPrey>, private readonly ids: WeakMap<PackPrey, string>,
-    private readonly wolves: AnimalSim[], private readonly packOf: WeakMap<AnimalSim, PackBrain<AnimalSim>>,
+  private readonly host: SimHost;
+  readonly packs: PackBrain<AnimalSim>[];
+  readonly herds: HerdBrain<AnimalSim>[];
+  private readonly actors: Map<string, AnimalSim>;
+  private readonly prey: Map<string, PackPrey>;
+  private readonly ids: WeakMap<PackPrey, string>;
+  private readonly wolves: AnimalSim[];
+  private readonly packOf: WeakMap<AnimalSim, PackBrain<AnimalSim>>;
+  readonly tokens: { id: string; owners: WeakMap<AnimalSim, Parameters<PackPorts<AnimalSim>['register']>[1]> } | undefined;
+  constructor(host: SimHost, packs: PackBrain<AnimalSim>[], herds: HerdBrain<AnimalSim>[],
+    actors: Map<string, AnimalSim>, prey: Map<string, PackPrey>, ids: WeakMap<PackPrey, string>,
+    wolves: AnimalSim[], packOf: WeakMap<AnimalSim, PackBrain<AnimalSim>>,
     rows: { id: string; firstRaid: number; environment?: NativeWildEnvironment; herds?: string },
-    readonly tokens?: { id: string; owners: WeakMap<AnimalSim, Parameters<PackPorts<AnimalSim>['register']>[1]> }) {
+    tokens?: { id: string; owners: WeakMap<AnimalSim, Parameters<PackPorts<AnimalSim>['register']>[1]> }) {
+    this.host = host; this.packs = packs; this.herds = herds; this.actors = actors; this.prey = prey; this.ids = ids; this.wolves = wolves; this.packOf = packOf; this.tokens = tokens;
     const map = collections.get(host) ?? new Map<string, NativeGroupCollection>();
     if (rows.environment !== undefined && !(rows.environment instanceof NativeWildEnvironment)) throw new Error('Invalid native group world');
     if (map.has(rows.id) || packs.length === 0 || packs.length > 8 || herds.length > 8 || packs.some(pack => !(pack instanceof PackBrain))

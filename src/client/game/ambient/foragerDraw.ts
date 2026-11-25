@@ -18,7 +18,9 @@ export class ForagerDraw {
   private readonly rows;
   private readonly matrix=new THREE.Matrix4(); private readonly angles=new THREE.Euler(0,0,0,'YXZ');
   private readonly rotation=new THREE.Quaternion(); private readonly point=new THREE.Vector3(); private readonly size=new THREE.Vector3(1,1,1);
-  constructor(private readonly owner:ForagerPopulation,geometry:THREE.BufferGeometry,material:THREE.Material,input:unknown){
+  private readonly owner: ForagerPopulation;
+  constructor(owner:ForagerPopulation,geometry:THREE.BufferGeometry,material:THREE.Material,input:unknown){
+    this.owner = owner;
     this.rows=v.parse(ForagerDrawSchema,input);
     if(!(owner instanceof ForagerPopulation)||Object.getPrototypeOf(owner)!==ForagerPopulation.prototype)throw new Error('Missing native forager owner');
     this.mesh=new THREE.InstancedMesh(geometry,material,Math.max(1,owner.rows.length));this.mesh.count=owner.rows.length;

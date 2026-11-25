@@ -24,9 +24,12 @@ export class CrowdDraw extends CrowdTargets {
   private readonly matrix = new THREE.Matrix4(); private readonly rotation = new THREE.Quaternion();
   private readonly point = new THREE.Vector3(); private readonly size = new THREE.Vector3();
   private readonly pose = { x: 0,y: 0,z: 0,yaw: 0,speed: 0,phase: 0,graze: 0,dead: false,deathTime: 0,scale: 1,wool: 0 };
-  constructor(controller: FlockBrain,private readonly body: CrowdBody,private readonly material: THREE.MeshLambertMaterial,input: unknown) {
+  private readonly body: CrowdBody;
+  private readonly material: THREE.MeshLambertMaterial;
+  constructor(controller: FlockBrain,body: CrowdBody,material: THREE.MeshLambertMaterial,input: unknown) {
     const row = v.parse(CrowdPresentationSchema,input);
-    super(controller,row);this.row=row;
+    super(controller,row);
+    this.body = body; this.material = material;this.row=row;
     if (!(controller instanceof FlockBrain) || body.parts.length!==row.motion.joints.length || body.pivots.length!==body.parts.length) throw new Error('Invalid crowd owner or joints');
     this.motion=new THREE.InstancedBufferAttribute(new Float32Array(this.n*4),4);this.motion.setUsage(THREE.DynamicDrawUsage);
     const geometry=new THREE.InstancedBufferGeometry();for(const [key,attribute]of Object.entries(body.geometry.attributes))geometry.setAttribute(key,attribute);

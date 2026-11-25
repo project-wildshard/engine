@@ -39,7 +39,9 @@ export class Progress {
   onEarned?: (def: AchievementDef) => void;
   onChange?: () => void;
 
-  constructor(readonly chunkId: string) {
+  readonly chunkId: string;
+  constructor(chunkId: string) {
+    this.chunkId = chunkId;
     this.defs = achievementsFor(chunkId);
     this.shard = progressSave.read(saveSlug(chunkId));
     this.updateSummary();

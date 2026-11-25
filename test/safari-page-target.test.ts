@@ -3,7 +3,9 @@ import { expect, test } from 'vitest';
 import { soakInspector } from '../scripts/soak/inspector.mjs';
 
 class WireEvent extends Event {
-  constructor(readonly data: string) { super('message'); }
+  readonly data: string;
+  constructor(data: string) { super('message');
+    this.data = data; }
 }
 class Socket extends EventTarget {
   static current: Socket | undefined;

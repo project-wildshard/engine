@@ -33,7 +33,9 @@ export class DeclaredBodyOps {
   private disposed = false;
   private intent: { x: number; z: number } | null = null;
   private forgetCleanup: (() => void) | undefined;
-  private constructor(private readonly owner: Owner, rows: DeclaredBodyOpsRows) {
+  private readonly owner: Owner;
+  private constructor(owner: Owner, rows: DeclaredBodyOpsRows) {
+    this.owner = owner;
     this.rows = rows; this.native = 'physics' in owner ? owner : null; this.page = 'physics' in owner ? null : owner;
     this.registries = declaredBodyRegistries(rows);
     this.service = this.native === null ? this.page?.app.bodies ?? null : new Bodies(this.native.physics, this.native.playerFocus);

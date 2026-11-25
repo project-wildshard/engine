@@ -11,8 +11,10 @@ export class PosedBufferView {
   readonly matrixAttribute: InterleavedBufferAttribute;
   readonly firstAttribute: InterleavedBufferAttribute;
   readonly secondAttribute: InterleavedBufferAttribute | null;
-  constructor(private readonly owner: Scope, matrix: InstancedInterleavedBuffer, first: InstancedInterleavedBuffer, second: InstancedInterleavedBuffer | null,
+  private readonly owner: Scope;
+  constructor(owner: Scope, matrix: InstancedInterleavedBuffer, first: InstancedInterleavedBuffer, second: InstancedInterleavedBuffer | null,
     start: number, capacity: number) {
+    this.owner = owner;
     const secondArray = second?.array;
     if (!(matrix.array instanceof Float32Array) || !(first.array instanceof Float32Array) || secondArray !== undefined && !(secondArray instanceof Float32Array)) throw new Error('Posed buffer storage must be Float32');
     this.matrix = matrix.array.subarray(start * 16, (start + capacity) * 16);
@@ -41,7 +43,10 @@ export class PosedBufferPool {
   private readonly matrix: InstancedInterleavedBuffer;
   private readonly first: InstancedInterleavedBuffer;
   private second: InstancedInterleavedBuffer | null = null;
-  constructor(private readonly owner: Scope, readonly capacity: number) {
+  private readonly owner: Scope;
+  readonly capacity: number;
+  constructor(owner: Scope, capacity: number) {
+    this.owner = owner; this.capacity = capacity;
     if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 4096 || owner.disposed || owner.disposing) throw new Error('Invalid posed buffer owner or capacity');
     this.matrix = new InstancedInterleavedBuffer(new Float32Array(capacity * 16), 16).setUsage(DynamicDrawUsage);
     this.first = new InstancedInterleavedBuffer(new Float32Array(capacity * 4), 4).setUsage(DynamicDrawUsage);

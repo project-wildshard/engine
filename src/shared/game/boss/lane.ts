@@ -22,7 +22,9 @@ export class Lane<B extends LaneBody = LaneBody> {
   private tellT = 1;
   /** the lane's full width (m): the decal paints it */
   readonly width: number;
-  constructor(row: StrikeSpec, private readonly reach: (actor: B, target: BrainPoint) => boolean = () => true) {
+  private readonly reach: (actor: B, target: BrainPoint) => boolean;
+  constructor(row: StrikeSpec, reach: (actor: B, target: BrainPoint) => boolean = () => true) {
+    this.reach = reach;
     if (row.shape.kind !== 'lane') throw new Error('Lane view requires a lane strike');
     this.spec = row; this.width = row.shape.width;
   }

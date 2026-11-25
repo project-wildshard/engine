@@ -198,7 +198,10 @@ export class FarBatches {
    *  DF10 (mini-dfload): always, with or without DF8's slots, so the ring's preparation also links each batch's program
    *  through its stand-in (`stand`) before the batch replaces its proxies: on the iPhone 13 a far batch linked its program
    *  inside a draw after control (a 1.1 s frame). */
-  constructor(private readonly parent: THREE.Object3D, private readonly keepMaterials = true) {
+  private readonly parent: THREE.Object3D;
+  private readonly keepMaterials;
+  constructor(parent: THREE.Object3D, keepMaterials = true) {
+    this.parent = parent; this.keepMaterials = keepMaterials;
     // DF10 (mini-dfload): a batch whose proxies are all hidden draws nothing, so it never looks a program up for nothing
     skipEmptyBatches(true);
   }

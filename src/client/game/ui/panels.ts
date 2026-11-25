@@ -48,8 +48,12 @@ export class DeclaredPanel {
   private openedAt = 0;
   private mounted: { view: PanelView; scope: Scope } | null = null;
   private rows: Scope | null = null;
-  constructor(private readonly content: () => PanelNode, private readonly owner: Scope,
-    private readonly policy: DeclaredPanelPolicy = {}) {
+  private readonly content: () => PanelNode;
+  private readonly owner: Scope;
+  private readonly policy: DeclaredPanelPolicy;
+  constructor(content: () => PanelNode, owner: Scope,
+    policy: DeclaredPanelPolicy = {}) {
+    this.content = content; this.owner = owner; this.policy = policy;
     if ((policy.closeKeys?.length ?? 0) > 32 || (policy.stopEvents?.length ?? 0) > 3) throw new RangeError('Panel input policy is unbounded');
     if (policy.lifetime !== 'open') this.mount();
     owner.onDispose(() => {

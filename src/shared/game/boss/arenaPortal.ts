@@ -36,8 +36,12 @@ export interface ArenaPortalSnapshot { readonly inside: boolean; readonly elapse
 export class ArenaPortalLaw {
   inside = false;
   private elapsed = 0; private fade = -1; private pending: 'enter' | 'exit' | null = null;
-  constructor(private readonly program: Pick<ReturnProgram, 'project'>, private readonly rows: { readonly signal: string; readonly end: number },
-    private readonly entrance: ArenaPortalEntrance | null) {}
+  private readonly program: Pick<ReturnProgram, 'project'>;
+  private readonly rows: { readonly signal: string; readonly end: number };
+  private readonly entrance: ArenaPortalEntrance | null;
+  constructor(program: Pick<ReturnProgram, 'project'>, rows: { readonly signal: string; readonly end: number },
+    entrance: ArenaPortalEntrance | null) {
+    this.program = program; this.rows = rows; this.entrance = entrance;}
   snapshot(): ArenaPortalSnapshot { return { inside: this.inside, elapsed: this.elapsed, fade: this.fade, pending: this.pending }; }
   restore(saved: ArenaPortalSnapshot): void {
     if (!Number.isFinite(saved.elapsed) || saved.elapsed < 0 || !Number.isFinite(saved.fade)) throw new Error('Invalid arena portal snapshot');
