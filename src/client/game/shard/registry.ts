@@ -13,7 +13,12 @@ export function defaultShard(): string {
 }
 export const playable = (manifest: Pick<ShardManifest, 'status'>): boolean => manifest.status !== 'hidden';
 
+/** CHUNK-PARAM CP1 (J522): the zone this page boots, as the entry resolved it (a tap's zone on a bare address), set before the
+ *  running manifest is first read; the address's `?chunk=` stays the fallback until CP22. */
+let pageZone: string | null = null;
+export function setPageZone(slug: string | null): void { pageZone = slug; }
 export function shardSlugFromUrl(search?: string): string {
+  if (search === undefined && pageZone !== null) return pageZone;
   const named = new URLSearchParams(search ?? (typeof location === 'undefined' ? '' : location.search)).get('chunk');
   return named ?? defaultShard();
 }

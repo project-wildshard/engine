@@ -102,6 +102,15 @@ persistHomeScreen();
 definePageSaveKeys(saves);
 /** the page's address as the boot reads it; a same-page entry (ZE10a3) reads it again for its next session */
 let search = new URLSearchParams(location.search);
+/** CHUNK-PARAM CP1 (J522): a tap names its zone in the tab (`titleArrival`) and leaves the address bare; the boot reads the tap's
+ *  zone where it read the address's. Only on the game's own `/` (Explore's too): a `/slug/` page or an author's inline shard keeps
+ *  its own. Not consumed here: the session consumes it, and the player's reload below drops it. */
+function adoptTap(into: URLSearchParams): void {
+  if (into.has('chunk') || document.getElementById('ws-shardfile') !== null || location.pathname !== '/') return;
+  const tap = pendingTitleArrival();
+  if (tap !== null) into.set('chunk', tap.slug);
+}
+adoptTap(search);
 const exploreSlug = exploreChannel() ? exploreSlugOfPath(location.pathname) : null;
 const exploreIndex = exploreChannel() && exploreSlug === null && !search.has('chunk');
 if (exploreChannel() && !exploreIndex) search = exploreBootParams(search, exploreSlug ?? undefined);
@@ -549,6 +558,7 @@ async function installInPageEntry(): Promise<void> {
       app.render?.dispose(true);
       if (url !== undefined) history.replaceState(history.state, '', url);
       search = new URLSearchParams(location.search);
+      adoptTap(search); // CP1: the zone this entry's travel wrote in the tap
       crashResume = null; // the first boot's crash resume, never the next zone's
       const [{ setActiveChunk }, { retireEntryReloadCapture }, { resetFolderControl }] = await Promise.all([import('@wildshard/engine/game/shard/registry'),
         import('@wildshard/engine/game/grid/pageEntry'), import('@wildshard/engine/game/shardfile/runtimeFolder')]);

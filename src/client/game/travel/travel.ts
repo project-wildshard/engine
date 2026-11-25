@@ -105,10 +105,11 @@ function arriveAt(request: TravelRequest): void {
   setTitleArrival({ slug: request.to, mode: request.mode, name: request.shown?.name ?? findTitleManifest(request.to)?.name ?? request.to, tier: arrivalTier.current,
     ...(request.shown === undefined ? {} : { art: request.shown.art }) });
 }
-function travelAddress(request: TravelRequest): URL {
-  const url = new URL(location.href);
-  url.searchParams.set('chunk', request.to);
-  for (const name of ['at', 'glreload', 'x', 'z', 'yaw', 'pitch', 'explore', 'cam', 'model', 'skipintro', 'tour', 'quest', 'drop']) url.searchParams.delete(name);
+/** CHUNK-PARAM CP1 (J522): the next page's address is `/` with the harness flags this one keeps; the zone rides in the tap
+ *  (`arriveAt`, written first), never in the address. */
+export function travelAddress(request: Pick<TravelRequest, 'mode'>, href: string = location.href): URL {
+  const here = new URL(href), url = new URL(`/${here.search}`, here.origin);
+  for (const name of ['chunk', 'at', 'glreload', 'x', 'z', 'yaw', 'pitch', 'explore', 'cam', 'model', 'skipintro', 'tour', 'quest', 'drop']) url.searchParams.delete(name);
   if (request.mode === 'explore') url.searchParams.set('explore', 'hub');
   url.searchParams.delete('v');
   return url;

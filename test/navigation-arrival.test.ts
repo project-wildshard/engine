@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from 'vitest';
-import { freshPageArrival, setTitleArrival, consumeTitleArrival, dropTabArrival, pendingTitleArrival } from '../src/client/engine/boot/titleArrival';
+import { freshPageArrival, setTitleArrival, consumeTitleArrival, dropTabArrival, pendingTitleArrival, tapNavigatedHere } from '../src/client/engine/boot/titleArrival';
 import { saveStorage } from '../src/client/engine/saves/slots';
 import { exploreSlugOfPath } from '../src/client/app/slugPath';
 import { adoptSlugAliases } from '../src/shared/game/slugNames';
@@ -9,7 +9,7 @@ adoptSlugAliases({ 'blender-template': 'brasscap-mesa' });
 import { bootRoute, exploreBootParams, onlineTitleFirst } from '../src/client/app/bootRoute';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { gridIntents } from '../src/client/game/grid/intent';
-import { travelService, travelSlot } from '../src/client/game/travel/travel';
+import { travelAddress, travelService, travelSlot } from '../src/client/game/travel/travel';
 import { installCatalogueFixture } from './fixtures/bootSetup';
 
 await installCatalogueFixture();
@@ -150,4 +150,39 @@ test('the Explore path chooses the shard and retains the view coordinates and mo
   expect(Object.fromEntries(exploreBootParams(query, slug ?? undefined))).toEqual({
     explore: 'world', cam: '16,32,64,0.5,0.1', model: 'tree', chunk: 'driftwood-isle',
   });
+});
+
+// CHUNK-PARAM CP1 (J522): the tap names the zone; the address the tap leaves for is a bare `/`.
+test('a tap on a bare / names its zone: the receiving page reads it with no slug, and spends it once', () => {
+  handoffs(10_010);
+  expect(pendingTitleArrival(), 'the bare page reads the zone from the tap').toEqual({ slug: 'driftwood-isle', mode: 'enter' });
+  expect(pendingTitleArrival('sunscar-dunes'), 'a slug still narrows it').toBeNull();
+  expect(consumeTitleArrival()).toEqual({ slug: 'driftwood-isle', mode: 'enter' });
+  expect(pendingTitleArrival(), 'consumed with its device copy').toBeNull();
+});
+
+test('a tap record with no usable zone names none', () => {
+  vi.stubGlobal('window', {});
+  vi.spyOn(Date, 'now').mockReturnValue(10_000);
+  try { saveStorage('session').setItem('titleArrival', JSON.stringify({ slug: '../x', mode: 'enter', at: 10_000 })); } catch { /* kept in memory, not persisted, in node */ }
+  expect(pendingTitleArrival()).toBeNull();
+  expect(consumeTitleArrival()).toBeNull();
+});
+
+test("the tap's device copy is taken only by the document the tap navigated, never another tab's / inside the minute", () => {
+  const origin = 'https://play.example';
+  expect(tapNavigatedHere({ referrer: `${origin}/leave?to=%2F`, origin, type: 'navigate' }), 'the tap navigated here (through the leave page)').toBe(true);
+  expect(tapNavigatedHere({ referrer: `${origin}/`, origin, type: undefined })).toBe(true);
+  expect(tapNavigatedHere({ referrer: '', origin, type: 'navigate' }), 'a second tab, a bookmark or a typed address').toBe(false);
+  expect(tapNavigatedHere({ referrer: 'https://elsewhere.example/', origin, type: 'navigate' }), 'a link from another site').toBe(false);
+  expect(tapNavigatedHere({ referrer: `${origin}/`, origin, type: 'reload' }), "the player's reload").toBe(false);
+  expect(tapNavigatedHere({ referrer: `${origin}/`, origin, type: 'back_forward' })).toBe(false);
+});
+
+test('travel leaves for a bare / with the harness flags it keeps, never naming the zone', () => {
+  const at = (href: string, mode: 'enter' | 'explore' = 'enter'): string => { const url = travelAddress({ mode }, href); return `${url.pathname}${url.search}`; };
+  expect(at('https://play.example/')).toBe('/');
+  expect(at('https://play.example/?chunk=pine-hollow&mute=1&nolock=1&skipintro=1&at=1,2,3,0,0&glreload=1&v=9')).toBe('/?mute=1&nolock=1');
+  expect(at('https://play.example/slug/pine-hollow?sw=0'), 'a /slug/ page leaves for /').toBe('/?sw=0');
+  expect(at('https://play.example/?tier=phone', 'explore')).toBe('/?tier=phone&explore=hub');
 });

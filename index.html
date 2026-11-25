@@ -257,6 +257,16 @@
           history.replaceState(history.state, '', location.pathname + '?' + next.toString() + location.hash);
         }
       } catch { /* storage blocked: the title, as before */ }
+      // CHUNK-PARAM CP1 (J522): a tap names its zone in the tab (titleArrival.ts) and leaves the address bare: this document is that
+      // zone's world page, read here as the entry reads it. The device copy (iOS's WebContent swap) only on a same-origin navigation.
+      if (!homeParams.has('chunk') && location.pathname === '/' && document.getElementById('ws-shardfile') === null) try {
+        const saved = (store, scope, key) => { const item = JSON.parse(store.getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; };
+        const fresh = tap => { const now = Date.now(), start = performance.timeOrigin; return tap && typeof tap.at === 'number' && /^[a-z0-9_-]+$/u.test(tap.slug)
+          && ['enter', 'explore', 'arena'].includes(tap.mode) && tap.at <= now && (now - tap.at <= 60000 || (start >= tap.at && start - tap.at <= 60000)) ? tap.slug : null; };
+        const nav = performance.getEntriesByType('navigation')[0], navigated = (!nav || nav.type === 'navigate') && document.referrer !== '' && new URL(document.referrer).origin === location.origin;
+        const zone = fresh(saved(sessionStorage, 'session', 'titleArrival')) || (navigated ? fresh(saved(localStorage, 'device', 'titleArrival.once')) : null);
+        if (zone) homeParams.set('chunk', zone);
+      } catch { /* storage blocked: the title, as before */ }
       if (!globalThis.__WS_EXPLORE__ && homeParams.size === 0) document.documentElement.classList.add('title-first');
       // BUGBASH-LOOP (J385): the launch shell and live menu belong to the title only. A world page (`?chunk=`, a tap's
       // navigation) paints its own full-screen loading card from the first bytes, never the bare title over it.

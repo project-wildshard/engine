@@ -33,20 +33,48 @@ export function freshPageArrival(at: number, now: number = Date.now(), startedAt
   return now - at <= MAX_AGE_MS || (startedAt >= at && startedAt - at <= MAX_AGE_MS);
 }
 
-function valid(raw: string | null, slug: string): TitleArrival | null {
+/** CHUNK-PARAM CP1 (J522): a zone's slug as the tap stored it; the address no longer names one, so the record does. */
+const ZONE = /^[a-z0-9_-]+$/u;
+
+function valid(raw: string | null, slug?: string): TitleArrival | null {
   if (raw === null) return null;
   try {
     const value: unknown = JSON.parse(raw);
     if (typeof value !== 'object' || value === null) return null;
     const candidate = value as Partial<StoredArrival>;
-    if (![slug].includes(candidate.slug ?? '') || (candidate.mode !== 'enter' && candidate.mode !== 'explore' && candidate.mode !== 'arena')) return null;
+    const zone = candidate.slug ?? '';
+    if (!ZONE.test(zone) || ![slug ?? zone].includes(zone) || (candidate.mode !== 'enter' && candidate.mode !== 'explore' && candidate.mode !== 'arena')) return null;
     if (typeof candidate.at !== 'number' || !freshPageArrival(candidate.at)) return null;
     const timing = bootTiming();
     if (timing !== undefined && candidate.timing !== undefined) timing.handoff = {
       ...candidate.timing, wall: candidate.at, received: timing.handoff?.['received'] ?? diagnosticNow(), newTimeOrigin: timing.timeOrigin,
       source: 'validated-title-arrival', validated: true, validatedAt: diagnosticNow(),
     };
-    return { slug, mode: candidate.mode };
+    return { slug: zone, mode: candidate.mode };
+  } catch { return null; }
+}
+
+/** CP1: the device copy (kept for iOS's WebContent swap, which loses the tab's session) belongs to the document the tap
+ *  navigated: a plain navigation from this origin (the title, or the leave page it went through). Another tab's `/`, a
+ *  bookmark or a reload inside the minute has no same-origin referrer or is no navigation, so it never takes the tap.
+ *  With no page (node tests, workers) there is no other tab to guard against. */
+export function tapNavigatedHere(page: { readonly referrer: string; readonly origin: string; readonly type: string | undefined } | undefined = currentPage()): boolean {
+  if (page === undefined) return true;
+  if (page.type !== undefined && page.type !== 'navigate') return false;
+  try { return page.referrer !== '' && new URL(page.referrer).origin === page.origin; } catch { return false; }
+}
+function currentPage(): { referrer: string; origin: string; type: string | undefined } | undefined {
+  if (typeof document === 'undefined' || typeof location === 'undefined') return undefined;
+  let type: string | undefined;
+  try { const nav: unknown = performance.getEntriesByType('navigation')[0]; const named: unknown = typeof nav === 'object' && nav !== null ? Reflect.get(nav, 'type') : undefined; type = typeof named === 'string' ? named : undefined; } catch { type = undefined; }
+  return { referrer: document.referrer, origin: location.origin, type };
+}
+function deviceBackup(take: boolean): string | null {
+  if (!tapNavigatedHere()) return null;
+  try {
+    const raw = saveStorage('device').getItem(BACKUP_KEY);
+    if (take) saveStorage('device').removeItem(BACKUP_KEY);
+    return raw;
   } catch { return null; }
 }
 
@@ -70,24 +98,24 @@ export function dropTabArrival(): void {
   try { saveStorage('session').removeItem(KEY); } catch { /* nothing was kept */ }
 }
 
-export function consumeTitleArrival(slug: string): TitleArrival | null {
-  let session: string | null = null, backup: string | null = null;
+/** The tap this document arrived with, consumed (both copies): the zone it names, or, given `slug`, only a tap for that zone. */
+export function consumeTitleArrival(slug?: string): TitleArrival | null {
+  let session: string | null = null;
   try { session = saveStorage('session').getItem(KEY); saveStorage('session').removeItem(KEY); } catch { /* use the backup */ }
-  try { backup = saveStorage('device').getItem(BACKUP_KEY); saveStorage('device').removeItem(BACKUP_KEY); } catch { /* use the session copy */ }
+  const backup = deviceBackup(true);
   return valid(session, slug) ?? valid(backup, slug);
 }
 
-/** Inspect the same fresh one-shot arrival without consuming the receiving session's handoff. */
-export function pendingTitleArrival(slug: string): TitleArrival | null {
-  let session: string | null = null, backup: string | null = null;
+/** Inspect the same fresh one-shot arrival without consuming the receiving session's handoff (CP1: with no `slug`, whatever zone it names). */
+export function pendingTitleArrival(slug?: string): TitleArrival | null {
+  let session: string | null = null;
   try { session = saveStorage('session').getItem(KEY); } catch { /* the backup may survive */ }
-  try { backup = saveStorage('device').getItem(BACKUP_KEY); } catch { /* the session may survive */ }
-  return valid(session, slug) ?? valid(backup, slug);
+  return valid(session, slug) ?? valid(deviceBackup(false), slug);
 }
 
 /** DL21: the fresh arrival's display facts and tap time for the receiving document's first card, without consuming it. */
 export function arrivalCard(slug: string): { name: string | undefined; tier: string | undefined; art: string | undefined; at: number } | null {
-  for (const read of [() => saveStorage('session').getItem(KEY), () => saveStorage('device').getItem(BACKUP_KEY)]) {
+  for (const read of [() => saveStorage('session').getItem(KEY), () => deviceBackup(false)]) {
     let raw: string | null = null;
     try { raw = read(); } catch { continue; }
     if (raw === null || valid(raw, slug) === null) continue;
