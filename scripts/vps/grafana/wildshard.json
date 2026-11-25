@@ -178,7 +178,7 @@
     "enable": true,
     "iconColor": "red",
     "name": "Reconnect storm",
-    "expr": "(sum(increase(wildshard_client_reconnects_total{channel=\"$channel\"}[1m])) or vector(0)) + (sum(increase(wildshard_socket_closes_total{channel=\"$channel\",reason!~\"closed|replaced\"}[1m])) or vector(0)) > 3",
+    "expr": "((sum (increase(wildshard_client_reconnects_total{channel=\"$channel\"}[1m]) or wildshard_client_reconnects_total{channel=\"$channel\"} * 0) + sum ((wildshard_client_reconnects_total{channel=\"$channel\"} unless wildshard_client_reconnects_total{channel=\"$channel\"} offset 1m) or wildshard_client_reconnects_total{channel=\"$channel\"} * 0)) or vector(0)) + ((sum (increase(wildshard_socket_closes_total{channel=\"$channel\",reason!~\"closed|replaced\"}[1m]) or wildshard_socket_closes_total{channel=\"$channel\",reason!~\"closed|replaced\"} * 0) + sum ((wildshard_socket_closes_total{channel=\"$channel\",reason!~\"closed|replaced\"} unless wildshard_socket_closes_total{channel=\"$channel\",reason!~\"closed|replaced\"} offset 1m) or wildshard_socket_closes_total{channel=\"$channel\",reason!~\"closed|replaced\"} * 0)) or vector(0)) > 3",
     "step": "60s",
     "titleFormat": "reconnect storm",
     "useValueForTime": false
@@ -786,7 +786,7 @@
       "uid": "wildshard-prometheus"
      },
      "refId": "A",
-     "expr": "sum by (reason) (increase(wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"}[1m]))",
+     "expr": "(sum by (reason) (increase(wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"}[1m]) or wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"} * 0) + sum by (reason) ((wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"} unless wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"} offset 1m) or wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"} * 0))",
      "legendFormat": "page lost link: {{reason}}",
      "range": true
     },
@@ -796,7 +796,7 @@
       "uid": "wildshard-prometheus"
      },
      "refId": "B",
-     "expr": "sum by (reason) (increase(wildshard_socket_closes_total{channel=\"$channel\",actor=~\"$actor\",reason!=\"closed\"}[1m]))",
+     "expr": "(sum by (reason) (increase(wildshard_socket_closes_total{channel=\"$channel\",actor=~\"$actor\",reason!=\"closed\"}[1m]) or wildshard_socket_closes_total{channel=\"$channel\",actor=~\"$actor\",reason!=\"closed\"} * 0) + sum by (reason) ((wildshard_socket_closes_total{channel=\"$channel\",actor=~\"$actor\",reason!=\"closed\"} unless wildshard_socket_closes_total{channel=\"$channel\",actor=~\"$actor\",reason!=\"closed\"} offset 1m) or wildshard_socket_closes_total{channel=\"$channel\",actor=~\"$actor\",reason!=\"closed\"} * 0))",
      "legendFormat": "door closed: {{reason}}",
      "range": true
     }
@@ -2416,7 +2416,7 @@
       "uid": "wildshard-prometheus"
      },
      "refId": "A",
-     "expr": "sum by (reason) (increase(wildshard_door_refusals_total{channel=\"$channel\"}[1m]))",
+     "expr": "(sum by (reason) (increase(wildshard_door_refusals_total{channel=\"$channel\"}[1m]) or wildshard_door_refusals_total{channel=\"$channel\"} * 0) + sum by (reason) ((wildshard_door_refusals_total{channel=\"$channel\"} unless wildshard_door_refusals_total{channel=\"$channel\"} offset 1m) or wildshard_door_refusals_total{channel=\"$channel\"} * 0))",
      "legendFormat": "{{reason}}",
      "range": true
     }
@@ -2823,7 +2823,7 @@
       "uid": "wildshard-prometheus"
      },
      "refId": "A",
-     "expr": "sum by (reason, device) (increase(wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"}[1m]))",
+     "expr": "(sum by (reason, device) (increase(wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"}[1m]) or wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"} * 0) + sum by (reason, device) ((wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"} unless wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"} offset 1m) or wildshard_client_reconnects_total{channel=\"$channel\",actor=~\"$actor\"} * 0))",
      "legendFormat": "{{reason}} {{device}}",
      "range": true
     }

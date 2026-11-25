@@ -12,6 +12,19 @@ const DS = { type: 'prometheus', uid: 'wildshard-prometheus' };
 const C = 'channel="$channel"', A = 'actor=~"$actor"';
 const W = '$__rate_interval';
 
+/**
+ * MMO-OBSERVABILITY OB13: events a minute from a counter whose label sets are born at their first event (a close reason, a
+ * reconnect reason, a new device). `increase()` reads a newborn series as 0, so the first `lost` close of a server's life never
+ * showed (OB9's staging drop). A series with no sample a minute ago counts its whole value; `* 0` keeps every group present so
+ * the two halves always add.
+ * @param {string} series  the counter and its selector, `name{labels}`
+ * @param {string} [by]    the labels to sum by
+ */
+export function events(series, by = '') {
+  const sum = by === '' ? 'sum' : `sum by (${by})`;
+  return `(${sum} (increase(${series}[1m]) or ${series} * 0) + ${sum} ((${series} unless ${series} offset 1m) or ${series} * 0))`;
+}
+
 /** @typedef {{ expr: string, legend?: string }} Query */
 /** @typedef {{ title: string, unit?: string, queries: Query[], w?: number, h?: number, stack?: boolean, max?: number, description?: string, thresholds?: number[] }} Panel */
 
@@ -43,8 +56,8 @@ export const ROWS = [
       { expr: `histogram_quantile(0.5, sum by (le, device) (rate(wildshard_client_fps_bucket{${C},${A}}[${W}])))`, legend: 'fps p50 {{device}}' },
       { expr: `60 * sum by (device) (rate(wildshard_client_long_frames_total{${C},${A}}[${W}]))`, legend: 'long frames/min {{device}}' }] },
     { title: 'Reconnects and closes per minute', unit: 'short', thresholds: [3], queries: [
-      { expr: `sum by (reason) (increase(wildshard_client_reconnects_total{${C},${A}}[1m]))`, legend: 'page lost link: {{reason}}' },
-      { expr: `sum by (reason) (increase(wildshard_socket_closes_total{${C},${A},reason!="closed"}[1m]))`, legend: 'door closed: {{reason}}' }] },
+      { expr: events(`wildshard_client_reconnects_total{${C},${A}}`, 'reason'), legend: 'page lost link: {{reason}}' },
+      { expr: events(`wildshard_socket_closes_total{${C},${A},reason!="closed"}`, 'reason'), legend: 'door closed: {{reason}}' }] },
   ] },
   { title: 'The box', panels: [
     { title: 'CPU by mode', unit: 'percent', stack: true, queries: [{ expr: `100 * sum by (mode) (rate(node_cpu_seconds_total{mode!="idle"}[${W}])) / scalar(count(count by (cpu) (node_cpu_seconds_total)))`, legend: '{{mode}}' }] },
@@ -103,7 +116,7 @@ export const ROWS = [
       { expr: `wildshard_socket_buffered_bytes_max{${C}}`, legend: 'worst client' }] },
     { title: 'Skipped frames per minute', unit: 'short', queries: [{ expr: `60 * rate(wildshard_socket_skipped_frames_total{${C}}[${W}])`, legend: 'skipped' }] },
     { title: 'Socket bytes', unit: 'Bps', queries: [{ expr: `rate(wildshard_socket_bytes_total{${C}}[${W}])`, legend: '{{direction}}' }] },
-    { title: 'Door refusals per minute (protocol errors, limits)', unit: 'short', queries: [{ expr: `sum by (reason) (increase(wildshard_door_refusals_total{${C}}[1m]))`, legend: '{{reason}}' }] },
+    { title: 'Door refusals per minute (protocol errors, limits)', unit: 'short', queries: [{ expr: events(`wildshard_door_refusals_total{${C}}`, 'reason'), legend: '{{reason}}' }] },
     { title: 'Crossings p95', unit: 's', queries: [{ expr: `histogram_quantile(0.95, sum by (le) (rate(wildshard_crossing_seconds_bucket{${C}}[5m])))`, legend: 'p95' }] },
   ] },
   { title: 'The page ($channel, from each client\'s 10 s word)', panels: [
@@ -119,7 +132,7 @@ export const ROWS = [
       { expr: `histogram_quantile(0.5, sum by (le, device) (rate(wildshard_client_rtt_seconds_bucket{${C},${A}}[${W}])))`, legend: 'p50 {{device}}' },
       { expr: `histogram_quantile(0.99, sum by (le, device) (rate(wildshard_client_rtt_seconds_bucket{${C},${A}}[${W}])))`, legend: 'p99 {{device}}' }] },
     { title: 'Pages reporting', unit: 'short', queries: [{ expr: `10 * sum by (actor, device) (rate(wildshard_client_stats_words_total{${C},${A}}[${W}]))`, legend: '{{actor}} {{device}}' }] },
-    { title: 'Links lost, by reason, per minute', unit: 'short', queries: [{ expr: `sum by (reason, device) (increase(wildshard_client_reconnects_total{${C},${A}}[1m]))`, legend: '{{reason}} {{device}}' }] },
+    { title: 'Links lost, by reason, per minute', unit: 'short', queries: [{ expr: events(`wildshard_client_reconnects_total{${C},${A}}`, 'reason, device'), legend: '{{reason}} {{device}}' }] },
   ] },
 ];
 
@@ -128,7 +141,7 @@ export const ANNOTATIONS = [
   { name: 'Restart or deploy', iconColor: 'orange', expr: `changes(process_start_time_seconds{job="wildshard",${C}}[1m]) > 0`, titleFormat: 'restart', step: '60s' },
   { name: 'Release (new build)', iconColor: 'purple', expr: `wildshard_build_info{${C}} unless wildshard_build_info{${C}} offset 2m`, titleFormat: 'build {{build}} serial {{serial}}', step: '60s' },
   { name: 'Cook busy', iconColor: 'yellow', expr: 'sum(rate(namedprocess_namegroup_cpu_seconds_total{groupname="wildshard-cook"}[1m])) > 0.5', titleFormat: 'cook', step: '60s' },
-  { name: 'Reconnect storm', iconColor: 'red', expr: `(sum(increase(wildshard_client_reconnects_total{${C}}[1m])) or vector(0)) + (sum(increase(wildshard_socket_closes_total{${C},reason!~"closed|replaced"}[1m])) or vector(0)) > 3`, titleFormat: 'reconnect storm', step: '60s' },
+  { name: 'Reconnect storm', iconColor: 'red', expr: `(${events(`wildshard_client_reconnects_total{${C}}`)} or vector(0)) + (${events(`wildshard_socket_closes_total{${C},reason!~"closed|replaced"}`)} or vector(0)) > 3`, titleFormat: 'reconnect storm', step: '60s' },
 ];
 
 /** The dashboard as Grafana reads it. */

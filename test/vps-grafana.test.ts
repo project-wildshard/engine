@@ -75,3 +75,18 @@ test('OB7: the dashboard is generated, and every metric it reads is exported by 
     expect(server, name).toContain(`'${family}'`);
   }
 });
+
+// OB13 (OB9's staging drop): a counter series is born at its first event, so `increase()` alone reads the first close of a reason,
+// actor or device as 0. Every per-minute read of a counter whose label sets appear mid-life counts a newborn series' value too.
+test('OB13: the closes, reconnects and refusals panels count a series born in the last minute', () => {
+  const board = JSON.parse(readFileSync('scripts/vps/grafana/wildshard.json', 'utf8')) as { panels: { targets?: { expr: string }[] }[]; annotations: { list: { expr?: string }[] } };
+  const exprs = [...board.panels.flatMap(panel => (panel.targets ?? []).map(target => target.expr)), ...board.annotations.list.flatMap(row => (row.expr === undefined ? [] : [row.expr]))];
+  const born = ['wildshard_socket_closes_total', 'wildshard_client_reconnects_total', 'wildshard_door_refusals_total'];
+  const reads = exprs.filter(expr => born.some(name => expr.includes(`increase(${name}`)));
+  expect(reads.length, 'the closes, both reconnects panels, the refusals and the storm marker').toBe(5);
+  for (const expr of reads) for (const name of born) {
+    const increases = expr.split(`increase(${name}`).length - 1;
+    if (increases === 0) continue;
+    expect(expr.split(new RegExp(`${name}\\{[^}]*\\} offset 1m`, 'u')).length - 1, `${name} in ${expr}`).toBe(increases);
+  }
+});
