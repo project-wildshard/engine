@@ -5,8 +5,9 @@ export interface Run {id:number;head_sha:string;display_title?:string;status:str
 export interface Job {id?:number;name:string;conclusion:string|null;started_at?:string|null;runner_id?:number|null;steps?:readonly {name:string;conclusion:string|null}[]}
 export interface MemoryQa {id:number;sha:string;created:string;warnings?:MemoryWarning[];pusher?:string;results?:readonly BudgetResult[]}
 export interface RedSpan {run:number;at:number;text:string;keeper:boolean;history?:{commits:string[];files:string[];jobs:string[]}}
-export interface State {judged:number[];dispatched:string[];memoryQa?:MemoryQa[];budgetPending?:Record<string,BudgetObservation>;red?:RedSpan;notified?:Record<string,string[]>}
-export interface Verdict {kind:'green'|'red'|'superseded'|'dispatch';run:Run;from?:string|null;by?:string}
+export interface Rerun {id:number;at:number}
+export interface State {judged:number[];dispatched:string[];reruns?:Rerun[];memoryQa?:MemoryQa[];budgetPending?:Record<string,BudgetObservation>;red?:RedSpan;notified?:Record<string,string[]>}
+export interface Verdict {kind:'green'|'red'|'superseded'|'dispatch'|'rerun';run:Run;from?:string|null;by?:string}
 export interface Pane {pane_id:string;label?:string;cwd?:string;foreground_cwd?:string}
 export interface RedRecipient {lane:string;sendPane?:string;sendTerminal?:string;key:string;lanes:Set<string>;commits:Set<string>;fixer:boolean}
 export interface RedLander {lane:string;slug:string;pane?:string}
@@ -26,6 +27,8 @@ export interface Io {
   memoryQa?:(rows:MemoryQa[])=>void;
   quotaReset?:()=>number;
   now?:()=>number;
+  /** Meta QA 11-25 row 67: rerun a red run's failed jobs once. */
+  rerun?:(id:number)=>void;
   /** QA 11-25 row 21: the builder's hc terminal, and hc send to a terminal (false when refused). */
   builder?:()=>string|undefined;
   hcSend?:(terminal:string,text:string)=>boolean;
@@ -37,7 +40,9 @@ export function failedNames(jobs:readonly Job[]):string[];
 export function blockingRun(run:Run,jobs:readonly Job[]):Run;
 export function cancelledJobs(jobs:readonly Job[]):{started:boolean,blockingFailed:boolean};
 export function fpsNight(run:{display_title?:string}):{build:string;since:string|null}|null;
-export function judge(runs:readonly Run[],state:State,tip:string|null):Verdict[];
+export const RERUN_STALE_MS: number;
+export function pendingReruns(state:State|null,runs:readonly Run[],now?:number):Set<number>;
+export function judge(runs:readonly Run[],state:State,tip:string|null,now?:number):Verdict[];
 export function verdictFor(runs:readonly Run[],sha:string,contains:(ancestor:string,descendant:string)=>boolean):{state:'green'|'red';run:Run}|null;
 export function landers(text:string):Map<string,{lane:string;slug:string;pane?:string;count?:number}>;
 export function withAuthors<L extends {lane:string;slug:string}>(found:readonly {sha:string;lander:L|undefined}[],authored:ReadonlyMap<string,readonly string[]>):{sha:string;lander:L|{lane:string;slug:string}|undefined}[];

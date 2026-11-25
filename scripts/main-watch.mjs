@@ -17,6 +17,10 @@
 // of the commits in its range (from their landed receipts). A later run in the same red span with no newly failing test
 // or job is `main still red`, never MAIN RED, and prompts nobody (A5); a new failure prompts its suspect and new landers. State (~/.cache/wildshard/main-watch.json) keeps the
 // judged run ids and span history.
+// Meta QA 11-25 row 67 (J505, no freezes): a red on a run's first attempt with no suspect (no commit in its range touches
+// a file its failed jobs name: row 57's cook-worker-limits flake) is not MAIN RED yet. Its failed jobs rerun once
+// (`main flake rerun <range> run <id>: ...`), nothing is prompted, and the run is judged again on attempt 2: green is
+// the usual `main green` (which lifts an engine land HOLD), red is the usual MAIN RED. A follow waits for attempt 2.
 // A green run that carries AMBER files (J295: a test file over its time budget, scripts/test-amber.mjs) also gives
 // one `main AMBER <sha> <file> <ms>/<budget>` receipt per file: the coordinator hands each out as a queue-skipping
 // fix row the same day (meta HOW-WE-BUILD-PLAN.md). AUDIO AU6 (J303): a shard whose audio is over 6 MB gives the same
@@ -80,11 +84,23 @@ export const failedNames=jobs=>failedJobs(jobs).map(job=>job.name);
 /** @typedef {{commits:string[],files:string[],jobs:string[]}} RedHistory */
 /** The first red run, its alert and keeper, plus the range of each attempted prompt and the failures seen in the span.
  * @typedef {{run:number,at:number,text:string,keeper:boolean,history?:RedHistory}} RedSpan */
-/** @typedef {{judged:number[],dispatched:string[],memoryQa?:MemoryQa[],budgetPending?:Record<string,{sha:string,contentKey:string,baseline:number|null,line:number|null}>,red?:RedSpan,notified?:Record<string,string[]>}} State */
-/** @typedef {{kind:'green'|'red'|'superseded'|'dispatch',run:Run,from?:string|null,by?:string}} Verdict */
+/** A flake rerun waiting on its second attempt: the run id and when it was asked for. @typedef {{id:number,at:number}} Rerun */
+/** @typedef {{judged:number[],dispatched:string[],reruns?:Rerun[],memoryQa?:MemoryQa[],budgetPending?:Record<string,{sha:string,contentKey:string,baseline:number|null,line:number|null}>,red?:RedSpan,notified?:Record<string,string[]>}} State */
+/** @typedef {{kind:'green'|'red'|'superseded'|'dispatch'|'rerun',run:Run,from?:string|null,by?:string}} Verdict */
 
 const short=(/** @type {string|null|undefined} */sha)=>(sha??'').slice(0,10);
 const finished=(/** @type {Run} */run)=>run.status==='completed';
+/** Row 67: a rerun that never shows its second attempt this long after it was asked for is judged as it stands. */
+export const RERUN_STALE_MS=30*60_000;
+/** Row 67: the reruns still waiting on attempt 2, from the state. @param {State|null} state @param {readonly Run[]} runs @param {number} now */
+export function pendingReruns(state,runs,now=Date.now()){
+  const out=new Set();
+  for(const row of state?.reruns??[]){
+    const run=runs.find(candidate=>candidate.id===row.id);
+    if(run!==undefined&&((run.run_attempt??1)>1?!finished(run):now-row.at<RERUN_STALE_MS))out.add(row.id);
+  }
+  return out;
+}
 /** The builds a driftwood-fps.yml run graded, from its run name (`driftwood fps <build> since <sha|none>`).
  * @param {{display_title?:string}} run @returns {{build:string,since:string|null}|null} */
 export function fpsNight(run){
@@ -126,10 +142,12 @@ export function blockingRun(run,jobs){
 /** What each newly finished run means, oldest first. Pure: `runs` is main's ci runs, newest or oldest first.
  * @param {readonly Run[]} runs @param {State} state @param {string|null} tip origin/main's SHA
  * @returns {Verdict[]} */
-export function judge(runs,state,tip){
+export function judge(runs,state,tip,now=Date.now()){
   const ordered=[...runs].sort(byCreated),judged=new Set(state.judged),out=/** @type {Verdict[]} */([]);
+  // Row 67: a flake rerun's run waits for its second attempt.
+  const pending=pendingReruns(state,runs,now);
   for(const [index,run] of ordered.entries()){
-    if(!finished(run)||judged.has(run.id))continue;
+    if(!finished(run)||judged.has(run.id)||pending.has(run.id))continue;
     const later=ordered.slice(index+1);
     if(cancelled(run)){
       const next=later[0];
@@ -315,6 +333,7 @@ export function readState(file){
       ?{commits:history.commits.filter(isString),files:history.files.filter(isString),jobs:history.jobs.filter(isString)}:undefined;
     return {judged:Array.isArray(value.judged)?value.judged.filter(Number.isSafeInteger):[],dispatched:Array.isArray(value.dispatched)?value.dispatched.filter(row=>typeof row==='string'):[],
       ...(Array.isArray(value.memoryQa)?{memoryQa:value.memoryQa}:{}),
+      ...(Array.isArray(value.reruns)?{reruns:value.reruns.filter((/** @type {any} */row)=>row&&Number.isSafeInteger(row.id)&&typeof row.at==='number').map((/** @type {Rerun} */row)=>({id:row.id,at:row.at}))}:{}),
       ...(value.budgetPending&&typeof value.budgetPending==='object'&&!Array.isArray(value.budgetPending)?{budgetPending:Object.fromEntries(Object.entries(value.budgetPending).filter(([,row])=>row&&typeof row==='object'&&typeof row.sha==='string'&&typeof row.contentKey==='string'&&(row.baseline===null||Number.isFinite(row.baseline))&&(row.line===null||Number.isFinite(row.line))))}:{}),
       ...(notified!==null&&typeof notified==='object'&&!Array.isArray(notified)?{notified}:{}),
       ...(red!==null&&typeof red==='object'&&Number.isSafeInteger(red.run)&&typeof red.at==='number'&&typeof red.text==='string'?{red:{run:red.run,at:red.at,text:red.text,keeper:red.keeper===true,...(kept===undefined?{}:{history:kept})}}:{})};
@@ -325,7 +344,7 @@ export function readState(file){
 function writeState(file,state){
   mkdirSync(dirname(file),{recursive:true});
   const temporary=`${file}.${process.pid}.tmp`;
-  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{}),...(state.budgetPending===undefined?{}:{budgetPending:state.budgetPending}),...(state.red===undefined?{}:{red:state.red}),...(state.notified===undefined?{}:{notified:state.notified})})}\n`);renameSync(temporary,file);
+  writeFileSync(temporary,`${JSON.stringify({judged:state.judged.slice(-KEEP),dispatched:state.dispatched.slice(-50),...(state.reruns?.length?{reruns:state.reruns.slice(-50)}:{}),...(state.memoryQa?.length?{memoryQa:state.memoryQa}:{}),...(state.budgetPending===undefined?{}:{budgetPending:state.budgetPending}),...(state.red===undefined?{}:{red:state.red}),...(state.notified===undefined?{}:{notified:state.notified})})}\n`);renameSync(temporary,file);
 }
 
 /** MD8: only mini routing changes. MacBook landers keep their existing prompts, including claimed runs.
@@ -574,6 +593,8 @@ export function liveIo(env=process.env){
       return trailers;
     },
     dispatch:()=>{run('gh',['workflow','run','ci.yml','--ref','main','-R',repo]);},
+    // Row 67: a flake rerun of a red run's failed jobs, on the user's login like the dispatch.
+    rerun:(/** @type {number} */id)=>{run('gh',['run','rerun',String(id),'--failed','-R',repo]);},
   };
   return io;
 }
@@ -597,8 +618,8 @@ export function sweep(io,hint={}){
       io.receipt(`started: ${baseline.length} finished main runs taken as already judged`);
       if(hint.sha===undefined)return [];
     }
-    const verdicts=judge(runs,previous,io.tip()),state=/** @type {State & {memoryQa:MemoryQa[]}} */({ ...previous,
-      judged:[...previous.judged],dispatched:[...previous.dispatched],memoryQa:[...previous.memoryQa??[]] });
+    const verdicts=judge(runs,previous,io.tip(),io.now?.()??Date.now()),state=/** @type {State & {memoryQa:MemoryQa[]}} */({ ...previous,
+      judged:[...previous.judged],dispatched:[...previous.dispatched],memoryQa:[...previous.memoryQa??[]],reruns:[...previous.reruns??[]] });
     const now=io.now?.()??Date.now();
     /** @param {Run} run @param {string} annotations @param {string[]} lines */
     const memoryWarnings=(run,annotations,lines)=>{
@@ -649,6 +670,20 @@ export function sweep(io,hint={}){
           const failed=jobs.names.join(' | ')||'see the run',url=`https://github.com/${io.repo}/actions/runs/${run.id}`;
           const changes=files.length===0?new Map():io.changes(verdict.from??null,run.head_sha);
           const suspect=redSuspect(commits,files,changes);
+          // Row 67 (J505): a first-attempt red on a green main with no suspect in its range reruns its failed jobs once,
+          // prompts nobody and is judged again on attempt 2. A red with a suspect, on attempt 2 or in a red span is as before.
+          if(suspect===undefined&&(run.run_attempt??1)===1&&state.red===undefined&&io.rerun!==undefined&&!state.reruns.some(row=>row.id===run.id)){
+            const shown=tests.length===0?failed:`${failed} (${tests.join(', ')})`;
+            let why='';
+            try{io.rerun(run.id);}catch(error){why=error instanceof Error?error.message.split('\n')[0]:String(error);}
+            if(why===''){
+              state.reruns.push({id:run.id,at:now});writeState(io.state,state);
+              for(const line of [...lines,`main flake rerun ${range} run ${run.id}: no suspect in range; failed jobs rerun once (J505); failed: ${shown}`])io.receipt(line);
+              verdict.kind='rerun';
+              continue;
+            }
+            lines.push(`main flake rerun of run ${run.id} did not start (${why}); judged red now`);
+          }
           const details={range,url,failed:tests.length===0?failed:`${failed} (${tests.join(', ')})`,named,suspect},agents=io.agents();
           fallback=fallbackRecipient(io.builder?.());
           fallbackAlert=redMessage(fallback,details);
@@ -801,9 +836,11 @@ export async function follow(io,options){
     try{
       // Judged from the runs seen before the sweep, which sees them too: a verdict is never returned unreported.
       // One fetch per pass: the sweep judges the same list (MF12).
-      const runs=io.runs(),done=verdictFor(runs,options.sha,io.contains)!==null;
+      const runs=io.runs();
       seen.push(...sweep({...io,runs:()=>runs},options));
-      if(done)return seen;
+      // Row 67: a run whose failed jobs were rerun has no verdict until its second attempt finishes.
+      const pending=pendingReruns(readState(io.state),runs,io.now?.()??Date.now());
+      if(verdictFor(runs.filter(row=>!pending.has(row.id)),options.sha,io.contains)!==null)return seen;
     }catch(error){
       // MF12: a spent GitHub quota is a wait until it resets, not a missing verdict; the deadline moves by the wait.
       const detail=`${error instanceof Error?error.message:String(error)} ${error!==null&&typeof error==='object'&&'stderr'in error?String(error.stderr):''}`;

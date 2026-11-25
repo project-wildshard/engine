@@ -472,7 +472,9 @@ class Landing{
   if(!isAncestor(this.root,main,head))return 'moved';
   if(main===head)return 'landed';
   // Meta QA 11-25 row 37: an open engine land HOLD in the receipts stops every lander but the one it names.
-  const held=holdRefusal({lane:this.lane,env:this.env,bodies:git(this.root,['log','--format=%B',`${main}..${head}`],this.env)});
+  // Row 67: a hold binds only a push touching the red's files; a disjoint one says so and goes.
+  const held=holdRefusal({lane:this.lane,env:this.env,bodies:git(this.root,['log','--format=%B',`${main}..${head}`],this.env),
+   files:git(this.root,['diff','--name-only',`${main}...${head}`],this.env).split('\n').filter(Boolean),say:line=>this.receipt(line)});
   if(held!==null){this.receipt(`STOP ${held}`);throw new StopError(held);}
   // Meta QA 11-25 row 58: land pushes only its own lane's commits. A commit naming another lane (its `Lane:` line) stops
   // the land and stays on the branch; a commit with none is this worktree's own. ALLOW_CARRY=1 (J381) sends it anyway.

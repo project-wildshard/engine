@@ -537,3 +537,76 @@ test('DF7: a red Driftwood floors night names the pushers since the last green n
   expect(fpsNight({ display_title: `driftwood fps ${sha('aaaa1111')} since none` })).toEqual({ build: sha('aaaa1111'), since: null });
   expect(w.sent).toEqual([]);
 });
+
+// Meta QA 11-25 row 67 (J505): row 57's cook-worker-limits flake held every lane until a human reran it. A first-attempt
+// red with no suspect in its range reruns its failed jobs once and is judged on attempt 2.
+// Earlier tests push onto the shared replay list, so these start from its first four runs.
+const base = replay.slice(0, 4);
+const attempt = (row: ReturnType<typeof run>, n: number, conclusion: string | null, status = 'completed') => ({ ...row, run_attempt: n, conclusion, status });
+
+test('row 67: a first-attempt red with no suspect reruns once, prompts nobody, and attempt 2 decides', () => {
+  const log = '05:50 UTC opus-red land plan/red-plan landed aaaa111100 on main (652afa6c00..aaaa111100); push';
+  for (const second of ['success', 'failure']) {
+    const reruns: number[] = [];
+    const w = world(base, log), io = { ...fake(`flake-${second}`, w), rerun: (id: number) => { reruns.push(id); } };
+    sweep(io);
+    const red = attempt(run(42970000020, 'aaaa1111', 'failure', 50), 1, 'failure');
+    w.runs = [...base, red];w.tip = sha('aaaa1111');w.receipts.length = 0;
+    expect(sweep(io).map(verdict => verdict.kind)).toEqual(['rerun']);
+    expect(reruns).toEqual([42970000020]);
+    expect(w.receipts).toEqual(['main flake rerun 652afa6c00..aaaa111100 run 42970000020: no suspect in range; failed jobs rerun once (J505); failed: tests (3)']);
+    expect(w.sent).toEqual([]);
+    // GitHub still shows attempt 1 for a moment, then attempt 2 runs: nothing is judged or rerun again.
+    sweep(io);w.runs = [...base, attempt(red, 2, null, 'in_progress')];sweep(io);
+    expect(reruns).toHaveLength(1);expect(w.receipts).toHaveLength(1);
+    w.runs = [...base, attempt(red, 2, second)];sweep(io);
+    if (second === 'success') {
+      expect(w.receipts[1]).toMatch(/^main green aaaa111100 \(run 42970000020;/u);
+      expect(w.sent).toEqual([]);
+    } else {
+      expect(w.receipts[1]).toBe('MAIN RED 652afa6c00..aaaa111100 run 42970000020: landers opus-red; failed: tests (3)');
+      expect(w.sent.map(([pane]) => pane)).toEqual(['w1:p2']);
+    }
+  }
+});
+
+test('row 67: a red with a suspect, on attempt 2, or in a red span is MAIN RED at once; a rerun that fails to start is too', () => {
+  const log = '05:50 UTC opus-red land plan/red-plan landed aaaa111100 on main (652afa6c00..aaaa111100); push';
+  const cases: [string, Partial<ReturnType<typeof fake>>, number][] = [
+    ['suspect', { failed: () => ({ names: ['tests (1)'], logs: ['FAIL scripts/red.mjs > it'] }), changes: () => new Map([[sha('aaaa1111'), ['scripts/red.mjs']]]) }, 1],
+    ['second', {}, 2],
+    ['refused', { rerun: () => { throw new Error('HTTP 403'); } }, 1],
+  ];
+  for (const [name, extra, n] of cases) {
+    const reruns: number[] = [];
+    const w = world(base, log), io = { ...fake(`no-flake-${name}`, w), rerun: (id: number) => { reruns.push(id); }, ...extra };
+    sweep(io);
+    w.runs = [...base, attempt(run(42970000021, 'aaaa1111', 'failure', 50), n, 'failure')];w.tip = sha('aaaa1111');
+    sweep(io);
+    expect(w.receipts.some(line => line.startsWith('MAIN RED 652afa6c00..aaaa111100 run 42970000021')), name).toBe(true);
+    expect(reruns, name).toEqual([]);
+    if (name === 'refused') expect(w.receipts).toContain('main flake rerun of run 42970000021 did not start (HTTP 403); judged red now');
+  }
+  // Already red: a later first-attempt red with no suspect is `main still red` or MAIN RED, never a rerun.
+  const reruns: number[] = [];
+  const w = world(base, log), io = { ...fake('no-flake-span', w), rerun: (id: number) => { reruns.push(id); } };
+  sweep(io);
+  w.runs = [...base, attempt(run(42970000022, 'aaaa1111', 'failure', 50), 2, 'failure')];w.tip = sha('aaaa1111');sweep(io);
+  w.runs = [...w.runs, attempt(run(42970000023, 'bbbb2222', 'failure', 52), 1, 'failure')];w.tip = sha('bbbb2222');sweep(io);
+  expect(reruns).toEqual([]);
+  expect(w.receipts.some(line => line.startsWith('main still red aaaa111100..bbbb222200 run 42970000023'))).toBe(true);
+});
+
+test('row 67: a follow waits through the rerun for attempt 2', async () => {
+  const w = world(base), reruns: number[] = [];
+  const red = attempt(run(42970000024, 'aaaa1111', 'failure', 50), 1, 'failure');
+  let polls = 0;
+  const io = { ...fake('flake-follow', w), rerun: (id: number) => { reruns.push(id); },
+    runs: () => { polls += 1; return polls === 1 ? base : polls <= 3 ? [...base, red] : [...base, attempt(red, 2, 'success')]; } };
+  sweep(io);
+  w.tip = sha('aaaa1111');
+  const seen = await follow(io, { sha: sha('aaaa1111'), lane: 'opus-new', pollMs: 1 });
+  expect(seen.map(verdict => verdict.kind)).toEqual(['rerun', 'green']);
+  expect(reruns).toEqual([42970000024]);
+  expect(w.receipts.some(line => line.startsWith('MAIN RED'))).toBe(false);
+});

@@ -8,6 +8,11 @@
 // `NOTE HOLD all lanes:` and `NOTE HOLD again:` (landers from `only <lane> lands` or `<lane> fixes forward first`),
 // lifted by a NOTE saying `HOLD lifted`. A release lane's `<lane> HOLD v0.1.89 train` holds a release, not lands.
 // The override is ALLOW_LAND_DURING_HOLD=1, named in an outgoing commit's body (J381).
+// Meta QA 11-25 row 67 (J505, no freezes): a hold binds only pushes that touch the red's files. The red's files are the
+// paths named in the hold line and in main-watch's `MAIN RED` and `NOTE RED` lines since the last lift or green. A push
+// none of whose files is one of them (or, for a named source file that is not a test, sits in its directory) goes, with
+// `HOLD open but this push is disjoint from <paths>; landing (J505)`. A hold that names no path binds every push. A push
+// that does touch the red's source still meets the red test in its own push gate (related tests), so it cannot pile on.
 import { closeSync, openSync, readSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -18,6 +23,9 @@ const HOLD = /^\S+ (?:UTC|Cancún) \S+ NOTE HOLD\b(.*)$/u;
 const LIFT = /^\S+ (?:UTC|Cancún) \S+ NOTE (?:LIFT engine\b|.*\bHOLD lifted\b)/u;
 const GREEN = /^\S+ (?:UTC|Cancún) main-watch main green\b/u;
 const OVERRIDE = 'ALLOW_LAND_DURING_HOLD';
+const RED = /^\S+ (?:UTC|Cancún) main-watch (?:MAIN RED|NOTE RED)\b/u;
+// A repo path: at least one directory, a file name with a code, data or config extension, and no URL scheme before it.
+const PATH = /(?<![\w:/.-])((?:[\w.@-]+\/)+[\w.-]+\.(?:[cm]?[jt]sx?|json|ya?ml|sh|py|wgsl|glsl|toml|md))(?![\w/])/gu;
 
 /** The landers a hold line names. @param {string} text @returns {string[]} */
 function landers(text) {
@@ -29,18 +37,42 @@ function landers(text) {
   return [...named];
 }
 
-/** The open engine land hold, or null: the newest hold line with no later lift or main-watch green.
- * @param {string} receipts the receipts log, or its tail @returns {{line:string,landers:string[]}|null} */
+/** The repo paths a receipt line names. @param {string} text @returns {string[]} */
+export function namedPaths(text) {
+  return [...new Set([...text.matchAll(PATH)].map(match => match[1].replace(/^\.\//u, '')))];
+}
+
+/** The open engine land hold, or null: the newest hold line with no later lift or main-watch green, and the red's
+ * files (row 67): the paths in it and in the span's main-watch red lines.
+ * @param {string} receipts the receipts log, or its tail @returns {{line:string,landers:string[],paths:string[]}|null} */
 export function openHold(receipts) {
-  const lines = receipts.split('\n');
+  const lines = receipts.split('\n'), reds = /** @type {string[]} */ ([]);
+  let hold = /** @type {{line:string,landers:string[]}|null} */ (null);
   for (let index = lines.length - 1; index >= 0; index--) {
     const line = lines[index].trim();
-    if (LIFT.test(line) || GREEN.test(line)) return null;
-    const hold = HOLD.exec(line);
+    if (LIFT.test(line) || GREEN.test(line)) break;
+    if (RED.test(line)) { reds.push(line); continue; }
+    const match = HOLD.exec(line);
     // A hold for lands names engine or all lanes; `HOLD again` repeats the last one.
-    if (hold !== null && /^ (?:engine|all|again)\b|\bengine\b/u.test(hold[1])) return { line, landers: landers(hold[1]) };
+    if (hold === null && match !== null && /^ (?:engine|all|again)\b|\bengine\b/u.test(match[1])) hold = { line, landers: landers(match[1]) };
   }
-  return null;
+  if (hold === null) return null;
+  // `all lanes` holds (rooms down, not a red) bind every push.
+  const paths = /\bNOTE HOLD all\b/u.test(hold.line) ? [] : namedPaths([hold.line, ...reds].join('\n'));
+  return { ...hold, paths };
+}
+
+const isTest = (/** @type {string} */ path) => /(?:^|\/)test\/|\.test\.[cm]?[jt]sx?$/u.test(path);
+const dirOf = (/** @type {string} */ path) => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '');
+
+/** The push's files that touch the red's files: the same path, the directory of a named source file (not a test), or a
+ * directory above a named path.
+ * @param {readonly string[]} files @param {readonly string[]} paths @returns {string[]} */
+export function touching(files, paths) {
+  const sources = new Set(paths.filter(path => !isTest(path)).map(dirOf));
+  // A directory pathspec (main-push before it commits) touches every named path under it.
+  const under = (/** @type {string} */ file) => { const dir = `${file.replace(/\/+$/u, '')}/`; return paths.some(path => path.startsWith(dir)); };
+  return files.filter(file => paths.includes(file) || sources.has(dirOf(file)) || under(file));
 }
 
 /** The receipts tail (the log is append-only and long). @param {NodeJS.ProcessEnv} env */
@@ -56,11 +88,16 @@ export function readReceipts(env = process.env) {
 }
 
 /** Why this push must wait, or null when it may go.
- * @param {{lane:string, env?:NodeJS.ProcessEnv, bodies:string, receipts?:string}} push
- *   bodies: the outgoing commits' messages, where the override must be named */
-export function holdRefusal({ lane, env = process.env, bodies, receipts = readReceipts(env) }) {
+ * @param {{lane:string, env?:NodeJS.ProcessEnv, bodies:string, receipts?:string, files?:readonly string[], say?:(line:string)=>void}} push
+ *   bodies: the outgoing commits' messages, where the override must be named; files: the paths the push changes
+ *   (row 67: unknown files bind as before); say: hears the disjoint-push note */
+export function holdRefusal({ lane, env = process.env, bodies, receipts = readReceipts(env), files, say }) {
   const hold = openHold(receipts);
   if (hold === null || hold.landers.includes(lane)) return null;
+  if (files !== undefined && files.length > 0 && hold.paths.length > 0 && touching(files, hold.paths).length === 0) {
+    say?.(`HOLD open but this push is disjoint from ${hold.paths.join(', ')}; landing (J505)`);
+    return null;
+  }
   const override = env[OVERRIDE] === '1';
   if (override && bodies.includes(OVERRIDE)) return null;
   const who = hold.landers.length > 0 ? `only ${hold.landers.join(', ')} land(s)` : 'nobody lands';
