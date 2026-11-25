@@ -113,3 +113,31 @@ test('the panel shows each picture from its moment to the next, the first from 0
   expect(spans([{ t: 1, file: 'a' }, { t: 3, file: 'b' }], 5)).toEqual([{ file: 'a', dur: 3 }, { file: 'b', dur: 2 }]);
   expect(() => spans([], 5)).toThrow(/no pictures/u);
 });
+
+// AT6: the party stands round its point facing in, and only ever joins a local world
+test('the party spreads round its point, faces it, and refuses a shared world', async () => {
+  const { spots, loopback } = await import('../../scripts/trailer/party.mjs');
+  const ring = spots(3, { x: 10, z: -5 }, 4);
+  expect(ring).toHaveLength(3);
+  for (const s of ring) {
+    expect(Math.hypot(s.x - 10, s.z + 5)).toBeCloseTo(4, 1);
+    expect(Math.atan2(-(10 - s.x), -(-5 - s.z))).toBeCloseTo(s.yaw, 2);
+  }
+  expect(loopback('http://127.0.0.1:4410/')).toBe('http://127.0.0.1:4410/');
+  expect(() => loopback('https://staging.wildshard.io/')).toThrow(/not a local world/u);
+});
+
+// AT10: the alpha 2 cut fills its length, keeps the bug off the build beats, and lands the score's hits
+test('the alpha 2 cut is about a minute and lands its last hit on the pull-back', async () => {
+  const { cut, onCut } = await import('../../scripts/trailer/cuts/alpha-2.mjs');
+  const { edl, mix, titles } = cut({ TAKE: 't.wav', SFX: 'sfx', bug: 'bug.png', 'build-1': 'a.mp4', 'build-2': 'b.mp4', 'build-3': 'c.mp4' });
+  expect(edl.clips.reduce((s, c) => s + c.dur, 0)).toBeCloseTo(edl.length, 6);
+  expect(edl.length).toBeGreaterThan(55);
+  expect(edl.length).toBeLessThan(66);
+  expect(edl.clips[0].shot).toBe('d-walk');
+  expect(edl.clips.find((c) => c.shot === 'g-rise').at).toBeCloseTo(onCut(64.77), 2);
+  expect(edl.overlays.some((o) => edl.clips.some((c) => 'video' in c && o.from === c.at))).toBe(false);
+  expect(titles.map((t) => t.card)).toEqual(expect.arrayContaining(['alpha', 'shard', 'bigcap', 'endA']));
+  expect(mix.length).toBe(edl.length);
+  expect(() => cut({ TAKE: 't.wav', SFX: 'sfx' })).toThrow(/--build-1/u);
+});

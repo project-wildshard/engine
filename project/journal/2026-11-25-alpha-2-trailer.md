@@ -33,3 +33,14 @@
   card a kicker, a big line (HTML) and a sub; the corner bug its pill (`ALPHA 2 · IN ENGINE`); the
   end card a second call to action (`Build your own zone with Claude Code`), the alpha line and
   the credits. Captions use `bigcap` (76 px Rajdhani, about 52 px cap height: over J520's 44).
+- AT3–AT6, AT10's cut: shot files for seven zones plus the grid (`shots/<slug>.mjs`), all
+  scouted dry at HEAD (the board: claude.ai artifact 1r2S4huyeyyZhPAHMgtbwp). Surprises: the
+  preview's catalogue lags the grid (Glowfen, Mirror Salt and Mossgate fail at
+  admission.assets: *Unknown built-in instance*), so those and the grid shots run on the
+  staging dev world (`dev.mjs --staging`); on that online page the creatures are the server's,
+  so fights shoot on the solo preview. Nine Dragon's shaft rig paused on the world watch's
+  error card (a look read the shaft's clear colour as an undrawn world): the capture now
+  answers the watch's 48 px looks itself, and a warm-up stall logs what the page says. A
+  creature's entry is recycled when it dies, so fights re-find their prey every tick (`PREY`).
+  `party.mjs` puts three real clients in a local world for the party shot, captured with
+  `--wall` (remote bodies move on the page's real clock). `cuts/alpha-2.mjs`: 19 clips, 63 s.

@@ -109,6 +109,15 @@ export const at = (t, T, step) => T >= t - 1e-9 && T < t + step - 1e-9;
 export const nearest = (re, max = 80) => `(() => { const w = ${W}, pp = w.player.position; return (w.animals?.animals ?? []).filter((a) => a.alive && !a.hidden && ${re}.test(a.kind) && a.position.distanceTo(pp) < ${max}).sort((a, b) => a.position.distanceTo(pp) - b.position.distanceTo(pp))[0] ?? null; })()`;
 /** ease the player's look onto `v` (an in-page expression for a creature), gain k per step */
 export const aimAt = (v, k = 0.12, dyAim = 0.8) => `(() => { const e = ${v}, p = ${W}.player; if (!e) return; const want = Math.atan2(-(e.position.x - p.position.x), -(e.position.z - p.position.z)); let d = want - p.yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); p.yaw += d * ${k}; const dy = e.position.y + ${dyAim} - (p.position.y + 1.65), dh = Math.hypot(e.position.x - p.position.x, e.position.z - p.position.z); p.pitch += (Math.atan2(dy, dh) - p.pitch) * ${k}; })();`;
+/** stand `back` m from the nearest living creature whose kind matches `re` (a regex literal string), facing it; it is
+ * window.__prey for the shot's ticks */
+export const preyNear = (re, back = 6, pitch = -0.04) => `{ const w = window.__wildshard.world; const pp = w.player.position; const b = (w.animals?.animals ?? []).filter((a) => a.alive && ${re}.test(a.kind)).sort((a, c) => a.position.distanceTo(pp) - c.position.distanceTo(pp))[0];
+  window.__preyKind = ${re};
+  if (b) { window.__prey = b; const dx = pp.x - b.position.x, dz = pp.z - b.position.z, l = Math.hypot(dx, dz) || 1, px = b.position.x + dx / l * ${back}, pz = b.position.z + dz / l * ${back};
+  await window.__wildshard.pose({ x: px, z: pz, yaw: Math.atan2(-(b.position.x - px), -(b.position.z - pz)), pitch: ${pitch} }); } }`;
+/** in-page: the nearest live, shown creature of preyNear's kind, found again every tick (a creature's entry can be
+ * recycled once it dies, so a held reference drifts onto another body) */
+export const PREY = `(() => { const w = ${W}, pp = w.player.position, re = window.__preyKind; if (!re) return null; return (w.animals?.animals ?? []).filter((a) => a.alive && !a.hidden && re.test(a.kind) && a.position.distanceTo(pp) < 40).sort((a, b) => a.position.distanceTo(pp) - b.position.distanceTo(pp))[0] ?? null; })()`;
 /** what creatures are near, for meta.json */
 export const NEAR_KINDS = `(() => { const w = ${W}, p = w.player.position; return { at: [p.x, p.y, p.z].map(v => +v.toFixed(1)), kinds: [...new Set((w.animals?.animals ?? []).filter((a) => a.alive && a.position.distanceTo(p) < 120).map((a) => a.kind))] }; })()`;
 /** join in-page JS snippets */

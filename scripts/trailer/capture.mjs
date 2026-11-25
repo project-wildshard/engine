@@ -48,6 +48,11 @@ export const RUNTIME = String.raw`((wall) => {
   // the gate: the game's own (entered, not paused, the cell ready) AND one frame asked for
   tr.gate = () => tr.go > 0 && tr.base();
   tr.base = g.frameGate; g.frameGate = tr.gate;
+  // the world watch (worldWatch.ts) judges 48 px copies of the frame a few seconds after control; a rig can hold the lens
+  // where no player stands (Nine Dragon's shaft, under the city: the clear colour), which it reads as an undrawn world and
+  // pauses on its error card mid-shot. The capture answers its looks with a drawn grey thumbnail; larger copies pass.
+  const realCaptureFrame = g.captureFrame.bind(g);
+  g.captureFrame = (maxW) => { if (maxW > 64) return realCaptureFrame(maxW); const c = document.createElement('canvas'); c.width = 48; c.height = 27; const x = c.getContext('2d'); x.fillStyle = '#7f8890'; x.fillRect(0, 0, 48, 27); return Promise.resolve(c); };
   // centripetal-ish Catmull-Rom on a key array, time-parametrised, the whole move eased in-out when rig.ease
   const cr = (p0, p1, p2, p3, u) => { const u2 = u * u, u3 = u2 * u; return 0.5 * ((2 * p1) + (-p0 + p2) * u + (2 * p0 - 5 * p1 + 4 * p2 - p3) * u2 + (-p0 + 3 * p1 - 3 * p2 + p3) * u3); };
   const easeIO = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
@@ -181,7 +186,7 @@ export async function main(argv) {
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
     const t0 = Date.now();
     if (first.grid) {
-      await page.goto(`${BASE}?mute=1&skipintro=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${BASE}?mute=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded' }); // the title, not skipintro: its MMO card is the way in
       await page.locator('.ws-main-grid').click({ timeout: 120000 });
       await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)), null, { timeout: 300000, polling: 500 });
       const failure = await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null);
@@ -222,7 +227,7 @@ export async function main(argv) {
           let stalls = 0;
           for (let k = 0; k < (s.warm ?? 240); k++) {
             if (s.warmTick) await page.evaluate(`(async () => { ${s.warmTick(k)} })()`);
-            if (!(await page.evaluate('window.__tr.step()'))) stalls++;
+            if (!(await page.evaluate('window.__tr.step()'))) { stalls++; console.log(`[${s.name}] warm step ${String(k)} stalled 30 s: ${JSON.stringify(await page.evaluate('(() => { const W = window.__wildshard, g = W.world.game; return { gate: window.__tr.base(), paused: W.world.hud.paused, entered: W.world.hud.entered, load: Boolean(document.querySelector(".ws-load")), err: document.querySelector("#wserr .msg")?.textContent ?? null }; })()'))}`); }
           }
           if (s.afterWarm) await page.evaluate(`(async () => { ${s.afterWarm} })()`);
           const probe = s.probe ? await page.evaluate(s.probe) : null;
