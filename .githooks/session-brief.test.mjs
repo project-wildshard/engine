@@ -11,6 +11,9 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CANONICAL = dirname(spawnSync('git', ['-C', ROOT, 'rev-parse', '--path-format=absolute', '--git-common-dir'], {encoding: 'utf8'}).stdout.trim());
 const BRIEF = join(ROOT, '.agents', 'hooks', 'session-brief.sh');
+// A commit hook runs these tests with git's own GIT_DIR and GIT_INDEX_FILE set: a temp repo's `git init` would then
+// re-init the real checkout and the brief would read it (meta QA 11-25 row 29, "could not parse HEAD" in a commit).
+const noGit = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
 const bin = fixtureScratch('repo-herdr');
 after(() => rmSync(bin, { recursive: true, force: true }));
 
@@ -65,7 +68,7 @@ describe('session brief: live plans', () => {
   const plans = (files) => {
     const repo = fixtureScratch('repo-brief');
     after(() => rmSync(repo, { recursive: true, force: true }));
-    spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+    spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: repo, env: noGit() });
     const hooks = relative(ROOT, dirname(BRIEF));
     cpSync(dirname(BRIEF), join(repo, hooks), { recursive: true });
     mkdirSync(join(repo, 'docs', 'plans'), { recursive: true });
@@ -157,7 +160,7 @@ describe('session brief: ./tmp line', () => {
   const repoWithTmp = ({ folders = true } = {}) => {
     const repo = realpathSync(fixtureScratch('repo-brief-tmp'));
     after(() => rmSync(repo, { recursive: true, force: true }));
-    spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
+    spawnSync('git', ['init', '-q', '-b', 'main'], { cwd: repo, env: noGit() });
     const hooks = relative(ROOT, dirname(BRIEF));
     cpSync(dirname(BRIEF), join(repo, hooks), { recursive: true });
     const old = new Date(Date.now() - 5 * 24 * 3600 * 1000);
@@ -256,5 +259,16 @@ describe('session brief: last 10 decisions from meta', () => {
   });
   test('no meta checkout there, no decision lines', () => {
     assert.doesNotMatch(run({ WS_META_DIR: join(ROOT, 'no-such-meta') }), /Last 10 decisions/);
+  });
+});
+
+// Meta QA 11-25 row 29: a hook test's temp-repo `git init` that inherits the commit hook's GIT_DIR re-inits the real
+// checkout (it wrote core.bare=true into engine's shared config once). Every one passes its own env.
+describe('hook tests: temp repos never see the hook\'s git env', () => {
+  test('every git init in .githooks and test/tooling tests passes an env', () => {
+    const files = spawnSync('git', ['-C', ROOT, 'ls-files', '.githooks/*.test.mjs', 'test/tooling/*.test.mjs'], { encoding: 'utf8', env: noGit() }).stdout.split('\n').filter(Boolean);
+    const bare = files.flatMap(file => readFileSync(join(ROOT, file), 'utf8').split('\n')
+      .flatMap((line, at) => /spawnSync\(\s*'git',\s*\[\s*'init'/u.test(line) && !/\benv\s*:/u.test(line) ? [`${file}:${String(at + 1)}`] : []));
+    assert.deepEqual(bare, []);
   });
 });
