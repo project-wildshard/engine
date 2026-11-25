@@ -12,6 +12,8 @@
 // home folder becomes ~, and a line that looks like a secret (a key, a token, a password) is dropped.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
+// the transcript holds each picture as base64 text: decoded through the engine's one codec (G649)
+import { base64Bytes } from '../../src/shared/engine/core/byteCodec.ts';
 
 /** beats (s) per kind of line */
 export const BEAT = { text: 0.9, tool: 0.45, result: 0.25, image: 0.9 };
@@ -57,7 +59,7 @@ export function replay(text, o = {}) {
       for (const x of content) {
         if (x.type === 'text' && x.text.trim()) {
           const body = lines(x.text.trim()).slice(0, 4);
-          if (body.length) put(`\r\n${C.text} ${body.map((l, k) => fit(l, 2)).join('\r\n  ')}\r\n`, BEAT.text);
+          if (body.length > 0) put(`\r\n${C.text} ${body.map((l) => fit(l, 2)).join('\r\n  ')}\r\n`, BEAT.text);
         } else if (x.type === 'tool_use') {
           if (x.name === 'Read' && x.input?.file_path) reads.set(x.id, clean(x.input.file_path, home));
           const line = lines(toolLine(x))[0];
@@ -75,7 +77,7 @@ export function replay(text, o = {}) {
           continue;
         }
         const out = lines(parts.filter((p) => p.type === 'text').map((p) => p.text).join('\n').trim()).filter((l) => l.trim());
-        if (!out.length) continue;
+        if (out.length === 0) continue;
         const shown = out.slice(0, 2).map((l, k) => `${k ? '     ' : '  ⎿  '}${C.dim(fit(l, 5))}`);
         if (out.length > 2) shown.push(`     ${C.dim(`… +${out.length - 2} lines`)}`);
         put(`${shown.join('\r\n')}\r\n`, BEAT.result);
@@ -101,7 +103,7 @@ export function main(argv) {
   if (dir) {
     mkdirSync(dir, { recursive: true });
     const list = images.map((im, k) => {
-      const bytes = Buffer.from(im.data, 'base64');
+      const bytes = Buffer.from(base64Bytes(im.data));
       const file = `${String(k).padStart(2, '0')}.${sniff(bytes)}`;
       writeFileSync(`${dir}/${file}`, bytes);
       return { t: im.t, file, path: im.path };

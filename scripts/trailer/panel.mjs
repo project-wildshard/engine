@@ -15,7 +15,7 @@ import sharp from 'sharp';
 /** each picture's span in seconds: from its t (the first from 0) to the next one's, the last to the end
  * @param {{ t: number, file: string }[]} images @param {number} length @returns {{ file: string, dur: number }[]} */
 export function spans(images, length) {
-  if (!images.length) throw new Error('panel: the span read no pictures');
+  if (images.length === 0) throw new Error('panel: the span read no pictures');
   return images.map((im, k) => {
     const from = k === 0 ? 0 : im.t, to = k + 1 < images.length ? images[k + 1].t : length;
     return { file: im.file, dur: Number(Math.max(0.05, to - from).toFixed(3)) };
