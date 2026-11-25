@@ -86,6 +86,13 @@ One way onto main (J422, Jake 2026-11-18; replaces J400, J404, J336's one land p
  - Land output: `land HH:MM:SS <state> <detail>`; a stop is one `land STOP …` line that names its fix. Exit 0: landed or
    nothing to land; exit 1: stopped. Landings and stops append to `~/.cache/wildshard/lane-receipts.log`
    (`grep ' land '`).
+ - **Land in the background (J505):** run `land.mjs` or `main-push.mjs` in the background with output to
+   `tmp/<lane>/land.log`. Never wrap it in `timeout`, pipe it into `head`, or commit while it lands: it stops its own
+   push on SIGTERM or EPIPE.
+ - **Phone jobs go through the queue (meta MINI-DEVEX MD1):** only the phone runner takes `iphone13.lock`. Run
+   `route-bench`, `link-bench` and `bench.mjs` (`scripts/memory/iphone/`) without `--with-locks`; they submit and stream
+   the log. Any other phone script: `node scripts/memory/iphone/phone-queue.mjs submit -- <script>`. Desktop runs take
+   `desktop-gpu.lock`.
  - Abandoned worktrees: `node scripts/worktree.mjs reap` (`--dry-run` first). It never touches an unlanded, dirty
    or busy one.
 
