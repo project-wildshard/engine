@@ -125,6 +125,7 @@
     "src/client/engine/boot/stuckStep.ts": "client",
     "src/client/engine/boot/sw.ts": "client",
     "src/client/engine/boot/texturePack.ts": "client",
+    "src/client/engine/boot/tapRecord.ts": "client",
     "src/client/engine/boot/titleArrival.ts": "client",
     "src/client/engine/boot/weights.ts": "client",
     "src/client/engine/calibrate/entry.ts": "client",

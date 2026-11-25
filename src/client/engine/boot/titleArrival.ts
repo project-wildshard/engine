@@ -1,6 +1,7 @@
 import { saveStorage } from '../saves/slots';
 import { bootMark, bootTiming } from '../../../shared/engine/boot/timing';
 import { diagnosticNow } from '../../../shared/engine/core/clock';
+import { tapRecord } from './tapRecord';
 /** One-shot intent from the renderer-free title page to the selected shard's fresh document. */
 export type TitleArrivalMode = 'enter' | 'explore' | 'arena';
 export interface TitleArrival { slug: string; mode: TitleArrivalMode }
@@ -105,9 +106,10 @@ function deviceBackup(take: boolean): string | null {
 export function setTitleArrival(arrival: TitleArrival & { name?: string; tier?: string; art?: string }, options: { readonly tab?: boolean } = {}): void {
   bootMark('app:navigation-decision', {slug: arrival.slug});
   const timing = bootTiming();
-  const raw = JSON.stringify({ ...arrival, at: Date.now(), from: ownDocument(), ...(timing === undefined ? {} : {timing: {
+  // CP12: the same bytes the harness writes (tapRecord.ts), plus this document and its boot timing.
+  const raw = tapRecord(arrival, Date.now(), { from: ownDocument(), ...(timing === undefined ? {} : {timing: {
     timeOrigin: timing.timeOrigin, decision: diagnosticNow(), input: Reflect.get(timing, 'lastInput'), attempt: timing.attempt,
-  }}) } satisfies StoredArrival);
+  }}) } satisfies Omit<StoredArrival, keyof TitleArrival | 'at' | 'name' | 'tier' | 'art'>);
   try { saveStorage('session').setItem(KEY, raw); } catch { /* the local one-shot below can carry the intent */ }
   // iOS home-screen navigation can replace WebContent between the static title and the game document.
   // The backup is consumed once, and expires quickly; it never becomes a remembered last shard.

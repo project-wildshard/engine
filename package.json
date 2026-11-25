@@ -226,6 +226,8 @@
     "./game/compendium/rules": "./src/shared/game/compendium/rules.ts",
     "./lint/sim-closure.mjs": "./lint/sim-closure.mjs",
     "./scripts/no-binary-json.mjs": "./scripts/no-binary-json.mjs",
+    "./scripts/zone-entry.mjs": "./scripts/zone-entry.mjs",
+    "./boot/tapRecord": "./src/client/engine/boot/tapRecord.ts",
     "./scripts/source-generation-outputs.json": "./scripts/source-generation-outputs.json",
     "./core/faults": "./src/shared/engine/core/faults.ts",
     "./core/fixedStep": "./src/shared/engine/core/fixedStep.ts",
