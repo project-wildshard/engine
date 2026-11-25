@@ -309,3 +309,11 @@ test('each harden drop-in leaves every syscall group its service calls allowed (
   const bare = dropIn(apply, sandbox, 'caddy').filter(line => line !== 'SystemCallFilter=@chown');
   expect(allowed(bare).has('@chown')).toBe(false);
 });
+
+// FAST-RELEASE FR-A22 (11-25): the cook's 7 CPUs run a 6-lane encoder; Pine's job alone peaked at 3963 MB on the MacBook with
+// 6 lanes, and the service had already peaked at 4.24G with 2, so harden's 5G would OOM-kill it.
+test('FR-A22: harden gives the cook 8G, room for a 6-lane job beside the worker and its listing', () => {
+  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const start = apply.indexOf('wildshard-cook.service.d/90-harden.conf'), drop = apply.slice(start, apply.indexOf('\nEOF\n', start));
+  expect(drop).toMatch(/^MemoryMax=8G$/mu);
+});

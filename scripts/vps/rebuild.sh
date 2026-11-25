@@ -142,8 +142,12 @@ if [ "${VERSION_CODENAME:-}" != noble ]; then say stop "Written for Ubuntu 24.04
 if [ "$(uname -m)" != x86_64 ]; then say warn "The VPS is x86_64, and this is $(uname -m)"; fi
 # The plan's CPU split (E7.2, MP1.8) needs the VPS's 16 cores. A smaller box runs Postgres and the cook worker unpinned,
 # since AllowedCPUs naming only absent CPUs stops a unit from starting at all.
-CPUS=$(nproc) SHARED_CPUS='AllowedCPUs=13-15'
-if [ "$CPUS" -lt 16 ]; then say warn "The units' AllowedCPUs assume 16 cores, and this has $CPUS"; SHARED_CPUS="# AllowedCPUs=13-15 needs 16 cores; this box has $CPUS"; fi
+# FAST-RELEASE FR-A22: the cook also takes staging's CPUs (9-12); see its unit.
+CPUS=$(nproc) SHARED_CPUS='AllowedCPUs=13-15' COOK_CPUS='AllowedCPUs=9-15'
+if [ "$CPUS" -lt 16 ]; then
+  say warn "The units' AllowedCPUs assume 16 cores, and this has $CPUS"
+  SHARED_CPUS="# AllowedCPUs=13-15 needs 16 cores; this box has $CPUS" COOK_CPUS="# AllowedCPUs=9-15 needs 16 cores; this box has $CPUS"
+fi
 
 # AUTO-RELEASE AR3: --cook is step 4 alone; the box already has what steps 1 to 3 make.
 if [ "$COOK_ONLY" = 0 ]; then
@@ -583,8 +587,13 @@ ExecStartPre=$COOK_LIB/unshare --user --map-root-user --net /bin/true
 ExecStart=$NODE --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs serve
 Restart=on-failure
 RestartSec=5
-# The plan's CPUs for Postgres and the cook worker; every job is a child, so these hold for all of them at once.
-$SHARED_CPUS
+# Every job is a child, so these hold for all of them at once. FAST-RELEASE FR-A22 (11-25): on Postgres's 13-15 alone a job
+# encoded with 2 lanes (COOK_CPU_SLOTS 3, less one) and Pine cooked in 849 s against 258 s on the MacBook's 6, while the box
+# sat at a load of 0.12. The cook also takes staging's 9-12 (7 CPUs: 6 lanes), at a fifth of the default weight and nice
+# 10, so staging rooms and Postgres win any contention. Production's 0-8 stay its own.
+$COOK_CPUS
+CPUWeight=20
+Nice=10
 MemoryMax=12G
 TasksMax=512
 LimitCORE=0

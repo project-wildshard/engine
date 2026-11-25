@@ -478,13 +478,16 @@ done
 # The cook's jobs each make a user and network namespace (C4), so it keeps exactly those two.
 # MemoryMax 4G -> 5G (11-25, QA 11-25 row 31's FR row): six cook runs peaked 3.6 to 4.0G and three were OOM-killed once a
 # bucket listing (about 1M objects) overlapped a cook; 1G more covers two listings and the peak. The box has 30G, 24G free.
+# 5G -> 8G (FAST-RELEASE FR-A22, 11-25): the cook now gets 7 CPUs, so its encoder runs 6 lanes, not 2, each with its own
+# WebAssembly heap; Pine's job alone peaked at 3963 MB with 6 lanes on the MacBook, and the service already peaked at 4.24G
+# with 2. 8G covers that job, the worker and its listing. Production's rooms peaked at 1.8G and staging's at 1.3G; 25G free.
 if put /etc/systemd/system/wildshard-cook.service.d/90-harden.conf 644 root:root VH7 <<EOF
 # VPS-HARDENING VH7
 [Service]
 $(printf '%s\n' "$sandbox" | grep -v '^PrivateUsers=')
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 RestrictNamespaces=user net
-MemoryMax=5G
+MemoryMax=8G
 EOF
 then units_changed=1; fi
 if put /etc/systemd/system/caddy.service.d/90-harden.conf 644 root:root VH7 <<EOF

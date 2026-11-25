@@ -423,3 +423,17 @@ test('MS2.4b: while cook.settings names the ref, a new staging follow state rest
   writeFileSync(state, 'COOK_ENGINE_REF=server-staging-cccc\nWILDSHARD_BUILD=cccc\n')
   expect(hash(missing)).not.toBe(before)
 })
+
+// FAST-RELEASE FR-A22 (11-25): on Postgres's 13-15 alone the cook's encoder ran 2 lanes and Pine cooked in 849 s on the box
+// against 258 s on the MacBook's 6, at a box load of 0.12. The cook takes staging's 9-12 too, at a low weight and nice, so
+// rooms and Postgres win contention, and never production's 0-8.
+test('FR-A22: the cook runs on CPUs 9-15 at a low weight, never production\'s', () => {
+  const start = source.indexOf('wildshard-cook.service" 644'), unit = source.slice(start, source.indexOf('WantedBy=multi-user.target', start))
+  expect(unit).toContain('\n$COOK_CPUS\n')
+  expect(unit).not.toContain('$SHARED_CPUS')
+  expect(source).toContain("COOK_CPUS='AllowedCPUs=9-15'")
+  expect(unit).toMatch(/^CPUWeight=20$/mu)
+  expect(unit).toMatch(/^Nice=10$/mu)
+  // production's rooms keep 0-8 to themselves (setup.sh), and 9-15 never reaches into them
+  expect(readFileSync('scripts/vps/setup.sh', 'utf8')).toContain('wildshard-server@production.service.d/cpus.conf <<\'EOF\'\n[Service]\nAllowedCPUs=0-8\n')
+})

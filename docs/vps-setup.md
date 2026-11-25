@@ -107,7 +107,7 @@ The cook worker runs from `/opt/wildshard/engine` at the tag and build a
 signed staging release names (CI's sparse set, `pnpm install
 --frozen-lockfile --ignore-scripts` once per commit, so no package script
 runs as root) as
-`wildshard-cook`, on `127.0.0.1:8792`, with CPUs 13-15. Each cook job
+`wildshard-cook`, on `127.0.0.1:8792`, with CPUs 9-15 at a low weight (FR-A22). Each cook job
 runs in a user and network namespace of its own. Ubuntu 24.04 refuses
 those to unconfined programs (`kernel.apparmor_restrict_unprivileged_userns=1`,
 true on the VPS), so the worker gets its own copy of `unshare` in
