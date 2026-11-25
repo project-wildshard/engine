@@ -52,7 +52,11 @@ await test('every actual cook input and the pinned format change cookRevision', 
   for (const file of baseline.files) {
     const at = join(root, file), bytes = readFileSync(at);
     writeFileSync(at, Buffer.concat([bytes, Buffer.from('\n')]));
-    assert.notEqual(cookRevision(root).revision, expected.revision, file);
+    // Meta QA 11-24 row 44 (MA14b): package.json joins the closure (engineFloor's literal URL) but none of its bytes move
+    // the revision (scripts/cook-revision.ts revisionBytes), so a release's version bump carries every head; its one cook
+    // input, the format pin, is hashed on its own (the 'format dependency' case below).
+    if (file === 'package.json') assert.equal(cookRevision(root).revision, expected.revision, file);
+    else assert.notEqual(cookRevision(root).revision, expected.revision, file);
     writeFileSync(at, bytes);
   }
   const rendererPath = join(root, rendererInput), rendererBytes = readFileSync(rendererPath);
