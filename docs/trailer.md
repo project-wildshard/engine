@@ -142,7 +142,17 @@ Claude Code.
 - On the dev world's online page the creatures are the server's: shoot fights on the solo
   preview. A creature's entry is recycled when it dies; aim with `PREY`, found again each tick.
 - A virtual clock and remote players disagree: capture party shots with `--wall --sub 1
-  --scale 1` (about 0.03 s a frame, so remote bodies move close to their real pace).
+  --scale 1`. That draws about 20 frames a real second on the grid (11-25), so remote bodies
+  play about 3x fast: cue the party slower (`d-party` uses 0.27 of a walk).
+- A closed page's body stays in the world for 5 minutes (the server's seat hold): a probe or a
+  capture that stood at a cell's (0, 0) leaves a ghost the next shot there walks through. Leave a
+  zone 5 minutes after probing it before its shots, or re-take the shot.
+- On the grid `window.__hf` is the home level's heightfield; a `rel` rig reads the active cell's
+  ground from the player's frame queries (`capture.mjs` `tr.ground`).
+- Nalati entered through the grid draws one flat colour with the AO pass on (meta AT16): its
+  shots set `NO_AO` until the engine fix lands.
+- A grid cell keeps its own sky and weather: the shot's `time` and `weather` reach the home level
+  only, so Nalati shoots under its own dusk.
 - A session's pictures can be mislabelled (a PNG type on JPEG bytes): `panel.mjs` sniffs and
   normalises them before the concat.
 - A free camera starts from the player's own eye: a rig's first frames can sweep past a post.
