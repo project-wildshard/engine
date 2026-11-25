@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const HOOKS = dirname(fileURLToPath(import.meta.url));
 const SCRIPTS = join(HOOKS, '..', 'kit', 'scripts');
-export const TRAILER = 'Assisted-by: Claude Code:claude-opus-5-5';
+export const TRAILER = 'Assisted-by: Claude:claude-opus-5-5';
 export const ok = (subject, body = 'Why this matters.') => `${subject}\n\n${body}\n\n${TRAILER}\n`;
 
 export const roots = [];
