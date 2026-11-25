@@ -19,8 +19,9 @@ export type FolderWorkerFactory=(...args:Parameters<typeof HeadlessSimulation.cr
 const defaultFolderWorker:FolderWorkerFactory=(...args)=>HeadlessSimulation.create(...args);
 
 /** Start the independent replay owner while its caller records native input.
- * Readiness still awaits the same worker admission and initial checkpoint. */
-export async function beginFolderSession(slug:string,variant?:FolderSessionVariant,snapshot?:string,createWorker:FolderWorkerFactory=defaultFolderWorker):Promise<{ready:()=>Promise<FolderSimulation>;assets:ReadonlyMap<string,Uint8Array>;product:Awaited<ReturnType<typeof loadHeadlessFolder>>}> {
+ * Readiness still awaits the same worker admission and initial checkpoint. A native worker takes its snapshot as a promise
+ * too: it boots while the caller makes the checkpoint (QA 11-25 row 59). */
+export async function beginFolderSession(slug:string,variant?:FolderSessionVariant,snapshot?:string|PromiseLike<string>,createWorker:FolderWorkerFactory=defaultFolderWorker):Promise<{ready:()=>Promise<FolderSimulation>;assets:ReadonlyMap<string,Uint8Array>;product:Awaited<ReturnType<typeof loadHeadlessFolder>>}> {
   if(variant!==undefined&&variantHosts[variant]!==slug)throw new Error('Native proof variant does not match product');
   const directory=builtFolder(slug),{product,assets}=await admittedFolder(directory,'full'),source=product.shardfile;
   const descriptor=outputDescriptor(source);if(descriptor===undefined)throw new Error('Missing admitted headless inventory');
@@ -30,7 +31,7 @@ export async function beginFolderSession(slug:string,variant?:FolderSessionVaria
   // client-plan runtime's product takes its fixed native adapter.
   const declared=source.runtime===null&&!sections.has('sim/runtime-plan');
   const nativeKind=variant??(!declared&&!sections.has('sim/runtime-plan')&&(slug==='driftwood-isle'||slug==='pine-hollow'||slug==='nine-dragon-stack'||slug==='nalati-grasslands')?nativeKinds[slug]:undefined);
-  const pending=nativeKind===undefined?createWorker(source,assets,snapshot,{deadline:'advisory',sections})
+  const pending=nativeKind===undefined?Promise.resolve(snapshot).then(checkpoint=>createWorker(source,assets,checkpoint,{deadline:'advisory',sections}))
     :createNativeProofWorker(source,assets,nativeKind,snapshot,sections,directory);
   // Observe failure immediately even while the caller is preparing its owner.
   const outcome=(async()=>{try{return {ok:true as const,sim:await pending};}catch(error){return {ok:false as const,error};}})();

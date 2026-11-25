@@ -12,7 +12,9 @@ import { scriptAdmissionRows } from '@wildshard/format/scriptContract';
 import { hashImmutableBytes } from '../../shared/host/immutable';
 
 export interface NativeProofWorkerOptions {
-  snapshot?: string;
+  /** The checkpoint to resume from. A promise lets the worker import its modules and admit the product while the caller is
+   * still making the checkpoint (QA 11-25 row 59): only the payload waits for it. */
+  snapshot?: string | PromiseLike<string>;
   sections?: ReadonlyMap<string, unknown>;
   /** A checked consumer build; omit only for an inline proof with no named files. */
   directory?: string;
@@ -35,9 +37,10 @@ export async function createNativeProofWorker(shard: Shardfile, assets: Readonly
       for (const hash of [...shard.files.map(file => file.hash), ...shard.requires.commons.map(identity => `commons:${identity}`)]) {
         const bytes = assets.get(hash); if (bytes === undefined) throw new Error('Missing admitted worker bytes'); admitted.set(hash, bytes);
       }
+      const snapshot = await options.snapshot;
       return {shard, assets: admitted, prepare: prepare.href, sections, binary,
         ...(options.directory === undefined ? {} : {directory: options.directory}),
-        ...(options.snapshot === undefined ? {} : {snapshot: options.snapshot})};
+        ...(snapshot === undefined ? {} : {snapshot})};
     });
   try { await worker.initialized(); return worker; } catch (error) { await worker.dispose(); throw error; }
 }

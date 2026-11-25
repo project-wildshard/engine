@@ -9,7 +9,7 @@ const modules: Readonly<Record<NativeProofKind, string>> = {"driftwood": "../pro
 
 /** Legacy engine fixtures choose their local composition; the published worker owns no shard catalogue. */
 export function createNativeProofWorker(shard: Shardfile, assets: ReadonlyMap<string, Uint8Array>, kind: NativeProofKind,
-  snapshot?: string, sections?: ReadonlyMap<string, unknown>, directory = `out/${shard.identity.slug}`): ReturnType<typeof createWorker> {
+  snapshot?: string | PromiseLike<string>, sections?: ReadonlyMap<string, unknown>, directory = `out/${shard.identity.slug}`): ReturnType<typeof createWorker> {
   return createWorker(shard, assets, new URL(`${modules[kind]}.ts`, import.meta.url), {
     ...(snapshot === undefined ? {} : {snapshot}), ...(sections === undefined ? {} : {sections}),
     ...(kind === 'trusted' || kind === 'deferred' ? {} : {directory}),
