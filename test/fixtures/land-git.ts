@@ -108,6 +108,8 @@ export function fixture() {
     WS_GH_READER: '0', WS_LAND_MODE: 'push',
     WS_STORE_USERS: join(root, 'store-users'), WS_STORE_RESERVATION: join(root, 'store-maintenance.lock'),
     WS_FULL_GATE_ROOT: join(root, 'full-gate'),
+    // J521: a fixture's branch deletes never reach the real log.
+    WS_BRANCH_LOG: join(root, 'deleted-branches.log'),
   };
   for (const key of Object.keys(env)) if (key.startsWith('GIT_') && !['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL'].includes(key)) Reflect.deleteProperty(env, key);
   const git = (cwd: string, args: readonly string[]): string => execFileSync('git', args, { cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();

@@ -26,3 +26,5 @@
   refuses naming the build (scripts/pin-packs.mjs). Live 19:35 UTC: Pine r18 has none for staging's 75fd4b97.
 - ZONE-SNAPSHOTS ZS7: the staging Zone Select snapshot drops Ink & Cel Valley's two hidden cards (live staging names
   neither retired zone after the API prune); test/retired-zones.test.ts keeps them out of tests, scripts and sources.
+- QA 11-24 row 15 (J521): land --done logs its local branch delete to ~/.cache/wildshard/deleted-branches.log and deletes
+  origin's copy of the plan branch when its tip is on what landed (under a lease), logged too. main-push runs only on main.

@@ -48,6 +48,41 @@ describe('land (J422): main-watch, the canonical checkout and cleanup after the 
     expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], { cwd: f.remote, env: f.env }).status).not.toBe(0);
   }, 60_000);
 
+  test('J521: --done logs its local delete, and deletes origin\'s landed copy under a lease, logged', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    const tip = f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    f.git(wt, ['push', '--quiet', 'origin', 'plan/foo']);
+    const result = f.land(wt, ['--done']);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/origin plan\/foo deleted/u);
+    expect(spawnSync('git', ['rev-parse', '--verify', '--quiet', 'refs/heads/plan/foo'], { cwd: f.remote, env: f.env }).status).not.toBe(0);
+    const lines = f.read(join(f.root, 'deleted-branches.log')).trim().split('\n');
+    expect(lines).toEqual([
+      expect.stringMatching(new RegExp(`^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ engine local plan/foo ${tip.slice(0, 12)}$`, 'u')),
+      expect.stringMatching(new RegExp(` engine remote plan/foo ${tip.slice(0, 12)}$`, 'u')),
+    ]);
+  }, 60_000);
+
+  test('J521: origin\'s copy with a commit main lacks is kept and not logged; push mode deletes nothing', () => {
+    const f = fixture();
+    const wt = f.worktree('foo');
+    f.commit(wt, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    const other = f.worktree('other');
+    const extra = f.commit(other, 'src/other.ts', 'export const other = true;', 'feat: other');
+    f.git(other, ['push', '--quiet', 'origin', `${extra}:refs/heads/plan/foo`]);
+    const result = f.land(wt, ['--done']);
+    expect(result.status, result.stdout).toBe(0);
+    expect(result.stdout).toMatch(/origin plan\/foo kept: [0-9a-f]{10} has commits not on main/u);
+    expect(f.git(f.remote, ['rev-parse', 'refs/heads/plan/foo'])).toBe(extra);
+    expect(f.read(join(f.root, 'deleted-branches.log'))).not.toContain('remote');
+    const g = fixture();
+    const kept = g.worktree('bar');
+    g.commit(kept, 'src/feature.ts', 'export const feature = true;', 'feat: add feature');
+    expect(g.land(kept, []).status).toBe(0);
+    expect(existsSync(join(g.root, 'deleted-branches.log'))).toBe(false);
+  }, 60_000);
+
   test('LS5: a worktree with untracked work is kept after --done; without --done push mode keeps everything', () => {
     const f = fixture();
     const wt = f.worktree('foo');

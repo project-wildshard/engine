@@ -13,7 +13,7 @@ import {execFileSync,spawn,spawnSync} from 'node:child_process';
 import {keepCopy,worktreeState} from './pin-keep-copy.mjs';
 import {appendFileSync,existsSync,linkSync,lstatSync,mkdirSync,readFileSync,realpathSync,renameSync,rmSync,writeFileSync} from 'node:fs';
 import {homedir,hostname} from 'node:os';
-import {dirname,join,resolve} from 'node:path';
+import {basename,dirname,join,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {MANIFEST as PINS_MANIFEST,stalePinFolders,verifiedPinsOutputs} from './pins-reuse.mjs';
 import {checkedTreeDirt} from './push-proof-cache.mjs';
@@ -665,13 +665,31 @@ class Landing{
    }
    const removed=tryGit(canonical,['worktree','remove',...(generatedOnly?['--force']:[]),this.root]);
    if(removed.status===0){
-    tryGitLocked(canonical,['update-ref','-d',`refs/heads/${this.branch}`,head],process.env,this.retry);
+    const gone=tryGitLocked(canonical,['update-ref','-d',`refs/heads/${this.branch}`,head],process.env,this.retry);
+    if(gone.status===0)logDeletedBranch(this.env,canonical,'local',this.branch,head);
     parts.push(`worktree and ${this.branch} removed; continue from ${canonical}`);
+    const remote=this.deleteLandedRemote(canonical,head);
+    if(remote!==null)parts.push(remote);
    }else parts.push(`worktree kept (${removed.stderr.trim().split('\n').at(-1)??'git worktree remove refused'})`);
   }
   const line=parts.join('; ');
   this.say('cleaned',line);
   return line;
+ }
+
+ /** QA 11-24 row 15 (J521, Jake 11-25: tools delete landed branches): origin's copy of the plan branch goes too, under a
+  * lease on the tip read here, and only when that tip is on what just landed. Nothing at origin is the usual case: land
+  * never pushes a plan branch.
+  * @param {string} canonical @param {string} head @returns {string|null} what happened, or null when origin has none */
+ deleteLandedRemote(canonical,head){
+  const listed=tryGit(canonical,['ls-remote','--heads','origin',`refs/heads/${this.branch}`],this.env);
+  const tip=listed.status===0?(listed.stdout.trim().split(/\s+/u)[0]??''):'';
+  if(!SHA.test(tip))return listed.status===0?null:`origin ${this.branch} not checked (${listed.stderr.trim().split('\n').at(-1)??'ls-remote failed'})`;
+  if(tryGit(canonical,['merge-base','--is-ancestor',tip,head],this.env).status!==0)return `origin ${this.branch} kept: ${short(tip)} has commits not on main`;
+  const deleted=tryGit(canonical,['push','--quiet',`--force-with-lease=refs/heads/${this.branch}:${tip}`,'origin','--delete',this.branch],this.env);
+  if(deleted.status!==0)return `origin ${this.branch} kept (${deleted.stderr.trim().split('\n').at(-1)??'push refused'})`;
+  logDeletedBranch(this.env,canonical,'remote',this.branch,tip);
+  return `origin ${this.branch} deleted`;
  }
 
  /** @param {string} rule @param {string} why @param {number} round @param {string} before */
@@ -686,6 +704,18 @@ class Landing{
   this.receipt(`landed ${short(head)} on main (${short(before)}..${short(head)}); ${rule}; rounds ${round}; main ci followed by main-watch${this.sizeWarning===null?'':'; one-row'}; finished=${new Date().toISOString()}; ${seconds} s`);
   return 0;
  }
+}
+
+/** J521: every branch a tool deletes is one line in `~/.cache/wildshard/deleted-branches.log` (`WS_BRANCH_LOG`), the same
+ * `<time> <repo> <local|remote> <branch> <sha>` lines as meta's scripts/delete-landed-branches.sh; `git branch <name>
+ * <sha>` brings one back. A log that cannot be written never fails the land.
+ * @param {NodeJS.ProcessEnv} env @param {string} canonical @param {'local'|'remote'} where @param {string} branch @param {string} sha */
+export function logDeletedBranch(env,canonical,where,branch,sha){
+ const log=env.WS_BRANCH_LOG??join(homedir(),'.cache/wildshard/deleted-branches.log');
+ try{
+  mkdirSync(dirname(log),{recursive:true});
+  appendFileSync(log,`${new Date().toISOString().replace(/\.\d+Z$/u,'Z')} ${basename(canonical)} ${where} ${branch} ${sha.slice(0,12)}\n`);
+ }catch{/* The branch is gone either way; the sha is in the land line. */}
 }
 
 /** The only main push land makes: the exact SHA, an explicit non-forced refspec.

@@ -9,6 +9,7 @@ export function failureLine(output: string, error?: Error): string;
 export const PINS_LEDGER: string;
 export function shaVerdict(data: unknown, sha: string): { state: 'pending' | 'green' | 'red'; runs: Record<string, { id: number; status: string; conclusion: string | null; branch: string; url: string; attempt: number }>; summary: string };
 export function mainPushArgs(sha: string): string[];
+export function logDeletedBranch(env: NodeJS.ProcessEnv, canonical: string, where: 'local' | 'remote', branch: string, sha: string): void;
 export function land(argv: string[], cwd?: string, env?: NodeJS.ProcessEnv): Promise<number>;
 export const STAMPS: readonly string[];
 export function prePushCause(output: string, porcelain?: string, fallback?: string): string;
