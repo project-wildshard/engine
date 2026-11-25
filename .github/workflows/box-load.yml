@@ -1,12 +1,12 @@
 # Meta MACBOOK-WAITS MW2 (EG-25, EG-29; J504 names the staging rooms box as the box for the nightly bot load): ordinary bots
-# from three hosted runners sit on the staging server for 15 minutes, and the box's own Prometheus reads what they cost:
+# from eight hosted runners sit on the staging server for 18 minutes, and the box's own Prometheus reads what they cost:
 # tick p95 (worst worker), resident memory and heap slope over a 10-minute window the bots fill, plus how many players that
 # window held at its emptiest. Read-only on the box: the probe goes through the gate (wildshard-box-gate probe), exactly
 # as box-probe.yml does; the bots are mmo-bots.mjs staging, built from the signed staging release's own tree.
 #   gh workflow run box-load.yml -R project-wildshard/engine
-# Seats: staging seats 16 and the door 4 sockets per address (mmo-bots.mjs), so each runner brings 4 bots and refuses to
-# take the last 4 seats from people; the load is as many legs as staging has room for, at most 12 bots. 32 bots on this box
-# need staging's seats raised or the box replica (`mmo-bots.mjs replica --box`) open to the workflows' key: a box change.
+# Seats: the door takes 4 sockets per address (mmo-bots.mjs), so each runner brings 4 bots and refuses to take the last 4
+# seats from people. Meta QA 11-24 row 24: eight legs, 32 bots, on staging's 40 seats (`wildshard-config set staging
+# WORLD_SEATS 40`, 32 bots and 8 for people); the probe waits for all 32 and says how many sat.
 name: box-load
 on:
   schedule:
@@ -18,7 +18,7 @@ concurrency:
   group: box-load
   cancel-in-progress: false
 env:
-  BOT_SECONDS: '900'
+  BOT_SECONDS: '1080'
 jobs:
   bots:
     if: github.repository == 'project-wildshard/engine'
@@ -29,7 +29,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        leg: [0, 1, 2]
+        leg: [0, 1, 2, 3, 4, 5, 6, 7]
     env:
       TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
     steps:
@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           players() { node scripts/box-ops.mjs players staging | node -e 'process.stdin.on("data", d => console.log(JSON.parse(d).players))'; }
-          base=$(players); want=$(( base + 8 )); echo "staging seats $base before the load; waiting for $want (two legs at least)"
+          base=$(players); want=$(( base + 32 )); echo "staging seats $base before the load; waiting for $want (all eight legs, 32 bots)"
           for _ in $(seq 1 90); do now=$(players); [ "$now" -ge "$want" ] && break; sleep 10; done
           [ "$now" -ge "$want" ] || { echo "::error::the bots never sat: $now players, wanted $want"; exit 1; }
           echo "seated: $now players; holding 600 s so the probe's 10-minute window is all load"
@@ -110,7 +110,8 @@ jobs:
           node scripts/box-ops.mjs players staging | tee "$RUNNER_TEMP/players.json"
           node -e '
             const fs = require("fs"), s = JSON.parse(fs.readFileSync(process.argv[1], "utf8")), p = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
-            const rows = [["players (fewest over the window / before)", p.fewestOverWindow + " / " + process.argv[3], "the load"],
+            const rows = [["bots seated (fewest over the window less before)", (p.fewestOverWindow - Number(process.argv[3])) + " of 32", "32"],
+              ["players (fewest over the window / before)", p.fewestOverWindow + " / " + process.argv[3], "the load"],
               ["tick p95 (worst worker, ms)", s.tickP95MaxMs + " (worker " + s.tickP95Worker + " of " + s.workers + ")", s.tickOk ? "under 12 ms" : "OVER 12 ms"],
               ["RSS (MiB)", s.rssMiB, s.rssOk ? "under 60% of cap" : "OVER 60% of cap"], ["heap slope (KiB/min)", s.heapSlopeKiBPerMin, "trend"]];
             const table = "### box-load staging (last " + s.window + ", bots seated)\n\n| Read | Value | Budget |\n|---|---|---|\n" + rows.map(r => "| " + r.join(" | ") + " |").join("\n");
