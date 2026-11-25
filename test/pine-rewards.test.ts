@@ -375,7 +375,7 @@ test('a shared-storage host preserves page discovery and worn finishes across re
   const again = await boot(storage, true);
   try {
     expect(again.booted.restored).toBe(true);
-    expect(skinSave.read('pine-hollow')).toEqual({ owned: ['scarback-furnace', 'hollow-ash'], worn: { crossbow: 'scarback-furnace' } });
+    expect(skinSave.read('pine-hollow')).toEqual({ owned: ['scarback-furnace', 'hollow-ash'], worn: { 'declared.weapon.crossbow': 'scarback-furnace' } });
     expect(compendiumSave.read('pine-hollow')['ghost-stag']).toMatchObject({ n: 7, t: 2 });
     expect(compendiumSave.read('pine-hollow')[place]).toEqual({ s: 2, n: 3, t: 0, b: 0 });
     await new Promise<void>(resolve => { setTimeout(resolve, 0); });
