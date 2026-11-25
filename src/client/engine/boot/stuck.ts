@@ -19,7 +19,7 @@ import { saveStorage } from '../saves/slots';
 import { ErrorReporter, safeUrl, sendReport } from '../core/errorReport';
 import { countReload, recentReloads } from '../core/reloadGuard';
 import { markReload } from './lastEnd';
-import { showEnd } from './endPlay';
+import { isLeavingPlay, showEnd } from './endPlay';
 import { pageScope } from '../../../shared/engine/app/resources';
 
 
@@ -134,6 +134,8 @@ async function showFailure(): Promise<void> {
 export function guardBoot(entered: Promise<unknown>): void {
   installChunkRecovery();
   void (async () => {
-    try { await entered; } catch (e) { if (!await recoverChunkFailure(e)) failed(e); }
+    // J501: a boot step that already left through the funnel (QA 11-25 row 35's updating card stays on this page) is no failure:
+    // recovering it reloaded the card away, onto the title
+    try { await entered; } catch (e) { if (isLeavingPlay(e)) return; if (!await recoverChunkFailure(e)) failed(e); }
   })();
 }

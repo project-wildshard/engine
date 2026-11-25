@@ -4,6 +4,7 @@
 import { afterEach, expect, test, vi } from 'vitest';
 import { guardBoot, OFFLINE_START_LINE } from './stuck';
 import { saveStorage } from '../saves/slots';
+import { LeavingPlayError } from './endPlay';
 
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); vi.unstubAllGlobals(); saveStorage('session')?.removeItem('boot.selfReload'); });
 
@@ -38,4 +39,17 @@ test('a boot that fails offline says so on the loading card until the network is
   window.dispatchEvent(new Event('online'));
   // the wait ends (its recovery is the SB53 test's): the line goes with it
   await vi.waitFor(() => { expect(card.querySelector('.ws-load-offline')).toBeNull(); });
+});
+
+// QA 11-25 row 35: a boot that stopped through the J501 funnel (the zone-updating card stays on the page) is no failure; the
+// boot's recovery reloaded it onto the title, and the card was gone a tenth of a second after it showed.
+test('a boot that left through the funnel is not recovered: no reload, no retry spent', async () => {
+  const reload = vi.fn<() => void>();
+  vi.stubGlobal('location', { href: 'https://boot.test/?chunk=brasscap-mesa', origin: 'https://boot.test', pathname: '/', search: '?chunk=brasscap-mesa', reload });
+  vi.stubGlobal('fetch', () => Promise.reject(new TypeError('Failed to fetch')));
+  vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true);
+  guardBoot(Promise.reject(new LeavingPlayError('brasscap-mesa: the world runs a newer revision than this page has; waiting for it')));
+  await new Promise(resolve => { setTimeout(resolve, 50); });
+  expect(reload).not.toHaveBeenCalled();
+  expect(saveStorage('session')?.getItem('boot.selfReload') ?? null).toBeNull();
 });

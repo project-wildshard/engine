@@ -7,7 +7,7 @@ import { afterEach, beforeEach, expect, test } from 'vitest';
 import { installCatalogue, installedCatalogue, type CatalogueDocument } from '../src/shared/game/grid/catalogueSlot';
 import { learnPlacedCells, roomsRevisions, type PlacedKeep } from '../src/client/game/grid/placedCells';
 import type { PlacedContent } from '../src/client/game/grid/placedContent';
-import { behindRooms, clearPlacedSpawns, placedLoose, placedSpawn } from '../src/client/game/boot/placedSpawn';
+import { behindRecheck, behindRooms, clearPlacedSpawns, placedLoose, placedSpawn } from '../src/client/game/boot/placedSpawn';
 import { clearFollowed, heardRooms, pageRevision, sessionHints, type RoomsHints } from '../src/client/game/grid/roomsRevision';
 import { installSaveEnvironment, saveEnvironment } from '../src/shared/engine/saves/environment';
 import { worldRevisions } from '../src/server/host/dedicated/gridCells';
@@ -57,6 +57,22 @@ test('the r8 page / r9 rooms split: the page draws r9, the rooms\' own upload, b
 test('r9 that the page cannot load: entering Driftwood refuses with Reload, never a mismatch', async () => {
   const read = await learnPlacedCells(URL_AT, { keep: keep(), hints: tab(), fetch: serving(signed(R9)), publicKey, content: () => Promise.resolve(undefined) });
   expect(read).toMatchObject({ followed: [], behind: ['driftwood-isle'] });
+  expect(behindRooms('driftwood-isle')).toBe(R9);
+  expect(placedSpawn('driftwood-isle')).toBeUndefined();
+});
+
+test('QA 11-25 row 35: the updating card asks the cook again by the same read, and only says whether it is there now', async () => {
+  let cooked = false;
+  const asked: string[] = [];
+  await learnPlacedCells(URL_AT, { keep: keep(), hints: tab(), fetch: serving(signed(R9)), publicKey,
+    content: (slug, hash) => { asked.push(`${slug}@${String(hash)}`); return Promise.resolve(cooked ? R9_COPY : undefined); } });
+  const recheck = behindRecheck('driftwood-isle');
+  expect(recheck).toBeDefined();
+  expect(await recheck?.()).toBe(false);
+  cooked = true;
+  expect(await recheck?.()).toBe(true);
+  expect(asked).toEqual([`driftwood-isle@${R9}`, `driftwood-isle@${R9}`, `driftwood-isle@${R9}`]);
+  // a yes installs nothing: the reload it gives does, on the next page
   expect(behindRooms('driftwood-isle')).toBe(R9);
   expect(placedSpawn('driftwood-isle')).toBeUndefined();
 });

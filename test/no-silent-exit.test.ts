@@ -99,7 +99,7 @@ export function plainRevisionThrows(file: string, text: string): string[] {
 test('a page behind its world\'s revision reloads or shows the modal, never a plain boot error (QA 11-24 row 20)', () => {
   const found = sources(SCAN).flatMap((path) => plainRevisionThrows(path, readFileSync(join(ROOT, path), 'utf8')));
   expect(found, `${found.join('\n')}\n\nA page older than its zone's world leaves through leaveForRoomsRevision() (src/client/game/boot/roomsAhead.ts): `
-    + 'reloadPlay REV-RELOAD once, then endPlay REV-BEHIND with Retry.').toEqual([]);
+    + 'the updating card, which reloads (REV-RELOAD) once the cook has its packs (QA 11-25 row 35).').toEqual([]);
   // the line Sentry filed as WILDSHARD-GAME-BX fails; the funnel's throw passes
   expect(plainRevisionThrows('a.ts', '  if (rooms !== undefined) throw new Error(`${bareSlug(slug)}: the world runs a newer revision (${rooms.slice(0, 12)}) than this page has. Reload to play it.`);\n'))
     .toEqual(['a.ts:1 throws a plain "newer revision" error']);

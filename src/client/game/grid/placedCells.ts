@@ -28,6 +28,8 @@ import { parseGridCatalogue } from '../../../shared/game/grid/catalogue';
 export const PLACED_DEADLINE_MS = 3000;
 /** OF20 with the title's time: an online page reads its kept file only once the fresh read has taken this long (or failed). */
 export const KEPT_AFTER_MS = 600;
+/** QA 11-25 row 35: each of the updating card's checks of the cook's index has its own deadline. */
+const RECHECK_DEADLINE_MS = 15_000;
 /** How long after the fresh file is believed the device keep writes it (its slots chunks load then, off the title's path). */
 export const KEEP_WRITE_AFTER_MS = 5000;
 
@@ -241,7 +243,11 @@ export async function learnPlacedCells(url: string, ports: PlacedPorts = {}): Pr
     // NB2 (J494): a slug the build baked whose rooms run another upload: until that upload's own copy is in, entering it refuses
     // with Reload (`spawnDownload.ts`). The cook's index for this build and those bytes is what the rooms preloaded (activation).
     const follow = roomsRevisions(document, file, (ports.hints ?? sessionHints()).read().revisions), followed: string[] = [], behind: string[] = [];
-    for (const [slug, hash] of follow) markBehindRooms(slug, hash);
+    // QA 11-25 row 35: the updating card asks the cook again by the same read, each with its own deadline (this read's signal ends
+    // with it); a yes only says the next page will follow, the reload does the rest
+    const recheck = (slug: string, hash: string) => async (): Promise<boolean> =>
+      (await content(slug, hash, AbortSignal.timeout(RECHECK_DEADLINE_MS)).catch(() => undefined)) !== undefined;
+    for (const [slug, hash] of follow) markBehindRooms(slug, hash, recheck(slug, hash));
     const following = Promise.all([...follow].map(async ([slug, hash]) => {
       const found = await content(slug, hash, abort.signal).catch(() => undefined);
       if (found === undefined) { behind.push(slug); return; }

@@ -35,12 +35,19 @@ export function placedSpawn(slug: string): PlacedSpawn | undefined { return plac
 /** SHARD-COMPAT NB2 (J494, Jake 2026-11-22: "the page should always run the server revision"): a slug this build baked whose rooms
  *  run other bytes (the signed placement file's hash), until the page installs the rooms' own copy (`placedCells.ts`). P1: staging's
  *  rooms ran Driftwood r9 while the page drew its baked r8 and every enemy was invisible. Entering it refuses with Reload instead. */
-const behind = new Map<string, string>();
-export function markBehindRooms(slug: string, hash: string): void { behind.set(bare(slug), hash); }
-export function clearBehindRooms(slug: string): void { behind.delete(bare(slug)); }
+const behind = new Map<string, string>(), rechecks = new Map<string, () => Promise<boolean>>();
+/** `recheck` (QA 11-25 row 35): asks again whether the page can load those bytes now (the cook's index is written), for the
+ *  updating card (`roomsAhead.ts`). */
+export function markBehindRooms(slug: string, hash: string, recheck?: () => Promise<boolean>): void {
+  behind.set(bare(slug), hash);
+  if (recheck === undefined) rechecks.delete(bare(slug)); else rechecks.set(bare(slug), recheck);
+}
+export function clearBehindRooms(slug: string): void { behind.delete(bare(slug)); rechecks.delete(bare(slug)); }
+/** How the updating card asks again for `slug`; undefined when the mark gave none. */
+export function behindRecheck(slug: string): (() => Promise<boolean>) | undefined { return rechecks.get(bare(slug)); }
 /** The hash the rooms run for `slug` when this page could not load it; undefined when the page runs what the rooms run. */
 export function behindRooms(slug: string): string | undefined { return behind.get(bare(slug)); }
-export function clearPlacedSpawns(): void { placed.clear(); behind.clear(); }
+export function clearPlacedSpawns(): void { placed.clear(); behind.clear(); rechecks.clear(); }
 const LOOSE_PATH = /^\/(?:shardfiles\/([a-z0-9_-]+)\/|programs\/([a-z0-9_-]+)\.json$)/u;
 /** A content-named file (`…/blobs/<kind>/<sha256>.<ext>`): the same bytes wherever it is served. */
 const NAMED_BLOB = /\/blobs\/[a-z0-9]+\/[a-f0-9]{64}\.[a-z0-9]+$/u;

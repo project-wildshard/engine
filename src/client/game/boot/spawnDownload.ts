@@ -995,12 +995,15 @@ export function entryProgramsURL(slug: string): string | null {
 /** OFFLINE OF12: the build bakes production's asset cache name (one bundle serves every channel); a page keeps its spawn
  *  files in its own channel's (`assetCacheName`), as the service worker of that channel does. */
 const channelCache = (baked: unknown): unknown => typeof baked === 'string' ? assetCacheName() : baked;
-function spawnSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string): {address: SpawnManifestAddress; cacheName: unknown; base: string} | null {
+/** `leave`: a foreground download (the page is entering the zone); every other read (the title's read-ahead, a held check, a part
+ *  table) only asks, and gets null for a zone the page can't load yet. */
+function spawnSelection(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string, leave = false): {address: SpawnManifestAddress; cacheName: unknown; base: string} | null {
   const text = document.getElementById('boot-module-files')?.textContent; if (!text) return null;
-  // NB2 (J494, Jake 2026-11-22): the page never plays other bytes than the rooms run; one it could not load refuses with Reload
+  // NB2 (J494, Jake 2026-11-22): the page never plays other bytes than the rooms run
   const rooms = behindRooms(slug);
-  // QA 11-24 row 20 (J501): no plain error; one marked reload onto the rooms' revision, then the title's REV-BEHIND modal with Retry
-  if (rooms !== undefined) throw leaveForRoomsRevision(slug, rooms).error;
+  // QA 11-24 row 20 (J501): no plain error. QA 11-25 row 35: the entering page shows the updating card and waits for the cook; a
+  // read that only asks never navigates (the title's read-ahead of the selected zone left the title in a loop, 76 loads in 90 s)
+  if (rooms !== undefined) { if (!leave) return null; throw leaveForRoomsRevision(slug, rooms).error; }
   const manifests = get(JSON.parse(text), 'spawnManifests');
   // SA48: a slug placed after the build reads the cook's entry rows from the store, on either flow (no build has its grid manifest;
   // the grid's own code and seams are this page's and load as they always do). NB2: so does a build's own slug whose rooms run
@@ -1176,7 +1179,7 @@ function lateDownload(start: (signal: AbortSignal) => Promise<SpawnDownload>): S
 }
 function spawnDownload(slug: string, flow: 'client' | 'grid', tier: 'phone' | 'desktop', mode: string, foreground: boolean): SpawnDownload | null {
   partTier = tier; installMemberLayer();
-  const selected = spawnSelection(slug, flow, tier, mode); if (selected === null) return null;
+  const selected = spawnSelection(slug, flow, tier, mode, foreground); if (selected === null) return null;
   const key = packsOn ? `packs:${flow}|${slug}|${tier}|${mode}` : addressKey(selected.address);
   if (current !== undefined && current.key === key) {
     if (foreground && !current.foreground) holdUnlisted(current.download.ready);
