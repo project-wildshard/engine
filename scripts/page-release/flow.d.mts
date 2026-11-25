@@ -37,6 +37,10 @@ export interface Deps {
   run: (file: string, args: string[], env: Record<string, string>) => void;
   fetchJSON: (url: string) => Promise<unknown>;
   fetchText: (url: string) => Promise<string>;
+  /** FR-A15: the HTTP status of a public rooms URL. */
+  roomsStatus?: (url: string) => Promise<number>;
+  /** ALLOW_ROOMS_DOWN=1 (J381). */
+  allowRoomsDown?: boolean;
   readFile: (path: string) => Uint8Array;
   state: { read: (phase: Phase) => unknown; write: (phase: Phase, value: object) => void };
   git: { clean: () => boolean; head: () => string; remoteTag: (tag: string) => string | undefined };
@@ -66,6 +70,9 @@ export const API_ORIGIN: string;
 export const RELEASE_PUBLIC_KEY: string;
 export function pinnedReleaseKey(configured?: string): string;
 export const PHASES: readonly Phase[];
+/** FR-A15: both channels' public rooms /up URLs. */
+export const PUBLIC_ROOMS: readonly string[];
+export function roomsDown(deps: Deps): Promise<string[]>;
 export const CHECKED_DOCUMENTS: readonly ['version.json', 'index.html', 'sw.js', 'deploy-chunks.json'];
 export const CHANNELS: { staging: WorldChannelConfig; production: WorldChannelConfig; preview: SoloChannelConfig; explore: SoloChannelConfig };
 export class RefusedError extends Error { constructor(message: string) }
