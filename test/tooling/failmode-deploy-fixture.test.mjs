@@ -27,6 +27,8 @@ test('FM11 changes the deployment documents while preserving compiled entry byte
   assert.match(document, /2026-11-19T05:00:01.000Z/u);
   assert.match(document, /src="\/b\/1234567-fixture\/entry.js"/u);
   assert.equal(readFileSync(join(next, 'b/1234567-fixture/entry.js'), 'utf8'), 'globalThis.answer = 42');
+  // meta QA 11-25 row 65: a page booted on the second build imports /b/{its build}/standalone/online.js by its own name
+  assert.equal(readFileSync(join(next, `b/${nextBuild}/entry.js`), 'utf8'), 'globalThis.answer = 42');
   assert.equal(readFileSync(join(next, `assets/spawn/packs-${nextBuild}.json`), 'utf8'), '{}');
   assert.deepEqual(JSON.parse(readFileSync(join(next, 'version.json'), 'utf8')), {
     build: nextBuild, time: '2026-11-19T05:00:01.000Z',
