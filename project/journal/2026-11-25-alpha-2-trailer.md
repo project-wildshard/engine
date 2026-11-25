@@ -10,3 +10,13 @@
   under `desktop-gpu.lock`. Plan worktrees were at the cap of 10, so this goes through
   engine-quickfix and main-push. Dry run on Driftwood: 5 shots, 3 stills each, 0.07 s a frame
   at 3840 × 2160.
+- AT2: cut, titles, mix, conform, build beat, SFX pick and music scan are back in
+  `scripts/trailer/`. A cut is a data file (`cuts/<name>.mjs`); cut.mjs hands it every other
+  `--key value`, so the alpha 2 cut takes its build beats and bug by name. The conform's grades
+  are keyed by zone slug, and a clip can now be a held `still` (the smoke cut of dry stills).
+  mix.py finds the game's hashed sounds (`<name>-<take>-<hash>.m4a`); sfx_pick.py reads CLAP
+  from sharddev's audio tools and no longer doubles the `tr-` prefix; build-beat.mjs takes its
+  panels as `--lapse` arguments instead of Sky Reach's fixed paths. The node tools are
+  importable (`import.meta.main`) so the push gate finds their tests, and `scripts/trailer/**`
+  sits beside look-loop/views.mjs in the scripts tsconfig's exclude list (capture scripts full
+  of in-page JS strings).

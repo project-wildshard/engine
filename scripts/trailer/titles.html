@@ -1,0 +1,294 @@
+<!doctype html>
+<!-- E168 Steam trailer typography. Every card is a pure function of time: titles.mjs calls window.pose(card, t)
+     for each 60 fps frame and screenshots it with a transparent background, so the overlay is frame-exact. -->
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: 'Rajdhani'; font-weight: 500; src: url('../../public/fonts/rajdhani-500-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Rajdhani'; font-weight: 600; src: url('../../public/fonts/rajdhani-600-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Rajdhani'; font-weight: 700; src: url('../../public/fonts/rajdhani-700-latin.woff2') format('woff2'); }
+@font-face { font-family: 'JetBrains Mono'; font-weight: 500; src: url('../../public/fonts/jetbrains-mono-latin.woff2') format('woff2'); }
+:root { --cyan: #8fe3ff; }
+html, body { margin: 0; width: 1920px; height: 1080px; background: transparent; overflow: hidden; }
+.card { position: absolute; inset: 0; display: none; }
+.card.on { display: block; }
+.mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; text-transform: uppercase; }
+.disp { font-family: 'Rajdhani', sans-serif; font-weight: 700; text-transform: uppercase; color: #fff; }
+.shadow { text-shadow: 0 2px 18px rgba(0, 8, 16, 0.55), 0 0 2px rgba(0, 8, 16, 0.5); }
+
+/* shard title: lower left, kicker + drawn hairline + name */
+#shard .wrap { position: absolute; left: 128px; bottom: 150px; }
+#shard .kicker { font-size: 22px; letter-spacing: 0.5em; color: var(--cyan); }
+#shard .line { height: 2px; margin: 18px 0 14px; background: linear-gradient(90deg, var(--cyan), rgba(143, 227, 255, 0)); box-shadow: 0 0 12px rgba(143, 227, 255, 0.6); transform-origin: left center; width: 520px; }
+#shard .name { font-size: 104px; line-height: 0.95; white-space: nowrap; }
+#shard .sub { margin-top: 16px; font-size: 20px; letter-spacing: 0.42em; color: rgba(255, 255, 255, 0.86); }
+#shard .brk { position: absolute; left: -34px; top: -26px; width: 22px; height: 22px; border-left: 2px solid var(--cyan); border-top: 2px solid var(--cyan); }
+
+/* centre line (the cold open) */
+#line .txt { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; font-size: 30px; letter-spacing: 0.6em; color: #fff; }
+
+/* end card */
+#end .veil { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 46%, rgba(4, 10, 18, 0.55), rgba(2, 6, 12, 0.92) 75%); }
+#end .center { position: absolute; left: 0; right: 0; top: 330px; text-align: center; }
+#end .project { font-size: 30px; letter-spacing: 0.9em; color: var(--cyan); margin-left: 0.9em; }
+#end .word { position: relative; display: inline-block; font-size: 190px; line-height: 1; letter-spacing: 0.1em; margin-top: 10px; overflow: hidden; padding: 0 0.1em; }
+#end .word .glint { position: absolute; top: 0; bottom: 0; width: 220px; background: linear-gradient(100deg, rgba(255, 255, 255, 0), rgba(200, 245, 255, 0.85), rgba(255, 255, 255, 0)); mix-blend-mode: overlay; }
+#end .rule { width: 760px; height: 2px; margin: 26px auto 34px; background: linear-gradient(90deg, rgba(143, 227, 255, 0), var(--cyan), rgba(143, 227, 255, 0)); box-shadow: 0 0 14px rgba(143, 227, 255, 0.7); }
+#end .cta { display: inline-block; padding: 16px 44px; border: 2px solid var(--cyan); background: rgba(13, 27, 38, 0.72); font-size: 40px; letter-spacing: 0.34em; color: #fff; }
+#end .cta b { color: var(--cyan); font-weight: 700; }
+#end .credits { position: absolute; left: 0; right: 0; bottom: 56px; text-align: center; font-size: 15px; letter-spacing: 0.28em; color: rgba(255, 255, 255, 0.5); }
+
+/* E169 F3, the Nine Dragon Stack teaser. body.portrait = the phone cut's 1080×1920 frame */
+html.portrait, body.portrait { width: 1080px; height: 1920px; }
+.cjk { font-family: 'Songti TC', 'Songti SC', serif; font-weight: 700; color: #fff; }
+/* the altimeter: a hairline scale on the right edge whose ticks run down as the camera climbs, the altitude read out
+   beside it, the place named when it lands */
+#alt .rail { position: absolute; right: 118px; top: 250px; height: 580px; width: 1px; background: linear-gradient(180deg, rgba(143, 227, 255, 0), rgba(143, 227, 255, 0.75) 22%, rgba(143, 227, 255, 0.75) 78%, rgba(143, 227, 255, 0)); }
+#alt .ticks { position: absolute; right: 118px; top: 250px; height: 580px; width: 40px; overflow: hidden;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 22%, #000 78%, transparent); }
+#alt .tick { position: absolute; right: 0; height: 1px; background: rgba(143, 227, 255, 0.8); }
+#alt .mark { position: absolute; right: 108px; top: 539px; width: 22px; height: 2px; background: var(--cyan); box-shadow: 0 0 10px rgba(143, 227, 255, 0.8); transform-origin: right center; }
+#alt .read { position: absolute; right: 150px; top: 512px; text-align: right; }
+#alt .num { font-size: 44px; letter-spacing: 0.08em; color: #fff; }
+#alt .num small { font-size: 22px; letter-spacing: 0.3em; color: var(--cyan); margin-left: 10px; }
+#alt .lbl { margin-top: 6px; font-size: 16px; letter-spacing: 0.42em; color: rgba(255, 255, 255, 0.82); white-space: nowrap; }
+#alt .kick { position: absolute; right: 150px; top: 478px; font-size: 14px; letter-spacing: 0.5em; color: var(--cyan); white-space: nowrap; }
+body.portrait #alt .rail, body.portrait #alt .ticks { right: 64px; top: 620px; height: 680px; }
+body.portrait #alt .mark { right: 54px; top: 959px; }
+body.portrait #alt .read { right: 96px; top: 932px; }
+body.portrait #alt .kick { right: 96px; top: 898px; }
+/* the teaser's end card: the mark, the name, COMING SOON, the credits */
+#teaser .veil { position: absolute; inset: 0; background: radial-gradient(ellipse 70% 60% at 50% 45%, rgba(3, 8, 16, 0.62), rgba(3, 8, 16, 0.38) 60%, rgba(2, 6, 12, 0.72)); }
+#teaser .center { position: absolute; left: 0; right: 0; top: 262px; text-align: center; }
+#teaser .kicker { font-size: 20px; letter-spacing: 0.7em; margin-left: 0.7em; color: var(--cyan); }
+#teaser .mark { display: inline-block; font-size: 168px; line-height: 1.12; letter-spacing: 0.22em; margin: 18px 0 0 0.22em;
+  text-shadow: 0 0 34px rgba(255, 80, 60, 0.28), 0 4px 30px rgba(0, 6, 14, 0.7); }
+#teaser .rule { width: 820px; height: 2px; margin: 26px auto 26px; background: linear-gradient(90deg, rgba(143, 227, 255, 0), var(--cyan), rgba(143, 227, 255, 0)); box-shadow: 0 0 14px rgba(143, 227, 255, 0.7); }
+#teaser .name { font-size: 74px; letter-spacing: 0.34em; margin-left: 0.34em; line-height: 1; }
+#teaser .cta { display: inline-block; margin-top: 40px; padding: 14px 40px 14px 52px; border: 2px solid var(--cyan); background: rgba(13, 27, 38, 0.72); font-size: 30px; letter-spacing: 0.5em; color: #fff; position: relative; }
+#teaser .cta::before, #teaser .cta::after { content: ''; position: absolute; width: 12px; height: 12px; border-color: var(--cyan); border-style: solid; }
+#teaser .cta::before { left: -8px; top: -8px; border-width: 2px 0 0 2px; }
+#teaser .cta::after { right: -8px; bottom: -8px; border-width: 0 2px 2px 0; }
+#teaser .credits { position: absolute; left: 0; right: 0; bottom: 48px; text-align: center; font-size: 14px; letter-spacing: 0.24em; line-height: 1.9; color: rgba(255, 255, 255, 0.55); }
+body.portrait #teaser .center { top: 560px; }
+body.portrait #teaser .mark { font-size: 132px; letter-spacing: 0.16em; margin-left: 0.16em; }
+body.portrait #teaser .rule { width: 760px; }
+body.portrait #teaser .name { font-size: 52px; letter-spacing: 0.26em; margin-left: 0.26em; }
+body.portrait #teaser .cta { font-size: 26px; }
+body.portrait #teaser .credits { bottom: 120px; font-size: 13px; letter-spacing: 0.16em; padding: 0 60px; }
+
+/* E466, the alpha trailer (the marketing site's look: the Cell logo, violet + cyan on the abyss). Every frame says alpha:
+   the opening card, the corner bug (rendered once, a still over the whole cut), the end card */
+:root { --violet: #a487ff; --abyss: #050a12; }
+#alpha { background: radial-gradient(ellipse at 50% 46%, rgba(5, 10, 18, 0.5), rgba(5, 10, 18, 0.82) 80%); } /* over in-engine footage */
+#alpha .center { position: absolute; left: 0; right: 0; top: 330px; text-align: center; }
+#alpha .mark { width: 92px; height: 92px; }
+#alpha .kicker { margin-top: 22px; font-size: 22px; letter-spacing: 0.7em; margin-left: 0.7em; color: var(--cyan); }
+#alpha .big { margin-top: 10px; font-size: 148px; line-height: 1; letter-spacing: 0.12em; margin-left: 0.12em; }
+#alpha .big b { color: var(--violet); font-weight: 700; }
+#alpha .rule { width: 720px; height: 2px; margin: 30px auto 26px; background: linear-gradient(90deg, rgba(164, 135, 255, 0), var(--violet), rgba(164, 135, 255, 0)); box-shadow: 0 0 14px rgba(164, 135, 255, 0.7); }
+#alpha .sub { font-size: 22px; letter-spacing: 0.34em; margin-left: 0.34em; color: rgba(232, 246, 255, 0.86); }
+#bug .pill { position: absolute; right: 56px; top: 46px; display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 16px;
+  background: rgba(5, 10, 18, 0.46); border: 1px solid rgba(164, 135, 255, 0.55); font-size: 21px; letter-spacing: 0.3em; color: #fff; }
+#bug .dot { width: 11px; height: 11px; background: var(--violet); box-shadow: 0 0 10px rgba(164, 135, 255, 0.9); }
+#bug .pill b { color: var(--violet); font-weight: 500; }
+#caption .wrap { position: absolute; left: 96px; bottom: 92px; }
+#caption .kick { font-size: 16px; letter-spacing: 0.5em; color: var(--violet); }
+#caption .txt { margin-top: 10px; font-size: 26px; letter-spacing: 0.2em; color: #fff; }
+#caption .brk { position: absolute; left: -26px; top: -18px; width: 16px; height: 16px; border-left: 2px solid var(--violet); border-top: 2px solid var(--violet); }
+#endA .veil { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 46%, rgba(5, 10, 18, 0.62), rgba(3, 6, 12, 0.95) 75%); }
+#endA .center { position: absolute; left: 0; right: 0; top: 270px; text-align: center; }
+#endA .logo { width: 760px; }
+#endA .rule { width: 760px; height: 2px; margin: 26px auto 34px; background: linear-gradient(90deg, rgba(164, 135, 255, 0), var(--violet), rgba(164, 135, 255, 0)); box-shadow: 0 0 14px rgba(164, 135, 255, 0.7); }
+#endA .cta { display: inline-block; padding: 16px 44px; border: 2px solid var(--cyan); background: rgba(13, 27, 38, 0.72); font-size: 40px; letter-spacing: 0.3em; color: #fff; }
+#endA .cta b { color: var(--cyan); font-weight: 700; }
+#endA .url { margin-top: 26px; font-size: 30px; letter-spacing: 0.4em; margin-left: 0.4em; color: var(--cyan); text-transform: none; }
+#endA .alpha { margin-top: 30px; font-size: 17px; letter-spacing: 0.4em; margin-left: 0.4em; color: var(--violet); }
+#endA .credits { position: absolute; left: 0; right: 0; bottom: 52px; text-align: center; font-size: 15px; letter-spacing: 0.24em; color: rgba(255, 255, 255, 0.5); }
+
+/* E466 CT6, the concept trailer: a concept tag on every frame, big phone-safe captions, the full label, its end card */
+#cbug .pill { position: absolute; right: 56px; top: 46px; display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 16px;
+  background: rgba(5, 10, 18, 0.5); border: 1px solid rgba(164, 135, 255, 0.6); font-size: 17px; letter-spacing: 0.26em; color: #fff; }
+#cbug .dot { width: 11px; height: 11px; background: var(--violet); box-shadow: 0 0 10px rgba(164, 135, 255, 0.9); }
+#cbug .pill b { color: var(--violet); font-weight: 500; }
+#bigcap .txt { position: absolute; left: 0; right: 0; bottom: 150px; text-align: center; font-size: 76px; line-height: 1.05;
+  letter-spacing: 0.06em; text-shadow: 0 3px 24px rgba(0, 6, 14, 0.85), 0 0 3px rgba(0, 6, 14, 0.8); }
+#clabel::before { content: ""; position: absolute; left: 0; right: 0; top: calc(80% - 34px); height: 140px; background: linear-gradient(90deg, rgba(5,10,18,0), rgba(5,10,18,0.72) 25%, rgba(5,10,18,0.72) 75%, rgba(5,10,18,0)); }
+#clabel .txt { position: absolute; left: 0; right: 0; top: 80%; text-align: center; font-size: 40px; letter-spacing: 0.55em;
+  margin-left: 0.55em; color: #fff; text-shadow: 0 2px 18px rgba(0, 6, 14, 0.9); }
+#clabel .sub { position: absolute; left: 0; right: 0; top: calc(80% + 62px); text-align: center; font-size: 26px; letter-spacing: 0.4em;
+  margin-left: 0.4em; color: var(--violet); text-shadow: 0 2px 14px rgba(0, 6, 14, 0.9); }
+#endC .veil { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 46%, rgba(5, 10, 18, 0.55), rgba(3, 6, 12, 0.92) 78%); }
+#endC .center { position: absolute; left: 0; right: 0; top: 250px; text-align: center; }
+#endC .logo { width: 720px; }
+#endC .line { margin-top: 34px; font-size: 54px; letter-spacing: 0.04em; }
+#endC .line b { color: var(--violet); font-weight: 700; }
+#endC .url { margin-top: 22px; font-size: 30px; letter-spacing: 0.4em; margin-left: 0.4em; color: var(--cyan); text-transform: none; }
+#endC .label { margin-top: 30px; font-size: 18px; letter-spacing: 0.4em; margin-left: 0.4em; color: rgba(255, 255, 255, 0.75); }
+#endC .credits { position: absolute; left: 0; right: 0; bottom: 48px; text-align: center; font-size: 14px; letter-spacing: 0.24em; color: rgba(255, 255, 255, 0.5); }
+</style></head>
+<body>
+<div class="card" id="shard"><div class="wrap"><div class="brk"></div><div class="kicker mono shadow"></div><div class="line"></div><div class="name disp shadow"></div><div class="sub mono shadow"></div></div></div>
+<div class="card" id="line"><div class="txt mono shadow"></div></div>
+<div class="card" id="end"><div class="veil"></div><div class="center"><div class="project mono">Project</div><div class="word disp"><span class="w">Wildshard</span><div class="glint"></div></div><div class="rule"></div><div class="cta disp">Wishlist <b>now</b> on Steam</div></div>
+  <div class="credits mono">Music: MiniMax-Music3 &nbsp;·&nbsp; Sound effects: MOSS-SoundEffect v2 · Stable Audio 3 — Powered by Stability AI &nbsp;·&nbsp; Captured in engine</div></div>
+<div class="card" id="alt"><div class="rail"></div><div class="ticks"></div><div class="mark"></div><div class="kick mono shadow"></div><div class="read"><div class="num mono shadow"></div><div class="lbl mono shadow"></div></div></div>
+<div class="card" id="teaser"><div class="veil"></div><div class="center"><div class="kicker mono shadow"></div><div class="mark cjk"></div><div class="rule"></div><div class="name disp shadow"></div><div class="cta disp"></div></div>
+  <div class="credits mono"></div></div>
+<div class="card" id="alpha"><div class="center"><img class="mark" src="assets/mark.svg"><div class="kicker mono">Project Wildshard</div><div class="big disp">Alpha <b>gameplay</b></div><div class="rule"></div><div class="sub mono">Captured in engine · everything here is work in progress</div></div></div>
+<div class="card" id="bug"><div class="pill mono"><div class="dot"></div><span><b>Alpha</b> · in engine</span></div></div>
+<div class="card" id="caption"><div class="wrap"><div class="brk"></div><div class="kick mono shadow"></div><div class="txt mono shadow"></div></div></div>
+<div class="card" id="endA"><div class="veil"></div><div class="center"><img class="logo" src="assets/logo.svg"><div class="rule"></div><div class="cta disp">Play free <b>in your browser</b></div><div class="url mono">wildshard.io</div><div class="alpha mono">Alpha · captured in engine · work in progress</div></div>
+  <div class="credits mono">Music: MiniMax-Music3 &nbsp;·&nbsp; Sound effects: MOSS-SoundEffect v2 · Stable Audio 3 — Powered by Stability AI &nbsp;·&nbsp; Built with Claude Code</div></div>
+<div class="card" id="cbug"><div class="pill mono"><div class="dot"></div><span><b>Concept trailer</b> · not gameplay</span></div></div>
+<div class="card" id="bigcap"><div class="txt disp"></div></div>
+<div class="card" id="clabel"><div class="txt mono">Concept trailer</div><div class="sub mono">Not gameplay · the vision of Project Wildshard</div></div>
+<div class="card" id="endC"><div class="veil"></div><div class="center"><img class="logo" src="assets/logo.svg"><div class="line disp">Play it in the browser. <b>Build it in Claude Code.</b></div><div class="url mono">wildshard.io</div><div class="label mono">Concept trailer · not gameplay</div></div>
+  <div class="credits mono">Images: OpenAI Image · Qwen-Image &nbsp;·&nbsp; Video: LTX-2.5 &nbsp;·&nbsp; Music: MiniMax-Music3 &nbsp;·&nbsp; Sound effects: MOSS-SoundEffect v2 · Stable Audio 3 — Powered by Stability AI</div></div>
+<script>
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = (x) => 1 - Math.pow(1 - clamp(x), 3);          // out-cubic
+const inOut = (x) => { x = clamp(x); return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const ramp = (t, a, b) => clamp((t - a) / (b - a));
+const $ = (s) => document.querySelector(s);
+// window.pose(card, t, opts): opts = { kicker, name, sub, dur } for 'shard'; { text, dur } for 'line'; { dur } for 'end'
+// the altimeter's ticks: one every 2 m, a longer one every 10 m, scrolled by the altitude (16 px a metre)
+const PX_M = 16;
+const ticks = document.querySelector('#alt .ticks');
+const tickEls = Array.from({ length: 48 }, () => { const d = document.createElement('div'); d.className = 'tick'; ticks.appendChild(d); return d; });
+const trackAt = (tr, t) => {                                   // [[t, value], ...] linear
+  if (t <= tr[0][0]) return tr[0][1];
+  for (let i = 1; i < tr.length; i++) if (t < tr[i][0]) { const [a, va] = tr[i - 1], [b, vb] = tr[i]; return va + (vb - va) * (t - a) / (b - a); }
+  return tr[tr.length - 1][1];
+};
+window.setPortrait = (on) => { document.body.classList.toggle('portrait', on); document.documentElement.classList.toggle('portrait', on); };
+window.pose = (card, t, o) => {
+  document.querySelectorAll('.card').forEach((c) => c.classList.toggle('on', c.id === card));
+  const out = 1 - ramp(t, o.dur - 0.45, o.dur);                // every card leaves over its last 0.45 s
+  if (card === 'shard') {
+    $('#shard .kicker').textContent = o.kicker; $('#shard .name').textContent = o.name; $('#shard .sub').textContent = o.sub ?? '';
+    $('#shard .brk').style.opacity = ease(ramp(t, 0.0, 0.3)) * out;
+    $('#shard .kicker').style.opacity = ease(ramp(t, 0.05, 0.4)) * out;
+    $('#shard .kicker').style.transform = `translateX(${(1 - ease(ramp(t, 0.05, 0.6))) * -24}px)`;
+    $('#shard .line').style.transform = `scaleX(${inOut(ramp(t, 0.1, 0.75))})`;
+    $('#shard .line').style.opacity = out;
+    const n = ease(ramp(t, 0.2, 1.1));
+    $('#shard .name').style.opacity = n * out;
+    $('#shard .name').style.letterSpacing = `${0.34 - 0.24 * n + 0.02 * ramp(t, 1.1, o.dur)}em`; // tracks in, then keeps a slow drift open
+    $('#shard .name').style.filter = `blur(${(1 - n) * 8}px)`;
+    $('#shard .sub').style.opacity = ease(ramp(t, 0.7, 1.3)) * out;
+  } else if (card === 'line') {
+    const n = ease(ramp(t, 0, 0.8));
+    $('#line .txt').textContent = o.text;
+    $('#line .txt').style.opacity = n * out;
+    $('#line .txt').style.letterSpacing = `${0.9 - 0.3 * n - 0.05 * ramp(t, 0.8, o.dur)}em`;
+    $('#line .txt').style.filter = `blur(${(1 - n) * 6}px)`;
+  } else if (card === 'alt') {
+    // o: { track: [[t, metres]...], land: t (the readout settles on `final`), final, kicker, label, finalLabel, dur }
+    const h = trackAt(o.track, t), landed = t >= o.land;
+    const shown = landed ? o.final : h;
+    const pxh = document.body.classList.contains('portrait') ? 680 : 580;
+    tickEls.forEach((d, i) => {
+      const m = Math.floor(shown / 2) * 2 + (i - 24) * 2;          // the tick's altitude
+      d.style.top = (pxh / 2 - (m - shown) * PX_M) + 'px';
+      d.style.width = (m % 10 === 0 ? 26 : 12) + 'px';
+      d.style.opacity = m % 10 === 0 ? 1 : 0.55;
+    });
+    $('#alt').style.opacity = ease(ramp(t, 0.0, 0.5)) * out;
+    $('#alt .num').innerHTML = '+' + String(Math.round(shown)).padStart(3, '0') + '<small>M</small>';
+    $('#alt .kick').textContent = o.kicker ?? '';
+    $('#alt .lbl').textContent = landed ? o.finalLabel : o.label;
+    $('#alt .lbl').style.opacity = landed ? ease(ramp(t, o.land, o.land + 0.35)) : 1;
+    $('#alt .lbl').style.color = landed ? '#fff' : 'rgba(255, 255, 255, 0.82)';
+    $('#alt .mark').style.transform = 'scaleX(' + (landed ? 1 + 0.8 * (1 - ease(ramp(t, o.land, o.land + 0.4))) : 1) + ')';
+  } else if (card === 'teaser') {
+    // o: { kicker, mark, name, cta, credits, dur }
+    const portrait = document.body.classList.contains('portrait');
+    $('#teaser .kicker').textContent = o.kicker; $('#teaser .mark').textContent = o.mark;
+    $('#teaser .name').textContent = o.name; $('#teaser .cta').textContent = o.cta; $('#teaser .credits').innerHTML = o.credits;
+    $('#teaser .veil').style.opacity = ease(ramp(t, 0, 0.8));
+    const m = ease(ramp(t, 0.1, 1.0));
+    $('#teaser .mark').style.opacity = m;
+    $('#teaser .mark').style.filter = 'blur(' + (1 - m) * 14 + 'px)';
+    $('#teaser .mark').style.transform = 'scale(' + (1.06 - 0.06 * m + 0.012 * ramp(t, 1, o.dur)) + ')';
+    $('#teaser .kicker').style.opacity = ease(ramp(t, 0.45, 1.0));
+    $('#teaser .rule').style.transform = 'scaleX(' + inOut(ramp(t, 0.6, 1.3)) + ')';
+    const n = ease(ramp(t, 0.75, 1.4));
+    $('#teaser .name').style.opacity = n;
+    $('#teaser .name').style.letterSpacing = ((portrait ? 0.26 : 0.34) + 0.12 * (1 - n)) + 'em';
+    $('#teaser .cta').style.opacity = ease(ramp(t, 1.15, 1.6));
+    $('#teaser .cta').style.transform = 'translateY(' + (1 - ease(ramp(t, 1.15, 1.7))) * 12 + 'px)';
+    $('#teaser .credits').style.opacity = ease(ramp(t, 1.5, 2.1));
+  } else if (card === 'alpha') {
+    // o: { dur } — whole from the first frame (a share sheet's thumbnail is frame 0, Jake 2026-10-09), a slow drift
+    // open, then out over its last 0.45 s; the veil goes with the words, the footage under it stays
+    $('#alpha .mark').style.opacity = 1;
+    $('#alpha .mark').style.transform = `scale(${1 + 0.03 * ramp(t, 0, o.dur)})`;
+    $('#alpha .kicker').style.opacity = 1;
+    $('#alpha .big').style.opacity = 1;
+    $('#alpha .big').style.filter = 'none';
+    $('#alpha .big').style.letterSpacing = `${0.12 + 0.02 * ramp(t, 0, o.dur)}em`;
+    $('#alpha .rule').style.transform = 'scaleX(1)';
+    $('#alpha .sub').style.opacity = 1;
+    $('#alpha .center').style.opacity = out;
+    $('#alpha').style.opacity = out;
+  } else if (card === 'bug') {
+    $('#bug .pill').style.opacity = 1;
+  } else if (card === 'caption') {
+    // o: { kicker, text, dur }
+    $('#caption .kick').textContent = o.kicker ?? ''; $('#caption .txt').textContent = o.text;
+    $('#caption .brk').style.opacity = ease(ramp(t, 0, 0.3)) * out;
+    $('#caption .kick').style.opacity = ease(ramp(t, 0.05, 0.45)) * out;
+    $('#caption .txt').style.opacity = ease(ramp(t, 0.2, 0.7)) * out;
+    $('#caption .txt').style.transform = `translateX(${(1 - ease(ramp(t, 0.2, 0.8))) * -18}px)`;
+  } else if (card === 'endA') {
+    $('#endA .veil').style.opacity = ease(ramp(t, 0, 0.9));
+    const w = ease(ramp(t, 0.15, 1.0));
+    $('#endA .logo').style.opacity = w;
+    $('#endA .logo').style.transform = `scale(${1.06 - 0.06 * w + 0.012 * ramp(t, 1, o.dur)})`;
+    $('#endA .logo').style.filter = `blur(${(1 - w) * 10}px)`;
+    $('#endA .rule').style.transform = `scaleX(${inOut(ramp(t, 0.7, 1.4))})`;
+    $('#endA .cta').style.opacity = ease(ramp(t, 1.0, 1.5));
+    $('#endA .cta').style.transform = `translateY(${(1 - ease(ramp(t, 1.0, 1.6))) * 14}px)`;
+    $('#endA .url').style.opacity = ease(ramp(t, 1.3, 1.8));
+    $('#endA .alpha').style.opacity = ease(ramp(t, 1.5, 2.0));
+    $('#endA .credits').style.opacity = ease(ramp(t, 1.7, 2.3));
+  } else if (card === 'cbug') {
+    $('#cbug .pill').style.opacity = 1;
+  } else if (card === 'bigcap') {
+    // o: { text, dur } — in fast, holds, out over the last 0.45 s
+    $('#bigcap .txt').textContent = o.text;
+    const n = ease(ramp(t, 0, 0.45));
+    $('#bigcap .txt').style.opacity = n * out;
+    $('#bigcap .txt').style.transform = `translateY(${(1 - n) * 18}px)`;
+    $('#bigcap .txt').style.letterSpacing = `${0.06 + 0.01 * ramp(t, 0.45, o.dur)}em`;
+  } else if (card === 'clabel') {
+    $('#clabel .txt').style.opacity = out;
+    $('#clabel .sub').style.opacity = out;
+  } else if (card === 'endC') {
+    $('#endC .veil').style.opacity = ease(ramp(t, 0, 0.9));
+    const w = ease(ramp(t, 0.15, 1.0));
+    $('#endC .logo').style.opacity = w;
+    $('#endC .logo').style.filter = `blur(${(1 - w) * 10}px)`;
+    $('#endC .line').style.opacity = ease(ramp(t, 0.8, 1.4));
+    $('#endC .url').style.opacity = ease(ramp(t, 1.2, 1.7));
+    $('#endC .label').style.opacity = ease(ramp(t, 1.4, 1.9));
+    $('#endC .credits').style.opacity = ease(ramp(t, 1.6, 2.2));
+    if (o && o.credits) $('#endC .credits').textContent = o.credits; // a trailer made another way names its own tools (T15)
+    if (o && o.lineHtml) $('#endC .line').innerHTML = o.lineHtml; // the player trailer's pitch, not the builder's (P15)
+  } else if (card === 'end') {
+    const v = ease(ramp(t, 0, 0.9));
+    $('#end .veil').style.opacity = v;
+    const w = ease(ramp(t, 0.15, 1.0));
+    $('#end .word').style.opacity = w;
+    $('#end .word').style.transform = `scale(${1.08 - 0.08 * w + 0.015 * ramp(t, 1, o.dur)})`;
+    $('#end .word').style.filter = `blur(${(1 - w) * 12}px)`;
+    $('#end .project').style.opacity = ease(ramp(t, 0.5, 1.1));
+    $('#end .glint').style.left = `${-260 + inOut(ramp(t, 0.9, 1.9)) * 1600}px`;
+    $('#end .rule').style.transform = `scaleX(${inOut(ramp(t, 0.8, 1.5))})`;
+    $('#end .cta').style.opacity = ease(ramp(t, 1.2, 1.7));
+    $('#end .cta').style.transform = `translateY(${(1 - ease(ramp(t, 1.2, 1.8))) * 14}px)`;
+    $('#end .credits').style.opacity = ease(ramp(t, 1.6, 2.2));
+  }
+};
+</script>
+</body></html>

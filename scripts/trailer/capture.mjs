@@ -27,45 +27,9 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { bootGroups, loadShots, RELEASE_HELD } from './shots/lib.mjs';
 
-const argv = process.argv.slice(2);
-const opt = (k, d) => {
-  const eq = argv.find((a) => a.startsWith(`--${k}=`));
-  if (eq) return eq.slice(k.length + 3);
-  const i = argv.indexOf(`--${k}`); return i === -1 ? d : argv[i + 1];
-};
-const flag = (k) => argv.includes(`--${k}`);
-const OUT = argv[0];
-if (!OUT || OUT.startsWith('--') || !opt('shots', '')) {
-  console.error(readFileSync(import.meta.filename, 'utf8').split('\n').slice(1, 16).map(l => l.replace(/^\/\/ ?/u, '')).join('\n'));
-  process.exit(2);
-}
-if (!flag('no-lock') && process.env.WS_TRAILER_LOCKED !== '1') {
-  // every 4K capture holds the Mac's GPU lock (meta MINI-DEVEX MD2): re-run this script under it
-  const { underDesktopGpuLock } = await import('../memory/iphone/locks.mjs');
-  process.env.WS_TRAILER_LOCKED = '1';
-  process.exit(await underDesktopGpuLock(import.meta.filename, argv));
-}
-const { chromium } = await import('../browser-playwright.mjs');
-const { KEYCHAIN_ARGS } = await import('../chromium-keychain.mjs');
-const { NAME_ASKED, developerSettings, harnessPins, hideDeveloperOverlays, saveFixture } = await import('../debug-settings.mjs');
-
-const FPS = 60;
-const SUB = Number(opt('sub', '2'));
-const SCALE = Number(opt('scale', '2'));
-const BASE = opt('base', 'http://127.0.0.1:4400/').replace(/\/?$/u, '/');
-const ONLY = opt('only', '') ? opt('only', '').split(',') : [];
-const MAXF = Number(opt('frames', '0'));
-const DRY = flag('dry');
-const WALL = flag('wall');
-const VIEW = { width: 1920, height: 1080 };
-const EDL = opt('edl', '') ? JSON.parse(readFileSync(opt('edl', ''), 'utf8')) : null;
-const keep = (name, i) => !EDL || EDL.clips.some((c) => c.shot === name && i >= Math.floor((c.in - 0.25) * FPS) && i < Math.ceil((c.in + c.dur + 0.25) * FPS));
-const shots = await loadShots(opt('shots', '').split(','));
-for (const o of ONLY) if (!shots.some(s => s.name === o)) throw new Error(`--only: no shot ${o}`);
-
 // ── in-page runtime ─────────────────────────────────────────────────────────────────────────────────────────────
 // Installed once per page. window.__tr.rig = { keys: [{ t, p:[x,y,z], l:[x,y,z], fov, roll }], ease } drives the camera.
-const RUNTIME = String.raw`((wall) => {
+export const RUNTIME = String.raw`((wall) => {
   const w = window.__wildshard.world, g = w.game, cam = g.camera;
   const tr = window.__tr = { go: 0, t: 0, rig: null, dt: 1 / 60, lastPose: null, drawn: 0, vt: 0, calls: 0 };
   // the capture clock: GameClock.setCapture(1 / dt) makes every drawn frame advance exactly dt
@@ -157,95 +121,144 @@ const RUNTIME = String.raw`((wall) => {
   return 'ok';
 })`;
 
-async function boot(browser, first) {
-  const ctx = await browser.newContext({ viewport: VIEW, deviceScaleFactor: SCALE });
-  await developerSettings(ctx, { tier: 'desktop', volume: 0, time: first.time ?? 'live', weather: first.weather ?? 'live' });
-  await saveFixture(ctx, { scope: 'global', key: 'gfx', data: { dpr: 'native', aa: 'on' } });
-  await ctx.addInitScript(hideDeveloperOverlays);
-  await harnessPins(ctx, { seed: 0x2545f491 });
-  await saveFixture(ctx, NAME_ASKED);
-  if (first.init) await ctx.addInitScript({ content: first.init });
-  await ctx.route('**/api/errors', route => route.fulfill({ status: 204, body: '' }));
-  const page = await ctx.newPage();
-  const errors = [];
-  page.on('pageerror', (e) => { errors.push(e.message.slice(0, 300)); });
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
-  const t0 = Date.now();
-  if (first.grid) {
-    await page.goto(`${BASE}?mute=1&skipintro=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded' });
-    await page.locator('.ws-main-grid').click({ timeout: 120000 });
-    await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)), null, { timeout: 300000, polling: 500 });
-    const failure = await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null);
-    if (failure) throw new Error(failure);
-    await page.evaluate(() => window.__wildshard.requireWorld().hud.enterNow());
-  } else {
-    await page.goto(`${BASE}?chunk=${first.zone}&mute=1&skipintro=1&nolock=1&sw=0`, { waitUntil: 'load' });
-  }
-  await page.waitForFunction(() => Boolean(window.__wildshard?.world?.hud?.entered && !document.querySelector('.ws-load') && window.__wildshard.world.game.frameGate()), undefined, { timeout: 300000, polling: 1000 });
-  if (await page.evaluate(() => window.__wildshard.world.hud.paused)) await page.keyboard.press('Escape');
-  await page.evaluate(`${RUNTIME}(${WALL})`);
-  console.log(`[boot ${first.zone}${first.grid ? ' grid' : ''} ${first.time ?? 'live'}/${first.weather ?? 'live'}] ready in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
-  return { ctx, page, errors };
+/** Whether frame i (60 fps) of a shot is written: always without an EDL, else inside a clip that uses it plus 0.25 s handles.
+ * @param {{ clips: { shot: string, in: number, dur: number }[] } | null} edl @param {string} name @param {number} i */
+export function keepFrame(edl, name, i, fps = 60) {
+  return !edl || edl.clips.some((c) => c.shot === name && i >= Math.floor((c.in - 0.25) * fps) && i < Math.ceil((c.in + c.dur + 0.25) * fps));
 }
 
-const done = (s) => !DRY && existsSync(`${OUT}/${s.name}/meta.json`) && JSON.parse(readFileSync(`${OUT}/${s.name}/meta.json`, 'utf8')).done === true;
-const want = shots.filter((s) => (ONLY.length === 0 || ONLY.includes(s.name)) && (!EDL || EDL.clips.some((c) => c.shot === s.name)));
-mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'] });
-const report = [];
-try {
-  for (const grp of bootGroups(want)) {
-    const todo = grp.shots.filter((s) => { if (done(s)) { console.log(`[${s.name}] have it`); return false; } return true; });
-    if (todo.length === 0) continue;
-    const { ctx, page, errors } = await boot(browser, todo[0]);
-    try {
-      for (const s of todo) {
-        errors.length = 0;
-        const dir = resolve(OUT, s.name);
-        mkdirSync(dir, { recursive: true });
-        const n = MAXF > 0 ? MAXF : Math.round(s.secs * FPS);
-        await page.evaluate(`(() => { const tr = window.__tr; tr.setRig(null); tr.t = 0; tr.setStep(1 / 60); tr.showHud(false); tr.hide = []; window.__wildshard.world.game.viewmodel.visible = true; ${RELEASE_HELD} })()`);
-        // a boss or an elite spawns a beat into play: step the world until the shot's subject exists
-        if (s.waitFor) for (let k = 0; k < 900 && !(await page.evaluate(s.waitFor)); k++) await page.evaluate('window.__tr.step()');
-        if (s.setup) await page.evaluate(`(async () => { ${s.setup} })()`);
-        if (s.rig) await page.evaluate((rig) => { window.__tr.setRig(rig); }, s.rig);
-        // the world streams in around the first pose at 1/60 steps before the capture clock takes over
-        let stalls = 0;
-        for (let k = 0; k < (s.warm ?? 240); k++) {
-          if (s.warmTick) await page.evaluate(`(async () => { ${s.warmTick(k)} })()`);
-          if (!(await page.evaluate('window.__tr.step()'))) stalls++;
-        }
-        if (s.afterWarm) await page.evaluate(`(async () => { ${s.afterWarm} })()`);
-        const probe = s.probe ? await page.evaluate(s.probe) : null;
-        // speed < 1 = slow motion in engine: the sim steps less per frame, every frame is real (no interpolation)
-        const SP = s.speed ?? 1;
-        await page.evaluate((dt) => { window.__tr.setStep(dt); }, SP / (FPS * SUB));
-        const tc = Date.now();
-        const picks = DRY ? new Set([0, Math.floor(n / 2), n - 1]) : null;
-        let idx = 0;
-        const poses = [];
-        for (let i = 0; i < n; i++) {
-          for (let sb = 0; sb < SUB; sb++) {
-            const t = (i * SUB + sb) / (FPS * SUB) * SP;
-            const tick = s.tick ? s.tick(t, i, sb, SP / (FPS * SUB)) : '';
-            const drew = await page.evaluate(`(async () => { window.__tr.t = ${t}; ${tick}; return window.__tr.step(); })()`);
-            if (!drew) stalls++;
-            if (picks ? picks.has(i) && sb === 0 : keep(s.name, i)) {
-              await page.screenshot({ path: `${dir}/${String(DRY ? i : idx).padStart(6, '0')}.jpg`, type: 'jpeg', quality: 95 });
-            }
-            idx++;
-          }
-          if (i % 30 === 0) poses.push(await page.evaluate('window.__tr.lastPose'));
-        }
-        await page.evaluate('window.__tr.setStep(1 / 60)');
-        const secs = (Date.now() - tc) / 1000;
-        console.log(`[${s.name}] ${n} frames × ${SUB} in ${secs.toFixed(0)} s (${(secs / n).toFixed(2)} s/frame)${stalls > 0 ? `, ${stalls} stalled steps` : ''}${errors.length > 0 ? `, ${errors.length} page errors` : ''}`);
-        writeFileSync(`${dir}/meta.json`, JSON.stringify({ name: s.name, zone: s.zone, time: s.time ?? 'live', weather: s.weather ?? 'live', frames: n, sub: SUB, fps: FPS, scale: SCALE, view: VIEW, base: BASE, dry: DRY, stalls, errors: [...errors], poses, probe, done: !DRY }, null, 1));
-        report.push({ name: s.name, frames: n, secs, stalls, errors: errors.length });
-      }
-    } finally { await ctx.close(); }
+/** The CLI. @param {string[]} argv */
+export async function main(argv) {
+  const opt = (k, d) => {
+    const eq = argv.find((a) => a.startsWith(`--${k}=`));
+    if (eq) return eq.slice(k.length + 3);
+    const i = argv.indexOf(`--${k}`); return i === -1 ? d : argv[i + 1];
+  };
+  const flag = (k) => argv.includes(`--${k}`);
+  const OUT = argv[0];
+  if (!OUT || OUT.startsWith('--') || !opt('shots', '')) {
+    console.error(readFileSync(import.meta.filename, 'utf8').split('\n').slice(1, 16).map(l => l.replace(/^\/\/ ?/u, '')).join('\n'));
+    return 2;
   }
-} finally {
-  await browser.close();
-  writeFileSync(`${OUT}/capture-report-${Date.now()}.json`, JSON.stringify(report, null, 1));
+  if (!flag('no-lock') && process.env.WS_TRAILER_LOCKED !== '1') {
+    // every 4K capture holds the Mac's GPU lock (meta MINI-DEVEX MD2): re-run this script under it
+    const { underDesktopGpuLock } = await import('../memory/iphone/locks.mjs');
+    process.env.WS_TRAILER_LOCKED = '1';
+    return underDesktopGpuLock(import.meta.filename, argv);
+  }
+  const { chromium } = await import('../browser-playwright.mjs');
+  const { KEYCHAIN_ARGS } = await import('../chromium-keychain.mjs');
+  const { NAME_ASKED, developerSettings, harnessPins, hideDeveloperOverlays, saveFixture } = await import('../debug-settings.mjs');
+
+  const FPS = 60;
+  const SUB = Number(opt('sub', '2'));
+  const SCALE = Number(opt('scale', '2'));
+  const BASE = opt('base', 'http://127.0.0.1:4400/').replace(/\/?$/u, '/');
+  const ONLY = opt('only', '') ? opt('only', '').split(',') : [];
+  const MAXF = Number(opt('frames', '0'));
+  const DRY = flag('dry');
+  const WALL = flag('wall');
+  const VIEW = { width: 1920, height: 1080 };
+  const EDL = opt('edl', '') ? JSON.parse(readFileSync(opt('edl', ''), 'utf8')) : null;
+  const keep = (name, i) => keepFrame(EDL, name, i, FPS);
+  const shots = await loadShots(opt('shots', '').split(','));
+  for (const o of ONLY) if (!shots.some(s => s.name === o)) throw new Error(`--only: no shot ${o}`);
+
+
+
+  async function boot(browser, first) {
+    const ctx = await browser.newContext({ viewport: VIEW, deviceScaleFactor: SCALE });
+    await developerSettings(ctx, { tier: 'desktop', volume: 0, time: first.time ?? 'live', weather: first.weather ?? 'live' });
+    await saveFixture(ctx, { scope: 'global', key: 'gfx', data: { dpr: 'native', aa: 'on' } });
+    await ctx.addInitScript(hideDeveloperOverlays);
+    await harnessPins(ctx, { seed: 0x2545f491 });
+    await saveFixture(ctx, NAME_ASKED);
+    if (first.init) await ctx.addInitScript({ content: first.init });
+    await ctx.route('**/api/errors', route => route.fulfill({ status: 204, body: '' }));
+    const page = await ctx.newPage();
+    const errors = [];
+    page.on('pageerror', (e) => { errors.push(e.message.slice(0, 300)); });
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
+    const t0 = Date.now();
+    if (first.grid) {
+      await page.goto(`${BASE}?mute=1&skipintro=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded' });
+      await page.locator('.ws-main-grid').click({ timeout: 120000 });
+      await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)), null, { timeout: 300000, polling: 500 });
+      const failure = await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null);
+      if (failure) throw new Error(failure);
+      await page.evaluate(() => window.__wildshard.requireWorld().hud.enterNow());
+    } else {
+      await page.goto(`${BASE}?chunk=${first.zone}&mute=1&skipintro=1&nolock=1&sw=0`, { waitUntil: 'load' });
+    }
+    await page.waitForFunction(() => Boolean(window.__wildshard?.world?.hud?.entered && !document.querySelector('.ws-load') && window.__wildshard.world.game.frameGate()), undefined, { timeout: 300000, polling: 1000 });
+    if (await page.evaluate(() => window.__wildshard.world.hud.paused)) await page.keyboard.press('Escape');
+    await page.evaluate(`${RUNTIME}(${WALL})`);
+    console.log(`[boot ${first.zone}${first.grid ? ' grid' : ''} ${first.time ?? 'live'}/${first.weather ?? 'live'}] ready in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+    return { ctx, page, errors };
+  }
+
+  const done = (s) => !DRY && existsSync(`${OUT}/${s.name}/meta.json`) && JSON.parse(readFileSync(`${OUT}/${s.name}/meta.json`, 'utf8')).done === true;
+  const want = shots.filter((s) => (ONLY.length === 0 || ONLY.includes(s.name)) && (!EDL || EDL.clips.some((c) => c.shot === s.name)));
+  mkdirSync(OUT, { recursive: true });
+  const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'] });
+  const report = [];
+  try {
+    for (const grp of bootGroups(want)) {
+      const todo = grp.shots.filter((s) => { if (done(s)) { console.log(`[${s.name}] have it`); return false; } return true; });
+      if (todo.length === 0) continue;
+      const { ctx, page, errors } = await boot(browser, todo[0]);
+      try {
+        for (const s of todo) {
+          errors.length = 0;
+          const dir = resolve(OUT, s.name);
+          mkdirSync(dir, { recursive: true });
+          const n = MAXF > 0 ? MAXF : Math.round(s.secs * FPS);
+          await page.evaluate(`(() => { const tr = window.__tr; tr.setRig(null); tr.t = 0; tr.setStep(1 / 60); tr.showHud(false); tr.hide = []; window.__wildshard.world.game.viewmodel.visible = true; ${RELEASE_HELD} })()`);
+          // a boss or an elite spawns a beat into play: step the world until the shot's subject exists
+          if (s.waitFor) for (let k = 0; k < 900 && !(await page.evaluate(s.waitFor)); k++) await page.evaluate('window.__tr.step()');
+          if (s.setup) await page.evaluate(`(async () => { ${s.setup} })()`);
+          if (s.rig) await page.evaluate((rig) => { window.__tr.setRig(rig); }, s.rig);
+          // the world streams in around the first pose at 1/60 steps before the capture clock takes over
+          let stalls = 0;
+          for (let k = 0; k < (s.warm ?? 240); k++) {
+            if (s.warmTick) await page.evaluate(`(async () => { ${s.warmTick(k)} })()`);
+            if (!(await page.evaluate('window.__tr.step()'))) stalls++;
+          }
+          if (s.afterWarm) await page.evaluate(`(async () => { ${s.afterWarm} })()`);
+          const probe = s.probe ? await page.evaluate(s.probe) : null;
+          // speed < 1 = slow motion in engine: the sim steps less per frame, every frame is real (no interpolation)
+          const SP = s.speed ?? 1;
+          await page.evaluate((dt) => { window.__tr.setStep(dt); }, SP / (FPS * SUB));
+          const tc = Date.now();
+          const picks = DRY ? new Set([0, Math.floor(n / 2), n - 1]) : null;
+          let idx = 0;
+          const poses = [];
+          for (let i = 0; i < n; i++) {
+            for (let sb = 0; sb < SUB; sb++) {
+              const t = (i * SUB + sb) / (FPS * SUB) * SP;
+              const tick = s.tick ? s.tick(t, i, sb, SP / (FPS * SUB)) : '';
+              const drew = await page.evaluate(`(async () => { window.__tr.t = ${t}; ${tick}; return window.__tr.step(); })()`);
+              if (!drew) stalls++;
+              if (picks ? picks.has(i) && sb === 0 : keep(s.name, i)) {
+                await page.screenshot({ path: `${dir}/${String(DRY ? i : idx).padStart(6, '0')}.jpg`, type: 'jpeg', quality: 95 });
+              }
+              idx++;
+            }
+            if (i % 30 === 0) poses.push(await page.evaluate('window.__tr.lastPose'));
+          }
+          await page.evaluate('window.__tr.setStep(1 / 60)');
+          const secs = (Date.now() - tc) / 1000;
+          console.log(`[${s.name}] ${n} frames × ${SUB} in ${secs.toFixed(0)} s (${(secs / n).toFixed(2)} s/frame)${stalls > 0 ? `, ${stalls} stalled steps` : ''}${errors.length > 0 ? `, ${errors.length} page errors` : ''}`);
+          writeFileSync(`${dir}/meta.json`, JSON.stringify({ name: s.name, zone: s.zone, time: s.time ?? 'live', weather: s.weather ?? 'live', frames: n, sub: SUB, fps: FPS, scale: SCALE, view: VIEW, base: BASE, dry: DRY, stalls, errors: [...errors], poses, probe, done: !DRY }, null, 1));
+          report.push({ name: s.name, frames: n, secs, stalls, errors: errors.length });
+        }
+      } finally { await ctx.close(); }
+    }
+  } finally {
+    await browser.close();
+    writeFileSync(`${OUT}/capture-report-${Date.now()}.json`, JSON.stringify(report, null, 1));
+  }
+  return 0;
 }
+
+if (import.meta.main) process.exitCode = await main(process.argv.slice(2));

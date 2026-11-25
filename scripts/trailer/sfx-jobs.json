@@ -1,0 +1,53 @@
+{
+  "_doc": "E168: the Steam trailer's sound design layer (the in-game sounds come from public/assets/sfx/). Every family is generated with MOSS-SoundEffect v2 and Stable Audio 3 Medium; the better take (CLAP rank) is used. `desc` is the CLAP ranking text.",
+  "families": {
+    "tr-whoosh": {
+      "kind": "oneshot",
+      "duration": 3,
+      "desc": "a fast cinematic whoosh swooshing past",
+      "prompt": "A single fast cinematic transition whoosh: air rushing past the camera from left to right, a rising swoosh that peaks and cuts off cleanly. Trailer sound design, no music."
+    },
+    "tr-braam": {
+      "kind": "oneshot",
+      "duration": 6,
+      "desc": "a huge deep cinematic brass braam impact",
+      "prompt": "A huge, deep cinematic trailer braam: one massive distorted low brass blast with a sub-bass boom, sustaining and decaying into a long hall reverb tail. Trailer sound design."
+    },
+    "tr-riser": {
+      "kind": "oneshot",
+      "duration": 5,
+      "desc": "a rising tension riser building up to a peak",
+      "prompt": "A cinematic tension riser: a rising, accelerating swell of shimmering strings and reversed noise that climbs in pitch for four seconds and stops abruptly at its peak. Trailer sound design, no melody."
+    },
+    "tr-impact": {
+      "kind": "oneshot",
+      "duration": 5,
+      "desc": "a massive cinematic boom impact hit",
+      "prompt": "A massive cinematic impact hit: a deep drum boom and metallic slam with a sub-bass drop, followed by a long, dark reverberant tail fading to silence. Trailer sound design."
+    },
+    "tr-subdrop": {
+      "kind": "oneshot",
+      "duration": 4,
+      "desc": "a deep sub bass drop rumble",
+      "prompt": "A deep sub-bass drop: a low boom that falls in pitch and rumbles away over three seconds. Cinematic trailer sound design, nothing else."
+    },
+    "tr-reverse": {
+      "kind": "oneshot",
+      "duration": 3,
+      "desc": "a reversed cymbal swell rising into a hit",
+      "prompt": "A reversed cymbal swell: a crash cymbal played backwards, swelling louder over two seconds and cutting off sharply. Cinematic trailer transition, nothing else."
+    },
+    "tr-sword": {
+      "kind": "oneshot",
+      "duration": 2,
+      "desc": "a sword blade slicing through the air with a metallic ring",
+      "prompt": "A heavy steel sword swung fast through the air: a sharp whoosh with a bright metallic ring of the blade. Close, clean, cinematic, no music."
+    },
+    "tr-gallop": {
+      "kind": "oneshot",
+      "duration": 5,
+      "desc": "horses galloping fast across grass",
+      "prompt": "Several horses galloping fast across open grassland, thundering hooves passing close by, wind. Cinematic, no music."
+    }
+  }
+}

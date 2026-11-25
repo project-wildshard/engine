@@ -45,3 +45,42 @@ test('every shot file in scripts/trailer/shots loads against the live grid', asy
   expect(shots.length).toBeGreaterThan(0);
   expect(new Set(shots.map(s => s.zone))).toEqual(new Set(['driftwood-isle']));
 });
+
+// AT2: the cut, titles, conform and build-beat tools are importable; their pure parts are checked here, the chain itself
+// by the smoke cut in the commit body (cuts/test.mjs).
+test('the capture runtime compiles and keeps only the frames a cut uses', async () => {
+  const { RUNTIME, keepFrame } = await import('../../scripts/trailer/capture.mjs');
+  expect(() => new Function(`return ${RUNTIME}`)).not.toThrow();
+  const edl = { clips: [{ shot: 'a', in: 1, dur: 2 }] };
+  expect(keepFrame(null, 'a', 0)).toBe(true);
+  expect([44, 45, 194, 195].map(i => keepFrame(edl, 'a', i))).toEqual([false, true, true, false]);
+  expect(keepFrame(edl, 'b', 60)).toBe(false);
+});
+
+test('a cut takes its own options, and the smoke cut fills its length', async () => {
+  const { cutOptions } = await import('../../scripts/trailer/cut.mjs');
+  expect(cutOptions(['o', 't', 's', '--cut', 'test', '--bug', 'b.png', '--portrait', '--build-1=x.mp4', '--flag'])).toEqual({ bug: 'b.png', 'build-1': 'x.mp4', flag: true });
+  const { cut } = await import('../../scripts/trailer/cuts/test.mjs');
+  const { edl, mix } = cut({ TAKE: 'take.wav', SFX: 'sfx' });
+  expect(edl.clips.reduce((s, c) => s + c.dur, 0)).toBe(edl.length);
+  expect(mix.length).toBe(edl.length);
+});
+
+test('the conform counts frames on the cut and blurs over sub-frames', async () => {
+  const { clipFrames, clipFilter } = await import('../../scripts/trailer/edit.mjs');
+  expect(clipFrames({ at: 1.005, dur: 1 })).toBe(60);
+  expect(clipFilter({ dur: 2 }, { sub: 2, zone: 'driftwood-isle' }, [1920, 1080])).toMatch(/^tmix=frames=2,select=.*scale=1920:1080.*eq=contrast=1\.04/u);
+  expect(clipFilter({ dur: 2, flashIn: 0.1 }, { sub: 1 }, [1920, 1080])).not.toMatch(/tmix/u);
+  const { cardTimes } = await import('../../scripts/trailer/titles.mjs');
+  expect(cardTimes({ dur: 0.5 }, false)).toHaveLength(30);
+  expect(cardTimes({ dur: 3, at: 1.2 }, true)).toEqual([1.2]);
+});
+
+test('a build beat replays a session up to its /exit, from a chosen second', async () => {
+  const { castSpan } = await import('../../scripts/trailer/build-beat.mjs');
+  const cast = [JSON.stringify({ version: 2, width: 80, height: 24 }), '[0.5, "o", "hello "]', '[2, "o", "world"]', '[3, "i", "/exit"]', '[4, "o", "bye"]'].join('\n');
+  expect(castSpan(cast).length).toBe(2);
+  const span = castSpan(cast, { from: 1 });
+  expect(span.events[0]).toEqual([0, 'o', 'hello ']);
+  expect(span.events.at(-1)).toEqual([1, 'o', 'world']);
+});
