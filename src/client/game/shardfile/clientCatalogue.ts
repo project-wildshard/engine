@@ -9,7 +9,7 @@ import { heldFinishEffect } from '../loadout/effects';
 import { STARTER_EFFECTS } from '../../../shared/game/systems/effects/starterEffects';
 import { ItemCatalogue } from '../../../shared/game/loadout/itemCatalogue';
 import { declaredFolderCompendium } from '../../../shared/game/shard/declaredRows';
-import { isItemId } from '../../../shared/game/bag/itemCatalog';
+import { installItemCatalogue } from './itemCatalogue';
 
 /** Kit-only catalogue registration from admitted ids. Preparation stays with
  * the resident resource owner; this feature registers no frame or save owner. */
@@ -39,11 +39,7 @@ export function installClientCatalogue(ctx: ShardContext, row: ClientFeatureRow)
 /** Client-only registration of admitted item and achievement rows in their existing level scope.
  * Simulation counters, ledger rewards and saved inventory retain their original owners. */
 export function installQuestCatalogue(ctx: Pick<ShardContext, 'product'> & { readonly rows: Pick<ShardContext['rows'], 'item' | 'feat'> }): void {
-  const items = ctx.product.section('combat/items').items.catalogue;
+  installItemCatalogue(ctx);
   const feats = ctx.product.section('quests/quests').quests.achievements;
-  // OF23a: the session's kit registers its starter bag first (`kit.items`); a shard that declares the same kit harvest
-  // items for its species' drops (Pine's `legacyHarvestItems`) keeps the kit's row instead of registering it twice
-  const own = items?.filter(item => !isItemId(item.id));
-  if (own !== undefined && own.length > 0) ctx.rows.item(own);
   if (feats !== undefined) ctx.rows.feat(feats);
 }

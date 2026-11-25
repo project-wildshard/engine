@@ -53,6 +53,7 @@ import { pageGridInstance, type ShardContext } from "../plugin/context";
 import type { ShardPlayHost } from '../../../shared/game/shard/runtime';
 import { installDeclaredPlumbing } from '../shard/declaredPlumbing';
 import { declaredFolderCompendium, declaredDay, declaredWeather } from '../../../shared/game/shard/declaredRows';
+import { installItemCatalogue } from './itemCatalogue';
 import { installDeclaredTargets, spentUses } from '../shard/declaredTargets';
 import { ownedLineFields } from './ownedLines';
 import { hasTalks, heldMove, installPlay, playWire } from './playInstalls';
@@ -501,6 +502,9 @@ export class ShardfileClient {
     const sketches = compendiumSketches(source.rows, this.assets.retained);
     for (const row of source.rows.compendiums) ctx.rows.compendium({ id: row.id, ...declaredFolderCompendium(ctx.product, row.id, sketches) });
     ctx.rows.lootTable(source.rows.loot);
+    // meta QA 11-24 row 45: a page with no client plan (no `content.catalogue`) still knows its own items: a species' harvest
+    // drops are items, and proof-stranger's wolf hide was unknown to the page, so a felled wolf offered no harvest
+    if (ctx.product.has('combat/items')) installItemCatalogue(ctx);
     const player = (): NonNullable<ShardContext['app']['player']> => { const actor = ctx.app.player; if (actor === null) throw new Error('Player health has not entered play'); return actor; };
     const actor: Actor = { id: 'actor.player', get tags() { return player().tags; }, get state() { return player().state; }, get attributes() { return player().attributes; }, get alive() { return player().alive; }, applyDamage: (request) => player().applyDamage(request) };
     const aimTarget = (target: CombatTarget): ItemTarget => {
