@@ -50,7 +50,7 @@ concurrency:
 jobs:
   pin:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 75
     outputs:
       record: ${{ steps.ring1.outputs.record }}
       branch: ${{ steps.branch.outputs.branch }}
@@ -67,6 +67,10 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: package.json
+      # Meta QA 11-25 row 64: never pin a head with no packs for a build the channel serves (REV-BEHIND, unenterable).
+      # Waits up to 40 min for the cook (it takes an advertised head first, FR-A20), then refuses naming each build.
+      - name: Wait for the head's packs on every build the channel serves
+        run: node scripts/pin-packs.mjs "$SLUG" "$HASH" "$CHANNEL" --wait=40
       - name: Move the slug's pin and the staging snapshot
         run: node scripts/pin-shard.ts "$SLUG" "$REVISION" "$HASH" "$CHANNEL" ${{ inputs.first && '--first' || '' }}
       # A Ring 1 slug's server slice is cut from its pinned head: a new head
