@@ -51,3 +51,9 @@
   countdown, report or cleanup-log kill: most likely SIGHUP when opus-tail's shell exited at its 12:29 handoff. Now
   --release-proof ignores SIGHUP, runs the bots in their own process group, logs any signal or exit to run.log, and the
   usage says to start it under `nohup` (macOS has no setsid).
+
+## A gh hiccup no longer holds a train (QA 11-25 row 7)
+
+- v0.1.91's train held at 15:48 UTC on one failed `gh run` read (quota 2,756 of 5,000, release CI queued), with the
+  local QA leg already passed. The train's `gh list` and `gh view` reads now get three tries 5 s apart (retryRead);
+  uploads and workflow runs still happen once.

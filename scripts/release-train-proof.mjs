@@ -66,3 +66,21 @@ export function attributionGap(env, prepared) {
   return (env.ASSISTED_BY ?? '').trim() !== '' ? undefined
     : 'set ASSISTED_BY=Claude:<model> (or Codex:<model>) for the prepared commit; SKIP_ATTRIB=1 only for a human-only release';
 }
+
+/**
+ * Meta QA 11-25 row 7 (J505): v0.1.91's train held at 15:48 UTC on one `gh run` call that failed once (quota at 2,756
+ * of 5,000, release CI queued), and the whole staging leg had to be rerun. A read-only `gh` call now gets three tries,
+ * five seconds apart, before it holds the train.
+ * @template T @param {() => T} read @param {{tries?: number, pauseMs?: number, pause?: (ms: number) => void}} [opts]
+ * @returns {T}
+ */
+export function retryRead(read, {tries = 3, pauseMs = 5000, pause = ms => { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }} = {}) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return read();
+    } catch (error) {
+      if (attempt >= tries) throw error;
+      pause(pauseMs);
+    }
+  }
+}

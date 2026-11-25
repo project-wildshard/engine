@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { attributionGap, nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './pid-lock.mjs';
@@ -131,7 +131,9 @@ async function main(args: string[]) {
   };
   const root = command(process.cwd(), 'git', ['rev-parse', '--show-toplevel']);
   const git = (cmd: string[], cwd = root) => command(cwd, 'git', cmd);
-  const gh = (cmd: string[], input?: string) => command(root, 'gh', cmd, input);
+  // A `list` or `view` read retries a passing hiccup (retryRead); an upload or a workflow run happens once.
+  const gh = (cmd: string[], input?: string) => input === undefined && ['list', 'view'].includes(cmd[1] ?? '')
+    ? retryRead(() => command(root, 'gh', cmd)) : command(root, 'gh', cmd, input);
   const runView = (id: number) => JSON.parse(gh(['run', 'view', String(id), '-R', repo,
     '--json', 'databaseId,headSha,status,conclusion,jobs,workflowName,event,headBranch,displayTitle'])) as Run;
   const watchRun = (id: number, log: string) => watchTrainRun(id,

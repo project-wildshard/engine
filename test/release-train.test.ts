@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { attributionGap, nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, watchTrainRun } from '../scripts/release-train-proof.mjs';
+import { attributionGap, nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -131,5 +131,20 @@ describe('attribution before local QA', () => {
     expect(attributionGap({ ASSISTED_BY: 'Claude:claude-opus-5-5' }, false)).toBeUndefined();
     expect(attributionGap({}, true)).toBeUndefined();
     expect(attributionGap({ SKIP_ATTRIB: '1' }, false)).toBeUndefined();
+  });
+});
+
+// Meta QA 11-25 row 7: one failed `gh run` read held v0.1.91's train at 15:48 UTC; a read now gets three tries.
+describe('retryRead', () => {
+  test('a passing hiccup is read again, not a hold', () => {
+    let calls = 0; const pauses: number[] = [];
+    expect(retryRead(() => { calls++; if (calls < 3) throw new Error('gh run'); return 'ok'; }, { pause: ms => { pauses.push(ms); } })).toBe('ok');
+    expect(calls).toBe(3);
+    expect(pauses).toEqual([5000, 5000]);
+  });
+  test('a failure on every try still holds', () => {
+    let calls = 0;
+    expect(() => retryRead(() => { calls++; throw new Error('gh run'); }, { pause: () => undefined })).toThrow('gh run');
+    expect(calls).toBe(3);
   });
 });
