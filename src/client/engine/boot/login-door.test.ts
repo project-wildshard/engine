@@ -35,7 +35,7 @@ test('a mailed link leaves the address at boot and waits in session storage', ()
   const alone = run(`https://play.wildshard.io/#login=${token}`);
   expect(alone.replaced).toEqual(['/']);
   expect(alone.held.get('wildshard.player.link')).toBe(token);
-  expect(run(`https://play.wildshard.io/?chunk=x#zone=driftwood&login=${token}`).replaced, 'the rest of the address stays').toEqual(['/?chunk=x#zone=driftwood']);
+  expect(run(`https://play.wildshard.io/?tier=phone#zone=driftwood&login=${token}`).replaced, 'the rest of the address stays').toEqual(['/?tier=phone#zone=driftwood']);
   expect(run(`https://play.wildshard.io/#login=${token}&zone=driftwood`).replaced).toEqual(['/#zone=driftwood']);
 });
 

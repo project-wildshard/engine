@@ -35,7 +35,7 @@ test('the secure door is the first script in the document', () => {
 });
 
 test('plain http on a named host moves to the same address on https before anything loads', () => {
-  expect(run('http://staging.wildshard.io/?chunk=driftwood-isle#x', false).replaced).toEqual(['https://staging.wildshard.io/?chunk=driftwood-isle#x']);
+  expect(run('http://staging.wildshard.io/?tier=phone#x', false).replaced).toEqual(['https://staging.wildshard.io/?tier=phone#x']);
   expect(run('http://play.wildshard.io/', false).replaced).toEqual(['https://play.wildshard.io/']);
 });
 

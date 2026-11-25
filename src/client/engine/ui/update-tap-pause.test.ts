@@ -15,7 +15,7 @@ test('RL2 / RL3: off the title one tap reloads in place; the pill and the cover 
   vi.useFakeTimers(); vi.stubGlobal('__BUILD_ID__', 'fixture-before');
   vi.stubGlobal('fetch', () => Promise.resolve(Response.json({ build: 'fixture-before' })));
   const replace = vi.fn<(url: string) => void>(), reload = vi.fn(), adopt = vi.fn((_to?: string) => Promise.resolve(false));
-  vi.stubGlobal('location', Object.assign(new URL('https://example.com/?chunk=canal-reserve&v=old'), { replace, reload }));
+  vi.stubGlobal('location', Object.assign(new URL('https://example.com/?v=old'), { replace, reload }));
   Object.defineProperty(window, '__ws_sw', { configurable: true, value: { waiting: { state: 'installed' }, adopt } });
   document.body.innerHTML = '<div id="hud"></div><div class="ws-gmenu show pause"></div>';
   await import('./Update');

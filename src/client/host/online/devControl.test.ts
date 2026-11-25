@@ -6,7 +6,7 @@ import { devControls, devControlUrl } from './devControl';
 afterEach(() => { vi.unstubAllGlobals(); });
 
 test('the control channel is the socket host over HTTP', () => {
-  expect(devControlUrl('ws://127.0.0.1:5555/?chunk=x')).toBe('http://127.0.0.1:5555/__dev/control');
+  expect(devControlUrl('ws://127.0.0.1:5555/')).toBe('http://127.0.0.1:5555/__dev/control');
   expect(devControlUrl('wss://example.test/room')).toBe('https://example.test/__dev/control');
 });
 

@@ -15,7 +15,7 @@ test('a thrown error during boot records the drop before the recovery reload', a
   let recordedAtReload: ReturnType<typeof takeDrop> = null;
   // the reload is the moment the page goes: the drop must be written by then (taken here as the next title would)
   reload.mockImplementation(() => { recordedAtReload = takeDrop(reloaded); });
-  vi.stubGlobal('location', { href: 'https://play.example/?chunk=blender-template', origin: 'https://play.example', search: '?chunk=blender-template', reload });
+  vi.stubGlobal('location', { href: 'https://play.example/?tier=phone', origin: 'https://play.example', search: '?tier=phone', reload });
   vi.stubGlobal('fetch', () => Promise.resolve(new Response('{}')));
   markDropStep({ world: 'blender-template', name: 'Blender Template', step: 'Joining the world' });
   guardBoot(Promise.reject(new TypeError('boot exploded')));

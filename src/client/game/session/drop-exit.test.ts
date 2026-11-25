@@ -11,7 +11,7 @@ const fresh: LastEnd = { kind: 'fresh', reason: 'fresh launch', at: 0, resident:
 test("the pause menu's exit to main menu leaves a quiet title", () => {
   markDropStep({ world: 'blender-template', name: 'Blender Template', step: 'Playing' });
   const went: string[] = [];
-  exitSessionToTitle({ url: 'https://play.example/?chunk=blender-template', replace: (url) => { went.push(url); } });
+  exitSessionToTitle({ url: 'https://play.example/?tier=phone', replace: (url) => { went.push(url); } });
   expect(went).toEqual(['https://play.example/']);
   expect(takeDrop(fresh)).toBeNull();
 });

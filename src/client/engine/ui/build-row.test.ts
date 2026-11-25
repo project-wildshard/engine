@@ -21,7 +21,7 @@ async function settingsBuild(running: string, live: string, where: 'title' | 'pa
   const fetches: string[] = [];
   vi.stubGlobal('fetch', (url: string, init?: RequestInit) => { fetches.push(`${url} ${init?.cache ?? ''}`); return Promise.resolve(Response.json({ build: live })); });
   const location = { reload: vi.fn(), replace: vi.fn() };
-  vi.stubGlobal('location', Object.assign(new URL('https://example.com/?chunk=driftwood-isle'), location));
+  vi.stubGlobal('location', Object.assign(new URL('https://example.com/?tier=phone'), location));
   document.body.innerHTML = where === 'title' ? '<div id="hud" class="intro"><div class="ws-main"></div></div>' : '<div id="hud"></div>';
   const { Scope } = await import('../../../shared/engine/app/scope');
   const { buildBuildRow } = await import('./buildRow');

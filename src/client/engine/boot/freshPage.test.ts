@@ -25,7 +25,7 @@ function leaveTo(href: string): string {
 
 test('the leave address keeps the path, query and hash, and the leave page goes there', () => {
   expect(LEAVE_PATH).toBe(HOST_LEAVE_PATH);
-  for (const target of ['/slug/driftwood-isle', '/?at=1,2&glreload#x', '/slug/sky-reach?chunk=3']) {
+  for (const target of ['/slug/driftwood-isle', '/?at=1,2&glreload#x', '/slug/sky-reach?tier=3']) {
     const leave = throughLeave(target, ORIGIN);
     expect(leave.startsWith('/leave?to=')).toBe(true);
     expect(leaveTo(new URL(leave, ORIGIN).href)).toBe(target);

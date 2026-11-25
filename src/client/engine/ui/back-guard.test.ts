@@ -14,7 +14,7 @@ function fakeHistory(start: unknown = null) {
       replaceState: (state: unknown) => { entries[at] = state; },
       back: () => { if (at === 0) return; at--; queueMicrotask(() => { for (const handler of handlers) handler(); }); },
     },
-    url: () => 'https://play.wildshard.io/?chunk=driftwood-isle',
+    url: () => 'https://play.wildshard.io/?tier=phone',
     listen: (handler) => { handlers.add(handler); return () => { handlers.delete(handler); }; },
     later: (go) => { timers.push(go); },
   };
