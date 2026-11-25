@@ -101,9 +101,12 @@ body.portrait #teaser .credits { bottom: 120px; font-size: 13px; letter-spacing:
 #endA .rule { width: 760px; height: 2px; margin: 26px auto 34px; background: linear-gradient(90deg, rgba(164, 135, 255, 0), var(--violet), rgba(164, 135, 255, 0)); box-shadow: 0 0 14px rgba(164, 135, 255, 0.7); }
 #endA .cta { display: inline-block; padding: 16px 44px; border: 2px solid var(--cyan); background: rgba(13, 27, 38, 0.72); font-size: 40px; letter-spacing: 0.3em; color: #fff; }
 #endA .cta b { color: var(--cyan); font-weight: 700; }
+#endA .cta2 { margin-top: 22px; font-size: 34px; letter-spacing: 0.16em; color: rgba(232, 246, 255, 0.92); }
+#endA .cta2:empty { display: none; }
+#endA .cta2 b { color: var(--violet); font-weight: 700; }
 #endA .url { margin-top: 26px; font-size: 30px; letter-spacing: 0.4em; margin-left: 0.4em; color: var(--cyan); text-transform: none; }
 #endA .alpha { margin-top: 30px; font-size: 17px; letter-spacing: 0.4em; margin-left: 0.4em; color: var(--violet); }
-#endA .credits { position: absolute; left: 0; right: 0; bottom: 52px; text-align: center; font-size: 15px; letter-spacing: 0.24em; color: rgba(255, 255, 255, 0.5); }
+#endA .credits { position: absolute; left: 0; right: 0; bottom: 52px; text-align: center; font-size: 15px; letter-spacing: 0.14em; color: rgba(255, 255, 255, 0.5); }
 
 /* E466 CT6, the concept trailer: a concept tag on every frame, big phone-safe captions, the full label, its end card */
 #cbug .pill { position: absolute; right: 56px; top: 46px; display: flex; align-items: center; gap: 12px; padding: 10px 18px 10px 16px;
@@ -137,7 +140,7 @@ body.portrait #teaser .credits { bottom: 120px; font-size: 13px; letter-spacing:
 <div class="card" id="alpha"><div class="center"><img class="mark" src="assets/mark.svg"><div class="kicker mono">Project Wildshard</div><div class="big disp">Alpha <b>gameplay</b></div><div class="rule"></div><div class="sub mono">Captured in engine · everything here is work in progress</div></div></div>
 <div class="card" id="bug"><div class="pill mono"><div class="dot"></div><span><b>Alpha</b> · in engine</span></div></div>
 <div class="card" id="caption"><div class="wrap"><div class="brk"></div><div class="kick mono shadow"></div><div class="txt mono shadow"></div></div></div>
-<div class="card" id="endA"><div class="veil"></div><div class="center"><img class="logo" src="assets/logo.svg"><div class="rule"></div><div class="cta disp">Play free <b>in your browser</b></div><div class="url mono">wildshard.io</div><div class="alpha mono">Alpha · captured in engine · work in progress</div></div>
+<div class="card" id="endA"><div class="veil"></div><div class="center"><img class="logo" src="assets/logo.svg"><div class="rule"></div><div class="cta disp">Play free <b>in your browser</b></div><div class="cta2 disp"></div><div class="url mono">wildshard.io</div><div class="alpha mono">Alpha · captured in engine · work in progress</div></div>
   <div class="credits mono">Music: MiniMax-Music3 &nbsp;·&nbsp; Sound effects: MOSS-SoundEffect v2 · Stable Audio 3 — Powered by Stability AI &nbsp;·&nbsp; Built with Claude Code</div></div>
 <div class="card" id="cbug"><div class="pill mono"><div class="dot"></div><span><b>Concept trailer</b> · not gameplay</span></div></div>
 <div class="card" id="bigcap"><div class="txt disp"></div></div>
@@ -219,8 +222,11 @@ window.pose = (card, t, o) => {
     $('#teaser .cta').style.transform = 'translateY(' + (1 - ease(ramp(t, 1.15, 1.7))) * 12 + 'px)';
     $('#teaser .credits').style.opacity = ease(ramp(t, 1.5, 2.1));
   } else if (card === 'alpha') {
-    // o: { dur } — whole from the first frame (a share sheet's thumbnail is frame 0, Jake 2026-10-09), a slow drift
+    // o: { dur, kicker?, bigHtml?, sub? } (a later trailer names its own: alpha 2's "Alpha <b>2</b>") — whole from the first frame (a share sheet's thumbnail is frame 0, Jake 2026-10-09), a slow drift
     // open, then out over its last 0.45 s; the veil goes with the words, the footage under it stays
+    if (o.kicker) $('#alpha .kicker').textContent = o.kicker;
+    if (o.bigHtml) $('#alpha .big').innerHTML = o.bigHtml;
+    if (o.sub) $('#alpha .sub').textContent = o.sub;
     $('#alpha .mark').style.opacity = 1;
     $('#alpha .mark').style.transform = `scale(${1 + 0.03 * ramp(t, 0, o.dur)})`;
     $('#alpha .kicker').style.opacity = 1;
@@ -232,6 +238,8 @@ window.pose = (card, t, o) => {
     $('#alpha .center').style.opacity = out;
     $('#alpha').style.opacity = out;
   } else if (card === 'bug') {
+    // o: { html? } — the label in the corner (alpha 2: "<b>Alpha 2</b> · in engine")
+    if (o && o.html) $('#bug .pill span').innerHTML = o.html;
     $('#bug .pill').style.opacity = 1;
   } else if (card === 'caption') {
     // o: { kicker, text, dur }
@@ -241,6 +249,12 @@ window.pose = (card, t, o) => {
     $('#caption .txt').style.opacity = ease(ramp(t, 0.2, 0.7)) * out;
     $('#caption .txt').style.transform = `translateX(${(1 - ease(ramp(t, 0.2, 0.8))) * -18}px)`;
   } else if (card === 'endA') {
+    // o: { dur, cta2Html?, alpha?, credits? } — a second call to action, the alpha line and the credits a trailer names
+    if (o && o.cta2Html) $('#endA .cta2').innerHTML = o.cta2Html;
+    if (o && o.alpha) $('#endA .alpha').textContent = o.alpha;
+    if (o && o.credits) $('#endA .credits').innerHTML = o.credits;
+    $('#endA .cta2').style.opacity = ease(ramp(t, 1.2, 1.7));
+    $('#endA .cta2').style.transform = `translateY(${(1 - ease(ramp(t, 1.2, 1.8))) * 14}px)`;
     $('#endA .veil').style.opacity = ease(ramp(t, 0, 0.9));
     const w = ease(ramp(t, 0.15, 1.0));
     $('#endA .logo').style.opacity = w;

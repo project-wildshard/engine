@@ -29,3 +29,7 @@
   normalised through sharp first: sessions read PNG, JPEG and mislabelled files, and the concat
   demuxer wants one codec). Three beats: Brasscap's Dust Wyrm, Mirror Salt into the engine,
   Nine Dragon's look pass. Code-point slicing, not UTF-16: a cut surrogate broke ffmpeg.
+- AT9: the title cards take their words from the cut instead of the first trailer's: the alpha
+  card a kicker, a big line (HTML) and a sub; the corner bug its pill (`ALPHA 2 · IN ENGINE`); the
+  end card a second call to action (`Build your own zone with Claude Code`), the alpha line and
+  the credits. Captions use `bigcap` (76 px Rajdhani, about 52 px cap height: over J520's 44).
