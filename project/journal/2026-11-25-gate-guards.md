@@ -24,3 +24,5 @@
   the next attempt finds no held body; a timing whose leg reloaded on "online seat elsewhere" reads "harness, rerun" (P2).
 - QA 11-25 row 64: shard-pin waits (40 min) for the head's packs on the build its channel serves a new page, then
   refuses naming the build (scripts/pin-packs.mjs). Live 19:35 UTC: Pine r18 has none for staging's 75fd4b97.
+- ZONE-SNAPSHOTS ZS7: the staging Zone Select snapshot drops Ink & Cel Valley's two hidden cards (live staging names
+  neither retired zone after the API prune); test/retired-zones.test.ts keeps them out of tests, scripts and sources.

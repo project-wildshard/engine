@@ -256,14 +256,6 @@
       "enters": 0
     },
     {
-      "slug": "ink-cel-valley",
-      "name": "Ink & Cel Valley",
-      "status": "hidden",
-      "heroHash": null,
-      "firstUploadedAt": null,
-      "enters": 0
-    },
-    {
       "slug": "nalati-grasslands",
       "name": "Nalati Grasslands",
       "status": "earlyAccess",
@@ -395,14 +387,6 @@
       "slug": "open-plot-starfall-observatory",
       "name": "Open Plot \u00b7 Starfall Observatory",
       "status": "earlyAccess",
-      "heroHash": null,
-      "firstUploadedAt": null,
-      "enters": 0
-    },
-    {
-      "slug": "pastel-plain",
-      "name": "Pastel Plain",
-      "status": "hidden",
       "heroHash": null,
       "firstUploadedAt": null,
       "enters": 0
