@@ -74,6 +74,9 @@ export function processDumps(events) {
  * @typedef {{atMs:number, step:string, renderer:number, gpu:number, browser:number, heapBytes:number}} BootReading
  */
 
+/** The memory trace's buffer: 256 MB holds hundreds of light dumps (QA 11-25 row 40). */
+export const TRACE_BUFFER_KB = 256 * 1024;
+
 /** The trace and request ids can start one apart. Match the same ordinal as measure.mjs does.
  * @param {readonly BootSample[]} samples @param {ReturnType<typeof processDumps>} dumps */
 export function alignProcessDumps(samples, dumps) {
@@ -241,7 +244,10 @@ export async function measureBootMemory({ url, chunk, everyMs = 250, settleMs = 
     const tracing = await browser.newBrowserCDPSession(), cdp = await context.newCDPSession(page);
     tracing.on('Tracing.dataCollected', event => { events.push(...event.value); });
     // No periodic dumps (CDP types memoryDumpConfig as strings): only the light dumps the sampler asks for.
-    const traceConfig = /** @type {{includedCategories:string[]}} */ ({ includedCategories: ['disabled-by-default-memory-infra'], memoryDumpConfig: { triggers: [] } });
+    // QA 11-25 row 40: a slow boot (software GL on hosted Linux) asks four times the dumps, and the default buffer filled and
+    // dropped the last ones, so the count refused; the buffer holds a long boot's every dump.
+    const traceConfig = /** @type {{includedCategories:string[]}} */ ({ includedCategories: ['disabled-by-default-memory-infra'], memoryDumpConfig: { triggers: [] },
+      traceBufferSizeInKb: TRACE_BUFFER_KB });
     await tracing.send('Tracing.start', { transferMode: 'ReportEvents', traceConfig });
     started = Date.now();
     const run = { sampling: true };

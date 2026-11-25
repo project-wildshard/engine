@@ -1,7 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import { runInNewContext } from 'node:vm';
 import { CRASH_LINE, MEMORY_AMBER } from '../src/client/game/grid/budgetOverlay';
-import { CHROMIUM_TO_PHONE, MEMORY_LINE_BYTES, PHONE_MODEL, alignProcessDumps, bootMemoryLine, chromiumToPhone, bootMemoryVerdict, bootPageURL, installBootMemoryProbe, processDumps } from '../scripts/boot-memory-peak.mjs';
+import { CHROMIUM_TO_PHONE, MEMORY_LINE_BYTES, PHONE_MODEL, alignProcessDumps, bootMemoryLine, TRACE_BUFFER_KB, chromiumToPhone, bootMemoryVerdict, bootPageURL, installBootMemoryProbe, processDumps } from '../scripts/boot-memory-peak.mjs';
 import type { BootSample } from '../scripts/boot-memory-peak.mjs';
 import { phoneFromLedger } from '../scripts/memory/phoneModel.mjs';
 
@@ -138,4 +138,9 @@ test('MG1: a run no dump measured refuses rather than passing', () => {
 test('MG1: the boot page enters the shard straight in, muted, with no service worker', () => {
   const page = new URL(bootPageURL('http://127.0.0.1:4401/?x=1', 'nine-dragon-stack'));
   expect(Object.fromEntries(page.searchParams)).toEqual({ x: '1', chunk: 'nine-dragon-stack', mute: '1', skipintro: '1', nolock: '1', sw: '0' });
+});
+
+test('QA 11-25 row 40: the trace holds a slow boot\'s every dump', () => {
+  // software GL on hosted Linux asked 186 dumps; the default buffer dropped the last ones and the count refused
+  expect(TRACE_BUFFER_KB).toBeGreaterThanOrEqual(64 * 1024);
 });

@@ -20,6 +20,7 @@ export interface BootMemoryVerdict {
 }
 export function processDumps(events: readonly unknown[]): Map<string, BootProcessTotals>;
 export function alignProcessDumps(samples: readonly BootSample[], dumps: Map<string, BootProcessTotals>): Map<string, BootProcessTotals>;
+export const TRACE_BUFFER_KB: number;
 export function bootMemoryVerdict(samples: readonly BootSample[], dumps: Map<string, BootProcessTotals>, options?: { factor?: number; budgetBytes?: number }): BootMemoryVerdict;
 export function bootMemoryLine(slug: string, verdict: BootMemoryVerdict): string;
 export function bootPageURL(url: string, chunk: string): string;
