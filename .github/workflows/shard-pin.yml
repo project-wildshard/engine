@@ -1,4 +1,6 @@
 name: shard-pin
+# Meta QA 11-25 row 61: shard-sweep.yml finds a revision's pin run by this title and never starts a second.
+run-name: shard-pin ${{ inputs.slug || github.event.client_payload.slug }} r${{ inputs.revision || github.event.client_payload.revision }}
 
 # Meta SHARD-PUBLISH-ACTIONS SP6 (J369, J371): after a shard repo's
 # publish.yml commits a revision, pin it here on plan/pin-<slug>-r<N>,
