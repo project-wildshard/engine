@@ -8,7 +8,7 @@ export interface RedSpan {run:number;at:number;text:string;keeper:boolean;histor
 export interface State {judged:number[];dispatched:string[];memoryQa?:MemoryQa[];budgetPending?:Record<string,BudgetObservation>;red?:RedSpan;notified?:Record<string,string[]>}
 export interface Verdict {kind:'green'|'red'|'superseded'|'dispatch';run:Run;from?:string|null;by?:string}
 export interface Pane {pane_id:string;label?:string;cwd?:string;foreground_cwd?:string}
-export interface RedRecipient {lane:string;sendPane?:string;key:string;lanes:Set<string>;commits:Set<string>;fixer:boolean}
+export interface RedRecipient {lane:string;sendPane?:string;sendTerminal?:string;key:string;lanes:Set<string>;commits:Set<string>;fixer:boolean}
 export interface RedLander {lane:string;slug:string;pane?:string}
 export interface RedSuspect {sha:string;file:string}
 export interface Io {
@@ -25,6 +25,9 @@ export interface Io {
   memoryQa?:(rows:MemoryQa[])=>void;
   quotaReset?:()=>number;
   now?:()=>number;
+  /** QA 11-25 row 21: the builder's hc terminal, and hc send to a terminal (false when refused). */
+  builder?:()=>string|undefined;
+  hcSend?:(terminal:string,text:string)=>boolean;
 }
 export const REPO: string;
 export const KEEPER_MS: number;
@@ -40,9 +43,10 @@ export function attribute<L extends {lane:string;count?:number}>(commits:readonl
 export function paneFor(panes:readonly Pane[],slug:string):string|undefined;
 export function failurePaths(logs:readonly string[]):string[];
 export function redSuspect(commits:readonly string[],files:readonly string[],changes:ReadonlyMap<string,readonly string[]>):RedSuspect|undefined;
-/** Build-max C1: the coordinator's pane, which takes a red no lander was reached for and the keeper's red. */
-export const FALLBACK_PANE:string;
-export function fallbackRecipient(pane?:string):RedRecipient;
+/** QA 11-25 row 21: the builder's hc terminal takes a red no lander was reached for and the keeper's red. */
+export const BUILDER_LABEL:string;
+export function fallbackRecipient(terminal:string|undefined):RedRecipient;
+export function redNote(lane:string,run:number,range:string,failed:string):string;
 export function redRecipients(rows:readonly {sha:string;lander?:RedLander}[],panes:readonly Pane[],agents:ReadonlyMap<string,string>,fixers:readonly string[]):RedRecipient[];
 export function redMessage(recipient:RedRecipient,details:{range:string;url:string;failed:string;named:string;suspect?:RedSuspect}):string;
 export function readState(file:string):State|null;
