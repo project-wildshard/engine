@@ -84,8 +84,10 @@ export const followParty = (t, secs, { r = 6.5, h = 1.7, a0 = 0.5, a1 = -0.2, fo
     const s = window.__pc ?? (window.__pc = want.slice()); for (let i = 0; i < 6; i++) s[i] += (want[i] - s[i]) * 0.12;
     window.__tr.setRig({ handheld: 0.4, keys: [{ t: 0, p: s.slice(0, 3), l: s.slice(3), fov: ${fov} }, { t: 1e6, p: s.slice(0, 3), l: s.slice(3), fov: ${fov} }] }); } }`;
 };
+// --wall at 1080p draws about 20 frames a real second, so the party (moving on the server's real time) plays about 3x fast:
+// a 0.27 walk cue reads as the first cut's stroll (AT15, 11-25; a 60 fps real-time capture would need a screencast path)
 shots.push({ name: 'd-party', zone: Z, time: T, weather: W, secs: 5, warm: 120,
-  setup: NO_VIEWMODEL + CALM + tp(60, 40, Math.PI, 0) + cueParty(),
+  setup: NO_VIEWMODEL + CALM + tp(60, 40, Math.PI, 0) + cueParty(PARTY, 0.27),
   tick: (t) => followParty(t, 5, { a0: 0.5, a1: -0.3, r: 7, h: 1.9 }),
   probe: '(() => ({ framed: window.__pm, bodies: (window.__onlinePlayers?.() ?? []).map((b) => [b.name, +b.x.toFixed(1), +b.z.toFixed(1), b.gait]) }))()' });
 
@@ -99,10 +101,10 @@ shots.push({ name: 'g-rise-low', zone: Z, time: T, weather: W, secs: 9.6, warm: 
   rig: { ease: false, keys: [
     { t: 0, p: [2.2, 3.6, -216], l: [0, 2.4, -192], fov: 52 },
     { t: 1.2, p: [2.2, 3.6, -216], l: [0, 2.4, -192], fov: 52 },
-    { t: 3.4, p: [10, 40, -262], l: [0, 0, -120], fov: 53 },
-    { t: 6, p: [4, 150, -350], l: [0, 0, -40], fov: 52 },
-    { t: 8, p: [0, 205, -385], l: [0, 0, -30], fov: 52 },
-    { t: 9.6, p: [-6, 214, -398], l: [0, 0, -30], fov: 51 },
+    // on the grid (AT15) it tops out about 32 m up: higher, the neighbours show their cut edges and the far grid's cyan
+    { t: 4.5, p: [7, 22, -248], l: [0, 1, -140], fov: 53 },
+    { t: 7.5, p: [8, 30, -258], l: [0, 0, -132], fov: 52 },
+    { t: 9.6, p: [8, 32, -262], l: [0, 0, -130], fov: 52 },
   ] },
   probe: '(() => ({ party: (window.__onlinePlayers?.() ?? []).map((b) => [b.name, +b.x.toFixed(1), +b.z.toFixed(1)]) }))()' });
 
