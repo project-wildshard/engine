@@ -176,6 +176,8 @@ export function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     // WIRE-STABILITY WR7: saves.lock.json, every save key's version, shape and migrations (test/saves-lock.test.ts).
     // One focused Vitest file; its script drops the push cohort's profile.
     {name:'check:saves',commands:[['pnpm','run','--silent','check:saves']]},
+    // Meta QA 11-25 row 25: every TypeScript file Node runs strip-only is erasable (no parameter property; fc0832b52's red).
+    {name:'check:strip-only',commands:[[process.execPath,'--no-warnings','scripts/strip-only.mjs']]},
   ];
 }
 

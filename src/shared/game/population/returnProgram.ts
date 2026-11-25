@@ -158,7 +158,9 @@ export class ReturnProgram {
   /** The same immutable admitted descriptor used by this selected instance. */
   readonly groupBindings?:GroupGuestBindingsV2;
   readonly prepareGroup?:NonNullable<NumericProjection['prepareGroup']>;
-  private constructor(row: ReturnType<typeof readProgram>, floor: (x: number, z: number) => number,private readonly owner?: Scope,raw?:Uint8Array,witness?:Uint8Array,prepared?:PreparedScriptMemory) {
+  private readonly owner: Scope | undefined;
+  private constructor(row: ReturnType<typeof readProgram>, floor: (x: number, z: number) => number,owner?: Scope,raw?:Uint8Array,witness?:Uint8Array,prepared?:PreparedScriptMemory) {
+    this.owner = owner;
     const script = row.script;
     const freeze=(value:unknown):void=>{if(typeof value!=='object'||value===null||Object.isFrozen(value))return;for(const child of Object.values(value))freeze(child);Object.freeze(value);};
     freeze(row);this.declaration=row;
@@ -368,7 +370,9 @@ export class ReturnProgram {
 export class ProjectedMotionSample {
   private initialized = false;
   private readonly frame = { dt: 0, x: 0, z: 0, px: 0, pz: 0, speed: 0 };
-  constructor(private readonly program: ReturnProgram, private readonly signal: string) {}
+  private readonly program: ReturnProgram;
+  private readonly signal: string;
+  constructor(program: ReturnProgram, signal: string) { this.program = program; this.signal = signal; }
   update(dt: number, x: number, z: number): number {
     const frame = this.frame;
     if (!this.initialized) { frame.px = x; frame.pz = z; this.initialized = true; }
@@ -438,7 +442,10 @@ export class ProjectedState<S extends Record<string,number> = Record<string,numb
     }
     if(Object.values(row.initial).some(value=>!Number.isFinite(value)))throw new Error('Invalid projection state');
   }
-  constructor(private readonly row:ProjectedStateRows<S>,private readonly program:NumericProjection) {
+  private readonly row:ProjectedStateRows<S>;
+  private readonly program:NumericProjection;
+  constructor(row:ProjectedStateRows<S>,program:NumericProjection) {
+    this.row=row;this.program=program;
     ProjectedState.preflight(row);this.state={...row.initial};this.retain=row.retain??Object.fromEntries(Object.keys(row.initial).map(key=>[key,key]));
   }
   value(key:string):number {const value=this.state[key];if(value===undefined)throw new Error('Unknown projection state slot');return value;}

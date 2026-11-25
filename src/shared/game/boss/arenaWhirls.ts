@@ -30,9 +30,10 @@ export class ArenaWhirls {
   readonly drawn: { k: number; shown: number; x: number; y: number; z: number }[];
   /** CI12: the ground each whirlwind stands on (its drawn and hit y): the page's terrainHeight, or a native host's sampler */
   private readonly ground: (x: number, z: number) => number;
-  constructor(input: ArenaWhirlsRows, program: ReturnProgram, gateProgram: ReturnProgram, private readonly nativeScope: Scope,
+  private readonly nativeScope: Scope;
+  constructor(input: ArenaWhirlsRows, program: ReturnProgram, gateProgram: ReturnProgram, nativeScope: Scope,
     ground: (x: number, z: number) => number = heightAt) {
-    this.ground = ground;
+    this.nativeScope = nativeScope; this.ground = ground;
     this.live(); ArenaWhirls.preflight(input); const gate = input.gate;
     this.gate = new ProjectedState({ ...gate.law, signals: { step: gate.law.signal, arm: gate.arm }, signal: 'step', outputs: Object.keys(gate.law.retain) }, gateProgram);
     this.rows = input; this.drawn = input.laws.map(() => ({ k: 0, shown: 0, x: 0, y: 0, z: 0 }));

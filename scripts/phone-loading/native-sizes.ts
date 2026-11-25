@@ -39,7 +39,8 @@ function size(value: unknown): value is number {return typeof value === 'number'
 /** Passive CDP ledger. Redirect hops keep separate entries; matching requires
  * URL, method, owner kind and the native request's own wall-clock start. */
 export class NativeSizeLedger {
-  constructor(private readonly bodyReader?: (session: string, id: string, url: string, headers: Readonly<Record<string, string>>) => Promise<number>) {}
+  private readonly bodyReader: ((session: string, id: string, url: string, headers: Readonly<Record<string, string>>) => Promise<number>) | undefined;
+  constructor(bodyReader?: (session: string, id: string, url: string, headers: Readonly<Record<string, string>>) => Promise<number>) { this.bodyReader = bodyReader; }
   private readonly active = new Map<string, Entry>();
   private readonly entries: Entry[] = [];
   private readonly requests = new WeakMap<Request, Entry>();
