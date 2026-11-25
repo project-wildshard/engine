@@ -34,6 +34,16 @@ export function declaredLevel(manifest: LevelLook, source: LevelLookSource): Lev
 }
 
 /**
+ * QA 11-25 row 52 (FORMAT-PRUNE FP47b): a runtime page's level look (a discovery naming its client-plan entry, Nalati's
+ * kind) is its product's (`look.level`) over its discovery document's, as a declared page's is. SDK 0.4.32 on carries
+ * no level look in discovery, so a runtime page that read discovery alone drew the plain sky with no HDRI, and its sky
+ * rig refused at level.world (Nalati on SDK 0.4.34).
+ */
+export function nativePageLevel<M extends LevelLook>(manifest: M, source: LevelLookSource): Omit<M, 'horizon'> & LevelLook {
+  return { ...withoutHorizon(manifest), ...declaredLevel(manifest, source) };
+}
+
+/**
  * ONE-FORMAT OF7: a declared page's level look reads `look/look` over its manifest. Where the look declares a setting it
  * wins: `look.light.heightFog` the atmosphere's height fog, `look.grade.bloom` the desktop bloom (the phone tier draws
  * none, M4.9). OF9b2 moved the rest (sun, hemisphere, tints, grade, horizon) into `look.level`, read by `declaredLevel`;

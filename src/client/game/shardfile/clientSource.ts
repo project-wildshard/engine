@@ -31,7 +31,7 @@ import { folderPaintedLook } from '../looks/paintedLook';
 import { emptyLook } from './emptyLook';
 import { declaredPost, declaredPostLook, withDeclaredPost } from './declaredRender';
 import { shardfileLook } from './look';
-import { declaredLook, withoutHorizon } from './declaredLook';
+import { declaredLook, nativePageLevel, withoutHorizon } from './declaredLook';
 import { catalogueBound, declaredStart, productStart } from './declaredStart';
 import { lookLightOn } from '@wildshard/engine/ui/lookLightOption';
 import { admitFolder, readFolderInput, readFolderDescriptor, type AdmittedFolder, type FolderOptions } from './folder';
@@ -221,7 +221,9 @@ export async function installManifestShardfile(manifest: ShardManifest, provided
     }
     // FORMAT-PRUNE FP54: a runtime page's start (spawn, loadout, audio) is its product's too, as a declared page's below: a
     // discovery built since OF9b5 carries none, so Pine 0.1.0.6 entered with no audio catalogue and kit's audio entry found no mixer
-    const started = productStart(manifest, source);
+    // QA 11-25 row 52 (FORMAT-PRUNE FP47b): and it draws its product's level look (`look.level`): a discovery built since
+    // SDK 0.4.32 carries none, so Nalati 0.4.34 got the plain sky, with no HDRI, and its sky rig refused at level.world
+    const started = nativePageLevel(productStart(manifest, source), source);
     if (!isBuildValidatedOutput(source)) return selectSource(started);
     const ground = tiledBootstrapGround(started.ground, source.props, source.runtime.binds ?? []);
     return selectSource(ground === started.ground ? started : { ...started, ground });
