@@ -11,7 +11,8 @@ for(const key of payloads)test(`grass refuses inline ${key} before file access`,
   expect(()=>new GrassPresentationProfile({...original,[key]:inline},files)).toThrow('Grass requires binary files');
   expect(has).not.toHaveBeenCalled();expect(get).not.toHaveBeenCalled();
 });
-for(const tier of ['phone','desktop']as const)for(const key of ['blades','flowers','cards']as const)
+// every scene the live pin carries (QA 11-24 row 70: a grass without cards has none)
+for(const tier of ['phone','desktop']as const)for(const key of Object.keys(original[tier].scenes) as ('blades'|'flowers'|'cards')[])
   test(`grass refuses inline ${tier} ${key} before file access`,()=>{
     const rows=structuredClone(original),files=new Map(GRASS_FILES),has=vi.spyOn(files,'has'),get=vi.spyOn(files,'get');
     rows[tier].scenes[key]=inline;

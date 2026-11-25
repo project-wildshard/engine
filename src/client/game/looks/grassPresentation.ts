@@ -44,6 +44,16 @@ function geometries(look: string, rows: ReturnType<typeof parseSceneBuffers>, fi
 
 interface Ring { T: number; G: number; mesh: THREE.Mesh; geo: InstancedBufferGeometry; half: number }
 
+/** A grass's near-field card clumps: the look, the tier's scene and card field, and the eye height they stand down above. */
+export interface GrassCardRows { readonly look: string; readonly scene: GrassPayload; readonly field: { readonly T: number; readonly s: number }; readonly height: number }
+/** QA 11-24 row 70 (J510): a grass may have no card clumps (Nalati draws real blades to the camera). The format admits its
+ *  card rows all together or not at all; null: this grass draws only its blades and flowers. */
+export function grassCards(input: GrassPresentationRows, tier: 'phone' | 'desktop'): GrassCardRows | null {
+  const look: string | undefined = input.view.looks[2], scene: GrassPayload | undefined = input[tier].scenes.cards;
+  const field: { T: number; s: number } | undefined = input[tier].cards, height: number | undefined = input.view.cardsHeight;
+  return look === undefined || scene === undefined || field === undefined || height === undefined ? null : { look, scene, field, height };
+}
+
 /** Client-only camera-ring presentation over admitted height, mask and draw buffers. No shard callbacks enter this owner. */
 export class GrassPresentationProfile {
   // A lent height map must not retain the retired profile's other input banks.
@@ -86,7 +96,8 @@ export class GrassPresentationProfile {
     this.heightTexture(); this.prepared.delete(this.input.height); await slice.check();
     for (const encoded of [this.input.field, this.input.ground]) { this.prepared.set(encoded, await this.inflate(encoded)); await slice.check(); }
     if(rows.channels!==undefined){this.prepared.set(rows.channels,await this.inflate(rows.channels));await slice.check();}
-    for (const encoded of [rows.scenes.blades, rows.scenes.flowers, rows.scenes.cards]) { this.prepared.set(encoded, sceneRows(await this.inflate(encoded))); await slice.check(); }
+    const cards = grassCards(this.input, TIER);
+    for (const encoded of [rows.scenes.blades, rows.scenes.flowers, ...(cards === null ? [] : [cards.scene])]) { this.prepared.set(encoded, sceneRows(await this.inflate(encoded))); await slice.check(); }
   }
   /** a map's bytes: prepared, else decoded now */
   bytes(encoded: GrassPayload): Uint8Array<ArrayBuffer> {
@@ -150,13 +161,13 @@ export class GrassPresentation {
   private readonly maskData: Uint8Array;
   private rings: Ring[] = [];
   private flowers: Ring | null = null;
-  private cards: { readonly geo: THREE.InstancedBufferGeometry; readonly tiles: number; readonly origin: THREE.Vector2 } | null = null;
+  private cards: { readonly geo: THREE.InstancedBufferGeometry; readonly tiles: number; readonly origin: THREE.Vector2; readonly rows: GrassCardRows } | null = null;
   private readonly trail: TrampleTrail;
   private baking = 0;
   /** live tunables */
   readonly params = { playerRadius: 0 };
 
-  constructor(private readonly profile: GrassPresentationProfile, private readonly sky: Sky, private readonly forest: Forest, private readonly bakeUniforms: StaticCaptureUniforms, private readonly atlas: Parameters<typeof loadSpecimenTexture>[0]) {
+  constructor(private readonly profile: GrassPresentationProfile, private readonly sky: Sky, private readonly forest: Forest, private readonly bakeUniforms: StaticCaptureUniforms, private readonly atlas: Parameters<typeof loadSpecimenTexture>[0] | undefined) {
     this.params.playerRadius = profile.input.view.playerRadius;
     this.trail = new TrampleTrail(trample, profile.input.view.trail.speedLimit);
     const grassRows = profile.input, { heightSize: HN, lattice: LAT, half: CHUNK_HALF } = grassRows.view, LN = Math.ceil(CHUNK_HALF * 2 / LAT) + 1;
@@ -171,14 +182,14 @@ export class GrassPresentation {
   }
 
   build(): this {
-    const grassRows = this.profile.input, { heightSize: HN, heightOrigin: H_ORG, lattice: LAT, half: CHUNK_HALF, looks: LOOKS } = grassRows.view, [BLADES,HEADS,CLUMPS] = LOOKS, rows = grassRows[TIER], RINGS = rows.rings, FLOWERS = rows.flowers, NEAR = rows.near, LN = Math.ceil(CHUNK_HALF * 2 / LAT) + 1;
+    const grassRows = this.profile.input, { heightSize: HN, heightOrigin: H_ORG, lattice: LAT, half: CHUNK_HALF, looks: LOOKS } = grassRows.view, [BLADES,HEADS] = LOOKS, CARD_ROWS = grassCards(grassRows, TIER), rows = grassRows[TIER], RINGS = rows.rings, FLOWERS = rows.flowers, NEAR = rows.near, LN = Math.ceil(CHUNK_HALF * 2 / LAT) + 1;
     const m = this.maps, files = this.profile.channelFiles(TIER);
     for (const id of LOOKS) {
       setLentTexture(id, 'tHeight', m.tHeight); setLentTexture(id, 'tMask', m.tMask); setLentTexture(id, 'tField', m.tField);
       setLentParam(id, 'heightXf', [H_ORG, H_ORG, 1 / HN, HN]); setLentParam(id, 'fieldXf', [-CHUNK_HALF, -CHUNK_HALF, 1 / LAT, LN]);
     }
     setLentTexture(BLADES, 'tGround', m.tGround); // the roots sink into the painted ground (the blades only)
-    setLentTexture(BLADES, 'tTrample', trample.texture); setLentTexture(CLUMPS, 'tTrample', trample.texture);
+    setLentTexture(BLADES, 'tTrample', trample.texture); if (CARD_ROWS !== null) setLentTexture(CARD_ROWS.look, 'tTrample', trample.texture);
     const draw = (id: string, geo: InstancedBufferGeometry, name: string): THREE.Mesh => {
       const mesh = new THREE.Mesh(geo, lentLook(id));
       mesh.frustumCulled = false; mesh.name = name;
@@ -199,16 +210,22 @@ export class GrassPresentation {
     }
     // the near field: the painted card atlas as clumps of 3 crossed quads (not camera-facing: they hold up walked round),
     // on the same field, mask, wind and trample as the blades, cut at the atlas's alpha; the atlas swapped in when it lands
-    const per = rows.per, geo = geometries(CLUMPS, this.profile.scene(rows.scenes.cards), files)[0];
-    if (geo === undefined) throw new Error('Grass cards missing');
-    setLentParam(CLUMPS, 'cardNear', [NEAR[0], NEAR[1], per]);
-    draw(CLUMPS, geo, 'grass-v2-cards');
-    this.cards = { geo, tiles: geo.instanceCount, origin: new THREE.Vector2() };
-    void (async (): Promise<void> => {
-      try { const atlas = await loadSpecimenTexture(this.atlas); atlas.wrapS = atlas.wrapT = THREE.ClampToEdgeWrapping; setLentTexture(CLUMPS, 'tCards', atlas); } catch (e: unknown) { console.warn('[grass v2] no card atlas', e); }
-    })();
+    if (CARD_ROWS !== null) this.buildCards(CARD_ROWS, rows.per, NEAR, files, draw);
     void this.bakeMask();
     return this;
+  }
+
+  /** the near field's card clumps, when the grass has them (`grassCards`) */
+  private buildCards(cardRows: GrassCardRows, per: number, near: readonly [number, number], files: ReadonlyMap<string,Uint8Array>, draw: (id: string, geo: InstancedBufferGeometry, name: string) => THREE.Mesh): void {
+    const CLUMPS = cardRows.look, geo = geometries(CLUMPS, this.profile.scene(cardRows.scene), files)[0], source = this.atlas;
+    if (geo === undefined) throw new Error('Grass cards missing');
+    setLentParam(CLUMPS, 'cardNear', [near[0], near[1], per]);
+    draw(CLUMPS, geo, 'grass-v2-cards');
+    this.cards = { geo, tiles: geo.instanceCount, origin: new THREE.Vector2(), rows: cardRows };
+    if (source === undefined) { console.warn('[grass v2] no card atlas'); return; }
+    void (async (): Promise<void> => {
+      try { const atlas = await loadSpecimenTexture(source); atlas.wrapS = atlas.wrapT = THREE.ClampToEdgeWrapping; setLentTexture(CLUMPS, 'tCards', atlas); } catch (e: unknown) { console.warn('[grass v2] no card atlas', e); }
+    })();
   }
 
   /** the dressing landed (`reseedGrassV2`): bake the fine mask again with its cover */
@@ -278,7 +295,7 @@ export class GrassPresentation {
    * to the camera, cull their tiles against its frustum, fill the tile lists and the instance counts.
    */
   private place(renderer: Renderer, camera: THREE.Camera): void {
-    const { half: CHUNK_HALF, cardsHeight, ringHeight } = this.profile.input.view, CARDS = this.profile.input[TIER].cards, CLUMPS = this.profile.input.view.looks[2];
+    const { half: CHUNK_HALF, ringHeight } = this.profile.input.view;
     const frame = renderCount(renderer); // the engine's render count (SF59: node draws bump three's)
     if (frame === this.placedFrame) return;
     this.placedFrame = frame;
@@ -297,6 +314,7 @@ export class GrassPresentation {
     });
     if (this.flowers) this.fill(this.flowers, cx, cz, null);
     if (this.cards) {
+      const { field: CARDS, height: cardsHeight, look: CLUMPS } = this.cards.rows;
       this.cards.geo.instanceCount = above > cardsHeight ? 0 : this.cards.tiles;
       const o2 = this.cards.origin.set(Math.floor(cx / CARDS.T) * CARDS.T, Math.floor(cz / CARDS.T) * CARDS.T);
       setLentParam(CLUMPS, 'cardField', [o2.x, o2.y, CARDS.T, CARDS.s]);
