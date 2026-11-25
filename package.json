@@ -889,7 +889,6 @@
     "./game/shardfile/pageWater": "./src/client/game/shardfile/pageWater.ts",
     "./game/shardfile/pagePreparation": "./src/client/game/shardfile/pagePreparation.ts",
     "./game/shardfile/clientMeadow": "./src/client/game/shardfile/clientMeadow.ts",
-    "./game/looks/speciesBook": "./src/client/game/looks/speciesBook.ts",
     "./game/looks/vertexWear": "./src/client/game/looks/vertexWear.ts",
     "./game/models/fixedDraws": "./src/client/game/models/fixedDraws.ts",
     "./game/models/islandLibrary": "./src/client/game/models/islandLibrary.ts",

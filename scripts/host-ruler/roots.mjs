@@ -24,8 +24,8 @@ export const SECTION_HOSTS = Object.freeze({
   'collections/displays': ['src/client/game/models/collectionDisplay.ts#CollectionCatalogue'],
   'models/island-library': ['src/client/game/models/islandLibrary.ts#IslandLibrary'],
   'world/trees': ['src/client/game/models/treeSet.ts#folderTreeSet', 'src/client/game/shardfile/forestPage.ts#placeForestPageModels'],
-  'look/rigged-hulls': ['src/client/game/looks/riggedHulls.ts#folderRiggedHulls'],
   'look/hull-book': [], // FORMAT-PRUNE FP20: no reader; the section leaves with the format's delete.
+  'look/rigged-hulls': [], // FORMAT-PRUNE FP20: no reader (folderRiggedHulls went); the section leaves with the format's delete.
   'look/painted': ['src/client/game/looks/paintedLook.ts#folderPaintedLook'],
   'look/colour-functions': ['src/client/engine/render/graph/colourFunction.ts#materialColourGraph'],
   'look/toon': ['src/client/game/looks/toonLook.ts#toonLook'],

@@ -2,12 +2,11 @@ import { readWholePartition, type WholeGeometryPiece as FormatWholeGeometryPiece
 import { materialColourGraph } from '@wildshard/engine/render/graph/colourFunction';
 import { isJsonData } from '@wildshard/format/json';
 import { clientPreparationBatch } from '../shardfile/preparationTiming';
-import { unzlibSync } from 'fflate';
 import { admitNativeWholeGeometry, halfAttribute } from '@wildshard/engine/models/nativeGeometry';
 import type { NativeAttributeSchema as WholeAttribute } from '@wildshard/format/nativeGeometryChannels';
 import { fetchDeflatedBytes, fetchLaneBytes, unshuffleLanes as restoreLanes } from '@wildshard/engine/core/deflate';
 import { geometryBoundsSteps } from '@wildshard/engine/world/geometryBounds';
-import { BAKED_BYTES as codecBakedBytes, appendGeometry as codecAppendGeometry, bakedGeometryBytes as codecBakedGeometryBytes, pad4 as codecPad4, readBakedAttribute, readBakedGeometry as codecReadBakedGeometry, type BakedGeometryRow as CodecBakedGeometryRow, type BakedType as CodecBakedType } from './bakedGeometry';
+import { BAKED_BYTES as codecBakedBytes, appendGeometry as codecAppendGeometry, bakedGeometryBytes as codecBakedGeometryBytes, pad4 as codecPad4, readBakedGeometry as codecReadBakedGeometry, type BakedGeometryRow as CodecBakedGeometryRow, type BakedType as CodecBakedType } from './bakedGeometry';
 import { workSlice } from '@wildshard/engine/core/workSlice';
 import { ownedArray } from '@wildshard/engine/core/ownedBuffer';
 import { presenting } from '@wildshard/engine/core/framePacing';
@@ -20,7 +19,6 @@ import { defineSceneModels, type BakedModelMetadata } from '@wildshard/engine/mo
 import { copyOwnedDrawGeometry, copyRestGeometry, identitySpaceGeometry, keepRestGeometryGrid, ownedGeometryGrid, type OwnedDrawGeometry } from '@wildshard/engine/models/ownedGeometry';
 import * as wholeV from 'valibot';
 import type { Scope as ResourceScope } from '@wildshard/engine/app/scope';
-import { resourceScope } from '@wildshard/engine/app/resources';
 import type { Shardfile } from '@wildshard/format/shardSchema';
 import { prepareRigLoader, loadRigFile, type ClipName, type SocketName } from "@wildshard/engine/anim/rig";
 import { retainCachedResources } from "@wildshard/engine/app/cachedAssets";
@@ -33,9 +31,7 @@ import type { SurfaceLook } from "@wildshard/format/surfaceLooks";
 import { Rng } from "@wildshard/format/seededRng";
 import type { SpeciesLook } from "@wildshard/engine/entities/species/look";
 import { NO_FUR } from "@wildshard/engine/entities/species/rigs";
-import { clipAnimate, stepCreatureLift, type SpeciesClips } from "../../../shared/game/plugin/animation";
-import { numericCreaturePoseFromBook } from '../../../shared/game/plugin/channelPrograms';
-import { parsePackedCreatureLooks } from '@wildshard/format/speciesLooks';
+import { clipAnimate, type SpeciesClips } from "../../../shared/game/plugin/animation";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { NpcMotion, NpcRow } from "../../../shared/game/plugin/quests";
 
@@ -1366,158 +1362,6 @@ function carryBounds(geometry: BufferGeometry, flat: BufferGeometry): BufferGeom
   geometry.dispose();
   return flat;
 }
-/** How long a packed body bake stays inflated after its last copy (ms): one entry's spawn bursts share one inflate. At
- *  2 s a cold Nalati crossing's boss spawn (2.4 s after the herd's) inflated the 8.7 MB bake again in script (fflate,
- *  ~100 ms of one play frame at phone 4× CPU); the held bytes are the burst's own, so the peak does not rise. */
-const DECODED_HOLD_MS = 10000;
-/** A packed body catalogue: load its compressed source once, then lend fresh owned parts per spawn. */
-export interface PackedCreatureBodies {
-  preload: () => Promise<void>;
-  copy: (kind: string, variant: string) => AnimalSpecies;
-  /** Bind inert look rows; a missing body family or numeric pose refuses admission. */
-  looks: (input: unknown) => { all: readonly SpeciesLook[]; get: (kind: string) => SpeciesLook };
-}
-
-/** zlib bytes inflated by the platform's stream decoder (off the script's own work), or in script where it has none. */
-async function inflateStream(bytes: Uint8Array): Promise<Uint8Array> {
-  if (typeof DecompressionStream === 'undefined') return unzlibSync(bytes);
-  const inflating = new Blob([bytes.slice()]).stream().pipeThrough(new DecompressionStream('deflate'));
-  return new Uint8Array(await new Response(inflating).arrayBuffer());
-}
-
-/**
- * Admit offset-addressed typed geometry blocks, bones and dimensions without changing their packed representation.
- * The compressed bytes are retained once; each copy inflates and copies its parts, never sharing mutable geometry.
- * Missing keys, early copies, unsafe paths, truncated blocks and incompatible metadata refuse before handing out a body.
- */
-export function packedCreatureBodies(input: unknown, decode: (bytes: Uint8Array) => Uint8Array = unzlibSync,
-  read?: (name: string) => Promise<Uint8Array>): PackedCreatureBodies {
-  const PackedBodyNumber = wholeV.pipe(wholeV.number(), wholeV.finite());
-  const PackedBodyWhole = wholeV.pipe(PackedBodyNumber, wholeV.integer(), wholeV.minValue(0), wholeV.maxValue(268435456));
-  const PackedBodyPart = wholeV.strictObject({ indexEncoding: wholeV.optional(wholeV.picklist(['delta', 'raw'])),
-    groups: wholeV.optional(wholeV.pipe(wholeV.array(wholeV.tuple([PackedBodyWhole, PackedBodyWhole, PackedBodyWhole])), wholeV.maxLength(1024))),
-    offsets: wholeV.pipe(wholeV.array(PackedBodyWhole), wholeV.maxLength(33)), row: wholeV.strictObject({
-    attrs: wholeV.pipe(wholeV.array(wholeV.tuple([wholeV.string(), wholeV.picklist(['f32', 'f16', 'u16', 'i8', 'u8']), wholeV.pipe(PackedBodyWhole, wholeV.minValue(1), wholeV.maxValue(16)), wholeV.boolean()])), wholeV.maxLength(32)),
-  count: PackedBodyWhole, index: wholeV.nullable(wholeV.picklist(['u16', 'u32'])), indexCount: PackedBodyWhole, box: wholeV.boolean() }) });
-  const PackedBodyParts = wholeV.union([wholeV.null(), PackedBodyPart, wholeV.pipe(wholeV.array(PackedBodyPart), wholeV.maxLength(64))]);
-  const PackedBody = wholeV.strictObject({ kind: wholeV.string(), variant: wholeV.string(),
-    bones: wholeV.pipe(wholeV.array(wholeV.strictObject({ name: wholeV.string(), parent: wholeV.nullable(wholeV.string()), pos: wholeV.tuple([PackedBodyNumber, PackedBodyNumber, PackedBodyNumber]) })), wholeV.maxLength(512)),
-    dims: wholeV.strictObject({ bodyY: PackedBodyNumber, bodyHalfLen: PackedBodyNumber, bodyRadius: PackedBodyNumber, headRadius: PackedBodyNumber, legLen: PackedBodyNumber,
-      feet: wholeV.pipe(wholeV.array(wholeV.tuple([PackedBodyNumber, PackedBodyNumber])), wholeV.maxLength(512)), halfWidth: PackedBodyNumber, capsuleAxis: wholeV.optional(wholeV.picklist(['y', 'z'])) }),
-    fur: PackedBodyParts, hard: PackedBodyParts, eye: PackedBodyParts });
-  const publicBodyFile = wholeV.pipe(wholeV.string(), wholeV.regex(/^\/assets\/[a-zA-Z0-9/_-]+-[0-9a-f]{64}\.bin$/u));
-  const namedBodyFile = wholeV.pipe(wholeV.string(), wholeV.maxLength(256),
-    wholeV.regex(/^(?:[a-zA-Z0-9_-]+\/)*[a-zA-Z0-9_-][a-zA-Z0-9_.-]*\.bin$/u));
-  const bake = wholeV.parse(wholeV.strictObject({ file: wholeV.union([publicBodyFile, namedBodyFile]),
-    bytes: PackedBodyWhole, bodies: wholeV.pipe(wholeV.array(PackedBody), wholeV.maxLength(1024)) }), input);
-  const load = bake.file.startsWith('/') ? fetchBuildFile : read;
-  if (load === undefined) throw new Error('Named packed creature body requires its product reader');
-  const keys = new Set<string>();
-  for (const body of bake.bodies) {
-    const key = JSON.stringify([body.kind, body.variant]);
-    if (keys.has(key)) throw new Error('Duplicate packed creature body');
-    keys.add(key);
-    for (const part of [body.fur, body.hard, body.eye].flatMap(parts => parts === null ? [] : Array.isArray(parts) ? parts : [parts])) {
-      const row = part.row;
-      if (row.attrs[0]?.[0] !== 'position' || new Set(row.attrs.map(attr => attr[0])).size !== row.attrs.length
-        || part.offsets.length !== row.attrs.length + (row.index === null ? 0 : 1) || (row.index === null && row.indexCount !== 0)) throw new Error('Invalid packed creature part');
-      const sizes = row.attrs.map(([, type, width]) => row.count * width * BAKED_BYTES[type]);
-      if (row.index !== null) sizes.push(row.indexCount * (part.indexEncoding === 'raw' && row.index === 'u16' ? 2 : 4));
-      if (part.offsets.some((offset, i) => offset % 4 !== 0 || offset + (sizes[i] ?? bake.bytes + 1) > bake.bytes)) throw new Error('Packed creature block exceeds its bake');
-    }
-  }
-  let compressed: Uint8Array | null = null, loading: Promise<void> | null = null, decoded: Uint8Array | null = null, hold: ReturnType<ResourceScope['timeout']> = 0;
-  // The bake inflates once per spawn burst, not once per copy (Nalati's is 8.7 MB for 27 bodies: a herd inflated it per
-  // animal, ~70 ms each on the Simulator). Copies slice their own arrays out, so the inflated bytes go a moment after the last.
-  const inflated = (packed: Uint8Array): Uint8Array => {
-    decoded ??= decode(packed);
-    const scope = resourceScope(); scope.cancelTimer(hold); hold = scope.timeout(DECODED_HOLD_MS, () => { decoded = null; });
-    return decoded;
-  };
-  // G639: the bake is inflated as it loads, by the platform's stream decoder where it can (a Nalati entry spent ~0.13 s of
-  // one frame inflating 8.7 MB in script at its first spawn); it is held until the first burst's copies are done. A failed
-  // read is not kept: the next preload reads again (QA 11-23-b row 34).
-  const preload = (): Promise<void> => {
-    loading ??= (async () => {
-      try {
-        const bytes = await load(bake.file); compressed = bytes;
-        if (decode === unzlibSync) decoded ??= await inflateStream(bytes);
-      } catch (error: unknown) { loading = null; throw error; }
-    })();
-    return loading;
-  };
-  const catalogue: PackedCreatureBodies = {
-    preload,
-    looks: lookInput => {
-      const book = parsePackedCreatureLooks(lookInput);
-      if (new Set(book.rows.map(row => row.id)).size !== book.rows.length || new Set(book.rows.map(row => row.kind)).size !== book.rows.length) throw new Error('Duplicate packed creature look');
-      const all = book.rows.map((row): SpeciesLook => {
-        const family = row.family ?? row.kind;
-        const bodyKey = (source: NonNullable<typeof row.variants>[string]): string => typeof source === 'string' ? source : source.body;
-        if (!bake.bodies.some(body => body.kind === family) || Object.values(row.variants ?? {}).some(variant => !keys.has(JSON.stringify([family, bodyKey(variant)])))) throw new Error('Missing packed creature look body');
-        const poseRows = row.pose === undefined ? undefined : book.poses[row.pose];
-        if (row.pose !== undefined && poseRows === undefined) throw new Error('Missing packed creature joint pose');
-        const pose = row.pose === undefined ? undefined : numericCreaturePoseFromBook(book, row.pose);
-        // QA 11-23-b row 34: every packed look preloads the bake it copies from, so a level that waits for its models
-        // (`AnimalFactory.ready`) never builds one before the bytes are in (Nalati's looks carry no hull preload of their own)
-        const look: SpeciesLook = { id: row.id, species: row.species, kind: row.kind, fur: NO_FUR, preload,
-          rigContract: { skeleton: row.skeleton, sockets: row.sockets, clips: row.clips },
-          build: variant => {
-            const source = row.variants?.[variant.id], key = row.variants === undefined ? variant.id : source === undefined ? undefined : bodyKey(source);
-            if (key === undefined) throw new Error('Unknown packed creature look variant');
-            const body = catalogue.copy(family, key); return row.facetJitter === undefined ? body : { ...body, facetJitter: row.facetJitter };
-          },
-        };
-        if (row.rig !== undefined) look.rig = row.rig;
-        if (row.standMem !== undefined) look.standMem = row.standMem;
-        if (row.eyeGlow !== undefined) look.eyeGlow = row.eyeGlow;
-        if (row.eyeGlowIntensity !== undefined) look.eyeGlowIntensity = row.eyeGlowIntensity;
-        if (row.hitArc !== undefined) {
-          // the blow travels against the heading when it lands from the front
-          const front = Math.cos(row.hitArc.arc * Math.PI / 180), scale = row.hitArc.scale;
-          look.damageMul = (a, _hit, dir) => Math.sin(a.yaw) * dir.x + Math.cos(a.yaw) * dir.z < -front ? scale : 1;
-        }
-        if (pose !== undefined || row.lift !== undefined) look.animate = context => {
-            if (row.lift !== undefined) stepCreatureLift(context.animal, context.dt, ...row.lift);
-            pose?.(context);
-        };
-        return look;
-      });
-      return { all, get: kind => { const look = all.find(row => row.kind === kind); if (look === undefined) throw new Error('Unknown packed creature look'); return look; } };
-    },
-    copy: (kind, variant) => {
-      const body = bake.bodies.find(row => row.kind === kind && row.variant === variant);
-      if (body === undefined) throw new Error(`no baked creature body ${kind}.${variant}`);
-      if (compressed === null) throw new Error(`Packed creature bodies are not loaded (${kind}.${variant})`);
-      const bytes = inflated(compressed);
-      if (bytes.length !== bake.bytes) throw new Error('Packed creature bake does not match its rows');
-      const part = (sources: wholeV.InferOutput<typeof PackedBodyParts>): BufferGeometry[] => (sources === null ? [] : Array.isArray(sources) ? sources : [sources]).map(source => {
-        const at = (i: number): number => { const offset = source.offsets[i]; if (offset === undefined) throw new Error('Packed creature block is missing'); return offset; };
-        const one = { ...source.row, index: null, indexCount: 0 }, [first, ...rest] = source.row.attrs;
-        if (first === undefined) throw new Error('Packed creature part has no attributes');
-        const g = readBakedGeometry(bytes, at(0), { ...one, attrs: [first] });
-        // each further attribute is its own block: read straight into its attribute (a geometry and a bounds pass per block
-        // were half of a Nalati entry's creature body copies at phone 4x, T10)
-        rest.forEach((attr, i) => { g.setAttribute(attr[0], readBakedAttribute(bytes, at(i + 1), one.count, attr)); });
-        if (source.row.index !== null) {
-          const start = at(source.row.attrs.length), size = source.row.index === 'u16' ? 2 : 4;
-          if (source.indexEncoding === 'raw') {
-            const buffer = bytes.slice(start, start + source.row.indexCount * size).buffer;
-            g.setIndex(new BufferAttribute(source.row.index === 'u16' ? new Uint16Array(buffer) : new Uint32Array(buffer), 1));
-          } else g.setIndex(readBakedGeometry(bytes, start, { ...source.row, attrs: [] }).index);
-        }
-        for (const [start, count, material] of source.groups ?? []) g.addGroup(start, count, material);
-        return g;
-      });
-      const { capsuleAxis, ...dims } = body.dims;
-      return { bones: body.bones.map(bone => ({ name: bone.name, parent: bone.parent, pos: [bone.pos[0], bone.pos[1], bone.pos[2]] })),
-        furParts: part(body.fur), hardParts: part(body.hard), eyeParts: part(body.eye),
-        dims: { ...dims, feet: dims.feet.map((foot): [number, number] => [foot[0], foot[1]]), ...(capsuleAxis === undefined ? {} : { capsuleAxis }) } };
-    },
-  };
-  return catalogue;
-}
-
 /** `a` (a baked builder's geometry) with `b` (what the page added to that builder since) after it */
 export const appendGeometry: typeof codecAppendGeometry = codecAppendGeometry;
 

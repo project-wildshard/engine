@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { loadRigFile, rigRoot, parseRigFile } from '@wildshard/engine/anim/rig';
+import { loadRigFile, rigRoot } from '@wildshard/engine/anim/rig';
 import { fetchImage } from '@wildshard/engine/boot/bytes';
 import { isJsonData } from '@wildshard/format/json';
 import type { RiggedHullFamilyRow, RiggedHullFiles, RiggedHullFlap, RiggedHullUrls } from '@wildshard/format/riggedHulls';
 import { retainCachedResources } from '@wildshard/engine/app/cachedAssets';
 import { cacheUntilDisposed } from '@wildshard/engine/app/disposalCache';
-import { ktx2File, ktx2Texture, ktx2TranscodeSupport, prepareCompressedTexture, parseKtx2Bytes } from '@wildshard/engine/core/ktx2';
+import { ktx2File, ktx2Texture, prepareCompressedTexture } from '@wildshard/engine/core/ktx2';
 import { compressedLayerArray } from '@wildshard/engine/render/layeredMaps';
 import { releaseOnUpload } from '@wildshard/engine/render/memorySaver';
 import type { RGB } from '@wildshard/engine/entities/species/loft';
@@ -32,35 +32,6 @@ import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
  * `flaps`, `pressFlap`) is pressed onto its body at load (positions + normals only). A variant can add baked rigid parts
  * to its hull in the same single draw (`parts`, merged once per variant and flagged `overgrown`), e.g. glowing eyes.
  */
-
-const folderFamilies = new Map<string, RiggedHulls>();
-/** Client-only row admission shared by creature factories and cold specimens.
- * The API takes a product id and reads its typed look section; it installs no per-shard callbacks. */
-export function folderRiggedHulls(slug: string): RiggedHulls {
-  const key = slug, cached = folderFamilies.get(key);
-  if (cached !== undefined) return cached;
-  let family: RiggedHulls | undefined, loading: Promise<RiggedHulls> | undefined;
-  const prepare = (): Promise<RiggedHulls> => {
-    loading ??= (async () => {
-      const { loadCatalogueFolder } = await import('@wildshard/engine/game/shardfile/runtimeFolder');
-      const product = await loadCatalogueFolder(slug), book = product.section('look/rigged-hulls');
-      const source = book.tiers[TIER];
-      if (book.productFiles) {
-        // Only named KTX2 coats use the byte parser. Other image codecs keep their original URL decoder.
-        const resources = { ...source, coats: Object.fromEntries(Object.entries(source.coats).map(([name, coat]) =>
-          [name, coat.image.startsWith('/') || coat.image.endsWith('.ktx2') ? coat : { ...coat, image: product.url(coat.image) }])) };
-        family = riggedHulls(book.family, resources, folderHullTransport(slug));
-        return family;
-      }
-      family = riggedHulls(book.family, source); return family;
-    })();
-    return loading;
-  };
-  const ready = (): RiggedHulls => { if (family === undefined) throw new Error('Rigged hull book is not prepared'); return family; };
-  const result: RiggedHulls = { load: async name => (await prepare()).load(name), preload: async kind => (await prepare()).preload(kind),
-    hullOf: (kind, variant) => ready().hullOf(kind, variant), skin: (kind, variant, bones) => ready().skin(kind, variant, bones) };
-  folderFamilies.set(key, result); return result;
-}
 
 /** ONE-FORMAT OF30: a crowd's own rig, named by its file, with no `look/rigged-hulls` family (Nalati's sheep). `file` is the
  *  desktop rig (`<hull>.rigged.glb`); the phone tier reads its `<hull>.phone.rigged.glb` twin, as a family's tiers did.
@@ -174,19 +145,6 @@ export function hullMapName(name: string, bytes: Uint8Array, astc: boolean): str
   if (astc || !nativeAstc(bytes)) return name;
   const twin = name.replace('.phone.', '.');
   return twin === name ? null : twin;
-}
-
-/** The cached family must not retain an admission or its transport bodies after its resident owner retires. */
-function folderHullTransport(slug: string): RiggedHullTransport {
-  const read = async () => (await import('@wildshard/engine/game/shardfile/runtimeFolder')).loadCatalogueFolder(slug);
-  return {
-    rig: async name => { const product = await read(); return parseRigFile(await product.file(name), product.url(name)); },
-    texture: async name => {
-      const product = await read(), bytes = await product.file(name), chosen = hullMapName(name, bytes, ktx2TranscodeSupport().astc);
-      if (chosen === null) throw new Error(`Rigged hull map ${name} is raw ASTC, which this device cannot sample, and has no Basis twin`);
-      return parseKtx2Bytes(chosen === name ? bytes : await product.file(chosen));
-    },
-  };
 }
 
 /** A family of rigged hulls from its row, optionally borrowing verified named product bytes. */

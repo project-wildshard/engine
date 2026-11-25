@@ -1,4 +1,4 @@
-import {installLiveSpeciesWorld as installWorldFixture} from './fixtures/liveSpeciesWorld';
+import {installKitWorldFixture as installWorldFixture} from './fixtures/kit-world';
 import { afterEach, expect, test, vi } from 'vitest';
 import { AnimalFactory, type AnimalModel } from '../src/client/engine/entities/AnimalFactory';
 import { SkyRig } from '../src/client/engine/world/skyRig';
@@ -56,7 +56,7 @@ test('retiring the owner during a pending slice refuses further model constructi
   await expect(prepared.prepareModels(Array.from({ length: 1025 }, () => ({ kind: 'bear' })))).rejects.toThrow('Excessive');
 });
 
-test.each(['bear', 'horse', 'wolf'])('one bind inversion preserves every native %s joint and posed vertex', kind => {
+test.each(['bear', 'boar'])('one bind inversion preserves every native %s joint and posed vertex', kind => {
   const prepared = factory(), model = prepared.model(kind); models.add(model);
   const inversions = vi.spyOn(Skeleton.prototype, 'calculateInverses');
   const before = prepared.instantiate(model, .37);

@@ -14,9 +14,9 @@ import { overrideTerrain } from '../src/test/engine/terrain';
 import { directLoopback } from '../src/test/engine/netLoopback';
 import { installDeclaredRiding } from '../src/server/game/shardfile/declaredRiding';
 import { courseHeightAt, HostSide, loadCourseRapier, PageSide, TARGET_ID, type MotionScenario } from './fixtures/motion-trace/parity';
-import { installLiveSpeciesWorld } from './fixtures/liveSpeciesWorld';
+import { installKitWorldFixture } from './fixtures/kit-world';
 
-await installLiveSpeciesWorld();
+await installKitWorldFixture();
 
 // ONE-FORMAT OF25b: a data shard's page has no Mount of its own, so it cannot predict the one riding primitive's ride. On
 // staging the server seated Ana on the stranger's skeleton horse, her page waited for a ride it would never enter, its

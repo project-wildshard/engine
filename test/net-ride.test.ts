@@ -26,7 +26,7 @@ import { SIM_CREATURE_RECIPE } from '../src/test/game/creatureRecipe';
 import { dormantHerd } from './fixtures/dormant-herd';
 import { courseHeightAt, HostSide, loadCourseRapier, PageSide, TARGET_ID, type MotionScenario } from './fixtures/motion-trace/parity';
 import { lendLiveNalati as lendNalatiPasture, lendLiveNalati as lendNalatiRiding, liveRiding as programs } from './fixtures/liveNalati';
-import {installLiveSpeciesWorld as installWorldFixture} from './fixtures/liveSpeciesWorld';
+import {installKitWorldFixture as installWorldFixture} from './fixtures/kit-world';
 
 await installWorldFixture();
 

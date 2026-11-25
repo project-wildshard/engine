@@ -225,7 +225,6 @@
     "test-domain.test.ts",
     "vitest-module-cache.test.ts",
     "declared-entry-targets-debug.test.ts",
-    "fixtures/native-book-derived.json",
     "fixtures/kit-wildlife/deer.skin.json",
     "fixtures/kit-wildlife/wolf.skin.json",
     "fixtures/gameplay-slice/blobs/json/54a69025b5bd39cd64877299bb29a5fd652e4c7773590f235be0cecefee1bb2e.json"

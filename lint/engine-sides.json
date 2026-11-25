@@ -887,7 +887,6 @@
     "src/client/game/looks/postGraphLook.ts": "client",
     "src/client/game/looks/riggedHulls.ts": "client",
     "src/client/game/looks/scaledPost.ts": "client",
-    "src/client/game/looks/speciesBook.ts": "client",
     "src/client/game/looks/staticCapture.ts": "client",
     "src/client/game/looks/streamedCover.ts": "client",
     "src/client/game/looks/coverLow.ts": "client",
