@@ -31,6 +31,7 @@ import {stripVTControlCharacters} from 'node:util';
 import {AMBER,parseAmber,parseAudioAmber,parseMemoryWarnings} from './test-amber.mjs';
 import {RATE_LIMITED,quotaReset,readerEnv} from './gh-limit.mjs';
 import {budgetReport,budgetSourceRun,confirmBudgetResults,parseBudgetResults} from './budgets/watch.mjs';
+import {messageLanes} from './lane-commits.mjs';
 
 export const REPO='project-wildshard/engine';
 const KEEP=500;
@@ -563,10 +564,11 @@ export function liveIo(env=process.env){
     lanes:(/** @type {readonly string[]} */commits)=>{
       /** @type {Map<string,string[]>} */const trailers=new Map();
       if(commits.length>0){
-        const log=run('git',['show','-s','--format=%H%x00%(trailers:key=Lane,valueonly)%x1e',...commits]);
+        // Row 54: the whole body, since main-push writes `Lane:` in its own paragraph, which `%(trailers)` never sees.
+        const log=run('git',['show','-s','--format=%H%x00%B%x1e',...commits]);
         for(const entry of log.split('\u001E')){
-          const [sha,lanes]=entry.trim().split('\0');
-          if(sha&&lanes!==undefined)trailers.set(sha,lanes.split(/\s+/u).filter(Boolean));
+          const [sha,body]=entry.trim().split('\0');
+          if(sha&&body!==undefined)trailers.set(sha,messageLanes(body));
         }
       }
       return trailers;
