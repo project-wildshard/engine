@@ -1,7 +1,8 @@
 // FORMAT-PRUNE FP47b: the grid page shell and a neighbour cell's backdrop read their product's own level look
 // (`look/look`'s `level`, `declaredLevel`) before the discovery document's, so discovery can drop sky, atmosphere, grade
-// and horizon. Today's builds copy `look.level` into discovery byte for byte, so on every pinned product the shell's
-// look hashes the same either way (no pixel can change); `pnpm pins` installs them under out/.
+// and horizon. Older builds copy `look.level` into discovery byte for byte, so on those pinned products the shell's
+// look hashes the same either way (no pixel can change); a newer build's discovery has none, and its shell draws the product's
+// own look.level. `pnpm pins` installs them under out/.
 // oxlint-disable-next-line import/no-nodejs-modules -- The pinned products are read from disk.
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- The pinned products are read from disk.
@@ -36,6 +37,17 @@ const slugs=existsSync(OUT)?readdirSync(OUT).filter(slug=>existsSync(join(OUT,sl
 describe('FP47b: the grid shell reads its product\'s look first',()=>{
  test.skipIf(slugs.length===0).each(slugs)('pinned %s: the shell\'s look hashes the same from its product as from discovery',slug=>{
   const {manifest,product}=pinned(slug);
+  // a product built after the SDK stopped copying the look (Mossgate r25 on engine main 70c50dce5) has none in discovery: the shell
+  // draws its product's own look.level, which is all FP47b asked discovery to drop for
+  if(manifest.sky===undefined){
+   const level=product.look.level as Pick<ShardManifest,'sky'|'atmosphere'|'grade'>|undefined;
+   expect(level?.sky,`${slug}: no look in discovery and none in look/look's level`).toBeDefined();
+   const own=gridPageShell(manifest,product),sky=level?.sky as Record<string,unknown>|undefined;
+   expect(own.sky).toEqual(Object.fromEntries(Object.keys(own.sky).map(key=>[key,sky?.[key]])));
+   expect(own.atmosphere).toEqual(level?.atmosphere);
+   expect(own.grade).toEqual(level?.grade);
+   return;
+  }
   expect(lookHash(gridPageShell(manifest,product))).toBe(lookHash(gridPageShell(manifest)));
   // the shell's level (`selectGridPageShell`), and the session's, which hands the product over too
   const shell=gridPageShell(manifest);
