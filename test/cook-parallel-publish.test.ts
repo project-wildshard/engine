@@ -123,3 +123,51 @@ test('FR-A2: the bucket listing runs while the job cooks, not after it', async (
   expect(row.state, row.detail).toBe('cooked');
   expect(listed, 'one listing, taken before the job finished').toEqual([false]);
 });
+
+// FR-A2 follow-up (opus-rel86, 11-25): v0.1.87's first publishes on staging each listed for 835.8 s, and a publish whose
+// kept listing was 10 to 20 min old waited for the prefetch's fresh one instead of using the kept copy.
+test('FR-A2: a publish uses a kept listing still young enough while a prefetch refreshes it', async () => {
+  const inner = folderStore(join(scratch, 'store-kept')), work = join(scratch, 'work-kept');
+  let now = 0, listings = 0, release = (): void => undefined;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const store: PackStore = {...inner, list: async prefix => {
+    if (prefix === '' && ++listings === 2) await held;
+    return inner.list(prefix);
+  }};
+  const tars = new Map(['one', 'two'].map(word => [createHash('sha256').update(`kept-${word}`).digest('hex'), new TextEncoder().encode(`kept-${word}`)]));
+  const [first = '', second = ''] = tars.keys();
+  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  const worker = createCookWorker({build: 'b-kept', store, launcher, serverPacks: join(scratch, 'server-kept'), scratch: work, now: () => now,
+    source: {heads: () => Promise.resolve([]), download: hash => Promise.resolve(tars.get(hash) ?? new Uint8Array())}});
+
+  expect((await worker.cook({slug, hash: first})).state).toBe('cooked');
+  now = 11 * 60_000;
+  const row = await Promise.race([worker.cook({slug, hash: second}), new Promise<undefined>(resolve => { setTimeout(resolve, 20_000); })]);
+  release();
+
+  expect(listings, 'the second job started a prefetch').toBe(2);
+  expect(row?.state, 'the publish did not wait for the held prefetch').toBe('cooked');
+});
+
+test('FR-A2: while a refresh runs, a kept listing past its age still serves, up to twice it', async () => {
+  const inner = folderStore(join(scratch, 'store-aged')), work = join(scratch, 'work-aged');
+  let now = 0, listings = 0, release = (): void => undefined;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const store: PackStore = {...inner, list: async prefix => {
+    if (prefix === '' && ++listings === 2) await held;
+    return inner.list(prefix);
+  }};
+  const tars = new Map(['one', 'two'].map(word => [createHash('sha256').update(`aged-${word}`).digest('hex'), new TextEncoder().encode(`aged-${word}`)]));
+  const [first = '', second = ''] = tars.keys();
+  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  const worker = createCookWorker({build: 'b-aged', store, launcher, serverPacks: join(scratch, 'server-aged'), scratch: work, now: () => now,
+    source: {heads: () => Promise.resolve([]), download: hash => Promise.resolve(tars.get(hash) ?? new Uint8Array())}});
+
+  expect((await worker.cook({slug, hash: first})).state).toBe('cooked');
+  now = 25 * 60_000;
+  const row = await Promise.race([worker.cook({slug, hash: second}), new Promise<undefined>(resolve => { setTimeout(resolve, 20_000); })]);
+  release();
+
+  expect(listings).toBe(2);
+  expect(row?.state, 'a 25-minute listing served while the refresh ran').toBe('cooked');
+});

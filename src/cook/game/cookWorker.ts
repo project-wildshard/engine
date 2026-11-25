@@ -502,14 +502,24 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     })();
     return listingNext;
   };
+  // The kept listing a publish may use without waiting. v0.1.87's publishes each waited on a whole listing (616.6 s from the
+  // MacBook, 835.8 s on the box, 11-25) that a prefetch had started while the kept copy was still usable. A listing takes
+  // most of LISTING_MAX_AGE_MS and its age counts from its start, so while a refresh runs the kept copy serves up to twice
+  // that. Its age never makes a PUT unsafe: `current` trusts only keys written in the last GC_GRACE_MS / 2.
+  const kept = (): Map<string, StoredObject> | undefined => {
+    if (listing === undefined) return undefined;
+    const age = clock() - listing.at;
+    return age < LISTING_MAX_AGE_MS || (listingNext !== undefined && age < 2 * LISTING_MAX_AGE_MS) ? listing.rows : undefined;
+  };
   const bucket = async (again: boolean): Promise<Map<string, StoredObject>> => {
+    const rows = again ? undefined : kept();
+    if (rows !== undefined) return rows;
     // `again` must see writes and deletes from now on (a reclaim just ran), so a listing that started earlier won't do.
     if (again && listingNext !== undefined) await listingNext.catch(() => undefined);
     if (listingNext !== undefined) {
       try { return await listingNext; } catch { return relist(); }
     }
-    if (again || listing === undefined || clock() - listing.at >= LISTING_MAX_AGE_MS) return relist();
-    return listing.rows;
+    return relist();
   };
   // FAST-RELEASE FR-A2, second half (opus-rel86, 11-25): a publish whose listing had aged out listed the whole bucket after
   // its cook (v0.1.85's recook: Pine published 5.2 min after an 820 s cook). A job starts the listing it will need, so it
@@ -534,11 +544,11 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
         + loose.reduce((sum, key) => sum + (rows.has(folder + key) ? 0 : statSync(join(client, key)).size), 0),
       used: usageOf([...rows.values()], budget).bytes,
     });
-    const kept = listing !== undefined && clock() - listing.at < LISTING_MAX_AGE_MS, began = clock();
+    const cached = kept() !== undefined, began = clock();
     let held = await bucket(false), {fresh, used} = measure(held);
     const listed = clock();
     // A kept listing still counts what GC has since taken, so it reads high: list again before refusing on it.
-    if (used + fresh > budget && kept) ({fresh, used} = measure(held = await bucket(true)));
+    if (used + fresh > budget && cached) ({fresh, used} = measure(held = await bucket(true)));
     if (needsReclaim(used + fresh, budget) && options.reclaim !== undefined) {
       const reclaimed = await options.reclaim();
       log(`pack store reclaimed before ${hash}: freed ${reclaimed.freedBytes} B in ${reclaimed.deleted} objects; ${reclaimed.usage.bytes} of ${budget} B used`);
