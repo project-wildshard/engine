@@ -179,6 +179,9 @@ export function staticChecks(lintThreads=PUSH_BUDGET.lintThreads){
     {name:'check:saves',commands:[['pnpm','run','--silent','check:saves']]},
     // Meta QA 11-25 row 25: every TypeScript file Node runs strip-only is erasable (no parameter property; fc0832b52's red).
     {name:'check:strip-only',commands:[[process.execPath,'--no-warnings','scripts/strip-only.mjs']]},
+    // Meta QA 11-25 row 42: every installed org package's engines.node admits each Node engine's range lets CI pick
+    // (format 0.79.2's <25 under engine's <27 broke server-release 45703635653 at pnpm install on Node 26).
+    {name:'check:node-ranges',commands:[[process.execPath,'scripts/node-ranges.mjs']]},
   ];
 }
 

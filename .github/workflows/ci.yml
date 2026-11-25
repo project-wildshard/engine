@@ -127,6 +127,11 @@ jobs:
           E7_STAGING_SHARDS: ${{ vars.E7_STAGING_SHARDS }}
           E7_PRODUCTION_SHARDS: ${{ vars.E7_PRODUCTION_SHARDS }}
         run: node scripts/pins-catalogue.ts check
+      # Meta QA 11-25 row 42: a run that resolved Node 24 still refuses an org package whose engines.node leaves out a
+      # Node that engine's range lets another workflow pick (format 0.79.2's <25 broke server-release on Node 26).
+      - name: Refuse an org package whose Node range misses engine's
+        if: matrix.job == 1
+        run: node scripts/node-ranges.mjs
       - name: Stop job 1's own-checks clock
         if: matrix.job == 1
         run: echo "WS_CI_JOB_OWN_MS=$(( $(date +%s%3N) - WS_CI_JOB_OWN_FROM_MS ))" >> "$GITHUB_ENV"

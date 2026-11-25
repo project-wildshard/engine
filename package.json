@@ -38,6 +38,7 @@
     "test:agent-hooks": "node --test '.agents/hooks/test/*.test.mjs'",
     "agents:sync": "node scripts/agent-sync.mjs",
     "check:page-events": "node scripts/check-page-events.mjs",
+    "check:node-ranges": "node scripts/node-ranges.mjs",
     "check:wire": "node node_modules/@wildshard/wire/bin.mjs check",
     "check:saves": "env -u WS_PUSH_GATE_PROFILE -u WS_CPU_ADMISSION vitest run test/saves-lock.test.ts",
     "md:wrap": "node kit/scripts/md-wrap.mjs",
