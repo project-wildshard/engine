@@ -42,6 +42,8 @@ export function writeManifest(root: string, key: string, products: Manifest['pro
 export function lockPins(root: string, options?: { wait?: boolean }): (() => void) | undefined;
 export function hashFiles(files: readonly { path: string; bytes: number }[]): Promise<string[]>;
 export function reusePins(root: string, key: string, options?: { sources?: readonly string[]; log?: (line: string) => void }): Promise<Reused | undefined>;
+/** FORMAT-PRUNE FP59: the first product whose build receipt the app build would refuse under `revision`. */
+export function staleReceipt(source: string, folders: readonly string[], revision: string): string | undefined;
 export function reuseUnchangedPins(root: string, inputs: string, pins: readonly PinDescriptor[]): Promise<(Pick<Manifest, 'products' | 'mounts'> & {owners: Incremental['owners']}) | undefined>;
 export function folderName(name: string): boolean;
 export function mountPath(path: string): boolean;

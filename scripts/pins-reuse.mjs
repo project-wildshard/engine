@@ -373,6 +373,25 @@ function receiptMatches(root,folder,pin){
  }catch{return false;}
 }
 
+/**
+ * FORMAT-PRUNE FP59 (opus-fp54, 11-25): engine main's reused install cloned a receipt the preparation client build then
+ * refused ("Stale output validation receipt: brasscap-mesa", app-build/validationReceipts.mjs). The first product whose
+ * build receipt fails that same check under `revision`, or undefined; a product without a build receipt (a migrated
+ * copy) is not checked.
+ * @param {string} source @param {readonly string[]} folders @param {string} revision @returns {string|undefined} */
+export function staleReceipt(source,folders,revision){
+ for(const folder of folders){
+  let receipt,bytes;
+  try{receipt=JSON.parse(readFileSync(join(source,'out',folder,'validation.json'),'utf8'));}catch{continue;}
+  if(typeof receipt!=='object'||receipt===null||!('revision' in receipt))continue;
+  try{bytes=readFileSync(join(source,'out',folder,'shard.json'));}catch{return folder;}
+  let index;
+  try{index=JSON.parse(bytes.toString('utf8'));}catch{return folder;}
+  if(receipt.revision!==revision||receipt.indexHash!==createHash('sha256').update(bytes).digest('hex')||receipt.sourceHash!==index?.build?.sourceHash)return folder;
+ }
+ return undefined;
+}
+
 /** @typedef {{source:string,mode:'in place'|'clone'|'copy',files:number,bytes:number,published:string[],seconds:{clone:number,verify:number}}} Reused */
 
 /**
@@ -390,6 +409,9 @@ export async function reusePins(tree,key,{sources,log=()=>undefined}={}){
   const manifest=readManifest(source);
   if(manifest===undefined){if(existsSync(join(source,MANIFEST)))log(`pins reuse: ${source} has a malformed manifest; skipped`);continue;}
   if(manifest.key!==key)continue;
+  // FORMAT-PRUNE FP59: a source whose build receipts the app build would refuse is never cloned
+  const stale=staleReceipt(source,Object.keys(manifest.products),shardfileValidationRevision(root));
+  if(stale!==undefined){log(`pins reuse: ${source} has a stale validation receipt (${stale}); skipped`);continue;}
   // Another tree's install must not rewrite it under the clone; a busy source is skipped, not waited for.
   const release=source===root?()=>undefined:lockPins(source,{wait:false});
   if(release===undefined){log(`pins reuse: ${source} is installing; skipped`);continue;}

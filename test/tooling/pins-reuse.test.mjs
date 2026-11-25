@@ -8,7 +8,7 @@ import {tmpdir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {afterEach, describe, expect, test} from 'vitest';
 import {clonePaths} from '../../scripts/apfs-clone.mjs';
-import {KEY_EXEMPT, KEY_SOURCES, MANIFEST, hashFiles, lockPins, pinsCompatibilityKey, pinsKey, reusePins, reuseUnchangedPins, writeManifest} from '../../scripts/pins-reuse.mjs';
+import {KEY_EXEMPT, KEY_SOURCES, MANIFEST, hashFiles, lockPins, pinsCompatibilityKey, pinsKey, reusePins, reuseUnchangedPins, staleReceipt, writeManifest} from '../../scripts/pins-reuse.mjs';
 
 /** @type {string[]} */
 const roots = [];
@@ -60,6 +60,26 @@ describe('pins reuse', () => {
     // Unchanged pins in the same tree are verified in place.
     const again = await reusePins(tree, KEY, {sources: []});
     expect(again).toMatchObject({source: resolve(tree), mode: 'in place', files: 6});
+  });
+
+  // FORMAT-PRUNE FP59: engine main cloned a receipt the app build then refused ("Stale output validation receipt")
+  test('a source whose build receipt the app build would refuse is skipped, so the full install runs', async () => {
+    const {root, tree} = repos(), index = PRODUCT['shard.json'];
+    const receipt = (indexHash) => JSON.stringify({pin: {hash: PIN}, revision: 'r1', indexHash, sourceHash: undefined});
+    const product = (indexHash) => ({...PRODUCT, 'validation.json': receipt(indexHash)});
+    const install = (/** @type {Record<string, string>} */ files) => {
+      for (const [path, body] of Object.entries(files)) put(root, `out/dunes/${path}`, body);
+      writeManifest(root, KEY, {dunes: Object.fromEntries(Object.entries(files).map(([path, body]) => [path, sha(body)]))},
+        Object.fromEntries(Object.entries(MOUNTS).map(([path, body]) => [path, sha(body)])));
+    };
+    install(product('0'.repeat(64)));
+    expect(staleReceipt(root, ['dunes'], 'r1')).toBe('dunes');
+    const lines = /** @type {string[]} */ ([]);
+    expect(await reusePins(tree, KEY, {log: line => { lines.push(line); }})).toBeUndefined();
+    expect(lines.join('\n')).toContain('stale validation receipt (dunes)');
+    install(product(sha(index)));
+    expect(staleReceipt(root, ['dunes'], 'r1')).toBeUndefined();
+    expect(staleReceipt(root, ['dunes'], 'r2')).toBe('dunes');
   });
 
   test('another key, a changed byte, an extra file, a link or a changed tracked mount means the full install', async () => {
