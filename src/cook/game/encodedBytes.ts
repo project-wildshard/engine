@@ -22,7 +22,8 @@ const codec=hash(JSON.stringify({schema:'portable-deflate/1',node:process.versio
 /** Exact portable output memo, never a geometry/source validation receipt.
  * Its caller retains every original decode and native-word certification. */
 export class PortableBytesCache {
-  constructor(private readonly directory:string){}
+  private readonly directory:string;
+  constructor(directory:string){this.directory = directory;}
   encode(input:Uint8Array):Uint8Array<ArrayBuffer>{
     // A cache cannot turn the portable encoder's refusal into a success.
     if(!(input instanceof Uint8Array)||!(input.buffer instanceof ArrayBuffer)||input.byteLength>256_000_000)return encodePortableBytes(input);
