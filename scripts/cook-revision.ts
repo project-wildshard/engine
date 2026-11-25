@@ -9,7 +9,7 @@ export interface CookRevision {revision:string;files:readonly string[];node:stri
 
 /** Actual runtime import walk of the byte producer, including literal worker URLs.
  * Proof execution is supplied by the host and is never a reusable verdict. */
-export function cookRevision(checkout=resolve(import.meta.dirname,'..')):CookRevision {
+export function cookRevision(checkout=resolve(import.meta.dirname,'..'),read:(path:string)=>Uint8Array=readFileSync):CookRevision {
   // QA 11-23 row 7: cook-worker.mjs passes `fileURLToPath(new URL('..', import.meta.url))`, which ends in `/`, so every
   // closure file failed the escape check below and the box worker never had a cook revision: every build recooked every head.
   const root=resolve(checkout);
@@ -64,6 +64,18 @@ export function cookRevision(checkout=resolve(import.meta.dirname,'..')):CookRev
   const format=pkg.dependencies['@wildshard/format'];if(format===undefined)throw new Error('No pinned cook format');
   const renderer=rendererRevision(root);
   const hash=createHash('sha256').update(JSON.stringify({schema:'cook-revision/2',node,brotli,format,renderer}));
-  for(const file of files)hash.update(file).update('\0').update(readFileSync(resolve(root,file))).update('\0');
+  for(const file of files)hash.update(file).update('\0').update(revisionBytes(file,read(resolve(root,file)))).update('\0');
   return {revision:hash.digest('hex'),files,node,brotli,format,renderer};
+}
+
+/** Meta QA 11-24 row 44 (MA14b): FP47b's engine floor (`src/cook/game/engineFloor.ts`) reads package.json's version through
+ * a literal `new URL`, so the closure took package.json whole, and every release's version bump moved the cook revision:
+ * v0.1.89 `338d2aad` to v0.1.90 `b0ef8f85` with no other input changed, so the box queued all 38 heads and carried none.
+ * The cook reads only `version` from it, and the version never changes a passing cook: it only refuses a product whose
+ * floor is above it, a release only rises, and `carry` copies passing indexes only. Its dependencies are the lockfile's
+ * and the format pin's (both hashed), its `exports` decide only which files join the closure (their names and bytes are
+ * hashed). So package.json adds nothing: a version bump, an `engines` pin (QA 11-25 row 41) or a script edit keeps the
+ * revision, and every head carries. */
+export function revisionBytes(file:string,bytes:Uint8Array):Uint8Array {
+  return file==='package.json'?new Uint8Array(0):bytes;
 }
