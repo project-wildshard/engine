@@ -802,7 +802,7 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
           const id = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
           outbox.push({ id, at: Date.now(), message: code + ': the game code didn\'t load (' + why + ')', stack: '',
             tags: { system: 'boot', build: String(globalThis.__WS_BUILD_ID__ || ''), shard: '', bootStage: 'loading', fatal: true, screen: 'boot-fail',
-              exit: { code, zone: new URLSearchParams(location.search).get('chunk') || '', revision: '', room: '', step: card.dataset.step || '' } } });
+              exit: { code, zone: (typeof homeParams === 'undefined' ? '' : homeParams.get('chunk') || ''), revision: '', room: '', step: card.dataset.step || '' } } });
           keys['screen.reports'] = { v: 1, data: outbox.slice(-8) }; localStorage.setItem(key, JSON.stringify(doc));
         } catch { /* storage off: the card still says it */ }
         const kicker = card.querySelector('[data-el="kicker"]'); if (kicker) kicker.textContent = 'Couldn\'t start';
@@ -855,10 +855,12 @@ html[data-ws-keyboard] #game, html[data-ws-keyboard] #hud { top: var(--ws-kb-top
         // network yield can paint the default place before this atomic insert.
         const template = document.getElementById('ws-loading-shell');
         try {
-        const card = template instanceof HTMLTemplateElement ? template.content.querySelector('.ws-load[data-shell]') : document.querySelector('.ws-load[data-shell]'), slug = new URLSearchParams(location.search).get('chunk');
+        // CHUNK-PARAM CP2 (J522): the zone is the tap's this document took (the first script's `taken`), or a `?chunk=` until CP22
+        const card = template instanceof HTMLTemplateElement ? template.content.querySelector('.ws-load[data-shell]') : document.querySelector('.ws-load[data-shell]'), addressed = new URLSearchParams(location.search).get('chunk');
         const field = name => card.querySelector('[data-el="' + name + '"]'), entry = (store, scope, key) => { try { const item = JSON.parse(store().getItem('wildshard.save.v2@2.' + scope) || '{}').keys?.[key]?.data; return typeof item === 'string' ? JSON.parse(item) : item; } catch { return null; } };
+        const found = [entry(() => sessionStorage, 'session', 'titleArrival'), entry(() => localStorage, 'device', 'titleArrival.once')]
+          .find(a => a && (addressed ? a.slug === addressed : a.taken === performance.timeOrigin) && Date.now() - a.at < 60000), slug = addressed || found?.slug;
         if (!card || !slug) return;
-        const found = [entry(() => sessionStorage, 'session', 'titleArrival'), entry(() => localStorage, 'device', 'titleArrival.once')].find(a => a?.slug === slug && Date.now() - a.at < 60000);
         // Adopt the clock's existing parsed handoff; no extra storage read on boot.
         if (found?.timing && window.__bootTiming) window.__bootTiming.handoff = {...found.timing,wall:found.at,received:performance.now(),newTimeOrigin:window.__bootTiming.timeOrigin,source:'title-arrival-clock-read',validated:false};
         const start = found ? Math.min(0, found.at - performance.timeOrigin) : 0, clock = field('clock');

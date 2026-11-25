@@ -1,6 +1,7 @@
 // @vitest-environment node
 import {afterEach, expect, test, vi} from 'vitest';
 import {entryTransport, installEntryTransport, startEntryDownload} from '../src/client/game/shardfile/entryTransport';
+import {dropTabArrival, setTitleArrival} from '../src/client/engine/boot/titleArrival';
 
 const key = Symbol.for('wildshard.entry-transport'), schedule = '/assets/entry-example-0123456789abcdef.json';
 const hash = 'a'.repeat(64), origin = 'https://example.test';
@@ -8,7 +9,9 @@ const local = (): void => { vi.stubGlobal('localStorage', {clear: (): void => un
 local();
 const address = (url: Parameters<typeof fetch>[0]): string => typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
 function setup(rows: unknown, cached: unknown = {}): ReturnType<typeof vi.fn<typeof fetch>> {
-  vi.stubGlobal('location', new URL(`${origin}/?chunk=example`));
+  // CHUNK-PARAM CP2 (J522): a bare address; the zone is the tap's
+  vi.stubGlobal('location', new URL(`${origin}/`));
+  setTitleArrival({slug: 'example', mode: 'enter'}, {tab: true});
   vi.stubGlobal('navigator', {userAgent: 'iPhone', platform: 'iPhone', maxTouchPoints: 5});
   vi.stubGlobal('document', {getElementById: () => ({textContent: JSON.stringify({entryDownloads: {example: {phone: schedule}}, entryIndexes: {example: '/shardfiles/example/shard.json?v=12345678'}})})});
   vi.stubGlobal('caches', {open: () => Promise.resolve({match: () => Promise.resolve(Response.json(cached))})});
@@ -16,7 +19,7 @@ function setup(rows: unknown, cached: unknown = {}): ReturnType<typeof vi.fn<typ
   vi.stubGlobal('fetch', read);
   return read;
 }
-afterEach(() => {entryTransport()?.stop(); Reflect.deleteProperty(globalThis, key); vi.unstubAllGlobals(); local();});
+afterEach(() => {dropTabArrival(); entryTransport()?.stop(); Reflect.deleteProperty(globalThis, key); vi.unstubAllGlobals(); local();});
 
 test('early wire is borrowed exactly once without changing the bytes', async () => {
   const path = '/shardfiles/example/blobs/bin/body.bin', read = setup([{path, bytes: 3, members: [hash]}]);
@@ -133,4 +136,10 @@ test('PZ3: with a content base the read-ahead reads there, and a loan answers it
   const response = await entryTransport()?.take(`${cdn}${path}`);
   expect(response).toBeInstanceOf(Response);
   expect(read.mock.calls.map(row => address(row[0]))).toEqual([`${cdn}${schedule}`, `${cdn}${path}`]);
+});
+
+test('CP2: a bare address with no tap reads nothing ahead', () => {
+  const read = setup([]); dropTabArrival(); installEntryTransport();
+  expect(entryTransport()).toBeUndefined();
+  expect(read).not.toHaveBeenCalled();
 });

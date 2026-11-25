@@ -17,3 +17,9 @@
   case). A record now carries `from` (the writing document's start) and `taken` (the start of the first other document
   that reads it, stamped by index.html's first paint): a later page in the tab finds it taken and stays the title. SB44's
   engine update reload hands the taken tap on, as before, without writing `chunk` into the address.
+
+# The first paint and the read-ahead read the tap (opus-chunk, CP2)
+
+- index.html's loading clock named its zone from the address; it now takes the record this document took (`taken` equals its
+  `performance.timeOrigin`), so a bare `/` the tap navigated runs the card's clock and name from the tap. The boot-fail
+  report's zone and `entryTransport`'s read-ahead read the same zone. A `?chunk=` still works until CP22.

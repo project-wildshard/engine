@@ -263,8 +263,15 @@ test('DL21: a world page\'s first-paint card runs its clock from the title tap b
   expect(clock()).toBe('00:03.5');
 });
 
+test('CHUNK-PARAM CP2: a bare / the tap navigated runs its card\'s clock and names the zone from the tap', () => {
+  const window = firstDocument('', { now: 0, callbacks: [] }, false, 1500);
+  expect(window.location.search).toBe('');
+  expect(startedOf(window)).toBe('-1500');
+  expect(window.document.querySelector('[data-el="slug"]')?.textContent).toBe('Home');
+});
+
 test('DL21: the title page and an arrival for another shard leave the card\'s clock alone', () => {
-  expect(startedOf(firstDocument('', undefined, false, 1500))).toBeUndefined();
+  expect(startedOf(firstDocument(''))).toBeUndefined();
   const other = firstDocument('?chunk=pine-hollow', { now: 0, callbacks: [] }, false, 1500);
   expect(startedOf(other)).toBe('0'); expect(other.document.querySelector('[data-el="slug"]')?.textContent).toBe('');
 });

@@ -1,4 +1,5 @@
 import { contentURL } from '@wildshard/engine/boot/contentBase';
+import { pendingTitleArrival } from '@wildshard/engine/boot/titleArrival';
 
 /** Build-produced read-ahead only. The ordinary product readers still admit
  * every size, hash and schema; this loan never writes a persistent cache. */
@@ -52,10 +53,15 @@ export function startEntryDownload(slug: string, flow: 'client' | 'grid' = 'clie
   } catch { /* Read-ahead never blocks a player navigation. */ }
 }
 
+/** CHUNK-PARAM CP2 (J522): the zone this document enters, from the tap it took; an address's `?chunk=` until CP22. */
+function entryZone(): string | null {
+  return pendingTitleArrival()?.slug ?? new URL(location.href).searchParams.get('chunk');
+}
+
 /** Read-only presentation facts, never entry authority. The fresh document
  * peeks at the existing one-shot grid intent without consuming it. */
 export function installEntryDownloadTotal(picked?: string, flow: 'client' | 'grid' = 'client'): void {
-  const selected = picked ?? new URL(location.href).searchParams.get('chunk');
+  const selected = picked ?? entryZone();
   if (selected === null || !/^[a-z0-9_-]+$/u.test(selected)) return;
   const raw = document.getElementById('boot-module-files')?.textContent;
   if (!raw) return;
@@ -87,7 +93,7 @@ export function entryTransport(): EntryTransport | undefined {
 export function installEntryTransport(): void {
   const key = Symbol.for('wildshard.entry-transport');
   if (Reflect.has(globalThis, key)) return;
-  const selected = new URL(location.href).searchParams.get('chunk');
+  const selected = entryZone();
   if (selected === null || !/^[a-z0-9_-]+$/u.test(selected)) return;
   const bank = document.getElementById('boot-module-files')?.textContent;
   if (!bank) return;
