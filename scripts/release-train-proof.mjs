@@ -84,3 +84,28 @@ export function retryRead(read, {tries = 3, pauseMs = 5000, pause = ms => { Atom
     }
   }
 }
+
+/**
+ * Meta QA 11-25 (opus-rel86, J505): a wait on `gh run list --commit <short sha>` matched no run and sat 20 minutes past
+ * a green ci (gh filters on the full SHA). Every `--commit` the train passes to gh is a full 40-hex SHA, or it throws.
+ * @param {readonly string[]} args @returns {readonly string[]}
+ */
+export function fullCommitArgs(args) {
+  args.forEach((arg, index) => {
+    if (arg === '--commit' && !/^[0-9a-f]{40}$/u.test(args[index + 1] ?? '')) {
+      throw new Error(`gh --commit needs a full 40-character SHA (git rev-parse first), not ${JSON.stringify(args[index + 1])}`);
+    }
+  });
+  return args;
+}
+
+/**
+ * Meta QA 11-25 (opus-rel86, J505): npm-publish.yml admits npm next on the exact green release CI alone (J475), yet the
+ * train dispatched it only after a staging candidate passed, so a release waiting behind another's staging never reached
+ * npm (the SDK waited on it). This is that J475 admission: the build and its release CI run, no staging serial.
+ * @param {string} build @param {number} ci @returns {{staging_build: string, staging_qualification: string}}
+ */
+export function releaseCiAdmission(build, ci) {
+  if (!trainSha.test(build) || !Number.isSafeInteger(ci) || ci <= 0) throw new Error('npm next needs the full build SHA and its release CI run');
+  return { staging_build: build, staging_qualification: JSON.stringify({ build, j475: { releaseCi: ci } }) };
+}

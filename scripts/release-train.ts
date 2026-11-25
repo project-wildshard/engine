@@ -9,7 +9,7 @@ import { dirname, join, resolve as absolute } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { attributionGap, nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
+import { attributionGap, fullCommitArgs, nextAdmission, releaseCiAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, trainSha as sha, trainTag as tagPattern, watchTrainRun,
   type Alias, type Leg, type Run } from './release-train-proof.mjs';
 import { CHANNELS, localQaGap, RELEASE_PUBLIC_KEY, type QaVerdict } from './page-release/flow.mjs';
 import { pidLock } from './pid-lock.mjs';
@@ -132,7 +132,8 @@ async function main(args: string[]) {
   const root = command(process.cwd(), 'git', ['rev-parse', '--show-toplevel']);
   const git = (cmd: string[], cwd = root) => command(cwd, 'git', cmd);
   // A `list` or `view` read retries a passing hiccup (retryRead); an upload or a workflow run happens once.
-  const gh = (cmd: string[], input?: string) => input === undefined && ['list', 'view'].includes(cmd[1] ?? '')
+  // A `--commit` is a full SHA (fullCommitArgs): gh matches no run on a short one.
+  const gh = (cmd: string[], input?: string) => input === undefined && ['list', 'view'].includes(fullCommitArgs(cmd)[1] ?? '')
     ? retryRead(() => command(root, 'gh', cmd)) : command(root, 'gh', cmd, input);
   const runView = (id: number) => JSON.parse(gh(['run', 'view', String(id), '-R', repo,
     '--json', 'databaseId,headSha,status,conclusion,jobs,workflowName,event,headBranch,displayTitle'])) as Run;
@@ -236,10 +237,62 @@ async function main(args: string[]) {
     }
     receipt(lane, `DONE ${tag} ${build.slice(0, 10)} exact release CI ${ci} green${reused ? `, reusing main CI ${source.databaseId} at the cut` : ''}.`);
 
+    // J505 (opus-rel86, 11-25): npm next needs only an admission (J475's exact green release CI, or the staging
+    // candidate's), so a release whose staging waits behind another still reaches npm next.
+    const publishNext = async (input: { staging_build: string; staging_qualification: string }, beforeDispatch?: () => Promise<void>) => {
+    const publish = join(saved, 'npm-next-run.json');
+    const previousRun = read(publish) as {build: string; run?: number} | undefined;
+    let run = previousRun?.build === build ? previousRun.run : undefined;
+    if (run === undefined) {
+      const history = JSON.parse(gh(['run', 'list', '-R', repo, '--workflow', 'npm-publish.yml', '--branch', 'main',
+        '--event', 'workflow_dispatch', '--limit', '100', '--json', 'displayTitle,databaseId'])) as { displayTitle: string; databaseId: number }[];
+      run = history.find(row => row.displayTitle === `npm next ${build}`)?.databaseId;
+    }
+    if (run === undefined) {
+      if (previousRun) throw new Error('An earlier exact npm dispatch is still unconfirmed in Actions');
+      await beforeDispatch?.();
+      record(publish, { build });
+      const result = gh(['workflow', 'run', 'npm-publish.yml', '-R', repo, '--ref', 'main', '--json'], JSON.stringify(input));
+      run = Number(/actions\/runs\/(\d+)/u.exec(result)?.[1]);
+      if (!Number.isSafeInteger(run) || run <= 0) throw new Error('Could not confirm the npm next dispatch');
+    }
+    if (!Number.isSafeInteger(run) || run <= 0) throw new Error('The recorded npm next run is invalid');
+    record(publish, { build, run });
+    receipt(lane, `NOTE ${tag} npm next run ${run}.`);
+    if (!provesNpmNext(await watchRun(run, join(out, 'npm-next.log')), build)) {
+      throw new Error(`Actions run ${run} did not prove npm next for this build`);
+    }
+    const version = `${tag.slice(1)}-next.${build.slice(0, 8)}`;
+    const tgz = `https://registry.npmjs.org/@wildshard/engine/-/engine-${version}.tgz`;
+    const deadline = Date.now() + 60 * 60_000;
+    while (Date.now() < deadline) {
+      try {
+        const metadata = JSON.parse(command(root, 'npm',
+          ['view', '@wildshard/engine@next', 'version', 'dist', '--json', '--prefer-online'])) as RegistryMetadata;
+        const integrity = metadata.dist?.integrity;
+        if (metadata.version === version && metadata.dist?.tarball === tgz && integrity?.startsWith('sha512-')) {
+          const response = await fetch(tgz, { redirect: 'error', signal: AbortSignal.timeout(45_000) });
+          if (response.ok && response.body) {
+            const hash = createHash('sha512');
+            for await (const chunk of response.body) hash.update(chunk);
+            if (`sha512-${hash.digest('base64')}` === integrity) {
+              record(join(saved, 'npm-next.json'), { build, version, run, integrityVerified: true });
+              receipt(lane, `DONE ${tag} npm next verified ${version} from ${build.slice(0, 10)} run ${run}. SHA-512 matched.`);
+              return;
+            }
+          }
+        }
+      } catch { /* npm publishes metadata and the tarball separately. */ }
+      await wait(15_000);
+    }
+    throw new Error('Public npm next did not serve the exact verified tarball');
+    };
+
     // J505: a busy staging alias has no say over preparing or proving another release.
     unlockStaging = pidLock(join(root, '.git', 'release-train.lock'));
     if (!unlockStaging) {
-      receipt(lane, `NOTE ${tag} is cut and CI is green. Staging is in use. Rerun this command to stage the same build.`);
+      receipt(lane, `NOTE ${tag} is cut and CI is green. Staging is in use: npm next goes out on the release CI now; rerun this command to stage the same build.`);
+      await publishNext(releaseCiAdmission(build, ci));
       process.exitCode = 1;
       return;
     }
@@ -364,53 +417,10 @@ async function main(args: string[]) {
       }
       if (!input) throw new Error('No passing candidate and matching staging alias for npm next');
       const { serial } = JSON.parse(input.staging_qualification) as { serial: number };
-      const publish = join(saved, 'npm-next-run.json');
-      const previousRun = read(publish) as {build: string; run?: number} | undefined;
-      let run = previousRun?.build === build ? previousRun.run : undefined;
-      if (run === undefined) {
-        const history = JSON.parse(gh(['run', 'list', '-R', repo, '--workflow', 'npm-publish.yml', '--branch', 'main',
-          '--event', 'workflow_dispatch', '--limit', '100', '--json', 'displayTitle,databaseId'])) as { displayTitle: string; databaseId: number }[];
-        run = history.find(row => row.displayTitle === `npm next ${build}`)?.databaseId;
-      }
-      if (run === undefined) {
-        if (previousRun) throw new Error('An earlier exact npm dispatch is still unconfirmed in Actions');
+      await publishNext(input, async () => {
         await requireSignedAlias(build, tag, serial);
         receipt(lane, `DONE ${tag} staging ${build} rooms/${serial}. Live QA and J451 follow.`);
-        record(publish, { build });
-        const result = gh(['workflow', 'run', 'npm-publish.yml', '-R', repo, '--ref', 'main', '--json'], JSON.stringify(input));
-        run = Number(/actions\/runs\/(\d+)/u.exec(result)?.[1]);
-        if (!Number.isSafeInteger(run) || run <= 0) throw new Error('Could not confirm the npm next dispatch');
-      }
-      if (!Number.isSafeInteger(run) || run <= 0) throw new Error('The recorded npm next run is invalid');
-      record(publish, { build, run });
-      receipt(lane, `NOTE ${tag} npm next run ${run}.`);
-      if (!provesNpmNext(await watchRun(run, join(out, 'npm-next.log')), build)) {
-        throw new Error(`Actions run ${run} did not prove npm next for this build`);
-      }
-      const version = `${tag.slice(1)}-next.${build.slice(0, 8)}`;
-      const tgz = `https://registry.npmjs.org/@wildshard/engine/-/engine-${version}.tgz`;
-      const deadline = Date.now() + 60 * 60_000;
-      while (Date.now() < deadline) {
-        try {
-          const metadata = JSON.parse(command(root, 'npm',
-            ['view', '@wildshard/engine@next', 'version', 'dist', '--json', '--prefer-online'])) as RegistryMetadata;
-          const integrity = metadata.dist?.integrity;
-          if (metadata.version === version && metadata.dist?.tarball === tgz && integrity?.startsWith('sha512-')) {
-            const response = await fetch(tgz, { redirect: 'error', signal: AbortSignal.timeout(45_000) });
-            if (response.ok && response.body) {
-              const hash = createHash('sha512');
-              for await (const chunk of response.body) hash.update(chunk);
-              if (`sha512-${hash.digest('base64')}` === integrity) {
-                record(join(saved, 'npm-next.json'), { build, version, run, integrityVerified: true });
-                receipt(lane, `DONE ${tag} npm next verified ${version} from ${build.slice(0, 10)} run ${run}. SHA-512 matched.`);
-                return;
-              }
-            }
-          }
-        } catch { /* npm publishes metadata and the tarball separately. */ }
-        await wait(15_000);
-      }
-      throw new Error('Public npm next did not serve the exact verified tarball');
+      });
     };
     const npm = failure(npmNext());
     const failures = (await Promise.all([pageResult, archives, npm])).filter(error => error !== undefined);

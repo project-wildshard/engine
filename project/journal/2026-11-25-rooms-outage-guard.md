@@ -63,3 +63,7 @@
 - v0.1.91's staging MMO observer reported `baseline-reconnect-budget`: its second baseline bot failed 5 joins. The door
   seats 4 sockets per address, and the 3 release-proof riders plus the observer's 2 bots all came from this Mac. Riders
   now default to 2 and refuse more than 4 minus the observer's 2.
+- v0.1.93's npm next would have waited out v0.1.92's whole staging leg: the train dispatched npm next only after a staging
+  candidate passed, though npm-publish.yml admits it on the exact green release CI (J475). The train now sends npm next
+  on that admission when staging is busy, and every `gh --commit` it passes must be a full SHA (a short one matched no
+  run and held a wait 20 minutes past a green ci).

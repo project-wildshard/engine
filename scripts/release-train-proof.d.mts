@@ -16,3 +16,5 @@ export function provesTrainCi(run: Run, build: string): boolean;
 export function provesReleaseReuse(run: Run, build: string, tag: string, cut: string, cwd: string): boolean;
 export function attributionGap(env: Record<string, string | undefined>, prepared: boolean): string | undefined;
 export function retryRead<T>(read: () => T, opts?: {tries?: number, pauseMs?: number, pause?: (ms: number) => void}): T;
+export function fullCommitArgs(args: readonly string[]): readonly string[];
+export function releaseCiAdmission(build: string, ci: number): { staging_build: string; staging_qualification: string };

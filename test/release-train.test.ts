@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { attributionGap, nextAdmission, provesNpmNext, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../scripts/release-train-proof.mjs';
+import { attributionGap, fullCommitArgs, nextAdmission, provesNpmNext, releaseCiAdmission, provesReleaseReuse, provesTrainCi, retryRead, watchTrainRun } from '../scripts/release-train-proof.mjs';
 import { createTempRepo } from '../src/test/helpers/git';
 
 const build = 'a'.repeat(40);
@@ -146,5 +146,26 @@ describe('retryRead', () => {
     let calls = 0;
     expect(() => retryRead(() => { calls++; throw new Error('gh run'); }, { pause: () => undefined })).toThrow('gh run');
     expect(calls).toBe(3);
+  });
+});
+
+describe('fullCommitArgs', () => {
+  test('refuses a short --commit, which gh would match to no run', () => {
+    const full = 'a'.repeat(40);
+    expect(fullCommitArgs(['run', 'list', '--commit', full])).toEqual(['run', 'list', '--commit', full]);
+    expect(() => fullCommitArgs(['run', 'list', '--commit', 'bed86d8fb352'])).toThrow('full 40-character SHA');
+    expect(() => fullCommitArgs(['run', 'list', '--commit'])).toThrow('full 40-character SHA');
+    expect(fullCommitArgs(['run', 'view', '123'])).toEqual(['run', 'view', '123']);
+  });
+});
+
+describe('releaseCiAdmission', () => {
+  test('admits npm next on the exact release CI, the shape npm-publish.yml reads as J475', () => {
+    const build = 'b'.repeat(40);
+    const input = releaseCiAdmission(build, 45698418187);
+    expect(input.staging_build).toBe(build);
+    expect(JSON.parse(input.staging_qualification)).toEqual({ build, j475: { releaseCi: 45698418187 } });
+    expect(() => releaseCiAdmission('889b423bed', 1)).toThrow('full build SHA');
+    expect(() => releaseCiAdmission(build, 0)).toThrow('release CI run');
   });
 });
