@@ -308,13 +308,19 @@ try {
   };
   /** Whether this page holds a seat. @param {import('playwright').Page} page */
   const seated = page => page.evaluate(() => typeof window.__workerClient === 'function' && window.__workerClient().own !== null).catch(() => false);
+  /** Whether this page holds a seat on a link that is still open. @param {import('playwright').Page} page */
+  const live = page => page.evaluate(() => typeof window.__workerClient === 'function' && window.__workerClient().own !== null && window.__workerClient().closed === null).catch(() => false);
   /** A case's device goes as a player's does: a seated page takes Leave the world (pause ▸ main menu), whose clean quit frees its
    *  seat at the door at once, then the context closes. A bare close leaves the seat held for HOLD_MS (5 min), and under `--seats=2`
    *  two held seats filled the door by the third case: every later play case was refused `full` (QA 11-25 row 65: modes 6, 9, 10,
    *  10b, 13, 16, 17 and 17b on the nightly). @param {Entered} entered */
   const leave = async entered => {
     const { page, context } = entered;
-    if (await seated(page)) {
+    // a case that ends mid-redial (its finally healed a moment ago) still holds the old link's seat: let the redial seat first, or
+    // the quit has no link to go on and the seat stays held (run 4 of row 65: 16b and 17 refused full after 15b and 16)
+    const inWorld = () => { try { return new URL(page.url()).searchParams.get('chunk') !== null; } catch { return false; } };
+    for (const until = Date.now() + 20_000; inWorld() && !await live(page) && Date.now() < until;) await sleep(500);
+    if (await live(page)) {
       const left = page.waitForURL(url => url.searchParams.get('chunk') === null, { timeout: 8000 }).then(() => true, () => false);
       if (await page.evaluate(() => document.dispatchEvent(new Event('ws:exit-to-main'))).then(() => true, () => false)) await left;
     }
