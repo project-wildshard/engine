@@ -1,7 +1,7 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in a folder of its own.
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in a folder of its own.
-import {mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in a folder of its own.
 import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- This test runs the worker in a folder of its own.
@@ -98,4 +98,28 @@ test('FR-A2: inParallel bounds its work, runs every item and stops taking new on
     if (item === 1) throw new Error('R2 PUT one answered 500');
   })).rejects.toThrow('R2 PUT one answered 500');
   expect(started.length, 'no new PUT starts after the first failure').toBeLessThan(6);
+});
+
+// FR-A2, second half (opus-rel86, 11-25): listing staging's bucket takes minutes (999,467 objects on 11-19), and the
+// worker re-lists once its copy is LISTING_MAX_AGE_MS old, so a publish often waited on a whole listing after its cook
+// (v0.1.85's recook: Pine's publish 5.2 min after an 820 s cook). The worker now lists while the job runs.
+test('FR-A2: the bucket listing runs while the job cooks, not after it', async () => {
+  // The job may write only under its own out folder: it leaves `job-done` there once it has slept a little.
+  const slow = join(scratch, 'slow-job.mjs'), work = join(scratch, 'work-listing');
+  writeFileSync(slow, `${JOB}\nawait new Promise(resolve => setTimeout(resolve, 300));\nwriteFileSync(join(out, 'job-done'), '');\n`);
+  const done = (): boolean => existsSync(work) && readdirSync(work, {recursive: true}).some(name => String(name).endsWith('job-done'));
+  const inner = folderStore(join(scratch, 'store-listing')), listed: boolean[] = [];
+  const store: PackStore = {...inner, list: async prefix => {
+    if (prefix === '') listed.push(done());
+    return inner.list(prefix);
+  }};
+  const hash = createHash('sha256').update('listing').digest('hex');
+  const launcher: JobLauncher = {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script: slow, wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024}};
+  const worker = createCookWorker({build: 'b-listing', store, launcher, serverPacks: join(scratch, 'server-listing'), scratch: work,
+    source: {heads: () => Promise.resolve([]), download: () => Promise.resolve(new TextEncoder().encode('listing'))}});
+
+  const row = await worker.cook({slug, hash});
+
+  expect(row.state, row.detail).toBe('cooked');
+  expect(listed, 'one listing, taken before the job finished').toEqual([false]);
 });

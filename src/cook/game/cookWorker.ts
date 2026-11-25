@@ -487,30 +487,54 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   // again once it is LISTING_MAX_AGE_MS old. A kept listing may still hold keys GC took since: `current` then skips a PUT only
   // for a key written in the last GC_GRACE_MS / 2, which GC (it takes nothing younger than GC_GRACE_MS) cannot have taken.
   let listing: {readonly rows: Map<string, StoredObject>; readonly at: number} | undefined;
+  /** The listing in flight, so a prefetch and a publish share one (`at` is when it started: it is never younger). */
+  let listingNext: Promise<Map<string, StoredObject>> | undefined;
+  const relist = (): Promise<Map<string, StoredObject>> => {
+    listingNext ??= (async () => {
+      const at = clock();
+      try {
+        const rows = await store.list('');
+        listing = {rows: new Map(rows.map(row => [row.key, row])), at};
+        return listing.rows;
+      } finally { listingNext = undefined; }
+    })();
+    return listingNext;
+  };
   const bucket = async (again: boolean): Promise<Map<string, StoredObject>> => {
-    if (again || listing === undefined || clock() - listing.at >= LISTING_MAX_AGE_MS) {
-      const rows = await store.list('');
-      listing = {rows: new Map(rows.map(row => [row.key, row])), at: clock()};
+    // `again` must see writes and deletes from now on (a reclaim just ran), so a listing that started earlier won't do.
+    if (again && listingNext !== undefined) await listingNext.catch(() => undefined);
+    if (listingNext !== undefined) {
+      try { return await listingNext; } catch { return relist(); }
     }
+    if (again || listing === undefined || clock() - listing.at >= LISTING_MAX_AGE_MS) return relist();
     return listing.rows;
   };
+  // FAST-RELEASE FR-A2, second half (opus-rel86, 11-25): a publish whose listing had aged out listed the whole bucket after
+  // its cook (v0.1.85's recook: Pine published 5.2 min after an 820 s cook). A job starts the listing it will need, so it
+  // runs while the job cooks. A failed prefetch is the publish's to report: it lists again.
+  const prefetch = (): void => {
+    if (listingNext === undefined && (listing === undefined || clock() - listing.at >= LISTING_MAX_AGE_MS / 2)) relist().catch(() => undefined);
+  };
+  let puts = 0;
   const put = async (key: string, body: Uint8Array, headers: ObjectHeaders): Promise<void> => {
     await store.put(key, body, headers);
+    puts++;
     listing?.rows.set(key, {key, bytes: body.byteLength, modified: clock()});
   };
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);
     if (keys.some(key => !cookOutputKey(key))) throw new Error('Cook output names a key outside its publication paths');
     // A recook can visit an older catalogue head after a staging upload. Only the upload owns these mutable names.
-    const folder = looseFolder(hash);
+    const folder = looseFolder(hash), putsBefore = puts;
     const loose = keys.filter(looseCookOutput), shared = keys.filter(key => !looseCookOutput(key));
     const measure = (rows: ReadonlyMap<string, StoredObject>): {readonly fresh: number; readonly used: number} => ({
       fresh: shared.reduce((sum, key) => sum + (rows.has(key) ? 0 : statSync(join(client, key)).size), 0)
         + loose.reduce((sum, key) => sum + (rows.has(folder + key) ? 0 : statSync(join(client, key)).size), 0),
       used: usageOf([...rows.values()], budget).bytes,
     });
-    const kept = listing !== undefined && clock() - listing.at < LISTING_MAX_AGE_MS;
+    const kept = listing !== undefined && clock() - listing.at < LISTING_MAX_AGE_MS, began = clock();
     let held = await bucket(false), {fresh, used} = measure(held);
+    const listed = clock();
     // A kept listing still counts what GC has since taken, so it reads high: list again before refusing on it.
     if (used + fresh > budget && kept) ({fresh, used} = measure(held = await bucket(true)));
     if (needsReclaim(used + fresh, budget) && options.reclaim !== undefined) {
@@ -544,6 +568,9 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
     }
     await inParallel(loose.filter(key => !current(folder + key)), PUT_PARALLEL,
       key => put(folder + key, readFileSync(join(client, key)), {...objectHeaders(key), cache: IMMUTABLE}));
+    // FR-A2: where a publish's time goes, so the next slow one names its part (listing, reclaim or PUTs).
+    const sent = puts - putsBefore, seconds = (ms: number): string => (ms / 1000).toFixed(1);
+    log(`publish ${report.slug} ${hash.slice(0, 12)}: listing ${seconds(listed - began)} s, ${sent} PUT(s) of ${keys.length} in ${seconds(clock() - listed)} s`);
     const target = join(serverPacks, report.slug, hash), parked = `${target}.${process.pid}.tmp`;
     rmSync(parked, {recursive: true, force: true}); mkdirSync(dirname(target), {recursive: true});
     cpSync(join(work, 'out/server'), parked, {recursive: true}); rmSync(target, {recursive: true, force: true}); renameSync(parked, target);
@@ -561,6 +588,7 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const attempt = async (head: {readonly slug: string; readonly hash: string}, tarball: Uint8Array, work: string): Promise<CookRow> => {
     const file = join(work, 'shard.tar'), out = join(work, 'out');
     writeFileSync(file, tarball);
+    prefetch();
     const outcome = await runJob(launcher, file, out, shardSlugOf(head.slug), phases => {
       log(`cook ${head.slug} ${head.hash.slice(0, 12)}: phases ${phases}`);
     }, sidecarPath(launcher.sidecars, head.hash, launcher.renderer), armedWords.get(head.hash));
