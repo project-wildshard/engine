@@ -80,13 +80,13 @@ function currentPage(): { referrer: string; origin: string; type: string | undef
   return { referrer: document.referrer, origin: location.origin, type };
 }
 /** CP1: a document other than the writer takes a fresh record it reads, so no later document in the tab can. */
-function claim(scope: 'session' | 'device', key: string, raw: string | null): string | null {
+function claim(kept: 'session' | 'device', key: string, raw: string | null): string | null {
   if (raw === null) return null;
   try {
     const value: unknown = JSON.parse(raw), own = ownDocument();
     if (typeof value !== 'object' || value === null || Reflect.get(value, 'taken') !== undefined || Reflect.get(value, 'from') === own) return raw;
     const taken = JSON.stringify({ ...value, taken: own });
-    saveStorage(scope).setItem(key, taken);
+    saveStorage(kept).setItem(key, taken);
     return taken;
   } catch { return raw; }
 }
