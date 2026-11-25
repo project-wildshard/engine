@@ -15,8 +15,8 @@ test('a native owner is found by the equipment row it wears (Driftwood\'s swords
 test('the item row and the declared id still win, in that order', () => {
   const byRow = kit([{ id: 'declared.weapon.a', row: { id: 'weapon.a' } }, { id: 'x', row: { id: 'weapon.sword' } }]);
   expect(kitWeaponOf(byRow, 'weapon.a', { id: 'weapon.sword' }).id).toBe('declared.weapon.a');
-  const byDeclared = kit([{ id: 'bow', row: { id: 'weapon.bow-row' } }]);
-  expect(kitWeaponOf(byDeclared, 'weapon.b', { id: 'weapon.bow', legacySlot: 'bow' }).id).toBe('bow');
+  const byDeclared = kit([{ id: 'declared.weapon.bow', row: { id: 'weapon.bow-row' } }]);
+  expect(kitWeaponOf(byDeclared, 'weapon.b', { id: 'weapon.bow' }).id).toBe('declared.weapon.bow');
 });
 
 test('a weapon the kit lacks still refuses', () => {
