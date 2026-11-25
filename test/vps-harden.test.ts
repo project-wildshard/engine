@@ -317,3 +317,11 @@ test('FR-A22: harden gives the cook 8G, room for a 6-lane job beside the worker 
   const start = apply.indexOf('wildshard-cook.service.d/90-harden.conf'), drop = apply.slice(start, apply.indexOf('\nEOF\n', start));
   expect(drop).toMatch(/^MemoryMax=8G$/mu);
 });
+
+// QA 11-25 row 68 (11-25): v0.1.92's recook failed the record pass on both heads it had to prepare, "Cannot open netlink
+// socket: Address family not supported by protocol": the prepare's WebKit opens a netlink socket inside the cook's sandbox.
+test("the cook's sandbox allows netlink, which the record pass's WebKit opens", () => {
+  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const start = apply.indexOf('wildshard-cook.service.d/90-harden.conf'), drop = apply.slice(start, apply.indexOf('\nEOF\n', start));
+  expect(drop).toMatch(/^RestrictAddressFamilies=.*\bAF_NETLINK\b/mu);
+});

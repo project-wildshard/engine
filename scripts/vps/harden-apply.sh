@@ -476,6 +476,9 @@ EOF
   then units_changed=1; fi
 done
 # The cook's jobs each make a user and network namespace (C4), so it keeps exactly those two.
+# AF_NETLINK (QA 11-25 row 68, 11-25): MA13's record pass prepares a head in WebKit inside the cook, and WebKit's network
+# monitor opens a netlink socket; without it v0.1.92's recook failed both heads it had to prepare ("Cannot open netlink
+# socket: Address family not supported by protocol"). The rooms' units already allow it.
 # MemoryMax 4G -> 5G (11-25, QA 11-25 row 31's FR row): six cook runs peaked 3.6 to 4.0G and three were OOM-killed once a
 # bucket listing (about 1M objects) overlapped a cook; 1G more covers two listings and the peak. The box has 30G, 24G free.
 # 5G -> 8G (FAST-RELEASE FR-A22, 11-25): the cook now gets 7 CPUs, so its encoder runs 6 lanes, not 2, each with its own
@@ -485,7 +488,7 @@ if put /etc/systemd/system/wildshard-cook.service.d/90-harden.conf 644 root:root
 # VPS-HARDENING VH7
 [Service]
 $(printf '%s\n' "$sandbox" | grep -v '^PrivateUsers=')
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 RestrictNamespaces=user net
 MemoryMax=8G
 EOF
