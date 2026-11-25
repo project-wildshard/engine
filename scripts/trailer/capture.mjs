@@ -212,6 +212,10 @@ export async function main(argv) {
 
   const done = (s) => !DRY && existsSync(`${OUT}/${s.name}/meta.json`) && JSON.parse(readFileSync(`${OUT}/${s.name}/meta.json`, 'utf8')).done === true;
   const want = shots.filter((s) => (ONLY.length === 0 || ONLY.includes(s.name)) && (!EDL || EDL.clips.some((c) => c.shot === s.name)));
+  // a cut that wants more of a shot than it lasts fails here, not at the conform after an hour of capture (11-25: dn-caravan)
+  for (const s of want) for (const c of EDL?.clips.filter((x) => x.shot === s.name) ?? []) {
+    if (c.in + c.dur > s.secs + 1e-6) throw new Error(`${s.name}: the cut wants ${String(c.in)}+${String(c.dur)} s of a ${String(s.secs)} s shot`);
+  }
   mkdirSync(OUT, { recursive: true });
   const browser = await chromium.launch({ headless: true, args: [...KEYCHAIN_ARGS, '--mute-audio', '--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'] });
   const report = [];

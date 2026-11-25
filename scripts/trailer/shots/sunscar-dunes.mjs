@@ -15,11 +15,11 @@ export const shots = [
       { t: 4, p: [1, 4.5, 64], l: [8, 26, -75], fov: 46 },
     ] } },
   // the caravan in the dunes
-  { name: 'dn-caravan', zone: Z, time: T, weather: W, secs: 4,
+  { name: 'dn-caravan', zone: Z, time: T, weather: W, secs: 4.2, // alpha 2 cuts 4.1 s of it from 0.05
     setup: NO_VIEWMODEL + CALM,
     rig: { rel: true, ease: true, keys: [
       { t: 0, p: [-60, 1.7, 43], l: [-78, 16.5, 28], fov: 50 },
-      { t: 4, p: [-68, 1.4, 36], l: [-78, 17, 28], fov: 46 },
+      { t: 4.2, p: [-68, 1.4, 36], l: [-78, 17, 28], fov: 46 },
     ] } },
   // fight: the whip on a dune strider
   { name: 'dn-whip', zone: Z, time: T, weather: W, secs: 4, warm: 120,
