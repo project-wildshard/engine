@@ -279,7 +279,7 @@ function dropIn(apply: string, sandbox: string[], unit: string): string[] {
     if (line === '$sandbox') return sandbox;
     const filtered = /^\$\(printf '%s\\n' "\$sandbox" \| grep -E?v '\^\(?([^)']+?)\)?='\)$/u.exec(line);
     if (filtered === null) return [line];
-    const names = new Set(filtered[1].split('|'));
+    const names = new Set((filtered[1] ?? '').split('|'));
     return sandbox.filter(row => !names.has(row.slice(0, row.indexOf('='))));
   });
 }
