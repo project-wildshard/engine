@@ -17,7 +17,7 @@ it('a version bump, an engines pin or a script edit in package.json keeps the co
   expect(cookRevision(root).files).toContain('package.json');
   expect(cookRevision(root, swap(pkgPath, json({...real, version: '9.9.9'}))).revision).toBe(now);
   expect(cookRevision(root, swap(pkgPath, json({...real, engines: {node: '24.18.1'}}))).revision).toBe(now);
-  expect(cookRevision(root, swap(pkgPath, json({...real, scripts: {...real.scripts as object, x: 'true'}}))).revision).toBe(now);
+  expect(cookRevision(root, swap(pkgPath, json({...real, scripts: {...real['scripts'] as object, x: 'true'}}))).revision).toBe(now);
 }, 120_000);
 
 it('a cook closure file still moves it, and only package.json is dropped', () => {
