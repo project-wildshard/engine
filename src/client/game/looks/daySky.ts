@@ -12,9 +12,27 @@ import type { DayLookSchema } from '@wildshard/format/dayLook';
  * lights turned with it (`driveDayLight`). The clock itself stays renderer-free (`./dayClock`, the headless host's).
  */
 
+/** A painted sky's `?time=` day parts, in hours (`DayCycle.set`). */
+const TIME_HOURS: Readonly<Record<string, number>> = { dawn: 5.6, day: 10, noon: 12, golden: 17.1, dusk: 18.15, night: 22.5, midnight: 0 };
+/**
+ * QA 11-24 row 60: `?time=` on a keyed day clock, as a painted sky reads it (`keyedSky.ts` paintedSky): an hour (0 to 24), or a
+ * part of the day, a phase the row names (`phases`) or a Settings ▸ Time of day pick (`fixed`). The hour maps through the
+ * clock's own law (`clockHour`'s inverse: 06:00 to 18:00 is the day fraction). Undefined when absent or unreadable.
+ */
+export function urlTimePhase<S extends DayLookSchema>(day: DayClock<S>, raw: string | null): number | undefined {
+  if (raw === null || raw === '') return undefined;
+  const style = day.style;
+  if (style.phases !== undefined && Object.hasOwn(style.phases, raw)) return style.phases[raw];
+  if (Object.hasOwn(style.fixed, raw)) return style.fixed[raw as keyof typeof style.fixed];
+  const hour = Object.hasOwn(TIME_HOURS, raw) ? TIME_HOURS[raw] : Number.parseFloat(raw);
+  if (hour === undefined || !Number.isFinite(hour)) return undefined;
+  const h = ((hour % 24) + 24) % 24, D = day.spec.dayFraction ?? 20 / 24;
+  return h >= 6 && h < 18 ? (h - 6) * D / 12 : D + (((h - 18) % 24 + 24) % 24) * (1 - D) / 12;
+}
+
 /**
  * The clock a backdrop runs, at the URL's / Settings' time: Settings ▸ Time of day parks it at a pick (paused), else `?tod=`
- * (a phase, or a name of the row's `phases`) or the row's start; `?clock=` seconds a cycle (default `cycleSeconds`).
+ * (a phase, or a name of the row's `phases`), else `?time=` (`urlTimePhase`), or the row's start; `?clock=` seconds a cycle (default `cycleSeconds`).
  * `curves` replace the row's (a backdrop that lays its weather over them).
  */
 export function runDayClock<S extends DayLookSchema>(day: DayClock<S>, cycleSeconds: number, curves: DayCurves = day.spec.curves): DayCycle<DayLookPreset<S>> {
@@ -22,9 +40,9 @@ export function runDayClock<S extends DayLookSchema>(day: DayClock<S>, cycleSeco
   const todRaw = qs.get('tod') ?? '';
   const named = style.phases !== undefined && Object.hasOwn(style.phases, todRaw) ? style.phases[todRaw] : undefined;
   const tod = named ?? Number.parseFloat(todRaw), cycle = Number.parseFloat(qs.get('clock') ?? '');
-  const time = setting('time'); // 'live' whenever ?tod / ?clock are in the URL
-  const frozen = time !== 'live';
-  const clock = new DayCycle({ ...day.spec, curves, start: frozen ? style.fixed[time] : Number.isFinite(tod) ? ((tod % 1) + 1) % 1 : style.start });
+  const time = setting('time'); // 'live' whenever ?tod / ?clock / ?time are in the URL
+  const frozen = time !== 'live', at = urlTimePhase(day, qs.get('time'));
+  const clock = new DayCycle({ ...day.spec, curves, start: frozen ? style.fixed[time] : Number.isFinite(tod) ? ((tod % 1) + 1) % 1 : at ?? style.start });
   clock.cycle = Number.isFinite(cycle) && cycle > 1 ? cycle : cycleSeconds;
   clock.paused = frozen;
   return clock;

@@ -124,7 +124,8 @@ export const BOOT_OPTIONS: readonly OptionKey[] = ['tier', 'touch'];
 const OPTION_SPECS: { [K in OptionKey]: { def: OptionValue<K> | null; params: readonly string[]; url: (q: URLSearchParams) => string | null } } = {
   tier: { def: 'auto', params: ['tier'], url: (q) => q.get('tier') },
   touch: { def: 'auto', params: ['touch'], url: (q) => (q.has('touch') ? 'on' : null) },               // ?touch (any value) forces them, as before
-  time: { def: 'live', params: ['tod', 'clock'], url: (q) => (q.has('tod') || q.has('clock') ? 'live' : null) }, // ?tod= / ?clock= run the clock from the URL's phase / speed
+  // ?tod= / ?clock= / ?time= run the clock from the URL's phase / speed / hour (QA 11-24 row 60: ?time= on every sky)
+  time: { def: 'live', params: ['tod', 'clock', 'time'], url: (q) => (q.has('tod') || q.has('clock') || q.has('time') ? 'live' : null) },
   weather: { def: 'live', params: ['weather'], url: (q) => q.get('weather') },                         // ?weather=rain: a held shower (captures)
 };
 const OPTION_KEYS = Object.keys(OPTION_VALUES) as OptionKey[];
