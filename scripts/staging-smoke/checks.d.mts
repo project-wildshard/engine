@@ -11,6 +11,10 @@ export function loadChecks(s: ScenarioResult, last: Record<string, number> | und
 /** Meta QA 11-25 row 60: over this 15-minute load per CPU, a missed load time is "noisy, rerun" (P2), not a hold. */
 export const NOISY_LOAD_PER_CPU: 0.75;
 /** A timing check with the load beside it; over `noisyLoad` a miss reads "noisy, rerun" (P2). */
+/** Meta QA 11-25 row 62: the leg reason when a leg reloaded on "online seat elsewhere". */
+export function seatReload(s: ScenarioResult): string | undefined;
+/** A missed timing that includes a seat-elsewhere reload reads "harness, rerun" (P2). */
+export function afterSeatReload(check: Check, seat: string | undefined): Check;
 export function underLoad(check: Check, load15: number | undefined, noisyLoad: number | undefined): Check;
 /** a.b.c below x.y.z @param {string} a @param {string} b */
 export function olderVersion(a: string, b: string): boolean;

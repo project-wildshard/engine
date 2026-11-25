@@ -3,7 +3,7 @@
 import { describe, expect, it, test } from 'vitest';
 import {createTempRepo} from '../src/test/helpers/git';
 import {engineRelease} from '../scripts/changelog.mjs';
-import { checkScenario, holds, olderVersion, verdictOf } from '../scripts/staging-smoke/checks.mjs';
+import { checkScenario, holds, olderVersion, seatReload, verdictOf } from '../scripts/staging-smoke/checks.mjs';
 import type { ScenarioResult } from '../scripts/staging-smoke/scenarios.mjs';
 import { isThirdPartyBeacon, ownPageErrors } from '../scripts/staging-smoke/thirdParty.mjs';
 import { PAGE_BG, blackWorld, worldStats } from '../scripts/staging-smoke/worldFrame.mjs';
@@ -182,5 +182,18 @@ describe('the deploy load budget (STAGING-QA SQ12)', () => {
     expect(checkScenario(fast, loaded).find(check => check.key === 'load')).toMatchObject({ ok: true, severity: 'P1', text: expect.stringContaining('(15-min load 19.4)') });
     // No line given (an old caller): a miss holds as before.
     expect(failed(k2(19.4), deploy)).toEqual(['P1 load']);
+  });
+  // Meta QA 11-25 row 62: v0.1.91's second K2 attempt (27.2 s) reloaded at 13.3 s on "online seat elsewhere (driftwood-isle)".
+  it('a timing whose leg reloaded on a seat still held reads "harness, rerun", not a hold', () => {
+    const seated = clean({ id: 'K2', legs: [leg({ name: 'journey', tapAt: 0, playAt: 27_200,
+      ends: [{ t: 13_300, document: 1, reason: 'online seat elsewhere (driftwood-isle)' }] })] });
+    expect(seatReload(seated)).toBe('journey: online seat elsewhere (driftwood-isle)');
+    const load = checkScenario(seated, deploy).find(check => check.key === 'load');
+    expect(load).toMatchObject({ ok: false, severity: 'P2' });
+    expect(load?.text).toMatch(/^harness, rerun: .* \(the leg reloaded on "journey: online seat elsewhere \(driftwood-isle\)", a player still seated from the attempt before; QA 11-25 row 62\)$/u);
+    expect(verdictOf([seated], deploy).hold).toBe(false);
+    // Any other reload still holds.
+    const other = clean({ id: 'K2', legs: [leg({ name: 'journey', tapAt: 0, playAt: 27_200, ends: [{ t: 13_300, document: 1, reason: 'REV-BEHIND' }] })] });
+    expect(failed(other, deploy)).toEqual(['P1 load']);
   });
 });

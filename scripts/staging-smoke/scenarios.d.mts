@@ -71,6 +71,8 @@ export function judgeWorldFrames(frames: Record<string, string>): Promise<Record
 export function liveCells(page: Page): Promise<string[]>;
 /** The recorded clip as an .mp4 (H.264, 15 fps), or the .webm when ffmpeg is missing.
  * @param {string} webm @param {string} mp4 @returns {string} */
+/** Meta QA 11-25 row 62: leave the world through EXIT TO MAIN (the clean quit) so the next attempt finds no held body. */
+export function leaveWorld(page: import('playwright').Page): Promise<string>;
 export function toMp4(webm: string, mp4: string): string;
 /** @typedef {import('playwright').Page} Page */
 /** @typedef {import('playwright').BrowserContext} BrowserContext */

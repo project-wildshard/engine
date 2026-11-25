@@ -20,3 +20,5 @@
   no pin run has tried (titled by run-name). Its first dry run found sunscar-dunes r9 and mirror-salt r8 unpinned.
 - Main red 45676829545 (row 58 follow-up): main-push run with no lane name (CI, Jake) sends unnamed commits; a named
   lane still leaves them. push-known-red's fixture commit names its lane.
+- QA 11-25 row 62: a kept K1/K2 profile leaves the world (EXIT TO MAIN, the clean quit) before its browser closes, so
+  the next attempt finds no held body; a timing whose leg reloaded on "online seat elsewhere" reads "harness, rerun" (P2).

@@ -548,6 +548,9 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
     await shoot('last');
   } finally {
     const video = page.video();
+    // Meta QA 11-25 row 62: a kept profile's player leaves the world as a player does (the pause menu's EXIT TO MAIN says
+    // the door's clean quit), so the next attempt on this profile finds no body still held and no "online seat elsewhere".
+    if (old) say(await leaveWorld(page));
     await context.close().catch(() => undefined);
     result.seconds = (Date.now() - started) / 1000;
     const webm = await video?.path().catch(() => undefined);
@@ -558,6 +561,26 @@ export async function runScenario(scenario, { url, out, card, deepLink, oldProfi
   }
   result.world = await judgeWorldFrames(result.frames);
   return result;
+}
+
+/**
+ * Row 62: leave the world through the pause menu's EXIT TO MAIN, which says the door's clean quit, so the server drops the body
+ * at once instead of holding it for a redial (HOLD_MS, five minutes). At most about 8 s; a page not in the world has nothing to leave.
+ * @param {import('playwright').Page} page @returns {Promise<string>} the log line
+ */
+export async function leaveWorld(page) {
+  try {
+    const menu = page.locator('.ws-gmenu.show');
+    if (!await menu.isVisible().catch(() => false)) await page.keyboard.press('Escape', { timeout: 2000 });
+    const exit = page.locator('.ws-gmenu.show .ws-gmenu-exit').first();
+    if (!await exit.waitFor({ state: 'visible', timeout: 2000 }).then(() => true, () => false)) return 'left: no pause menu (not in the world)';
+    await exit.click({ timeout: 2000 });
+    // The quit goes out on the socket before the title shows; give it a moment to reach the door.
+    await page.waitForTimeout(3000);
+    return 'left the world (EXIT TO MAIN, the clean quit)';
+  } catch (error) {
+    return `left: could not leave cleanly (${error instanceof Error ? error.message.split('\n')[0] ?? '' : String(error)})`;
+  }
 }
 
 /** The recorded clip as an .mp4 (H.264, 15 fps), or the .webm when ffmpeg is missing.

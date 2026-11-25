@@ -42,3 +42,13 @@ test('staging QA runs its legs inside the hold', () => {
   expect(qa.indexOf('await qualify({', hold)).toBeGreaterThan(hold);
   expect(qa.indexOf('} finally { unlock(); }', hold)).toBeGreaterThan(qa.indexOf('await qualify({', hold));
 });
+
+// Meta QA 11-25 row 62: a kept profile (K1, K2) leaves the world through EXIT TO MAIN before its browser closes, so the next
+// attempt on it finds no held body.
+test('a kept profile leaves the world cleanly before the browser closes', () => {
+  const scenarios = readFileSync(resolve('scripts/staging-smoke/scenarios.mjs'), 'utf8');
+  const leave = scenarios.indexOf('if (old) say(await leaveWorld(page));');
+  expect(leave).toBeGreaterThan(0);
+  expect(scenarios.indexOf('await context.close()', leave)).toBeGreaterThan(leave);
+  expect(scenarios).toContain("page.locator('.ws-gmenu.show .ws-gmenu-exit')");
+});

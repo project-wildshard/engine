@@ -38,7 +38,22 @@ export function legTimes(s) {
  * time (P2; K1 and K2 compare only against the budget: a forced update's time is the old build's).
  * @param {ScenarioResult} s @param {Record<string, number> | undefined} last @returns {Check[]} */
 export function loadChecks(s, last, noisyLoad) {
-  return timingChecks(s, last).map(check => underLoad(check, s.load15, noisyLoad));
+  const seat = seatReload(s);
+  return timingChecks(s, last).map(check => underLoad(check, s.load15, noisyLoad)).map(check => afterSeatReload(check, seat));
+}
+
+/** Meta QA 11-25 row 62: the page left with "online seat elsewhere": the server still seated this profile's player from the
+ * attempt before (v0.1.91's second K2 leg, 13.3 s). The leg's reason, or undefined. @param {ScenarioResult} s */
+export function seatReload(s) {
+  for (const leg of s.legs) for (const end of leg.ends ?? []) if (/online seat elsewhere/u.test(end.reason)) return `${leg.name}: ${end.reason}`;
+  return undefined;
+}
+
+/** A missed timing that includes a seat-elsewhere reload measures the harness, not the build: "harness, rerun" (P2).
+ * @param {Check} check @param {string | undefined} seat @returns {Check} */
+export function afterSeatReload(check, seat) {
+  if (check.ok || seat === undefined || check.severity === 'P2' && check.text.startsWith('noisy, rerun')) return check;
+  return { ...check, severity: 'P2', text: `harness, rerun: ${check.text} (the leg reloaded on "${seat}", a player still seated from the attempt before; QA 11-25 row 62)` };
 }
 
 /** @param {ScenarioResult} s @param {Record<string, number> | undefined} last @returns {Check[]} */
