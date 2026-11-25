@@ -85,6 +85,24 @@ const OWN = new Set();
  * these functions directly reads `unnamed`, never the script's own name. */
 const currentLane = () => { const named = laneName(process.env, 'main-push'); return 'lane' in named ? named.lane : 'unnamed'; };
 
+/** The outgoing commits (`%h %s` rows) this run did not make: another lane's, carried along (M1).
+ * @param {string} cwd @param {string} range */
+const carriedRows = (cwd, range) => run(cwd, ['log', '--format=%h %s', range]).stdout.trim().split('\n').filter(Boolean)
+  .filter((row) => !OWN.has(row.slice(row.indexOf(' ') + 1)));
+
+/**
+ * Meta QA 11-25 row 53: SKIP_CHECK=1 skips the gate for the pusher's own commits (J381), never for another lane's commit
+ * it carries (M1): that commit's own push was never gated, or its gate was red. engine 5068a7365's push refused it on
+ * typecheck (TS7006 in an untyped .mjs), then opus-fr13's `SKIP_CHECK=1` main-push carried it ungated to main, red.
+ * So with a carried commit the variable is dropped and the gate runs; `dropped` says so for the log.
+ * @param {Record<string, string | undefined>} env @param {readonly string[]} carried
+ */
+export function gateEnv(env, carried) {
+  if (carried.length === 0 || env['SKIP_CHECK'] !== '1') return { env, dropped: false };
+  const { SKIP_CHECK: _skip, ...rest } = env;
+  return { env: rest, dropped: true };
+}
+
 /** @typedef {{sha:string,lane:string,ref:string,files:string[],upstream:string}} HeldCommit */
 /** @param {string} cwd */
 const heldDirectory = (cwd) => resolve(cwd, git(cwd, ['rev-parse', '--git-path', 'main-push-held']));
@@ -250,7 +268,8 @@ export function pushMain(cwd, remote = 'origin') {
   let pushed;
   try {
     // FS18: the pre-push's pin provenance passes a test/pins change that main-push itself sends from main.
-    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_LAND_MAIN_PUSH: `main-push:${sent}` };
+    const { env } = gateEnv({ ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_LAND_MAIN_PUSH: `main-push:${sent}` },
+      carriedRows(cwd, `refs/remotes/${remote}/main..${sent}`));
     pushed = spawnSync('git', ['push', remote, `${sent}:refs/heads/main`], { cwd, env, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', fd, fd] });
   } finally {
     closeSync(fd);
@@ -476,11 +495,15 @@ export async function pregate(cwd, log, remote = 'origin') {
   const logFile = resolve(cwd, git(cwd, ['rev-parse', '--git-path', `main-push-gate-${process.pid}.log`]));
   const fd = openSync(logFile, 'w');
   const began = Date.now();
+  // Row 53: a carried commit drops SKIP_CHECK, so its gate runs; a gate skipped by SKIP_CHECK marks nothing, or a later
+  // push carrying these commits would skip its gate on the mark.
+  const carried = carriedRows(cwd, `${base}..${head}`);
+  const { env, dropped } = gateEnv({ ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_MAIN_WATCH: '0', WS_LAND_MAIN_PUSH: `main-push:${head}` }, carried);
+  if (dropped) log(`SKIP_CHECK=1 dropped: ${carried.length} commit(s) of another lane ride along (M1), so the gate runs: ${carried.join('; ')}`);
   let gated;
   try {
     // FS18: the same marker the push under the lock carries (`pushMain`), so pin provenance passes main-push's own
     // test/pins change here too; without it the early gate refused every pin re-record (opus-of19b0, 2026-11-19).
-    const env = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))), WS_MAIN_WATCH: '0', WS_LAND_MAIN_PUSH: `main-push:${head}` };
     gated = spawnSync('bash', [hook, remote, url], { cwd, env, input: `refs/heads/main ${head} refs/heads/main ${base}\n`, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['pipe', fd, fd] });
   } finally {
     closeSync(fd);
@@ -492,6 +515,7 @@ export async function pregate(cwd, log, remote = 'origin') {
     throw new StopError(`the gate (run before the lock) refused: ${(red.length > 0 ? red : lines.slice(-8)).join(' | ')}. Whole output: ${logFile}`);
   }
   rmSync(logFile, { force: true });
+  if (env['SKIP_CHECK'] === '1') return 'SKIP_CHECK=1: the gate skipped this lane\'s own commits; nothing marked gated';
   const { markGated } = await import('./main-push-gated.mjs');
   const marked = markGated(cwd, `${base}..${head}`);
   return `gate green before the lock in ${Math.round((Date.now() - began) / 1000)} s; ${marked} commit(s) marked`;

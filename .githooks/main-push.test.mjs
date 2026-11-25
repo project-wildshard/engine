@@ -6,7 +6,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { join } from 'node:path';
 import { after, beforeEach, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { heldCommits, parseArgs } from '../scripts/main-push.mjs';
+import { gateEnv, heldCommits, parseArgs } from '../scripts/main-push.mjs';
 
 const SCRIPT = fileURLToPath(new URL('../scripts/main-push.mjs', import.meta.url));
 const repoDir = fileURLToPath(new URL('..', import.meta.url));
@@ -269,4 +269,30 @@ test('a push names another lane\'s committed commit it carries along (M1)', () =
   assert.equal(out.status, 0, out.stderr);
   // FS19: the pusher's herdr pane rides in the receipt when the push runs in one.
   assert.match(out.stdout, /2 commit\(s\)(?: pane \S+)?, 1 of them another lane's, carried along \(M1\): [0-9a-f]+ other lane: carried/u);
+});
+
+// Meta QA 11-25 row 53: engine 5068a7365's push was refused on typecheck (an untyped .mjs), then another lane's
+// `SKIP_CHECK=1` main-push carried it ungated to main, red. A stand-in typecheck: a `.mjs` holding `untyped` fails.
+const TYPECHECK = '#!/bin/sh\n[ "$SKIP_CHECK" = 1 ] && exit 0\nwhile read -r _ local _ remote; do\n  for f in $(git diff --name-only "$remote" "$local" -- "*.mjs"); do\n    if git show "$local:$f" | grep -q untyped; then echo "  X push blocked: $f(1,14): error TS7006: Parameter \'k\' implicitly has an \'any\' type." >&2; exit 1; fi\n  done\ndone\nexit 0\n';
+
+test('a push adding an untyped .mjs is refused, and SKIP_CHECK=1 never skips the gate for a carried commit', () => {
+  write(a, '.hooks/pre-push', TYPECHECK);
+  chmodSync(join(a, '.hooks/pre-push'), 0o755);
+  write(a, 'capture.mjs', 'export const keys = (k, d) => k; // untyped\n');
+  const own = push(a, '-m', 'feat: capture', 'capture.mjs');
+  assert.equal(own.status, 1);
+  assert.match(own.stderr, /main-push STOP git push refused by the pre-push: .*capture\.mjs\(1,14\): error TS7006/u);
+
+  // The refused commit stays on local main; the next lane's SKIP_CHECK push would carry it along (M1).
+  write(a, 'mine.md', 'y\n');
+  const carried = spawnSync(process.execPath, [SCRIPT, '--wait', '0', '-m', 'docs: mine', 'mine.md'], { cwd: a, encoding: 'utf8', env: { ...env, ...ID, SKIP_CHECK: '1', WS_LANE_NAME: 'lane-b' } });
+  assert.equal(carried.status, 1, carried.stdout);
+  assert.match(carried.stderr, /error TS7006/u);
+  assert.throws(() => remoteFile('capture.mjs'), 'the untyped file never reached main');
+});
+
+test('gateEnv drops SKIP_CHECK only when another lane\'s commit rides along', () => {
+  assert.deepEqual(gateEnv({ SKIP_CHECK: '1', A: 'x' }, ['abc other lane']), { env: { A: 'x' }, dropped: true });
+  assert.deepEqual(gateEnv({ SKIP_CHECK: '1' }, []), { env: { SKIP_CHECK: '1' }, dropped: false });
+  assert.deepEqual(gateEnv({ A: 'x' }, ['abc other lane']), { env: { A: 'x' }, dropped: false });
 });
