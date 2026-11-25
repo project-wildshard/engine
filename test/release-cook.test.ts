@@ -1,7 +1,7 @@
 // @vitest-environment node
 import {expect, test} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {hardenDue, selectCookRelease} from '../scripts/release-cook.mjs';
+import {cookUnitGap, expectedCookUnit, hardenDue, selectCookRelease} from '../scripts/release-cook.mjs';
 
 const build = 'a'.repeat(40), staging = {tag: `server-staging-${build}`, build};
 
@@ -38,4 +38,39 @@ test('wildshard-apply stamps the harden release-cook reads', () => {
   expect(stamp.exec(cook)?.[1]).toBe(stamp.exec(apply)?.[1]);
   // Only a harden that exited 0 writes it, and world-readable, so wildshard-agent reads it without sudo.
   expect(apply).toMatch(/which === 'harden' && run\.status === 0\) \{\s*writeFileSync\(HARDEN_STAMP, `\$\{commit\} \$\{tag\}\\n`, \{ mode: 0o644 \}\)/u);
+});
+
+// FAST-RELEASE FR-A25: v0.1.91 moved the cook before the harden refreshed the box's rebuild.sh, so the move wrote the old
+// unit (AllowedCPUs=13-15, no CPUWeight) and the staging recook the pack wait waited on ran on 3 CPUs, not FR-A22's 7.
+test('the train hardens before the cook move, and the cook move comes before the staging pack wait', () => {
+  const cook = readFileSync('scripts/release-cook.mjs', 'utf8');
+  const main = cook.slice(cook.indexOf('async function main()'), cook.indexOf('\n}\n', cook.indexOf('async function main()')));
+  const harden = main.lastIndexOf('await hardenIfDue(tag, production.build, cookBuild, dry);'), move = main.lastIndexOf('moveCook(tag, production.build);');
+  expect(harden).toBeGreaterThan(0);
+  expect(move).toBeGreaterThan(harden);
+  expect(main.indexOf('checkCookUnit();', move)).toBeGreaterThan(move);
+  // The move itself runs no harden after it.
+  const moveCook = cook.slice(cook.indexOf('function moveCook('), cook.indexOf('\n}\n', cook.indexOf('function moveCook(')));
+  expect(moveCook).not.toContain('hardenIfDue');
+  // page-release's staging check runs release-cook; the deploy's pack wait (FR-A19) comes only after the check phase.
+  const flow = readFileSync('scripts/page-release/flow.mjs', 'utf8');
+  expect(flow.indexOf("deps.run('node', ['scripts/release-cook.mjs', '--staging'")).toBeGreaterThan(0);
+  const deploy = readFileSync('scripts/page-release/staging-deploy.mjs', 'utf8');
+  expect(deploy.indexOf('await waitPacks();')).toBeGreaterThan(deploy.indexOf("await phase('check');"));
+});
+
+test('the cook unit check reads rebuild.sh and refuses the v0.1.91 box', () => {
+  const rebuild = readFileSync('scripts/vps/rebuild.sh', 'utf8');
+  const expected = expectedCookUnit(rebuild);
+  expect(expected).toEqual({AllowedCPUs: '9-15', CPUWeight: '20', MemoryMax: String(8 * 1024 ** 3)});
+  // The box after v0.1.91's harden (read 11-25 18:20 UTC).
+  expect(cookUnitGap(expected, 'CPUWeight=[not set]\nAllowedCPUs=13-15\nMemoryMax=8589934592\n'))
+    .toBe('AllowedCPUs box 13-15, rebuild.sh 9-15; CPUWeight box [not set], rebuild.sh 20');
+  expect(cookUnitGap(expected, 'CPUWeight=20\nAllowedCPUs=9-15\nMemoryMax=8589934592\n')).toBeNull();
+  expect(cookUnitGap(expected, '')).toContain('AllowedCPUs box (none)');
+  // One MemoryMax: the unit's equals harden's drop-in, which overrides it on the box.
+  const apply = readFileSync('scripts/vps/harden-apply.sh', 'utf8'), at = apply.indexOf('wildshard-cook.service.d/90-harden.conf');
+  const dropIn = /^MemoryMax=(\d+)G$/mu.exec(apply.slice(at, apply.indexOf('\nEOF\n', at)))?.[1];
+  expect(String(Number(dropIn) * 1024 ** 3)).toBe(expected.MemoryMax);
+  expect(() => expectedCookUnit('CPUWeight=20\n')).toThrow('no COOK_CPUS');
 });

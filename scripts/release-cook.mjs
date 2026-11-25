@@ -14,9 +14,17 @@
 // 4. FAST-RELEASE FR-A11: harden copies all of scripts/vps to the box, so when scripts/vps changed since the box's last
 //    harden (wildshard-apply's stamp, else the cook's previous build), the release runs `wildshard-apply <tag> harden`
 //    itself, behind the same --check gate. A gate or an apply that fails says why in a `warn` line; the release goes on.
+// 5. FAST-RELEASE FR-A25: the harden comes first, before the cook move. `wildshard-config cook` runs the box's root-owned
+//    copy of rebuild.sh (/opt/wildshard-vps, which only harden refreshes), and the move restarts the cook, which starts the
+//    staging recook the pack wait then waits on. With the harden after the move (v0.1.91), the move wrote the old unit
+//    (AllowedCPUs=13-15, no CPUWeight) and the release recooked on 3 CPUs; FR-A22's 7 waited for the next release.
+// 6. After the move, the cook unit's AllowedCPUs, CPUWeight and MemoryMax (`systemctl show`) must equal what this build's
+//    rebuild.sh writes, or the release stops: that gap let FR-A22's CPU half go missing unnoticed. When the cook already ran
+//    the tag, a stale unit is rewritten by one more `wildshard-config cook` from the fresh copy, then read again.
 // --dry-run reads the box and says what it would do; it writes nothing. Output never carries an address or a secret.
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { spawnSync } from 'node:child_process';
+import {readFileSync} from 'node:fs';
 import {resolve as resolvePath} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
@@ -30,6 +38,8 @@ const OFF_SSH_ROWS = new Set(['SC2']);
 // wildshard-apply writes `<commit> <tag>` here after a harden that exits 0 (FR-A11): root-written, world-readable.
 const HARDEN_STAMP = '/var/lib/wildshard-harden-applied';
 const VPS = 'scripts/vps/';
+// FR-A25: what the release reads of the running cook unit.
+const UNIT_SHOW = 'systemctl show wildshard-cook -p AllowedCPUs -p CPUWeight -p MemoryMax';
 
 /** @param {string} what @param {string} message */
 function say(what, message) { console.info(`${what.padEnd(7)} ${redact(message)}`); }
@@ -80,6 +90,13 @@ async function main() {
     if (health.out.includes('up')) {
       say('ok', `the cook worker already runs ${tag} and answers /health`);
       await hardenIfDue(tag, production.build, cookBuild, dry);
+      if (!dry) {
+        if (cookUnitGap(expectedCookUnit(readFileSync('scripts/vps/rebuild.sh', 'utf8')), box(UNIT_SHOW).out) !== null) {
+          say('doing', `the cook unit is behind this build's rebuild.sh: sudo -n wildshard-config cook ${tag} rewrites it`);
+          moveCook(tag, production.build);
+        }
+        checkCookUnit();
+      }
       return;
     }
   }
@@ -102,18 +119,54 @@ async function main() {
     }
   }
 
+  // FR-A25: harden first, so the move runs this build's rebuild.sh and the recook it starts runs on this build's unit.
+  await hardenIfDue(tag, production.build, cookBuild, dry);
   if (dry) {
-    say('would', `sudo -n wildshard-config cook ${tag}`);
-    await hardenIfDue(tag, production.build, cookBuild, dry);
+    say('would', `sudo -n wildshard-config cook ${tag}, then read the cook unit against this build's rebuild.sh`);
     return;
   }
+  moveCook(tag, production.build);
+  checkCookUnit();
+}
+
+/** `wildshard-config cook <tag>` and its settle check. @param {string} tag @param {string} build */
+function moveCook(tag, build) {
   const moved = box(`sudo -n /usr/local/sbin/wildshard-config cook ${tag}`);
   for (const line of moved.out.trim().split('\n').filter(row => /^(ok|doing|undo|stop|note|wait|warn|done)\s/u.test(row))) console.info(redact(line));
   if (moved.status !== 0) stop(`wildshard-config cook ${tag} exited ${String(moved.status)}`);
   const after = box('sudo -n /usr/local/sbin/wildshard-config show cook; curl -fsS --max-time 5 http://127.0.0.1:8792/health >/dev/null && echo health-up');
-  if (!after.out.includes(`COOK_ENGINE_REF=${tag}\n`) || !after.out.includes(`WILDSHARD_BUILD=${production.build}`) || !after.out.includes('health-up')) stop('the cook did not settle on the new tag; see journalctl -u wildshard-cook');
-  say('done', `the cook worker runs ${tag} (${production.build.slice(0, 8)}) and answers /health`);
-  await hardenIfDue(tag, production.build, cookBuild, dry);
+  if (!after.out.includes(`COOK_ENGINE_REF=${tag}\n`) || !after.out.includes(`WILDSHARD_BUILD=${build}`) || !after.out.includes('health-up')) stop('the cook did not settle on the new tag; see journalctl -u wildshard-cook');
+  say('done', `the cook worker runs ${tag} (${build.slice(0, 8)}) and answers /health`);
+}
+
+/** FR-A25: the running cook unit against this build's rebuild.sh; stops the release on any difference. */
+function checkCookUnit() {
+  const expected = expectedCookUnit(readFileSync('scripts/vps/rebuild.sh', 'utf8'));
+  const gap = cookUnitGap(expected, box(UNIT_SHOW).out);
+  if (gap !== null) stop(`the cook unit does not match this build's rebuild.sh: ${gap} (FR-A25); the recook would run on the wrong box`);
+  say('ok', `cook unit AllowedCPUs=${expected.AllowedCPUs} CPUWeight=${expected.CPUWeight} MemoryMax=${expected.MemoryMax} as rebuild.sh writes`);
+}
+
+const UNITS = /** @type {Record<string, number>} */ ({K: 1024, M: 1024 ** 2, G: 1024 ** 3, T: 1024 ** 4});
+
+/** What rebuild.sh's wildshard-cook unit sets on a 16-core box: AllowedCPUs (COOK_CPUS), CPUWeight and MemoryMax in
+ *  bytes, as `systemctl show` prints them. @param {string} rebuild @returns {{AllowedCPUs: string, CPUWeight: string, MemoryMax: string}} */
+export function expectedCookUnit(rebuild) {
+  const cpus = /\bCOOK_CPUS='AllowedCPUs=([0-9,-]+)'/u.exec(rebuild)?.[1];
+  const start = rebuild.indexOf('"$SYSTEMD/wildshard-cook.service" 644'), end = rebuild.indexOf('\nEOF\n', start);
+  const unit = start === -1 || end === -1 ? '' : rebuild.slice(start, end);
+  const weight = /^CPUWeight=(\d+)$/mu.exec(unit)?.[1], memory = /^MemoryMax=(\d+)([KMGT])?$/mu.exec(unit);
+  if (cpus === undefined || !unit.includes('$COOK_CPUS') || weight === undefined || memory === null) throw new Error("rebuild.sh's cook unit has no COOK_CPUS, CPUWeight or MemoryMax line");
+  return {AllowedCPUs: cpus, CPUWeight: weight, MemoryMax: String(Number(memory[1]) * (memory[2] === undefined ? 1 : UNITS[memory[2]] ?? 1))};
+}
+
+/** Each key `systemctl show` reports differently from `expected`, as `key box <value>, rebuild.sh <value>`, or null.
+ * @param {{AllowedCPUs: string, CPUWeight: string, MemoryMax: string}} expected @param {string} shown */
+export function cookUnitGap(expected, shown) {
+  const read = Object.fromEntries(shown.split('\n').map(line => line.trim().split('=')).filter(([key]) => key !== undefined && key !== '')
+    .map(([key, ...value]) => [key, value.join('=')]));
+  const gaps = Object.entries(expected).filter(([key, value]) => read[key] !== value).map(([key, value]) => `${key} box ${read[key] ?? '(none)'}, rebuild.sh ${value}`);
+  return gaps.length === 0 ? null : gaps.join('; ');
 }
 
 /** The --check rows that make an unattended apply unsafe, or null when it may run. @returns {string | null} */

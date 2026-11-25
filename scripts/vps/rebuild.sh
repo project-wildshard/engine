@@ -637,7 +637,10 @@ RestartSec=5
 $COOK_CPUS
 CPUWeight=20
 Nice=10
-MemoryMax=12G
+# FAST-RELEASE FR-A25 (11-25): 12G -> 8G, harden's drop-in (VH7) value. 12G came with this unit on 11-10 (MP0.1) and never
+# held: harden's drop-in overrides it (4G, then 5G, then FR-A22's 8G; the box reads 8589934592). One value in both files
+# lets the release check the running unit against this one (release-cook.mjs).
+MemoryMax=8G
 TasksMax=512
 LimitCORE=0
 NoNewPrivileges=yes

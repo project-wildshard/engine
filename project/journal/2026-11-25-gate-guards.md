@@ -8,3 +8,7 @@
 - QA 11-25 row 58: main-push pushes only its own lane's commits (git replay past the others, which stay on local
   main and are named); land refuses a commit naming another lane; the commit-msg hook writes Lane: from
   WS_LANE_NAME. ALLOW_CARRY=1 is the J381 hatch back to M1 carrying.
+- FAST-RELEASE FR-A25: release-cook hardens before the cook move (the move runs the box copy of rebuild.sh, which only
+  harden refreshes), then reads the cook unit (systemctl show) against rebuild.sh and stops on a gap. The box after
+  v0.1.91: AllowedCPUs 13-15, CPUWeight unset, MemoryMax 8G effective (unit file 12G from 11-10, overridden by
+  the drop-in); rebuild.sh unit now says 8G too.
