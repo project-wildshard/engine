@@ -84,3 +84,32 @@ test('a build beat replays a session up to its /exit, from a chosen second', asy
   expect(span.events[0]).toEqual([0, 'o', 'hello ']);
   expect(span.events.at(-1)).toEqual([1, 'o', 'world']);
 });
+
+// AT7: a real session replayed as a terminal, and the pictures it read as the panel beside it
+test('a session transcript replays as cast lines, in order, with its pictures and no secrets', async () => {
+  const { replay, toolLine, sniff, BEAT } = await import('../../scripts/trailer/transcript-cast.mjs');
+  const png = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0, 0, 0, 0]).toString('base64');
+  const rows = [
+    { type: 'assistant', timestamp: '2026-11-19T08:00:00Z', message: { content: [{ type: 'text', text: 'too early' }] } },
+    { type: 'assistant', timestamp: '2026-11-19T08:01:00Z', message: { content: [{ type: 'text', text: 'Shoot the wyrm.' }, { type: 'tool_use', id: 'r1', name: 'Read', input: { file_path: '/home/me/shot.png' } }] } },
+    { type: 'user', timestamp: '2026-11-19T08:01:01Z', message: { content: [{ type: 'tool_result', tool_use_id: 'r1', content: [{ type: 'image', source: { media_type: 'image/png', data: png } }] }] } },
+    { type: 'assistant', timestamp: '2026-11-19T08:01:02Z', message: { content: [{ type: 'tool_use', id: 'b1', name: 'Bash', input: { command: 'ls\nmore' } }] } },
+    { type: 'user', timestamp: '2026-11-19T08:01:03Z', message: { content: [{ type: 'tool_result', tool_use_id: 'b1', content: 'a\nb\nc\napi_key=abcdefghijkl' }] } },
+  ].map((r) => JSON.stringify(r)).join('\n');
+  const { events, images, length } = replay(rows, { from: '08:01', home: '/home/me' });
+  expect(events.map((e) => e[2]).join('')).not.toMatch(/too early|abcdefghijkl/u);
+  expect(events[0][2]).toContain('Shoot the wyrm.');
+  expect(images).toHaveLength(1);
+  expect(images[0].path).toBe('~/shot.png');
+  expect(events.at(-1)[2]).toContain('… +1 lines');
+  expect(length).toBeCloseTo(BEAT.text + BEAT.tool + BEAT.image + BEAT.tool + BEAT.result, 6);
+  expect(toolLine({ name: 'Edit', input: { file_path: 'a.ts' } })).toBe('Update(a.ts)');
+  expect(sniff(Buffer.from(png, 'base64'))).toBe('png');
+  expect(sniff(Buffer.from([0xFF, 0xD8, 0, 0]))).toBe('jpg');
+});
+
+test('the panel shows each picture from its moment to the next, the first from 0', async () => {
+  const { spans } = await import('../../scripts/trailer/panel.mjs');
+  expect(spans([{ t: 1, file: 'a' }, { t: 3, file: 'b' }], 5)).toEqual([{ file: 'a', dur: 3 }, { file: 'b', dur: 2 }]);
+  expect(() => spans([], 5)).toThrow(/no pictures/u);
+});

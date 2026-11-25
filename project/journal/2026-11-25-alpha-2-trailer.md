@@ -20,3 +20,12 @@
   importable (`import.meta.main`) so the push gate finds their tests, and `scripts/trailer/**`
   sits beside look-loop/views.mjs in the scripts tsconfig's exclude list (capture scripts full
   of in-page JS strings).
+- AT7: the build half is real sessions, not hero-card time-lapses (the hero cards in the
+  zone repos barely change over 8–31 revisions). `transcript-cast.mjs` replays a Claude Code
+  session transcript as an asciicast: every line is the session's own text, tool call or
+  result, on a compressed clock; secrets and the home folder are scrubbed. The transcripts
+  embed the pictures the session read, so `--images` pulls them out with their moments, and
+  `panel.mjs` turns them into the video build-beat.mjs shows beside the terminal (pictures
+  normalised through sharp first: sessions read PNG, JPEG and mislabelled files, and the concat
+  demuxer wants one codec). Three beats: Brasscap's Dust Wyrm, Mirror Salt into the engine,
+  Nine Dragon's look pass. Code-point slicing, not UTF-16: a cut surrogate broke ffmpeg.
