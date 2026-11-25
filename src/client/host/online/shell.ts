@@ -40,7 +40,7 @@ import { devControls, type DevControls } from './devControl';
 import { replaceFresh } from '@wildshard/engine/boot/freshPage';
 import { leftByPlayer } from '@wildshard/engine/boot/dropNotice';
 import { ROOMS_PING_EVENT, ROOMS_PING_EVERY_MS, roomsPingMs, type RoomsPing } from '@wildshard/engine/net/roomsPing';
-import { heardRooms } from '@wildshard/engine/game/grid/roomsRevision';
+import { heardRooms, roomsAheadEnd } from '@wildshard/engine/game/grid/roomsRevision';
 import { installedCatalogue } from '@wildshard/engine/game/grid/catalogueSlot';
 /** NB2: the slug a grid cell runs, by the page's catalogue (the instance itself when it names none). */
 const cellSlug = (cell: string): string => installedCatalogue()?.grid.cells.find(row => row.instance === cell)?.slug ?? cell;
@@ -89,8 +89,8 @@ export interface OnlineView {
   readonly mayRedial?: () => boolean;
   /** J174: a deploy is due, and play goes on. */
   readonly countdown: (countdown: Countdown) => void;
-  /** The seat is in a cell this page hasn't loaded. */
-  readonly elsewhere: (shard: string) => void;
+  /** The seat is in a cell this page hasn't loaded, or (`why`, roomsRevision.ts `roomsAheadEnd`) its rooms run newer bytes of this one. */
+  readonly elsewhere: (shard: string, why?: string) => void;
   /** GO4, GO5: a grid page's seat, by instance, and where in it. */
   readonly placed?: (cell: string, at: SeatPlace | undefined) => void;
   /** GO4: a grid page's seat is in a cell it didn't boot: enter the grid again there. */
@@ -197,7 +197,7 @@ export function connectOnline(config: OnlineConfig, view: OnlineView): OnlineShe
         if (worldReadsDevice(bytes)) sendDevice(transport, config.build); if (worldReadsSaves(bytes)) savesDoors.add(transport);
         if (worldReadsStats(bytes)) statsDoors.add(transport);
         // NB2 (J494): the page runs the rooms' revision of its zone, never its own; it reloads once onto it, or entry refuses
-        try { heardRooms(JSON.parse(decoder.decode(bytes)), gridCell === undefined ? config.loaded : cellSlug(gridCell), zone => { view.elsewhere(zone); }); } catch { /* a word that says no revisions changes nothing */ }
+        try { heardRooms(JSON.parse(decoder.decode(bytes)), gridCell === undefined ? config.loaded : cellSlug(gridCell), (zone, hash) => { view.elsewhere(zone, roomsAheadEnd(zone, hash)); }); } catch { /* a word that says no revisions changes nothing */ }
         return;
       }
       if (control === 'voice') {
@@ -619,7 +619,7 @@ export async function startOnline(config: StartOnline): Promise<StartedOnline> {
     placed: (cell, stand) => { if (stand !== undefined) gridNow?.placed(cell, stand); },
     regrid: cell => { regrid(cell); },
     regridInPage: cell => gridNow?.reenterInPage?.(cell, () => { regrid(cell); }) === true,
-    elsewhere: seat => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); leaving.unload(`online seat elsewhere (${seat})`); replaceFresh(url); },
+    elsewhere: (seat, why) => { entering(seat); const url = new URL(location.href); url.searchParams.set('chunk', seat); leaving.unload(why ?? `online seat elsewhere (${seat})`); replaceFresh(url); },
   });
   shellNow = shell;
   // the fresh read behind a kept copy: another build reloads into it, as a fresh read before the dial would (two reloads share one

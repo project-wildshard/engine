@@ -80,6 +80,9 @@ export function sessionHints(build: unknown = Reflect.get(globalThis, '__WS_BUIL
 /** What a page did with the door's world word: nothing to do, a reload onto the rooms' bytes, or none left to give (it stays behind,
  *  and `spawnDownload.ts` refuses entry with Reload). */
 export type RoomsHeard = 'same' | 'reload' | 'behind';
+/** QA 11-25 row 63: the end a rooms-ahead reload leaves with. It goes out through the shell's seat-elsewhere path, but it is no
+ *  seat: v0.1.91's K2 read 'online seat elsewhere (driftwood-isle)' as a seat regression when Driftwood r13 went live after the cut. */
+export function roomsAheadEnd(zone: string, hash: string): string { return `rooms ahead (${zone} runs ${hash.slice(0, 12)})`; }
 /** On every world word: keep the rooms' revisions for this build, and reload once when the zone this page plays (`loaded`) runs other
  *  bytes than the rooms. A second word that still disagrees for the same hash never reloads again.
  *  QA 11-23-b rows 18 and 20 (Jake, staging, Signal Dunes r6 live at 16:28 UTC: thrown to the main menu, and ENTER THE MMO's Signal

@@ -8,7 +8,7 @@ import { installCatalogue, installedCatalogue, type CatalogueDocument } from '..
 import { learnPlacedCells, roomsRevisions, type PlacedKeep } from '../src/client/game/grid/placedCells';
 import type { PlacedContent } from '../src/client/game/grid/placedContent';
 import { behindRecheck, behindRooms, clearPlacedSpawns, placedLoose, placedSpawn } from '../src/client/game/boot/placedSpawn';
-import { clearFollowed, heardRooms, pageRevision, sessionHints, type RoomsHints } from '../src/client/game/grid/roomsRevision';
+import { clearFollowed, heardRooms, pageRevision, roomsAheadEnd, sessionHints, type RoomsHints } from '../src/client/game/grid/roomsRevision';
 import { installSaveEnvironment, saveEnvironment } from '../src/shared/engine/saves/environment';
 import { worldRevisions } from '../src/server/host/dedicated/gridCells';
 import { catalogueBeforePlacements } from './fixtures/catalogue-before-placements';
@@ -112,6 +112,14 @@ test('the reload onto the rooms\' bytes goes back into the zone the page plays, 
   const left: string[] = [];
   expect(heardRooms(word, 'driftwood-isle', (zone, hash) => { left.push(`${zone} ${hash}`); }, hints)).toBe('reload');
   expect(left).toEqual([`driftwood-isle ${R9}`]);
+});
+
+// QA 11-25 row 63: v0.1.91's K2 ended 'online seat elsewhere (driftwood-isle)' because Driftwood r13 went live after the cut, and the
+// release lane chased a seat regression. The reload names the rooms and the bytes they run, never a seat.
+test('the reload onto the rooms\' bytes says so, and never says seat', () => {
+  const end = roomsAheadEnd('driftwood-isle', R9);
+  expect(end).toBe(`rooms ahead (driftwood-isle runs ${R9.slice(0, 12)})`);
+  expect(end).not.toMatch(/seat/);
 });
 
 test('a page that still cannot draw the rooms\' bytes after its one reload never reloads again', () => {
