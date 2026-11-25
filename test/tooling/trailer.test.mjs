@@ -56,6 +56,17 @@ test('a shot boots the grid, and only a singleZone shot boots its zone alone', (
   expect(bootGroups([{ name: 'a', zone: 'nalati-grasslands' }, { name: 'b', zone: 'nalati-grasslands', singleZone: true }])).toHaveLength(2);
 });
 
+test('a page walks to its cell neighbour by neighbour', async () => {
+  const { route } = await import('../../scripts/trailer/grid.mjs');
+  const cells = [['driftwood-isle', 0, 0], ['nalati-grasslands', 1, 0], ['nine-dragon-stack', 1, -1], ['far-reach', 0, -1], ['island', 3, 3]].map(([instance, x, z]) => ({ instance, cell: [x, z] }));
+  expect(route(cells, 'driftwood-isle', 'driftwood-isle')).toEqual([]);
+  expect(route(cells, 'driftwood-isle', 'nalati-grasslands')).toEqual(['nalati-grasslands']);
+  expect(route(cells, 'driftwood-isle', 'nine-dragon-stack')).toHaveLength(2);
+  expect(route(cells, 'driftwood-isle', 'nine-dragon-stack').at(-1)).toBe('nine-dragon-stack');
+  expect(() => route(cells, 'driftwood-isle', 'island')).toThrow(/no way/u);
+  expect(() => route(cells, 'driftwood-isle', 'nowhere')).toThrow(/not a cell/u);
+});
+
 test('every shot file in scripts/trailer/shots loads against the live grid', async () => {
   const shots = await loadShots(['driftwood-isle']);
   expect(shots.length).toBeGreaterThan(0);

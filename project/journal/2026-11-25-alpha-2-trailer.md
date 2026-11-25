@@ -59,3 +59,12 @@
   words) and `build-beat --layout stack` (zone on top, about 46 px type). Mirror Salt (its page
   stalls loading on local worlds), the open plots and the crossing were dropped; the dev world
   runs without `--staging` when a staging revision fails to cook.
+
+- AT15 (Jake, 15:2x Cancún: shots played "in magic 'single zone' mode which doesnt exist on
+  staging"): every page now comes in through the title's MMO card and walks to its shot's cell
+  neighbour by neighbour (`scripts/trailer/grid.mjs`: `enterGrid`, `route`, `enterCell`,
+  `skipReveal`); `?chunk=` only for a shot that says `singleZone: true` (Brasscap, no cell of the
+  staging grid). The hop holds forward over the seam, not `walkLeg`: walkLeg's waypoint is in
+  render coordinates, which jump at the seam, and it stops its clock while a crossing loads, so it
+  never ended (a 600 s hang into Sunscar Dunes). Hosted staging was not usable (its Driftwood entry
+  ends REV-BEHIND), so the shots ran on `dev.mjs --staging` (the staging grid on a local server).
