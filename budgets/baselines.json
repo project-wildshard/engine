@@ -1851,6 +1851,162 @@
    "value": 100,
    "contentKey": "mossgate@21",
    "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+  },
+  "render/phone-high/programs/brasscap-mesa": {
+   "value": 31,
+   "contentKey": "brasscap-mesa@18",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/driftwood-isle": {
+   "value": 84,
+   "contentKey": "driftwood-isle@12",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/far-reach": {
+   "value": 86,
+   "contentKey": "far-reach@8",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/mirror-salt": {
+   "value": 39,
+   "contentKey": "mirror-salt@7",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/mossgate": {
+   "value": 98,
+   "contentKey": "mossgate@24",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/nalati-grasslands": {
+   "value": 94,
+   "contentKey": "nalati-grasslands@9",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/nine-dragon-stack": {
+   "value": 47,
+   "contentKey": "nine-dragon-stack@9",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-alien-plain": {
+   "value": 22,
+   "contentKey": "open-plot-alien-plain@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-clockwork-canyon": {
+   "value": 23,
+   "contentKey": "open-plot-clockwork-canyon@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-coral-drift": {
+   "value": 22,
+   "contentKey": "open-plot-coral-drift@4",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-desert-ruin": {
+   "value": 23,
+   "contentKey": "open-plot-desert-ruin@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-ember-forge": {
+   "value": 23,
+   "contentKey": "open-plot-ember-forge@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-fossil-badlands": {
+   "value": 23,
+   "contentKey": "open-plot-fossil-badlands@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-frostline-peaks": {
+   "value": 23,
+   "contentKey": "open-plot-frostline-peaks@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-jungle-ziggurat": {
+   "value": 23,
+   "contentKey": "open-plot-jungle-ziggurat@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-lantern-bayou": {
+   "value": 22,
+   "contentKey": "open-plot-lantern-bayou@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-mosslight-ruins": {
+   "value": 24,
+   "contentKey": "open-plot-mosslight-ruins@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-night-market": {
+   "value": 24,
+   "contentKey": "open-plot-night-market@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-patchwork-fairground": {
+   "value": 23,
+   "contentKey": "open-plot-patchwork-fairground@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-saltwind-lighthouse": {
+   "value": 23,
+   "contentKey": "open-plot-saltwind-lighthouse@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-sky-harbor": {
+   "value": 23,
+   "contentKey": "open-plot-sky-harbor@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-sky-race": {
+   "value": 23,
+   "contentKey": "open-plot-sky-race@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-starfall-observatory": {
+   "value": 23,
+   "contentKey": "open-plot-starfall-observatory@3",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/open-plot-thin-ice": {
+   "value": 23,
+   "contentKey": "open-plot-thin-ice@4",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/pine-hollow": {
+   "value": 104,
+   "contentKey": "pine-hollow@16",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+  },
+  "render/phone-high/programs/sunscar-dunes": {
+   "value": 50,
+   "contentKey": "sunscar-dunes@8",
+   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
+   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
   }
  }
 }
