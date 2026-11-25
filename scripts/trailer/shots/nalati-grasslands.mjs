@@ -38,12 +38,12 @@ export const shots = [
 // the grid crossing (TR9 of the first trailer, blocked then): booted on the grid from the title's MMO card (Driftwood is
 // home, render coordinates = Driftwood's), the player on the seam road between Driftwood and Nalati (pitch 562.5 m: the
 // road at x 281, Nalati's west edge at x 312.5) sprints east over the seam into Nalati with every cell near (G607)
-shots.push({ name: 'g-cross', zone: Z, grid: true, time: T, weather: W, secs: 4, warm: 240,
+shots.push({ name: 'g-cross', zone: Z, time: T, weather: W, secs: 4, warm: 240,
   setup: js(VIEWMODEL, CALM, 'await window.__wildshard.pose({ x: 292, z: 2, yaw: -Math.PI / 2, pitch: -0.02 });'),
   afterWarm: held('move.forward') + held('sprint'),
   probe: '(() => { const s = window.__wildshard.shard.grid.state(); return { inside: s.inside, loading: s.cellLoading, at: window.__wildshard.world.player.position.toArray().map((v) => +v.toFixed(1)) }; })()' });
 // the same seam the other way: out of Nalati's grass west onto the road, Driftwood's sea ahead
-shots.push({ name: 'g-cross-west', zone: Z, grid: true, time: T, weather: W, secs: 4, warm: 240,
+shots.push({ name: 'g-cross-west', zone: Z, time: T, weather: W, secs: 4, warm: 240,
   setup: js(VIEWMODEL, CALM, 'await window.__wildshard.pose({ x: 334, z: 2, yaw: Math.PI / 2, pitch: -0.04 });'),
   afterWarm: held('move.forward') + held('sprint'),
-  probe: '(() => { const s = window.__wildshard.shard.grid.state(); return { inside: s.inside, at: window.__wildshard.world.player.position.toArray().map((v) => +v.toFixed(1)) }; })()' });
+  probe: '(() => ({ at: window.__wildshard.world.player.position.toArray().map((v) => +v.toFixed(1)) }))()' });

@@ -7,7 +7,9 @@
 //   { name, zone, secs,                      unique kebab name; a slug on the live grid (test/pins/staging.json); seconds
 //     time?, weather?,                       Debug settings written before the boot: time live|midday|golden|sunset|night,
 //                                            weather live|clear|fog|rain (src/client/engine/ui/Settings.ts OPTION_VALUES)
-//     grid?,                                 true: boot the grid page and stand in `zone`'s cell (crossings, the pull-back)
+//     singleZone?,                           true: boot `?chunk=<zone>`, the zone alone. Players never see that, so a shot
+//                                            opts in by name; every other shot boots the grid as players see it and stands
+//                                            in `zone`'s cell, its neighbours at the edges (Jake, AT15)
 //     rig?,                                  a camera rig { keys: [{ t, p: [x,y,z], l: [x,y,z], fov?, roll? }], ease?, rel?,
 //                                            relLook?, handheld?, viewmodel?, carryPlayer? }; absent: the game's own camera
 //     setup?, afterWarm?, waitFor?, probe?,  in-page JS strings, run before the warm-up, after it, polled until truthy
@@ -41,6 +43,8 @@ export function refuseShot(s, zones) {
     for (const k of keys) if (!(Number.isFinite(k.t) && [k.p, k.l].every(v => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite)))) return `${s.name}: a rig key needs t, p [x,y,z] and l [x,y,z]`;
     if (keys.some((k, i) => i > 0 && k.t <= keys[i - 1].t)) return `${s.name}: rig keys must rise in t`;
   }
+  if (s.singleZone !== undefined && s.singleZone !== true) return `${s.name}: singleZone is true or absent`;
+  if (s.grid !== undefined) return `${s.name}: grid is the default now; a shot of the zone alone says singleZone: true`;
   for (const f of ['setup', 'afterWarm', 'waitFor', 'probe', 'init']) if (s[f] !== undefined && typeof s[f] !== 'string') return `${s.name}: ${f} must be in-page JS (a string)`;
   for (const f of ['tick', 'warmTick']) if (s[f] !== undefined && typeof s[f] !== 'function') return `${s.name}: ${f} must be a function returning in-page JS`;
   return null;
@@ -64,12 +68,21 @@ export async function loadShots(sets, zones = gridZones()) {
   return shots;
 }
 
+/** The page a shot boots: the grid (the title's MMO card, as players come in) unless it says singleZone: true, the only
+ * way to `?chunk=`. @param {string} base @param {{ zone: string, singleZone?: boolean }} s */
+export function bootUrl(base, s) {
+  const root = base.replace(/\/?$/u, '/');
+  return s.singleZone === true
+    ? { grid: false, url: `${root}?chunk=${encodeURIComponent(s.zone)}&mute=1&skipintro=1&nolock=1&sw=0` }
+    : { grid: true, url: `${root}?mute=1&nolock=1&sw=0` };
+}
+
 /** Shots that share one page load: same zone, light, weather, grid mode and init. @param {readonly any[]} shots */
 export function bootGroups(shots) {
   /** @type {{ key: string, shots: any[] }[]} */
   const groups = [];
   for (const s of shots) {
-    const key = [s.zone, s.time ?? 'live', s.weather ?? 'live', s.grid ? 'grid' : 'shard', s.init ?? ''].join('|');
+    const key = [s.zone, s.time ?? 'live', s.weather ?? 'live', s.singleZone === true ? 'alone' : 'grid', s.init ?? ''].join('|');
     const g = groups.find(x => x.key === key);
     if (g) g.shots.push(s); else groups.push({ key, shots: [s] });
   }

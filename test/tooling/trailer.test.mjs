@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, expect, test } from 'vitest';
-import { bootGroups, gridZones, loadShots, refuseShot } from '../../scripts/trailer/shots/lib.mjs';
+import { bootGroups, bootUrl, gridZones, loadShots, refuseShot } from '../../scripts/trailer/shots/lib.mjs';
 
 const scratch = mkdtempSync(join(tmpdir(), 'trailer-shots-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
@@ -38,6 +38,22 @@ test('a bad light, a short rig and a duplicate name are refused', async () => {
   expect(refuseShot({ name: 'x', zone: 'driftwood-isle', secs: 0 }, zones)).toMatch(/secs/u);
   const dup = file('dup.mjs', `export const shots = [{ name: 'x', zone: 'driftwood-isle', secs: 1 }, { name: 'x', zone: 'driftwood-isle', secs: 1 }];`);
   await expect(loadShots([dup], zones)).rejects.toThrow(/duplicate shot x/u);
+});
+
+// AT15 (Jake: "you managed to play each shard/zone in magic 'single zone' mode which doesnt exist on staging"): a shot boots the
+// grid as players see it; `?chunk=` only when it says singleZone: true
+test('a shot boots the grid, and only a singleZone shot boots its zone alone', () => {
+  const grid = bootUrl('http://127.0.0.1:4420', { zone: 'nalati-grasslands' });
+  expect(grid.grid).toBe(true);
+  expect(grid.url).toBe('http://127.0.0.1:4420/?mute=1&nolock=1&sw=0');
+  expect(grid.url).not.toMatch(/chunk=/u);
+  const alone = bootUrl('http://127.0.0.1:4420/', { zone: 'nalati-grasslands', singleZone: true });
+  expect(alone.grid).toBe(false);
+  expect(alone.url).toMatch(/[?]chunk=nalati-grasslands&/u);
+  const zones = ['nalati-grasslands'];
+  expect(refuseShot({ name: 'a', zone: 'nalati-grasslands', secs: 1, singleZone: 'yes' }, zones)).toMatch(/singleZone/u);
+  expect(refuseShot({ name: 'a', zone: 'nalati-grasslands', secs: 1, grid: true }, zones)).toMatch(/grid is the default/u);
+  expect(bootGroups([{ name: 'a', zone: 'nalati-grasslands' }, { name: 'b', zone: 'nalati-grasslands', singleZone: true }])).toHaveLength(2);
 });
 
 test('every shot file in scripts/trailer/shots loads against the live grid', async () => {
@@ -108,14 +124,42 @@ test('a session transcript replays as cast lines, in order, with its pictures an
   expect(sniff(Buffer.from([0xFF, 0xD8, 0, 0]))).toBe('jpg');
 });
 
+// AT10 re-cut: a beat read on a phone shows the ask and the answer, not tool noise
+test('a compact replay opens on the ask from the brief and keeps only the matching answer and chosen pictures', async () => {
+  const { replay, firstSentence, wrap, SHOWN, toolLine, firstPrompt } = await import('../../scripts/trailer/transcript-cast.mjs');
+  const pic = Buffer.from([0xFF, 0xD8, 0, 0]).toString('base64');
+  const read = (id, path) => [
+    { type: 'assistant', timestamp: '2026-11-19T08:01:00Z', message: { content: [{ type: 'tool_use', id, name: 'Read', input: { file_path: path } }] } },
+    { type: 'user', timestamp: '2026-11-19T08:01:01Z', message: { content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'image', source: { media_type: 'image/jpeg', data: pic } }] }] } },
+  ];
+  const rows = [
+    { type: 'user', timestamp: '2026-11-19T08:00:00Z', message: { content: 'You are a lane. Rebuild the bandits limb by limb. Read the plan.' } },
+    { type: 'assistant', timestamp: '2026-11-19T08:01:00Z', message: { content: [{ type: 'text', text: 'Now the bars helper.' }, { type: 'tool_use', id: 'w', name: 'Write', input: { file_path: '/home/me/x/cc26.py' } }] } },
+    ...read('a', '/home/me/sheet.png'), ...read('b', '/home/me/board.png'),
+    { type: 'assistant', timestamp: '2026-11-19T08:02:00Z', message: { content: [{ type: 'text', text: 'Done.\n- **CC13** pushed. The bandits are rebuilt on the skin. Pins move.' }] } },
+  ].map((r) => JSON.stringify(r)).join('\n');
+  expect(firstPrompt(rows)).toContain('Rebuild the bandits');
+  const { events, images } = replay(rows, { home: '/home/me', compact: true, cols: 40, ask: 'Rebuild the bandits limb by limb.', prose: true, match: /bandits are rebuilt/iu, pictures: /sheet/u });
+  const shown = events.map((e) => e[2]).join('');
+  expect(shown).toContain('> Rebuild the bandits limb by limb.');
+  expect(shown).toContain('The bandits are rebuilt on the skin.');
+  expect(shown).not.toMatch(/bars helper|cc26|Read image|Pins move/u);
+  expect(images.map((i) => i.path)).toEqual(['~/sheet.png']);
+  expect(() => replay(rows, { compact: true, ask: 'not in the brief' })).toThrow(/first prompt/u);
+  expect(firstSentence('One. Two.\nThree')).toBe('One.');
+  expect(wrap('aaa bbb ccc', 7, '  ')).toBe('aaa bbb\r\n  ccc');
+  expect(SHOWN.test(toolLine({ name: 'Bash', input: { command: 'cd x && pnpm lint' } }, true))).toBe(true);
+  expect(SHOWN.test(toolLine({ name: 'Bash', input: { command: 'ls -la' } }, true))).toBe(false);
+});
+
 test('the panel shows each picture from its moment to the next, the first from 0', async () => {
   const { spans } = await import('../../scripts/trailer/panel.mjs');
   expect(spans([{ t: 1, file: 'a' }, { t: 3, file: 'b' }], 5)).toEqual([{ file: 'a', dur: 3 }, { file: 'b', dur: 2 }]);
   expect(() => spans([], 5)).toThrow(/no pictures/u);
 });
 
-// AT6: the party stands round its point facing in, and only ever joins a local world
-test('the party spreads round its point, faces it, and refuses a shared world', async () => {
+// AT6: the party stands round its point facing in, and never joins production
+test('the party spreads round its point, faces it, and refuses production', async () => {
   const { spots, loopback } = await import('../../scripts/trailer/party.mjs');
   const ring = spots(3, { x: 10, z: -5 }, 4);
   expect(ring).toHaveLength(3);
@@ -124,18 +168,32 @@ test('the party spreads round its point, faces it, and refuses a shared world', 
     expect(Math.atan2(-(10 - s.x), -(-5 - s.z))).toBeCloseTo(s.yaw, 2);
   }
   expect(loopback('http://127.0.0.1:4410/')).toBe('http://127.0.0.1:4410/');
-  expect(() => loopback('https://staging.wildshard.io/')).toThrow(/not a local world/u);
+  expect(loopback('https://staging.wildshard.io/')).toBe('https://staging.wildshard.io/');
+  expect(() => loopback('https://wildshard.io/')).toThrow(/not a local world or staging/u);
+  const { wedge } = await import('../../scripts/trailer/party.mjs');
+  const at = { x: 0, z: -200, yaw: Math.PI }; // facing +z
+  expect(wedge(0, at)).toEqual({ x: 0, z: -200, yaw: Math.PI });
+  const [l, r] = [wedge(1, at, 1), wedge(2, at, 1)];
+  expect(l.z).toBeCloseTo(-201.3, 2); // behind the leader
+  expect(r.z).toBeCloseTo(-201.3, 2);
+  expect(Math.abs(l.x - r.x)).toBeCloseTo(2, 2); // one metre either side
 });
 
 // AT10: the alpha 2 cut fills its length, keeps the bug off the build beats, and lands the score's hits
 test('the alpha 2 cut is about a minute and lands its last hit on the pull-back', async () => {
   const { cut, onCut } = await import('../../scripts/trailer/cuts/alpha-2.mjs');
-  const { edl, mix, titles } = cut({ TAKE: 't.wav', SFX: 'sfx', bug: 'bug.png', 'build-1': 'a.mp4', 'build-2': 'b.mp4', 'build-3': 'c.mp4' });
+  const { edl, mix, titles } = cut({ TAKE: 't.wav', SFX: 'sfx', bug: 'bug.png', 'build-1': 'a.mp4', 'build-2': 'b.mp4' });
   expect(edl.clips.reduce((s, c) => s + c.dur, 0)).toBeCloseTo(edl.length, 6);
   expect(edl.length).toBeGreaterThan(55);
   expect(edl.length).toBeLessThan(66);
   expect(edl.clips[0].shot).toBe('d-walk');
-  expect(edl.clips.find((c) => c.shot === 'g-rise').at).toBeCloseTo(onCut(64.77), 2);
+  const rise = edl.clips.find((c) => c.shot === 'g-rise-low');
+  expect(onCut(64.77)).toBeGreaterThan(rise.at);
+  expect(onCut(64.77)).toBeLessThan(rise.at + rise.dur);
+  expect(edl.clips.filter((c) => c.video).map((c) => c.video)).toEqual(['a.mp4', 'b.mp4']);
+  const party = edl.clips.find((c) => c.shot === 'd-party');
+  expect(titles.find((t) => t.card === 'bigcap').at).toBeGreaterThanOrEqual(party.at); // the pitch line over the party
+  expect(edl.clips.map((c) => c.zone)).not.toContain('mirror-salt');
   expect(edl.overlays.reduce((s, o) => s + o.to - o.from, 0)).toBeCloseTo(edl.length - edl.clips.at(-1).dur, 2); // the bug on every frame but the end hold
   expect(titles.map((t) => t.card)).toEqual(expect.arrayContaining(['alpha', 'shard', 'bigcap', 'endA']));
   expect(mix.length).toBe(edl.length);

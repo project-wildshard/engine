@@ -4,11 +4,14 @@
 // zone before and after).
 //
 //   node scripts/trailer/build-beat.mjs <session.cast> <out.mp4> --dur <s> --lapse <a.mp4> [--lapse <b.mp4>] [--crop-top <px>]
-//        [--from <s>] [--to <s>] [--hold <s>]
+//        [--from <s>] [--to <s>] [--hold <s>] [--layout side|stack]
 //
 // --from / --to cut the session to that span (its seconds, before the speed-up); everything after a typed /exit is cut.
-// Layout (1920×1080 on the site's abyss): the terminal on the left (agg, the asciinema renderer, scaled to fit 960 px), one
-// panel on the right at 800 px or two stacked; a cyan hairline frames each. The bottom left stays clear for a caption.
+// Layout (1920×1080 on the site's abyss), a cyan hairline framing each part:
+//   side   the terminal on the left (agg, the asciinema renderer, scaled to fit 960 px), one panel on the right at 800 px or
+//          two stacked. The bottom left stays clear for a caption.
+//   stack  read on a phone: the panel large on top (1216 × 684), the terminal as a strip under it across the frame, its
+//          few rows (transcript-cast.mjs --compact --rows 4) at about 46 px type.
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
@@ -38,7 +41,7 @@ export function main(argv) {
   const all = (/** @type {string} */ k) => argv.flatMap((a, i) => (a === `--${k}` ? [argv[i + 1]] : []));
   if (!OUT) { console.error('node scripts/trailer/build-beat.mjs <session.cast> <out.mp4> --dur <s> --lapse <mp4> [--lapse <mp4>]'); return 2; }
   const DUR = Number(opt('dur', '8')), HOLD = Number(opt('hold', '1')), CROP = Number(opt('crop-top', '0'));
-  const LAPSES = all('lapse');
+  const LAPSES = all('lapse'), STACK = opt('layout', 'side') === 'stack';
   const TMP = `${OUT}.parts`;
   mkdirSync(TMP, { recursive: true });
   const ff = (/** @type {string[]} */ args) => execFileSync('ffmpeg', ['-v', 'error', '-y', ...args], { stdio: 'inherit' });
@@ -47,11 +50,11 @@ export function main(argv) {
   writeFileSync(`${TMP}/session.cast`, `${[JSON.stringify(header), ...events.map((e) => JSON.stringify(e))].join('\n')}\n`);
   const speed = Math.max(1, length / (DUR - HOLD));
   console.log(`[build-beat] session ${length.toFixed(0)} s → ${(DUR - HOLD).toFixed(2)} s (${speed.toFixed(0)}×)`);
-  execFileSync('agg', ['--speed', String(speed), '--fps-cap', '30', '--font-size', '22', '--idle-time-limit', '100000', '--last-frame-duration', '0', `${TMP}/session.cast`, `${TMP}/term.gif`], { stdio: 'inherit' });
-  ff(['-i', `${TMP}/term.gif`, '-vf', `fps=${FPS},scale=960:900:force_original_aspect_ratio=decrease:flags=lanczos,tpad=stop_mode=clone:stop_duration=${DUR},trim=duration=${DUR},format=yuv444p`,
+  execFileSync('agg', ['--speed', String(speed), '--fps-cap', '30', '--font-size', STACK ? '34' : '22', '--idle-time-limit', '100000', '--last-frame-duration', '0', `${TMP}/session.cast`, `${TMP}/term.gif`], { stdio: 'inherit' });
+  ff(['-i', `${TMP}/term.gif`, '-vf', `fps=${FPS},scale=${STACK ? '1800:296' : '960:900'}:force_original_aspect_ratio=decrease:flags=lanczos,tpad=stop_mode=clone:stop_duration=${DUR},trim=duration=${DUR},format=yuv444p`,
     '-c:v', 'libx264', '-qp', '6', '-pix_fmt', 'yuv444p', `${TMP}/term.mkv`]);
 
-  const two = LAPSES.length > 1, pw = two ? 800 : 820;
+  const two = LAPSES.length > 1, pw = STACK ? 1216 : two ? 800 : 820;
   LAPSES.slice(0, 2).forEach((f, k) => {
     const d = Number(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', f]).toString().trim());
     ff(['-i', f, '-vf', `${CROP > 0 ? `crop=iw:ih-${CROP}:0:${CROP},` : ''}setpts=PTS*${(DUR / d).toFixed(5)},fps=${FPS},scale=${pw}:-2:flags=lanczos,trim=duration=${DUR},format=yuv444p`,
@@ -59,8 +62,9 @@ export function main(argv) {
   });
   const frame = (/** @type {number} */ i) => `[${i}:v]pad=iw+4:ih+4:2:2:color=0x8fe3ff@0.55[f${i}]`;
   const ins = ['-f', 'lavfi', '-i', `color=c=0x050a12:s=1920x1080:r=${FPS}:d=${DUR}`, '-i', `${TMP}/term.mkv`, ...LAPSES.slice(0, 2).flatMap((_, k) => ['-i', `${TMP}/lapse-${k}.mkv`])];
-  const graph = [frame(1), '[0:v][f1]overlay=56:56:shortest=1[a]'];
-  if (LAPSES.length === 1) graph.push(frame(2), '[a][f2]overlay=1050:(H-h)/2:shortest=1,format=yuv420p[v]');
+  const graph = [frame(1), STACK ? '[0:v][f1]overlay=(W-w)/2:H-h-36:shortest=1[a]' : '[0:v][f1]overlay=56:56:shortest=1[a]'];
+  if (STACK && LAPSES.length > 0) graph.push(frame(2), '[a][f2]overlay=(W-w)/2:36:shortest=1,format=yuv420p[v]');
+  else if (LAPSES.length === 1) graph.push(frame(2), '[a][f2]overlay=1050:(H-h)/2:shortest=1,format=yuv420p[v]');
   else if (two) graph.push(frame(2), frame(3), '[a][f2]overlay=1066:60:shortest=1[b]', '[b][f3]overlay=1066:H-h-60:shortest=1,format=yuv420p[v]');
   else graph.push('[a]format=yuv420p[v]');
   ff([...ins, '-filter_complex', graph.join(';'), '-map', '[v]', '-r', String(FPS), '-c:v', 'libx264', '-crf', '12', '-preset', 'slow', '-pix_fmt', 'yuv420p', OUT]);

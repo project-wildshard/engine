@@ -25,7 +25,8 @@
 // Frames land in <outDir>/<shot>/<nnnnnn>.jpg at 60·sub fps; <outDir>/<shot>/meta.json records the pose track and probe.
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { bootGroups, loadShots, RELEASE_HELD } from './shots/lib.mjs';
+import { enterCell, enterGrid } from './grid.mjs';
+import { bootGroups, bootUrl, loadShots, RELEASE_HELD } from './shots/lib.mjs';
 
 // ── in-page runtime ─────────────────────────────────────────────────────────────────────────────────────────────
 // Installed once per page. window.__tr.rig = { keys: [{ t, p:[x,y,z], l:[x,y,z], fov, roll }], ease } drives the camera.
@@ -185,20 +186,21 @@ export async function main(argv) {
     page.on('pageerror', (e) => { errors.push(e.message.slice(0, 300)); });
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
     const t0 = Date.now();
-    if (first.grid) {
-      await page.goto(`${BASE}?mute=1&nolock=1&sw=0`, { waitUntil: 'domcontentloaded' }); // the title, not skipintro: its MMO card is the way in
-      await page.locator('.ws-main-grid').click({ timeout: 120000 });
+    const { grid, url } = bootUrl(BASE, first); // the grid as players see it; `?chunk=` only for a shot that says singleZone
+    if (grid) {
+      await enterGrid(page, url);
       await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)), null, { timeout: 300000, polling: 500 });
       const failure = await page.evaluate(() => document.querySelector('#wserr .msg')?.textContent ?? null);
       if (failure) throw new Error(failure);
       await page.evaluate(() => window.__wildshard.requireWorld().hud.enterNow());
     } else {
-      await page.goto(`${BASE}?chunk=${first.zone}&mute=1&skipintro=1&nolock=1&sw=0`, { waitUntil: 'load' });
+      await page.goto(url, { waitUntil: 'load' });
     }
     await page.waitForFunction(() => Boolean(window.__wildshard?.world?.hud?.entered && !document.querySelector('.ws-load') && window.__wildshard.world.game.frameGate()), undefined, { timeout: 300000, polling: 1000 });
     if (await page.evaluate(() => window.__wildshard.world.hud.paused)) await page.keyboard.press('Escape');
+    if (grid) await enterCell(page, first.zone);
     await page.evaluate(`${RUNTIME}(${WALL})`);
-    console.log(`[boot ${first.zone}${first.grid ? ' grid' : ''} ${first.time ?? 'live'}/${first.weather ?? 'live'}] ready in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
+    console.log(`[boot ${first.zone}${grid ? ' on the grid' : ' alone'} ${first.time ?? 'live'}/${first.weather ?? 'live'}] ready in ${((Date.now() - t0) / 1000).toFixed(0)} s`);
     return { ctx, page, errors };
   }
 

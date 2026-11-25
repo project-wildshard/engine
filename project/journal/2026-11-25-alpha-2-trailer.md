@@ -47,3 +47,15 @@
 - AT12: `docs/trailer.md`, the re-make recipe (pieces, a shot, where to shoot, the commands,
   sound, the alpha 2 cut, the honesty rules, gotchas). The corner bug now sits over the build
   beats too, so every frame but the end card's hold carries the alpha label.
+- AT10 re-cut (opus-trailer-2): the first master's sheet showed a party that never reached the
+  frame, a drab crossing under the pitch line, flat cyan far cells in the 1050 m pull-back,
+  unreadable build beats and a washed-out Mirror Salt. The party is now real clients marching
+  on a cue: `party.mjs --go <port>` serves `/go`, which poses every member in a `wedge` and
+  starts a straight walk; the shot cues it and its lens follows the bodies the page draws
+  (`__onlinePlayers`, filtered to the party's last middle so a closed page's ghost is never
+  framed). The pitch line moved onto that shot; the finale is `g-rise-low`, off the party and
+  up over Driftwood only (far views wait, J509). The build beats show the ask and the answer:
+  `transcript-cast --compact --ask --prose --match --pictures` (the ask must be the brief's own
+  words) and `build-beat --layout stack` (zone on top, about 46 px type). Mirror Salt (its page
+  stalls loading on local worlds), the open plots and the crossing were dropped; the dev world
+  runs without `--staging` when a staging revision fails to cook.

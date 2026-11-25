@@ -13,8 +13,9 @@ export const shots = [
   { name: 'b-street', zone: Z, time: T, weather: W, secs: 3.5, warm: 60, setup: VIEWMODEL + CALM, afterWarm: held('move.forward') },
   // the town: a low crane round the station and the BRASSCAP sign
   { name: 'b-town', zone: Z, time: T, weather: W, secs: 4, setup: NO_VIEWMODEL + CALM, afterWarm: orbit(25, 5, Math.PI + 0.6, Math.PI - 0.2, 60) },
-  // fight: the lever rifle on a bandit camp
-  { name: 'b-bandits', zone: Z, time: T, weather: W, secs: 4, warm: 120,
+  // fight: the lever rifle on a bandit camp. Brasscap is no cell of the staging grid (11-25): players reach it from ZONE
+  // SELECT, alone, so this shot boots it alone as they see it
+  { name: 'b-bandits', zone: Z, singleZone: true, time: T, weather: W, secs: 4, warm: 120,
     setup: VIEWMODEL + WILD,
     afterWarm: preyNear('/bandit/', 6.5),
     probe: NEAR_KINDS,
