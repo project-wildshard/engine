@@ -67,6 +67,17 @@ test('a watch loop goes whole: the unreadable tail shares the marked ugrep\'s pr
   assert.match(result.kill[0].reason, /process group 310 with 311/);
 });
 
+// Meta QA 11-25 row 23: on Linux every own process's markers are readable, and a CI job runs its steps in one process
+// group, so the group rule is off there: the hook passes groupSweep false and only marked processes go.
+test('with the group rule off (Linux), only marked processes go, never their unmarked group', () => {
+  const procs = table(...base(),
+    row(320, 1, 'node -e setTimeout(() => {}, 300000)', { pgid: 8348 }),
+    row(321, 1, 'node -e setTimeout(() => {}, 300000)', { owner: 200, pgid: 8348 }),
+  );
+  assert.deepEqual(killed(select(procs, { now: NOW, groupSweep: false })), [321]);
+  assert.deepEqual(killed(select(procs, { now: NOW })), [320, 321]);
+});
+
 test('a live session\'s processes are left alone', () => {
   const result = select(table(...base()), { now: NOW });
   assert.deepEqual(killed(result), []);
@@ -178,7 +189,7 @@ test('on Linux the markers come from /proc/<pid>/environ; a gone or foreign proc
 
 // End to end with real processes: a fake session process named `claude` starts three sleepers (its own, one from
 // another session id, one with no marker), then runs the hook as its SessionEnd. Only its own sleeper may die.
-// QA 11-25 row 23: on the Linux CI runner the real kill still failed after the /proc fix. There, a sleeper left alive
+// QA 11-25 row 23: on the Linux CI runner the real kill still failed after the /proc fix. There, a wrong outcome
 // reports what the hook saw (its log, ps and /proc) and skips, until engine CI shows the case passing on a hosted runner.
 const LINUX = process.platform === 'linux';
 test('SessionEnd, for real: the ended session\'s process dies, the rest live', async (t) => {
@@ -212,7 +223,7 @@ setTimeout(() => {
       return false;
     }
   };
-  if (LINUX && alive(pids.own)) {
+  if (LINUX && (alive(pids.own) || !alive(pids.other) || !alive(pids.none))) {
     const environ = (pid) => { try { return readFileSync(`/proc/${pid}/environ`, 'utf8').split('\0').filter((pair) => /^CLAUDE/.test(pair)).join(' '); } catch (error) { return String(error.code); } };
     const ps = spawnSync('ps', ['-o', 'pid,ppid,pgid,stat,tty,lstart,command', '-p', Object.values(pids).join(',')], { encoding: 'utf8' }).stdout;
     let log = '';

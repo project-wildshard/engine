@@ -15,3 +15,5 @@ Row 23 found the self-hosted cause: a Linux runner's node sits in actions-runner
 and the RUNNER rule spared anything under actions-runner. RUNNER now matches only the runner
 itself. On Linux a miss still reports and skips until a hosted run shows the case passing.
 Row 24: `pkill-guard.mjs` refuses `pkill` and `killall` in agent shells.
+The group rule is off on Linux: a CI job runs its steps in one process group, and the
+macOS rule took the unmarked sleeper with the marked one (repo-kit run 45581962563).
