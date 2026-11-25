@@ -53,6 +53,24 @@ export const CHANNELS = {
   },
 };
 
+// FAST-RELEASE FR-A15 (QA 11-25 row 31): both channels' rooms sit behind one Caddy on the box, and the release's own gates
+// read the tailnet, so a box change that took both public hosts down (Cloudflare 521 from 10:11 UTC 11-25) passed every
+// check. A staging or production release reads both public /up URLs before the cook and harden, after them, and after
+// the alias move, and stops on anything but 200.
+export const PUBLIC_ROOMS = Object.freeze(['https://rooms.wildshard.io/up', 'https://rooms-staging.wildshard.io/up']);
+
+/** Each public rooms URL that does not answer 200, as `<url> answered <status>`. @param {Deps} deps @returns {Promise<string[]>} */
+export async function roomsDown(deps) {
+  const read = deps.roomsStatus;
+  if (read === undefined) return [];
+  const rows = await Promise.all(PUBLIC_ROOMS.map(async url => {
+    let status = 0;
+    try { status = await read(url); } catch { status = 0; }
+    return status === 200 ? undefined : `${url} answered ${status === 0 ? 'nothing' : status}`;
+  }));
+  return rows.filter(row => row !== undefined);
+}
+
 export class RefusedError extends Error {
   /** @param {string} message */
   constructor(message) { super(message); this.name = 'RefusedError'; }
@@ -106,6 +124,9 @@ export function pinnedReleaseKey(configured) {
  * @property {(file: string, args: string[], env: Record<string, string>) => void} run
  * @property {(url: string) => Promise<unknown>} fetchJSON  200 only, no cache, no redirects.
  * @property {(url: string) => Promise<string>} fetchText
+ * @property {(url: string) => Promise<number>} [roomsStatus]  FR-A15: the HTTP status of a public rooms URL (agent-marked,
+ *   no cache). Staging and production read both PUBLIC_ROOMS before the cook and harden, after them and after the alias.
+ * @property {boolean} [allowRoomsDown]  ALLOW_ROOMS_DOWN=1 (J381): a release that fixes a rooms outage goes on, and says so.
  * @property {(path: string) => Uint8Array} readFile
  * @property {{read: (phase: Phase) => any, write: (phase: Phase, value: object) => void}} state
  * @property {{clean: () => boolean, head: () => string, remoteTag: (tag: string) => string|undefined}} git
@@ -147,6 +168,13 @@ export async function runPhase(phase, deps) {
     deps.log(`DRY-RUN would refuse: ${message}`);
   };
   const plan = (/** @type {string} */ line) => deps.log(`${dry ? 'DRY-RUN would ' : ''}${line}`);
+  const rooms = async (/** @type {string} */ when) => {
+    if (dry || deps.roomsStatus === undefined || channel.channel === 'preview' || channel.solo) return;
+    const down = await roomsDown(deps);
+    if (down.length === 0) { deps.log(`PASS public rooms ${when}: both answer 200`); return; }
+    if (deps.allowRoomsDown === true) { deps.log(`NOTE public rooms ${when}: ${down.join('; ')} (ALLOW_ROOMS_DOWN=1)`); return; }
+    refuse(`public rooms ${when}: ${down.join('; ')} (FR-A15; ALLOW_ROOMS_DOWN=1 only for a release that fixes them)`);
+  };
   /** @type {HostContext} */
   const context = {root: deps.root, channel, build: deps.build, saveEpoch: deps.manifest.saveEpoch, version: deps.manifest.version};
 
@@ -245,11 +273,13 @@ export async function runPhase(phase, deps) {
   if (channel.channel === 'production') await productionGates(phase, deps, refuse);
 
   if (phase === 'check') {
+    await rooms('before the check');
     if (channel.channel === 'staging') {
       plan('move the cook when this exact staging release is signed, during the rooms switch');
       if (!dry) {
         await waitForGate(channel, deps, refuse, true);
         deps.run('node', ['scripts/release-cook.mjs', '--staging', `--build=${deps.build}`]);
+        await rooms('after the cook and harden');
       }
       plan('ready every signed extra placement for this exact build before checking the page');
       if (!dry) deps.run('node', ['--import', './scripts/bake-loader.mjs', 'scripts/release-placed-ready.mjs', 'staging'], {WS_BUILD_ID: deps.build});
@@ -297,12 +327,14 @@ export async function runPhase(phase, deps) {
     if (gate.serial !== deps.qa?.roomsSerial) refuse('staging rooms serial changed since candidate QA; run the candidate leg again');
     plan('move the cook to this signed staging build before moving the page alias');
     if (!dry) deps.run('node', ['scripts/release-cook.mjs', '--staging', `--build=${deps.build}`]);
+    await rooms('after the cook and harden');
   }
   for (const line of deps.host.describe('goLive', deployed)) plan(line);
   if (dry) return {refusals};
   await deps.host.goLive(deployed);
   deps.log(`ALIAS MOVED ${channel.origin} -> ${deployment.id}; checking the domain`);
   await waitForDomain(channel, deps, refuse);
+  await rooms('after the alias move');
   deps.state.write('go-live', {build: deps.build, channel: channel.channel, deployment, ...(gate.serial === undefined ? {} : {serial: gate.serial})});
   deps.log(`PASS ${channel.origin} -> ${deps.build} ${deployment.id} after matching serial ${gate.serial}${channel.solo ? ' (solo)' : ''} (alias last)`);
   deps.log(channel.solo ? `next: node scripts/e7-doctor-proof.mjs ${channel.origin} ${deps.build} --human-static`

@@ -8,7 +8,7 @@ import {join, resolve} from 'node:path';
 // oxlint-disable-next-line import/no-nodejs-modules -- The CLI's usage check runs as a child, before any git or host call.
 import {spawnSync} from 'node:child_process';
 import {afterEach, expect, test} from 'vitest';
-import {CHANNELS, CHECKED_DOCUMENTS, PHASES, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
+import {CHANNELS, CHECKED_DOCUMENTS, PHASES, PUBLIC_ROOMS, QA_LEGS, RELEASE_PUBLIC_KEY, qaGap, pinnedReleaseKey, RefusedError, runPhase, type Channel, type Deps, type PageHost, type Phase} from '../scripts/page-release/flow.mjs';
 import {runRedacted} from '../scripts/page-release/redact.mjs';
 import {CONFIG, WORKERS, isVersionUrl, workersHost} from '../scripts/page-release/hosts/workers.mjs';
 import {measureAssets} from '../scripts/app-build/assetLimits.mjs';
@@ -734,4 +734,28 @@ test('an Explore build refuses a catalogue other than the live staging bytes', a
   files.set(catalogue, Buffer.from('old'));
   await expect(runPhase('build', deps)).rejects.toThrow('Explore requires --catalogue');
   await expect(runPhase('build', {...deps, catalogue, fetchText: () => Promise.resolve('current')})).rejects.toThrow('Explore catalogue differs');
+});
+
+// FR-A15 (QA 11-25 row 31): a release reads both public rooms /up URLs before the cook and harden, after them and after the
+// alias, and stops on anything but 200, because its own gates read the tailnet and passed through an hour of 521s.
+test('a staging release stops when a public rooms host answers 521, and ALLOW_ROOMS_DOWN lets a fix through', async () => {
+  const {deps, calls, lines} = rig();
+  const status = new Map(PUBLIC_ROOMS.map(url => [url, 200]));
+  deps.roomsStatus = url => { calls.push(`fetch ${url}`); return Promise.resolve(status.get(url) ?? 0); };
+  await through(deps, 'go-live');
+  expect(lines.filter(line => line.startsWith('PASS public rooms'))).toEqual([
+    'PASS public rooms before the check: both answer 200', 'PASS public rooms after the cook and harden: both answer 200',
+    'PASS public rooms after the cook and harden: both answer 200', 'PASS public rooms after the alias move: both answer 200']);
+
+  const down = rig();
+  down.deps.roomsStatus = url => Promise.resolve(url === PUBLIC_ROOMS[0] ? 521 : 200);
+  await through(down.deps, 'upload');
+  await expect(runPhase('check', down.deps)).rejects.toThrow(/public rooms before the check: https:\/\/rooms\.wildshard\.io\/up answered 521/);
+  expect(down.calls).not.toContain('state check');
+
+  const unread = rig();
+  unread.deps.roomsStatus = () => Promise.reject(new Error('refused'));
+  unread.deps.allowRoomsDown = true;
+  await through(unread.deps, 'check');
+  expect(unread.lines).toContain(`NOTE public rooms before the check: ${PUBLIC_ROOMS[0]} answered nothing; ${PUBLIC_ROOMS[1]} answered nothing (ALLOW_ROOMS_DOWN=1)`);
 });

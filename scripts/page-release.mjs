@@ -32,6 +32,8 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
+import {agentFetch} from './agent-requests.mjs';
+import {agentUrl} from './agent-marker.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
@@ -123,6 +125,9 @@ async function run(step, generatedQa) {
       },
       fetchJSON: async url => (await fetch200(url)).json(),
       fetchText: async url => (await fetch200(url)).text(),
+      // FR-A15: the public rooms hosts, agent-marked; ALLOW_ROOMS_DOWN=1 lets a release that fixes an outage go on (J381).
+      roomsStatus: async url => (await agentFetch(agentUrl(url), {cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(20_000)})).status,
+      allowRoomsDown: process.env.ALLOW_ROOMS_DOWN === '1',
       readFile: path => readFileSync(path),
       state: {
         read: name => readState()[name],
