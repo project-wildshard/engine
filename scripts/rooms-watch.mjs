@@ -2,7 +2,8 @@
 // FAST-RELEASE FR-A15 part 3 (meta QA 11-25 row 31): the outside alarm that reaches an agent. On 11-25 both rooms hosts
 // answered Cloudflare 521 from 10:11 UTC for over an hour; Sentry's uptime monitor raised WILDSHARD-GAME-86 at 10:13, but
 // its only alert rules mail Jake and no agent polls Sentry (J252's hourly tick no longer runs), so nobody acted on it.
-// This poller reads both public rooms /up URLs (agent-marked) and, with a Sentry token, the open outage-category issues.
+// This poller reads both public rooms /up URLs (agent-marked by user agent only: Caddy's `rewrite * /health` keeps a
+// query, and the server answers `/health?agent=` with 404, so `?agent=` would read every host as 503) and, with a Sentry token, the open outage-category issues.
 // A host down on two reads in a row, or a newly open outage issue, writes `NOTE RED builder: ...` to the receipts and
 // `hc send`s it to the builder's terminal (main-watch's lookup); a host back gives one `rooms back` line. It never pages
 // Jake: phone, mail and Signal routing are his call. The disabled Sentry monitors stay off (one free uptime seat).
@@ -15,7 +16,6 @@ import {homedir} from 'node:os';
 import {dirname, join, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {agentFetch} from './agent-requests.mjs';
-import {agentUrl} from './agent-marker.mjs';
 import {BUILDER_LABEL} from './main-watch.mjs';
 
 export const ROOMS = Object.freeze(['https://rooms.wildshard.io/up', 'https://rooms-staging.wildshard.io/up']);
@@ -92,7 +92,7 @@ function sentryToken(home) {
 
 /** @param {string} url @returns {Promise<number>} */
 async function readStatus(url) {
-  try { return (await agentFetch(agentUrl(url), {cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15_000)})).status; }
+  try { return (await agentFetch(url, {cache: 'no-store', redirect: 'manual', signal: AbortSignal.timeout(15_000)})).status; }
   catch { return 0; }
 }
 
