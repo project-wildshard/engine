@@ -67,7 +67,12 @@ if [ "$mode" = docs ]; then
   # Space-separated repo paths from scripts/ci-selection.mjs. A file the config quarantines
   # is excluded from the full suite too, so zero selected files is green here.
   # shellcheck disable=SC2086
-  if [ -n "${DOCS_TESTS:-}" ]; then check doc-tests node scripts/vitest-tmp.ts run --passWithNoTests $DOCS_TESTS; fi
+  # A selected reader may open a pinned shard (save-whole-documents seats Driftwood: v0.1.86's release ci went red on
+  # "No shard source and no pinned product"), so install the pins first, as the code lane does before its shards.
+  if [ -n "${DOCS_TESTS:-}" ]; then
+    check doc-pins bash -c 'pnpm pins && pnpm gen:inputs'
+    check doc-tests node scripts/vitest-tmp.ts run --passWithNoTests $DOCS_TESTS
+  fi
 fi
 if [ "$mode" = code ]; then
   check sides pnpm check:sides

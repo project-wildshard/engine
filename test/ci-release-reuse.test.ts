@@ -126,3 +126,12 @@ test('every ci.yml job follows the selector, so a reused release run starts no s
     !/\n {4}if: \$\{\{ inputs\.memory_record &&/u.test(block)).map(({ name }) => name);
   expect(unfollowed).toEqual([]);
 });
+
+test('the docs lane installs the pins before the reader tests it runs', () => {
+  // v0.1.86's release ci 45567218760: save-whole-documents seats Driftwood, and the docs lane had no pins installed.
+  const script = readFileSync('scripts/ci-static.sh', 'utf8');
+  const pins = script.indexOf("check doc-pins bash -c 'pnpm pins && pnpm gen:inputs'"), tests = script.indexOf('check doc-tests ');
+  expect(pins).toBeGreaterThan(0);
+  expect(tests).toBeGreaterThan(pins);
+  expect(script.slice(script.lastIndexOf('if [ -n "${DOCS_TESTS:-}" ]', pins), tests)).not.toContain('fi\n');
+});
