@@ -242,3 +242,13 @@ test('no scripts/vps/ script pipes into grep -q (pipefail SIGPIPE race)', () => 
     if (code.some(line => /\|\s*matches\b/u.test(line))) expect(text, name).toContain('matches() { grep "$@" >/dev/null; }');
   }
 });
+
+// OB9 (opus-wave, v0.1.85 staging): harden-apply.sh runs its steps as "$HERE/<step>.sh", and harden-grafana.sh was
+// committed 100644, so the box said "Permission denied" and skipped the dashboard. Every step it runs is executable in git.
+test('every step harden-apply.sh runs directly is executable in git', () => {
+  const apply = readFileSync(resolve('scripts/vps/harden-apply.sh'), 'utf8');
+  const steps = [...new Set([...apply.matchAll(/"\$HERE\/([a-z0-9-]+\.sh)"/gu)].map(match => `scripts/vps/${match[1]}`))];
+  expect(steps).toContain('scripts/vps/harden-grafana.sh');
+  const modes = spawnSync('git', ['ls-files', '-s', '--', ...steps], { encoding: 'utf8' }).stdout.trim().split('\n');
+  expect(modes.filter(line => !line.startsWith('100755 ')), 'git update-index --chmod=+x').toEqual([]);
+});
