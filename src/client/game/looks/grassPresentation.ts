@@ -256,7 +256,7 @@ export class GrassPresentation {
   }
 
   update(dt: number, playerPos: THREE.Vector3): void {
-    const LOOKS = this.profile.input.view.looks, [BLADES,HEADS,CLUMPS] = LOOKS;
+    const LOOKS = this.profile.input.view.looks, [,HEADS] = LOOKS;
     // the player parts the grass and leaves a trail; the wind and the trample advance
     this.trail.push(dt, playerPos, this.params.playerRadius, this.profile.input.view.trail.strength);
     wind.update(dt);
@@ -280,7 +280,8 @@ export class GrassPresentation {
       if (b.tBakeContact.value) setLentTexture(id, 'tBakeContact', b.tBakeContact.value);
     }
     setLentParam(HEADS, 'time', u.uTime.value);
-    for (const id of [BLADES, CLUMPS]) {
+    // the blades and, when the grass has them, the card clumps (optional since QA 11-24 row 70): every look but the heads
+    for (const id of LOOKS.filter((_, k) => k !== 1)) {
       setLentParam(id, 'sunView', u.uSunView.value.toArray());
       setLentParam(id, 'wind', [w.uWindDir.value.x, w.uWindDir.value.y, w.uWindTravel.value, w.uWindTime.value]);
       setLentParam(id, 'windAux', [w.uWindSpeed.value, w.uWindGustiness.value]);
