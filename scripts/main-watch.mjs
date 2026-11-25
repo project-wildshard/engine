@@ -162,7 +162,36 @@ export function landers(text){
   for(const match of text.matchAll(/^\d\d:\d\d UTC (\S+) land plan\/(\S+) landed(?:, MAIN RED)? ([0-9a-f]{10}) on main/gmu)){
     const [,lane='',slug='',sha='']=match;out.set(sha,{lane,slug});
   }
+  // Meta QA 11-25 row 54: the land queue's own `<lane> LAND PUSHED engine <sha>` (its short SHA may be 9 long).
+  for(const match of text.matchAll(/^\d\d:\d\d (?:UTC|Cancún) (\S+) LAND PUSHED engine ([0-9a-f]{7,40})\b/gmu)){
+    const [,lane='',sha='']=match;if(!out.has(sha.slice(0,10)))out.set(sha.slice(0,10),{lane,slug:''});
+  }
   return out;
+}
+
+/** The lander of `sha` in `who`: by its 10-character short SHA, else by a shorter receipt SHA it starts with.
+ * @template L @param {ReadonlyMap<string,L>} who @param {string} sha @returns {L|undefined} */
+function landerOf(who,sha){
+  const exact=who.get(sha.slice(0,10));
+  if(exact!==undefined)return exact;
+  for(const [key,lander] of who)if(key.length<10&&sha.startsWith(key))return lander;
+  return undefined;
+}
+
+/**
+ * Meta QA 11-25 row 54: a red range names every lane that landed a commit in it, not only the pusher. engine run
+ * 45662209325 named opus-fr13, whose main-push carried opus-trailer's 5068a7365 (M1), and missed opus-trailer, whose
+ * commit was the red. Each commit's `Lane:` trailers (`authored`, by full SHA) add a row for every author lane the
+ * pusher is not, so the receipt, the NOTE RED lines and the prompts reach the author too.
+ * @template {{lane:string,slug:string}} L
+ * @param {readonly {sha:string,lander:L|undefined}[]} found @param {ReadonlyMap<string,readonly string[]>} authored
+ * @returns {{sha:string,lander:L|{lane:string,slug:string}|undefined}[]} */
+export function withAuthors(found,authored){
+  /** @type {{sha:string,lander:L|{lane:string,slug:string}|undefined}[]} */const rows=[...found];
+  for(const {sha,lander} of found){
+    for(const lane of authored.get(sha)??[])if(lane!==lander?.lane&&!rows.some(row=>row.sha===sha&&row.lander?.lane===lane))rows.push({sha,lander:{lane,slug:''}});
+  }
+  return rows;
 }
 
 /** Each commit of a red range with its lander. `commits` is newest first (rev-list); a main-push lander also owns the
@@ -170,7 +199,7 @@ export function landers(text){
  * @template {{lane:string,count?:number}} L
  * @param {readonly string[]} commits @param {ReadonlyMap<string,L>} who @returns {{sha:string,lander:L|undefined}[]} */
 export function attribute(commits,who){
-  const found=commits.map(sha=>({sha,lander:who.get(sha.slice(0,10))}));
+  const found=commits.map(sha=>({sha,lander:landerOf(who,sha)}));
   const own=found.map(row=>row.lander);
   for(const [index,row] of found.entries()){
     if(own[index]===undefined)continue;
@@ -528,7 +557,11 @@ export function liveIo(env=process.env){
       const machine=env.WS_MACHINE??(/mini/iu.test(hostname())?'mini':'macbook');
       if(machine!=='mini')return true;
       const text=io.receipts(),localLanes=new Set([...io.agents().keys(),...io.fixers(),...[...landers(text).values()].map(row=>row.lane)]);
-      const trailers=new Map();
+      return shouldPromptRed({machine,run:id,commits,recipientLanes,localLanes,receipts:text,trailers:io.lanes(commits)});
+    },
+    // Each commit's `Lane:` trailers, by full SHA (row 54 names their authors; MD8 routes by them).
+    lanes:(/** @type {readonly string[]} */commits)=>{
+      /** @type {Map<string,string[]>} */const trailers=new Map();
       if(commits.length>0){
         const log=run('git',['show','-s','--format=%H%x00%(trailers:key=Lane,valueonly)%x1e',...commits]);
         for(const entry of log.split('\u001E')){
@@ -536,7 +569,7 @@ export function liveIo(env=process.env){
           if(sha&&lanes!==undefined)trailers.set(sha,lanes.split(/\s+/u).filter(Boolean));
         }
       }
-      return shouldPromptRed({machine,run:id,commits,recipientLanes,localLanes,receipts:text,trailers});
+      return trailers;
     },
     dispatch:()=>{run('gh',['workflow','run','ci.yml','--ref','main','-R',repo]);},
   };
@@ -595,7 +628,7 @@ export function sweep(io,hint={}){
       else if(verdict.kind==='dispatch')lines.push(`main ${short(run.head_sha)} has only a cancelled run (${run.id}) and nothing newer; dispatched ci on main once`);
       else{
         const commits=io.commits(verdict.from??null,run.head_sha),range=`${short(verdict.from)||'start'}..${short(run.head_sha)}`;
-        const found=attribute(commits,who);
+        const found=withAuthors(attribute(commits,who),io.lanes?.(commits)??new Map());
         const names=[...new Set(found.map(row=>row.lander?.lane??'').filter(Boolean))];
         const named=names.length===0?'no land receipt (pushed by hand or the queue)':names.join(', ');
         let annotations='';

@@ -2,7 +2,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { expect, test } from 'vitest';
-import { failurePaths, KEEPER_MS, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
+import { attribute, failurePaths, KEEPER_MS, landers, readState, redMessage, redRecipients, redSuspect, shouldPromptRed, sweep } from '../main-watch.mjs';
 
 const older = 'a'.repeat(40), newer = 'b'.repeat(40), other = 'c'.repeat(40);
 const testFile = 'test/host-ruler-roots.test.ts', sourceFile = 'scripts/host-ruler/roots.mjs';
@@ -236,3 +236,38 @@ test('MD9 sweep persists observations, processes newest-first API runs in order,
   expect(receipts.filter(entry=>entry.startsWith('main BUDGET regressed'))).toHaveLength(2);
   expect(receipts.some(entry=>entry.startsWith('main budget observation'))).toBe(true);
 }));
+
+// Meta QA 11-25 row 54: engine run 45662209325 named only opus-fr13, whose main-push carried opus-trailer's red commit.
+test('a red range names and prompts every lane that landed a commit in it: the pusher and the carried commit\'s author', () => {
+  const scratch = mkdtempSync(join(resolve('tmp'), 'main-watch-authors-'));
+  try {
+    const green = { id: 70, created_at: '2026-11-25T17:00:00Z', head_sha: other, status: 'completed', conclusion: 'success', event: 'push' };
+    const runs = [green];
+    /** @type {{to:string,text:string}[]} */ const sent = [];
+    /** @type {string[]} */ const receipts = [];
+    /** @type {Parameters<typeof sweep>[0]} */ const io = {
+      repo: 'project-wildshard/engine', state: join(scratch, 'state.json'), runs: () => runs, tip: () => runs.at(-1)?.head_sha ?? other,
+      contains: () => true, failed: () => ({ names: [failed], logs: [] }), annotations: () => '',
+      commits: () => [newer, older], changes: () => new Map(),
+      // opus-fr13's main-push sent its own commit (newer) and carried opus-trailer's (older); a land queue receipt too.
+      receipts: () => '12:12 Cancún opus-fr13 main-push pushed main bbbbbbbbbb: 2 commit(s), 1 of them another lane\'s, carried along (M1)\n',
+      lanes: () => new Map([[newer, ['opus-fr13']], [older, ['opus-trailer']]]),
+      receipt: line => { receipts.push(line); }, panes: () => [], now: () => Date.parse(green.created_at),
+      agents: () => new Map([['opus-fr13', 't1'], ['opus-trailer', 't2']]), fixers: () => [],
+      send: (to, text) => { sent.push({ to, text }); return true; },
+      prompt: (to, text) => { sent.push({ to, text }); return true; }, dispatch: () => undefined,
+    };
+    sweep(io);
+    runs.push({ ...green, id: 71, head_sha: newer, conclusion: 'failure' });
+    sweep(io);
+    expect(receipts.find(line => line.startsWith('MAIN RED'))).toMatch(/landers opus-fr13, opus-trailer;/u);
+    expect(receipts.filter(line => line.startsWith('NOTE RED')).map(line => line.split(':')[0])).toEqual(['NOTE RED opus-fr13', 'NOTE RED opus-trailer']);
+    expect(sent.map(row => row.to).sort()).toEqual(['opus-fr13', 'opus-trailer']);
+    expect(sent.find(row => row.to === 'opus-trailer')?.text).toContain('aaaaaaaaaa');
+  } finally { rmSync(scratch, { recursive: true, force: true }); }
+});
+
+test('a land queue receipt names its lander by its 9-character SHA', () => {
+  const who = landers('17:12 UTC opus-fr13 LAND PUSHED engine 2e2d6786d (QA11-25 52)\n');
+  expect(attribute(['2e2d6786d3'.padEnd(40, '0')], who).map(row => row.lander?.lane)).toEqual(['opus-fr13']);
+});

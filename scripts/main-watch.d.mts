@@ -17,6 +17,7 @@ export interface Io {
   changes:(from:string|null,to:string)=>Map<string,string[]>;agents:()=>Map<string,string>;
   receipts:()=>string;receipt:(line:string)=>void;panes:()=>Pane[];send:(pane:string,text:string)=>boolean;prompt:(agent:string,text:string)=>boolean;fixers:()=>string[];dispatch:()=>void;
   redAllowed?:(run:number,commits:readonly string[],recipientLanes:readonly string[])=>boolean;
+  lanes?:(commits:readonly string[])=>Map<string,string[]>;
   nativeRuns?:()=>Run[];
   budgetRuns?:()=>Run[];
   failmodeRuns?:()=>Run[];
@@ -39,6 +40,7 @@ export function fpsNight(run:{display_title?:string}):{build:string;since:string
 export function judge(runs:readonly Run[],state:State,tip:string|null):Verdict[];
 export function verdictFor(runs:readonly Run[],sha:string,contains:(ancestor:string,descendant:string)=>boolean):{state:'green'|'red';run:Run}|null;
 export function landers(text:string):Map<string,{lane:string;slug:string;pane?:string;count?:number}>;
+export function withAuthors<L extends {lane:string;slug:string}>(found:readonly {sha:string;lander:L|undefined}[],authored:ReadonlyMap<string,readonly string[]>):{sha:string;lander:L|{lane:string;slug:string}|undefined}[];
 export function attribute<L extends {lane:string;count?:number}>(commits:readonly string[],who:ReadonlyMap<string,L>):{sha:string;lander:L|undefined}[];
 export function paneFor(panes:readonly Pane[],slug:string):string|undefined;
 export function failurePaths(logs:readonly string[]):string[];
