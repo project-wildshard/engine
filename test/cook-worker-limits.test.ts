@@ -16,7 +16,7 @@ import {folderStore, r2Store} from '../src/cook/game/packStore';
 import {hashOf, rawTar, slug, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** C4 (J28, J29, J30): a real product and hostile ones through real child processes under their real limits. */
-// Hostile archives, job limits and the R2 store. Real cooks are in cook-worker.test.ts and cook-worker-publish.test.ts.
+// Hostile archives, job limits and the R2 store. Real cooks are in cook-worker.test.ts and cook-worker-publish*.test.ts.
 const pack = (files: ReadonlyMap<string, Uint8Array>): Uint8Array => writeTar(files);
 
 describe('the cook worker', () => {

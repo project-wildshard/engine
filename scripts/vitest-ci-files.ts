@@ -32,6 +32,10 @@ export const CI_NATIVE_GROUPS = {
   // The publish file's cold real cook keeps the original serial, no-neighbour placement. The limits file
   // (hostile archives, job limits, R2) runs no real cook and stays an ordinary file, so the planner fits.
   'native-cook-publish': ['test/cook-worker-publish.test.ts'],
+  // QA 11-25 row 33: the publish file passed the 60 s file budget (66 s on main), so its budget refusal and its full store's
+  // alarm each run in a file of their own, each with its own cold real cook and the same placement.
+  'native-cook-publish-budget': ['test/cook-worker-publish-budget.test.ts'],
+  'native-cook-publish-full': ['test/cook-worker-publish-full.test.ts'],
   // The stale preparation's worker case (J262) cooks three times in the worker's bounded child: split from
   // cook-stale-preparation.test.ts, which passed the 60 s file budget, it keeps the same no-neighbour placement.
   'native-cook-stale': ['test/cook-stale-preparation-worker.test.ts'],

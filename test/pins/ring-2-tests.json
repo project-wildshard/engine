@@ -7,6 +7,8 @@
  "test/compiled-grid-strips.test.ts",
  "test/cook-worker.test.ts",
  "test/cook-worker-publish.test.ts",
+ "test/cook-worker-publish-budget.test.ts",
+ "test/cook-worker-publish-full.test.ts",
  "test/cook-worker-limits.test.ts",
  "test/released-save-play.test.ts",
  "test/driftwood-headless-population.test.ts",

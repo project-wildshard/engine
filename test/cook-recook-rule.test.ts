@@ -35,6 +35,9 @@ describe('the recook rule (SP7)', () => {
     scratch = mkdtempSync(join(tmpdir(), 'cook-recook-'));
     mkdirSync(join(scratch, 'jobs'), {recursive: true});
     writeFileSync(join(scratch, 'jobs/job.mjs'), job);
+    // QA 11-25 row 33: the counting job is plain JavaScript, so it takes an empty loader in bake-loader's place; bake-loader's
+    // TypeScript hooks cost each of the file's 58 launches about 0.2 s and checked nothing here.
+    writeFileSync(join(scratch, 'jobs/loader.mjs'), '');
     store = folderStore(join(scratch, 'store'));
     for (let at = 0; at < HEADS; at++) {
       const bytes = new TextEncoder().encode(`shard ${String(at)}`), hash = hashOf(bytes);
@@ -47,7 +50,7 @@ describe('the recook rule (SP7)', () => {
   const worker = (build: string, cook: string | undefined): ReturnType<typeof createCookWorker> => {
     if (store === undefined) throw new Error('no store');
     return createCookWorker({build, store, serverPacks: join(scratch, 'server'), scratch: join(scratch, 'jobs'), validator: 'v1', ...(cook === undefined ? {} : {cook}),
-      launcher: {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script: join(scratch, 'jobs/job.mjs'), wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024, cpuSlots: 1}},
+      launcher: {root, execPath: process.execPath, loader: join(scratch, 'jobs/loader.mjs'), script: join(scratch, 'jobs/job.mjs'), wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024, cpuSlots: 1}},
       source: {heads: () => Promise.resolve(heads.map((head, at) => ({...head, revision: at + 1}))), download: hash => { downloads++; const bytes = blobs.get(hash); if (bytes === undefined) throw new Error('No such shardfile'); return Promise.resolve(bytes); }}});
   };
   const index = async (build: string, hash: string): Promise<CookIndex> => {
@@ -89,7 +92,7 @@ describe('the recook rule (SP7)', () => {
     expect(plain.state).toBe('cooked');
     if (store === undefined) throw new Error('no store');
     const other = createCookWorker({build: 'build-e', store, serverPacks: join(scratch, 'server'), scratch: join(scratch, 'jobs'), validator: 'v2', cook: 'cook-2',
-      launcher: {root, execPath: process.execPath, loader: join(root, 'scripts/bake-loader.mjs'), script: join(scratch, 'jobs/job.mjs'), wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024, cpuSlots: 1}},
+      launcher: {root, execPath: process.execPath, loader: join(scratch, 'jobs/loader.mjs'), script: join(scratch, 'jobs/job.mjs'), wrap: [], limits: {seconds: 30, memoryMB: 2048, heapMB: 1024, cpuSlots: 1}},
       source: {heads: () => Promise.resolve([]), download: hash => Promise.resolve(blobs.get(hash) ?? new Uint8Array())}});
     expect((await other.cook(heads[1] ?? {slug: '', hash: ''})).state).toBe('cooked');
   }, 120_000);

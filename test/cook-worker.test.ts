@@ -8,7 +8,8 @@ import {hashOf, slug, useCookHarness} from './fixtures/cookWorkerHarness';
 
 /** C4 (J28, J29, J30): a real product and hostile ones through real child processes under their real limits. */
 // The cold real cook and the store it leaves. Hostile archives, job limits and the R2 store are in
-// cook-worker-limits.test.ts; the HTTP notice's own cold cook and the pack budget are in cook-worker-publish.test.ts.
+// cook-worker-limits.test.ts; the HTTP notice's own cold cook is in cook-worker-publish.test.ts and the pack budget in
+// cook-worker-publish-budget.test.ts and cook-worker-publish-full.test.ts.
 describe('the cook worker', () => {
   const h = useCookHarness();
 

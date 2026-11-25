@@ -9,7 +9,7 @@ import {PUSH_BUDGET} from './push-budget.mjs';
 interface CookEnvironment extends NodeJS.ProcessEnv { WS_CPU_SLOTS?:string }
 const {WS_CPU_ADMISSION:enabled}=process.env;
 // The limits file drives no real cook. Pin the two real cook callers to their admitted grant.
-const COOK_WORKER_TESTS=new Set(['test/cook-worker.test.ts','test/cook-worker-publish.test.ts']);
+const COOK_WORKER_TESTS=new Set(['test/cook-worker.test.ts','test/cook-worker-publish.test.ts','test/cook-worker-publish-budget.test.ts','test/cook-worker-publish-full.test.ts']);
 if(enabled==='1'||(!process.env.CI&&!process.env.GITHUB_ACTIONS)){
   if(enabled==='1')assertHeavyLease('full-test');
   // Reused workers can return after failed collection or a fixture can

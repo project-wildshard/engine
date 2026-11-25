@@ -53,6 +53,8 @@
   "test/quest-mechanics.test.ts": [],
   "test/cook-worker.test.ts": ["sunscar-dunes"],
   "test/cook-worker-publish.test.ts": ["sunscar-dunes"],
+  "test/cook-worker-publish-budget.test.ts": ["sunscar-dunes"],
+  "test/cook-worker-publish-full.test.ts": ["sunscar-dunes"],
   "test/cook-worker-limits.test.ts": ["sunscar-dunes"],
   "test/released-save-play.test.ts": ["brasscap-mesa", "sunscar-dunes", "far-reach", "driftwood-isle", "nalati-grasslands", "pine-hollow", "nine-dragon-stack"],
   "test/cook-refusals.test.ts": ["brasscap-mesa"],

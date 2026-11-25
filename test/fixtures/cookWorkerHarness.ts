@@ -1,11 +1,11 @@
 // oxlint-disable-next-line import/no-nodejs-modules -- Shardfiles are addressed by their real hash.
 import {createHash} from 'node:crypto';
 // oxlint-disable-next-line import/no-nodejs-modules -- Each cook file runs the worker in folders of its own.
-import {mkdtempSync, rmSync} from 'node:fs';
+import {closeSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, rmSync} from 'node:fs';
 // oxlint-disable-next-line import/no-nodejs-modules -- Each cook file runs the worker in folders of its own.
 import {tmpdir} from 'node:os';
 // oxlint-disable-next-line import/no-nodejs-modules -- Each cook file runs the worker in folders of its own.
-import {join} from 'node:path';
+import {dirname, join} from 'node:path';
 import {afterAll, beforeAll} from 'vitest';
 import {readTar} from '@wildshard/format/tar';
 import {folderTarball} from '../../src/cook/game/folderTarball';
@@ -20,6 +20,15 @@ export const hashOf = (bytes: Uint8Array): string => createHash('sha256').update
 /** ZONE-SNAPSHOTS ZS8 (J507): an old-format product the chain carries forward, made up (shard-format's CLI fixture at
  *  format 0.1, one terrain tile), never a stored zone. */
 export const legacyMigrationFixture = { folder: join('test', 'fixtures', 'made-up-old'), slug: 'cli-fixture' };
+
+/** A file of `bytes` that allocates none of its disk space: the page's content and the cook's packed parts in the
+ *  publish files (cook-worker-publish*.test.ts). */
+export function sparse(folder: string, key: string, bytes: number): void {
+  const file = join(folder, key);
+  mkdirSync(dirname(file), {recursive: true});
+  const fd = openSync(file, 'w');
+  try { ftruncateSync(fd, bytes); } finally { closeSync(fd); }
+}
 
 /** A ustar with one entry `writeTar` would never write, its checksum right, so only a reader's rules refuse it. */
 export function rawTar(name: string, body: Uint8Array, type = '0'): Uint8Array {
