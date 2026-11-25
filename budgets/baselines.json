@@ -3,169 +3,176 @@
  "about": "BUDGET-CAPS: each budget's recorded baseline, written by node scripts/budgets/cli.mjs record (never by hand). contentKey is what the value was measured on: a shard's pinned revision (<slug>@<revision>) for its numbers, engine for the app's own. declared: an engine feature that raised this budget in the commit that wrote it (cli.mjs declare); record clears it. The soft line is value plus 10% (J444).",
  "baselines": {
   "download/phone/pine-hollow": {
-   "value": 56418889,
-   "contentKey": "pine-hollow@11",
-   "commit": "c5b5031275838f265f827b1c7bfa7fe605f1da4b",
-   "why": "new shard revisions pinned on main (budgets run 45143442332): Pine r11, Driftwood r9, Nalati r6, Nine Dragon, Brasscap r13, Mossgate r23, Mirror Salt r6"
+   "value": 49349395,
+   "contentKey": "pine-hollow@18",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/driftwood-isle": {
-   "value": 22836165,
-   "contentKey": "driftwood-isle@9",
-   "commit": "c5b5031275838f265f827b1c7bfa7fe605f1da4b",
-   "why": "new shard revisions pinned on main (budgets run 45143442332): Pine r11, Driftwood r9, Nalati r6, Nine Dragon, Brasscap r13, Mossgate r23, Mirror Salt r6"
+   "value": 27134797,
+   "contentKey": "driftwood-isle@12",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/far-reach": {
-   "value": 26457977,
-   "contentKey": "far-reach@4",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 31948387,
+   "contentKey": "far-reach@9",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/sunscar-dunes": {
-   "value": 11462235,
-   "contentKey": "sunscar-dunes@5",
-   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
-   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
+   "value": 11443863,
+   "contentKey": "sunscar-dunes@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/nalati-grasslands": {
-   "value": 69024089,
-   "contentKey": "nalati-grasslands@6",
-   "commit": "c5b5031275838f265f827b1c7bfa7fe605f1da4b",
-   "why": "new shard revisions pinned on main (budgets run 45143442332): Pine r11, Driftwood r9, Nalati r6, Nine Dragon, Brasscap r13, Mossgate r23, Mirror Salt r6"
+   "value": 80550798,
+   "contentKey": "nalati-grasslands@10",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/nine-dragon-stack": {
-   "value": 26996429,
-   "contentKey": "nine-dragon-stack@6",
-   "commit": "c5b5031275838f265f827b1c7bfa7fe605f1da4b",
-   "why": "new shard revisions pinned on main (budgets run 45143442332): Pine r11, Driftwood r9, Nalati r6, Nine Dragon, Brasscap r13, Mossgate r23, Mirror Salt r6"
+   "value": 28537547,
+   "contentKey": "nine-dragon-stack@11",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "js/grid-session/raw": {
-   "value": 41896,
+   "value": 46637,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
-   "declared": "engine features landed 2026-11-19..24 (4d573c835..ca4f9c1a7) while budgets.yml never reached its Judge step (Collect failed on retired test shards' size rows, fixed a38fc9ecd): +11% title, +11% grid-session over five days of title/zone-select/map/drop work; record from the first green budgets run (J444)"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "js/grid-session/gzip": {
-   "value": 14354,
+   "value": 16056,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
-   "declared": "engine features landed 2026-11-19..24 (4d573c835..ca4f9c1a7) while budgets.yml never reached its Judge step (Collect failed on retired test shards' size rows, fixed a38fc9ecd): +11% title, +11% grid-session over five days of title/zone-select/map/drop work; record from the first green budgets run (J444)"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "js/title/raw": {
-   "value": 368338,
+   "value": 410973,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
-   "declared": "engine features landed 2026-11-19..24 (4d573c835..ca4f9c1a7) while budgets.yml never reached its Judge step (Collect failed on retired test shards' size rows, fixed a38fc9ecd): +11% title, +11% grid-session over five days of title/zone-select/map/drop work; record from the first green budgets run (J444)"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "js/title/gzip": {
-   "value": 126790,
+   "value": 142748,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
-   "declared": "engine features landed 2026-11-19..24 (4d573c835..ca4f9c1a7) while budgets.yml never reached its Judge step (Collect failed on retired test shards' size rows, fixed a38fc9ecd): +11% title, +11% grid-session over five days of title/zone-select/map/drop work; record from the first green budgets run (J444)"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "js/session/raw": {
-   "value": 4413316,
+   "value": 4660178,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
-   "declared": "EM17 verifies cooked document provenance before typed intake; MIRROR-SALT-ZONE MSZ20: vehicles (MSZ7 to MSZ19: handling step, hulls, prediction, seat view, followed vehicles, drive discs) add about 45 KB raw, 13 KB gzip to the session closure (measured ac8e123e7: 4,485,462 raw, 1,391,246 gzip)"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "js/session/gzip": {
-   "value": 1365883,
+   "value": 1454184,
    "contentKey": "engine",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
-   "declared": "EM17 verifies cooked document provenance before typed intake; MIRROR-SALT-ZONE MSZ20: vehicles (MSZ7 to MSZ19: handling step, hulls, prediction, seat view, followed vehicles, drive discs) add about 45 KB raw, 13 KB gzip to the session closure (measured ac8e123e7: 4,485,462 raw, 1,391,246 gzip)"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "ledger/brasscap-mesa/control": {
-   "value": 63331668,
-   "contentKey": "brasscap-mesa@9",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 124538419,
+   "contentKey": "brasscap-mesa@19",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 1749456,
-    "workers": 6448783,
-    "geometry": 14550490,
-    "textures": 14217376,
-    "scene": 528392,
+    "engine": 1749904,
+    "workers": 6549825,
+    "geometry": 16068463,
+    "textures": 6891004,
+    "scene": 8990156,
     "audio": 0,
-    "loading": 23026387,
+    "loading": 81478283,
     "margin": 0
    }
   },
   "ledger/brasscap-mesa/peak": {
-   "value": 89830521,
-   "contentKey": "brasscap-mesa@9",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 142985957,
+   "contentKey": "brasscap-mesa@19",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 1749456,
-    "workers": 6448783,
-    "geometry": 14550490,
-    "textures": 14217376,
-    "scene": 528392,
+    "engine": 1749904,
+    "workers": 6814021,
+    "geometry": 16068463,
+    "textures": 15279600,
+    "scene": 9524804,
     "audio": 0,
-    "loading": 49525240,
+    "loading": 90738381,
     "margin": 0
    }
   },
   "ledger/driftwood-isle/control": {
-   "value": 184973500,
-   "contentKey": "driftwood-isle@5",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 181183468,
+   "contentKey": "driftwood-isle@12",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 1880528,
-    "workers": 15048057,
-    "geometry": 37857984,
-    "textures": 55031590,
-    "scene": 0,
-    "audio": 18661903,
-    "loading": 53682654,
+    "engine": 1881616,
+    "workers": 20866329,
+    "geometry": 39680996,
+    "textures": 14921664,
+    "scene": 9659052,
+    "audio": 17402183,
+    "loading": 73960844,
     "margin": 0
    }
   },
   "ledger/driftwood-isle/peak": {
-   "value": 228021971,
-   "contentKey": "driftwood-isle@5",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 278394013,
+   "contentKey": "driftwood-isle@12",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 1880528,
-    "workers": 15048057,
-    "geometry": 37857984,
-    "textures": 55031590,
-    "scene": 0,
-    "audio": 32977423,
-    "loading": 82415605,
+    "engine": 1881616,
+    "workers": 20866329,
+    "geometry": 39680996,
+    "textures": 56864670,
+    "scene": 9659052,
+    "audio": 17402183,
+    "loading": 129228383,
     "margin": 0
    }
   },
   "ledger/far-reach/control": {
-   "value": 211483552,
-   "contentKey": "far-reach@4",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 214750503,
+   "contentKey": "far-reach@9",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 0,
+    "engine": 256,
     "workers": 8720141,
-    "geometry": 15393208,
-    "textures": 158019576,
-    "scene": 0,
+    "geometry": 15988987,
+    "textures": 149741900,
+    "scene": 1210040,
     "audio": 0,
-    "loading": 26539843,
+    "loading": 36278395,
     "margin": 0
    }
   },
   "ledger/far-reach/peak": {
-   "value": 332578589,
-   "contentKey": "far-reach@4",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 352904228,
+   "contentKey": "far-reach@9",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 0,
+    "engine": 256,
     "workers": 8720141,
-    "geometry": 15393208,
-    "textures": 158019576,
-    "scene": 0,
+    "geometry": 15988987,
+    "textures": 158130496,
+    "scene": 1210040,
     "audio": 0,
-    "loading": 147634880,
+    "loading": 166043524,
     "margin": 0
    }
   },
@@ -202,578 +209,614 @@
    }
   },
   "ledger/nalati-grasslands/control": {
-   "value": 225721180,
-   "contentKey": "nalati-grasslands@4",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 215832905,
+   "contentKey": "nalati-grasslands@10",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 9837744,
-    "workers": 10314783,
-    "geometry": 35834403,
-    "textures": 79911074,
-    "scene": 0,
-    "audio": 23016238,
-    "loading": 63996154,
+    "engine": 9839408,
+    "workers": 10668161,
+    "geometry": 38216577,
+    "textures": 69525830,
+    "scene": 15427524,
+    "audio": 2648440,
+    "loading": 66696181,
     "margin": 0
    }
   },
   "ledger/nalati-grasslands/peak": {
-   "value": 308955314,
-   "contentKey": "nalati-grasslands@4",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 331039574,
+   "contentKey": "nalati-grasslands@10",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 9837744,
-    "workers": 12039869,
-    "geometry": 35834403,
-    "textures": 79911074,
-    "scene": 0,
-    "audio": 40002202,
-    "loading": 128519238,
+    "engine": 9839408,
+    "workers": 10855602,
+    "geometry": 38216577,
+    "textures": 69525830,
+    "scene": 15609828,
+    "audio": 2648440,
+    "loading": 181533105,
     "margin": 0
    }
   },
   "ledger/open-plot-alien-plain/control": {
-   "value": 42320099,
-   "contentKey": "open-plot-alien-plain@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 34728602,
+   "contentKey": "open-plot-alien-plain@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1577240,
+    "engine": 788620,
     "workers": 7905147,
-    "geometry": 9189566,
-    "textures": 3283316,
+    "geometry": 9190406,
+    "textures": 2158988,
     "scene": 0,
-    "audio": 8044048,
-    "loading": 9681846,
+    "audio": 3271591,
+    "loading": 9836610,
     "margin": 0
    }
   },
   "ledger/open-plot-alien-plain/peak": {
-   "value": 65096502,
-   "contentKey": "open-plot-alien-plain@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 48105193,
+   "contentKey": "open-plot-alien-plain@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 7905147,
-    "geometry": 9189566,
-    "textures": 11671904,
+    "geometry": 9190406,
+    "textures": 11781128,
     "scene": 0,
-    "audio": 20620048,
-    "loading": 11493661,
+    "audio": 3271591,
+    "loading": 11740745,
     "margin": 0
    }
   },
   "ledger/open-plot-clockwork-canyon/control": {
-   "value": 62344517,
-   "contentKey": "open-plot-clockwork-canyon@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 52617480,
+   "contentKey": "open-plot-clockwork-canyon@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 702696,
+    "engine": 351348,
     "workers": 10145518,
-    "geometry": 16577112,
-    "textures": 3284704,
+    "geometry": 16577952,
+    "textures": 1286112,
     "scene": 0,
-    "audio": 11744663,
-    "loading": 16376344,
+    "audio": 7003586,
+    "loading": 16550268,
     "margin": 0
    }
   },
   "ledger/open-plot-clockwork-canyon/peak": {
-   "value": 86511937,
-   "contentKey": "open-plot-clockwork-canyon@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 68969000,
+   "contentKey": "open-plot-clockwork-canyon@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10145518,
-    "geometry": 16577112,
-    "textures": 11673304,
+    "geometry": 16577952,
+    "textures": 11782800,
     "scene": 0,
-    "audio": 24848663,
-    "loading": 19051164,
+    "audio": 7003586,
+    "loading": 19242968,
     "margin": 0
    }
   },
   "ledger/open-plot-coral-drift/control": {
-   "value": 66740272,
-   "contentKey": "open-plot-coral-drift@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 57936717,
+   "contentKey": "open-plot-coral-drift@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 702696,
+    "engine": 351348,
     "workers": 8885894,
-    "geometry": 21870636,
-    "textures": 3627380,
+    "geometry": 21871476,
+    "textures": 1628504,
     "scene": 0,
-    "audio": 7545574,
-    "loading": 20594612,
+    "audio": 3611683,
+    "loading": 20885116,
     "margin": 0
    }
   },
   "ledger/open-plot-coral-drift/peak": {
-   "value": 89097152,
-   "contentKey": "open-plot-coral-drift@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 76200697,
+   "contentKey": "open-plot-coral-drift@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8885894,
-    "geometry": 21870636,
-    "textures": 12015968,
+    "geometry": 21871476,
+    "textures": 12125192,
     "scene": 0,
-    "audio": 16953574,
-    "loading": 25154904,
+    "audio": 3611683,
+    "loading": 25490276,
     "margin": 0
    }
   },
   "ledger/open-plot-desert-ruin/control": {
-   "value": 74080429,
-   "contentKey": "open-plot-desert-ruin@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 59382280,
+   "contentKey": "open-plot-desert-ruin@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1096368,
+    "engine": 548184,
     "workers": 10499964,
-    "geometry": 20997068,
-    "textures": 3958948,
+    "geometry": 20997908,
+    "textures": 2353748,
     "scene": 0,
-    "audio": 14361461,
-    "loading": 20046812,
+    "audio": 3640452,
+    "loading": 20245656,
     "margin": 0
    }
   },
   "ledger/open-plot-desert-ruin/peak": {
-   "value": 103104343,
-   "contentKey": "open-plot-desert-ruin@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 76690626,
+   "contentKey": "open-plot-desert-ruin@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10499964,
-    "geometry": 20997068,
-    "textures": 12347536,
+    "geometry": 20997908,
+    "textures": 12456760,
     "scene": 0,
-    "audio": 30585461,
-    "loading": 24458138,
+    "audio": 3640452,
+    "loading": 24879366,
     "margin": 0
    }
   },
   "ledger/open-plot-ember-forge/control": {
-   "value": 64693534,
-   "contentKey": "open-plot-ember-forge@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 49527684,
+   "contentKey": "open-plot-ember-forge@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1096368,
+    "engine": 548184,
     "workers": 11826643,
-    "geometry": 14499682,
-    "textures": 12056204,
+    "geometry": 14500522,
+    "textures": 2062404,
     "scene": 0,
-    "audio": 7919131,
-    "loading": 14175698,
+    "audio": 5142449,
+    "loading": 14351114,
     "margin": 0
    }
   },
   "ledger/open-plot-ember-forge/peak": {
-   "value": 76718205,
-   "contentKey": "open-plot-ember-forge@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 66089679,
+   "contentKey": "open-plot-ember-forge@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 11826643,
-    "geometry": 14499682,
-    "textures": 12056204,
+    "geometry": 14500522,
+    "textures": 12165416,
     "scene": 0,
-    "audio": 16223131,
-    "loading": 17896369,
+    "audio": 5142449,
+    "loading": 18238473,
     "margin": 0
    }
   },
   "ledger/open-plot-fossil-badlands/control": {
-   "value": 53304123,
-   "contentKey": "open-plot-fossil-badlands@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 43061515,
+   "contentKey": "open-plot-fossil-badlands@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 702696,
+    "engine": 351348,
     "workers": 8754950,
-    "geometry": 13667856,
-    "textures": 3286052,
+    "geometry": 13668648,
+    "textures": 1287184,
     "scene": 0,
-    "audio": 9841117,
-    "loading": 13537972,
+    "audio": 4566453,
+    "loading": 13730236,
     "margin": 0
    }
   },
   "ledger/open-plot-fossil-badlands/peak": {
-   "value": 78083956,
-   "contentKey": "open-plot-fossil-badlands@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 59590116,
+   "contentKey": "open-plot-fossil-badlands@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8754950,
-    "geometry": 13667856,
-    "textures": 11674648,
+    "geometry": 13668648,
+    "textures": 11783872,
     "scene": 0,
-    "audio": 23665117,
-    "loading": 16105209,
+    "audio": 4566453,
+    "loading": 16600017,
     "margin": 0
    }
   },
   "ledger/open-plot-frostline-peaks/control": {
-   "value": 60244385,
-   "contentKey": "open-plot-frostline-peaks@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 50723688,
+   "contentKey": "open-plot-frostline-peaks@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 702696,
+    "engine": 351348,
     "workers": 10494859,
-    "geometry": 15511388,
-    "textures": 5351588,
+    "geometry": 15511012,
+    "textures": 3352992,
     "scene": 0,
-    "audio": 9580048,
-    "loading": 15090326,
+    "audio": 4996007,
+    "loading": 15314774,
     "margin": 0
    }
   },
   "ledger/open-plot-frostline-peaks/peak": {
-   "value": 87739991,
-   "contentKey": "open-plot-frostline-peaks@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 71459602,
+   "contentKey": "open-plot-frostline-peaks@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10494859,
-    "geometry": 15511388,
-    "textures": 13740184,
+    "geometry": 15511012,
+    "textures": 13849680,
     "scene": 0,
-    "audio": 21964048,
-    "loading": 21813336,
+    "audio": 4996007,
+    "loading": 22391868,
     "margin": 0
    }
   },
   "ledger/open-plot-jungle-ziggurat/control": {
-   "value": 68008276,
-   "contentKey": "open-plot-jungle-ziggurat@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 48078534,
+   "contentKey": "open-plot-jungle-ziggurat@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1096368,
+    "engine": 548184,
     "workers": 10291920,
-    "geometry": 16083248,
-    "textures": 12351660,
+    "geometry": 16084088,
+    "textures": 2357856,
     "scene": 0,
-    "audio": 9230312,
-    "loading": 15834960,
+    "audio": 1658974,
+    "loading": 16041144,
     "margin": 0
    }
   },
   "ledger/open-plot-jungle-ziggurat/peak": {
-   "value": 83019877,
-   "contentKey": "open-plot-jungle-ziggurat@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 64779819,
+   "contentKey": "open-plot-jungle-ziggurat@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10291920,
-    "geometry": 16083248,
-    "textures": 12351660,
+    "geometry": 16084088,
+    "textures": 12460872,
     "scene": 0,
-    "audio": 20318312,
-    "loading": 19758561,
+    "audio": 1658974,
+    "loading": 20067789,
     "margin": 0
    }
   },
   "ledger/open-plot-lantern-bayou/control": {
-   "value": 75163219,
-   "contentKey": "open-plot-lantern-bayou@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 56728161,
+   "contentKey": "open-plot-lantern-bayou@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1096368,
+    "engine": 548184,
     "workers": 9339731,
-    "geometry": 21665438,
-    "textures": 11673308,
+    "geometry": 21666278,
+    "textures": 1679784,
     "scene": 0,
-    "audio": 7924180,
-    "loading": 20344386,
+    "audio": 1731762,
+    "loading": 20666054,
     "margin": 0
    }
   },
   "ledger/open-plot-lantern-bayou/peak": {
-   "value": 89784305,
-   "contentKey": "open-plot-lantern-bayou@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 73406459,
+   "contentKey": "open-plot-lantern-bayou@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 9339731,
-    "geometry": 21665438,
-    "textures": 11673308,
+    "geometry": 21666278,
+    "textures": 11782800,
     "scene": 0,
-    "audio": 18436180,
-    "loading": 24453472,
+    "audio": 1731762,
+    "loading": 24669712,
     "margin": 0
    }
   },
   "ledger/open-plot-mosslight-ruins/control": {
-   "value": 79382753,
-   "contentKey": "open-plot-mosslight-ruins@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 63557222,
+   "contentKey": "open-plot-mosslight-ruins@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1096368,
+    "engine": 548184,
     "workers": 12244499,
-    "geometry": 22164342,
-    "textures": 12466412,
+    "geometry": 22165182,
+    "textures": 2472888,
     "scene": 0,
-    "audio": 7123118,
-    "loading": 21168206,
+    "audio": 3587967,
+    "loading": 21442134,
     "margin": 0
    }
   },
   "ledger/open-plot-mosslight-ruins/peak": {
-   "value": 93532486,
-   "contentKey": "open-plot-mosslight-ruins@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 81451803,
+   "contentKey": "open-plot-mosslight-ruins@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 12244499,
-    "geometry": 22164342,
-    "textures": 12466412,
+    "geometry": 22165182,
+    "textures": 12575904,
     "scene": 0,
-    "audio": 16051118,
-    "loading": 26389939,
+    "audio": 3587967,
+    "loading": 26662075,
     "margin": 0
    }
   },
   "ledger/open-plot-night-market/control": {
-   "value": 91934016,
-   "contentKey": "open-plot-night-market@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 70751848,
+   "contentKey": "open-plot-night-market@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1096368,
+    "engine": 548184,
     "workers": 13572419,
-    "geometry": 25681954,
-    "textures": 13740184,
+    "geometry": 25682794,
+    "textures": 3746664,
     "scene": 0,
-    "audio": 10609117,
-    "loading": 24114166,
+    "audio": 1772981,
+    "loading": 24332438,
     "margin": 0
    }
   },
   "ledger/open-plot-night-market/peak": {
-   "value": 114232837,
-   "contentKey": "open-plot-night-market@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 91355005,
+   "contentKey": "open-plot-night-market@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 13572419,
-    "geometry": 25681954,
-    "textures": 13740184,
+    "geometry": 25682794,
+    "textures": 13849680,
     "scene": 0,
-    "audio": 24961117,
-    "loading": 32060987,
+    "audio": 1772981,
+    "loading": 32260955,
     "margin": 0
    }
   },
   "ledger/open-plot-patchwork-fairground/control": {
-   "value": 49982355,
-   "contentKey": "open-plot-patchwork-fairground@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 41906995,
+   "contentKey": "open-plot-patchwork-fairground@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 702696,
+    "engine": 351348,
     "workers": 9175262,
-    "geometry": 12064174,
-    "textures": 3286052,
+    "geometry": 12064918,
+    "textures": 1287184,
     "scene": 0,
-    "audio": 9045127,
-    "loading": 12195564,
+    "audio": 5939071,
+    "loading": 12386516,
     "margin": 0
    }
   },
   "ledger/open-plot-patchwork-fairground/peak": {
-   "value": 72828697,
-   "contentKey": "open-plot-patchwork-fairground@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 57934865,
+   "contentKey": "open-plot-patchwork-fairground@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 9175262,
-    "geometry": 12064174,
-    "textures": 11674648,
+    "geometry": 12064918,
+    "textures": 11783872,
     "scene": 0,
-    "audio": 21189127,
-    "loading": 14509310,
+    "audio": 5939071,
+    "loading": 14755566,
     "margin": 0
    }
   },
   "ledger/open-plot-saltwind-lighthouse/control": {
-   "value": 32303715,
-   "contentKey": "open-plot-saltwind-lighthouse@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 27677636,
+   "contentKey": "open-plot-saltwind-lighthouse@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 1096368,
     "engine": 548184,
     "workers": 6925771,
-    "geometry": 4907688,
-    "textures": 1571632,
+    "geometry": 4908016,
+    "textures": 1681128,
     "scene": 0,
-    "audio": 11382502,
-    "loading": 5871570,
+    "audio": 6487075,
+    "loading": 6031094,
     "margin": 0
    }
   },
   "ledger/open-plot-saltwind-lighthouse/peak": {
-   "value": 57833272,
-   "contentKey": "open-plot-saltwind-lighthouse@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 41630825,
+   "contentKey": "open-plot-saltwind-lighthouse@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 6925771,
-    "geometry": 4907688,
-    "textures": 11674648,
+    "geometry": 4908016,
+    "textures": 11784144,
     "scene": 0,
-    "audio": 22950502,
-    "loading": 7158487,
+    "audio": 6487075,
+    "loading": 7309643,
     "margin": 0
    }
   },
   "ledger/open-plot-sky-harbor/control": {
-   "value": 54572654,
-   "contentKey": "open-plot-sky-harbor@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 44681947,
+   "contentKey": "open-plot-sky-harbor@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 702696,
+    "engine": 351348,
     "workers": 8475370,
-    "geometry": 15679962,
-    "textures": 3286048,
+    "geometry": 15679010,
+    "textures": 1287456,
     "scene": 0,
-    "audio": 7545574,
-    "loading": 15369524,
+    "audio": 2649123,
+    "loading": 15536944,
     "margin": 0
    }
   },
   "ledger/open-plot-sky-harbor/peak": {
-   "value": 76368026,
-   "contentKey": "open-plot-sky-harbor@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 61150071,
+   "contentKey": "open-plot-sky-harbor@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8475370,
-    "geometry": 15679962,
-    "textures": 11674648,
+    "geometry": 15679010,
+    "textures": 11784144,
     "scene": 0,
-    "audio": 18105574,
-    "loading": 18216296,
+    "audio": 2649123,
+    "loading": 18346248,
     "margin": 0
    }
   },
   "ledger/open-plot-sky-race/control": {
-   "value": 56512052,
-   "contentKey": "open-plot-sky-race@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 46873669,
+   "contentKey": "open-plot-sky-race@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 702696,
+    "engine": 351348,
     "workers": 8608374,
-    "geometry": 15321754,
-    "textures": 3286048,
+    "geometry": 15322402,
+    "textures": 1287184,
     "scene": 0,
-    "audio": 9998068,
-    "loading": 15081632,
+    "audio": 5358013,
+    "loading": 15243652,
     "margin": 0
    }
   },
   "ledger/open-plot-sky-race/peak": {
-   "value": 79932349,
-   "contentKey": "open-plot-sky-race@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 63373426,
+   "contentKey": "open-plot-sky-race@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 8608374,
-    "geometry": 15321754,
-    "textures": 11674648,
+    "geometry": 15322402,
+    "textures": 11783872,
     "scene": 0,
-    "audio": 22430068,
-    "loading": 17681329,
+    "audio": 5358013,
+    "loading": 18084589,
     "margin": 0
    }
   },
   "ledger/open-plot-starfall-observatory/control": {
-   "value": 58380559,
-   "contentKey": "open-plot-starfall-observatory@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 49936781,
+   "contentKey": "open-plot-starfall-observatory@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 702696,
+    "engine": 351348,
     "workers": 10280755,
-    "geometry": 15646614,
-    "textures": 3284708,
+    "geometry": 15647454,
+    "textures": 1286112,
     "scene": 0,
-    "audio": 9460180,
-    "loading": 15492126,
+    "audio": 6007986,
+    "loading": 15660430,
     "margin": 0
    }
   },
   "ledger/open-plot-starfall-observatory/peak": {
-   "value": 82559900,
-   "contentKey": "open-plot-starfall-observatory@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 66242486,
+   "contentKey": "open-plot-starfall-observatory@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 10280755,
-    "geometry": 15646614,
-    "textures": 11673304,
+    "geometry": 15647454,
+    "textures": 11782800,
     "scene": 0,
-    "audio": 22612180,
-    "loading": 18130871,
+    "audio": 6007986,
+    "loading": 18307315,
     "margin": 0
    }
   },
   "ledger/open-plot-thin-ice/control": {
-   "value": 36635290,
-   "contentKey": "open-plot-thin-ice@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 29475215,
+   "contentKey": "open-plot-thin-ice@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
-    "browser": 2810784,
-    "engine": 1405392,
+    "browser": 1096368,
+    "engine": 548184,
     "workers": 6196082,
-    "geometry": 6816282,
-    "textures": 3284704,
+    "geometry": 6817122,
+    "textures": 1679784,
     "scene": 0,
-    "audio": 8661166,
-    "loading": 7460880,
+    "audio": 5508991,
+    "loading": 7628684,
     "margin": 0
    }
   },
   "ledger/open-plot-thin-ice/peak": {
-   "value": 58032286,
-   "contentKey": "open-plot-thin-ice@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7",
+   "value": 43687609,
+   "contentKey": "open-plot-thin-ice@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
     "engine": 1405392,
     "workers": 6196082,
-    "geometry": 6816282,
-    "textures": 11673304,
+    "geometry": 6817122,
+    "textures": 11782800,
     "scene": 0,
-    "audio": 21525166,
-    "loading": 7605276,
+    "audio": 5508991,
+    "loading": 9166438,
     "margin": 0
    }
   },
@@ -810,70 +853,70 @@
    }
   },
   "ledger/pine-hollow/control": {
-   "value": 179123887,
-   "contentKey": "pine-hollow@6",
-   "commit": "cf8078d96172764541d8c08565573b1b8ac15d55",
-   "why": "Pine r6 engine-cooked phone layers and full-size hero art",
+   "value": 229904088,
+   "contentKey": "pine-hollow@18",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 524288,
-    "workers": 8300285,
-    "geometry": 36629165,
-    "textures": 66096724,
-    "scene": 158244,
-    "audio": 0,
-    "loading": 64604397,
+    "engine": 526656,
+    "workers": 12713981,
+    "geometry": 42359134,
+    "textures": 62457820,
+    "scene": 11081016,
+    "audio": 22593805,
+    "loading": 75360892,
     "margin": 0
    }
   },
   "ledger/pine-hollow/peak": {
-   "value": 252857523,
-   "contentKey": "pine-hollow@6",
-   "commit": "cf8078d96172764541d8c08565573b1b8ac15d55",
-   "why": "Pine r6 engine-cooked phone layers and full-size hero art",
+   "value": 347869241,
+   "contentKey": "pine-hollow@18",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 524288,
-    "workers": 10477576,
-    "geometry": 36629165,
-    "textures": 66096724,
-    "scene": 329280,
-    "audio": 0,
-    "loading": 135989706,
+    "engine": 526656,
+    "workers": 12713981,
+    "geometry": 42359134,
+    "textures": 70846416,
+    "scene": 11081016,
+    "audio": 22593805,
+    "loading": 184937449,
     "margin": 0
    }
   },
   "ledger/sunscar-dunes/control": {
-   "value": 142403998,
-   "contentKey": "sunscar-dunes@5",
-   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
-   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458",
+   "value": 166591642,
+   "contentKey": "sunscar-dunes@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 1405392,
-    "workers": 6481442,
-    "geometry": 8446696,
-    "textures": 72793076,
-    "scene": 528392,
+    "engine": 1405648,
+    "workers": 6485579,
+    "geometry": 10249720,
+    "textures": 72793684,
+    "scene": 6125648,
     "audio": 0,
-    "loading": 49938216,
+    "loading": 66720579,
     "margin": 0
    }
   },
   "ledger/sunscar-dunes/peak": {
-   "value": 196841614,
-   "contentKey": "sunscar-dunes@5",
-   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
-   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458",
+   "value": 214583566,
+   "contentKey": "sunscar-dunes@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)",
    "detail": {
     "browser": 2810784,
-    "engine": 1405392,
-    "workers": 6481442,
-    "geometry": 8446696,
-    "textures": 81181676,
-    "scene": 528392,
+    "engine": 1405648,
+    "workers": 6485579,
+    "geometry": 10249720,
+    "textures": 81182284,
+    "scene": 6125648,
     "audio": 0,
-    "loading": 95987232,
+    "loading": 106323903,
     "margin": 0
    }
   },
@@ -918,16 +961,16 @@
    "why": "STR22: first hosted memory-footprint run on main to judge the walk (44468967622 at 41d629f2), median of 3 (3.44-3.83 MB/s); the mini's 7.30 pin is not comparable"
   },
   "nine/boot/retained-geometry": {
-   "value": 8106593,
-   "contentKey": "nine-dragon-stack@5",
-   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
-   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
+   "value": 8027535,
+   "contentKey": "nine-dragon-stack@11",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "nine/boot/live-heap": {
-   "value": 199926631,
-   "contentKey": "nine-dragon-stack@5",
-   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
-   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
+   "value": 183551763,
+   "contentKey": "nine-dragon-stack@11",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "nine/street/triangles95": {
    "value": 904000,
@@ -1252,149 +1295,166 @@
    "why": "first memory-footprint run on the verdict (BC11), main f31a7d3f58"
   },
   "download/phone/brasscap-mesa": {
-   "value": 8884721,
-   "contentKey": "brasscap-mesa@13",
-   "commit": "c5b5031275838f265f827b1c7bfa7fe605f1da4b",
-   "why": "new shard revisions pinned on main (budgets run 45143442332): Pine r11, Driftwood r9, Nalati r6, Nine Dragon, Brasscap r13, Mossgate r23, Mirror Salt r6"
+   "value": 8901445,
+   "contentKey": "brasscap-mesa@19",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-alien-plain": {
-   "value": 7437567,
-   "contentKey": "open-plot-alien-plain@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 6825358,
+   "contentKey": "open-plot-alien-plain@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-clockwork-canyon": {
-   "value": 10007932,
-   "contentKey": "open-plot-clockwork-canyon@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 9217192,
+   "contentKey": "open-plot-clockwork-canyon@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-coral-drift": {
-   "value": 10020000,
-   "contentKey": "open-plot-coral-drift@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 9443133,
+   "contentKey": "open-plot-coral-drift@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-desert-ruin": {
-   "value": 10139236,
-   "contentKey": "open-plot-desert-ruin@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 9425078,
+   "contentKey": "open-plot-desert-ruin@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-ember-forge": {
-   "value": 8583220,
-   "contentKey": "open-plot-ember-forge@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 7976360,
+   "contentKey": "open-plot-ember-forge@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-fossil-badlands": {
-   "value": 7382220,
-   "contentKey": "open-plot-fossil-badlands@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 6687968,
+   "contentKey": "open-plot-fossil-badlands@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-frostline-peaks": {
-   "value": 10112557,
-   "contentKey": "open-plot-frostline-peaks@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 9593980,
+   "contentKey": "open-plot-frostline-peaks@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-jungle-ziggurat": {
-   "value": 9501885,
-   "contentKey": "open-plot-jungle-ziggurat@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 8863344,
+   "contentKey": "open-plot-jungle-ziggurat@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-lantern-bayou": {
-   "value": 9493353,
-   "contentKey": "open-plot-lantern-bayou@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 8941629,
+   "contentKey": "open-plot-lantern-bayou@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-mosslight-ruins": {
-   "value": 12342070,
-   "contentKey": "open-plot-mosslight-ruins@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 11783984,
+   "contentKey": "open-plot-mosslight-ruins@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-night-market": {
-   "value": 12299448,
-   "contentKey": "open-plot-night-market@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 11585885,
+   "contentKey": "open-plot-night-market@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-patchwork-fairground": {
-   "value": 7070665,
-   "contentKey": "open-plot-patchwork-fairground@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 6507260,
+   "contentKey": "open-plot-patchwork-fairground@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-saltwind-lighthouse": {
-   "value": 6094448,
-   "contentKey": "open-plot-saltwind-lighthouse@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 5203810,
+   "contentKey": "open-plot-saltwind-lighthouse@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-sky-harbor": {
-   "value": 8191465,
-   "contentKey": "open-plot-sky-harbor@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 7580016,
+   "contentKey": "open-plot-sky-harbor@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-sky-race": {
-   "value": 8286853,
-   "contentKey": "open-plot-sky-race@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 7593855,
+   "contentKey": "open-plot-sky-race@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-starfall-observatory": {
-   "value": 9510563,
-   "contentKey": "open-plot-starfall-observatory@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 8785430,
+   "contentKey": "open-plot-starfall-observatory@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/open-plot-thin-ice": {
-   "value": 6663130,
-   "contentKey": "open-plot-thin-ice@1",
-   "commit": "4d573c83517f715fb056be1dc179ba07493260b7"
+   "value": 5994293,
+   "contentKey": "open-plot-thin-ice@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/brasscap-mesa": {
-   "value": 277467,
-   "contentKey": "brasscap-mesa@9",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 113434,
+   "contentKey": "brasscap-mesa@19",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/brasscap-mesa": {
-   "value": 66,
-   "contentKey": "brasscap-mesa@9",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 54,
+   "contentKey": "brasscap-mesa@19",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/brasscap-mesa": {
    "value": 34,
-   "contentKey": "brasscap-mesa@9",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "brasscap-mesa@19",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/driftwood-isle": {
-   "value": 305026,
-   "contentKey": "driftwood-isle@9",
-   "commit": "e51e3e5b5ef8ee09e996a5065895a30ca18831a8",
-   "why": "DF9 phone Low far LOD, fixed headless spawn views on Driftwood r9 (J490)"
+   "value": 304489,
+   "contentKey": "driftwood-isle@12",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/driftwood-isle": {
-   "value": 73,
-   "contentKey": "driftwood-isle@5",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 44,
+   "contentKey": "driftwood-isle@12",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/driftwood-isle": {
-   "value": 91,
-   "contentKey": "driftwood-isle@5",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 88,
+   "contentKey": "driftwood-isle@12",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/far-reach": {
-   "value": 1689568,
-   "contentKey": "far-reach@4",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 1657757,
+   "contentKey": "far-reach@9",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/far-reach": {
-   "value": 128,
-   "contentKey": "far-reach@4",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 121,
+   "contentKey": "far-reach@9",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/far-reach": {
-   "value": 88,
-   "contentKey": "far-reach@4",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 87,
+   "contentKey": "far-reach@9",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/ink-cel-valley": {
    "value": 313335,
@@ -1415,346 +1475,346 @@
    "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
   },
   "render/phone-low/triangles/nalati-grasslands": {
-   "value": 1187070,
-   "contentKey": "nalati-grasslands@4",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 853036,
+   "contentKey": "nalati-grasslands@10",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/nalati-grasslands": {
-   "value": 79,
-   "contentKey": "nalati-grasslands@4",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 76,
+   "contentKey": "nalati-grasslands@10",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/nalati-grasslands": {
-   "value": 96,
-   "contentKey": "nalati-grasslands@4",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 93,
+   "contentKey": "nalati-grasslands@10",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/nine-dragon-stack": {
-   "value": 527095,
-   "contentKey": "nine-dragon-stack@5",
-   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
-   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
+   "value": 634477,
+   "contentKey": "nine-dragon-stack@11",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/nine-dragon-stack": {
-   "value": 87,
-   "contentKey": "nine-dragon-stack@5",
-   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
-   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
+   "value": 92,
+   "contentKey": "nine-dragon-stack@11",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/nine-dragon-stack": {
    "value": 50,
-   "contentKey": "nine-dragon-stack@5",
-   "commit": "0fe30df3e707a78346a809e87995b57d4914876d",
-   "why": "Nine r5 ships declared props, melee, grapple and portals through the common shard format."
+   "contentKey": "nine-dragon-stack@11",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-alien-plain": {
    "value": 44156,
-   "contentKey": "open-plot-alien-plain@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-alien-plain@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-alien-plain": {
    "value": 47,
-   "contentKey": "open-plot-alien-plain@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-alien-plain@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-alien-plain": {
-   "value": 24,
-   "contentKey": "open-plot-alien-plain@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 22,
+   "contentKey": "open-plot-alien-plain@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-clockwork-canyon": {
    "value": 71484,
-   "contentKey": "open-plot-clockwork-canyon@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-clockwork-canyon@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-clockwork-canyon": {
-   "value": 53,
-   "contentKey": "open-plot-clockwork-canyon@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 50,
+   "contentKey": "open-plot-clockwork-canyon@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-clockwork-canyon": {
-   "value": 25,
-   "contentKey": "open-plot-clockwork-canyon@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-clockwork-canyon@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-coral-drift": {
    "value": 105008,
-   "contentKey": "open-plot-coral-drift@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-coral-drift@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-coral-drift": {
    "value": 55,
-   "contentKey": "open-plot-coral-drift@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-coral-drift@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-coral-drift": {
-   "value": 24,
-   "contentKey": "open-plot-coral-drift@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 22,
+   "contentKey": "open-plot-coral-drift@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-desert-ruin": {
    "value": 95629,
-   "contentKey": "open-plot-desert-ruin@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-desert-ruin@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-desert-ruin": {
    "value": 51,
-   "contentKey": "open-plot-desert-ruin@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-desert-ruin@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-desert-ruin": {
-   "value": 25,
-   "contentKey": "open-plot-desert-ruin@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 23,
+   "contentKey": "open-plot-desert-ruin@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-ember-forge": {
    "value": 84752,
-   "contentKey": "open-plot-ember-forge@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-ember-forge@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-ember-forge": {
    "value": 55,
-   "contentKey": "open-plot-ember-forge@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-ember-forge@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-ember-forge": {
-   "value": 25,
-   "contentKey": "open-plot-ember-forge@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 23,
+   "contentKey": "open-plot-ember-forge@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-fossil-badlands": {
    "value": 83298,
-   "contentKey": "open-plot-fossil-badlands@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-fossil-badlands@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-fossil-badlands": {
    "value": 49,
-   "contentKey": "open-plot-fossil-badlands@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-fossil-badlands@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-fossil-badlands": {
-   "value": 25,
-   "contentKey": "open-plot-fossil-badlands@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-fossil-badlands@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-frostline-peaks": {
    "value": 96510,
-   "contentKey": "open-plot-frostline-peaks@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-frostline-peaks@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-frostline-peaks": {
-   "value": 57,
-   "contentKey": "open-plot-frostline-peaks@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 54,
+   "contentKey": "open-plot-frostline-peaks@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-frostline-peaks": {
-   "value": 25,
-   "contentKey": "open-plot-frostline-peaks@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-frostline-peaks@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-jungle-ziggurat": {
    "value": 73613,
-   "contentKey": "open-plot-jungle-ziggurat@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-jungle-ziggurat@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-jungle-ziggurat": {
    "value": 51,
-   "contentKey": "open-plot-jungle-ziggurat@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-jungle-ziggurat@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-jungle-ziggurat": {
-   "value": 25,
-   "contentKey": "open-plot-jungle-ziggurat@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 23,
+   "contentKey": "open-plot-jungle-ziggurat@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-lantern-bayou": {
    "value": 120687,
-   "contentKey": "open-plot-lantern-bayou@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-lantern-bayou@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-lantern-bayou": {
-   "value": 53,
-   "contentKey": "open-plot-lantern-bayou@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 50,
+   "contentKey": "open-plot-lantern-bayou@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-lantern-bayou": {
-   "value": 24,
-   "contentKey": "open-plot-lantern-bayou@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 23,
+   "contentKey": "open-plot-lantern-bayou@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-mosslight-ruins": {
    "value": 116799,
-   "contentKey": "open-plot-mosslight-ruins@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-mosslight-ruins@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-mosslight-ruins": {
-   "value": 56,
-   "contentKey": "open-plot-mosslight-ruins@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 53,
+   "contentKey": "open-plot-mosslight-ruins@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-mosslight-ruins": {
-   "value": 26,
-   "contentKey": "open-plot-mosslight-ruins@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 25,
+   "contentKey": "open-plot-mosslight-ruins@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-night-market": {
    "value": 141711,
-   "contentKey": "open-plot-night-market@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-night-market@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-night-market": {
-   "value": 57,
-   "contentKey": "open-plot-night-market@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 54,
+   "contentKey": "open-plot-night-market@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-night-market": {
-   "value": 26,
-   "contentKey": "open-plot-night-market@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 25,
+   "contentKey": "open-plot-night-market@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-patchwork-fairground": {
    "value": 80172,
-   "contentKey": "open-plot-patchwork-fairground@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-patchwork-fairground@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-patchwork-fairground": {
    "value": 41,
-   "contentKey": "open-plot-patchwork-fairground@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-patchwork-fairground@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-patchwork-fairground": {
-   "value": 25,
-   "contentKey": "open-plot-patchwork-fairground@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-patchwork-fairground@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-saltwind-lighthouse": {
    "value": 23394,
-   "contentKey": "open-plot-saltwind-lighthouse@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-saltwind-lighthouse@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-saltwind-lighthouse": {
-   "value": 51,
-   "contentKey": "open-plot-saltwind-lighthouse@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 50,
+   "contentKey": "open-plot-saltwind-lighthouse@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-saltwind-lighthouse": {
-   "value": 25,
-   "contentKey": "open-plot-saltwind-lighthouse@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-saltwind-lighthouse@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-sky-harbor": {
    "value": 86000,
-   "contentKey": "open-plot-sky-harbor@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-sky-harbor@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-sky-harbor": {
-   "value": 45,
-   "contentKey": "open-plot-sky-harbor@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 42,
+   "contentKey": "open-plot-sky-harbor@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-sky-harbor": {
-   "value": 25,
-   "contentKey": "open-plot-sky-harbor@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-sky-harbor@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-sky-race": {
    "value": 83796,
-   "contentKey": "open-plot-sky-race@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-sky-race@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-sky-race": {
    "value": 41,
-   "contentKey": "open-plot-sky-race@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-sky-race@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-sky-race": {
-   "value": 25,
-   "contentKey": "open-plot-sky-race@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-sky-race@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-starfall-observatory": {
    "value": 67276,
-   "contentKey": "open-plot-starfall-observatory@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-starfall-observatory@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-starfall-observatory": {
-   "value": 53,
-   "contentKey": "open-plot-starfall-observatory@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 50,
+   "contentKey": "open-plot-starfall-observatory@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-starfall-observatory": {
-   "value": 25,
-   "contentKey": "open-plot-starfall-observatory@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-starfall-observatory@3",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/open-plot-thin-ice": {
    "value": 42328,
-   "contentKey": "open-plot-thin-ice@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "open-plot-thin-ice@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/open-plot-thin-ice": {
-   "value": 37,
-   "contentKey": "open-plot-thin-ice@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 36,
+   "contentKey": "open-plot-thin-ice@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/open-plot-thin-ice": {
-   "value": 25,
-   "contentKey": "open-plot-thin-ice@1",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 24,
+   "contentKey": "open-plot-thin-ice@4",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/pastel-plain": {
    "value": 152425,
@@ -1775,238 +1835,274 @@
    "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
   },
   "render/phone-low/triangles/pine-hollow": {
-   "value": 972245,
-   "contentKey": "pine-hollow@6",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 914493,
+   "contentKey": "pine-hollow@18",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/pine-hollow": {
    "value": 81,
-   "contentKey": "pine-hollow@6",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "contentKey": "pine-hollow@18",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/pine-hollow": {
-   "value": 108,
-   "contentKey": "pine-hollow@6",
-   "commit": "602f0d9344",
-   "why": "Phone Low spawn workload on headless SwiftShader, fixed 1x with three views per pin"
+   "value": 107,
+   "contentKey": "pine-hollow@18",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/sunscar-dunes": {
-   "value": 276837,
-   "contentKey": "sunscar-dunes@5",
-   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
-   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
+   "value": 150735,
+   "contentKey": "sunscar-dunes@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/sunscar-dunes": {
-   "value": 54,
-   "contentKey": "sunscar-dunes@5",
-   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
-   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
+   "value": 47,
+   "contentKey": "sunscar-dunes@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/sunscar-dunes": {
-   "value": 50,
-   "contentKey": "sunscar-dunes@5",
-   "commit": "e02289a2da1bc7ca78983bbd9bef6dec101b31a4",
-   "why": "Dunes r5 ordinary upload (OF19d), budgets run 44766175458"
+   "value": 51,
+   "contentKey": "sunscar-dunes@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/mirror-salt": {
-   "value": 5687840,
-   "contentKey": "mirror-salt@6",
-   "commit": "c5b5031275838f265f827b1c7bfa7fe605f1da4b",
-   "why": "new shard revisions pinned on main (budgets run 45143442332): Pine r11, Driftwood r9, Nalati r6, Nine Dragon, Brasscap r13, Mossgate r23, Mirror Salt r6"
+   "value": 5706880,
+   "contentKey": "mirror-salt@7",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "download/phone/mossgate": {
-   "value": 9409424,
-   "contentKey": "mossgate@23",
-   "commit": "c5b5031275838f265f827b1c7bfa7fe605f1da4b",
-   "why": "new shard revisions pinned on main (budgets run 45143442332): Pine r11, Driftwood r9, Nalati r6, Nine Dragon, Brasscap r13, Mossgate r23, Mirror Salt r6"
+   "value": 9428501,
+   "contentKey": "mossgate@25",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/mirror-salt": {
-   "value": 195350,
-   "contentKey": "mirror-salt@5",
-   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+   "value": 63683,
+   "contentKey": "mirror-salt@7",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/mirror-salt": {
-   "value": 150,
-   "contentKey": "mirror-salt@5",
-   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+   "value": 101,
+   "contentKey": "mirror-salt@7",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/mirror-salt": {
    "value": 44,
-   "contentKey": "mirror-salt@5",
-   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+   "contentKey": "mirror-salt@7",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/triangles/mossgate": {
-   "value": 1397573,
-   "contentKey": "mossgate@21",
-   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+   "value": 1247059,
+   "contentKey": "mossgate@25",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/draws/mossgate": {
-   "value": 158,
-   "contentKey": "mossgate@21",
-   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+   "value": 130,
+   "contentKey": "mossgate@25",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-low/programs/mossgate": {
-   "value": 100,
-   "contentKey": "mossgate@21",
-   "commit": "1de3f917bf8ae5001fbd2f0bea310ffd3dfe7753"
+   "value": 101,
+   "contentKey": "mossgate@25",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/brasscap-mesa": {
    "value": 31,
-   "contentKey": "brasscap-mesa@18",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "contentKey": "brasscap-mesa@19",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/driftwood-isle": {
    "value": 84,
    "contentKey": "driftwood-isle@12",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/far-reach": {
    "value": 86,
-   "contentKey": "far-reach@8",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "contentKey": "far-reach@9",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/mirror-salt": {
    "value": 39,
    "contentKey": "mirror-salt@7",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/mossgate": {
    "value": 98,
-   "contentKey": "mossgate@24",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "contentKey": "mossgate@25",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/nalati-grasslands": {
    "value": 94,
-   "contentKey": "nalati-grasslands@9",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "contentKey": "nalati-grasslands@10",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/nine-dragon-stack": {
-   "value": 47,
-   "contentKey": "nine-dragon-stack@9",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "value": 49,
+   "contentKey": "nine-dragon-stack@11",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-alien-plain": {
    "value": 22,
    "contentKey": "open-plot-alien-plain@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-clockwork-canyon": {
    "value": 23,
    "contentKey": "open-plot-clockwork-canyon@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-coral-drift": {
    "value": 22,
    "contentKey": "open-plot-coral-drift@4",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-desert-ruin": {
    "value": 23,
    "contentKey": "open-plot-desert-ruin@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-ember-forge": {
    "value": 23,
    "contentKey": "open-plot-ember-forge@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-fossil-badlands": {
    "value": 23,
    "contentKey": "open-plot-fossil-badlands@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-frostline-peaks": {
    "value": 23,
    "contentKey": "open-plot-frostline-peaks@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-jungle-ziggurat": {
    "value": 23,
    "contentKey": "open-plot-jungle-ziggurat@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-lantern-bayou": {
    "value": 22,
    "contentKey": "open-plot-lantern-bayou@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-mosslight-ruins": {
    "value": 24,
    "contentKey": "open-plot-mosslight-ruins@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-night-market": {
    "value": 24,
    "contentKey": "open-plot-night-market@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-patchwork-fairground": {
    "value": 23,
    "contentKey": "open-plot-patchwork-fairground@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-saltwind-lighthouse": {
    "value": 23,
    "contentKey": "open-plot-saltwind-lighthouse@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-sky-harbor": {
    "value": 23,
    "contentKey": "open-plot-sky-harbor@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-sky-race": {
    "value": 23,
    "contentKey": "open-plot-sky-race@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-starfall-observatory": {
    "value": 23,
    "contentKey": "open-plot-starfall-observatory@3",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/open-plot-thin-ice": {
    "value": 23,
    "contentKey": "open-plot-thin-ice@4",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/pine-hollow": {
    "value": 104,
-   "contentKey": "pine-hollow@16",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "contentKey": "pine-hollow@18",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   },
   "render/phone-high/programs/sunscar-dunes": {
    "value": 50,
    "contentKey": "sunscar-dunes@8",
-   "commit": "aa3970d35e8f94c0800962e1a43f90d6ce8424b7",
-   "why": "QA 11-24 row 57: the phone High programs budget's first baseline, budgets run 45542177338"
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+  },
+  "download/phone/glowfen": {
+   "value": 6489656,
+   "contentKey": "glowfen@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+  },
+  "render/phone-low/triangles/glowfen": {
+   "value": 77677,
+   "contentKey": "glowfen@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+  },
+  "render/phone-low/draws/glowfen": {
+   "value": 50,
+   "contentKey": "glowfen@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+  },
+  "render/phone-low/programs/glowfen": {
+   "value": 51,
+   "contentKey": "glowfen@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
+  },
+  "render/phone-high/programs/glowfen": {
+   "value": 48,
+   "contentKey": "glowfen@8",
+   "commit": "3ae235c821a76d0c5d14e6a213e82953a44dc7d5",
+   "why": "new shard revisions pinned on main (budgets run 45684953784, the first green since Nine r11): Glowfen r8 first pin, Nine Dragon r11 (J519 cards), Pine r18, Nalati r10, Driftwood r12 (J439, J444)"
   }
  }
 }
