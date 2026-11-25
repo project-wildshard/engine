@@ -12,11 +12,12 @@ import { HOST_PROBE } from '../src/server/game/plugin/simulation';
 import { loadRapier } from '../src/shared/engine/physics/rapier';
 import { SaveStore } from '../src/shared/engine/saves/store';
 import { loadoutLegacySlot } from '../src/shared/game/loadout/persistence';
-import pineRows from './fixtures/engine-lift/loadout.json' with { type: 'json' };
 import { pinePin } from './fixtures/engine-lift/pins';
 
 // GR8: called, not read from a scheduler job's output
 const itemRows = pinePin.product.section('combat/items').items;
+// J507: Pine's loadout as its live pin ships it, never a stored copy (r17 names its weapons `declared.<item>`, FP22)
+const pineRows = v.parse(LoadoutSchema, pinePin.product.section('held/loadout'));
 
 test('existing v1 Pine loadout saves continue with the exact ABI and owned flags', () => {
   const rows = v.parse(LoadoutSchema, pineRows), documents = new Map<string, string>();
