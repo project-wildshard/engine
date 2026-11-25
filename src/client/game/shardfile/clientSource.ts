@@ -29,6 +29,7 @@ import { shardFromDiscovery } from '../shard/discovery';
 import { ownInlineCandidate } from './inlineOwner';
 import { folderPaintedLook } from '../looks/paintedLook';
 import { emptyLook } from './emptyLook';
+import { declaredPost, declaredPostLook } from './declaredRender';
 import { shardfileLook } from './look';
 import { declaredLook, withoutHorizon } from './declaredLook';
 import { catalogueBound, declaredStart, productStart } from './declaredStart';
@@ -120,7 +121,7 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
   const residency = clientResidency(source, ownedBindings);
   const assets = new ClientAssets(source, admitted.assets, options);
   const manifest = sourceManifest(source, admitted.assets, bindings.imageOwner);
-  const clientBindings = { ...ownedBindings, allocator: residency.allocator };
+  const clientBindings = { ...ownedBindings, allocator: residency.allocator }, post = declaredPost(source);
   const result: ShardManifest = { ...manifest, ...(source.presentation === undefined ? { biome: 'Authored world', blurb: source.identity.name } : {}),
     // Traversal belongs to the platform, independently of authored item rows or Developer mode.
     loadout: { weapons: [], tools: ['tool.hoverboard'], start: ['tool.hoverboard'] },
@@ -130,7 +131,8 @@ function clientSource(admitted: AdmittedFolder, options: FolderOptions, bindings
     species: source.rows.species.map((row) => row.kind), uses: ['spawns', 'quests', 'bosses', 'elites', 'swim', 'hover', 'explore', 'practice'],
     loot: { coins: coinsDeclared(source.rows.loot) },
     creatures: { lowPoly: true, waitForModels: false, furRim: false, tintRange: 0, oneMaterial: true },
-    render: product => product.has('look/painted') ? folderPaintedLook(product) : Promise.resolve(source.look.keys.length === 0 ? emptyLook(source.look.dayOverride) : shardfileLook(source.look, assets.retained)),
+    // QA 11-24 row 59: a declared post look (Nine's rain, ink lines and live light) runs as a discovery page runs it
+    render: product => post !== null ? declaredPostLook(post, product) : product.has('look/painted') ? folderPaintedLook(product) : Promise.resolve(source.look.keys.length === 0 ? emptyLook(source.look.dayOverride) : shardfileLook(source.look, assets.retained)),
     load: async () => { const { ShardfileClient } = await import('./client'); return { default: class extends ShardfileClient { constructor() { super(source, assets, clientBindings); } } }; },
   };
   provideManifestAdmission(result, admitted, options, assets);

@@ -1091,6 +1091,7 @@
     "src/client/game/shardfile/clientSkins.ts": "client",
     "src/client/game/shardfile/clientSource.ts": "client",
     "src/client/game/shardfile/declaredLook.ts": "client",
+    "src/client/game/shardfile/declaredRender.ts": "client",
     "src/client/game/shardfile/declaredStart.ts": "client",
     "src/client/game/shardfile/phoneMemoryLine.ts": "client",
     "src/client/game/shardfile/preparedCandidate.ts": "client",
