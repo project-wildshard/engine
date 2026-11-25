@@ -57,3 +57,9 @@
 - v0.1.91's train held at 15:48 UTC on one failed `gh run` read (quota 2,756 of 5,000, release CI queued), with the
   local QA leg already passed. The train's `gh list` and `gh view` reads now get three tries 5 s apart (retryRead);
   uploads and workflow runs still happen once.
+
+## Release-proof riders leave the observer its sockets (v0.1.91 P2)
+
+- v0.1.91's staging MMO observer reported `baseline-reconnect-budget`: its second baseline bot failed 5 joins. The door
+  seats 4 sockets per address, and the 3 release-proof riders plus the observer's 2 bots all came from this Mac. Riders
+  now default to 2 and refuse more than 4 minus the observer's 2.

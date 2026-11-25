@@ -14,7 +14,7 @@
 //   node scripts/mmo-bots.mjs staging --outside-proof --bots 1 --seconds 60   (TC45: public Tunnel, no private health)
 //   node scripts/mmo-bots.mjs staging --restart-proof [--bots 4] [--seconds 600]   (MW5, J504: once every bot sits, asks
 //     staging-room-restart.yml for one staging restart; each bot must hear why, come back within 2 m and keep what it owns)
-//   node scripts/mmo-bots.mjs staging --release-proof [--bots 3] [--seconds 50400] --work-dir tmp/<lane>   (MW5, Jake 2026-11-24
+//   node scripts/mmo-bots.mjs staging --release-proof [--bots 2] [--seconds 50400] --work-dir tmp/<lane>   (MW5, Jake 2026-11-24
 //     "Bots ride the next release": the bots sit for up to 14 hours, sitting again after any drop, until the next staging release's
 //     countdown; the fighter hurts a creature inside it, and each bot must come back to the new build within 2 m, keeping its lines.
 //     It reads the signed release file when the countdown is heard (the bots' preload) and staging's build after. It never asks
@@ -107,11 +107,14 @@ if (pgRestartCheckpoint && (pgRestartAt === undefined || pgRestartAt + 75 >= Num
   throw new Error('--pg-restart-checkpoint needs --pg-restart-at and more than 75 s of bot time after it');
 if (values.tailnet && mode !== 'staging') throw new Error('--tailnet is for staging');
 if (mode !== 'replica' && mode !== 'staging') { console.error('usage: mmo-bots.mjs replica|staging [--bots N] [--seconds S]'); process.exit(2); }
-const bots = Number(values.bots ?? (outsideProof ? 1 : releaseProof ? 3 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (releaseProof ? 50_400 : mode === 'replica' ? 120 : 60));
+const bots = Number(values.bots ?? (outsideProof ? 1 : releaseProof ? 2 : mode === 'replica' ? 32 : 2)), seconds = Number(values.seconds ?? (releaseProof ? 50_400 : mode === 'replica' ? 120 : 60));
 if (!Number.isInteger(bots) || bots < 1 || bots > 64 || !Number.isFinite(seconds) || seconds < 5 || seconds > (releaseProof ? 50_400 : 3600)) throw new Error('--bots 1..64, --seconds 5..3600 (50,400 with --release-proof)');
 if (outsideProof && (bots !== 1 || seconds > 120)) throw new Error('--outside-proof needs --bots 1 and at most 120 seconds');
 if (restartProof && (bots > PER_ADDRESS || seconds < 60 || seconds > 900)) throw new Error('--restart-proof needs at most 4 bots and 60 to 900 seconds');
-if (releaseProof && (bots > PER_ADDRESS || seconds < 60)) throw new Error('--release-proof needs at most 4 bots and 60 to 50,400 seconds');
+// QA 11-24 row 5 (11-25): the release train's MMO observer seats 2 baseline bots from this Mac too, and the door seats 4
+// sockets per address; 3 riders left the observer 1, so v0.1.91's staging leg read no baseline (P2). Riders leave it 2.
+const OBSERVER_SOCKETS = 2;
+if (releaseProof && (bots > PER_ADDRESS - OBSERVER_SOCKETS || seconds < 60)) throw new Error(`--release-proof needs at most ${String(PER_ADDRESS - OBSERVER_SOCKETS)} bots (the release's observer takes ${String(OBSERVER_SOCKETS)} of the door's ${String(PER_ADDRESS)} per address) and 60 to 50,400 seconds`);
 const candidate = outsideProof || restartProof || releaseProof ? execFileSync('git', ['rev-parse', 'HEAD'], {cwd: ROOT, encoding: 'utf8'}).trim() : null;
 if ((outsideProof || restartProof || releaseProof) && execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], {cwd: ROOT, encoding: 'utf8'}).trim() !== '')
   throw new Error('Commit the outside proof candidate before observing staging');

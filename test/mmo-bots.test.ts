@@ -217,3 +217,12 @@ test('release-proof bots outlive the lane shell that started them and record any
   expect(driver).toContain("{ stdio: ['ignore', 'pipe', 'inherit'], detached: releaseProof }");
   expect(driver).toContain('nohup node scripts/mmo-bots.mjs staging --release-proof');
 });
+
+// QA 11-24 row 5 (11-25): 3 release-proof riders plus the train's 2-bot MMO observer asked the door for 5 sockets from one
+// address (4 allowed), and v0.1.91's staging observer never armed its baseline (P2). Riders now leave the observer its 2.
+test('release-proof riders leave the release observer its two sockets', () => {
+  const run = spawnSync(process.execPath, ['scripts/mmo-bots.mjs', 'staging', '--release-proof', '--bots', '3', '--work-dir', 'tmp/x'], { encoding: 'utf8', timeout: 10_000 });
+  expect(run.status).not.toBe(0);
+  expect(run.stderr).toContain('--release-proof needs at most 2 bots (the release\'s observer takes 2 of the door\'s 4 per address)');
+  expect(driver).toContain("releaseProof ? 2 : mode === 'replica'");
+});
