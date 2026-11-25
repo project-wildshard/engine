@@ -1291,6 +1291,7 @@
     "src/cook/game/cookProvenance.ts": "cook",
     "src/cook/game/cookSidecar.ts": "cook",
     "src/cook/game/cookWorker.ts": "cook",
+    "src/cook/game/keptListing.ts": "cook",
     "src/cook/game/recordPass.ts": "cook",
     "src/cook/game/recordSidecars.ts": "cook",
     "src/cook/game/sidecarPrepare.ts": "cook",

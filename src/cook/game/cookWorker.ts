@@ -35,6 +35,7 @@ import {expectedCopyOf, provenanceRefusal, type ExpectedCopy, type ListedCopy} f
 import {stalePreparationLine, type PreparationState} from './shardCook';
 import {cookPreparedLine, sidecarPath} from './cookSidecar';
 import type {ObjectHeaders, PackStore, StoredObject} from './packStore';
+import {appendPut, loadListing, saveListing} from './keptListing';
 import {installedRuntimeReads} from './installedRuntimeReads';
 import {cookIndexPath, readServerPackBook, serverPackBookPath} from '../../shared/game/shardfile/serverPack';
 import {cookedMapPath} from '../../shared/game/shardfile/cookedMapPath';
@@ -296,6 +297,9 @@ export const PACK_BUDGET_BYTES = 4_000_000_000;
 const GC_GRACE_MS = 3_600_000;
 /** How long a worker reuses its listing of the bucket (`createCookWorker`'s `bucket`); under GC_GRACE_MS / 2, though `current` doesn't rely on it. */
 const LISTING_MAX_AGE_MS = 20 * 60_000;
+/** FR-A21: how long a listing saved before a restart (`listingFile`) serves while its first refresh runs. Its age only skews
+ *  the budget measure (a PUT is skipped only for a key written in the last GC_GRACE_MS / 2); a release restart is minutes. */
+export const RESTORED_LISTING_MAX_AGE_MS: number = 6 * 3_600_000;
 // R2 is shared with release documents and page content. Only these cook and
 // pack namespaces are rebuildable. Match the index shape as well as its prefix.
 const COOK_INDEX = /^index\/[\w.-]{1,64}\/([a-f0-9]{64})\.json$/u;
@@ -434,6 +438,9 @@ export interface CookWorkerOptions {
    *  would leave under RECLAIM_HEADROOM of the budget free, so a full store never refuses a publish a collection can fit. */
   readonly reclaim?: () => Promise<GcReport>;
   readonly log?: (line: string) => void;
+  /** FAST-RELEASE FR-A21: where the kept bucket listing is saved (after each listing, and each PUT after it), so a restarted
+   *  worker serves it while a fresh listing refreshes it instead of waiting on a whole listing first (963 s on the box). */
+  readonly listingFile?: string;
   /** QA 11-24 row 62: raise an alarm (Sentry on the box); never throws. A full pack store calls it at most once a day. */
   readonly alarm?: (line: string) => void;
   readonly now?: () => number;
@@ -495,7 +502,21 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   // uploads cooked 7.5 min apart behind 10 s jobs. The worker keeps one listing and adds its own writes to it, and lists
   // again once it is LISTING_MAX_AGE_MS old. A kept listing may still hold keys GC took since: `current` then skips a PUT only
   // for a key written in the last GC_GRACE_MS / 2, which GC (it takes nothing younger than GC_GRACE_MS) cannot have taken.
-  let listing: {readonly rows: Map<string, StoredObject>; readonly at: number} | undefined;
+  let listing: {readonly rows: Map<string, StoredObject>; readonly at: number; readonly restored?: true} | undefined;
+  // FR-A21: a restart resumes from the saved listing. A save or a note that fails costs only a listing after the next restart.
+  const {listingFile} = options;
+  /** Off after a note fails (a full disk), so one failure logs once; the next save turns it back on. */
+  let noting = true;
+  const saved = (what: string, write: () => void): boolean => {
+    try { write(); return true; } catch (error) { log(`cook listing ${what} failed: ${error instanceof Error ? error.message : String(error)}`); return false; }
+  };
+  if (listingFile !== undefined) {
+    const restored = loadListing(listingFile);
+    if (restored !== undefined) {
+      listing = {...restored, restored: true};
+      log(`cook listing restored: ${restored.rows.size} objects, listed ${((clock() - restored.at) / 60_000).toFixed(1)} min ago`);
+    }
+  }
   /** The listing in flight, so a prefetch and a publish share one (`at` is when it started: it is never younger). */
   let listingNext: Promise<Map<string, StoredObject>> | undefined;
   const relist = (): Promise<Map<string, StoredObject>> => {
@@ -504,6 +525,13 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
       try {
         const rows = await store.list('');
         listing = {rows: new Map(rows.map(row => [row.key, row])), at};
+        if (listingFile !== undefined) {
+          const {rows: kept} = listing, began = clock();
+          if (saved('save', () => { saveListing(listingFile, at, kept.values()); })) {
+            noting = true;
+            log(`cook listing saved: ${kept.size} objects in ${((clock() - began) / 1000).toFixed(1)} s`);
+          }
+        }
         return listing.rows;
       } finally { listingNext = undefined; }
     })();
@@ -515,8 +543,8 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   // that. Its age never makes a PUT unsafe: `current` trusts only keys written in the last GC_GRACE_MS / 2.
   const kept = (): Map<string, StoredObject> | undefined => {
     if (listing === undefined) return undefined;
-    const age = clock() - listing.at;
-    return age < LISTING_MAX_AGE_MS || (listingNext !== undefined && age < 2 * LISTING_MAX_AGE_MS) ? listing.rows : undefined;
+    const age = clock() - listing.at, refreshing = listing.restored === true ? RESTORED_LISTING_MAX_AGE_MS : 2 * LISTING_MAX_AGE_MS;
+    return age < LISTING_MAX_AGE_MS || (listingNext !== undefined && age < refreshing) ? listing.rows : undefined;
   };
   const bucket = async (again: boolean): Promise<Map<string, StoredObject>> => {
     const rows = again ? undefined : kept();
@@ -538,7 +566,9 @@ export function createCookWorker(options: CookWorkerOptions): CookWorker {
   const put = async (key: string, body: Uint8Array, headers: ObjectHeaders): Promise<void> => {
     await store.put(key, body, headers);
     puts++;
-    listing?.rows.set(key, {key, bytes: body.byteLength, modified: clock()});
+    const row = {key, bytes: body.byteLength, modified: clock()};
+    listing?.rows.set(key, row);
+    if (listingFile !== undefined && listing !== undefined && noting) noting = saved('note', () => { appendPut(listingFile, row); });
   };
   const publish = async (work: string, report: CookJobReport, hash: string): Promise<void> => {
     const client = join(work, 'out/client'), keys = filesUnder(client);

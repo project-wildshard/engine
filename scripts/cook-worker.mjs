@@ -15,14 +15,14 @@
 //   node --import ./scripts/bake-loader.mjs scripts/cook-worker.mjs report    print usage against the budget (J89)
 // Environment: WILDSHARD_API_URL, WILDSHARD_BUILD; R2_ACCOUNT_ID, R2_BUCKET_PACKS, R2_PACKS_ACCESS_KEY_ID,
 // R2_PACKS_SECRET_ACCESS_KEY, or COOK_STORE_DIR for a folder; COOK_NOTIFY_TOKEN; COOK_PORT (8792; 8790 and 8791 are the game's), COOK_HOST (127.0.0.1);
-// COOK_SERVER_PACKS, COOK_SCRATCH; COOK_SECONDS, COOK_MEMORY_MB, COOK_HEAP_MB, COOK_MAX_SHARDFILE_BYTES; COOK_JOB_WRAP, a JSON array the host puts
+// COOK_SERVER_PACKS, COOK_SCRATCH, COOK_LISTING_FILE (FR-A21); COOK_SECONDS, COOK_MEMORY_MB, COOK_HEAP_MB, COOK_MAX_SHARDFILE_BYTES; COOK_JOB_WRAP, a JSON array the host puts
 // before each job to take its network away (see the wildshard-cook unit in scripts/vps/rebuild.sh). SP1b-T: COOK_SIDECARS, the
 // folder of cook preparation sidecars every job reads; COOK_RECORDER (the `wildshard` command, a JSON array),
 // COOK_PREPARATION_CLIENT, COOK_RECORD_CANARY, COOK_RECORD_WRAP, COOK_RECORD_SECONDS, COOK_RECORD_ACCEPTED for the record pass.
 import { agentFetch as fetch } from './agent-requests.mjs';
 import { readFileSync } from 'node:fs';
 import { availableParallelism } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const { apiSource, bootCook, collectGarbage, createCookWorker, DEFAULT_LIMITS, notifyServer, pollCatalogue, PACK_BUDGET_BYTES, POLL_EVERY_MS, reclaimPacks, storeUsage, uncookedLiveRefusal } = await import('../src/cook/game/cookWorker.ts');
@@ -84,7 +84,13 @@ const reclaim = async () => {
   console.log(`pack store reclaim: freed ${report.freedBytes} B in ${report.deleted} objects; kept ${builds.length} builds and ${heads.size} heads; ${report.usage.bytes} of ${packBudget} B used`);
   return report;
 };
-const worker = () => createCookWorker({ alarm: cookAlarm,
+/** FAST-RELEASE FR-A21: the kept bucket listing survives a restart (a whole R2 listing took 963 s on the box), beside the
+ *  scratch folder and named for its bucket; COOK_LISTING_FILE moves it, and a blank one turns it off. A folder store lists fast. */
+const listingFile = (() => {
+  if (env.COOK_LISTING_FILE !== undefined) return env.COOK_LISTING_FILE === '' ? undefined : resolve(env.COOK_LISTING_FILE);
+  return env.COOK_STORE_DIR === undefined || env.COOK_STORE_DIR === '' ? join(dirname(scratch), `listing-${need('R2_BUCKET_PACKS')}.tsv`) : undefined;
+})();
+const worker = () => createCookWorker({ alarm: cookAlarm, ...(listingFile === undefined ? {} : { listingFile }),
   build: need('WILDSHARD_BUILD'), store, source: uploadSource, log: line => { console.log(line); }, reclaim,
   serverPacks: resolve(env.COOK_SERVER_PACKS ?? 'tmp/cook/server'), scratch,
   ...(validator === undefined ? {} : { validator }), ...(cookRevisionId === undefined ? {} : { cook: cookRevisionId }),
