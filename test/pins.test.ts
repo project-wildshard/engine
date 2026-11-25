@@ -130,7 +130,9 @@ test('bytes that are not the pin never reach the cache or out/', async () => {
   writeFileSync(join(root, 'test/pins/shardfiles.json'), JSON.stringify({ api: 'local', shards: [{ slug: 'tampered', revision: 1, hash, bytes: body.length }] }));
   writeFileSync(join(root, 'package.json'), '{}');
   writeFileSync(join(root, 'pnpm-lock.yaml'), '');
-  const env = { ...process.env, WILDSHARD_API: `http://127.0.0.1:${address.port}`, WILDSHARD_PIN_MIRROR: 'http://127.0.0.1:1', WILDSHARD_PIN_CACHE: join(root, 'cache') };
+  // The dead mirror is a miss that may pass, so the tool retries it (QA 11-25 row 39); this test is about the bytes, so
+  // the retries wait 1 ms, not 5 s and 20 s (main AMBER 110dedfc1e: this file at 60.2 s of 60 s, 26 s of it here).
+  const env = { ...process.env, WILDSHARD_API: `http://127.0.0.1:${address.port}`, WILDSHARD_PIN_MIRROR: 'http://127.0.0.1:1', WILDSHARD_PIN_CACHE: join(root, 'cache'), WILDSHARD_PIN_RETRY_MS: '1' };
   expect(await install(root, env)).toMatch(/is not the pin/u);
   expect(existsSync(join(root, 'cache'))).toBe(false);
   expect(existsSync(join(root, 'out/tampered'))).toBe(false);
