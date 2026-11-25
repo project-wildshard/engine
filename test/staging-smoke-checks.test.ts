@@ -163,4 +163,24 @@ describe('the deploy load budget (STAGING-QA SQ12)', () => {
     expect(failed(k6, deploy)).toEqual(['P2 slow-play']);
     expect(checkScenario(k6, deploy).find(check => check.key === 'slow-play')?.text).toContain('pine-hollow 13.0 s against 10.0 s');
   });
+  // Meta QA 11-25 row 60: v0.1.91 held on K2 at 20.9 s against 20 s while lanes' local runs loaded the Mac.
+  it('records the 15-minute load beside each timing, and over the load line a miss reads "noisy, rerun", not a hold', () => {
+    const k2 = (load15: number) => clean({ id: 'K2', load15, legs: [leg({ name: 'journey', tapAt: 0, playAt: 20_900 })] });
+    const loaded = { ...deploy, noisyLoad: 12 };
+    const noisy = checkScenario(k2(19.4), loaded).find(check => check.key === 'load');
+    expect(noisy).toMatchObject({ ok: false, severity: 'P2' });
+    expect(noisy?.text).toMatch(/^noisy, rerun: a return visit at Low Power and 400 ms reached play in 20\.9 s, over the 20 s budget \(SB47\) \(15-min load 19\.4, over the 12\.0 line; QA 11-25 row 60\)$/u);
+    const judged = verdictOf([k2(19.4)], loaded);
+    expect(judged.hold).toBe(false);
+    expect(judged.rows[0]).toMatchObject({ load15: 19.4, timeToPlay: 20_900 });
+    // Under the line the same miss still holds, with the load beside it; a pass carries the load too.
+    const quiet = checkScenario(k2(3.2), loaded).find(check => check.key === 'load');
+    expect(quiet).toMatchObject({ ok: false, severity: 'P1' });
+    expect(quiet?.text).toContain('(15-min load 3.2)');
+    expect(verdictOf([k2(3.2)], loaded).hold).toBe(true);
+    const fast = clean({ id: 'K2', load15: 19.4, legs: [leg({ name: 'journey', tapAt: 0, playAt: 9_000 })] });
+    expect(checkScenario(fast, loaded).find(check => check.key === 'load')).toMatchObject({ ok: true, severity: 'P1', text: expect.stringContaining('(15-min load 19.4)') });
+    // No line given (an old caller): a miss holds as before.
+    expect(failed(k2(19.4), deploy)).toEqual(['P1 load']);
+  });
 });

@@ -23,6 +23,7 @@ import { iosSafari } from './staging-qa-sim.mjs';
 import { readOnlyPhoneLoad } from './journey-proof.mjs';
 import { roomsRevisionFindings } from './rooms-revision-check.ts';
 import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
+import { holdDesktopGpu } from './memory/iphone/locks.mjs';
 
 /** @typedef {import('./staging-smoke/checks.mjs').Finding} Finding */
 /** @typedef {{ id: string, browser: string, pass: boolean, seconds: number, playedMs: number, reason?: string, log: string }} Proof */
@@ -225,10 +226,17 @@ async function cli() {
     rig = local && source !== undefined ? await openQaRig({ root, build: source, out, ...(tourSeed === undefined ? {} : {tourSeed}) }) : undefined;
     candidate = candidateUrl !== undefined && source !== undefined ? await openQaCandidate({ root, out, candidate: candidateUrl, build: source }) : undefined;
     unbind = candidate === undefined ? undefined : bindCandidateBrowser(candidate);
-    if (runQa) await qualify({ url: rig?.base ?? url, release, root: rig?.source ?? root, out, store, local, kind, legStarted,
-      selected, expected, owner, full: requested === undefined && tourSeed === undefined,
-      ...(candidate === undefined ? {} : { candidate }),
-      ...(source === undefined ? {} : { source }), ...(args.has('bugbash') ? { bugbash: args.get('bugbash') } : {}) });
+    if (runQa) {
+      // Meta QA 11-25 row 60: the K-series load times run under desktop-gpu.lock, so lanes' heavy runs wait for them
+      // (heavy-lane.py) and GPU benches never share the Mac with them; v0.1.91 held on K2 at 20.9 s against 20 s.
+      const unlock = await holdDesktopGpu(line => console.log(`staging-qa: ${line}`));
+      try {
+        await qualify({ url: rig?.base ?? url, release, root: rig?.source ?? root, out, store, local, kind, legStarted,
+          selected, expected, owner, full: requested === undefined && tourSeed === undefined,
+          ...(candidate === undefined ? {} : { candidate }),
+          ...(source === undefined ? {} : { source }), ...(args.has('bugbash') ? { bugbash: args.get('bugbash') } : {}) });
+      } finally { unlock(); }
+    }
     if (rig !== undefined && source !== undefined && tourSeed !== undefined &&
         (!runQa || readResult(join(out, 'verdict.json'))?.hold === false)) {
       const {runLoopbackSmoke:walk} = await import(pathToFileURL(join(rig.source, 'scripts/zone-entry-tour.mjs')).href);

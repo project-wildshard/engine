@@ -12,3 +12,6 @@
   harden refreshes), then reads the cook unit (systemctl show) against rebuild.sh and stops on a gap. The box after
   v0.1.91: AllowedCPUs 13-15, CPUWeight unset, MemoryMax 8G effective (unit file 12G from 11-10, overridden by
   the drop-in); rebuild.sh unit now says 8G too.
+- QA 11-25 row 60: staging-qa holds desktop-gpu.lock (a lockf child) while its legs measure; new heavy-lane leases
+  for full Vitest and builds wait while it is held (push gates and land do not, so pushes keep flowing); every K
+  timing carries the 15-min load, and over 0.75 x CPUs a miss reads "noisy, rerun" (P2) instead of a hold.

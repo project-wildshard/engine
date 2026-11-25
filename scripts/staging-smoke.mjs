@@ -27,13 +27,13 @@ import './agent-fetch.mjs';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { SCENARIOS, runScenario } from './staging-smoke/scenarios.mjs';
-import { holds, verdictOf, worstFirst } from './staging-smoke/checks.mjs';
+import { holds, NOISY_LOAD_PER_CPU, verdictOf, worstFirst } from './staging-smoke/checks.mjs';
 import { keepRun, lastRelease, newestProfiles, saveProfiles, STORE } from './staging-smoke/store.mjs';
 import { keepReleaseProof, openReleaseRun } from './release-run.mjs';
 import { changelogBullets, deployVision, visionFindings, visionPass } from './staging-smoke/vision.mjs';
 import { bugbashRows } from './staging-smoke/bugbash.mjs';
 import { isClean, receiptLine, writeBoard } from './staging-smoke/board.mjs';
-import { homedir } from 'node:os';
+import { availableParallelism, homedir, loadavg } from 'node:os';
 
 /** The whole run's budget (SM8 (d)): over this the runner warns. */
 export const RUN_BUDGET_S = 600;
@@ -91,6 +91,8 @@ export async function runSmoke({ url, release, out, only, cells, card = 'driftwo
       ...(scenario.id === 'K1' || scenario.id === 'K2' ? oldFor(scenario.browser) : {}),
       ...(version.minClient === undefined ? {} : { minClient: version.minClient }), ...(version.build === undefined ? {} : { candidateBuild: version.build }),
     });
+    // Meta QA 11-25 row 60: the Mac's 15-minute load beside each scenario's timings.
+    result.load15 = Number(loadavg()[2]?.toFixed(2) ?? 0);
     scenarios.push(result);
     const problems = result.legs.flatMap((leg) => leg.problems.map((p) => `${leg.name}: ${p.text}`));
     log(`${result.status === 'skip' ? 'SKIP' : result.status === 'ran' && problems.length === 0 ? 'PASS' : 'FAIL'} ${result.id} ${result.title} ${result.seconds.toFixed(0)} s${result.reason === undefined ? '' : `: ${result.reason}`}`);
@@ -99,7 +101,8 @@ export async function runSmoke({ url, release, out, only, cells, card = 'driftwo
   const seconds = (Date.now() - started) / 1000;
   const last = store === undefined ? undefined : lastRelease(store, release);
   const times = lastTimeToPlay ?? last?.timeToPlay;
-  const judged = verdictOf(scenarios, { release, version, deploy, ...(build === undefined ? {} : { build }), ...(times === undefined ? {} : { lastTimeToPlay: times }) });
+  const noisyLoad = Number(process.env.WS_QA_NOISY_LOAD ?? availableParallelism() * NOISY_LOAD_PER_CPU);
+  const judged = verdictOf(scenarios, { release, version, deploy, noisyLoad, ...(build === undefined ? {} : { build }), ...(times === undefined ? {} : { lastTimeToPlay: times }) });
   // SM3: the Opus vision pass, against the last release's keyframes
   /** @type {Awaited<ReturnType<typeof visionPass>>} */
   let looks = [];

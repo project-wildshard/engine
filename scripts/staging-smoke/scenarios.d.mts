@@ -215,4 +215,5 @@ export type ScenarioResult = {
         black: string | null;
     }>;
     cells?: string[];
+    load15?: number;
 };

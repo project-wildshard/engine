@@ -5,7 +5,7 @@
 /** @typedef {{ scenario: string, key: string, severity: Severity, text: string, source: 'check' | 'vision', frame?: string, video?: string }} Finding */
 /** @typedef {import('./scenarios.mjs').ScenarioResult} ScenarioResult */
 /** @typedef {{ build?: string, describe?: string, clientVersion?: string, minClient?: string }} Version */
-/** @typedef {{ release: string, version: Version, build?: string, lastTimeToPlay?: Record<string, number>, checkVersion?: boolean, deploy?: boolean }} CheckContext */
+/** @typedef {{ release: string, version: Version, build?: string, lastTimeToPlay?: Record<string, number>, checkVersion?: boolean, deploy?: boolean, noisyLoad?: number }} CheckContext */
 
 import { ownPageErrors } from './thirdParty.mjs';
 
@@ -16,6 +16,18 @@ const NOT_P1 = /^never reached play|^an error or drop modal opened$/u;
 export const RETURN_PLAY_BUDGET_MS = 20_000;
 /** SQ12: time to play over this share of the last release's is a P2 on a deploy. */
 export const SLOWER_SHARE = 1.25;
+/** Meta QA 11-25 row 60: over this 15-minute load per CPU, a missed load time is "noisy, rerun" (P2), not a hold. v0.1.91
+ * held on K2 at 20.9 s against 20 s while lanes' local runs loaded the Mac. 0.75 leaves a quarter of the CPUs idle. */
+export const NOISY_LOAD_PER_CPU = 0.75;
+
+/** A timing check taken on a loaded Mac: the load beside it, and over `noisyLoad` a miss reads "noisy, rerun" (P2).
+ * @param {Check} check @param {number | undefined} load15 @param {number | undefined} noisyLoad @returns {Check} */
+export function underLoad(check, load15, noisyLoad) {
+  if (load15 === undefined) return check;
+  const load = `15-min load ${load15.toFixed(1)}`;
+  if (check.ok || noisyLoad === undefined || load15 <= noisyLoad) return { ...check, text: `${check.text} (${load})` };
+  return { ...check, severity: 'P2', text: `noisy, rerun: ${check.text} (${load}, over the ${noisyLoad.toFixed(1)} line; QA 11-25 row 60)` };
+}
 
 /** Each leg's milliseconds from its tap to play, by leg name (a K6 leg is one card). @param {ScenarioResult} s @returns {Record<string, number>} */
 export function legTimes(s) {
@@ -25,7 +37,12 @@ export function legTimes(s) {
 /** SQ12 on a deploy: K2's return visit inside its budget (P1), and each leg no more than SLOWER_SHARE of the last release's
  * time (P2; K1 and K2 compare only against the budget: a forced update's time is the old build's).
  * @param {ScenarioResult} s @param {Record<string, number> | undefined} last @returns {Check[]} */
-export function loadChecks(s, last) {
+export function loadChecks(s, last, noisyLoad) {
+  return timingChecks(s, last).map(check => underLoad(check, s.load15, noisyLoad));
+}
+
+/** @param {ScenarioResult} s @param {Record<string, number> | undefined} last @returns {Check[]} */
+function timingChecks(s, last) {
   const ttp = timeToPlay(s);
   /** @type {Check[]} */
   const checks = [];
@@ -74,7 +91,7 @@ export function checkScenario(s, ctx) {
       { key: 'error-card', severity: 'P0', ok: !error, text: 'an error card opened' },
       { key: 'stick', severity: 'P0', ok: stuck.length === 0, text: `the move stick did not move the player (${stuck.join(', ')})` },
       { key: 'black-world', severity: 'P0', ok: black === undefined, text: black ?? 'the world drew' },
-      ...loadChecks(s, ctx.lastTimeToPlay),
+      ...loadChecks(s, ctx.lastTimeToPlay, ctx.noisyLoad),
     ];
   }
   /** @type {Check[]} */
@@ -178,7 +195,8 @@ export function verdictOf(scenarios, ctx) {
   const rows = scenarios.map((s) => {
     const checks = checkScenario(s, { ...ctx, checkVersion: s === first });
     const ttp = timeToPlay(s);
-    return { scenario: s, checks, findings: findingsOf(s, checks), legTimes: legTimes(s), ...(ttp === undefined ? {} : { timeToPlay: ttp }) };
+    return { scenario: s, checks, findings: findingsOf(s, checks), legTimes: legTimes(s), ...(ttp === undefined ? {} : { timeToPlay: ttp }),
+      ...(s.load15 === undefined ? {} : { load15: s.load15 }) };
   });
   const findings = rows.flatMap((r) => r.findings).sort(worstFirst);
   return { rows, findings, hold: holds(findings) };

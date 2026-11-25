@@ -7,7 +7,11 @@ export const SLOWER_SHARE: 1.25;
 /** Each leg's milliseconds from its tap to play, by leg name. */
 export function legTimes(s: ScenarioResult): Record<string, number>;
 /** SQ12 on a deploy: K2's return visit inside its budget (P1), and each leg within SLOWER_SHARE of the last release's (P2). */
-export function loadChecks(s: ScenarioResult, last: Record<string, number> | undefined): Check[];
+export function loadChecks(s: ScenarioResult, last: Record<string, number> | undefined, noisyLoad?: number): Check[];
+/** Meta QA 11-25 row 60: over this 15-minute load per CPU, a missed load time is "noisy, rerun" (P2), not a hold. */
+export const NOISY_LOAD_PER_CPU: 0.75;
+/** A timing check with the load beside it; over `noisyLoad` a miss reads "noisy, rerun" (P2). */
+export function underLoad(check: Check, load15: number | undefined, noisyLoad: number | undefined): Check;
 /** a.b.c below x.y.z @param {string} a @param {string} b */
 export function olderVersion(a: string, b: string): boolean;
 /** Milliseconds from the first leg's tap to play, or undefined when it never played. @param {ScenarioResult} s */
@@ -30,6 +34,7 @@ export function verdictOf(scenarios: readonly ScenarioResult[], ctx: CheckContex
         checks: Check[];
         findings: Finding[];
         legTimes: Record<string, number>;
+        load15?: number | undefined;
     }[];
     findings: Finding[];
     hold: boolean;
@@ -69,4 +74,5 @@ export type CheckContext = {
     lastTimeToPlay?: Record<string, number>;
     checkVersion?: boolean;
     deploy?: boolean;
+    noisyLoad?: number;
 };

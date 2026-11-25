@@ -28,6 +28,11 @@ BUILD_SLOTS = ('build', 'build-2', 'build-3')
 RESOURCES = {'full-test': ('full-test',), 'full-gate': ('full-gate',), 'build': ('build',), 'check': ('full-test', 'build')}
 LANES = ('full-test', 'full-gate', *BUILD_SLOTS)
 WAIT_SECONDS = 5 * 60
+# Meta QA 11-25 row 60: release QA's load-time checks (the K-series) run under desktop-gpu.lock
+# (scripts/memory/iphone/locks.mjs), and v0.1.91 held on K2 at 20.9 s against 20 s while lanes' runs loaded the Mac.
+# A new heavy lease waits while that lock is held, at most this long, then goes on and says so.
+DESKTOP_GPU_MAX_WAIT = 30 * 60
+DESKTOP_GPU_POLL = 5
 
 
 def read_metadata(path):
@@ -289,6 +294,51 @@ def ancestors():
         result.add(current)
         current = parents.get(current, 0)
     return result
+
+
+def desktop_gpu_lock():
+    """The shared desktop-gpu.lock path, as locks.mjs names it (WS_LOCK_ROOT moves it in tests)."""
+    root = os.environ.get('WS_LOCK_ROOT') or str(Path.home() / 'projects/games/wildshard/engine/tmp')
+    return Path(root) / 'desktop-gpu.lock'
+
+
+def desktop_gpu_held(path):
+    """True while another process holds desktop-gpu.lock. The probe takes a shared lock for an instant and drops it."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+    except BlockingIOError:
+        return True
+    finally:
+        os.close(fd)
+    return False
+
+
+def wait_desktop_gpu(path=None, limit=None, sleep=None, monotonic=None, say=None):
+    """Row 60: wait while release QA (or a GPU bench) holds desktop-gpu.lock; returns the seconds waited. A run that
+    already holds the lock (WS_DESKTOP_GPU_HELD=1, set by its holder) never waits on itself, and a run inside a lease that
+    already waited (WS_DESKTOP_GPU_WAITED=1: a gate's own Vitest files) does not wait again."""
+    if os.environ.get('WS_DESKTOP_GPU_HELD') == '1' or os.environ.get('WS_DESKTOP_GPU_WAITED') == '1':
+        return 0.0
+    path = desktop_gpu_lock() if path is None else path
+    limit = DESKTOP_GPU_MAX_WAIT if limit is None else limit
+    sleep = time.sleep if sleep is None else sleep
+    monotonic = time.monotonic if monotonic is None else monotonic
+    say = (lambda line: print(line, file=sys.stderr, flush=True)) if say is None else say
+    began, told = monotonic(), False
+    while desktop_gpu_held(path):
+        waited = monotonic() - began
+        if waited >= limit:
+            say('heavy-lane: desktop-gpu.lock still held after %d min; going on (meta QA 11-25 row 60)' % (waited // 60))
+            break
+        if not told:
+            say('heavy-lane: waiting while desktop-gpu.lock is held (release QA timings or a GPU bench; meta QA 11-25 row 60)')
+            told = True
+        sleep(DESKTOP_GPU_POLL)
+    return monotonic() - began
 
 
 def inherited(root, resources):
@@ -817,6 +867,11 @@ def main():
         if os.environ.get('WS_CPU_ADMISSION') != '1':
             parser.error('checkout-scoped pushes require CPU admission')
         entry['checkout'] = str(Path.cwd().resolve())
+    # Heavy local runs (a full Vitest suite, builds) wait; a push gate (checkout scope) and land's coordination do not, so
+    # pushes keep flowing. Only the machine's own lanes: a scheduler root of its own (a test fixture) shares no Mac.
+    if not args.checkout_scope and args.kind != 'full-gate' and root == (Path.home() / '.wildshard-heavy-lanes').resolve():
+        wait_desktop_gpu()
+        os.environ['WS_DESKTOP_GPU_WAITED'] = '1'
     held, child, started, load, code = None, None, None, None, 130
     cpu_owned = None
     command_began, command_owner, command_before, command_result = None, None, None, None

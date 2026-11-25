@@ -17,7 +17,7 @@
 // The locks live in the canonical engine checkout's tmp/, shared by every worktree; WS_LOCK_ROOT moves them (tests).
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -70,3 +70,29 @@ export const underPhoneLocks = (script, args, phone) => underLock('phone', scrip
 
 /** @param {string} script @param {string[]} args */
 export const underDesktopGpuLock = (script, args) => underLock('desktop', script, args);
+
+/**
+ * Meta QA 11-25 row 60: hold the desktop locks around in-process work (release QA's K-series load times), not a child
+ * command. A `lockf` child holds them while its stdin stays open; the returned release closes it. While held,
+ * WS_DESKTOP_GPU_HELD=1 tells this process's children (heavy-lane.py) that the holder is their own, so they never wait
+ * on it. With no `/usr/bin/lockf` (Linux CI) it holds nothing.
+ * @param {(line: string) => void} [log] @param {string} [root] @returns {Promise<() => void>}
+ */
+export async function holdDesktopGpu(log = console.log, root = lockRoot()) {
+  if (!existsSync('/usr/bin/lockf')) return () => { /* No lockf here: nothing held. */ };
+  mkdirSync(root, { recursive: true });
+  log(waitLine('desktop'));
+  const child = spawn('/usr/bin/lockf', [...lockfArgs('desktop', root), '/bin/sh', '-c', 'echo held; exec cat >/dev/null'], { stdio: ['pipe', 'pipe', 'inherit'] });
+  await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', code => reject(new Error(`lockf exited ${String(code)} before it held ${DESKTOP_GPU_LOCK}`)));
+    child.stdout.on('data', chunk => { if (String(chunk).includes('held')) resolve(undefined); });
+  });
+  const before = process.env.WS_DESKTOP_GPU_HELD;
+  process.env.WS_DESKTOP_GPU_HELD = '1';
+  return () => {
+    if (before === undefined) delete process.env.WS_DESKTOP_GPU_HELD;
+    else process.env.WS_DESKTOP_GPU_HELD = before;
+    child.stdin.end();
+  };
+}

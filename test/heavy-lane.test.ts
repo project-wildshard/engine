@@ -305,3 +305,40 @@ with tempfile.TemporaryDirectory(prefix='dead-lease-test-', dir='tmp') as tempor
 `], { encoding: 'utf8', timeout: 10_000 });
   expect(JSON.parse(result)).toEqual({ named: ['live-gate', 'orphan-gate'], kept: ['full-test-live.active.json', 'full-test-orphan.active.json'] });
 });
+
+// Meta QA 11-25 row 60: release QA's K-series load times run under desktop-gpu.lock; a new heavy lease (full Vitest,
+// gates, builds) waits while it is held, and the QA holder's own children never wait on it.
+test('a heavy slot waits while desktop-gpu.lock is held, and goes on when it is released', () => {
+  const result = execFileSync('python3', ['-c', `
+import fcntl, importlib.util, os, pathlib, sys, tempfile
+sys.path.insert(0, str(pathlib.Path('scripts').resolve()))
+spec = importlib.util.spec_from_file_location('heavy_lane', 'scripts/heavy-lane.py')
+module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+for key in ('WS_DESKTOP_GPU_HELD', 'WS_DESKTOP_GPU_WAITED'): os.environ.pop(key, None)
+pathlib.Path('tmp').mkdir(exist_ok=True)
+with tempfile.TemporaryDirectory(prefix='gpu-lock-', dir='tmp') as temporary:
+ lock = pathlib.Path(temporary).resolve() / 'desktop-gpu.lock'
+ assert module.wait_desktop_gpu(lock, sleep=lambda s: None) == 0 or True
+ holder = open(lock, 'a'); fcntl.flock(holder, fcntl.LOCK_EX)
+ clock = {'now': 0.0, 'sleeps': 0}; said = []
+ def sleep(seconds):
+  clock['sleeps'] += 1; clock['now'] += seconds
+  if clock['sleeps'] == 3: holder.close()
+ waited = module.wait_desktop_gpu(lock, sleep=sleep, monotonic=lambda: clock['now'], say=said.append)
+ assert clock['sleeps'] == 3 and waited == 3 * module.DESKTOP_GPU_POLL, (clock, waited)
+ assert len(said) == 1 and 'waiting while desktop-gpu.lock is held' in said[0], said
+ assert not module.desktop_gpu_held(lock)
+ holder = open(lock, 'a'); fcntl.flock(holder, fcntl.LOCK_EX)
+ clock = {'now': 0.0, 'sleeps': 0}; said = []
+ def tick(seconds): clock['now'] += seconds
+ module.wait_desktop_gpu(lock, limit=12, sleep=tick, monotonic=lambda: clock['now'], say=said.append)
+ assert 'still held' in said[-1], said
+ os.environ['WS_DESKTOP_GPU_HELD'] = '1'
+ assert module.wait_desktop_gpu(lock, sleep=lambda s: (_ for _ in ()).throw(AssertionError('the holder waited on itself'))) == 0
+ os.environ.pop('WS_DESKTOP_GPU_HELD'); os.environ['WS_DESKTOP_GPU_WAITED'] = '1'
+ assert module.wait_desktop_gpu(lock, sleep=lambda s: (_ for _ in ()).throw(AssertionError('a nested lease waited again'))) == 0
+ holder.close()
+print('ok')
+`], {encoding: 'utf8', timeout: 15000});
+  expect(result.trim()).toBe('ok');
+});

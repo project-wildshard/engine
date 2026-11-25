@@ -28,7 +28,7 @@ import { saveFixture } from '../debug-settings.mjs';
  *   seconds: number, legs: Leg[], errors: string[], events: ProbeEvent[], log: string[], frames: Record<string, string>,
  *   video?: string, settings?: { opened: boolean, closed: boolean }, quietTitle?: { drop: boolean, left: boolean }, drops?: number,
  *   oldCache?: { before: StorageState, after: StorageState, minClient?: string }, profile?: string, endState?: StorageState,
- *   world?: Record<string, { stats: WorldStats, black: string | null }>, cells?: string[],
+ *   world?: Record<string, { stats: WorldStats, black: string | null }>, cells?: string[], load15?: number,
  * }} ScenarioResult
  */
 
