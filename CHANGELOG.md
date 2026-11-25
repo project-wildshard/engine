@@ -13,6 +13,12 @@ it into main while other lanes continue landing.
 `scripts/changelog.mjs` checks the format; the pre-push hook and CI refuse a push whose `package.json` version has no
 valid section, and a `vX.Y.Z` tag whose commit has none.
 
+## v0.1.93 (2026-11-25)
+
+- The game reads the newest shard format, so zones published with the latest SDK open as built.
+- A slow early server no longer holds up the first picture on lower-power devices.
+- Release checks retry a one-off content read error instead of stopping the release.
+
 ## v0.1.90 (2026-11-25)
 
 - The cook stays within its memory while it lists a large store, so new zone uploads keep cooking.
