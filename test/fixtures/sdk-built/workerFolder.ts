@@ -9,10 +9,10 @@ export function frozenDecisionWorkerFolder(input:Shardfile,moduleBytes:Uint8Arra
  // revision, seed; a newer parse spells the lineage saveRevision, after seed
  const identity:Record<string,unknown>={...input.identity},{saveRevision,seed,...head}=identity;
  const lineage=saveRevision===undefined?input:{...input,identity:{...head,revision:saveRevision,seed}};
- // FP4 (format 0.74.0): requires.capabilities is optional and today's parse leaves it out; the pin hashed it as an empty
- // list after sdk
- const {sdk,...rest}=lineage.requires as Record<string,unknown>;
- const written='capabilities' in lineage.requires?lineage:{...lineage,requires:{sdk,capabilities:[],...rest}};
+ // FP4 (format 0.74.0) and FP33 (requires.sdk deleted): today's parse has neither field; the pin hashed `sdk: '0.1'` first,
+ // then capabilities as an empty list
+ const {sdk:_sdk,capabilities=[],...rest}=lineage.requires as Record<string,unknown>;
+ const written={...lineage,requires:{sdk:'0.1',capabilities,...rest}};
  if(sha256(new TextEncoder().encode(JSON.stringify(written)))!==pin.inputSha256)throw new Error('Frozen worker fixture source differs');
  const assets=new Map(pin.assets.map(([hash,encoded])=>{
   const bytes=Uint8Array.from(Buffer.from(encoded,'base64'));
@@ -21,5 +21,8 @@ export function frozenDecisionWorkerFolder(input:Shardfile,moduleBytes:Uint8Arra
  }));
  const original=assets.get(sha256(moduleBytes));
  if(original===undefined||original.length!==moduleBytes.length)throw new Error('Frozen worker fixture module differs');
- return {shard:parseShardfile(structuredClone(pin.shard)),assets};
+ // FP33: the frozen product still carries requires.sdk, which the schema no longer knows
+ const frozen=structuredClone(pin.shard) as {requires?:Record<string,unknown>};
+ if(frozen.requires!==undefined)Reflect.deleteProperty(frozen.requires,'sdk');
+ return {shard:parseShardfile(frozen),assets};
 }

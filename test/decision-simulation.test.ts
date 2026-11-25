@@ -289,7 +289,6 @@ test('SDK worker executes the declared v1 section and reports its real fuel rath
   const f = fixture(); f.source.budgets.sim.resident = 1_000_000;
   // This frozen ABI-1 SDK product captured the preceding format, not today's author default.
   f.source.version = '0.1';
-  f.source.requires = { sdk: '0.1', ...f.source.requires }; // the frozen product's key order: sdk first (CP8 dropped it from today's default)
   const product = frozenDecisionWorkerFolder(f.source,bytes);
   const session = await HeadlessSimulation.create(product.shard, product.assets, undefined, { deadline: 'advisory', sections: f.sections });
   try {
@@ -310,7 +309,6 @@ test('author proof admits the declared v1 section only when given the sections, 
   const f = fixture(); f.source.budgets.sim.resident = 1_000_000;
   // The same frozen ABI-1 SDK product retains its captured input versions.
   f.source.version = '0.1';
-  f.source.requires = { sdk: '0.1', ...f.source.requires }; // the frozen product's key order: sdk first (CP8 dropped it from today's default)
   const product = frozenDecisionWorkerFolder(f.source, bytes);
   const plan = { version: 1 as const, tape: Array.from({ length: 8 }, () => []), checkpointTick: 4, requiredFacts: ['tc-ne5b.never-filed'] };
   await expect(proveAuthorSimulation(product.shard, product.assets, plan)).rejects.toThrow(/Import signature outside ABI|wrong ABI export/u);
