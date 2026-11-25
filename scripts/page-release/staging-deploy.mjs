@@ -109,8 +109,9 @@ async function runZoneEntry(out, build, resume) {
 
 /** @param {{ root:string, build:string, release:string, source:string, out:string, observerProof?:string, zoneEntryResume?:string,
  * localQa?:import('./flow.mjs').QaVerdict, readState:() => any, get:(url:string) => Promise<any>,
- * phase:(name:import('./flow.mjs').Phase, qa?:import('./flow.mjs').QaVerdict) => Promise<unknown>, log:(line:string)=>void }} opts */
-export async function deployStaging({ root, build, release, source, out, observerProof, zoneEntryResume, localQa, readState, get, phase, log }) {
+ * phase:(name:import('./flow.mjs').Phase, qa?:import('./flow.mjs').QaVerdict) => Promise<unknown>, log:(line:string)=>void,
+ * waitPacks?:() => Promise<void> }} opts */
+export async function deployStaging({ root, build, release, source, out, observerProof, zoneEntryResume, localQa, readState, get, phase, log, waitPacks }) {
   const reportPath = join(out, 'verdict.json');
   if (existsSync(reportPath)) throw new RefusedError('Choose a fresh staging deploy evidence directory');
   mkdirSync(out, { recursive: true, mode: 0o700 });
@@ -170,6 +171,11 @@ export async function deployStaging({ root, build, release, source, out, observe
         }
         await phase('check');
       }
+    }
+    // FR-A19: never tour a build mid-recook (v0.1.89 and v0.1.90 held on 404 packs); wait, bounded, for every staging head.
+    if (waitPacks !== undefined) {
+      step = 'packs';
+      await waitPacks();
     }
     step = 'deploy smoke';
     const candidate = alreadyLive ? undefined : readState().check.deployment.url;

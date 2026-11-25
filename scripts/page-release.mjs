@@ -33,7 +33,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {CHANNELS, pinnedReleaseKey, RefusedError, buildEnv, runPhase} from './page-release/flow.mjs';
 import {agentFetch} from './agent-requests.mjs';
-import {missingProductionPacks} from './page-release/production-packs.mjs';
+import {missingProductionPacks, waitForPacks} from './page-release/production-packs.mjs';
 import {workersHost} from './page-release/hosts/workers.mjs';
 import {r2Packs} from './page-release/packs.mjs';
 import {publishContent, r2Content, r2Copies} from './page-release/content.mjs';
@@ -167,7 +167,9 @@ try {
         out: resolve(value('qa-out') ?? scratch.proof),
         ...(localQa === undefined ? {} : { localQa }), ...(proof === undefined ? {} : { observerProof: resolve(proof) }),
         ...(resume === undefined ? {} : { zoneEntryResume: resolve(resume) }),
-        readState, get: async url => (await fetch200(url)).json(), phase: run, log });
+        readState, get: async url => (await fetch200(url)).json(), phase: run, log,
+        // FR-A19: staging QA starts only when every staging head has packs for this build (at most 45 min).
+        waitPacks: () => waitForPacks(build, 'staging', {log}) });
     } else await run(/** @type {import('./page-release/flow.mjs').Phase} */ (phase));
   }
 } catch (error) {

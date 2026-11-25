@@ -31,3 +31,9 @@
   sunscar-dunes (cooks the OOMs cut short); v0.1.90 lacks 26 while the cook recooks for its new cook revision.
 - v0.1.90's release clone predates the gate, so its promotion runs `node scripts/page-release/production-packs.mjs
   <build>` from main first.
+
+## FR-A19: staging QA waits for the recook
+
+- v0.1.89 and v0.1.90 both held at staging QA on 404 packs: each toured while the cook recooked every head for the new
+  build. `deployStaging` now waits, at most 45 min, until every head staging advertises has its exact-build index, and
+  holds with the missing heads named after that (`waitForPacks`, the same read as FR-A17's production gate).
