@@ -478,47 +478,6 @@ export async function play(browser, phone, base, only = '') {
     await shard.context.close();
   }
 
-  // A data shard: the page is the data client's alone. Its door is a public field, so the server turns it and the page draws what the row says.
-  if (runs('data')) { const data = await open(browser, phone, base, '/?chunk=pastel-plain&mute=1&nolock=1');
-  const door = () => data.page.evaluate(() => ({ row: window.__workerClientRow('pastel.door.open') ?? null, targets: window.__wildshard.shard.shardfile.targets() }));
-  await step('pastel boots on the row', async () => { await entered(data.page); return started(data.page); });
-  await step('pastel draws the server creatures', async () => { const r = await report(data.page); return { ok: r.rows > 0 && Object.keys(r.retired).length === 0, rows: r.rows, retired: r.retired }; });
-  await step('pastel\'s quest stands on the row', async () => { const r = await report(data.page); return { ok: 'pastel.quest' in r.quests, quests: r.quests }; });
-  await step('the door is shut, and its panel and collider say so', async () => { const at = await door(); return { ok: at.row === 0 && at.targets.every(row => row.visible && row.solid), ...at }; });
-  await step('a predicted walk stops at the shut door', async () => {
-    await data.page.evaluate(() => { const { player } = window.__wildshard.world; player.link.place(0, 1.4, -6, 0); });
-    await data.page.waitForTimeout(800);
-    await data.page.evaluate(() => { const { player } = window.__wildshard.world; player.yaw = 0; player.touchMove.y = 1; }); // straight at it: `walk` would step around
-    await data.page.waitForTimeout(2500);
-    await data.page.evaluate(() => { window.__wildshard.world.player.touchMove.y = 0; });
-    await data.page.waitForTimeout(800);
-    const r = await report(data.page), parted = Math.hypot(r.x - r.serverX, r.z - r.serverZ);
-    return { ok: r.z > -9 && r.z < -7 && parted < 1, z: r.z, parted };
-  });
-  await step('a press turns the door on the server, and the page follows the row', async () => {
-    const prompt = await prompted(data.page, 'pastel.door.use');
-    if (prompt === null) return { ok: false, why: 'no prompt' };
-    await data.page.evaluate(({ x, y, z }) => { window.__wildshard.world.player.link.place(x, y + 0.2, z + 1.5, 0); }, prompt);
-    await data.page.waitForTimeout(1200);
-    for (let i = 0; i < 6 && (await door()).row !== 1; i++) { await data.page.keyboard.press('KeyE'); await data.page.waitForTimeout(600); }
-    const at = await door(); return { ok: at.row === 1 && at.targets.every(row => !row.visible && !row.solid), ...at };
-  });
-  await step('a predicted walk goes through the open door and stays with the server', async () => {
-    const before = await report(data.page);
-    await walk(data.page, 0, -12, 1, 6);
-    await data.page.waitForTimeout(800);
-    const r = await report(data.page), parted = Math.hypot(r.x - r.serverX, r.z - r.serverZ);
-    return { ok: r.z < -10 && parted < 1, z: r.z, parted, corrections: r.corrections - before.corrections, worst: r.worstOffset };
-  });
-  await step('pastel saves and resumes with its door open', async () => {
-    await data.page.evaluate(() => Promise.race([window.__workerClientSave(), new Promise(resolve => { setTimeout(resolve, 6000); })]));
-    await data.page.reload({ waitUntil: 'load' }); await entered(data.page);
-    await data.page.waitForFunction(() => window.__workerClientRow('pastel.door.open') === 1, undefined, { timeout: 30_000 });
-    const at = await door(); return { ok: at.targets.every(row => !row.visible && !row.solid), ...at };
-  });
-  await step('pastel raises no page error', () => ({ ok: data.errors.length === 0, errors: [...new Set(data.errors)].slice(0, 6) }));
-  await data.context.close(); }
-
   // The grid: a crossing, a save, a reload
   if (runs('grid')) { const grid = await open(browser, phone, base, floorGridBenchmarkUrl(base).replace(base, '/'));
   await step('the grid boots on the row', async () => {

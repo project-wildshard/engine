@@ -4,7 +4,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
 /** The shards gathered so far. Open Plots follows; its products share one source folder. */
-export const GATHERED_SHARDS = Object.freeze(['ink-cel-valley', 'pastel-plain', 'sunscar-dunes', 'far-reach', 'driftwood-isle', 'nalati-grasslands', 'pine-hollow', 'nine-dragon-stack']);
+export const GATHERED_SHARDS = Object.freeze(['sunscar-dunes', 'far-reach', 'driftwood-isle', 'nalati-grasslands', 'pine-hollow', 'nine-dragon-stack']);
 
 /** Shards whose public/assets/<slug> tree is gathered too: src/shards/<slug>/assets/public/ holds it, gen writes the aliases.
  * URLs, map inputs and every reader keep the public path, so the move renames nothing they name. To add a shard:

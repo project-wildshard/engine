@@ -19,8 +19,6 @@ const SCOPE=['test/','src/','scripts/'];
 const LIVE='test/pins/';
 const SELF=new Set(['scripts/zone-snapshot-guard.mjs','scripts/zone-snapshot-guard.d.mts',BASELINE,'test/zone-snapshot-guard.test.ts']);
 const TEXT=/\.(?:json|ts|mts|mjs|js|cjs|tsx)$/u;
-/** Zones that left the grid but whose names still mark a snapshot. */
-const RETIRED=['ink-cel-valley','pastel-plain'];
 // J506 (Jake, 2026-11-23): Brasscap Mesa's export is the one zone copy kept on purpose (scripts/brasscap-export.mjs rebuilds
 // it from a shard-brasscap commit). It passes only at the current format: an older export is a snapshot like any other.
 const KEPT_EXPORTS=new Set(['test/fixtures/corpus/brasscap-mesa/shard.json']);
@@ -37,9 +35,9 @@ export function compareVersions(a,b){
   return 0;
 }
 
-/** The zone names a revision path may not carry: the live pins' slugs, the retired ones and the short names.
+/** The zone names a revision path may not carry: the live pins' slugs and the short names.
  * @param {string[]} slugs */
-export function zoneNames(slugs){return [...new Set([...slugs,...RETIRED,...ALIASES])].sort((a,b)=>b.length-a.length);}
+export function zoneNames(slugs){return [...new Set([...slugs,...ALIASES])].sort((a,b)=>b.length-a.length);}
 
 /** @param {unknown} json */
 function shardVersion(json){
@@ -61,7 +59,7 @@ function shardSlug(json){
 /** Every offender in a tree, sorted: `<rule> <path>`.
  * @param {{ paths: string[], read: (path: string) => string, current: string, zones: string[] }} input */
 export function zoneSnapshotOffenders({paths,read,current,zones}){
-  const names=zoneNames(zones),slugs=new Set([...zones,...RETIRED]);
+  const names=zoneNames(zones),slugs=new Set(zones);
   const revision=new RegExp(`(?:^|[/_.-])(?:${names.join('|')})-r[0-9]+(?:[/_.-]|$)`,'u');
   /** @type {Set<string>} */
   const found=new Set();

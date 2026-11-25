@@ -74,30 +74,6 @@
         "margin": 0
       }
     },
-    "ink-cel-valley": {
-      "control": {
-        "browser": 2810784,
-        "engine": 1405392,
-        "workers": 7056417,
-        "geometry": 7367392,
-        "textures": 18599340,
-        "scene": 5101832,
-        "audio": 0,
-        "loading": 17992983,
-        "margin": 0
-      },
-      "peak": {
-        "browser": 2810784,
-        "engine": 1405392,
-        "workers": 7056417,
-        "geometry": 7367392,
-        "textures": 18599340,
-        "scene": 5101832,
-        "audio": 0,
-        "loading": 17992983,
-        "margin": 0
-      }
-    },
     "nalati-grasslands": {
       "control": {
         "browser": 2810784,
@@ -527,30 +503,6 @@
         "scene": 6720,
         "audio": 21525166,
         "loading": 8991262,
-        "margin": 0
-      }
-    },
-    "pastel-plain": {
-      "control": {
-        "browser": 2810784,
-        "engine": 1405392,
-        "workers": 7057146,
-        "geometry": 7367356,
-        "textures": 12977772,
-        "scene": 5101832,
-        "audio": 0,
-        "loading": 18231796,
-        "margin": 0
-      },
-      "peak": {
-        "browser": 2810784,
-        "engine": 1405392,
-        "workers": 7057146,
-        "geometry": 7367356,
-        "textures": 12977772,
-        "scene": 5101832,
-        "audio": 0,
-        "loading": 18231796,
         "margin": 0
       }
     },

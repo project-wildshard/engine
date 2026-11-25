@@ -76,20 +76,6 @@
     "wallMs": 0,
     "over50": 0
   },
-  "preview/chromium-desktop/ink-cel-valley:open-plot-0-4": {
-    "ok": true,
-    "borderToControlMs": 0,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 0
-  },
-  "preview/chromium-desktop/ink-cel-valley:pastel-plain": {
-    "ok": true,
-    "borderToControlMs": 99,
-    "freezeMs": 0,
-    "wallMs": 0,
-    "over50": 0
-  },
   "preview/chromium-desktop/nalati-grasslands:nine-dragon-stack": {
     "ok": true,
     "borderToControlMs": 0,
@@ -160,20 +146,6 @@
     "wallMs": 0,
     "over50": 0
   },
-  "preview/chromium-desktop/open-plot-0-3:pastel-plain": {
-    "ok": true,
-    "borderToControlMs": 97,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 0
-  },
-  "preview/chromium-desktop/open-plot-0-4:ink-cel-valley": {
-    "ok": true,
-    "borderToControlMs": 100,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 0
-  },
   "preview/chromium-desktop/open-plot-1-0:blender-template": {
     "ok": true,
     "borderToControlMs": 0,
@@ -199,13 +171,6 @@
     "ok": true,
     "borderToControlMs": 0,
     "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 0
-  },
-  "preview/chromium-desktop/open-plot-2-4:ink-cel-valley": {
-    "ok": true,
-    "borderToControlMs": 95,
-    "freezeMs": 0,
     "wallMs": 0,
     "over50": 0
   },
@@ -300,39 +265,11 @@
     "wallMs": 0,
     "over50": 0
   },
-  "preview/chromium-desktop/pastel-plain:open-plot-0-3": {
-    "ok": true,
-    "borderToControlMs": 0,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 0
-  },
-  "preview/chromium-desktop/pastel-plain:pine-hollow": {
-    "ok": true,
-    "borderToControlMs": 0,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 1
-  },
-  "preview/chromium-desktop/pastel-plain:sunscar-dunes": {
-    "ok": true,
-    "borderToControlMs": 100,
-    "freezeMs": 0,
-    "wallMs": 0,
-    "over50": 9
-  },
   "preview/chromium-desktop/pine-hollow:open-plot-2-4": {
     "ok": true,
     "borderToControlMs": 0,
     "freezeMs": 100,
     "wallMs": 0,
-    "over50": 0
-  },
-  "preview/chromium-desktop/pine-hollow:pastel-plain": {
-    "ok": true,
-    "borderToControlMs": 99,
-    "freezeMs": 8097,
-    "wallMs": 8100,
     "over50": 0
   },
   "preview/chromium-desktop/pine-hollow:template-2": {
@@ -447,20 +384,6 @@
     "wallMs": 0,
     "over50": 0
   },
-  "preview/webkit-phone/ink-cel-valley:open-plot-0-4": {
-    "ok": true,
-    "borderToControlMs": 0,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 1
-  },
-  "preview/webkit-phone/ink-cel-valley:pastel-plain": {
-    "ok": true,
-    "borderToControlMs": 102,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 3
-  },
   "preview/webkit-phone/nalati-grasslands:nine-dragon-stack": {
     "ok": true,
     "borderToControlMs": 112,
@@ -538,20 +461,6 @@
     "wallMs": 0,
     "over50": 7
   },
-  "preview/webkit-phone/open-plot-0-3:pastel-plain": {
-    "ok": true,
-    "borderToControlMs": 0,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 1
-  },
-  "preview/webkit-phone/open-plot-0-4:ink-cel-valley": {
-    "ok": true,
-    "borderToControlMs": 0,
-    "freezeMs": 417,
-    "wallMs": 0,
-    "over50": 3
-  },
   "preview/webkit-phone/open-plot-1-0:blender-template": {
     "ok": true,
     "borderToControlMs": 105,
@@ -579,13 +488,6 @@
     "freezeMs": 100,
     "wallMs": 0,
     "over50": 4
-  },
-  "preview/webkit-phone/open-plot-2-4:ink-cel-valley": {
-    "ok": true,
-    "borderToControlMs": 0,
-    "freezeMs": 100,
-    "wallMs": 0,
-    "over50": 1
   },
   "preview/webkit-phone/open-plot-2-4:open-plot-3-4": {
     "ok": true,
@@ -685,40 +587,12 @@
     "wallMs": 0,
     "over50": 0
   },
-  "preview/webkit-phone/pastel-plain:open-plot-0-3": {
-    "ok": true,
-    "borderToControlMs": 0,
-    "freezeMs": 207,
-    "wallMs": 0,
-    "over50": 0
-  },
-  "preview/webkit-phone/pastel-plain:pine-hollow": {
-    "ok": true,
-    "borderToControlMs": 1613,
-    "freezeMs": 934,
-    "wallMs": 800,
-    "over50": 3
-  },
-  "preview/webkit-phone/pastel-plain:sunscar-dunes": {
-    "ok": true,
-    "borderToControlMs": 205,
-    "freezeMs": 100,
-    "wallMs": 100,
-    "over50": 0
-  },
   "preview/webkit-phone/pine-hollow:open-plot-2-4": {
     "ok": true,
     "borderToControlMs": 98,
     "freezeMs": 100,
     "wallMs": 0,
     "over50": 8
-  },
-  "preview/webkit-phone/pine-hollow:pastel-plain": {
-    "ok": true,
-    "borderToControlMs": 96,
-    "freezeMs": 516,
-    "wallMs": 0,
-    "over50": 0
   },
   "preview/webkit-phone/pine-hollow:template-2": {
     "ok": true,

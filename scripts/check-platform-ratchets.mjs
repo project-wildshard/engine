@@ -246,9 +246,9 @@ export function comparePlatformList(list, baselineFile, candidateFile, trees, so
       if (after.baseline[slug] !== lines) failures.push(`${list}: ${slug} baseline must stay ${lines}`);
     }
     for (const [slug, lines] of Object.entries(after.baseline)) {
-      if (!Object.hasOwn(before.baseline, slug) && !['thin-ice', 'blender-template', 'pastel-plain', 'ink-cel-valley', 'open-plots'].includes(slug)) failures.push(`${list}: unknown shard ${slug}`);
+      if (!Object.hasOwn(before.baseline, slug) && !['thin-ice', 'blender-template', 'open-plots'].includes(slug)) failures.push(`${list}: unknown shard ${slug}`);
       if (!Number.isSafeInteger(lines) || lines <= 0) failures.push(`${list}: invalid baseline for ${slug}`);
-      if (['blender-template', 'pastel-plain', 'ink-cel-valley', 'open-plots'].includes(slug) && after.enforced[slug] !== 0) failures.push(`${list}: ${slug} needs its zero runtime ceiling from its first commit`);
+      if (['blender-template', 'open-plots'].includes(slug) && after.enforced[slug] !== 0) failures.push(`${list}: ${slug} needs its zero runtime ceiling from its first commit`);
       if (slug === 'thin-ice' && !Object.hasOwn(after.enforced, slug)) failures.push(`${list}: thin-ice needs its 20 % ceiling from its first commit`);
     }
     for (const [slug, ceiling] of Object.entries(before.enforced)) {

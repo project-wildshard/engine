@@ -124,11 +124,7 @@ public/assets/pine-hollow/map/top.webp
 public/assets/driftwood-isle/map/top.webp
 
 # Source-program maps publish only the compatibility public alias from their admitted product.
-/public/assets/pastel-plain/map/top.webp
-/public/assets/ink-cel-valley/map/top.webp
 # A gathered shard's published files live in its folder; gen copies them here (scripts/shard-public.mjs).
-/public/assets/pastel-plain/entry-reads.json
-/public/assets/ink-cel-valley/entry-reads.json
 /public/assets/sunscar-dunes/entry-reads.json
 /public/assets/far-reach/entry-reads.json
 /public/assets/driftwood-isle/entry-reads.json

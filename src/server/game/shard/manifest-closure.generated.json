@@ -61,25 +61,6 @@
     "src/shards/far-reach/thumbs/far-reach-portrait.jpg",
     "src/shards/far-reach/thumbs/far-reach.jpg"
   ],
-  "ink-cel-valley": [
-    "src/shared/engine/core/config.ts",
-    "src/shared/engine/core/noise.ts",
-    "src/shared/engine/core/rng.ts",
-    "src/shared/engine/sim/shore.ts",
-    "src/shared/engine/world/bakedTerrainField.ts",
-    "src/shared/engine/world/groundField.ts",
-    "src/shared/engine/world/scalarChannel.ts",
-    "src/shared/engine/world/terrainField.ts",
-    "src/shared/engine/world/water/body.ts",
-    "src/shared/engine/world/water/declared.ts",
-    "src/shared/engine/world/waves.ts",
-    "src/shared/engine/world/yawFrame.ts",
-    "src/client/game/shard/manifest.ts",
-    "src/shared/game/grid/pageMode.ts",
-    "src/shared/game/shardfile/fileInputs.ts",
-    "src/shards/ink-cel-valley/discovery.generated.ts",
-    "src/shards/ink-cel-valley/manifest.json"
-  ],
   "nalati-grasslands": [
     "src/shared/engine/core/config.ts",
     "src/shared/engine/core/noise.ts",
@@ -558,25 +539,6 @@
     "src/shards/open-plots/thumbs/thin-ice-landscape.jpg",
     "src/shards/open-plots/thumbs/thin-ice-portrait.jpg",
     "src/shards/open-plots/thumbs/thin-ice.jpg"
-  ],
-  "pastel-plain": [
-    "src/shared/engine/core/config.ts",
-    "src/shared/engine/core/noise.ts",
-    "src/shared/engine/core/rng.ts",
-    "src/shared/engine/sim/shore.ts",
-    "src/shared/engine/world/bakedTerrainField.ts",
-    "src/shared/engine/world/groundField.ts",
-    "src/shared/engine/world/scalarChannel.ts",
-    "src/shared/engine/world/terrainField.ts",
-    "src/shared/engine/world/water/body.ts",
-    "src/shared/engine/world/water/declared.ts",
-    "src/shared/engine/world/waves.ts",
-    "src/shared/engine/world/yawFrame.ts",
-    "src/client/game/shard/manifest.ts",
-    "src/shared/game/grid/pageMode.ts",
-    "src/shared/game/shardfile/fileInputs.ts",
-    "src/shards/pastel-plain/discovery.generated.ts",
-    "src/shards/pastel-plain/manifest.json"
   ],
   "pine-hollow": [
     "src/shared/engine/core/config.ts",

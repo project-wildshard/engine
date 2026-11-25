@@ -192,17 +192,17 @@ test('row 4: no placeholder open plot or test shard reaches Featured, Popular or
 // QA 11-23-b row 26 (J453, J498): staging v0.1.76's grid placed the hidden test shards Pastel Plain and Ink-Cel Valley, and the
 // door's Popular and New listed them by their upload names. A test shard on the grid is in All only.
 test('row 26: a test shard the grid places is in no player list, however many arrivals it has', () => {
-  const live = { serial: 93, slugs: ['driftwood-isle', 'mossgate', 'pastel-plain', 'ink-cel-valley', 'cinder-orchard'], featured: PLACED_FEATURED };
+  const live = { serial: 93, slugs: ['driftwood-isle', 'mossgate', 'blender-template', 'f30-clean', 'cinder-orchard'], featured: PLACED_FEATURED };
   const uploads = [
     { slug: 'mossgate', name: 'Mossgate Hollow', firstUploadedAt: '2026-11-19T12:00:00.000Z' },
-    { slug: 'pastel-plain', name: 'Pastel Plain', firstUploadedAt: '2026-11-22T12:00:00.000Z' },
-    { slug: 'ink-cel-valley', name: 'Ink-Cel Valley', firstUploadedAt: '2026-11-22T13:00:00.000Z' },
+    { slug: 'blender-template', name: 'Blender Template', firstUploadedAt: '2026-11-22T12:00:00.000Z' },
+    { slug: 'f30-clean', name: 'F30 Clean', firstUploadedAt: '2026-11-22T13:00:00.000Z' },
     { slug: 'cinder-orchard', name: 'Cinder Orchard', firstUploadedAt: '2026-11-19T11:00:00.000Z' },
   ];
-  const counts = [{ slug: 'pastel-plain', humans: 9, agents: 0, uniqueHumans: 9 }, { slug: 'mossgate', humans: 1, agents: 0, uniqueHumans: 1 }];
+  const counts = [{ slug: 'blender-template', humans: 9, agents: 0, uniqueHumans: 9 }, { slug: 'mossgate', humans: 1, agents: 0, uniqueHumans: 1 }];
   const tabs = zoneSelectTabs('staging', live, uploads, counts);
-  for (const list of [tabs.featured, tabs.popular, tabs.new]) expect(names(list)).not.toEqual(expect.arrayContaining(['pastel-plain']));
+  for (const list of [tabs.featured, tabs.popular, tabs.new]) expect(names(list)).not.toEqual(expect.arrayContaining(['blender-template']));
   expect(names(tabs.popular)).toEqual(['mossgate', 'driftwood-isle']);
   expect(names(tabs.new)).toEqual(['mossgate']);
-  expect(names(tabs.all)).toEqual(expect.arrayContaining(['pastel-plain', 'ink-cel-valley', 'cinder-orchard']));
+  expect(names(tabs.all)).toEqual(expect.arrayContaining(['blender-template', 'f30-clean', 'cinder-orchard']));
 });

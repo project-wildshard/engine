@@ -25,14 +25,6 @@
       "loadingBytes": 1415754105,
       "evidence": "engine-pinned product revision 4 (tar 5bc5adcf764a), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
     },
-    "ink-cel-valley": {
-      "armed": "2026-11-18",
-      "by": "mini-pinemem5",
-      "epoch": 8,
-      "playingBytes": 636979847,
-      "loadingBytes": 925290035,
-      "evidence": "engine-pinned product revision 1 (tar 5764c86a258a), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
-    },
     "nalati-grasslands": {
       "armed": "2026-11-18",
       "by": "mini-pinemem5",
@@ -184,14 +176,6 @@
       "playingBytes": 657896658,
       "loadingBytes": 957357794,
       "evidence": "engine-pinned product revision 1 (tar 4546f70ddac2), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
-    },
-    "pastel-plain": {
-      "armed": "2026-11-18",
-      "by": "mini-pinemem5",
-      "epoch": 8,
-      "playingBytes": 636958876,
-      "loadingBytes": 925256481,
-      "evidence": "engine-pinned product revision 1 (tar e42e2f5f5793), a data shard with no runtime reading; epoch-8 golden estimate; mini-resweep reads every light zone under both J410 lines standalone"
     },
     "pine-hollow": {
       "armed": "2026-11-18",
