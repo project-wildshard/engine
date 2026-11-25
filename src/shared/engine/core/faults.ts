@@ -120,10 +120,27 @@ export class DescribedError {
   }
 }
 
-/** `{ message, stack }` of anything thrown */
+/** An AggregateError's inner errors, named so a card shows the real cause, not only "Level load and cleanup failed" (meta
+ *  MMO-OBSERVABILITY OB10, friction F33). `message` is appended to the outer message (empty for any other error); `stack`
+ *  to the outer stack. At most three inner errors, each cut to 200 characters; an inner aggregate is named, not opened. */
+export function innerErrors(reason: unknown): { message: string; stack: string } {
+  if (!(reason instanceof AggregateError) || !Array.isArray(reason.errors) || reason.errors.length === 0) return { message: '', stack: '' };
+  const inner: unknown[] = reason.errors;
+  const named = inner.slice(0, 3).map((e, i) => {
+    const text = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    return `${i + 1}/${inner.length} ${text.slice(0, 200)}`;
+  });
+  const stacks = inner.slice(0, 3).map((e) => (e instanceof Error ? e.stack ?? '' : '')).filter((t) => t !== '');
+  return { message: ` [${named.join(' | ')}]`, stack: stacks.map((t) => `\nCaused by: ${t}`).join('') };
+}
+
+/** `{ message, stack }` of anything thrown; an AggregateError names its inner errors (OB10) */
 export function describeError(reason: unknown): { message: string; stack: string } {
   if (reason instanceof DescribedError) return { message: reason.message, stack: reason.stack };
-  if (reason instanceof Error) return { message: `${reason.name}: ${reason.message}`, stack: reason.stack ?? '' };
+  if (reason instanceof Error) {
+    const inner = innerErrors(reason);
+    return { message: `${reason.name}: ${reason.message}${inner.message}`, stack: (reason.stack ?? '') + inner.stack };
+  }
   if (typeof reason === 'object' && reason !== null) { try { return { message: JSON.stringify(reason).slice(0, 400), stack: '' }; } catch { /* fall through */ } }
   return { message: String(reason), stack: '' };
 }

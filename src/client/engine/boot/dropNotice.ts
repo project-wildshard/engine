@@ -1,5 +1,6 @@
 import { pageScope } from '../../../shared/engine/app/resources';
 import type { Scope } from '../../../shared/engine/app/scope';
+import { innerErrors } from '../../../shared/engine/core/faults';
 import { jsonSlot, type Json } from '../saves/slots';
 import type { LastEnd } from './lastEnd';
 /**
@@ -118,7 +119,8 @@ export function describeDropError(error: unknown): { message: string; code: stri
   if (error === undefined || error === null) return { message: '', code: '', stack: '' };
   if (error instanceof Error) {
     const code: unknown = Reflect.get(error, 'code');
-    return { message: `${error.name}: ${error.message}`, code: typeof code === 'string' || typeof code === 'number' ? String(code) : '', stack: error.stack ?? '' };
+    const inner = innerErrors(error);
+    return { message: `${error.name}: ${error.message}${inner.message}`, code: typeof code === 'string' || typeof code === 'number' ? String(code) : '', stack: (error.stack ?? '') + inner.stack };
   }
   if (typeof error === 'object') {
     const code: unknown = Reflect.get(error, 'code'), reason: unknown = Reflect.get(error, 'reason'), message: unknown = Reflect.get(error, 'message');
