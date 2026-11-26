@@ -13,3 +13,9 @@ and secure doors, freshPage, the dev control socket, the back guard, the build r
 drop recorders, drop exit, navmesh) use another param or a bare address. The other ten test code that still reads the
 param (first paint, reloads, stuck offline, load failure copy, loading menu, loading-row ratio, slug path, main menu
 deck) and move with their M1 rows.
+
+The save store keeps a key's `data` as the parsed record, so the tap goes in as an object: a JSON string reads back as
+a string, the entry refuses it and the page shows the title (the first browser run sat on the title for 180 s). `alone`
+writes no tap and puts the zone's cell at (0, 0), as CP10's one-cell world boots with none. Local proof on a preview of
+799a6edd9: with neighbours, desktop and WebKit iPhone 13 are inside pine-hollow with 22 cells in 11 s and 8 s; alone,
+inside it with 1 cell in 12 s and 6 s; no request carries chunk.

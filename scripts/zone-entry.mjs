@@ -46,7 +46,7 @@ export function oneCellCatalogue(catalogue, zone) {
   const bare = (/** @type {string} */ slug) => slug.replace(/^_/u, '');
   const cells = (catalogue.grid?.cells ?? []).filter(cell => bare(cell.slug) === zone);
   if (cells.length !== 1) throw new Error(`zone-entry: the build's catalogue has ${String(cells.length)} cells for ${zone}, not one`);
-  return { ...catalogue, placements: (catalogue.placements ?? []).filter(row => bare(row.slug) === zone), grid: { ...catalogue.grid, cells } };
+  return { ...catalogue, grid: { ...catalogue.grid, cells: [{ ...cells[0], cell: [0, 0] }] } };
 }
 
 const INLINE = /<script type="application\/json" id="ws-catalogue">([^<]*)<\/script>/u;
@@ -54,7 +54,7 @@ const INLINE = /<script type="application\/json" id="ws-catalogue">([^<]*)<\/scr
 export function oneCellPage(html, zone) {
   const found = INLINE.exec(html);
   if (found?.[1] === undefined) throw new Error('zone-entry: this build inlines no ws-catalogue, so it has no world to cut to one cell');
-  const text = JSON.stringify(oneCellCatalogue(JSON.parse(found[1]), zone)).replaceAll('<', String.raw`<`);
+  const text = JSON.stringify(oneCellCatalogue(JSON.parse(found[1]), zone)).replaceAll('<', String.raw`\u003c`);
   return html.replace(INLINE, () => `<script type="application/json" id="ws-catalogue">${text}</script>`);
 }
 
@@ -68,10 +68,12 @@ export async function enterZone(page, { zone, base, mode = 'enter', name, alone 
   if (origin === 'null') throw new Error('zone-entry: give a base URL, the page is on no origin yet');
   const home = `${origin}/`;
   // The tab's storage belongs to the origin: stand on it (a small static file, never a page that boots) to write the tap.
-  if (new URL(page.url() === 'about:blank' ? 'about:blank' : page.url()).origin !== origin) await page.goto(`${origin}/version.json`, { waitUntil: 'commit' });
-  await page.evaluate(({ key, raw }) => { sessionStorage.setItem(key, raw); },
-    { key: `${prefix}session`, raw: tapDocument({ zone, mode, ...(name === undefined ? {} : { name }), held: await page.evaluate(k => sessionStorage.getItem(k), `${prefix}session`) }) });
-  if (alone) {
+  // A one-cell page boots its cell with no tap (CP10); a tap there would ask the grid path for a world it doesn't hold.
+  if (!alone) {
+    if (new URL(page.url() === 'about:blank' ? 'about:blank' : page.url()).origin !== origin) await page.goto(`${origin}/version.json`, { waitUntil: 'commit' });
+    await page.evaluate(({ key, raw }) => { sessionStorage.setItem(key, raw); },
+      { key: `${prefix}session`, raw: tapDocument({ zone, mode, ...(name === undefined ? {} : { name }), held: await page.evaluate(k => sessionStorage.getItem(k), `${prefix}session`) }) });
+  } else {
     await page.route(home, async route => {
       const response = await route.fetch();
       await route.fulfill({ response, body: oneCellPage(await response.text(), zone) });

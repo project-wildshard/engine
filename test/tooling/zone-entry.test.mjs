@@ -44,16 +44,17 @@ test('the init script writes the same tap into the tab, keeping its other keys',
   assert.doesNotMatch(printed, /chunk/u);
 });
 
-test('alone cuts the inline catalogue to the zone\'s one cell', () => {
+test('alone cuts the inline catalogue to the zone\'s one cell, at the origin as CP10 boots it', () => {
   const catalogue = { placements: [{ slug: 'pine-hollow' }, { slug: 'driftwood-isle' }],
-    grid: { version: 0, cells: [{ instance: 'a', slug: 'pine-hollow', cell: [0, 0] }, { instance: 'b', slug: 'driftwood-isle', cell: [1, 0] }] } };
-  const one = oneCellCatalogue(catalogue, 'pine-hollow');
-  assert.deepEqual(one.grid.cells, [{ instance: 'a', slug: 'pine-hollow', cell: [0, 0] }]);
-  assert.deepEqual(one.placements, [{ slug: 'pine-hollow' }]);
+    grid: { version: 0, cells: [{ instance: 'a', slug: 'pine-hollow', cell: [0, 0] }, { instance: 'b', slug: 'driftwood-isle', cell: [1, 0], note: '</script>' }] } };
+  const one = oneCellCatalogue(catalogue, 'driftwood-isle');
+  assert.deepEqual(one.grid.cells, [{ instance: 'b', slug: 'driftwood-isle', cell: [0, 0], note: '</script>' }]);
+  assert.deepEqual(one.placements, catalogue.placements, 'the title rows stay; only the world is one cell');
   assert.throws(() => oneCellCatalogue(catalogue, 'nine-dragon-stack'), /0 cells for nine-dragon-stack/u);
-  const html = `<html><script type="application/json" id="ws-catalogue">${JSON.stringify(catalogue)}</script></html>`;
+  const html = `<html><script type="application/json" id="ws-catalogue">${JSON.stringify(catalogue).replaceAll('<', `${'\\'}u003c`)}</script></html>`;
   const page = oneCellPage(html, 'driftwood-isle');
-  assert.match(page, /"driftwood-isle"/u);
-  assert.doesNotMatch(page, /"pine-hollow"/u);
+  const inline = /id="ws-catalogue">(.*?)<\/script>/su.exec(page)?.[1] ?? '';
+  assert.deepEqual(JSON.parse(inline).grid.cells.map(row => row.slug), ['driftwood-isle']);
+  assert.doesNotMatch(inline, /</u, 'a < in the catalogue never closes the inline script');
   assert.throws(() => oneCellPage('<html></html>', 'pine-hollow'), /inlines no ws-catalogue/u);
 });
