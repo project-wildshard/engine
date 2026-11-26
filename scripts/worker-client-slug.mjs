@@ -13,7 +13,7 @@ export async function slugEntry(browser, phone, base, step, slug = 'driftwood-is
   page.on('pageerror', error => { errors.push(error.message.slice(0, 300)); });
   await saveFixture(context, { scope: 'device', key: 'devMode', data: true });
   try {
-    await step(`slug: /slug/${slug} shows the shard's one card with PLAY`, async () => {
+    await step(`slug: /slug/${slug} shows the shard's one card with Enter zone`, async () => {
       await page.goto(new URL(`/slug/${slug}?mute=1&nolock=1`, base).href, { waitUntil: 'load' });
       const play = page.locator('.ws-slug .ws-menu-play');
       await play.waitFor({ timeout: 60_000 });
@@ -22,7 +22,7 @@ export async function slugEntry(browser, phone, base, step, slug = 'driftwood-is
         return { slug: root?.dataset.slug, placed: root?.dataset.placed,
         name: document.querySelector('.ws-slug .ws-menu-card b')?.textContent, play: document.querySelector('.ws-slug .ws-menu-play b')?.textContent, path: location.pathname };
       });
-      return { ok: card.slug === slug && card.placed === 'true' && card.play === 'Play', ...card };
+      return { ok: card.slug === slug && card.placed === 'true' && card.play === 'Enter zone', ...card };
     });
     await step(`slug: PLAY enters the world's grid at ${slug}'s cell`, async () => {
       await Promise.all([page.waitForEvent('domcontentloaded', { timeout: 60_000 }).catch(() => undefined), (async () => {
