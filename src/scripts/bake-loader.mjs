@@ -95,9 +95,9 @@ if (Array.isArray(list.SHARDS)) installShards(list.SHARDS);
 else {
   // C3: no shard source, so the built products say what shards exist, as they do for a page.
   const { shardFromDiscovery } = await import(here('../client/game/shard/discovery.ts'));
-  const products = fileURLToPath(new URL('../../out', import.meta.url));
-  const documents = existsSync(products) ? readdirSync(products).map(name => join(products, name, 'mounts/shardfiles', name, 'discovery.json')).filter(file => existsSync(file)) : [];
-  if (documents.length > 0) installShards(documents.map(file => shardFromDiscovery(JSON.parse(readFileSync(file, 'utf8')))).sort((a, b) => a.order - b.order));
+  const { builtShards, pinsInstall } = await import('./built-shards.mjs');
+  const shards = builtShards(fileURLToPath(new URL('../../out', import.meta.url)), shardFromDiscovery, { replacing: pinsInstall(process.argv) });
+  if (shards.length > 0) installShards(shards);
 }
 installAssetTables({
   bytes: bytes.PUBLIC_BYTES ?? {}, versions: versions.ASSET_VERSIONS ?? {},
