@@ -56,6 +56,10 @@ export class Physics {
   near: NearColliders | null = null;
   /** ms the last `step()` took (the perf meter / bench read it) */
   stepMs = 0;
+  /** QA 11-24 row 72: every kinematic body in this world by handle, kept as bodies are made, restored and removed (nothing in
+   *  the engine changes a body's type: test/character-motor-values.test.ts holds that). The motor's deck probe reads it. */
+  private readonly kinematicBodies = new Map<number, RigidBody>();
+  readonly kinematic: ReadonlyMap<number, RigidBody> = this.kinematicBodies;
 
   readonly R: Rapier;
   private readonly rayVectors: RayVectors[] = [];
@@ -74,11 +78,13 @@ export class Physics {
     this.owner = owner;
     this.world = snapshot === undefined ? new R.World({ x: 0, y: -9.81, z: 0 }) : repairRestoredParents(R.World.restoreSnapshot(snapshot));
     this.world.timestep = FIXED_STEP;
+    this.world.forEachRigidBody(body => { if (body.isKinematic()) this.kinematicBodies.set(body.handle, body); });
     const bodies = this.bodyCaptures, colliders = this.colliderCaptures;
     const createBody = this.world.createRigidBody.bind(this.world), removeBody = this.world.removeRigidBody.bind(this.world);
     const createCollider = this.world.createCollider.bind(this.world), removeCollider = this.world.removeCollider.bind(this.world);
     this.world.createRigidBody = (desc) => {
       const body = createBody(desc), scope = this.creationOwner();
+      if (body.isKinematic()) this.kinematicBodies.set(body.handle, body);
       if (scope) {
         this.bodyOwners.set(body.handle, scope);
         bodies.set(body.handle, scope.capture('bodies', () => { if (!this.freed && body.isValid()) this.world.removeRigidBody(body); }));
@@ -104,7 +110,7 @@ export class Physics {
       for (let i = 0; i < body.numColliders(); i++) {
         const collider = body.collider(i); colliders.get(collider.handle)?.(); colliders.delete(collider.handle); this.colliderOwners.delete(collider.handle); untagCollider(collider);
       }
-      bodies.get(body.handle)?.(); bodies.delete(body.handle); this.bodyOwners.delete(body.handle); removeBody(body);
+      bodies.get(body.handle)?.(); bodies.delete(body.handle); this.bodyOwners.delete(body.handle); this.kinematicBodies.delete(body.handle); removeBody(body);
     };
   }
 

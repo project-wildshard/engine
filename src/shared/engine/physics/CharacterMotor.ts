@@ -64,6 +64,9 @@ interface Vec3 { x: number; y: number; z: number }
 const GROUND_PROBE_UP = 0.1, GROUND_PROBE_DOWN = 0.25;
 /** how near a kinematic body must be for Rapier's platform friction to act on a move (its skin plus its prediction) */
 const DECK_REACH = 0.1;
+/** QA 11-24 row 72: up to this many kinematic bodies, the deck probe first measures them (see `noDeckNear`), with this much
+ *  slack (m) on the bounds for rounding. */
+const FEW_DECKS = 16, DECK_SLACK = 0.05;
 /**
  * NET-LAG NL13b4: a grounded sideways move on flat static support starts this far above the controller's skin, with no fall
  * in it, and ends back on the skin. Resting on the skin, the capsule met the floor and any wall it leaned on both at time 0,
@@ -419,8 +422,42 @@ export class CharacterMotor {
     const { R, world } = this.physics, p = this.probe;
     this.deckProbe ??= new R.Capsule(this.halfAxis, this.opts.radius + DECK_REACH);
     p.x = feet.x; p.y = feet.y + this.lift; p.z = feet.z;
+    if (this.noDeckNear(p)) return false;
     return world.intersectionWithShape(p, this.rot, this.deckProbe,
       R.QueryFilterFlags.ONLY_KINEMATIC | R.QueryFilterFlags.EXCLUDE_SENSORS, this.filter, this.collider) !== null;
+  }
+
+  /** QA 11-24 row 72: no deck can be near when no kinematic body's collider can reach the probe. The deck query cost every
+   *  walking player 1.3 to 1.6 us a tick, almost always to answer false (Driftwood: 2127 colliders, a few movers). While
+   *  the world holds few kinematic bodies, their colliders are measured against the probe's bounding sphere; a shape with
+   *  no simple bound, a near one, or more kinematic bodies asks the query as before. */
+  private noDeckNear(center: Vec3): boolean {
+    const { kinematic } = this.physics;
+    if (kinematic.size > FEW_DECKS) return false;
+    this.deckFar = true; this.deckCenter = center;
+    kinematic.forEach(this.seeDeck);
+    return this.deckFar;
+  }
+  private deckFar = true;
+  private deckCenter: Vec3 = { x: 0, y: 0, z: 0 };
+  private readonly deckAt: Vec3 = { x: 0, y: 0, z: 0 };
+  private readonly deckExtents: Vec3 = { x: 0, y: 0, z: 0 };
+  private readonly seeDeck = (body: RigidBody): void => {
+    if (!this.deckFar) return;
+    const c = this.deckCenter, probe = this.halfAxis + this.opts.radius + DECK_REACH + DECK_SLACK;
+    for (let i = 0; i < body.numColliders(); i++) {
+      const collider = body.collider(i), at = collider.translation(this.deckAt), reach = probe + this.boundOf(collider);
+      if (!((at.x - c.x) ** 2 + (at.y - c.y) ** 2 + (at.z - c.z) ** 2 > reach * reach)) { this.deckFar = false; return; }
+    }
+  };
+  /** The radius of a sphere about the collider's origin that holds its shape; Infinity for a shape with no simple bound. */
+  private boundOf(collider: Collider): number {
+    const { ShapeType } = this.physics.R, type = collider.shapeType();
+    if (type === ShapeType.Ball) return collider.radius();
+    if (type === ShapeType.Cuboid) { const e = collider.halfExtents(this.deckExtents); return e === null ? Infinity : Math.hypot(e.x, e.y, e.z); }
+    if (type === ShapeType.Capsule) return collider.halfHeight() + collider.radius();
+    if (type === ShapeType.Cylinder) return Math.hypot(collider.halfHeight(), collider.radius());
+    return Infinity;
   }
 
   /** the steepest slope climbed from now on (degrees); it slides on ground 5° steeper */
