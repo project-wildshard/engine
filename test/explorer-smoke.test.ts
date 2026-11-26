@@ -178,7 +178,8 @@ test.each(['state', 'pixels'] as const)('a stuck %s read refuses within the unch
 });
 
 test('the Explorer leg retains every primary, including Signal and Developer-only rows, once', () => {
-  expect(explorerCases(catalogue)).toEqual(['driftwood-isle','nine-dragon-stack','sunscar-dunes','brasscap-mesa','open-plot-alien-plain']);
+  // CHUNK-PARAM CP16 (08be8b49c) retired the public-policy Nine case, so Nine comes in with the Developer cases, after Signal
+  expect(explorerCases(catalogue)).toEqual(['driftwood-isle','sunscar-dunes','nine-dragon-stack','brasscap-mesa','open-plot-alien-plain']);
 });
 
 test('missing, failed, duplicate and black card frames refuse with their real model identity', () => {

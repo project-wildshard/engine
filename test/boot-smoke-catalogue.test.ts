@@ -32,8 +32,9 @@ test('cold title installation supplies every smoke case without preparing any wo
   installTitleManifests(rows);
   expect(Reflect.get(globalThis, titleSlot)).toBe(rows);
   expect(bootCatalogue()).toEqual(rows.map(({ slug, status, shardSelect }) => ({ slug, status, legacy: false, shardSelect: shardSelect !== false })));
+  // CHUNK-PARAM CP16 (08be8b49c): the public-policy Nine case retired with the address; Nine's Developer case stays
   expect(bootCases(bootCatalogue()).map(row => row[1])).toEqual([
-    'driftwood-isle', 'nine-dragon-stack', 'nine-dragon-stack', 'sunscar-dunes', 'brasscap-mesa', 'driftwood-isle',
+    'driftwood-isle', 'nine-dragon-stack', 'sunscar-dunes', 'brasscap-mesa', 'driftwood-isle',
   ]);
 });
 
