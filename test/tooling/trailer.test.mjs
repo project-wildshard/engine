@@ -42,15 +42,16 @@ test('a bad light, a short rig and a duplicate name are refused', async () => {
 });
 
 // AT15 (Jake: "you managed to play each shard/zone in magic 'single zone' mode which doesnt exist on staging"): a shot boots the
-// grid as players see it; `?chunk=` only when it says singleZone: true
+// grid as players see it; the zone alone (a one-cell world, never named in the URL: J522) only when it says singleZone: true
 test('a shot boots the grid, and only a singleZone shot boots its zone alone', () => {
   const grid = bootUrl('http://127.0.0.1:4420', { zone: 'nalati-grasslands' });
   expect(grid.grid).toBe(true);
   expect(grid.url).toBe('http://127.0.0.1:4420/?mute=1&nolock=1&sw=0');
   expect(grid.url).not.toMatch(/chunk=/u);
   const alone = bootUrl('http://127.0.0.1:4420/', { zone: 'nalati-grasslands', singleZone: true });
-  expect(alone.grid).toBe(false);
-  expect(alone.url).toMatch(/[?]chunk=nalati-grasslands&/u);
+  expect([alone.grid, alone.alone, grid.alone]).toEqual([false, true, false]);
+  expect(alone.url).toBe('http://127.0.0.1:4420/?mute=1&skipintro=1&nolock=1&sw=0');
+  expect(alone.url).not.toMatch(/chunk/u);
   const zones = ['nalati-grasslands'];
   expect(refuseShot({ name: 'a', zone: 'nalati-grasslands', secs: 1, singleZone: 'yes' }, zones)).toMatch(/singleZone/u);
   expect(refuseShot({ name: 'a', zone: 'nalati-grasslands', secs: 1, grid: true }, zones)).toMatch(/grid is the default/u);

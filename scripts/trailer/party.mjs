@@ -1,7 +1,7 @@
 // The party for a multiplayer shot (docs/trailer.md): a few other players in the captured client's room, played by headless
 // pages of the same build against a LOCAL world (scripts/dev.mjs --staging: the staging grid on a local server) or staging
 // itself (at most 4 clients there with the camera), never production. Each page comes in through the title's MMO card as a
-// player does (grid.mjs; never `?chunk=`), enters with its own Name, stands in the zone's cell at its spot round a point and then walks a slow loop there in real time, jumping now and then, so the
+// player does (grid.mjs; never a zone in the URL), enters with its own Name, stands in the zone's cell at its spot round a point and then walks a slow loop there in real time, jumping now and then, so the
 // capture (capture.mjs --wall, against the same world) sees real bodies moving, synced by the real server.
 //
 //   node scripts/trailer/party.mjs <world url> --zone <slug> --at <x>,<z> [--names Ayla,Bram,Corin] [--radius 4] [--secs 600]

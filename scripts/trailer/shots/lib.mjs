@@ -7,7 +7,8 @@
 //   { name, zone, secs,                      unique kebab name; a slug on the live grid (test/pins/staging.json); seconds
 //     time?, weather?,                       Debug settings written before the boot: time live|midday|golden|sunset|night,
 //                                            weather live|clear|fog|rain (src/client/engine/ui/Settings.ts OPTION_VALUES)
-//     singleZone?,                           true: boot `?chunk=<zone>`, the zone alone. Players never see that, so a shot
+//     singleZone?,                           true: boot the zone alone, a one-cell world of it (zone-entry's alone; no zone
+//                                            in any URL, J522). Players never see that, so a shot
 //                                            opts in by name; every other shot boots the grid as players see it and stands
 //                                            in `zone`'s cell, its neighbours at the edges (Jake, AT15)
 //     rig?,                                  a camera rig { keys: [{ t, p: [x,y,z], l: [x,y,z], fov?, roll? }], ease?, rel?,
@@ -68,13 +69,14 @@ export async function loadShots(sets, zones = gridZones()) {
   return shots;
 }
 
-/** The page a shot boots: the grid (the title's MMO card, as players come in) unless it says singleZone: true, the only
- * way to `?chunk=`. @param {string} base @param {{ zone: string, singleZone?: boolean }} s */
+/** The page a shot boots: the grid (the title's MMO card, as players come in) unless it says singleZone: true, the only way
+ * to boot a zone alone (`alone`: capture.mjs enters it with zone-entry's one-cell world). Neither URL names the zone (J522).
+ * @param {string} base @param {{ zone: string, singleZone?: boolean }} s */
 export function bootUrl(base, s) {
   const root = base.replace(/\/?$/u, '/');
   return s.singleZone === true
-    ? { grid: false, url: `${root}?chunk=${encodeURIComponent(s.zone)}&mute=1&skipintro=1&nolock=1&sw=0` }
-    : { grid: true, url: `${root}?mute=1&nolock=1&sw=0` };
+    ? { grid: false, alone: true, url: `${root}?mute=1&skipintro=1&nolock=1&sw=0` }
+    : { grid: true, alone: false, url: `${root}?mute=1&nolock=1&sw=0` };
 }
 
 /** Shots that share one page load: same zone, light, weather, grid mode and init. @param {readonly any[]} shots */

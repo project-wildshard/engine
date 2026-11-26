@@ -23,6 +23,7 @@
 //     too, and the viewmodel on rig shots (unless the rig says `viewmodel: true`);
 //   * headless Chromium, muted, with the keychain flags (scripts/chromium-keychain.mjs), under desktop-gpu.lock.
 // Frames land in <outDir>/<shot>/<nnnnnn>.jpg at 60·sub fps; <outDir>/<shot>/meta.json records the pose track and probe.
+import { enterZone } from '../zone-entry.mjs';
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { enterCell, enterGrid } from './grid.mjs';
@@ -192,7 +193,7 @@ export async function main(argv) {
     page.on('pageerror', (e) => { errors.push(e.message.slice(0, 300)); });
     page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
     const t0 = Date.now();
-    const { grid, url } = bootUrl(BASE, first); // the grid as players see it; `?chunk=` only for a shot that says singleZone
+    const { grid, url } = bootUrl(BASE, first); // the grid as players see it; the zone alone only for a shot that says singleZone
     if (grid) {
       await enterGrid(page, url);
       await page.waitForFunction(() => Boolean(document.querySelector('#wserr .msg')?.textContent) || (!document.querySelector('.ws-load') && Boolean(window.__wildshard?.world?.game)), null, { timeout: 300000, polling: 500 });
@@ -200,7 +201,8 @@ export async function main(argv) {
       if (failure) throw new Error(failure);
       await page.evaluate(() => window.__wildshard.requireWorld().hud.enterNow());
     } else {
-      await page.goto(url, { waitUntil: 'load' });
+      // CHUNK-PARAM CP21 (J522): the zone alone is a one-cell world of it, entered without naming it in the URL
+      await enterZone(page, { zone: first.zone, base: url, flags: new URL(url).searchParams.toString(), alone: true, waitUntil: 'load' });
     }
     await page.waitForFunction(() => Boolean(window.__wildshard?.world?.hud?.entered && !document.querySelector('.ws-load') && window.__wildshard.world.game.frameGate()), undefined, { timeout: 300000, polling: 1000 });
     if (await page.evaluate(() => window.__wildshard.world.hud.paused)) await page.keyboard.press('Escape');

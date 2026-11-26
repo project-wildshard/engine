@@ -1,7 +1,7 @@
 // The grid as players see it (meta ALPHA-2-TRAILER AT15; Jake, 2026-11-25: a trailer shot "in magic 'single zone' mode
 // which doesnt exist on staging" is wrong). A trailer page comes in through the title's MMO card, the way a player does,
-// then stands in its shot's cell: capture.mjs and party.mjs both boot this way, and `?chunk=` is only for a shot that
-// says singleZone: true (shots/lib.mjs bootUrl).
+// then stands in its shot's cell: capture.mjs and party.mjs both boot this way, and the zone alone (a one-cell world) is
+// only for a shot that says singleZone: true (shots/lib.mjs bootUrl).
 
 /** Into the world from the title's MMO card, the way a player comes in; throws the page's own error card.
  * @param {import('playwright').Page} page @param {string} url the title (bootUrl's grid url) */

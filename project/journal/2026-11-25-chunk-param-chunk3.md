@@ -11,3 +11,5 @@
 - CP14: the bots now ask for their cell with RoomBot's goto word (CP5) instead of a socket address.
 - CP15: three edits had to go back. `leave-saved-paths`, `inline-save-epoch` and the `/slug/...?sw=0` worker case all
   depend on the param (or on `sw=0` switching the worker off), so they move with CP22, when the code stops reading it.
+- CP21: the trailer's lone-zone shot (`singleZone: true`) now boots a one-cell world through `enterZone({ alone: true })`.
+  Nobody answered the NOTE, and the trailer lanes had nothing in flight, so it went in as described.
