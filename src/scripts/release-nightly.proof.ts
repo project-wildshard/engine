@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {execFileSync, spawnSync} from 'node:child_process';
 import {chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {delimiter, join, resolve} from 'node:path';
-import {releaseTagCommit, releaseTagPush, requireCovers, requireFresh, requireNoNewFailures, runnerFaults} from './release-nightly.ts';
+import {releaseTagCommit, releaseTagPush, requireCovers, requireFresh, requireNoNewFailures, runnerFaults, uncoveredFailures} from './release-nightly.ts';
 
 const latest = {id: 42, head_sha: 'a'.repeat(40), status: 'completed', conclusion: 'failure', event: 'schedule'};
 const fixedLatest = latest;
@@ -41,6 +41,15 @@ const faulted = {...report, failures: [
   {key: `${nine}/draw`, error: 'jsHandle.evaluate: Execution context was destroyed, most likely because of a navigation.'},
   {key: `${pine}/cook`, error: 'Expected one receipt, got 0'}, {key: `${pine}/boot`, error: 'Expected one receipt, got 0'}],
 newFailures: [`${nine}/boot`, `${nine}/hover`, `${nine}/draw`, `${pine}/cook`, `${pine}/boot`]};
+
+await test('ALLOW_NIGHTLY_FAILURES covers only the failures its fix names', () => {
+  const fix = {sha: 'f'.repeat(40), message: 'fix(nightly): cold heads boot and explore again\n\nNightly 42 failed boot and Explorer; pass cook, boot, hover, draw and explorer.', files: ['src/scripts/nightly-heads.ts']};
+  const keys = ['chromium/nine@ab12/boot', 'webkit/nine@ab12/hover', 'chromium/nine@ab12/explorer', 'runner/heads'];
+  assert.deepEqual(uncoveredFailures(keys, [fix]), []);
+  assert.deepEqual(uncoveredFailures([...keys, 'webkit/nine@ab12/sound', 'runner/budgets', 'test/door.test.ts'], [fix]), ['webkit/nine@ab12/sound', 'runner/budgets', 'test/door.test.ts']);
+  assert.deepEqual(uncoveredFailures(['test/door.test.ts'], [{...fix, files: ['test/door.test.ts']}]), []);
+  assert.deepEqual(uncoveredFailures(['chromium/nine@ab12/boot'], [{...fix, message: 'reboots the bootstrap', files: []}]), ['chromium/nine@ab12/boot']);
+});
 
 await test('a runner-fault nightly lets the tag through; a real red still holds it', () => {
   assert.deepEqual(requireNoNewFailures(faulted, latest), faulted.newFailures);
@@ -154,6 +163,22 @@ else if(args.slice(0,2).join(' ')==='run download'&&['42','43'].includes(args[2]
     const aged = execute(report, false, [aging]);
     assert.notEqual(aged.status, 0); assert.match(aged.stderr, /started 27\.0 h ago, over 26\.0 h; release held\. Dispatch one on main: gh workflow run nightly/u);
     assert.doesNotMatch(aged.stderr, /LOCAL_GATE_REACHED/u);
+    // ALLOW_NIGHTLY_FAILURES=<fix> (J381) passes only when the fix names every new failure; one it does not name holds.
+    const fix = git('commit-tree', `${head}^{tree}`, '-p', head, '-m', 'fix(nightly): heads boot again', '-m', 'Nightly 42 failed every boot.');
+    const failing = {...report, failures: [{key: planted}], newFailures: [planted]};
+    const covered = execute(failing, false, [diagnostic, latest], {ALLOW_NIGHTLY_FAILURES: fix.slice(0, 10)});
+    assert.equal(covered.status, 37, covered.stderr); assert.match(covered.stdout, /ALLOW_NIGHTLY_FAILURES=\S+ \(J381\): all 1 new failures named/u);
+    const cook = 'chromium/other@hash/cook';
+    const uncovered = execute({...failing, failures: [{key: planted}, {key: cook}], newFailures: [planted, cook]}, false, [diagnostic, latest], {ALLOW_NIGHTLY_FAILURES: fix});
+    assert.notEqual(uncovered.status, 0); assert.match(uncovered.stderr, /names no fix for 1 of 2 new failures; release held: chromium\/other@hash\/cook/u);
+    assert.doesNotMatch(uncovered.stderr, /LOCAL_GATE_REACHED/u);
+    const unnamed = git('commit-tree', `${head}^{tree}`, '-p', head, '-m', 'fix(nightly): boot again');
+    const silent = execute(failing, false, [diagnostic, latest], {ALLOW_NIGHTLY_FAILURES: unnamed});
+    assert.notEqual(silent.status, 0); assert.match(silent.stderr, /does not name nightly 42/u);
+    const bare = execute(failing, false, [diagnostic, latest], {ALLOW_NIGHTLY_FAILURES: '1'});
+    assert.notEqual(bare.status, 0); assert.match(bare.stderr, /takes fixing commit SHAs/u);
+    const mismatched = execute({...failing, run: '41'}, false, [diagnostic, latest], {ALLOW_NIGHTLY_FAILURES: fix});
+    assert.notEqual(mismatched.status, 0); assert.match(mismatched.stderr, /mismatched/u);
     const hatch = execute(report, false, [aging], {ALLOW_STALE_NIGHTLY: '1'});
     assert.equal(hatch.status, 37, hatch.stderr); assert.match(hatch.stdout, /ALLOW_STALE_NIGHTLY=1 \(J381\)/u);
     assert.deepEqual(readdirSync(join(root, 'tmp/release-nightly')), []);

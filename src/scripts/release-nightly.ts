@@ -75,6 +75,68 @@ export function requireFresh(latest: Pick<NightlyRun, 'id' | 'created_at'>, now:
     throw new Error(`TC22: newest release nightly ${latest.id} started ${hours(now - at)} h ago, over ${hours(STALE_MS)} h; release held. Dispatch one on main: ${DISPATCH}`);
 }
 
+// v0.1.96 and v0.1.97 tags (opus-rel86, opus-rel97): a red nightly whose new failures a later main commit fixes held the
+// tag, and the only way past was --no-verify, which also skipped the changelog, AGENTS.md, format and pin checks.
+// ALLOW_NIGHTLY_FAILURES=<sha>[,<sha>] (J381) names the fixing commits. Each must be on origin/main, descend from the
+// nightly's head and name the nightly's run id in its message. The tag passes only when every new failure is named by a
+// fix's message or a path it touches: a head phase by its phase word (boot, hover, draw, explorer, cook), a runner job by
+// its job word, anything else by its whole key. One failure outside that set still holds the tag, so the hatch cannot
+// wave a new red through. A missing, mismatched or malformed verdict still holds.
+export interface FixCommit {sha: string; message: string; files: string[]}
+
+/** The new failures no fixing commit names. */
+export function uncoveredFailures(keys: readonly string[], fixes: readonly FixCommit[]): string[] {
+  const text = fixes.map(fix => `${fix.message}\n${fix.files.join('\n')}`).join('\n').toLowerCase();
+  const named = (word: string) =>
+    new RegExp(`(^|[^a-z0-9])${word.toLowerCase().replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}($|[^a-z0-9])`, 'u').test(text);
+  return keys.filter(key => {
+    if (named(key)) return false;
+    const head = /^(?:chromium|webkit)\/[^/]+@[^/]+\/([a-z]+)$/u.exec(key);
+    if (head?.[1] !== undefined) return !named(head[1]);
+    const runner = /^runner\/([a-z0-9-]+)$/u.exec(key);
+    if (runner?.[1] !== undefined) return !named(runner[1]);
+    return true;
+  });
+}
+
+/** A fixing commit, refused unless it is on origin/main, descends from the nightly's head and names the nightly's run. */
+export function readFix(ref: string, latest: Pick<NightlyRun, 'id' | 'head_sha'>, git: Git): FixCommit {
+  if (!/^[0-9a-f]{7,40}$/u.test(ref)) throw new Error(`TC22: ALLOW_NIGHTLY_FAILURES takes fixing commit SHAs, not ${JSON.stringify(ref)}; release held`);
+  try {git('cat-file', '-e', `${ref}^{commit}`);} catch {
+    try {git('fetch', '--quiet', 'origin', ref);} catch {/* judged below */}
+  }
+  let sha: string;
+  try {sha = git('rev-parse', '--verify', `${ref}^{commit}`).trim();} catch {
+    throw new Error(`TC22: fixing commit ${ref} is not in this clone; release held`);
+  }
+  try {git('merge-base', '--is-ancestor', latest.head_sha, sha);} catch {
+    throw new Error(`TC22: fixing commit ${ref} does not descend from nightly ${latest.id}'s head ${latest.head_sha.slice(0, 10)}; release held`);
+  }
+  let main = '';
+  try {main = git('rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main').trim();} catch {/* no origin/main: a fixture */}
+  if (main !== '') {
+    try {git('merge-base', '--is-ancestor', sha, main);} catch {throw new Error(`TC22: fixing commit ${ref} is not on origin/main; release held`);}
+  }
+  const message = git('log', '-1', '--format=%B', sha);
+  if (!new RegExp(`(^|\\D)${latest.id}(\\D|$)`, 'u').test(message))
+    throw new Error(`TC22: fixing commit ${ref} does not name nightly ${latest.id}; release held`);
+  return {sha, message, files: git('diff-tree', '--no-commit-id', '--name-only', '-r', sha).split('\n').filter(Boolean)};
+}
+
+export function allowFailures(judge: () => string[], keys: () => readonly string[], latest: Pick<NightlyRun, 'id' | 'head_sha'>,
+  git: Git, env: NodeJS.ProcessEnv = process.env): string[] {
+  try {return judge();} catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const refs = (env.ALLOW_NIGHTLY_FAILURES ?? '').split(',').map(ref => ref.trim()).filter(Boolean);
+    if (refs.length === 0 || !message.startsWith('TC22: new nightly failures')) throw error;
+    const fixes = refs.map(ref => readFix(ref, latest, git)), failing = keys(), left = uncoveredFailures(failing, fixes);
+    if (left.length > 0)
+      throw new Error(`TC22: ALLOW_NIGHTLY_FAILURES=${refs.join(',')} names no fix for ${left.length} of ${failing.length} new failures; release held: ${left.slice(0, 20).join(', ')}`);
+    console.log(`TC22: ALLOW_NIGHTLY_FAILURES=${refs.join(',')} (J381): all ${failing.length} new failures named by ${fixes.map(fix => fix.sha.slice(0, 10)).join(', ')}; letting through`);
+    return [];
+  }
+}
+
 export type Git = (...args: string[]) => string;
 
 /** Commits the tag carries past the nightly's head, or an error when the nightly is off the tag's line. */
@@ -121,7 +183,9 @@ export function checkReleaseNightly(tag = 'HEAD', now = Date.now()): void {
   try {
     execFileSync('gh', ['run', 'download', String(latest.id), '--repo', 'project-wildshard/engine',
       '--name', 'nightly-verdict', '--dir', folder], {encoding: 'utf8', timeout: 20000, maxBuffer: 1024 * 1024});
-    const faults = requireNoNewFailures(JSON.parse(readFileSync(join(folder, 'verdict.json'), 'utf8')), latest);
+    const value: unknown = JSON.parse(readFileSync(join(folder, 'verdict.json'), 'utf8'));
+    const git: Git = (...args) => execFileSync('git', args, {encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000});
+    const faults = allowFailures(() => requireNoNewFailures(value, latest), () => (value as Report).newFailures, latest, git);
     if (faults.length > 0) logRunnerFault(latest.id, faults);
     else console.log(`TC22: nightly ${latest.id} has no new failures; J167 any-red qualification still requires the manual check`);
   } finally {rmSync(folder, {recursive: true, force: true});}

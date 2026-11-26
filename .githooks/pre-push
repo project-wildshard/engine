@@ -12,6 +12,7 @@
 #    Bypass: SKIP_CHECK=1.
 # Release tags first read the latest qualifying production nightly (TC22), even when
 # the branch-based release helper or a cached gate skips release-check.
+# Bypasses (J381, each named in the receipt): ALLOW_STALE_NIGHTLY=1, ALLOW_NIGHTLY_FAILURES=<fixing sha> (only failures that commit names).
 # Enable once per clone: git config core.hooksPath .githooks
 set -euo pipefail
 top="$(git rev-parse --show-toplevel)"
